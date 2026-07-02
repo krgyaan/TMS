@@ -1,226 +1,79 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useState, useCallback } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { useTqById, useTqItems } from '@/hooks/api/useTqManagement';
-import { useTender } from '@/hooks/api/useTenders';
-import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
-import { useInfoSheet } from '@/hooks/api/useInfoSheets';
-import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
-import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
-import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
-import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
-import { useBidSubmissionByTender } from '@/hooks/api/useBidSubmissions';
-import { useTqTypes } from '@/hooks/api/useTqTypes';
 import { paths } from '@/app/routes/paths';
-import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
-import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
-import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
-import { TenderApprovalView } from '@/modules/tendering/tender-approval/components/TenderApprovalView';
-import { PhysicalDocsView } from '@/modules/tendering/physical-docs/components/PhysicalDocsView';
-import { EmdTenderFeeShow } from '@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow';
-import { DocumentChecklistView } from '@/modules/tendering/checklists/components/DocumentChecklistView';
-import { CostingSheetView } from '@/modules/tendering/costing-sheets/components/CostingSheetView';
-import { BidSubmissionView } from '@/modules/tendering/bid-submissions/components/BidSubmissionView';
-import { TqView } from './components/TqView';
+import { TenderDetailsSection } from '@/modules/tendering/tenders/components/TenderView';
+import { PhysicalDocsSection } from '@/modules/tendering/physical-docs/components/PhysicalDocsView';
+import { EmdTenderFeeSection } from '@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow';
+import { DocumentChecklistSection } from '@/modules/tendering/checklists/components/DocumentChecklistView';
+import { CostingSheetSection } from '@/modules/tendering/costing-sheets/components/CostingSheetView';
+import { BidSubmissionSection } from '@/modules/tendering/bid-submissions/components/BidSubmissionView';
+import { TqTenderSection } from './components/TqView';
+import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
+import { RfqSection } from '../rfqs/components/RfqView';
+import { RaSection } from '../ras/components/RaShow';
+import { TenderResultSection } from '../results/components/TenderResultView';
 
 export default function TqViewPage() {
-    const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
+    const { tenderId } = useParams();
 
-    if (!id) {
-        return <div>Invalid TQ ID</div>;
-    }
-
-    const tqId = Number(id);
-    const { data: tqData, isLoading: tqLoading, error: tqError } = useTqById(tqId);
-    const tenderId = tqData?.tenderId;
-
-    // Fetch all related tender data
-    const { data: tender, isLoading: tenderLoading } = useTender(tenderId!);
-    const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId!);
-    const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId!);
-    const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId!);
-    const { data: paymentRequests, isLoading: requestsLoading } = usePaymentRequestsByTender(tenderId!);
-    const { data: documentChecklist, isLoading: documentChecklistLoading } = useDocumentChecklistByTender(tenderId!);
-    const { data: costingSheet, isLoading: costingSheetLoading } = useCostingSheetByTender(tenderId!);
-    const { data: bidSubmission, isLoading: bidSubmissionLoading } = useBidSubmissionByTender(tenderId!);
-    const { data: tqItems, isLoading: itemsLoading } = useTqItems(tqId);
-    const { data: tqTypes } = useTqTypes();
-
-    const isLoading = tqLoading || tenderLoading || approvalLoading || infoSheetLoading || physicalDocLoading || requestsLoading || documentChecklistLoading || costingSheetLoading || bidSubmissionLoading || itemsLoading;
-
-    if (tqError) {
+    if (!tenderId) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                    Failed to load TQ details. Please try again later.
-                </AlertDescription>
+                <AlertDescription>Invalid TQ ID {tenderId}</AlertDescription>
             </Alert>
         );
     }
 
-    if (tqLoading) {
-        return <Skeleton className="h-[800px]" />;
-    }
+    const navigate = useNavigate();
+    const parsedTenderId = tenderId ? parseInt(tenderId, 10) : null;
 
-    if (!tqData) {
-        return <div>TQ not found</div>;
-    }
+    const { steps: tenderSteps } = useTenderStepStatuses(parsedTenderId);
 
-    // Combine tender and approval into TenderWithRelations
-    const tenderWithRelations: TenderWithRelations | null = tender
-        ? {
-              ...tender,
-              approval: approval || null,
-          }
-        : null;
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["tq-management"]));
+
+    const toggleSection = useCallback((id: string) => {
+        setExpandedSections((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
+
+    const expandAll = useCallback(() => setExpandedSections(new Set(tenderSteps.map((s) => s.id))), [tenderSteps]);
+    const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
+
+    const renderSectionContent = (stepId: string) => {
+        if (!parsedTenderId) return null;
+        switch (stepId) {
+            case "tender-details": return <TenderDetailsSection tenderId={parsedTenderId} />;
+            case "physical-docs": return <PhysicalDocsSection tenderId={parsedTenderId} />;
+            case "emd-fees": return <EmdTenderFeeSection tenderId={parsedTenderId} />;
+            case "rfq": return <RfqSection tenderId={parsedTenderId} />;
+            case "checklist": return <DocumentChecklistSection tenderId={parsedTenderId} />;
+            case "costing": return <CostingSheetSection tenderId={parsedTenderId} />;
+            case "bid": return <BidSubmissionSection tenderId={parsedTenderId} />;
+            case "tq-management": return <TqTenderSection tenderId={parsedTenderId} />;
+            case "ra-management": return <RaSection tenderId={parsedTenderId} />;
+            case "result": return <TenderResultSection tenderId={parsedTenderId} />;
+            default: return null;
+        }
+    };
 
     return (
-        <div className="space-y-6">
-            <Tabs defaultValue="tq-management" className="space-y-4">
-                <TabsList className="grid w-fit grid-cols-9 gap-2">
-                    <TabsTrigger value="tender">Tender</TabsTrigger>
-                    <TabsTrigger value="info-sheet">Info Sheet</TabsTrigger>
-                    <TabsTrigger value="approval">Tender Approval</TabsTrigger>
-                    <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
-                    <TabsTrigger value="emds-tenderfees">EMD & Tender Fees</TabsTrigger>
-                    <TabsTrigger value="document-checklist">Document Checklist</TabsTrigger>
-                    <TabsTrigger value="costing-details">Costing Details</TabsTrigger>
-                    <TabsTrigger value="bid-submission">Bid Submission</TabsTrigger>
-                    <TabsTrigger value="tq-management">TQ Management</TabsTrigger>
-                </TabsList>
-
-                {/* Tender */}
-                <TabsContent value="tender">
-                    {tenderWithRelations ? (
-                        <TenderView
-                            tender={tenderWithRelations}
-                            isLoading={isLoading}
-                            showEditButton={false}
-                            showBackButton={false}
-                        />
-                    ) : (
-                        <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>Tender information not available.</AlertDescription>
-                        </Alert>
-                    )}
-                </TabsContent>
-
-                {/* Info Sheet */}
-                <TabsContent value="info-sheet">
-                    {infoSheetLoading ? (
-                        <InfoSheetView isLoading />
-                    ) : infoSheet ? (
-                        <InfoSheetView infoSheet={infoSheet} />
-                    ) : (
-                        <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>No info sheet exists for this tender yet.</AlertDescription>
-                        </Alert>
-                    )}
-                </TabsContent>
-
-                {/* Tender Approval */}
-                <TabsContent value="approval">
-                    {tenderWithRelations ? (
-                        <TenderApprovalView
-                            tender={tenderWithRelations}
-                            isLoading={isLoading}
-                            showEditButton={false}
-                            showBackButton={false}
-                        />
-                    ) : (
-                        <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>Tender approval information not available.</AlertDescription>
-                        </Alert>
-                    )}
-                </TabsContent>
-
-                {/* Physical Docs */}
-                <TabsContent value="physical-docs">
-                    {physicalDocLoading ? (
-                        <PhysicalDocsView isLoading={true} physicalDoc={null} />
-                    ) : physicalDoc ? (
-                        <PhysicalDocsView physicalDoc={physicalDoc} />
-                    ) : (
-                        <PhysicalDocsView isLoading={false} physicalDoc={null} />
-                    )}
-                </TabsContent>
-
-                {/* EMD & Tender Fees */}
-                <TabsContent value="emds-tenderfees">
-                    <EmdTenderFeeShow
-                        paymentRequests={paymentRequests || null}
-                        tender={tender || null}
-                        isLoading={isLoading}
-                    />
-                </TabsContent>
-
-                {/* Document Checklist */}
-                <TabsContent value="document-checklist">
-                    <DocumentChecklistView
-                        checklist={documentChecklist}
-                        isLoading={documentChecklistLoading}
-                        showEditButton={false}
-                        showBackButton={false}
-                    />
-                </TabsContent>
-
-                {/* Costing Details */}
-                <TabsContent value="costing-details">
-                    <CostingSheetView
-                        costingSheet={costingSheet}
-                        isLoading={isLoading}
-                        showEditButton={false}
-                        showBackButton={false}
-                    />
-                </TabsContent>
-
-                {/* Bid Submission */}
-                <TabsContent value="bid-submission">
-                    {bidSubmissionLoading ? (
-                        <BidSubmissionView bidSubmission={null} isLoading />
-                    ) : bidSubmission ? (
-                        <BidSubmissionView
-                            bidSubmission={bidSubmission}
-                            showEditButton={false}
-                            showBackButton={false}
-                        />
-                    ) : (
-                        <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>No bid submission exists for this tender yet.</AlertDescription>
-                        </Alert>
-                    )}
-                </TabsContent>
-
-                {/* TQ Management */}
-                <TabsContent value="tq-management">
-                    <TqView
-                        tqData={tqData}
-                        tqItems={tqItems || null}
-                        tqTypes={tqTypes || null}
-                        isLoading={tqLoading || itemsLoading}
-                        showEditButton={true}
-                        showBackButton={true}
-                        onEdit={() => {
-                            if (tqData.status === 'TQ received') {
-                                navigate(paths.tendering.tqEditReceived(tqId));
-                            } else if (tqData.status === 'TQ replied') {
-                                navigate(paths.tendering.tqEditReplied(tqId));
-                            } else if (tqData.status === 'Disqualified, TQ missed') {
-                                navigate(paths.tendering.tqEditMissed(tqId));
-                            }
-                        }}
-                        onBack={() => navigate(paths.tendering.tqManagement)}
-                    />
-                </TabsContent>
-            </Tabs>
-        </div>
+        <ShowPageLayout
+            steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "emd-fees", "rfq", "checklist", "costing", "bid", "tq-management", "ra-management", "result"].includes(s.id))}
+            expandedSections={expandedSections}
+            onToggleSection={toggleSection}
+            onExpandAll={expandAll}
+            onCollapseAll={collapseAll}
+            onBack={() => navigate(paths.tendering.tqManagement)}
+            backLabel="Back to TQ Management"
+            renderSectionContent={renderSectionContent}
+        />
     );
 }

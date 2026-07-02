@@ -7,18 +7,14 @@ import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Save, Plus, X, ArrowLeft } from 'lucide-react';
 import { useScheduleRa } from '@/hooks/api/useReverseAuctions';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
+import { SelectField } from '@/components/form/SelectField';
+import DateTimeInput from '@/components/form/DateTimeInput';
 
 const ScheduleRaSchema = z.object({
     technicallyQualified: z.enum(['Yes', 'No']),
@@ -56,7 +52,7 @@ const ScheduleRaSchema = z.object({
 type FormValues = z.infer<typeof ScheduleRaSchema>;
 
 interface RaScheduleFormPageProps {
-    raId: number;
+    tenderId: number;
     tenderDetails: {
         tenderNo: string;
         tenderName: string;
@@ -65,7 +61,7 @@ interface RaScheduleFormPageProps {
 }
 
 export default function RaScheduleFormPage({
-    raId,
+    tenderId,
     tenderDetails,
     onSuccess,
 }: RaScheduleFormPageProps) {
@@ -110,23 +106,28 @@ export default function RaScheduleFormPage({
         form.setValue('qualifiedPartiesNames', current.filter((_, i) => i !== index));
     };
 
+    // Helper function to normalize empty strings to undefined for optional fields
+    const normalizeOptionalString = (value: string | undefined): string | undefined => {
+        return value && value.trim() ? value.trim() : undefined;
+    };
+
     const onSubmit = async (data: FormValues) => {
         try {
             await scheduleRaMutation.mutateAsync({
-                id: raId,
+                tenderId,
                 data: {
                     technicallyQualified: data.technicallyQualified,
-                    disqualificationReason: data.disqualificationReason,
-                    qualifiedPartiesCount: data.qualifiedPartiesCount,
-                    qualifiedPartiesNames: data.qualifiedPartiesNames,
-                    raStartTime: data.raStartTime,
-                    raEndTime: data.raEndTime,
+                    disqualificationReason: normalizeOptionalString(data.disqualificationReason),
+                    qualifiedPartiesCount: normalizeOptionalString(data.qualifiedPartiesCount),
+                    qualifiedPartiesNames: data.qualifiedPartiesNames && data.qualifiedPartiesNames.length > 0 ? data.qualifiedPartiesNames : undefined,
+                    raStartTime: normalizeOptionalString(data.raStartTime),
+                    raEndTime: normalizeOptionalString(data.raEndTime),
                 },
             });
             if (onSuccess) {
                 onSuccess();
             } else {
-                navigate(`/tendering/ras/${raId}`);
+                navigate(paths.tendering.ras);
             }
         } catch (error) {
             console.error('Error scheduling RA:', error);
@@ -141,7 +142,7 @@ export default function RaScheduleFormPage({
                     {tenderDetails.tenderNo} - {tenderDetails.tenderName}
                 </CardDescription>
                 <CardAction>
-                    <Button variant="outline" onClick={() => navigate(`/tendering/ras/${raId}`)}>
+                    <Button variant="outline" onClick={() => navigate(paths.tendering.ras)}>
                         <ArrowLeft className="mr-2 h-4 w-4" />
                         Back
                     </Button>
@@ -150,49 +151,38 @@ export default function RaScheduleFormPage({
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                        {/* Technical Qualification */}
-                        <FieldWrapper
-                            control={form.control}
-                            name="technicallyQualified"
-                            label="Technically Qualified"
-                        >
-                            {(field) => (
-                                <Select
-                                    value={field.value}
-                                    onValueChange={field.onChange}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select qualification status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Yes">Yes</SelectItem>
-                                        <SelectItem value="No">No</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            )}
-                        </FieldWrapper>
-
-                        {/* Disqualification Reason (if No) */}
-                        {technicallyQualified === 'No' && (
-                            <FieldWrapper
+                        <div className="grid gap-4 md:grid-cols-3 items-start">
+                            {/* Technical Qualification */}
+                            <SelectField
                                 control={form.control}
-                                name="disqualificationReason"
-                                label="Reason for Disqualification"
-                            >
-                                {(field) => (
-                                    <Textarea
-                                        {...field}
-                                        placeholder="Enter reason for disqualification"
-                                        rows={3}
-                                    />
-                                )}
-                            </FieldWrapper>
-                        )}
+                                name="technicallyQualified"
+                                label="Technically Qualified"
+                                options={[
+                                    { value: 'Yes', label: 'Yes' },
+                                    { value: 'No', label: 'No' },
+                                ]}
+                                placeholder="Select qualification status"
+                            />
+                            {/* Disqualification Reason (if No) */}
+                            {technicallyQualified === 'No' && (
+                                <FieldWrapper
+                                    control={form.control}
+                                    name="disqualificationReason"
+                                    label="Reason for Disqualification"
+                                >
+                                    {(field) => (
+                                        <Textarea
+                                            {...field}
+                                            placeholder="Enter reason for disqualification"
+                                            rows={3}
+                                        />
+                                    )}
+                                </FieldWrapper>
+                            )}
 
-                        {/* Qualified Details (if Yes) */}
-                        {technicallyQualified === 'Yes' && (
-                            <>
-                                <div className="grid gap-4 md:grid-cols-2">
+                            {/* Qualified Details (if Yes) */}
+                            {technicallyQualified === 'Yes' && (
+                                <>
                                     <FieldWrapper
                                         control={form.control}
                                         name="qualifiedPartiesCount"
@@ -206,58 +196,59 @@ export default function RaScheduleFormPage({
                                             />
                                         )}
                                     </FieldWrapper>
-                                </div>
 
-                                {/* Qualified Parties Names */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">
-                                        Name of Qualified Parties
-                                    </label>
-                                    <div className="flex gap-2">
-                                        <Input
-                                            value={newPartyName}
-                                            onChange={(e) => setNewPartyName(e.target.value)}
-                                            placeholder="Enter party name"
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    e.preventDefault();
-                                                    addPartyName();
-                                                }
-                                            }}
-                                        />
-                                        <Button type="button" onClick={addPartyName} size="icon">
-                                            <Plus className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                    {qualifiedPartiesNames.length > 0 && (
-                                        <div className="flex flex-wrap gap-2 mt-2">
-                                            {qualifiedPartiesNames.map((name, index) => (
-                                                <Badge key={index} variant="secondary" className="gap-1">
-                                                    {name}
-                                                    <X
-                                                        className="h-3 w-3 cursor-pointer"
-                                                        onClick={() => removePartyName(index)}
+                                    {/* Qualified Parties Names */}
+                                    <div className="flex flex-col gap-2">
+                                        <div className="flex gap-2 items-center">
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name="qualifiedPartiesNames"
+                                                label="Name of Qualified Parties"
+                                                description="Add party names or enter 'not known' if unknown"
+                                            >
+                                                {(_field) => (
+                                                    <Input
+                                                        value={newPartyName}
+                                                        onChange={(e) => setNewPartyName(e.target.value)}
+                                                        placeholder="Enter party name"
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault();
+                                                                addPartyName();
+                                                            }
+                                                        }}
                                                     />
-                                                </Badge>
-                                            ))}
+                                                )}
+                                            </FieldWrapper>
+                                            <Button type="button" onClick={addPartyName} size="icon">
+                                                <Plus className="h-4 w-4" />
+                                            </Button>
                                         </div>
-                                    )}
-                                    <p className="text-xs text-muted-foreground">
-                                        Add party names or enter "not known" if unknown
-                                    </p>
-                                </div>
+                                        {qualifiedPartiesNames.length > 0 && (
+                                            <div className="flex flex-wrap gap-2 mt-2">
+                                                {qualifiedPartiesNames.map((name, index) => (
+                                                    <Badge key={index} variant="secondary" className="gap-1">
+                                                        {name}
+                                                        <X
+                                                            className="h-3 w-3 cursor-pointer"
+                                                            onClick={() => removePartyName(index)}
+                                                        />
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
 
-                                {/* RA Schedule Times */}
-                                <div className="grid gap-4 md:grid-cols-2">
+                                    {/* RA Schedule Times */}
                                     <FieldWrapper
                                         control={form.control}
                                         name="raStartTime"
                                         label="RA Start Time"
                                     >
                                         {(field) => (
-                                            <Input
+                                            <DateTimeInput
                                                 {...field}
-                                                type="datetime-local"
+                                                placeholder="Select start time"
                                             />
                                         )}
                                     </FieldWrapper>
@@ -267,21 +258,21 @@ export default function RaScheduleFormPage({
                                         label="RA End Time"
                                     >
                                         {(field) => (
-                                            <Input
+                                            <DateTimeInput
                                                 {...field}
-                                                type="datetime-local"
+                                                placeholder="Select end time"
                                             />
                                         )}
                                     </FieldWrapper>
-                                </div>
-                            </>
-                        )}
+                                </>
+                            )}
+                        </div>
 
                         <div className="flex justify-end gap-2 pt-4">
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => navigate(`/tendering/ras/${raId}`)}
+                                onClick={() => navigate(paths.tendering.ras)}
                                 disabled={isSubmitting}
                             >
                                 Cancel

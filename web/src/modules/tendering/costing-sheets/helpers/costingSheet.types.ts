@@ -84,22 +84,26 @@ export interface CostingSheetDashboardRowWithTimer extends CostingSheetDashboard
 }
 export type SubmitCostingSheetDto = {
     tenderId: number;
-    submittedFinalPrice: string;
-    submittedReceiptPrice: string;
-    submittedBudgetPrice: string;
-    submittedGrossMargin: string;
-    teRemarks: string;
+    details: {
+        submittedFinalPrice: string;
+        submittedReceiptPrice: string;
+        submittedBudgetPrice: string;
+        submittedGrossMargin: string;
+        teRemarks: string;
+    }[];
 };
 
 export type UpdateCostingSheetDto = {
-    submittedFinalPrice: string;
-    submittedReceiptPrice: string;
-    submittedBudgetPrice: string;
-    submittedGrossMargin: string;
-    teRemarks: string;
+    details: {
+        submittedFinalPrice: string;
+        submittedReceiptPrice: string;
+        submittedBudgetPrice: string;
+        submittedGrossMargin: string;
+        teRemarks: string;
+    }[];
 };
 
-export type TabKey = 'pending' | 'submitted' | 'tender-dnb';
+export type CostingSheetTab = 'pending' | 'submitted' | 'tender-dnb';
 
 export interface CostingSheetDashboardCounts {
     pending: number;
@@ -109,7 +113,8 @@ export interface CostingSheetDashboardCounts {
 }
 
 export type CostingSheetListParams = {
-    tab?: TabKey;
+    search?: string;
+    tab?: CostingSheetTab;
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -130,4 +135,58 @@ export type DriveScopesResponse = {
     hasScopes: boolean;
     missingScopes: string[];
     grantedScopes: string[];
+};
+
+// --- Costing Detail types (merged from costingDetail.types) ---
+
+export type TenderCostingDetail = {
+    id: number;
+    tenderCostingSheetId: number;
+    submittedFinalPrice: string | null;
+    submittedReceiptPrice: string | null;
+    submittedBudgetPrice: string | null;
+    submittedGrossMargin: string | null;
+    teRemarks: string | null;
+    submittedBy: number | null;
+    submittedAt: Date | null;
+    finalPrice: string | null;
+    receiptPrice: string | null;
+    budgetPrice: string | null;
+    grossMargin: string | null;
+    tlRemarks: string | null;
+    rejectionReason: string | null;
+    approvedBy: number | null;
+    approvedAt: Date | null;
+    status: CostingSheetStatus;
+    createdAt: Date;
+    updatedAt: Date;
+    tenderId: number;
+    googleSheetUrl: string | null;
+    sheetTitle: string | null;
+    oemVendorIds: number[] | null;
+};
+
+export type CreateCostingDetailDto = {
+    tenderId: number;
+    submittedFinalPrice: string;
+    submittedReceiptPrice: string;
+    submittedBudgetPrice: string;
+    submittedGrossMargin: string;
+    teRemarks: string;
+};
+
+export type UpdateCostingDetailDto = {
+    submittedFinalPrice?: string;
+    submittedReceiptPrice?: string;
+    submittedBudgetPrice?: string;
+    submittedGrossMargin?: string;
+    teRemarks?: string;
+};
+
+export type CombinedPricing = {
+    totalFinalPrice: string | null;
+    totalReceiptPrice: string | null;
+    totalBudgetPrice: string | null;
+    detailsCount: number;
+    approvedCount: number;
 };

@@ -1,11 +1,5 @@
 import { BaseApiService } from './base.service';
-import type {
-    CreateTenderRequest,
-    TenderInfo,
-    TenderInfoWithNames,
-    UpdateTenderRequest,
-    TenderListParams,
-} from '@/modules/tendering/tenders/helpers/tenderInfo.types';
+import type { CreateTenderRequest, TenderInfo, TenderInfoWithNames, UpdateTenderRequest, TenderListParams } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import type { PaginatedResult } from '@/types/api.types';
 
 class TenderInfosService extends BaseApiService {
@@ -41,6 +35,12 @@ class TenderInfosService extends BaseApiService {
             if (params.limit) {
                 search.set('limit', String(params.limit));
             }
+            if (params.sortBy) {
+                search.set('sortBy', params.sortBy);
+            }
+            if (params.sortOrder) {
+                search.set('sortOrder', params.sortOrder);
+            }
         }
 
         const queryString = search.toString();
@@ -49,6 +49,10 @@ class TenderInfosService extends BaseApiService {
 
     async getById(id: number): Promise<TenderInfoWithNames> {
         return this.get<TenderInfoWithNames>(`/${id}`);
+    }
+
+    async getPaymentDetails(id: number): Promise<any> {
+        return this.get<any>(`/${id}/payment-details`);
     }
 
     async create(data: CreateTenderRequest): Promise<TenderInfo> {
@@ -67,8 +71,17 @@ class TenderInfosService extends BaseApiService {
         return this.post<{ tenderName: string }>('/generate-name', params);
     }
 
-    async getDashboardCounts(): Promise<any> {
-        return this.get<any>('/dashboard/counts');
+    async getDashboardCounts(teamId?: number): Promise<any> {
+        const search = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            search.set('teamId', String(teamId));
+        }
+        const queryString = search.toString();
+        return this.get<any>(queryString ? `/dashboard/counts?${queryString}` : '/dashboard/counts');
+    }
+
+    async updateStatus(id: number, data: { status: number; comment: string }): Promise<TenderInfo> {
+        return this.patch<TenderInfo>(`/${id}/status`, data);
     }
 }
 

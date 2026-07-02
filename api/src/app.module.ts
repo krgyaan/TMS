@@ -45,13 +45,14 @@ import { TenderApprovalModule } from "@/modules/tendering/tender-approval/tender
 import { EmployeeImprestModule } from "@/modules/employee-imprest/employee-imprest.module";
 import { PhysicalDocsModule } from "@/modules/tendering/physical-docs/physical-docs.module";
 import { RfqsModule } from "@/modules/tendering/rfqs/rfq.module";
+import { RfqResponseModule } from "@/modules/tendering/rfq-response/rfq-response.module";
 import { CourierModule } from "@/modules/courier/courier.module";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { join } from "path";
 import { existsSync } from "fs";
 import { MailerModule } from "@/mailer/mailer.module";
 import { FollowUpModule } from "@/modules/follow-up/follow-up.module";
-import { EmdsModule } from "@/modules/tendering/emds/emds.module";
+import { PaymentRequestsModule } from "@/modules/tendering/payment-requests/payment-requests.module";
 import { DocumentChecklistsModule } from "@/modules/tendering/checklists/document-checklists.module";
 import { CostingSheetsModule } from "@/modules/tendering/costing-sheets/costing-sheets.module";
 import { CostingApprovalsModule } from "@/modules/tendering/costing-approvals/costing-approvals.module";
@@ -64,16 +65,56 @@ import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module
 import { TenderFilesModule } from "@/modules/tendering/tender-files/tender-files.module";
 import { EmailModule } from "@/modules/email/email.module";
 import { EmdResponsibilitiesModule } from "@/modules/master/emd-responsibilities/emd-responsibilities.module";
+import { FinancialYearModule } from "@/modules/master/financial-year/financial-year.module";
+import { FinanceDocTypeModule } from "@/modules/master/finance-doc-type/finance-doc-type.module";
 import { TenderExecutivePerformanceModule } from "./modules/performance/tender-executive-performance/tender-executive-performance.module";
 import { TeamLeaderPerformanceModule } from "./modules/performance/team-leader-performance/team-leader-performance.module";
-import { OemDashboardModule } from "./modules/performance/oem-performance/oem-performance.module";
+import { OemPerformanceModule } from "./modules/performance/oem-performance/oem-performance.module";
 import { PayOnPortalModule } from "@/modules/bi-dashboard/pay-on-portal/pay-on-portal.module";
 import { BankGuaranteeModule } from "@/modules/bi-dashboard/bank-guarantee/bank-guarantee.module";
 import { DemandDraftModule } from "@/modules/bi-dashboard/demand-draft/demand-draft.module";
 import { FdrModule } from "@/modules/bi-dashboard/fdr/fdr.module";
 import { BankTransferModule } from "@/modules/bi-dashboard/bank-transfer/bank-transfer.module";
 import { ChequeModule } from "@/modules/bi-dashboard/cheque/cheque.module";
+import { TenderFeeModule } from "@/modules/bi-dashboard/tender-fee/tender-fee.module";
 import { TimersModule } from "@/modules/timers/timers.module";
+import { BusinessPerformanceModule } from "./modules/performance/business-performance/business-performance.module";
+import { WoBasicDetailsModule } from "@/modules/operations/wo-basic-details/wo-basic-details.module";
+import { KickOffMeetingModule } from "./modules/operations/kick-off-meeting/kick-off-meeting.module";
+import { ProjectDashboardModule } from "./modules/operations/projects/project-dashboard.module";
+import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
+import { PqrModule } from "@/modules/shared/pqr/pqr.module";
+import { FinanceDocumentsModule } from "@/modules/shared/finance-documents/finance-documents.module";
+import { ProjectsMasterrModule } from "@/modules/shared/projects-master/projects-master.module";
+import { AllExceptionsFilter } from "./logger/all-exception.filter";
+import { LoggerModule } from "@/logger/logger.module";
+import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
+import { ClientDirectoryModule } from "@/modules/shared/client-directory/client-directory.module";
+import { RequestExtensionsModule } from "./modules/tendering/request_extensions/request-extension.module";
+import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-queries.module";
+import { LoanAdvanceModule } from "./modules/accounts/loan-advance/loan-advance.module";
+import { WoDetailsModule } from "./modules/operations/wo-details/wo-details.module";
+import { WoContactsModule } from "./modules/operations/wo-contacts/wo-contacts.module";
+import { WoAmendmentsModule } from "./modules/operations/wo-amendments/wo-amendments.module";
+import { WoDocumentsModule } from "./modules/operations/wo-documents/wo-documents.module";
+import { WoQueriesModule } from "./modules/operations/wo-queries/wo-queries.module";
+import { CustomerPerformanceModule } from "./modules/performance/customer-performance/customer-performance.module";
+import { LocationPerformanceModule } from "./modules/performance/location-performance/location-performance.module";
+import { ContractAgreementModule } from "./modules/operations/contract-agreement/contract-agreement.module";
+import { VendorWorkOrderModule } from "./modules/operations/vendor-work-orders/vendor-work-order.module";
+import { PurchaseInvoiceModule } from "./modules/operations/purchase-invoices/purchase-invoice.module";
+import { PaymentRequestModule } from "./modules/operations/payment-requests/payment-request.module";
+import { MakerRequestModule } from "./modules/operations/maker-requests/maker-request.module";
+import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employee-profiles.module";
+import { AssetsModule } from "@/modules/hrms/assets/assets.module";
+import { AccountChecklistModule } from './modules/accounts/account-checklist/account-checklist.module';
+import { AccountChecklistSchedulerModule } from "./modules/accounts/account-checklist/account-checklist-scheduler.module";
+import { SchedulerModule } from "@/modules/scheduler/scheduler.module";
+import { OnboardingModule } from './modules/hrms/onboarding/onboarding.module';
+import { EmployeeOnboardingModule } from './modules/hrms/employee-onboarding/employee-onboarding.module';
+import { ProfileModule } from './modules/profile/profile.module';
+import { TrainingModule } from './modules/hrms/training/training.module';
+import { CircularsModule } from './modules/master/circulars/circulars.module';
 
 @Module({
     imports: [
@@ -96,6 +137,7 @@ import { TimersModule } from "@/modules/timers/timers.module";
                 ...validateAuthEnv(env),
             }),
         }),
+        LoggerModule,
         DatabaseModule,
         UsersModule,
         RolesModule,
@@ -133,11 +175,12 @@ import { TimersModule } from "@/modules/timers/timers.module";
         TenderInfoSheetsModule,
         TenderApprovalModule,
         PhysicalDocsModule,
+        RfqResponseModule,
         RfqsModule,
         CourierModule,
         MailerModule,
         FollowUpModule,
-        EmdsModule,
+        PaymentRequestsModule,
         DocumentChecklistsModule,
         CostingSheetsModule,
         CostingApprovalsModule,
@@ -149,24 +192,63 @@ import { TimersModule } from "@/modules/timers/timers.module";
         TenderFilesModule,
         EmailModule,
         EmdResponsibilitiesModule,
+        FinancialYearModule,
+        FinanceDocTypeModule,
         TenderExecutivePerformanceModule,
         TeamLeaderPerformanceModule,
-        OemDashboardModule,
+        OemPerformanceModule,
         PayOnPortalModule,
         BankGuaranteeModule,
         DemandDraftModule,
         FdrModule,
         BankTransferModule,
         ChequeModule,
+        TenderFeeModule,
         TimersModule,
+        WoBasicDetailsModule,
+        WoDetailsModule,
+        WoContactsModule,
+        WoAmendmentsModule,
+        WoDocumentsModule,
+        WoQueriesModule,
+        KickOffMeetingModule,
+        ProjectDashboardModule,
+        FollowupSchedulerModule,
+        PqrModule,
+        FinanceDocumentsModule,
+        ProjectsMasterModule,
+        ProjectsMasterrModule,
+        BusinessPerformanceModule,
+        RequestExtensionsModule,
+        SubmitQueriesModule,
+        LoanAdvanceModule,
+        CustomerPerformanceModule,
+        LocationPerformanceModule,
+        ContractAgreementModule,
+        VendorWorkOrderModule,
+        PurchaseInvoiceModule,
+        PaymentRequestModule,
+        MakerRequestModule,
+        EmployeeProfilesModule,
+        AssetsModule,
+        AccountChecklistModule,
+        AccountChecklistSchedulerModule,
+        SchedulerModule,
+        OnboardingModule,
+        EmployeeOnboardingModule,
+        ProfileModule,
+        ClientDirectoryModule,
+        TrainingModule,
+        CircularsModule,
     ],
-    controllers: [AppController],
+    controllers: [AppController,],
     providers: [
         AppService,
         {
             provide: APP_GUARD,
             useClass: JwtAuthGuard,
         },
+        AllExceptionsFilter
     ],
 })
-export class AppModule { }
+export class AppModule {}

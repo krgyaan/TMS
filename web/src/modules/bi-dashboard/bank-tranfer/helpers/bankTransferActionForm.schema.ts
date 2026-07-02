@@ -17,38 +17,27 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     // Accounts Form (BT) 1 - Request to Bank
     bt_req: z.enum(['Accepted', 'Rejected']).optional(),
     reason_req: z.string().optional(),
+    payment_datetime: z.string().optional(),
     utr_no: z.string().optional(),
-    account_name: z.string().optional(),
-    account_no: z.string().optional(),
-    ifsc_code: z.string().optional(),
-    amount: z.coerce.number().optional(),
-    payment_date: z.string().optional(),
-    remarks: z.string().optional(),
+    utr_message: z.string().optional(),
 
     // Initiate Followup
     organisation_name: z.string().optional(),
     contacts: z.array(ContactPersonSchema).optional(),
     followup_start_date: z.string().optional(),
     frequency: z.number().int().min(1).max(6).optional(),
-    stop_reason: z.number().int().min(1).max(4).optional().nullable(),
-    proof_text: z.string().optional().nullable(),
-    stop_remarks: z.string().optional().nullable(),
-    proof_image: z.any().optional(), // File
+    emailBody: z.string().optional(),
 
-    // Returned
-    return_reason: z.string().optional(),
-    return_date: z.string().optional(),
-    return_remarks: z.string().optional(),
-    utr_num: z.string().optional(),
+    // Returned via Bank Transfer
+    transfer_date: z.string().optional(),
+    return_utr: z.string().optional(),
 
-    // Settled
-    settlement_date: z.string().optional(),
-    settlement_amount: z.coerce.number().optional(),
-    settlement_reference_no: z.string().optional(),
+    // Settled with Project Account
+    settle_remarks: z.string().optional(),
 }).refine(
     (data) => {
         // Action 1: status is required
-        if (data.action === 'accounts-form-1') {
+        if (data.action === 'accounts-form') {
             return !!data.bt_req;
         }
         return true;
@@ -59,7 +48,7 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
-        if (data.action === 'accounts-form-1' && data.bt_req === 'Rejected') {
+        if (data.action === 'accounts-form' && data.bt_req === 'Rejected') {
             return !!data.reason_req;
         }
         return true;
@@ -67,6 +56,18 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     {
         message: 'Reason for rejection is required',
         path: ['reason_req'],
+    }
+).refine(
+    (data) => {
+        // Action 1: When Accepted, payment_datetime, utr_no, utr_message are required
+        if (data.action === 'accounts-form' && data.bt_req === 'Accepted') {
+            return !!data.payment_datetime && !!data.utr_no && !!data.utr_message;
+        }
+        return true;
+    },
+    {
+        message: 'Date and time of payment, UTR number, and UTR message are required when accepted',
+        path: ['payment_datetime'],
     }
 ).refine(
     (data) => {
@@ -108,16 +109,48 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
-        // Action 3: return_reason, return_date, utr_num are required
+        // Action 3: transfer_date and return_utr are required
         if (data.action === 'returned') {
-            return !!data.return_reason && !!data.return_date && !!data.utr_num;
+            return !!data.transfer_date && !!data.return_utr;
         }
         return true;
     },
     {
-        message: 'Return reason, return date, and UTR number are required',
-        path: ['return_reason'],
+        message: 'Transfer date and Return UTR are required',
+        path: ['transfer_date'],
+    }
+).refine(
+    (data) => {
+        if (data.action === 'settled') {
+            return !!data.settle_remarks;
+        }
+        return true;
+    },
+    {
+        message: 'Settlement remarks are required',
+        path: ['settle_remarks'],
     }
 );
 
 export type BankTransferActionFormValues = z.infer<typeof BankTransferActionFormSchema>;
+
+export interface BankTransferActionPayload {
+    action: string;
+    bt_req?: 'Accepted' | 'Rejected';
+    reason_req?: string;
+    payment_datetime?: string;
+    utr_no?: string;
+    utr_message?: string;
+    organisation_name?: string;
+    contacts?: Array<{
+        name: string;
+        phone?: string | null;
+        email?: string | null;
+    }>;
+    followup_start_date?: string;
+    frequency?: number;
+    transfer_date?: string;
+    return_utr?: string;
+    settle_remarks?: string;
+    emailBody?: string;
+}

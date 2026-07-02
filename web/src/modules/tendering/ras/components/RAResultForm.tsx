@@ -23,13 +23,17 @@ import {
 import { Save, IndianRupee } from 'lucide-react';
 import { useUploadRaResult } from '@/hooks/api/useReverseAuctions';
 import { TenderFileUploader } from '@/components/tender-file-upload';
+import { showErrorToast } from '@/utils/errorToast';
 
 const UploadRaResultSchema = z.object({
     raResult: z.enum(['Won', 'Lost', 'H1 Elimination']),
     veL1AtStart: z.enum(['Yes', 'No']),
     raStartPrice: z.string().optional(),
     raClosePrice: z.string().optional(),
+    raClosePriceL2: z.string().optional(),
+    raOurPrice: z.string().optional(),
     raCloseTime: z.string().optional(),
+    resultReason: z.string().optional(),
     screenshotQualifiedParties: z.array(z.string()).default([]),
     screenshotDecrements: z.array(z.string()).default([]),
     finalResultScreenshot: z.array(z.string()).default([]),
@@ -62,7 +66,10 @@ export default function RAResultForm({
             veL1AtStart: 'Yes',
             raStartPrice: '',
             raClosePrice: '',
+            raClosePriceL2: '',
+            raOurPrice: '',
             raCloseTime: '',
+            resultReason: '',
             screenshotQualifiedParties: [],
             screenshotDecrements: [],
             finalResultScreenshot: [],
@@ -83,13 +90,16 @@ export default function RAResultForm({
             const finalResultScreenshotPath = data.finalResultScreenshot.length > 0 ? data.finalResultScreenshot[0] : null;
 
             await uploadResultMutation.mutateAsync({
-                id: raId,
+                raId: raId,
                 data: {
                     raResult: data.raResult,
                     veL1AtStart: data.veL1AtStart,
                     raStartPrice: data.raStartPrice,
                     raClosePrice: data.raClosePrice,
+                    raClosePriceL2: data.raClosePriceL2,
+                    raOurPrice: data.raOurPrice,
                     raCloseTime: data.raCloseTime,
+                    resultReason: data.resultReason,
                     screenshotQualifiedParties: screenshotQualifiedPartiesPath,
                     screenshotDecrements: screenshotDecrementsPath,
                     finalResultScreenshot: finalResultScreenshotPath,
@@ -99,6 +109,7 @@ export default function RAResultForm({
             form.reset();
         } catch (error) {
             console.error('Error uploading RA result:', error);
+            showErrorToast(error);
         }
     };
 

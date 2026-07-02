@@ -1,7 +1,7 @@
-﻿import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
 import { randomBytes } from "node:crypto";
 import { hash, verify } from "argon2";
-import { and, eq, isNull, inArray, asc } from "drizzle-orm";
+import { and, eq, isNull, inArray, asc, sql, or } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { users, type NewUser, type User } from "@db/schemas/auth/users.schema";
@@ -14,6 +14,8 @@ import { permissions } from "@db/schemas/auth/permissions.schema";
 import { designations } from "@db/schemas/master/designations.schema";
 import { teams } from "@db/schemas/master/teams.schema";
 import { RoleName, DataScope, getDataScope, canSwitchTeams } from "@/common/constants/roles.constant";
+import { PermissionService } from "@/modules/auth/services/permission.service";
+import { oauthAccounts } from "@/db/schemas";
 
 export type SafeUser = Pick<User, "id" | "name" | "email" | "username" | "mobile" | "team" | "isActive" | "createdAt" | "updatedAt">;
 
@@ -27,6 +29,8 @@ export type UserProfileSummary = {
     employeeCode?: string | null;
     designationId?: number | null;
     primaryTeamId?: number | null;
+    profilePhoto : string | null;
+    googlePhoto : string | null;
     oldTeamId?: number | null;
     altEmail?: string | null;
     emergencyContactName?: string | null;
@@ -50,7 +54,7 @@ export type UserRoleInfo = {
 };
 
 // UPDATED: Include role in UserWithRelations
-export type UserWithRelations = SafeUser & {
+export type UserWithRelations = Omit<SafeUser, "team"> & {
     profile: UserProfileSummary | null;
     team: { id: number; name: string | null } | null;
     designation: { id: number; name: string | null } | null;
@@ -67,11 +71,15 @@ export type UserAuthInfo = {
     oldTeamId: number | null;
     dataScope: DataScope;
     canSwitchTeams: boolean;
+    permissions: string[];
 };
 
 @Injectable()
 export class UsersService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly permissionService: PermissionService,
+    ) {}
 
     // UPDATED: Include role in base query
     private baseUserQuery() {
@@ -96,11 +104,10 @@ export class UsersService {
                 profileGender: userProfiles.gender,
                 profileEmployeeCode: userProfiles.employeeCode,
                 profileDesignationId: userProfiles.designationId,
-                profilePrimaryTeamId: userProfiles.primaryTeamId,
                 profileAltEmail: userProfiles.altEmail,
                 profileEmergencyContactName: userProfiles.emergencyContactName,
                 profileEmergencyContactPhone: userProfiles.emergencyContactPhone,
-                profileImage: userProfiles.image,
+                profilePhoto: userProfiles.image,
                 profileSignature: userProfiles.signature,
                 profileDateOfJoining: userProfiles.dateOfJoining,
                 profileDateOfExit: userProfiles.dateOfExit,
@@ -111,19 +118,22 @@ export class UsersService {
                 // Team fields
                 teamId: teams.id,
                 teamName: teams.name,
+                primaryTeamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team})`,
                 // Designation fields
                 designationId: designations.id,
                 designationName: designations.name,
                 // Role fields (NEW)
                 roleId: roles.id,
                 roleName: roles.name,
+                googlePhoto : oauthAccounts.avatar
             })
             .from(users)
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
             .leftJoin(designations, eq(userProfiles.designationId, designations.id))
-            .leftJoin(teams, eq(userProfiles.primaryTeamId, teams.id))
+            .leftJoin(teams, eq(teams.id, sql<number>`COALESCE(${users.primaryTeamId}, ${users.team})`))
             .leftJoin(userRoles, eq(userRoles.userId, users.id)) // NEW
-            .leftJoin(roles, eq(roles.id, userRoles.roleId)); // NEW
+            .leftJoin(roles, eq(roles.id, userRoles.roleId))// NEW
+            .leftJoin(oauthAccounts, eq(oauthAccounts.userId, users.id));
     }
 
     // UPDATED: Include role in mapping
@@ -134,16 +144,16 @@ export class UsersService {
                   userId: row.profileUserId,
                   firstName: row.profileFirstName,
                   lastName: row.profileLastName,
+                  profilePhoto: row.profilePhoto,
+                  googlePhoto: row.googlePhoto,
                   dateOfBirth: row.profileDateOfBirth,
                   gender: row.profileGender,
                   employeeCode: row.profileEmployeeCode,
                   designationId: row.profileDesignationId,
-                  primaryTeamId: row.profilePrimaryTeamId,
                   oldTeamId: row.team,
                   altEmail: row.profileAltEmail,
                   emergencyContactName: row.profileEmergencyContactName,
                   emergencyContactPhone: row.profileEmergencyContactPhone,
-                  image: row.profileImage,
                   signature: row.profileSignature,
                   dateOfJoining: row.profileDateOfJoining,
                   dateOfExit: row.profileDateOfExit,
@@ -191,7 +201,7 @@ export class UsersService {
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             profile,
-            team: row.primaryTeamId !== null ? row.primaryTeamId : row.oldTeamId,
+            team: row.teamId != null ? { id: row.teamId, name: row.teamName } : null,
             designation,
             role, // NEW
         };
@@ -205,29 +215,50 @@ export class UsersService {
                 email: users.email,
                 roleName: roles.name,
                 roleId: roles.id,
-                primaryTeamId: userProfiles.primaryTeamId,
+                primaryTeamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team})`,
                 oldTeamId: users.team,
+                permissionModule: permissions.module,
+                permissionAction : permissions.action,
             })
             .from(users)
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
             .leftJoin(userRoles, eq(userRoles.userId, users.id))
+            .leftJoin(userPermissions, eq(userPermissions.userId, users.id))
+            .leftJoin(permissions, eq(permissions.id, userPermissions.permissionId))
             .leftJoin(roles, eq(roles.id, userRoles.roleId))
-            .where(and(eq(users.id, userId), isNull(users.deletedAt)))
-            .limit(1);
+            .where(and(eq(users.id, userId), isNull(users.deletedAt)));
 
-        const row = rows[0];
-        if (!row) return null;
+            if (!rows.length) return null;
 
-        return {
-            userId: row.userId,
-            email: row.email,
-            roleName: row.roleName,
-            roleId: row.roleId,
-            primaryTeamId: row.primaryTeamId,
-            oldTeamId: row.oldTeamId,
-            dataScope: getDataScope(row.roleName ?? ""),
-            canSwitchTeams: canSwitchTeams(row.roleName ?? ""),
-        };
+            const base = rows[0];
+
+            // ✅ Build permission strings: "module:action"
+            const permissionsList = [
+                ...new Set(
+                    rows
+                        .filter(
+                            (row) =>
+                                row.permissionModule !== null &&
+                                row.permissionAction !== null
+                        )
+                        .map(
+                            (row) =>
+                                `${row.permissionModule}:${row.permissionAction}`
+                        )
+                ),
+            ];
+
+            return {
+                userId: base.userId,
+                email: base.email,
+                roleName: base.roleName,
+                roleId: base.roleId,
+                primaryTeamId: base.primaryTeamId,
+                oldTeamId: base.oldTeamId,
+                dataScope: getDataScope(base.roleName ?? ""),
+                canSwitchTeams: canSwitchTeams(base.roleName ?? ""),
+                permissions: permissionsList,
+            };
     }
 
     // NEW: Assign role to user
@@ -290,17 +321,21 @@ export class UsersService {
             throw new NotFoundException("One or more permissions not found");
         }
 
-        // Delete existing user permissions for these permission IDs
-        await this.db.delete(userPermissions).where(and(eq(userPermissions.userId, userId), inArray(userPermissions.permissionId, permissionIds)));
+        await this.db.transaction(async (tx) => {
+            // Delete existing user permissions for these permission IDs
+            await tx.delete(userPermissions).where(and(eq(userPermissions.userId, userId), inArray(userPermissions.permissionId, permissionIds)));
 
-        // Insert new permissions
-        const values = permissionIds.map((permissionId, index) => ({
-            userId,
-            permissionId,
-            granted: granted[index],
-        }));
+            // Insert new permissions
+            const values = permissionIds.map((permissionId, index) => ({
+                userId,
+                permissionId,
+                granted: granted[index],
+            }));
 
-        await this.db.insert(userPermissions).values(values);
+            await tx.insert(userPermissions).values(values);
+        });
+
+        await this.permissionService.refreshUserOverrides(userId);
     }
 
     // NEW: Get user's permissions with granted/denied status
@@ -340,6 +375,8 @@ export class UsersService {
         if (result.length === 0) {
             throw new NotFoundException(`User permission override not found for user ${userId} and permission ${permissionId}`);
         }
+
+        await this.permissionService.refreshUserOverrides(userId);
     }
 
     // NEW: Get role by name
@@ -531,12 +568,25 @@ export class UsersService {
         }
     }
 
+    async updateLastLogin(userId: number): Promise<void> {
+        await this.db
+            .update(users)
+            .set({ lastLoginAt: new Date(), updatedAt: new Date() })
+            .where(and(eq(users.id, userId), isNull(users.deletedAt)));
+    }
+
     private async hashPassword(plain: string) {
         return hash(plain);
     }
 
     async getTeamMembers(teamId: number): Promise<User[]> {
-        const result = (await this.db
+        const conditions = [isNull(users.deletedAt)];
+
+        if (teamId !== 0) {
+            conditions.push(eq(users.team, teamId));
+        }
+
+        const result = await this.db
             .select({
                 id: users.id,
                 name: users.name,
@@ -546,7 +596,8 @@ export class UsersService {
                 isActive: users.isActive,
             })
             .from(users)
-            .where(and(eq(users.team, teamId), isNull(users.deletedAt)))) as User[];
+            .where(and(...conditions)) as User[];
+
         return result;
     }
 
@@ -560,8 +611,35 @@ export class UsersService {
             .from(users)
             .innerJoin(userRoles, eq(userRoles.userId, users.id))
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-            .leftJoin(teams, eq(teams.id, userProfiles.primaryTeamId))
+            .leftJoin(teams, eq(teams.id, sql<number>`COALESCE(${users.primaryTeamId}, ${users.team})`))
             .where(and(eq(userRoles.roleId, roleId), isNull(users.deletedAt), eq(users.isActive, true)))
+            .orderBy(asc(users.name));
+    }
+
+    async findUsersOfOps(teamId?: number) {
+       // users.team = 3, user is active, not deleted
+        const conditions = [
+            eq(users.team, 3),
+            isNull(users.deletedAt),
+            eq(users.isActive, true),
+        ];
+
+        // If a specific team is provided, also filter by users.primaryTeamId
+        if (teamId !== undefined) {
+            conditions.push(eq(sql<number>`COALESCE(${users.primaryTeamId}, ${users.team})`, teamId));
+        }
+
+        return this.db
+            .select({
+                id: users.id,
+                name: users.name,
+                email: users.email,
+                teamName: teams.name,
+            })
+            .from(users)
+            .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+            .leftJoin(teams, eq(teams.id, sql<number>`COALESCE(${users.primaryTeamId}, ${users.team})`))
+            .where(and(...conditions))
             .orderBy(asc(users.name));
     }
 }

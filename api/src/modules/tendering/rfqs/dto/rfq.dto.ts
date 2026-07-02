@@ -40,6 +40,7 @@ export const CreateRfqSchema = z.object({
     tenderId: bigintField().positive('Tender ID must be positive'),
     dueDate: dateField,
     docList: optionalString,
+    requestedOrganization: optionalTextField(255),
     requestedVendor: optionalTextField(255),
     items: z.array(RfqItemSchema).min(1, 'At least one item is required'),
     documents: z.array(RfqDocumentSchema).optional(),
@@ -53,54 +54,10 @@ export type CreateRfqDto = z.infer<typeof CreateRfqSchema>;
 export const UpdateRfqSchema = z.object({
     dueDate: dateField,
     docList: optionalString,
+    requestedOrganization: optionalTextField(255),
     requestedVendor: optionalTextField(255),
     items: z.array(RfqItemSchema).optional(),
     documents: z.array(RfqDocumentSchema).optional(),
 });
 
 export type UpdateRfqDto = z.infer<typeof UpdateRfqSchema>;
-
-/**
- * RFQ Response Item Schema - Based on rfqResponseItems table
- */
-export const RfqResponseItemSchema = z.object({
-    requirement: textField().min(1, 'Requirement is required'),
-    unit: optionalTextField(64),
-    qty: optionalNumber(z.coerce.number().nonnegative()),
-    unitPrice: optionalNumber(z.coerce.number().min(0)),
-    totalPrice: optionalNumber(z.coerce.number().min(0)),
-});
-
-export type RfqResponseItemDto = z.infer<typeof RfqResponseItemSchema>;
-
-/**
- * Create RFQ Response Schema - Based on rfqResponses table
- */
-export const CreateRfqResponseSchema = z.object({
-    rfqId: bigintField().positive('RFQ ID must be positive'),
-    vendorId: bigintField().positive('Vendor ID must be positive'),
-    receiptDatetime: requiredDateField,
-    gstPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
-    gstType: optionalTextField(50),
-    deliveryTime: optionalNumber(z.coerce.number().int().nonnegative()),
-    freightType: optionalTextField(50),
-    notes: optionalString,
-    items: z.array(RfqResponseItemSchema).min(1, 'At least one item is required'),
-    documents: z.array(RfqDocumentSchema).optional(),
-});
-
-export type CreateRfqResponseDto = z.infer<typeof CreateRfqResponseSchema>;
-
-/**
- * Update RFQ Response Schema - Partial update
- */
-export const UpdateRfqResponseSchema = z.object({
-    receiptDatetime: dateField,
-    gstPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
-    gstType: optionalTextField(50),
-    deliveryTime: optionalNumber(z.coerce.number().int().nonnegative()),
-    freightType: optionalTextField(50),
-    notes: optionalString,
-});
-
-export type UpdateRfqResponseDto = z.infer<typeof UpdateRfqResponseSchema>;

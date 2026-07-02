@@ -62,13 +62,15 @@ export class TenderStatusHistoryService {
      */
     async findByTenderId(
         tenderId: number,
+        tx?: DbInstance
     ): Promise<TenderStatusHistoryWithNames[]> {
+        const db = tx || this.db;
         // Use proper aliases for multiple joins on same table
         const prevStatusAlias = alias(statuses, 'prev_status');
         const newStatusAlias = alias(statuses, 'new_status');
         const userAlias = alias(users, 'changed_by_user');
 
-        const rows = await this.db
+        const rows = await db
             .select({
                 id: tenderStatusHistory.id,
                 tenderId: tenderStatusHistory.tenderId,

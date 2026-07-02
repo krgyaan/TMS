@@ -10,10 +10,9 @@ import { RfqForm } from './components/RfqForm';
 
 export default function RfqCreatePage() {
     const navigate = useNavigate();
-    const { id } = useParams<{ id: string }>();
-    const tenderId = id ? parseInt(id) : null;
+    const { tenderId } = useParams<{ tenderId: string }>();
 
-    const { data: tender, isLoading, error } = useTender(tenderId);
+    const { data: tender, isLoading, error } = useTender(Number(tenderId));
 
     if (!tenderId) {
         return (
@@ -61,10 +60,11 @@ export default function RfqCreatePage() {
         rfqTo: tender.rfqTo || '',
         itemName: tender.itemName || '',
         teamMemberName: tender.teamMemberName || '',
+        status: tender.status || 0,
         statusName: tender.statusName || '',
-        dueDate: tender.dueDate,
+        dueDate: tender.dueDate as Date,
         rfqId: null,
-        vendorOrganizationNames: null,
+        // vendorOrganizationNames: null,
     };
 
     return (

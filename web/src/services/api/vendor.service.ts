@@ -1,18 +1,13 @@
-import { BaseApiService } from './base.service';
-import type {
-    Vendor,
-    VendorWithRelations,
-    CreateVendorDto,
-    UpdateVendorDto
-} from '@/types/api.types';
+import { BaseApiService } from "./base.service";
+import type { Vendor, VendorWithRelations, CreateVendorDto, UpdateVendorDto } from "@/types/api.types";
 
 class VendorsService extends BaseApiService {
     constructor() {
-        super('/vendors');
+        super("/vendors");
     }
 
     async getAll(): Promise<Vendor[]> {
-        return this.get<Vendor[]>('');
+        return this.get<Vendor[]>("");
     }
 
     async getById(id: number): Promise<Vendor> {
@@ -28,16 +23,16 @@ class VendorsService extends BaseApiService {
     }
 
     async create(data: CreateVendorDto): Promise<Vendor> {
-        return this.post<Vendor>('', data);
+        return this.post<Vendor>("", data);
     }
 
     async update(id: number, data: UpdateVendorDto): Promise<Vendor> {
         return this.patch<Vendor>(`/${id}`, data);
     }
 
-    // async delete(id: number): Promise<void> {
-    //     return this.delete<void>(`/${id}`);
-    // }
+    async deleteVendor(id: number): Promise<void> {
+        return super.delete<void>(`/${id}`);
+    }
 }
 
 export const vendorsService = new VendorsService();

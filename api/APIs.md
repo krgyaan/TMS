@@ -40,7 +40,7 @@ Base URL prefix is configurable via `API_PREFIX` (default: `api/v1`). All routes
   - Response: `UserProfile[]`
 
 - POST `/api/v1/user-profiles` — Create a user profile
-  - Body: `{ userId: number, firstName?: string, lastName?: string, dateOfBirth?: string, gender?: string, employeeCode?: string, designationId?: number, primaryTeamId?: number, altEmail?: string (email), emergencyContactName?: string, emergencyContactPhone?: string, image?: string, signature?: string, dateOfJoining?: string, dateOfExit?: string, timezone?: string, locale?: string }`
+  - Body: `{ userId: number, firstName?: string, lastName?: string, dateOfBirth?: string, gender?: string, employeeCode?: string, designationId?: number, altEmail?: string (email), emergencyContactName?: string, emergencyContactPhone?: string, image?: string, signature?: string, dateOfJoining?: string, dateOfExit?: string, timezone?: string, locale?: string }`
   - Response: `UserProfile`
 
 - GET `/api/v1/oauth-accounts` — List OAuth accounts
@@ -79,7 +79,7 @@ Types
 - `Role`: `{ id: number, name: string, guardName?: string | null, isActive: boolean, createdAt: string, updatedAt: string }`
 - `Designation`: `{ id: number, name: string, description?: string | null, isActive: boolean, createdAt: string, updatedAt: string }`
 - `Team`: `{ id: number, name: string, parentId?: number | null, isActive: boolean, createdAt: string, updatedAt: string }`
-- `UserProfile`: `{ id: number, userId: number, firstName?: string | null, lastName?: string | null, dateOfBirth?: string | null, gender?: string | null, employeeCode?: string | null, designationId?: number | null, primaryTeamId?: number | null, altEmail?: string | null, emergencyContactName?: string | null, emergencyContactPhone?: string | null, image?: string | null, signature?: string | null, dateOfJoining?: string | null, dateOfExit?: string | null, timezone?: string | null, locale?: string | null, isActive: boolean, createdAt: string, updatedAt: string }`
+- `UserProfile`: `{ id: number, userId: number, firstName?: string | null, lastName?: string | null, dateOfBirth?: string | null, gender?: string | null, employeeCode?: string | null, designationId?: number | null, altEmail?: string | null, emergencyContactName?: string | null, emergencyContactPhone?: string | null, image?: string | null, signature?: string | null, dateOfJoining?: string | null, dateOfExit?: string | null, timezone?: string | null, locale?: string | null, isActive: boolean, createdAt: string, updatedAt: string }`
 - `OauthAccount`: `{ id: number, userId: number, provider: string, providerUserId: string, providerEmail?: string | null, avatar?: string | null, accessToken: string, refreshToken?: string | null, expiresAt?: string | null, scopes?: string | null, rawPayload?: any | null, isActive: boolean, createdAt: string, updatedAt: string }`
 - `TenderStatus`: `{ id: number, name: string, tenderCategory?: string | null, status: boolean, createdAt: string, updatedAt: string }`
 

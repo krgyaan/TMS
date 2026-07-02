@@ -1,4 +1,5 @@
 export type BankGuaranteeDashboardTab = 'new-requests' | 'live-yes' | 'live-pnb' | 'live-bg-limit' | 'cancelled' | 'rejected';
+export type BankGuaranteeExportTab = BankGuaranteeDashboardTab | 'all';
 
 export type BankGuaranteeDashboardFilters = {
     tab?: BankGuaranteeDashboardTab;
@@ -11,6 +12,7 @@ export type BankGuaranteeDashboardFilters = {
 
 export interface BankGuaranteeDashboardRow {
     id: number;
+    requestId: number;
     bgDate: Date | null;
     bgNo: string | null;
     beneficiaryName: string | null;

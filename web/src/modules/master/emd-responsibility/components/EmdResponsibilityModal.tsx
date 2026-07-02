@@ -8,22 +8,22 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { Plus, Pencil, ShieldCheck, Loader2 } from "lucide-react";
+import { Plus, Pencil, ShieldCheck, User, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import { useCreateEmdResponsibility, useUpdateEmdResponsibility } from "@/hooks/api/useEmdResponsibility";
+import { useGetTeamMembers } from "@/hooks/api/useUsers";
 
 import type { EmdResponsibility } from "@/types/api.types";
-import { Textarea } from "@/components/ui/textarea";
 
 const EmdResponsibilityFormSchema = z.object({
-    name: z.string().min(1, "Name is required").max(100),
-    description: z.string().max(500).optional(),
-    status: z.boolean().default(true),
+    name: z.string().min(1, "Name is required").max(255),
+    instrumentType: z.string().max(30).optional(),
+    assignedUserId: z.coerce.number().int().positive().optional(),
 });
 
 type EmdResponsibilityFormValues = z.infer<typeof EmdResponsibilityFormSchema>;
@@ -40,13 +40,14 @@ export const EmdResponsibilityModal = ({ open, onOpenChange, emdResponsibility, 
     const updateEmdResponsibility = useUpdateEmdResponsibility();
 
     const isEdit = !!emdResponsibility;
+    const { data: accountsUsers = [], isLoading: usersLoading } = useGetTeamMembers(5);
 
     const form = useForm<EmdResponsibilityFormValues>({
         resolver: zodResolver(EmdResponsibilityFormSchema),
         defaultValues: {
             name: "",
-            description: "",
-            status: true,
+            instrumentType: "",
+            assignedUserId: undefined,
         },
     });
 
@@ -56,12 +57,14 @@ export const EmdResponsibilityModal = ({ open, onOpenChange, emdResponsibility, 
         if (isEdit && emdResponsibility) {
             form.reset({
                 name: emdResponsibility.name ?? "",
-                status: emdResponsibility.status ?? true,
+                instrumentType: emdResponsibility.instrumentType ?? "",
+                assignedUserId: emdResponsibility.assignedUserId ?? undefined,
             });
         } else {
             form.reset({
                 name: "",
-                status: true,
+                instrumentType: "",
+                assignedUserId: undefined,
             });
         }
 
@@ -141,41 +144,61 @@ export const EmdResponsibilityModal = ({ open, onOpenChange, emdResponsibility, 
                                 )}
                             />
 
-                            {/* Description */}
+                            {/* Instrument Type */}
                             <FormField
                                 control={form.control}
-                                name="description"
+                                name="instrumentType"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Description</FormLabel>
-                                        <FormControl>
-                                            <Textarea rows={3} placeholder="Enter description (optional)" {...field} />
-                                        </FormControl>
+                                        <FormLabel>Instrument Type</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select instrument type (optional)" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="DD">DD</SelectItem>
+                                                <SelectItem value="FDR">FDR</SelectItem>
+                                                <SelectItem value="BG">BG</SelectItem>
+                                                <SelectItem value="Cheque">Cheque</SelectItem>
+                                                <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                                                <SelectItem value="Portal Payment">Portal Payment</SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
 
-                            {/* Status */}
+                            {/* Assigned User */}
                             <FormField
                                 control={form.control}
-                                name="status"
+                                name="assignedUserId"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <div
-                                            className={cn(
-                                                "flex items-center justify-between rounded-lg border p-4",
-                                                field.value ? "bg-emerald-50/50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800" : "bg-muted/30 border-muted"
-                                            )}
+                                        <FormLabel className="flex items-center gap-2">
+                                            <User className="h-4 w-4 text-muted-foreground" />
+                                            Assigned User
+                                        </FormLabel>
+                                        <Select
+                                            onValueChange={v => field.onChange(v ? Number(v) : undefined)}
+                                            value={field.value ? String(field.value) : ""}
                                         >
-                                            <div className="space-y-0.5">
-                                                <FormLabel className="text-sm font-medium cursor-pointer">{field.value ? "Active" : "Inactive"}</FormLabel>
-                                                <p className="text-xs text-muted-foreground">{field.value ? "Responsibility is enabled" : "Responsibility is disabled"}</p>
-                                            </div>
                                             <FormControl>
-                                                <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder={usersLoading ? "Loading users..." : "Select assigned user (optional)"} />
+                                                </SelectTrigger>
                                             </FormControl>
-                                        </div>
+                                            <SelectContent>
+                                                {accountsUsers.map(user => (
+                                                    <SelectItem key={user.id} value={String(user.id)}>
+                                                        {user.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
                                     </FormItem>
                                 )}
                             />

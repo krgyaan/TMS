@@ -3,9 +3,9 @@ import { z } from "zod";
 import { EmdResponsibilityService } from "@/modules/master/emd-responsibilities/emd-responsibilities.service";
 
 const CreateEmdResponsibilitySchema = z.object({
-    name: z.string().min(1, "Name is required").max(100),
-    description: z.string().max(500).optional(),
-    status: z.boolean().optional().default(true),
+    name: z.string().min(1, "Name is required").max(255),
+    instrumentType: z.string().max(30).optional(),
+    assignedUserId: z.number().int().positive().optional(),
 });
 
 const UpdateEmdResponsibilitySchema = CreateEmdResponsibilitySchema.partial();
@@ -28,8 +28,7 @@ export class EmdResponsibilityController {
         if (!query) {
             return [];
         }
-        // return this.leadTypesService.search(query);
-        return [];
+        return this.emdResponsibilityService.search(query);
     }
 
     @Get(":id")
@@ -54,9 +53,9 @@ export class EmdResponsibilityController {
         return this.emdResponsibilityService.update(id, parsed);
     }
 
-    // @Delete(':id')
-    // @HttpCode(HttpStatus.NO_CONTENT)
-    // async delete(@Param('id', ParseIntPipe) id: number) {
-    //     await this.leadTypesService.delete(id);
-    // }
+    @Delete(':id')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    async delete(@Param('id', ParseIntPipe) id: number) {
+        await this.emdResponsibilityService.delete(id);
+    }
 }

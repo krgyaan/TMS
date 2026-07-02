@@ -2,61 +2,59 @@ import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 /* UI */
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 /* Icons */
 import {
-    ArrowLeft,
-    Edit,
-    Building2,
-    User,
-    Phone,
-    Mail,
-    FileText,
-    Clock,
-    Calendar,
-    IndianRupee,
-    MapPin,
-    Target,
-    UserCheck,
-    UserPlus,
-    CalendarClock,
     AlertCircle,
+    ArrowLeft,
+    Building2,
+    Calendar,
+    CalendarClock,
     CheckCircle2,
-    PauseCircle,
-    ExternalLink,
+    Clock,
     Copy,
     Download,
-    FileImage,
+    Edit,
+    ExternalLink,
     File,
-    MoreHorizontal,
-    Share2,
-    Printer,
+    FileImage,
+    FileText,
+    IndianRupee,
+    Mail,
+    MapPin,
+    PauseCircle,
+    Phone,
+    Target,
+    User,
+    UserCheck,
+    UserPlus
 } from "lucide-react";
 
 /* Data */
-import { useFollowUp } from "./follow-up.hooks";
 import { paths } from "@/app/routes/paths";
+import { useFollowUp } from "./follow-up.hooks";
 
 /* ================================
    CONSTANTS
 ================================ */
 
 const FREQUENCY_CONFIG: Record<number, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ElementType }> = {
+    3: { label: "2 times a day", variant: "secondary", icon: Calendar },
     1: { label: "Daily", variant: "default", icon: Clock },
     2: { label: "Alternate Days", variant: "default", icon: Clock },
-    3: { label: "Weekly", variant: "secondary", icon: Calendar },
-    4: { label: "Bi-Weekly", variant: "secondary", icon: Calendar },
-    5: { label: "Monthly", variant: "outline", icon: CalendarClock },
-    6: { label: "Stopped", variant: "destructive", icon: PauseCircle },
+    4: { label: "Weekly (every Mon)", variant: "secondary", icon: Calendar },
+    5: { label: "Twice a Week (every Mon & Thu)", variant: "outline", icon: CalendarClock },
+    6: { label: "Stop", variant: "destructive", icon: PauseCircle },
+    7: { label: "Once in 15 Days (Alternate Mondays)", variant: "outline", icon: CalendarClock },
+    8: { label: "Once a Month (First Monday of the Month)", variant: "outline", icon: CalendarClock },
 };
-
 const STOP_REASON_LABELS: Record<number, string> = {
     1: "Person is getting angry / requested to stop",
     2: "Objective Achieved",
@@ -406,6 +404,9 @@ const buildFileUrl = (value?: unknown): string => {
     // already a full URL (S3, CDN, etc.)
     if (value.startsWith("http")) return value;
 
+    // already has a directory prefix (e.g. "accounts/file.pdf" or "courier/file.docx")
+    if (value.includes('/')) return `/uploads/${value}`;
+
     return `/uploads/accounts/${value}`;
 };
 
@@ -469,7 +470,7 @@ function AttachmentCard({ url, index }: { url: unknown; index: number }) {
 
             {isImage && (
                 <div className="mt-3 rounded-lg overflow-hidden bg-muted">
-                    <img src={url} alt={fileName} className="w-full h-32 object-cover" loading="lazy" />
+                    <img src={fileUrl} alt={fileName} className="w-full h-32 object-cover" loading="lazy" />
                 </div>
             )}
         </div>

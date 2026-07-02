@@ -1,48 +1,52 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useEffect, useCallback } from 'react';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
-import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Send, XCircle, Eye, Edit, FileX2, CheckCircle, FileCheck } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { formatDateTime } from '@/hooks/useFormatedDate';
-import { useTqManagement, useMarkAsNoTq, useTqManagementDashboardCounts, useTqQualified } from '@/hooks/api/useTqManagement';
-import { tenderNameCol } from '@/components/data-grid/columns';
-import QualificationDialog from './components/QualificationDialog';
-import type { TabKey, TqManagementDashboardRow, TqManagementDashboardRowWithTimer } from './helpers/tqManagement.types';
+import { dateCol, tenderNameCol } from '@/components/data-grid/columns';
+import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
+import type { ActionItem } from '@/components/ui/ActionMenu';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import DataTable from '@/components/ui/data-table';
+import { Input } from '@/components/ui/input';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useMarkAsNoTq, useTqManagement, useTqManagementDashboardCounts, useTqQualified } from '@/hooks/api/useTqManagement';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
+import type { ColDef } from 'ag-grid-community';
+import { AlertCircle, CheckCircle, Edit, Eye, FileCheck, FileX2, Plus, Search, Send, XCircle } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { formatDateTime } from '@/hooks/useFormatedDate';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
+import QualificationDialog from './components/QualificationDialog';
+import type { TabKey, TqManagementDashboardRowWithTimer } from './helpers/tqManagement.types';
 
 
 const TqManagementListPage = () => {
-    const [activeTab, setActiveTab] = useState<TabKey>('awaited');
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
+    const {
+        activeTab, setActiveTab,
+        search, setSearch,
+        debouncedSearch,
+        pagination, setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState({
+        storageKey: 'tq-management',
+        defaultTab: 'awaited' as TabKey,
+    });
     const [noTqDialogOpen, setNoTqDialogOpen] = useState(false);
     const [tqQualifiedDialogOpen, setTqQualifiedDialogOpen] = useState(false);
     const [pendingTenderId, setPendingTenderId] = useState<number | null>(null);
     const [pendingTqId, setPendingTqId] = useState<number | null>(null);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
     const navigate = useNavigate();
-
-    useEffect(() => {
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab]);
-
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
-            }));
-        setSortModel(sortModel);
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, []);
 
     // Fetch paginated data for active tab using tabKey
     const { data: apiResponse, isLoading: loading, error } = useTqManagement(
@@ -52,6 +56,7 @@ const TqManagementListPage = () => {
             limit: pagination.pageSize,
             sortBy: sortModel[0]?.colId,
             sortOrder: sortModel[0]?.sort,
+            search: debouncedSearch || undefined,
         }
     );
 
@@ -61,6 +66,8 @@ const TqManagementListPage = () => {
     const totalRows = apiResponse?.meta?.total || 0;
     const markNoTqMutation = useMarkAsNoTq();
     const tqQualifiedMutation = useTqQualified();
+
+    const { hasTenderingPermission } = useTenderingPermissions();
 
     const getStatusVariant = (status: string) => {
         switch (status) {
@@ -88,9 +95,9 @@ const TqManagementListPage = () => {
         setNoTqDialogOpen(true);
     };
 
-    const handleNoTqConfirm = async (qualified: boolean) => {
+    const handleNoTqConfirm = async (qualified: boolean, disqualificationReason?: string) => {
         if (pendingTenderId !== null) {
-            await markNoTqMutation.mutateAsync({ tenderId: pendingTenderId, qualified });
+            await markNoTqMutation.mutateAsync({ tenderId: pendingTenderId, qualified, disqualificationReason });
             setPendingTenderId(null);
         }
     };
@@ -100,9 +107,9 @@ const TqManagementListPage = () => {
         setTqQualifiedDialogOpen(true);
     };
 
-    const handleTqQualifiedConfirm = async (qualified: boolean) => {
+    const handleTqQualifiedConfirm = async (qualified: boolean, disqualificationReason?: string) => {
         if (pendingTqId !== null) {
-            await tqQualifiedMutation.mutateAsync({ tqId: pendingTqId, qualified });
+            await tqQualifiedMutation.mutateAsync({ tqId: pendingTqId, qualified, disqualificationReason });
             setPendingTqId(null);
         }
     };
@@ -113,8 +120,7 @@ const TqManagementListPage = () => {
             onClick: (row: TqManagementDashboardRowWithTimer) => {
                 navigate(paths.tendering.tqReceived(row.tenderId));
             },
-            icon: <Send className="h-4 w-4" />,
-            visible: (row) => row.tqStatus === 'TQ awaited',
+            icon: <Plus className="h-4 w-4" />,
         },
         {
             label: 'Mark as No TQ',
@@ -125,60 +131,44 @@ const TqManagementListPage = () => {
             visible: (row) => row.tqStatus === 'TQ awaited',
         },
         {
-            label: 'TQ Replied',
+            label: 'Reply TQ',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
-                navigate(paths.tendering.tqReplied(row.tqId!));
+                navigate(paths.tendering.tqReplied(row.tenderId));
             },
             icon: <Send className="h-4 w-4" />,
-            visible: (row) => row.tqStatus === 'TQ received' && row.tqId !== null,
+            visible: (row) => row.tqTooltipData?.some(tq => tq.status === 'TQ received') ?? false,
         },
         {
             label: 'TQ Missed',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
-                navigate(paths.tendering.tqMissed(row.tqId!));
+                navigate(paths.tendering.tqMissed(row.tenderId));
             },
             icon: <XCircle className="h-4 w-4" />,
-            visible: (row) => row.tqStatus === 'TQ received' && row.tqId !== null,
+            visible: (row) => row.tqTooltipData?.some(tq => tq.status === 'TQ received') ?? false,
         },
         {
             label: 'Edit TQ Received',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
-                navigate(paths.tendering.tqEditReceived(row.tqId!));
+                navigate(paths.tendering.tqEditReceived(row.tenderId));
             },
             icon: <Edit className="h-4 w-4" />,
-            visible: (row) => row.tqStatus === 'TQ received' && row.tqId !== null,
+            visible: (row) => hasTenderingPermission && (row.tqTooltipData?.some(tq => tq.status === 'TQ received') ?? false),
         },
         {
-            label: 'Edit TQ Reply',
+            label: 'Edit Submit TQ',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
-                navigate(paths.tendering.tqEditReplied(row.tqId!));
+                navigate(paths.tendering.tqEditReplied(row.tenderId));
             },
             icon: <Edit className="h-4 w-4" />,
-            visible: (row) => row.tqStatus === 'TQ replied' && row.tqId !== null,
+            visible: (row) => hasTenderingPermission && (row.tqTooltipData?.some(tq => tq.status === 'TQ replied') ?? false),
         },
         {
             label: 'Edit TQ Missed',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
-                navigate(paths.tendering.tqEditMissed(row.tqId!));
+                navigate(paths.tendering.tqEditMissed(row.tenderId));
             },
             icon: <Edit className="h-4 w-4" />,
-            visible: (row) => row.tqStatus === 'Disqualified, TQ missed' && row.tqId !== null,
-        },
-        {
-            label: 'View Details',
-            onClick: (row: TqManagementDashboardRowWithTimer) => {
-                navigate(paths.tendering.tqView(row.tqId!));
-            },
-            icon: <Eye className="h-4 w-4" />,
-            visible: (row) => row.tqId !== null,
-        },
-        {
-            label: 'View All TQs',
-            onClick: (row: TqManagementDashboardRowWithTimer) => {
-                navigate(paths.tendering.tqViewAll(row.tenderId));
-            },
-            icon: <Eye className="h-4 w-4" />,
-            visible: (row) => row.tqCount > 1,
+            visible: (row) => hasTenderingPermission && (row.tqTooltipData?.some(tq => tq.status === 'Disqualified, TQ missed') ?? false),
         },
         {
             label: 'TQ Qualified',
@@ -186,9 +176,16 @@ const TqManagementListPage = () => {
                 handleTqQualified(row.tqId!);
             },
             icon: <FileCheck className="h-4 w-4" />,
-            visible: (row) => row.tqStatus === 'TQ replied' && row.tqId !== null,
+            visible: (row) => row.tqTooltipData?.some(tq => tq.status === 'TQ replied') ?? false,
         },
-    ], [navigate, markNoTqMutation, handleTqQualified]);
+        {
+            label: 'View Details',
+            onClick: (row: TqManagementDashboardRowWithTimer) => {
+                navigate(paths.tendering.tqView(row.tenderId));
+            },
+            icon: <Eye className="h-4 w-4" />,
+        },
+    ], [navigate, markNoTqMutation, handleTqQualified, hasTenderingPermission]);
 
     const tabsConfig = useMemo(() => {
         return [
@@ -204,7 +201,7 @@ const TqManagementListPage = () => {
             },
             {
                 key: 'replied' as TabKey,
-                name: 'TQ Replied',
+                name: 'TQ Submitted',
                 count: counts?.replied ?? 0,
             },
             {
@@ -221,11 +218,12 @@ const TqManagementListPage = () => {
     }, [counts]);
 
     const colDefs = useMemo<ColDef<TqManagementDashboardRowWithTimer>[]>(() => [
-        tenderNameCol<TqManagementDashboardRowWithTimer>('tenderNo', {
+        tenderNameCol<TqManagementDashboardRowWithTimer>('tenderName', {
+            field: 'tenderName',
+            colId: 'tenderName',
             headerName: 'Tender',
             filter: true,
             width: 200,
-            colId: 'tenderNo',
             sortable: true,
         }),
         {
@@ -237,15 +235,14 @@ const TqManagementListPage = () => {
             sortable: true,
             filter: true,
         },
-        {
+        dateCol<TqManagementDashboardRowWithTimer>('bidSubmissionDate', { includeTime: true }, {
             field: 'bidSubmissionDate',
+            colId: 'bidSubmissionDate',
             headerName: 'Bid Submission',
             width: 150,
-            colId: 'bidSubmissionDate',
-            valueGetter: (params: any) => params.data?.bidSubmissionDate ? formatDateTime(params.data.bidSubmissionDate) : '—',
             sortable: true,
             filter: true,
-        },
+        }),
         {
             field: 'statusName',
             headerName: 'Tender Status',
@@ -255,19 +252,18 @@ const TqManagementListPage = () => {
             sortable: true,
             filter: true,
         },
-        {
+        dateCol<TqManagementDashboardRowWithTimer>('tqSubmissionDeadline', { includeTime: true }, {
             field: 'tqSubmissionDeadline',
+            colId: 'tqSubmissionDeadline',
             headerName: 'TQ Deadline',
             width: 150,
-            colId: 'tqSubmissionDeadline',
-            valueGetter: (params: any) => params.data?.tqSubmissionDeadline ? formatDateTime(params.data.tqSubmissionDeadline) : '—',
             sortable: true,
             filter: true,
-        },
+        }),
         {
             field: 'tqStatus',
             headerName: 'TQ Status',
-            width: 180,
+            width: 130,
             colId: 'tqStatus',
             sortable: true,
             filter: true,
@@ -284,14 +280,43 @@ const TqManagementListPage = () => {
         {
             field: 'tqCount',
             headerName: 'TQ Count',
-            width: 120,
+            width: 110,
             colId: 'tqCount',
             valueGetter: (params: any) => params.data?.tqCount || 0,
             sortable: true,
             cellRenderer: (params: any) => {
                 const count = params.value;
-                if (count > 0) {
-                    return <Badge variant="outline">{count}</Badge>;
+                const tqData = params.data?.tqTooltipData;
+                if (count > 0 && tqData?.length > 0) {
+                    return (
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger>
+                                    <Badge variant="outline" className="cursor-pointer">{count}</Badge>
+                                </TooltipTrigger>
+                                <TooltipContent className="w-50 bg-accent" side="right" align="start">
+                                    <div className="space-y-2">
+                                        {tqData.map((tq: any) => (
+                                            <div key={tq.seqNo} className="border-b last:border-0 pb-2 last:pb-0">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <Badge variant="outline" className="text-[10px]">TQ #{tq.seqNo}</Badge>
+                                                    <Badge variant='secondary' className="text-[10px]">
+                                                        {tq.status}
+                                                    </Badge>
+                                                </div>
+                                                <div className="text-xs text-muted-foreground mb-0.5">
+                                                    {tq.receivedAt ? formatDateTime(tq.receivedAt) : '—'}
+                                                </div>
+                                                <div className="text-xs font-medium">
+                                                    {tq.typeNames?.join(', ') || '—'}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    );
                 }
                 return count;
             },
@@ -299,7 +324,7 @@ const TqManagementListPage = () => {
         {
             field: 'timer',
             headerName: 'Timer',
-            width: 150,
+            width: 120,
             cellRenderer: (params: any) => {
                 const { data } = params;
                 const timer = data?.timer;
@@ -320,12 +345,12 @@ const TqManagementListPage = () => {
             },
         },
         {
-            headerName: 'Actions',
+            headerName: '',
             filter: false,
             cellRenderer: createActionColumnRenderer(tqManagementActions),
             sortable: false,
             pinned: 'right',
-            width: 80,
+            width: 57,
         },
     ], [tqManagementActions]);
 
@@ -382,7 +407,7 @@ const TqManagementListPage = () => {
             </CardHeader>
             <CardContent className="px-0">
                 <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)}>
-                    <TabsList className="m-auto">
+                    <TabsList className="m-auto mb-4">
                         {tabsConfig.map((tab) => (
                             <TabsTrigger
                                 key={tab.key}
@@ -398,6 +423,34 @@ const TqManagementListPage = () => {
                             </TabsTrigger>
                         ))}
                     </TabsList>
+
+                    {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                    <div className="flex items-center gap-4 px-6 pb-4">
+                        {/* Quick Filters (Left) */}
+                        <QuickFilter options={[
+                            { label: 'This Week', value: 'this-week' },
+                            { label: 'This Month', value: 'this-month' },
+                            { label: 'This Year', value: 'this-year' },
+                        ]}
+                            value={search}
+                            onChange={(value) => setSearch(value)}
+                        />
+
+                        {/* Search Bar (Center) - Flex grow */}
+                        <div className="flex-1 flex justify-end">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-8 w-64"
+                                />
+                            </div>
+                        </div>
+
+                    </div>
 
                     {tabsConfig.map((tab) => (
                         <TabsContent
@@ -428,6 +481,9 @@ const TqManagementListPage = () => {
                                             rowCount={totalRows}
                                             paginationState={pagination}
                                             onPaginationChange={setPagination}
+                                            onPageSizeChange={handlePageSizeChange}
+                                            showTotalCount={true}
+                                            showLengthChange={true}
                                             gridOptions={{
                                                 defaultColDef: {
                                                     editable: false,
@@ -459,6 +515,15 @@ const TqManagementListPage = () => {
                 onConfirm={handleTqQualifiedConfirm}
                 title="Mark TQ as Qualified"
                 description="This technical query has been replied. Please select whether the tender is Qualified or Disqualified."
+            />
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
             />
         </Card>
     );

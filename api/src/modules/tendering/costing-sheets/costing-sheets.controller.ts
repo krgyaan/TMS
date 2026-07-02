@@ -1,16 +1,17 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Query, Logger } from '@nestjs/common';
 import { CostingSheetsService, type CostingSheetFilters } from '@/modules/tendering/costing-sheets/costing-sheets.service';
 import type { SubmitCostingSheetDto, UpdateCostingSheetDto, CreateSheetDto, CreateSheetWithNameDto } from './dto/costing-sheet.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import { getFrontendTimer } from '@/modules/timers/timer-helper';
 
 @Controller('costing-sheets')
 export class CostingSheetsController {
     private readonly logger = new Logger(CostingSheetsController.name);
     constructor(
         private readonly costingSheetsService: CostingSheetsService,
-        private readonly workflowService: WorkflowService
+        private readonly timersService: TimersService
     ) { }
 
     @Get('dashboard')
@@ -21,30 +22,25 @@ export class CostingSheetsController {
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
+        @CurrentUser() user?: ValidatedUser,
+        @Query('teamId') teamId?: string,
     ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
         const result = await this.costingSheetsService.getDashboardData(tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
             sortOrder,
             search,
-        });
+        }, user, parseNumber(teamId));
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
             result.data.map(async (tender) => {
-                let timer: TimerData | null = null;
-                try {
-                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'costing_sheets');
-                    if (!timer.hasTimer) {
-                        timer = null;
-                    }
-                } catch (error) {
-                    this.logger.error(
-                        `Failed to get timer for tender ${tender.tenderId}:`,
-                        error
-                    );
-                }
-
+                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'costing_sheet');
                 return {
                     ...tender,
                     timer
@@ -59,8 +55,16 @@ export class CostingSheetsController {
     }
 
     @Get('dashboard/counts')
-    getDashboardCounts() {
-        return this.costingSheetsService.getDashboardCounts();
+    getDashboardCounts(
+        @CurrentUser() user?: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        return this.costingSheetsService.getDashboardCounts(user, parseNumber(teamId));
     }
 
     @Get('check-drive-scopes')
@@ -73,6 +77,11 @@ export class CostingSheetsController {
         return this.costingSheetsService.findByTenderId(tenderId);
     }
 
+    @Get('tender/:tenderId/combined')
+    getCombinedPricing(@Param('tenderId', ParseIntPipe) tenderId: number) {
+        return this.costingSheetsService.getCombinedPricing(tenderId);
+    }
+
     @Get(':id')
     findById(@Param('id', ParseIntPipe) id: number) {
         return this.costingSheetsService.findById(id);
@@ -80,7 +89,7 @@ export class CostingSheetsController {
 
     @Post()
     create(
-        @Body() dto: SubmitCostingSheetDto,
+        @Body() dto: any,
         @CurrentUser() user: ValidatedUser
     ) {
         return this.costingSheetsService.create({
@@ -92,10 +101,27 @@ export class CostingSheetsController {
     @Patch(':id')
     update(
         @Param('id', ParseIntPipe) id: number,
-        @Body() dto: UpdateCostingSheetDto,
+        @Body() dto: any,
         @CurrentUser() user: ValidatedUser
     ) {
         return this.costingSheetsService.update(id, dto, user.sub);
+    }
+
+    @Post(':id/add-detail')
+    addDetail(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: any,
+        @CurrentUser() user: ValidatedUser
+    ) {
+        return this.costingSheetsService.addDetail(id, dto, user.sub);
+    }
+
+    @Delete(':sheetId/details/:detailId')
+    removeDetail(
+        @Param('sheetId', ParseIntPipe) sheetId: number,
+        @Param('detailId', ParseIntPipe) detailId: number,
+    ) {
+        return this.costingSheetsService.removeDetail(detailId);
     }
 
     @Post('create-sheet')

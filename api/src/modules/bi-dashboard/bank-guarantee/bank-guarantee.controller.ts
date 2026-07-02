@@ -40,6 +40,13 @@ export class BankGuaranteeController {
         });
     }
 
+    @Get('dashboard/export')
+    getExportData(
+        @Query('tab') tab?: string,
+    ) {
+        return this.bankGuaranteeService.getExportData(tab);
+    }
+
     @Get('dashboard/counts')
     getDashboardCounts() {
         return this.bankGuaranteeService.getDashboardCounts();
@@ -48,6 +55,32 @@ export class BankGuaranteeController {
     @Get('dashboard/card-stats')
     getDashboardCardStats() {
         return this.bankGuaranteeService.getDashboardCardStats();
+    }
+
+    @Get('requests/:id')
+    async getById(@Param('id', ParseIntPipe) id: number) {
+        return this.bankGuaranteeService.getById(id);
+    }
+
+    @Get('instruments/:id/action-form')
+    async getActionFormData(@Param('id', ParseIntPipe) id: number) {
+        return this.bankGuaranteeService.getActionFormData(id);
+    }
+
+    @Get('instruments/:id/followup')
+    async getFollowupData(@Param('id', ParseIntPipe) id: number) {
+        return this.bankGuaranteeService.getFollowupData(id);
+    }
+
+    @Put(':id')
+    @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
+    async update(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() body: any,
+        @UploadedFiles() files: Express.Multer.File[],
+        @Req() req: any,
+    ) {
+        return this.bankGuaranteeService.update(id, body, files || [], req.user);
     }
 
     @Put('instruments/:id/action')

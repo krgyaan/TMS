@@ -1,31 +1,47 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import DataTable from "@/components/ui/data-table";
-import type { ColDef } from "ag-grid-community";
-import { useMemo, useState, useEffect, useCallback } from "react";
-import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import type { ActionItem } from "@/components/ui/ActionMenu";
-import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { formatDateTime } from "@/hooks/useFormatedDate";
-import { formatINR } from "@/hooks/useINRFormatter";
-import type { CostingSheetDashboardRow, CostingSheetDashboardRowWithTimer, TabKey } from "@/modules/tendering/costing-sheets/helpers/costingSheet.types";
-import { tenderNameCol } from "@/components/data-grid/columns";
-import { useCostingSheets, useCostingSheetsCounts, useCheckDriveScopes, useCreateCostingSheet, useCreateCostingSheetWithName } from "@/hooks/api/useCostingSheets";
+import { currencyCol, dateCol, tenderNameCol } from "@/components/data-grid/columns";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { toast } from "sonner";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { QuickFilter } from "@/components/ui/quick-filter";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCheckDriveScopes, useCostingSheets, useCostingSheetsCounts, useCreateCostingSheet, useCreateCostingSheetWithName } from "@/hooks/api/useCostingSheets";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
+import axiosInstance from "@/lib/axios";
+import type { CostingSheetDashboardRowWithTimer, CostingSheetTab } from "@/modules/tendering/costing-sheets/helpers/costingSheet.types";
+import type { ColDef } from "ag-grid-community";
+import { AlertCircle, Edit, ExternalLink, Eye, FileX2, Plus, Search, Send, XCircle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { ChangeStatusModal } from "../tenders/components/ChangeStatusModal";
 
 const CostingSheets = () => {
-    const [activeTab, setActiveTab] = useState<TabKey>('pending');
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const navigate = useNavigate();
+
+    const {
+        activeTab,
+        setActiveTab,
+        search,
+        setSearch,
+        debouncedSearch,
+        pagination,
+        setPagination,
+        handleSortChanged,
+        handlePageSizeChange,
+        sortModel,
+    } = usePersistentTableState({
+        storageKey: 'costing-sheets',
+        defaultTab: 'pending' as CostingSheetTab,
+    });
 
     const [connectDriveOpen, setConnectDriveOpen] = useState(false);
     const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
@@ -35,29 +51,59 @@ const CostingSheets = () => {
         suggestedName?: string;
     } | null>(null);
     const [isCreating, setIsCreating] = useState(false);
+    const [isConnectingDrive, setIsConnectingDrive] = useState(false);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
+    const pendingTenderId = useRef<number | null>(null);
 
-    const { data: driveScopes } = useCheckDriveScopes();
+    const { data: driveScopes, refetch: refetchDriveScopes } = useCheckDriveScopes();
     const createSheetMutation = useCreateCostingSheet();
     const createSheetWithNameMutation = useCreateCostingSheetWithName();
 
     useEffect(() => {
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab]);
+        const handler = (event: MessageEvent) => {
+            if (event.data?.type !== 'GOOGLE_DRIVE_AUTH') return;
 
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
-            }));
-        setSortModel(sortModel);
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, []);
+            if (event.data.status === 'success') {
+                refetchDriveScopes();
+                setConnectDriveOpen(false);
+                toast.success('Google Drive connected!');
+
+                if (pendingTenderId.current) {
+                    const tenderId = pendingTenderId.current;
+                    pendingTenderId.current = null;
+                    createSheetMutation.mutateAsync(tenderId)
+                        .then((result) => {
+                            if (result.success && result.sheetUrl) {
+                                window.open(result.sheetUrl, '_blank');
+                            } else if (result.isDuplicate) {
+                                setDuplicateInfo({
+                                    tenderId,
+                                    existingUrl: result.existingSheetUrl,
+                                    suggestedName: result.suggestedName,
+                                });
+                                setDuplicateDialogOpen(true);
+                            } else if (result.message) {
+                                toast.error(result.message);
+                            }
+                        })
+                        .catch(() => {/* error handled by mutation */});
+                }
+            } else {
+                toast.error(`Failed to connect Google Drive: ${event.data.error}`);
+                setIsConnectingDrive(false);
+            }
+        };
+
+        window.addEventListener('message', handler);
+        return () => window.removeEventListener('message', handler);
+    }, [refetchDriveScopes, createSheetMutation]);
 
     const { data: apiResponse, isLoading: loading, error } = useCostingSheets(
-        activeTab as TabKey,
-        { page: pagination.pageIndex + 1, limit: pagination.pageSize },
+        activeTab,
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
@@ -69,6 +115,7 @@ const CostingSheets = () => {
     const handleCreateCosting = useCallback(async (row: CostingSheetDashboardRowWithTimer) => {
         // Check if user has Drive scopes
         if (!driveScopes?.hasScopes) {
+            pendingTenderId.current = row.tenderId;
             setConnectDriveOpen(true);
             return;
         }
@@ -122,11 +169,47 @@ const CostingSheets = () => {
         }
     }, [duplicateInfo, createSheetWithNameMutation]);
 
-    const handleConnectDrive = useCallback(() => {
-        // Redirect to Google OAuth with Drive scopes
-        const authUrl = `${import.meta.env.VITE_API_URL}/integrations/google/drive-auth-url`;
-        window.location.href = authUrl;
-    }, []);
+    const handleConnectDrive = useCallback(async () => {
+        if (isConnectingDrive) return;
+
+        setIsConnectingDrive(true);
+        try {
+            // Fetch the OAuth URL from the API
+            const response = await axiosInstance.get('/integrations/google/drive-auth-url');
+            const data = response.data;
+
+            // Check if user already has scopes
+            if (data.hasScopes) {
+                toast.success('Google Drive is already connected');
+                setConnectDriveOpen(false);
+                return;
+            }
+
+            // Extract the OAuth URL from the response
+            if (data.url && typeof data.url === 'string') {
+                // Open Google OAuth in a popup
+                const w = 600;
+                const h = 700;
+                const left = Math.max(0, (window.screen.width - w) / 2);
+                const top = Math.max(0, (window.screen.height - h) / 2);
+                window.open(
+                    data.url,
+                    'google-drive-auth',
+                    `width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=no`,
+                );
+            } else {
+                throw new Error('Invalid response from server: missing OAuth URL');
+            }
+        } catch (error: any) {
+            const errorMessage = error?.response?.data?.message ||
+                error?.message ||
+                'Failed to connect Google Drive. Please try again.';
+            toast.error(errorMessage);
+            console.error('Failed to get Google Drive auth URL:', error);
+        } finally {
+            setIsConnectingDrive(false);
+        }
+    }, [isConnectingDrive]);
 
     const costingSheetActions: ActionItem<CostingSheetDashboardRowWithTimer>[] = useMemo(() => [
         {
@@ -142,7 +225,7 @@ const CostingSheets = () => {
                 navigate(paths.tendering.costingSheetSubmit(row.tenderId));
             },
             icon: <Send className="h-4 w-4" />,
-            visible: (row) => row.googleSheetUrl ? true : false,
+            visible: (row) => Boolean(row.googleSheetUrl) && activeTab === 'pending',
         },
         {
             label: 'Edit Costing',
@@ -167,22 +250,28 @@ const CostingSheets = () => {
             },
             icon: <Eye className="h-4 w-4" />,
         },
+        {
+            label : 'Mark As DNB',
+            onClick: (row) => navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'costing-sheet')),
+            icon: <XCircle className ="h-4 w-4" />,
+            visible : () =>  activeTab != "tender-dnb"
+        }
     ], [navigate, handleCreateCosting, isCreating]);
 
     const tabsConfig = useMemo(() => {
         return [
             {
-                key: 'pending' as TabKey,
+                key: 'pending' as CostingSheetTab,
                 name: 'Costing Sheet Pending',
                 count: counts?.pending || 0,
             },
             {
-                key: 'submitted' as TabKey,
+                key: 'submitted' as CostingSheetTab,
                 name: 'Costing Sheet Submitted',
                 count: counts?.submitted || 0,
             },
             {
-                key: 'tender-dnb' as TabKey,
+                key: 'tender-dnb' as CostingSheetTab,
                 name: 'Tender DNB',
                 count: counts?.['tender-dnb'] || 0,
             },
@@ -190,8 +279,10 @@ const CostingSheets = () => {
     }, [counts]);
 
     const colDefs = useMemo<ColDef<CostingSheetDashboardRowWithTimer>[]>(() => [
-        tenderNameCol<CostingSheetDashboardRowWithTimer>('tenderNo', {
+        tenderNameCol<CostingSheetDashboardRowWithTimer>('tenderName', {
             headerName: 'Tender Details',
+            field: 'tenderName',
+            colId: 'tenderName',
             filter: true,
             width: 200,
         }),
@@ -204,46 +295,27 @@ const CostingSheets = () => {
             sortable: true,
             filter: true,
         },
-        {
+        dateCol<CostingSheetDashboardRowWithTimer>('dueDate', { includeTime: true }, {
+            headerName: 'Due Date',
             field: 'dueDate',
             colId: 'dueDate',
-            headerName: 'Due Date',
             width: 140,
-            valueGetter: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
             sortable: true,
             filter: true,
-        },
-        {
-            field: 'emdAmount',
-            colId: 'emdAmount',
-            headerName: 'EMD',
+        }),
+        currencyCol<CostingSheetDashboardRowWithTimer>('emdAmount', {
+            field: "emdAmount",
+            colId: "emdAmount",
+            headerName: "EMD",
+            filter: true,
+            sortable: true,
             width: 100,
-            valueGetter: (params: any) => {
-                const value = params.data?.emdAmount;
-                if (!value) return '—';
-                return formatINR(parseFloat(value));
-            },
-            sortable: true,
-            filter: true,
-        },
-        {
-            field: 'gstValues',
-            colId: 'gstValues',
-            headerName: 'Tender Value',
-            width: 120,
-            valueGetter: (params: any) => {
-                const value = params.data?.gstValues;
-                if (value === null || value === undefined) return '—';
-                return formatINR(value);
-            },
-            sortable: true,
-            filter: true,
-        },
+        }),
         {
             field: 'statusName',
             colId: 'statusName',
             headerName: 'Tender Status',
-            width: 120,
+            width: 150,
             sortable: true,
             filter: true,
             cellRenderer: (params: any) => {
@@ -265,32 +337,14 @@ const CostingSheets = () => {
                 return <Badge variant={status === 'Submitted' ? 'success' : status === 'Rejected/Redo' ? 'destructive' : 'secondary'}>{status}</Badge>;
             },
         },
-        {
-            field: 'submittedFinalPrice',
-            colId: 'submittedFinalPrice',
-            headerName: 'Final Price',
-            width: 130,
-            valueGetter: (params: any) => {
-                const value = params.data?.submittedFinalPrice;
-                if (!value) return '—';
-                return formatINR(parseFloat(value));
-            },
-            sortable: true,
+        currencyCol<CostingSheetDashboardRowWithTimer>('submittedFinalPrice', {
+            field: "submittedFinalPrice",
+            colId: "submittedFinalPrice",
+            headerName: "Final Price",
             filter: true,
-        },
-        {
-            field: 'submittedBudgetPrice',
-            colId: 'submittedBudgetPrice',
-            headerName: 'Budget',
-            width: 130,
-            valueGetter: (params: any) => {
-                const value = params.data?.submittedBudgetPrice;
-                if (!value) return '—';
-                return formatINR(parseFloat(value));
-            },
             sortable: true,
-            filter: true,
-        },
+            width: 130,
+        }),
         {
             field: 'googleSheetUrl',
             headerName: 'Sheet',
@@ -316,7 +370,7 @@ const CostingSheets = () => {
         {
             field: 'timer',
             headerName: 'Timer',
-            width: 150,
+            width: 110,
             cellRenderer: (params: any) => {
                 const { data } = params;
                 const timer = data?.timer;
@@ -398,8 +452,8 @@ const CostingSheets = () => {
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)}>
-                    <TabsList className="m-auto">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CostingSheetTab)}>
+                    <TabsList className="m-auto mb-4">
                         {tabsConfig.map((tab) => (
                             <TabsTrigger
                                 key={tab.key}
@@ -415,6 +469,31 @@ const CostingSheets = () => {
                             </TabsTrigger>
                         ))}
                     </TabsList>
+
+                    {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                    <div className="flex items-center gap-4 px-6 pb-4">
+                        {/* Quick Filters (Left) */}
+                        <QuickFilter options={[
+                            { label: 'This Week', value: 'this-week' },
+                            { label: 'This Month', value: 'this-month' },
+                            { label: 'This Year', value: 'this-year' },
+                        ]} value={search} onChange={(value) => setSearch(value)} />
+
+                        {/* Search Bar (Center) - Flex grow */}
+                        <div className="flex-1 flex justify-end">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-8 w-64"
+                                />
+                            </div>
+                        </div>
+
+                    </div>
 
                     {tabsConfig.map((tab) => (
                         <TabsContent
@@ -443,6 +522,9 @@ const CostingSheets = () => {
                                             rowCount={totalRows}
                                             paginationState={pagination}
                                             onPaginationChange={setPagination}
+                                            onPageSizeChange={handlePageSizeChange}
+                                            showTotalCount={true}
+                                            showLengthChange={true}
                                             gridOptions={{
                                                 defaultColDef: {
                                                     editable: false,
@@ -482,11 +564,15 @@ const CostingSheets = () => {
                         </ul>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setConnectDriveOpen(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setConnectDriveOpen(false)}
+                            disabled={isConnectingDrive}
+                        >
                             Cancel
                         </Button>
-                        <Button onClick={handleConnectDrive}>
-                            Connect Google Drive
+                        <Button onClick={handleConnectDrive} disabled={isConnectingDrive}>
+                            {isConnectingDrive ? 'Connecting...' : 'Connect Google Drive'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -543,6 +629,15 @@ const CostingSheets = () => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </Card>
     );
 };

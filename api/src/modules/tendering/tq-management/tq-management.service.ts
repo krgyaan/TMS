@@ -8,7 +8,8 @@ import { users } from '@db/schemas/auth/users.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
 import { tenderQueries } from '@db/schemas/tendering/tender-queries.schema';
-import { tenderQueryItems } from '@db/schemas/tendering';
+import { tenderQueryItems, tenderResults, tqTypes } from '@db/schemas/tendering';
+import { teams } from '@db/schemas/master/teams.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
@@ -17,6 +18,8 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { TenderResultService } from '../tender-result/tender-result.service';
 
 export interface TqManagementDashboardCounts {
     awaited: number;
@@ -35,6 +38,13 @@ export type TqManagementFilters = {
     sortOrder?: 'asc' | 'desc';
 };
 
+export type TqTooltipItem = {
+    seqNo: number;
+    status: string;
+    receivedAt: Date | null;
+    typeNames: string[];
+}
+
 export type TqManagementDashboardRow = {
     tenderId: number;
     tenderNo: string;
@@ -48,6 +58,7 @@ export type TqManagementDashboardRow = {
     tqId: number | null;
     tqCount: number;
     bidSubmissionId: number | null;
+    tqTooltipData: TqTooltipItem[];
 }
 
 @Injectable()
@@ -60,12 +71,53 @@ export class TqManagementService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly tenderResulService : TenderResultService,
     ) { }
+
+    /**
+     * Build role-based filter conditions for tender queries
+     */
+    private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
+        const roleFilterConditions: any[] = [];
+
+        if (user && user.roleId) {
+            if (user.dataScope === 'all') {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+            } else if (user.canSwitchTeams && teamId !== undefined && teamId !== null) {
+                // Role can switch teams and selected a specific team
+                roleFilterConditions.push(eq(tenderInfos.team, teamId));
+            } else if (user.dataScope === 'team') {
+                // Team-scoped roles: Filter by primary team
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            } else {
+                // Self-scoped roles: Show only own records
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            }
+        } else {
+            // No user provided - return empty for security
+            roleFilterConditions.push(sql`1 = 0`);
+        }
+
+        return roleFilterConditions;
+    }
 
     /**
      * Get dashboard data by tab
      */
     async getDashboardData(
+        user?: ValidatedUser,
+        teamId?: number,
         tabKey?: 'awaited' | 'received' | 'replied' | 'qualified' | 'disqualified',
         filters?: {
             page?: number;
@@ -87,6 +139,10 @@ export class TqManagementService {
             eq(bidSubmissions.status, 'Bid Submitted'),
         ];
 
+        // Apply role-based filtering
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        conditions.push(...roleFilterConditions);
+
         // Latest TQ per tender (using subquery to get latest per tender)
         const latestTq = this.db.$with('latest_tq').as(
             this.db
@@ -103,7 +159,7 @@ export class TqManagementService {
                         SELECT tq2.id
                         FROM ${tenderQueries} tq2
                         WHERE tq2.tender_id = ${tenderQueries.tenderId}
-                        ORDER BY tq2.created_at DESC, tq2.id DESC
+                        ORDER BY tq2.updated_at DESC, tq2.created_at DESC, tq2.id DESC
                         LIMIT 1
                     )`
                 )
@@ -113,10 +169,11 @@ export class TqManagementService {
         if (activeTab === 'awaited') {
             conditions.push(
                 or(
-                    isNull(latestTq.id as any),
-                    eq(latestTq.status, 'TQ awaited') as any
+                    isNull(tenderResults.id),
+                    eq(tenderResults.tqStatus, 'pending') as any
                 ) as any
             );
+            conditions.push(isNull(latestTq.id) as any);
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'received') {
             conditions.push(eq(latestTq.status, 'TQ received') as any);
@@ -126,35 +183,61 @@ export class TqManagementService {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'qualified') {
             conditions.push(
+                or (
                 inArray(latestTq.status, [
                     'Qualified, No TQ received',
+                    'Qualified, TQ replied',
+                    'Qualified, TQ Replied',
                     'TQ replied, Qualified',
-                ]) as any
+                    'TQ Replied, Qualified'
+                ]) as any,
+                and (
+                    isNotNull(tenderResults.id),
+                    inArray(tenderResults.tqStatus, 
+                        ['Qualified, No TQ received',
+                        'Qualified, TQ replied',
+                        'Qualified, TQ Replied',
+                        'TQ replied, Qualified',
+                        'TQ Replied, Qualified'])
+                    ) as any,
+                ) as any
             );
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'disqualified') {
             conditions.push(
+                or (
                 inArray(latestTq.status, [
                     'Disqualified, No TQ received',
                     'Disqualified, TQ missed',
-                ]) as any
+                    'Disqualified, TQ Missed',
+                ]) as any,
+                and (
+                    isNotNull(tenderResults.id),
+                    inArray(tenderResults.tqStatus, 
+                        ['Disqualified, No TQ received',
+                        'Disqualified, TQ missed',
+                        'Disqualified, TQ Missed'])
+                    ) as any,
+                ) as any
             );
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
 
-        // Search
+        // Search - search across all rendered columns
         if (filters?.search) {
             const searchStr = `%${filters.search}%`;
-            conditions.push(
-                sql`(
-                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
-                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
-                    ${users.name} ILIKE ${searchStr} OR
-                    ${statuses.name} ILIKE ${searchStr}
-                )`
-            );
+            const searchConditions: any[] = [
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+                sql`${bidSubmissions.submissionDatetime}::text ILIKE ${searchStr}`,
+                sql`${latestTq.tqSubmissionDeadline}::text ILIKE ${searchStr}`,
+                sql`${latestTq.status} ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
 
         const whereClause = and(...conditions);
@@ -192,6 +275,7 @@ export class TqManagementService {
             .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
             .from(tenderInfos)
             .leftJoin(latestTq, eq(latestTq.tenderId, tenderInfos.id))
+            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
@@ -237,6 +321,7 @@ export class TqManagementService {
             .leftJoin(latestTq, eq(latestTq.tenderId, tenderInfos.id))
             .leftJoin(tqCount, eq(tqCount.tenderId, tenderInfos.id))
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .innerJoin(
@@ -265,24 +350,82 @@ export class TqManagementService {
             tqSubmissionDeadline: row.tqSubmissionDeadline ?? null,
             bidSubmissionId: row.bidSubmissionId,
             tqCount: row.tqCount ?? 0,
+            tqTooltipData: [],
         }));
 
+        // Fetch TQ tooltip data for the current page's tenders
+        const pageTenderIds = result.map(r => r.tenderId).filter(Boolean);
+        if (pageTenderIds.length > 0) {
+            const tooltipRows = await this.db
+                .select({
+                    tenderId: tenderQueries.tenderId,
+                    tqId: tenderQueries.id,
+                    status: tenderQueries.status,
+                    receivedAt: tenderQueries.receivedAt,
+                    createdAt: tenderQueries.createdAt,
+                    srNo: tenderQueryItems.srNo,
+                    typeName: tqTypes.name,
+                })
+                .from(tenderQueries)
+                .leftJoin(tenderQueryItems, eq(tenderQueryItems.tenderQueryId, tenderQueries.id))
+                .leftJoin(tqTypes, eq(tqTypes.id, tenderQueryItems.tqTypeId))
+                .where(inArray(tenderQueries.tenderId, pageTenderIds))
+                .orderBy(tenderQueries.createdAt, tenderQueryItems.srNo);
+
+            // Build tooltip data per tender
+            const tooltipMap = new Map<number, TqTooltipItem[]>();
+            const tqSeen = new Map<string, number>();
+
+            for (const tqRow of tooltipRows) {
+                if (!tooltipMap.has(tqRow.tenderId)) {
+                    tooltipMap.set(tqRow.tenderId, []);
+                }
+                const tenderTqs = tooltipMap.get(tqRow.tenderId)!;
+                const tqKey = `${tqRow.tenderId}-${tqRow.tqId}`;
+                let entryIdx = tqSeen.get(tqKey);
+
+                if (entryIdx === undefined) {
+                    entryIdx = tenderTqs.length;
+                    tqSeen.set(tqKey, entryIdx);
+                    tenderTqs.push({
+                        seqNo: entryIdx + 1,
+                        status: tqRow.status ?? '',
+                        receivedAt: tqRow.receivedAt,
+                        typeNames: [],
+                    });
+                }
+
+                if (tqRow.typeName && !tenderTqs[entryIdx].typeNames.includes(tqRow.typeName)) {
+                    tenderTqs[entryIdx].typeNames.push(tqRow.typeName);
+                }
+            }
+
+            // Attach tooltip data to each dashboard row
+            for (const row of result) {
+                row.tqTooltipData = tooltipMap.get(row.tenderId) ?? [];
+            }
+        }
 
         return wrapPaginatedResponse(result, total, page, limit);
     }
 
-    async getDashboardCounts(): Promise<TqManagementDashboardCounts> {
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<TqManagementDashboardCounts> {
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             eq(bidSubmissions.status, 'Bid Submitted'),
+            ...roleFilterConditions,
         ];
 
         // Get all tenders matching base conditions
         const allTenders = await this.db
             .select({
                 tenderId: tenderInfos.id,
+                tenderResultId: tenderResults.id,
+                tqStatus: tenderResults.tqStatus,
             })
             .from(tenderInfos)
             .leftJoin(
@@ -292,6 +435,7 @@ export class TqManagementService {
                     eq(bidSubmissions.status, 'Bid Submitted')
                 )
             )
+            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
             .where(and(...baseConditions));
 
         const tenderIds = allTenders.map(t => t.tenderId);
@@ -307,16 +451,17 @@ export class TqManagementService {
             };
         }
 
-        // Get all TQ records for these tenders, ordered by createdAt DESC
+        // Get all TQ records for these tenders, ordered by updatedAt DESC to prioritize recently updated TQs
         const allTqs = await this.db
             .select({
                 tenderId: tenderQueries.tenderId,
                 status: tenderQueries.status,
                 createdAt: tenderQueries.createdAt,
+                updatedAt: tenderQueries.updatedAt,
             })
             .from(tenderQueries)
             .where(inArray(tenderQueries.tenderId, tenderIds))
-            .orderBy(desc(tenderQueries.createdAt));
+            .orderBy(desc(tenderQueries.updatedAt), desc(tenderQueries.createdAt));
 
         // Create a map of tenderId -> latest status (first occurrence is latest due to DESC order)
         const statusMap = new Map<number, TenderQueryStatus>();
@@ -333,17 +478,32 @@ export class TqManagementService {
         let qualified = 0;
         let disqualified = 0;
 
-        for (const tenderId of tenderIds) {
-            const status = statusMap.get(tenderId) || 'TQ awaited';
-            if (status === 'TQ awaited') {
+        for (const tender of allTenders) {
+            const tenderId = tender.tenderId;
+            const latestTqStatus = statusMap.get(tenderId) || 'TQ awaited';
+            const trId = tender.tenderResultId;
+            const trTqStatus = tender.tqStatus as string | undefined | null;
+
+            // Aligning with the awaited tab condition in getDashboardData
+            if (!statusMap.has(tenderId) && (!trId || trTqStatus === 'pending')) {
                 awaited++;
-            } else if (status === 'TQ received') {
+            }
+            if (latestTqStatus === 'TQ received') {
                 received++;
-            } else if (status === 'TQ replied') {
+            }
+            if (latestTqStatus === 'TQ replied') {
                 replied++;
-            } else if (status === 'Qualified, No TQ received' || status === 'TQ replied, Qualified') {
+            }
+            if (
+                ['Qualified, No TQ received', 'Qualified, TQ replied', 'Qualified, TQ Replied', 'TQ replied, Qualified', 'TQ Replied, Qualified'].includes(latestTqStatus) ||
+                (trId && ['Qualified, No TQ received', 'Qualified, TQ replied', 'Qualified, TQ Replied', 'TQ replied, Qualified', 'TQ Replied, Qualified'].includes(trTqStatus as string))
+            ) {
                 qualified++;
-            } else if (status === 'Disqualified, No TQ received' || status === 'Disqualified, TQ missed') {
+            }
+            if (
+                ['Disqualified, No TQ received', 'Disqualified, TQ missed', 'Disqualified, TQ Missed'].includes(latestTqStatus) ||
+                (trId && ['Disqualified, No TQ received', 'Disqualified, TQ missed', 'Disqualified, TQ Missed'].includes(trTqStatus as string))
+            ) {
                 disqualified++;
             }
         }
@@ -354,7 +514,7 @@ export class TqManagementService {
             replied,
             qualified,
             disqualified,
-            total: awaited + received + replied + qualified + disqualified,
+            total: tenderIds.length,
         };
     }
 
@@ -402,10 +562,20 @@ export class TqManagementService {
     }) {
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(data.tenderId);
+
+        if(!currentTender){
+            throw new BadRequestException("Tender Not Found");
+        }
+
         const prevStatus = currentTender?.status ?? null;
+        let newStatus = prevStatus;
+
+        const changeStatus = await this.checkForStatusChange(prevStatus);
 
         // AUTO STATUS CHANGE: Update tender status to 19 (TQ Received) and track it
-        const newStatus = 19; // Status ID for "TQ Received"
+        if(changeStatus){
+            newStatus = 19; // Status ID for "TQ Received"
+        }
 
         const result = await this.db.transaction(async (tx) => {
             // Create TQ record
@@ -434,10 +604,12 @@ export class TqManagementService {
             }
 
             // Update tender status
-            await tx
-                .update(tenderInfos)
-                .set({ status: newStatus, updatedAt: new Date() })
-                .where(eq(tenderInfos.id, data.tenderId));
+            if (newStatus !== prevStatus) {
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, data.tenderId));
+            }
 
             // Track status change
             await this.tenderStatusHistoryService.trackStatusChange(
@@ -472,11 +644,21 @@ export class TqManagementService {
 
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(tqRecord.tenderId);
-        const prevStatus = currentTender?.status ?? null;
+        
+        if(!currentTender){
+            throw new BadRequestException("Tender Not Found");
+        }
+
+        const prevStatus = currentTender.status;
+        let newStatus = prevStatus;
 
         // AUTO STATUS CHANGE: Update tender status to 20 (TQ replied) and track it
         // Note: Status 40 (TQ replied, Qualified) would require additional qualification check
-        const newStatus = 20; // Status ID for "TQ replied"
+        const changeStatus = await this.checkForStatusChange(prevStatus);
+
+        if(changeStatus){
+            newStatus = 20; // Status ID for "TQ replied"
+        }
 
         const result = await this.db.transaction(async (tx) => {
             const updated = await tx
@@ -494,10 +676,12 @@ export class TqManagementService {
                 .returning();
 
             // Update tender status
-            await tx
-                .update(tenderInfos)
-                .set({ status: newStatus, updatedAt: new Date() })
-                .where(eq(tenderInfos.id, tqRecord.tenderId));
+            if (newStatus !== prevStatus) {
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, tqRecord.tenderId));
+            }
 
             // Track status change
             await this.tenderStatusHistoryService.trackStatusChange(
@@ -532,10 +716,21 @@ export class TqManagementService {
 
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(tqRecord.tenderId);
-        const prevStatus = currentTender?.status ?? null;
+
+        if(!currentTender){
+            throw new BadRequestException("Tender Not Found");
+        }
+
+        const prevStatus = currentTender?.status;
+        let newStatus = prevStatus;
 
         // AUTO STATUS CHANGE: Update tender status to 39 (Disqualified, TQ missed) and track it
-        const newStatus = 39; // Status ID for "Disqualified, TQ missed"
+
+        const changeStatus = await this.checkForStatusChange(prevStatus);
+
+        if(changeStatus){
+            newStatus = 39; // Status ID for "Disqualified, TQ missed"
+        }
 
         const result = await this.db.transaction(async (tx) => {
             const updated = await tx
@@ -551,10 +746,28 @@ export class TqManagementService {
                 .returning();
 
             // Update tender status
-            await tx
-                .update(tenderInfos)
-                .set({ status: newStatus, updatedAt: new Date() })
-                .where(eq(tenderInfos.id, tqRecord.tenderId));
+            if (newStatus !== prevStatus) {
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, tqRecord.tenderId));
+            }
+
+
+            //we also need to update the result status if the tender is qualified or disqualified
+            const {id : resultId} = await this.tenderResulService.getOrCreateForTender(tqRecord.tenderId);
+
+            //updating the actual entry to be disqualified -> The result entry
+            await this.db
+                .update(tenderResults)
+                .set({
+                    technicallyQualified: "No",
+                    status : "Disqualified",
+                    disqualificationReason: data.missedReason,
+                    tqStatus : "Disqualified, TQ missed"
+                })
+                .where(eq(tenderResults.id, resultId));
+
 
             // Track status change
             await this.tenderStatusHistoryService.trackStatusChange(
@@ -575,18 +788,30 @@ export class TqManagementService {
         return result[0];
     }
 
-    async markAsNoTq(tenderId: number, userId: number, qualified: boolean = true) {
+    async markAsNoTq(tenderId: number, userId: number, qualified: boolean = true, disqualificationReason?: string) {
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(tenderId);
-        const prevStatus = currentTender?.status ?? null;
+
+        if(!currentTender){
+            throw new BadRequestException("Tender Not Found");
+        }
+
+        const prevStatus = currentTender.status;
+        let newStatus = prevStatus;
+
+        //finding the tq_status for Result Entry 
+        let tqStatus = qualified ? 'Qualified, No TQ Recieved' : 'Disqualified, No TQ Recieved';
 
         // AUTO STATUS CHANGE: Update tender status based on qualification
         // Status 37 (Qualified, No TQ received) or Status 38 (Disqualified, No TQ received)
-        const newStatus = qualified ? 37 : 38;
+        const changeStatus = await this.checkForStatusChange(prevStatus);
+
+        if(changeStatus){
+            newStatus = qualified ? 37 : 38;
+        }
 
         const result = await this.db.transaction(async (tx) => {
             // Create a TQ record with "No TQ" status based on qualification
-            const tqStatus = qualified ? 'Qualified, No TQ received' : 'Disqualified, No TQ received';
             const [tqRecord] = await tx
                 .insert(tenderQueries)
                 .values({
@@ -595,14 +820,31 @@ export class TqManagementService {
                     receivedBy: userId,
                     receivedAt: new Date(),
                     tqSubmissionDeadline: null,
+                    missedReason: qualified ? null : disqualificationReason,
                 })
                 .returning();
 
             // Update tender status
-            await tx
-                .update(tenderInfos)
-                .set({ status: newStatus, updatedAt: new Date() })
-                .where(eq(tenderInfos.id, tenderId));
+            if (newStatus !== prevStatus) {
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, tenderId));
+            }
+
+            //we also need to update the result status if the tender is qualified or disqualified
+            const {id : resultId} = await this.tenderResulService.getOrCreateForTender(tenderId);
+
+            //updating the actual entry to be disqualified -> The result entry
+            await this.db
+                .update(tenderResults)
+                .set({
+                    technicallyQualified: qualified ? "Yes" : "No",
+                    status: qualified ? sql`CASE WHEN ${tenderResults.status} IS NULL OR ${tenderResults.status} = '' THEN 'Under Evaluation' ELSE ${tenderResults.status} END` : "Disqualified",
+                    disqualificationReason: qualified ? null : (disqualificationReason || null),
+                    tqStatus : tqStatus
+                })
+                .where(eq(tenderResults.id, resultId));
 
             // Track status change
             await this.tenderStatusHistoryService.trackStatusChange(
@@ -610,7 +852,7 @@ export class TqManagementService {
                 newStatus,
                 userId,
                 prevStatus,
-                qualified ? 'Qualified, No TQ received' : 'Disqualified, No TQ received',
+                tqStatus,
                 tx
             );
 
@@ -620,36 +862,67 @@ export class TqManagementService {
         return result;
     }
 
-    async tqQualified(id: number, userId: number, qualified: boolean = true) {
+    async tqQualified(id: number, userId: number, qualified: boolean = true, disqualificationReason?: string) {
         // Get TQ record to find tenderId
         const tqRecord = await this.findById(id);
         const tenderId = tqRecord.tenderId;
 
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(tenderId);
-        const prevStatus = currentTender?.status ?? null;
+
+        if(!currentTender){
+            throw new BadRequestException("Tender Not Found");
+        }
+
+
+        const prevStatus = currentTender.status;
+        let newStatus = prevStatus;
 
         // AUTO STATUS CHANGE: Update tender status based on qualification
         // Status 40 (TQ replied, Qualified) or Status 39 (Disqualified, TQ missed)
-        const newStatus = qualified ? 40 : 39;
+        const changeStatus = await this.checkForStatusChange(prevStatus);
+        
+        if(changeStatus){
+            newStatus = qualified ? 40 : 39;
+        }
+        
+        //finding the tq_status for Result Entry 
+        let tqStatus = qualified ? 'Qualified, TQ Replied' : 'Disqualified, TQ Missed';
 
         const result = await this.db.transaction(async (tx) => {
             // Update TQ record status based on qualification
-            const tqStatus = qualified ? 'TQ replied, Qualified' : 'Disqualified, TQ missed';
             const updated = await tx
                 .update(tenderQueries)
                 .set({
                     status: tqStatus,
+                    missedReason: qualified ? null : disqualificationReason,
                     updatedAt: new Date(),
                 })
                 .where(eq(tenderQueries.id, id))
                 .returning();
 
             // Update tender status
-            await tx
-                .update(tenderInfos)
-                .set({ status: newStatus, updatedAt: new Date() })
-                .where(eq(tenderInfos.id, tenderId));
+            if (newStatus !== prevStatus) {
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, tenderId));
+            }
+            
+            //we also need to update the result status if the tender is qualified or disqualified
+            const {id : resultId} = await this.tenderResulService.getOrCreateForTender(tqRecord.tenderId);
+
+            //updating the actual entry to be disqualified -> The result entry
+            await this.db
+                .update(tenderResults)
+                .set({
+                    technicallyQualified: qualified ? "Yes" : "No",
+                    status : qualified ? "Under Evaluation" : "Disqualified",
+                    disqualificationReason: qualified ? null : (disqualificationReason || null),
+                    tqStatus : tqStatus,
+                })
+                .where(eq(tenderResults.id, resultId));
+
 
             // Track status change
             await this.tenderStatusHistoryService.trackStatusChange(
@@ -657,14 +930,28 @@ export class TqManagementService {
                 newStatus,
                 userId,
                 prevStatus,
-                qualified ? 'TQ Qualified' : 'TQ Disqualified',
+                tqStatus,
                 tx
             );
 
             return updated[0];
         });
 
+        // Send email notification only when qualified
+        if (qualified) {
+            await this.sendTqQualifiedEmail(tenderId, userId);
+        }
+
         return result;
+    }
+
+    async checkForStatusChange(status) {
+        const statusList = await this.db.select().from(statuses).where(inArray(statuses.tenderCategory,['lost', 'won']));
+        const resultStatus = statusList.map((val) => Number(val.id));
+
+        const changeStatus = status && !resultStatus.includes(Number(status));
+
+        return changeStatus;
     }
 
     async updateTqReceived(
@@ -710,6 +997,19 @@ export class TqManagementService {
     }
 
     /**
+     * Get accounts team ID
+     */
+    private async getAccountsTeamId(): Promise<number | null> {
+        const [accountsTeam] = await this.db
+            .select({ id: teams.id })
+            .from(teams)
+            .where(sql`LOWER(${teams.name}) LIKE '%account%'`)
+            .limit(1);
+
+        return accountsTeam?.id || null;
+    }
+
+    /**
      * Helper method to send email notifications
      */
     private async sendEmail(
@@ -719,7 +1019,7 @@ export class TqManagementService {
         subject: string,
         template: string,
         data: Record<string, any>,
-        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[]; attachments?: { files: string[]; baseDir?: string } }
     ) {
         try {
             await this.emailService.sendTenderEmail({
@@ -731,6 +1031,7 @@ export class TqManagementService {
                 subject,
                 template,
                 data,
+                attachments: recipients.attachments,
             });
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
@@ -743,7 +1044,7 @@ export class TqManagementService {
      */
     private async sendTqReceivedEmail(
         tenderId: number,
-        tqRecord: { id: number; tqSubmissionDeadline: Date | null },
+        tqRecord: { id: number; tqSubmissionDeadline: Date | null; tqDocumentReceived?: string | null },
         receivedBy: number,
         tqItems: Array<{ tqTypeId: number; queryDescription: string }>
     ) {
@@ -799,15 +1100,24 @@ export class TqManagementService {
             coordinator: coordinatorName,
         };
 
+        // Build CC recipients
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+            { type: 'role', role: 'Team Leader', teamId: tender.team },
+        ];
+
         await this.sendEmail(
             'tq.received',
             tenderId,
             receivedBy,
-            `TQ Received: ${tender.tenderNo}`,
+            `TQ Received - ${tender.tenderName}`,
             'tq-received',
             emailData,
             {
                 to: [{ type: 'user', userId: tender.teamMember }],
+                cc: ccRecipients,
+                attachments: tqRecord.tqDocumentReceived ? { files: [tqRecord.tqDocumentReceived] } : undefined,
             }
         );
     }
@@ -817,7 +1127,7 @@ export class TqManagementService {
      */
     private async sendTqRepliedEmail(
         tenderId: number,
-        tqRecord: { repliedDatetime: Date | null },
+        tqRecord: { repliedDatetime: Date | null; repliedDocument?: string | null; proofOfSubmission?: string | null },
         repliedBy: number
     ) {
         const tender = await this.tenderInfosService.findById(tenderId);
@@ -876,15 +1186,96 @@ export class TqManagementService {
             teName: teUser.name,
         };
 
+        // Build CC recipients
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+        ];
+
+        const attachmentFiles: string[] = [];
+        if (tqRecord.repliedDocument) {
+            attachmentFiles.push(tqRecord.repliedDocument);
+        }
+        if (tqRecord.proofOfSubmission) {
+            attachmentFiles.push(tqRecord.proofOfSubmission);
+        }
+
         await this.sendEmail(
             'tq.replied',
             tenderId,
             repliedBy,
-            `TQ Replied: ${tender.tenderNo}`,
+            `TQ Replied - ${tender.tenderName}`,
             'tq-replied',
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: ccRecipients,
+                attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
+            }
+        );
+    }
+
+    /**
+     * Send TQ qualified email
+     */
+    private async sendTqQualifiedEmail(
+        tenderId: number,
+        qualifiedBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        if (!teUser) return;
+
+        // Get coordinator name
+        const coordinatorEmails = await this.recipientResolver.getEmailsByRole('Coordinator', tender.team);
+        let coordinatorName = 'Coordinator';
+        if (coordinatorEmails.length > 0) {
+            const [coordinatorUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, coordinatorEmails[0]))
+                .limit(1);
+            if (coordinatorUser?.name) {
+                coordinatorName = coordinatorUser.name;
+            }
+        }
+
+        // Format due date
+        const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        const emailData = {
+            te: teUser.name,
+            tender_name: tender.tenderName,
+            tender_no: tender.tenderNo,
+            dueDate,
+            coordinator: coordinatorName,
+        };
+
+        // Build CC recipients
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+            { type: 'role', role: 'Team Leader', teamId: tender.team },
+        ];
+
+        await this.sendEmail(
+            'tq.qualified',
+            tenderId,
+            qualifiedBy,
+            `TQ Qualified - ${tender.tenderName}`,
+            'tq-qualified',
+            emailData,
+            {
+                to: [{ type: 'user', userId: tender.teamMember }],
+                cc: ccRecipients,
             }
         );
     }
@@ -937,15 +1328,22 @@ export class TqManagementService {
             te_name: teUser.name,
         };
 
+        // Build CC recipients
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+        ];
+
         await this.sendEmail(
             'tq.missed',
             tenderId,
             changedBy,
-            `TQ Missed: ${tender.tenderNo}`,
+            `TQ Missed - ${tender.tenderName}`,
             'tq-missed',
             emailData,
             {
                 to: [{ type: 'user', userId: tender.teamMember }],
+                cc: ccRecipients,
             }
         );
     }

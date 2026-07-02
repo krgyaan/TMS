@@ -1,14 +1,4 @@
-import {
-    Body,
-    Controller,
-    Get,
-    HttpCode,
-    HttpStatus,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-} from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
 import { TenderInfoSheetsService } from '@/modules/tendering/info-sheets/info-sheets.service';
 import { TenderInfoSheetPayloadSchema } from '@/modules/tendering/info-sheets/dto/info-sheet.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
@@ -21,6 +11,11 @@ export class TenderInfoSheetsController {
     @Get(':tenderId')
     async getByTender(@Param('tenderId', ParseIntPipe) tenderId: number) {
         return this.infoSheetsService.findByTenderId(tenderId);
+    }
+
+    @Get(':tenderId/contacts')
+    async getTenderContacts(@Param('tenderId', ParseIntPipe) tenderId: number) {
+        return this.infoSheetsService.getTenderContacts(tenderId);
     }
 
     @Post(':tenderId')

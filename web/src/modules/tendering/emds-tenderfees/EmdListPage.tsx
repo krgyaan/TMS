@@ -1,37 +1,53 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
-import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import { EyeIcon, Pencil, Plus, RefreshCw } from "lucide-react";
+import { CheckCircle, EyeIcon, Pencil, Plus, RefreshCw, Search, Send, Download, XCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsTrigger, TabsList } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { usePaymentDashboard, usePaymentDashboardCounts } from "@/hooks/api/useEmds";
+import { usePaymentDashboard, usePaymentDashboardCounts } from "@/hooks/api/usePaymentRequests";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import type { ActionItem } from "@/components/ui/ActionMenu";
-import type { PendingTenderRow, PendingTenderRowWithTimer, PaymentRequestRow, PaymentRequestRowWithTimer } from "./helpers/emdTenderFee.types";
-import { tenderNameCol } from "@/components/data-grid";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { PendingTenderRowWithTimer, PaymentRequestRowWithTimer } from "./helpers/payment-request.types";
+import { currencyCol, tenderNameCol } from "@/components/data-grid";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
+import { ChangeStatusModal } from "../tenders/components/ChangeStatusModal";
+import { useTenderingPermissions } from "../hooks/useTenderingPermissions";
+import { formatINR } from "@/hooks/useINRFormatter";
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
+import { demandDraftsService } from '@/services/api/demand-drafts.service';
+import { fdrsService } from '@/services/api/fdrs.service';
+import { bankTransfersService } from '@/services/api/bank-transfers.service';
+import { payOnPortalsService } from '@/services/api/pay-on-portals.service';
+import { chequesService } from '@/services/api/cheques.service';
+import { bankGuaranteesService } from '@/services/api/bank-guarantees.service';
+import { paymentRequestsService } from '@/services/api/payment-requests.service';
+import { useAuth } from "@/contexts/AuthContext";
 
-// Tab configuration
 const TABS = [
-    { value: 'pending', label: 'EMD Request Pending' },
-    { value: 'sent', label: 'EMD Request Sent' },
-    { value: 'approved', label: 'EMD Paid' },
-    { value: 'rejected', label: 'EMD Rejected' },
-    { value: 'returned', label: 'EMD Returned' },
-    { value: 'tender-dnb', label: 'Tender DNB' },
+    { value: 'pending', label: 'Request Pending' },
+    { value: 'sent', label: 'Request Sent' },
+    { value: 'paid', label: 'EMD Paid' },
+    { value: 'rejected', label: 'Rejected' },
+    { value: 'returned', label: 'Returned' },
+    { value: 'fees', label: 'Tender/Processing Fees' },
+    { value: 'others', label: 'Others' },
+    { value: 'dnb', label: 'DNB' },
 ] as const;
 
 type TabValue = typeof TABS[number]['value'];
 
-// Status badge colors
 const STATUS_COLORS: Record<string, string> = {
     'Pending': 'bg-yellow-100 text-yellow-800 border-yellow-200',
     'Sent': 'bg-blue-100 text-blue-800 border-blue-200',
@@ -40,14 +56,16 @@ const STATUS_COLORS: Record<string, string> = {
     'Returned': 'bg-purple-100 text-purple-800 border-purple-200',
 };
 
-// Purpose badge colors
 const PURPOSE_COLORS: Record<string, string> = {
     'EMD': 'bg-blue-50 text-blue-700 border-blue-200',
     'Tender Fee': 'bg-green-50 text-green-700 border-green-200',
     'Processing Fee': 'bg-purple-50 text-purple-700 border-purple-200',
+    'Security Deposit': 'bg-orange-50 text-orange-700 border-orange-200',
+    'Performance BG': 'bg-cyan-50 text-cyan-700 border-cyan-200',
+    'Surety Bond': 'bg-pink-50 text-pink-700 border-pink-200',
+    'Other Payment': 'bg-gray-50 text-gray-700 border-gray-200',
 };
 
-// Instrument type display
 const INSTRUMENT_LABELS: Record<string, string> = {
     'DD': 'Demand Draft',
     'FDR': 'Fixed Deposit',
@@ -59,36 +77,211 @@ const INSTRUMENT_LABELS: Record<string, string> = {
 
 const EmdsAndTenderFeesPage = () => {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<TabValue>('pending');
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
 
-    // Reset pagination when tab changes
-    useEffect(() => {
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab]);
+    const {
+        activeTab,
+        setActiveTab,
+        search,
+        setSearch,
+        debouncedSearch,
+        pagination,
+        setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState({
+        storageKey: 'emd-tenderfees',
+        defaultTab: 'pending' as TabValue,
+    });
 
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
-            }));
-        setSortModel(sortModel);
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, []);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
+    const { hasTenderingPermission } = useTenderingPermissions();
+    const [exporting, setExporting] = useState(false);
+    const { isAdmin, isSuperUser } = useAuth();
+    const [consentModal, setConsentModal] = useState<{
+        open: boolean;
+        row: PaymentRequestRowWithTimer | null;
+    }>({ open: false, row: null });
+
+    const EXPORT_TAB_OPTIONS = [
+        { value: 'pending', label: 'Request Pending' },
+        { value: 'sent', label: 'Request Sent' },
+        { value: 'paid', label: 'EMD Paid' },
+        { value: 'rejected', label: 'Rejected' },
+        { value: 'returned', label: 'Returned' },
+        { value: 'fees', label: 'Tender/Processing Fees' },
+        { value: 'others', label: 'Others' },
+        { value: 'dnb', label: 'DNB' },
+    ];
+    const [exportTab, setExportTab] = useState('');
+
+    const getActionFormData = async (instrumentId: number, instrumentType: string): Promise<Record<string, any>> => {
+        try {
+            switch (instrumentType) {
+                case 'DD': return await demandDraftsService.getActionFormData(instrumentId);
+                case 'FDR': return await fdrsService.getActionFormData(instrumentId);
+                case 'Bank Transfer': return await bankTransfersService.getActionFormData(instrumentId);
+                case 'Portal Payment': return await payOnPortalsService.getActionFormData(instrumentId);
+                case 'Cheque': return await chequesService.getActionFormData(instrumentId);
+                case 'BG': return await bankGuaranteesService.getActionFormData(instrumentId);
+                default: return {};
+            }
+        } catch {
+            return {};
+        }
+    };
+
+    const fetchAllRows = async (tab: string): Promise<any[]> => {
+        const allRows: any[] = [];
+        let page = 1;
+        const limit = 100;
+        let total = 0;
+        do {
+            const data = await paymentRequestsService.getDashboard({ tab: tab as any, page, limit });
+            allRows.push(...(data.data || []));
+            total = data.meta?.total || data.data?.length || 0;
+            page++;
+        } while (allRows.length < total);
+        return allRows;
+    };
+
+    const handleExport = async () => {
+        if (!exportTab) return;
+        setExporting(true);
+        try {
+            const rows = await fetchAllRows(exportTab);
+            if (rows.length === 0) return;
+
+            const isPendingTab = exportTab === 'pending' || exportTab === 'dnb';
+
+            // Build base rows with dashboard fields
+            let exportRows: Record<string, any>[];
+
+            if (isPendingTab) {
+                exportRows = rows.map((r: any) => ({
+                    'Tender No': r.tenderNo || '',
+                    'Tender Name': r.tenderName || '',
+                    'Tender Value': r.gstValues || '',
+                    'EMD': r.emd || '',
+                    'Tender Fee': r.tenderFee || '',
+                    'Processing Fee': r.processingFee || '',
+                    'Member': r.teamMember || '',
+                    'Due Date': r.dueDate ? new Date(r.dueDate).toLocaleDateString('en-GB') : '',
+                    'Status': r.statusName || '',
+                }));
+            } else {
+                // First map basic dashboard fields
+                exportRows = rows.map((r: any) => ({
+                    'Tender No': r.tenderNo || '',
+                    'Tender Name': r.tenderName || '',
+                    'Purpose': r.purpose || '',
+                    'Amount Required': r.amountRequired || '',
+                    'Mode': r.instrumentType || '',
+                    'Favouring': r.favouring || '',
+                    'Status': r.displayStatus || '',
+                    'Member': r.teamMember || '',
+                    'Due Date': r.dueDate ? new Date(r.dueDate).toLocaleDateString('en-GB') : '',
+                    'Bid Valid Till': r.bidValid ? new Date(r.bidValid).toLocaleDateString('en-GB') : '',
+                }));
+
+                // For tabs with advanced forms (paid, fees, others, returned, rejected), fetch action form data per instrument
+                if (['paid', 'fees', 'others', 'returned', 'rejected'].includes(exportTab)) {
+                    for (let i = 0; i < rows.length; i++) {
+                        const row = rows[i];
+                        if (row.instrumentId && row.instrumentType) {
+                            const formData = await getActionFormData(row.instrumentId, row.instrumentType);
+                            if (formData && Object.keys(formData).length > 0) {
+                                const flat = flattenFormData(formData, row.instrumentType);
+                                Object.assign(exportRows[i], flat);
+                            }
+                        }
+                    }
+                }
+            }
+
+            const ws = XLSX.utils.json_to_sheet(exportRows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, exportTab);
+            const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            saveAs(new Blob([buf]), `${exportTab}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        } catch (err) {
+            console.error('Export failed:', err);
+        } finally {
+            setExporting(false);
+        }
+    };
+
+    const flattenFormData = (data: Record<string, any>, instrumentType: string): Record<string, any> => {
+        const out: Record<string, any> = {};
+        const prefix = instrumentType === 'DD' ? 'DD' : instrumentType === 'FDR' ? 'FDR' : instrumentType === 'BG' ? 'BG' : 
+                       instrumentType === 'Cheque' ? 'Cheque' : instrumentType === 'Bank Transfer' ? 'BT' : 'POP';
+
+        if (instrumentType === 'DD') {
+            if (data.ddNo) out[`${prefix} No`] = data.ddNo;
+            if (data.ddDate) out[`${prefix} Date`] = new Date(data.ddDate).toLocaleDateString('en-GB');
+            if (data.reqNo) out['Courier Req No'] = data.reqNo;
+            if (data.ddNeeds) out['Deliver By'] = data.ddNeeds;
+            if (data.ddPurpose) out['Purpose Detail'] = data.ddPurpose;
+            if (data.ddRemarks) out['Remarks'] = data.ddRemarks;
+            if (data.utr) out['UTR'] = data.utr;
+        } else if (instrumentType === 'FDR') {
+            if (data.fdrNo) out[`${prefix} No`] = data.fdrNo;
+            if (data.fdrDate) out[`${prefix} Date`] = new Date(data.fdrDate).toLocaleDateString('en-GB');
+            if (data.reqNo) out['Courier Req No'] = data.reqNo;
+            if (data.fdrNeeds) out['Deliver By'] = data.fdrNeeds;
+            if (data.fdrPurpose) out['Purpose Detail'] = data.fdrPurpose;
+            if (data.fdrRemark) out['Remarks'] = data.fdrRemark;
+            if (data.fdrExpiryDate) out[`${prefix} Expiry`] = new Date(data.fdrExpiryDate).toLocaleDateString('en-GB');
+            if (data.utr) out['UTR'] = data.utr;
+        } else if (instrumentType === 'Bank Transfer') {
+            if (data.accountName) out['Account Name'] = data.accountName;
+            if (data.utrNo) out['UTR'] = data.utrNo;
+            if (data.transactionDate) out['Transaction Date'] = new Date(data.transactionDate).toLocaleDateString('en-GB');
+            if (data.utrMsg) out['UTR Message'] = data.utrMsg;
+            if (data.transferDate) out['Transfer Date'] = new Date(data.transferDate).toLocaleDateString('en-GB');
+            if (data.returnUtr) out['Return UTR'] = data.returnUtr;
+            if (data.rejectionReason) out['Rejection Reason'] = data.rejectionReason;
+        } else if (instrumentType === 'Portal Payment') {
+            if (data.portalName) out['Portal Name'] = data.portalName;
+            if (data.utrNo) out['UTR'] = data.utrNo;
+            if (data.transactionDate) out['Transaction Date'] = new Date(data.transactionDate).toLocaleDateString('en-GB');
+            if (data.utrMsg) out['UTR Message'] = data.utrMsg;
+            if (data.transferDate) out['Transfer Date'] = new Date(data.transferDate).toLocaleDateString('en-GB');
+            if (data.returnUtr) out['Return UTR'] = data.returnUtr;
+            if (data.rejectionReason) out['Rejection Reason'] = data.rejectionReason;
+        } else if (instrumentType === 'Cheque') {
+            if (data.chequeNo) out['Cheque No'] = data.chequeNo;
+            if (data.chequeDate) out['Cheque Date'] = new Date(data.chequeDate).toLocaleDateString('en-GB');
+            if (data.bankName) out['Bank'] = data.bankName;
+            if (data.chequeNeeds) out['Cheque Needs'] = data.chequeNeeds;
+            if (data.chequeReason) out['Cheque Reason'] = data.chequeReason;
+        } else if (instrumentType === 'BG') {
+            if (data.bgNo) out['BG No'] = data.bgNo;
+            if (data.bgDate) out['BG Date'] = new Date(data.bgDate).toLocaleDateString('en-GB');
+            if (data.beneficiaryName) out['Beneficiary'] = data.beneficiaryName;
+            if (data.bankName) out['Bank'] = data.bankName;
+            if (data.bgPurpose) out['BG Purpose'] = data.bgPurpose;
+            if (data.bgNeeds) out['BG Needs'] = data.bgNeeds;
+        }
+
+        // Common fields across all types
+        if (data.issueDate) out['Issue Date'] = new Date(data.issueDate).toLocaleDateString('en-GB');
+        if (data.expiryDate) out['Expiry Date'] = new Date(data.expiryDate).toLocaleDateString('en-GB');
+        if (data.payableAt) out['Payable At'] = data.payableAt;
+        if (data.favouring && !out['Favouring']) out['Favouring'] = data.favouring;
+
+        return out;
+    };
 
     // Fetch dashboard data
-    const {
-        data: dashboardData,
-        isLoading,
-        error,
-        refetch,
-    } = usePaymentDashboard(
+    const { data: dashboardData, isLoading, error, refetch } = usePaymentDashboard(
         activeTab,
         { page: pagination.pageIndex + 1, limit: pagination.pageSize },
-        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
+        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort },
+        debouncedSearch || undefined
     );
 
     const { data: countsFromHook } = usePaymentDashboardCounts();
@@ -96,266 +289,168 @@ const EmdsAndTenderFeesPage = () => {
     const counts = dashboardData?.counts || countsFromHook;
     const totalRows = dashboardData?.meta?.total || dashboardData?.data?.length || 0;
 
-    const pendingColDefs = useMemo<ColDef<PendingTenderRowWithTimer>[]>(() => [
-        tenderNameCol<PendingTenderRowWithTimer>('tenderNo', {
+    const columnDefs = useMemo<ColDef<any>[]>(() => {
+        const isPendingTab = activeTab === 'pending' || activeTab === 'dnb';
+
+        // ─── Shared columns ───
+        const tenderDetailsCol = tenderNameCol<any>('tenderName', {
+            field: 'tenderName',
+            colId: 'tenderName',
             headerName: 'Tender Details',
             filter: true,
-            width: 200,
-        }),
-        {
-            field: 'gstValues',
-            headerName: 'Tender Value',
-            width: 130,
-            cellRenderer: (params: any) => {
-                return <span className="font-medium">{formatINR(Number(params.value) || 0)}</span>;
-            },
-        },
-        {
-            field: 'emd',
-            headerName: 'EMD',
-            width: 100,
-            cellRenderer: (params: any) => {
-                const amount = Number(params.value) || 0;
-                if (amount <= 0) return <span className="text-gray-400">—</span>;
-                return (
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span className="font-medium">{formatINR(amount)}</span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>{params.data?.emdMode}</p>
-                        </TooltipContent>
-                    </Tooltip>
-                );
-            },
-        },
-        {
-            field: 'tenderFee',
-            headerName: 'Tender Fee',
-            width: 120,
-            cellRenderer: (params: any) => {
-                const amount = Number(params.value) || 0;
-                if (amount <= 0) return <span className="text-gray-400">—</span>;
-                return (
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span className="font-medium">{formatINR(amount)}</span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>{params.data?.tenderFeeMode}</p>
-                        </TooltipContent>
-                    </Tooltip>
-                );
-            },
-        },
-        {
-            field: 'processingFee',
-            headerName: 'Processing Fee',
-            width: 140,
-            cellRenderer: (params: any) => {
-                const amount = Number(params.value) || 0;
-                if (amount <= 0) return <span className="text-gray-400">—</span>;
-                return (
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span className="font-medium">{formatINR(amount)}</span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            <p>{params.data?.processingFeeMode}</p>
-                        </TooltipContent>
-                    </Tooltip>
-                );
-            },
-        },
-        {
-            field: 'teamMemberName',
-            headerName: 'Assigned To',
-            width: 150,
+            width: isPendingTab ? 200 : 250,
+        });
+
+        const teamMemberCol: ColDef<any> = {
+            field: 'teamMember',
+            headerName: 'Member',
+            width: isPendingTab ? 150 : 140,
             cellRenderer: (params: any) =>
-                params.value || <span className="text-gray-400">Unassigned</span>,
-        },
-        {
-            field: 'dueDate',
-            headerName: 'Due Date',
-            width: 140,
+                params.data?.teamMember || <span className="text-gray-400">Unassigned</span>,
+        };
+
+        const timerCol: ColDef<any> = {
+            field: 'timer',
+            headerName: 'Timer',
+            width: 110,
             cellRenderer: (params: any) => {
-                if (!params.value) return <span className="text-gray-400">—</span>;
-                const dueDate = new Date(params.value);
-                const isOverdue = dueDate < new Date();
-                const isUpcoming = dueDate <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+                const timer = params.data?.timer;
+                if (!timer) {
+                    return <TenderTimerDisplay remainingSeconds={0} status="NOT_STARTED" />;
+                }
                 return (
-                    <span className={`${isOverdue ? 'text-red-600 font-medium' : isUpcoming ? 'text-orange-600' : ''}`}>
-                        {formatDateTime(params.value)}
-                    </span>
+                    <TenderTimerDisplay
+                        remainingSeconds={timer.remainingSeconds}
+                        status={timer.status}
+                        deadline={timer.deadline}
+                    />
                 );
             },
-        },
-        {
-            field: 'statusName',
-            headerName: 'Status',
-            width: 200,
-            cellRenderer: (params: any) => {
-                return <Badge variant="outline" className={STATUS_COLORS[params.value] || ''}>{params.value}</Badge>;
-            },
-        },
-        {
-            headerName: '',
-            filter: false,
-            sortable: false,
-            width: 57,
-            cellRenderer: (params: any) => {
-                const actions: ActionItem<PendingTenderRowWithTimer>[] = [
-                    {
-                        label: 'View Tender',
-                        icon: <EyeIcon className="w-4 h-4" />,
-                        onClick: (r) => navigate(paths.tendering.tenderView(r.tenderId)),
+        };
+
+        // ─── Pending / DNB specific columns ───
+        if (isPendingTab) {
+            const actionCol: ColDef<any> = {
+                headerName: '',
+                filter: false,
+                sortable: false,
+                width: 57,
+                cellRenderer: (params: any) => {
+                    const actions: ActionItem<PendingTenderRowWithTimer>[] = [
+                        {
+                            label: 'View Tender',
+                            icon: <EyeIcon className="w-4 h-4" />,
+                            onClick: (r) => navigate(paths.tendering.tenderView(r.tenderId)),
+                        },
+                        {
+                            label: 'Mark As DNB',
+                            icon: <XCircle className="h-4 w-4" />,
+                            onClick: (r) => navigate(paths.tendering.bidMissedGlobal(r.tenderId, 'emd')),
+                            visible: () => activeTab === 'pending',
+                        },
+                    ];
+                    if (activeTab === 'pending') {
+                        actions.unshift({
+                            label: 'Create Request',
+                            icon: <Plus className="w-4 h-4" />,
+                            onClick: (r) => navigate(paths.tendering.emdsTenderFeesCreate(r.tenderId)),
+                        });
+                    }
+                    const ActionRenderer = createActionColumnRenderer(actions);
+                    return <ActionRenderer data={params.data!} />;
+                },
+                pinned: 'right',
+            };
+
+            return [
+                tenderDetailsCol,
+                currencyCol<any>('gstValues', {
+                    field: "gstValues",
+                    colId: "gstValues",
+                    headerName: 'Tender Value',
+                    filter: true,
+                    sortable: true,
+                    width: 130,
+                }),
+                currencyCol<any>('emd', {
+                    field: "emd",
+                    colId: "emd",
+                    headerName: "EMD",
+                    filter: true,
+                    sortable: true,
+                    width: 120,
+                    cellRenderer: (params: any) => {
+                        const emd = params.data?.emd;
+                        const emdMode = params.data?.emdMode;
+
+                        if (!emd) return <span className="text-gray-400">—</span>;
+                        return <p>{formatINR(emd)} {emdMode ? `(${emdMode})` : ''}</p>;
                     },
-                ];
-                // Only show "Create Request" for pending tab, not tender-dnb
-                if (activeTab === 'pending') {
-                    actions.unshift({
-                        label: 'Create Request',
-                        icon: <Plus className="w-4 h-4" />,
-                        onClick: (r) => navigate(paths.tendering.emdsTenderFeesCreate(r.tenderId)),
-                    });
-                }
-                const ActionRenderer = createActionColumnRenderer(actions);
-                return <ActionRenderer data={params.data!} />;
-            },
-            pinned: 'right',
-        },
-        {
-            field: 'timer',
-            headerName: 'Timer',
-            width: 150,
-            cellRenderer: (params: any) => {
-                const { data } = params;
-                const timer = data?.timer;
+                }),
+                currencyCol<any>('tenderFee', {
+                    field: "tenderFee",
+                    colId: "tenderFee",
+                    headerName: "Tender Fee",
+                    filter: true,
+                    sortable: true,
+                    width: 120,
+                    cellRenderer: (params: any) => {
+                        const tenderFee = params.data?.tenderFee;
+                        const tenderFeeMode = params.data?.tenderFeeMode;
 
-                if (!timer) {
-                    return <TenderTimerDisplay
-                        remainingSeconds={0}
-                        status="NOT_STARTED"
-                    />;
-                }
+                        if (!tenderFee) return <span className="text-gray-400">—</span>;
+                        return <p>{formatINR(tenderFee)} {tenderFeeMode ? `(${tenderFeeMode})` : ''}</p>;
+                    },
+                }),
+                currencyCol<any>('processingFee', {
+                    field: "processingFee",
+                    colId: "processingFee",
+                    headerName: "Processing Fee",
+                    filter: true,
+                    sortable: true,
+                    width: 120,
+                    cellRenderer: (params: any) => {
+                        const processingFee = params.data?.processingFee;
+                        const processingFeeMode = params.data?.processingFeeMode;
 
-                return (
-                    <TenderTimerDisplay
-                        remainingSeconds={timer.remainingSeconds}
-                        status={timer.status}
-                    />
-                );
-            },
-        },
-    ], [navigate, activeTab]);
+                        if (!processingFee) return <span className="text-gray-400">—</span>;
+                        return <p>{formatINR(processingFee)} {processingFeeMode ? `(${processingFeeMode})` : ''}</p>;
+                    },
+                }),
+                teamMemberCol,
+                {
+                    field: 'dueDate',
+                    colId: 'dueDate',
+                    headerName: 'Due Date',
+                    width: 140,
+                    cellRenderer: (params: any) => {
+                        if (!params.value) return <span className="text-gray-400">—</span>;
+                        const dueDate = new Date(params.value);
+                        const isOverdue = dueDate < new Date();
+                        const isUpcoming = dueDate <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+                        return (
+                            <span className={`${isOverdue ? 'text-red-600 font-medium' : isUpcoming ? 'text-orange-600' : ''}`}>
+                                {formatDateTime(params.value)}
+                            </span>
+                        );
+                    },
+                    sortable: true,
+                },
+                {
+                    field: 'statusName',
+                    headerName: 'Tender Status',
+                    width: 150,
+                    cellRenderer: (params: any) => (
+                        params.value
+                    ),
+                },
+                timerCol,
+                actionCol,
+            ];
+        }
 
-    const requestColDefs = useMemo<ColDef<PaymentRequestRowWithTimer>[]>(() => [
-        tenderNameCol<PaymentRequestRowWithTimer>('tenderNo', {
-            headerName: 'Tender Details',
-            filter: true,
-            width: 200,
-        }),
-        {
-            field: 'purpose',
-            headerName: 'Type',
-            width: 130,
-            cellRenderer: (params: any) => {
-                const purpose = params.value as string;
-                return (
-                    <Badge variant="outline" className={`${PURPOSE_COLORS[purpose] || ''} font-medium`}>
-                        {purpose}
-                    </Badge>
-                );
-            },
-        },
-        {
-            field: 'amountRequired',
-            headerName: 'Amount',
-            width: 100,
-            cellRenderer: (params: any) =>
-                params.value ? (
-                    <span className="font-medium">{formatINR(params.value)}</span>
-                ) : (
-                    <span className="text-gray-400">—</span>
-                ),
-        },
-        {
-            field: 'instrumentType',
-            headerName: 'Mode',
-            width: 120,
-            cellRenderer: (params: any) => {
-                if (!params.value) return <span className="text-gray-400 text-sm">—</span>;
-                return <span>{INSTRUMENT_LABELS[params.value] || params.value}</span>;
-            },
-        },
-        {
-            field: 'displayStatus',
-            headerName: 'Status',
-            width: 90,
-            cellRenderer: (params: any) => {
-                const status = params.value as string;
-                return (
-                    <Badge variant="outline" className={STATUS_COLORS[status] || ''}>
-                        {status}
-                    </Badge>
-                );
-            },
-        },
-        {
-            field: 'dueDate',
-            headerName: 'Due Date',
-            width: 140,
-            cellRenderer: (params: any) => {
-                if (!params.value) return <span className="text-gray-400">—</span>;
-                const dueDate = new Date(params.value);
-                const isOverdue = dueDate < new Date();
-                const isUpcoming = dueDate <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
-                return (
-                    <span className={`${isOverdue ? 'text-red-600 font-medium' : isUpcoming ? 'text-orange-600' : ''}`}>
-                        {formatDateTime(params.value)}
-                    </span>
-                );
-            },
-        },
-        {
-            field: 'teamMemberName',
-            headerName: 'Assigned To',
-            width: 140,
-            cellRenderer: (params: any) =>
-                params.value || <span className="text-gray-400">Unassigned</span>,
-        },
-        {
-            field: 'createdAt',
-            headerName: 'Requested On',
-            width: 140,
-            cellRenderer: (params: any) => {
-                return <span>{formatDateTime(params.value)}</span>;
-            },
-        },
-        {
-            field: 'timer',
-            headerName: 'Timer',
-            width: 150,
-            cellRenderer: (params: any) => {
-                const { data } = params;
-                const timer = data?.timer;
-
-                if (!timer) {
-                    return <TenderTimerDisplay
-                        remainingSeconds={0}
-                        status="NOT_STARTED"
-                    />;
-                }
-
-                return (
-                    <TenderTimerDisplay
-                        remainingSeconds={timer.remainingSeconds}
-                        status={timer.status}
-                    />
-                );
-            },
-        },
-        {
+        // ─── Request tabs (sent, rejected, approved, etc.) ───
+        const actionCol: ColDef<any> = {
             headerName: '',
             filter: false,
             sortable: false,
@@ -366,29 +461,168 @@ const EmdsAndTenderFeesPage = () => {
                     {
                         label: 'View Details',
                         icon: <EyeIcon className="w-4 h-4" />,
-                        onClick: (r) => navigate(paths.tendering.emdsTenderFeesView(r.tenderId)),
+                        onClick: (r) => {
+                            if (r.tenderId > 0) {
+                                navigate(paths.tendering.emdsTenderFeesView(r.tenderId));
+                            } else {
+                                navigate(`${paths.tendering.emdsTenderFeesView(r.tenderId)}?pr=${r.id}`);
+                            }
+                        },
+                    },
+                    {
+                        label: 'Mark As DNB',
+                        icon: <XCircle className="h-4 w-4" />,
+                        onClick: (r) => navigate(paths.tendering.bidMissedGlobal(r.tenderId, 'emd')),
+                        visible: () => hasTenderingPermission,
                     },
                 ];
 
-                // Add edit for Sent/Rejected
-                if (activeTab === 'sent' || activeTab === 'rejected') {
+                if (activeTab === 'sent') {
                     actions.unshift({
-                        label: activeTab === 'rejected' ? 'Resubmit' : 'Edit Request',
-                        icon: activeTab === 'rejected' ? <RefreshCw className="w-4 h-4" /> : <Pencil className="w-4 h-4" />,
-                        onClick: (r) => navigate(paths.tendering.emdsTenderFeesEdit(r.tenderId)),
+                        label: 'Consent for EMD Payment/Pay',
+                        icon: <CheckCircle className="w-4 h-4" />,
+                        onClick: (r) => setConsentModal({ open: true, row: r }),
+                        visible: () => hasTenderingPermission,
+                    });
+                    actions.unshift({
+                        label: 'Edit Request',
+                        icon: <Pencil className="w-4 h-4" />,
+                        onClick: (r) => navigate(paths.tendering.emdsTenderFeesEdit(r.id)),
                     });
                 }
-
+                if (activeTab === 'rejected') {
+                    actions.unshift({
+                        label: 'Resubmit',
+                        icon: <RefreshCw className="w-4 h-4" />,
+                        onClick: (r) => navigate(paths.tendering.emdsTenderFeesEdit(r.id)),
+                    });
+                }
+                if (activeTab === 'paid') {
+                    actions.unshift({
+                        label: 'Follow Up',
+                        icon: <Send className="w-4 h-4" />,
+                        onClick: (r) => navigate(paths.tendering.emdsTenderFeesFollowUp(r.id)),
+                    });
+                }
                 const ActionRenderer = createActionColumnRenderer(actions);
                 return <ActionRenderer data={row} />;
             },
             pinned: 'right',
-        },
-    ], [navigate, activeTab]);
+        };
 
-    // Select column definitions based on active tab
-    // Both 'pending' and 'tender-dnb' tabs use tender-level columns
-    const columnDefs = (activeTab === 'pending' || activeTab === 'tender-dnb') ? pendingColDefs : requestColDefs;
+        return [
+            tenderDetailsCol,
+            teamMemberCol,
+            ...((activeTab === 'others' || activeTab === 'fees') ? [{
+                field: 'purpose',
+                headerName: 'Purpose',
+                width: 150,
+                cellRenderer: (params: any) => {
+                    const displayValue = activeTab === 'others'
+                        ? (params.data?.detailPurpose || params.value)
+                        : params.value;
+                    return (
+                        <Badge variant="outline" className={`${PURPOSE_COLORS[displayValue] || ''} font-medium`}>
+                            {displayValue}
+                        </Badge>
+                    );
+                },
+            }] : []),
+            currencyCol<any>('amountRequired', {
+                field: "amountRequired",
+                colId: "amountRequired",
+                headerName: "Amount Required",
+                filter: true,
+                sortable: true,
+                width: 100,
+            }),
+            {
+                field: 'instrumentType',
+                headerName: 'Mode',
+                width: 120,
+                cellRenderer: (params: any) => {
+                    const reqType = activeTab === 'others' ? params.data?.requestType : '';
+                    if (!params.value) return <span className="text-gray-400 text-sm">—</span>;
+                    return <span>{INSTRUMENT_LABELS[params.value] || params.value} <br />{reqType && <span className="text-xs text-muted-foreground">({reqType})</span>}</span>;
+                },
+            },
+            ...(activeTab === 'others' ? [{
+                field: 'favouring' as const,
+                headerName: 'Favouring',
+                width: 180,
+                cellRenderer: (params: any) => params.value || <span className="text-gray-400">—</span>,
+            }] : []),
+            {
+                field: 'displayStatus',
+                headerName: 'Status',
+                width: 110,
+                cellRenderer: (params: any) => (
+                    <Badge variant="outline" className={STATUS_COLORS[params.value] || ''}>
+                        {params.value}
+                    </Badge>
+                ),
+            },
+            {
+                field: 'dueDate',
+                headerName: 'Due Date',
+                width: 140,
+                cellRenderer: (params: any) => {
+                    if (!params.value) return <span className="text-gray-400">—</span>;
+                    const dueDate = new Date(params.value);
+                    const isOverdue = dueDate < new Date();
+                    const isUpcoming = dueDate <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+                    return (
+                        <span className={`${isOverdue ? 'text-red-600 font-medium' : isUpcoming ? 'text-orange-600' : ''}`}>
+                            {formatDateTime(params.value)}
+                        </span>
+                    );
+                },
+                sortable: true,
+            },
+            {
+                field: 'bidValid',
+                headerName: 'Bid Valid Till',
+                width: 150,
+                cellRenderer: (params: any) => {
+                    if (!params.value) return <span className="text-gray-400">—</span>;
+                    return formatDateTime(params.value);
+                },
+                hide: activeTab === 'others',
+            },
+            ...(activeTab === 'paid' ? [
+                {
+                    field: 'tenderStatus' as const,
+                    headerName: 'Tender Status',
+                    width: 130,
+                    cellRenderer: (params: any) => (params.value),
+                    sortable: true,
+                },
+                {
+                    field: 'paidDate' as const,
+                    headerName: 'Paid Date',
+                    width: 140,
+                    cellRenderer: (params: any) => {
+                        if (!params.value) return <span className="text-gray-400">—</span>;
+                        return formatDateTime(params.value);
+                    },
+                    sortable: true,
+                },
+                {
+                    field: 'bidSubmissionDate' as const,
+                    headerName: 'Bid Submission Date',
+                    width: 160,
+                    cellRenderer: (params: any) => {
+                        if (!params.value) return <span className="text-gray-400">—</span>;
+                        return formatDateTime(params.value);
+                    },
+                    sortable: true,
+                },
+            ] : []),
+            timerCol,
+            actionCol,
+        ];
+    }, [navigate, activeTab, setChangeStatusModal, hasTenderingPermission]);
+
     const tableData = dashboardData?.data || [];
 
     const renderTabTrigger = (tab: typeof TABS[number]) => {
@@ -401,8 +635,8 @@ const EmdsAndTenderFeesPage = () => {
                 case 'sent':
                     count = counts.sent ?? 0;
                     break;
-                case 'approved':
-                    count = counts.approved ?? 0;
+                case 'paid':
+                    count = counts.paid ?? 0;
                     break;
                 case 'rejected':
                     count = counts.rejected ?? 0;
@@ -410,8 +644,14 @@ const EmdsAndTenderFeesPage = () => {
                 case 'returned':
                     count = counts.returned ?? 0;
                     break;
-                case 'tender-dnb':
-                    count = counts.tenderDnb ?? 0;
+                case 'fees':
+                    count = counts.fees ?? 0;
+                    break;
+                case 'others':
+                    count = counts.others ?? 0;
+                    break;
+                case 'dnb':
+                    count = counts.dnb ?? 0;
                     break;
             }
         }
@@ -425,7 +665,6 @@ const EmdsAndTenderFeesPage = () => {
         );
     };
 
-    // Loading state
     if (isLoading && !dashboardData) {
         return (
             <Card>
@@ -444,7 +683,6 @@ const EmdsAndTenderFeesPage = () => {
         );
     }
 
-    // Error state
     if (error) {
         return (
             <Card>
@@ -472,45 +710,197 @@ const EmdsAndTenderFeesPage = () => {
                         <CardTitle>EMDs, Tender Fees & Processing Fees</CardTitle>
                         <CardDescription>
                             Track all payment requests for your assigned tenders
-                            {counts && (
-                                <span className="ml-2 text-muted-foreground">
-                                    • {counts.total} total items
-                                </span>
-                            )}
                         </CardDescription>
                     </div>
                 </div>
-
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)} className="mt-4">
-                    <TabsList>
-                        {TABS.map(renderTabTrigger)}
-                    </TabsList>
-                </Tabs>
             </CardHeader>
 
-            <CardContent className="px-0">
-                <DataTable
-                    data={tableData}
-                    loading={isLoading}
-                    columnDefs={columnDefs as ColDef[]}
-                    manualPagination={true}
-                    rowCount={totalRows}
-                    paginationState={pagination}
-                    onPaginationChange={setPagination}
-                    gridOptions={{
-                        defaultColDef: {
-                            filter: true,
-                            resizable: true,
-                            sortable: true,
-                        },
-                        onSortChanged: handleSortChanged,
-                        suppressRowClickSelection: true,
-                        overlayNoRowsTemplate: `<span style="padding: 10px; text-align: center;">No ${activeTab} items found</span>`,
-                    }}
-                />
+            <CardContent className="flex-1 px-0">
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)} className="flex flex-col w-full">
+                    <div className="flex-none m-auto mb-4">
+                        <TabsList>
+                            {TABS.map(renderTabTrigger)}
+                        </TabsList>
+                    </div>
+
+                    {/* Search Row: Download + Search */}
+                    <div className="flex items-center gap-4 px-6 pb-4">
+                        {
+                            (isAdmin || isSuperUser) && (
+                            <div className="flex items-center gap-2">
+                                <Select value={exportTab} onValueChange={setExportTab}>
+                                    <SelectTrigger className="w-48">
+                                        <SelectValue placeholder="Choose tab to export" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {EXPORT_TAB_OPTIONS.map(opt => (
+                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleExport}
+                                    disabled={!exportTab || exporting}
+                                >
+                                    <Download className="mr-2 h-4 w-4" />
+                                    {exporting ? 'Exporting...' : 'Download Excel'}
+                                </Button>
+                            </div>
+                            )
+                        }
+                        <div className="flex-1 flex justify-end">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-8 w-64"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 min-h-0">
+                        <DataTable
+                            data={tableData}
+                            loading={isLoading}
+                            columnDefs={columnDefs as ColDef[]}
+                            manualPagination={true}
+                            rowCount={totalRows}
+                            paginationState={pagination}
+                            onPaginationChange={setPagination}
+                            onPageSizeChange={handlePageSizeChange}
+                            showTotalCount={true}
+                            showLengthChange={true}
+                            gridOptions={{
+                                defaultColDef: {
+                                    filter: true,
+                                    resizable: true,
+                                    sortable: true,
+                                },
+                                onSortChanged: handleSortChanged,
+                                suppressRowClickSelection: true,
+                                overlayNoRowsTemplate: `<span style="padding: 10px; text-align: center;">No ${activeTab} items found</span>`,
+                            }}
+                        />
+                    </div>
+                </Tabs>
             </CardContent>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
+
+            <ConsentForPayModal
+                open={consentModal.open}
+                onOpenChange={(open) => setConsentModal({ ...consentModal, open })}
+                row={consentModal.row}
+                onSuccess={() => {
+                    setConsentModal({ open: false, row: null });
+                    refetch();
+                }}
+            />
         </Card>
     );
 };
+
+function ConsentForPayModal({
+    open,
+    onOpenChange,
+    row,
+    onSuccess,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    row: PaymentRequestRowWithTimer | null;
+    onSuccess: () => void;
+}) {
+    const [remark, setRemark] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        setRemark('');
+    }, [open, row?.instrumentId]);
+
+    const handleSubmit = async () => {
+        if (!row?.instrumentId || !remark.trim()) return;
+        setSaving(true);
+        try {
+            await paymentRequestsService.updateConsentForPay(row.instrumentId, remark.trim());
+            onSuccess();
+        } catch (error) {
+            console.error('Failed to update consent:', error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Consent for EMD Payment/Pay</DialogTitle>
+                    <DialogDescription>
+                        Review the details below and provide your consent remark.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <span className="text-muted-foreground">Project Name:</span>
+                            <p className="font-medium">{row?.tenderName || '—'}</p>
+                        </div>
+                        <div>
+                            <span className="text-muted-foreground">Tender No:</span>
+                            <p className="font-medium">{row?.tenderNo || '—'}</p>
+                        </div>
+                        <div>
+                            <span className="text-muted-foreground">Amount:</span>
+                            <p className="font-medium">{row?.amountRequired ? formatINR(Number(row.amountRequired)) : '—'}</p>
+                        </div>
+                        <div>
+                            <span className="text-muted-foreground">Mode:</span>
+                            <p className="font-medium">{row?.instrumentType ? (INSTRUMENT_LABELS as any)[row.instrumentType] || row.instrumentType : '—'}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-sm text-muted-foreground block mb-1">Consent Remark</label>
+                        <Textarea
+                            placeholder="Enter your consent remark..."
+                            value={remark}
+                            onChange={(e) => setRemark(e.target.value)}
+                            rows={3}
+                        />
+                    </div>
+                    {row?.consentForPay && (
+                        <div>
+                            <label className="text-sm text-muted-foreground block mb-1">Previous Comments</label>
+                            <div className="text-xs text-muted-foreground bg-muted rounded p-2 whitespace-pre-wrap max-h-32 overflow-y-auto">
+                                {row.consentForPay}
+                            </div>
+                        </div>
+                    )}
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+                        Cancel
+                    </Button>
+                    <Button onClick={handleSubmit} disabled={!remark.trim() || saving}>
+                        {saving ? 'Saving...' : 'Consent & Pay'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 export default EmdsAndTenderFeesPage;

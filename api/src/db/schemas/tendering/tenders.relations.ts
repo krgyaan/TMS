@@ -8,7 +8,7 @@ import { statuses } from '@db/schemas/master/statuses.schema';
 import { locations } from '@db/schemas/master/locations.schema';
 import { websites } from '@db/schemas/master/websites.schema';
 import { rfqs } from '@db/schemas/tendering/rfqs.schema';
-import { paymentRequests } from '@db/schemas/tendering/emds.schema';
+import { paymentRequests } from './payment-requests.schema';
 import { tenderStatusHistory } from '@db/schemas/tendering/tender-status-history.schema';
 import { tenderIncompleteFields } from '@db/schemas/tendering/tender-incomplete-fields.schema';
 

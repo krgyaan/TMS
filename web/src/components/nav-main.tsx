@@ -18,7 +18,7 @@ export function NavMain({
 }: {
     items: {
         title: string;
-        url: string;
+        url?: string;
         icon?: LucideIcon;
         isActive?: boolean;
         items?: {
@@ -46,11 +46,12 @@ export function NavMain({
                 {items.map(item => {
                     // Render single menu item without dropdown
                     if (!item.items || item.items.length === 0) {
-                        const active = location.pathname === item.url || location.pathname.startsWith(item.url + "/");
+                        const url = item.url || "#";
+                        const active = location.pathname === url || location.pathname.startsWith(url + "/");
                         return (
                             <SidebarMenuItem className="cursor-pointer" key={item.title}>
                                 <SidebarMenuButton asChild tooltip={item.title} isActive={active}>
-                                    <NavLink to={item.url}>
+                                    <NavLink to={url}>
                                         {item.icon && <item.icon />}
                                         <span className="text-sm font-medium">{item.title}</span>
                                     </NavLink>

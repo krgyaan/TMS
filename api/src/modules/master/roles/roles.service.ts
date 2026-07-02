@@ -1,14 +1,18 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, like, and } from 'drizzle-orm';
+import { eq, ilike, and } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { roles, type Role, type NewRole } from '@db/schemas/auth/roles.schema';
 import { rolePermissions } from '@db/schemas/auth/role-permissions.schema';
 import { permissions, type Permission } from '@db/schemas/auth/permissions.schema';
+import { PermissionService } from '@/modules/auth/services/permission.service';
 
 @Injectable()
 export class RolesService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly permissionService: PermissionService,
+    ) { }
 
     async findAll(): Promise<Role[]> {
         return this.db.select().from(roles);
@@ -57,7 +61,7 @@ export class RolesService {
         return this.db
             .select()
             .from(roles)
-            .where(like(roles.name, searchPattern));
+            .where(ilike(roles.name, searchPattern));
     }
 
     async getRolePermissions(roleId: number): Promise<Permission[]> {
@@ -82,35 +86,43 @@ export class RolesService {
             throw new NotFoundException(`Role with ID ${roleId} not found`);
         }
 
-        // Remove existing permissions for this role
-        await this.db.delete(rolePermissions).where(eq(rolePermissions.roleId, roleId));
+        await this.db.transaction(async (tx) => {
+            // Remove existing permissions for this role
+            await tx.delete(rolePermissions).where(eq(rolePermissions.roleId, roleId));
 
-        // Insert new permissions
-        if (permissionIds.length > 0) {
-            await this.db.insert(rolePermissions).values(
-                permissionIds.map((permissionId) => ({
-                    roleId,
-                    permissionId,
-                })),
-            );
-        }
+            // Insert new permissions
+            if (permissionIds.length > 0) {
+                await tx.insert(rolePermissions).values(
+                    permissionIds.map((permissionId) => ({
+                        roleId,
+                        permissionId,
+                    })),
+                );
+            }
+        });
+
+        await this.permissionService.refreshRolePermissions(roleId);
     }
 
     async removePermission(roleId: number, permissionId: number): Promise<void> {
-        const result = await this.db
-            .delete(rolePermissions)
-            .where(
-                and(
-                    eq(rolePermissions.roleId, roleId),
-                    eq(rolePermissions.permissionId, permissionId),
-                ),
-            )
-            .returning();
+        const result = await this.db.transaction(async (tx) => {
+            return tx
+                .delete(rolePermissions)
+                .where(
+                    and(
+                        eq(rolePermissions.roleId, roleId),
+                        eq(rolePermissions.permissionId, permissionId),
+                    ),
+                )
+                .returning();
+        });
 
         if (!result[0]) {
             throw new NotFoundException(
                 `Permission ${permissionId} not found for role ${roleId}`,
             );
         }
+
+        await this.permissionService.refreshRolePermissions(roleId);
     }
 }

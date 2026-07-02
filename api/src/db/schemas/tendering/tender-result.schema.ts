@@ -38,6 +38,7 @@ export const tenderResults = pgTable(
 
         // Result
         result: varchar("result", { length: 50 }),
+        resultReason: text("result_reason"),
 
         // Pricing
         l1Price: decimal("l1_price", { precision: 15, scale: 2 }),
@@ -50,6 +51,11 @@ export const tenderResults = pgTable(
 
         // When result was uploaded
         resultUploadedAt: timestamp("result_uploaded_at", { withTimezone: true }),
+
+        tenderCancelledScreenshot: text("tender_cancelled_screenshot"),
+
+        raStatus : varchar("ra_status" , {length : 50}),
+        tqStatus : varchar("tq_status" , {length : 50}),
 
         // Timestamps
         createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),

@@ -1,0 +1,245 @@
+import type { PaymentRequestFormValues, PaymentDetailsFormValues, OldEntryPaymentRequestFormValues, BiOtherThanTenderRequestFormValues } from './payment-request.schema';
+import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
+
+/**
+ * Props for EmdTenderFeeRequestForm component
+ */
+export interface EmdTenderFeeRequestFormProps {
+    tenderId: number;
+    mode: 'create' | 'edit';
+    existingData?: any; // TODO: Define proper type for existing payment request data
+}
+
+// Re-export form value types
+export type { PaymentRequestFormValues, PaymentDetailsFormValues };
+export type { OldEntryPaymentRequestFormValues, BiOtherThanTenderRequestFormValues } from './payment-request.schema';
+
+// Backward-compatible aliases (deprecated - use new names)
+export type EmdRequestFormValues = PaymentRequestFormValues;
+export type OldEmdRequestFormValues = OldEntryPaymentRequestFormValues;
+export type BiOtherThanEmdRequestFormValues = BiOtherThanTenderRequestFormValues;
+
+export type PaymentPurpose = "EMD" | "Tender Fee" | "Processing Fee" | "Security Deposit" | "Performance BG" | "Surety Bond" | "Other Payment";
+
+export type InstrumentType = "DD" | "FDR" | "BG" | "Cheque" | "Bank Transfer" | "Portal Payment";
+
+export type DashboardRowType = "request" | "missing";
+
+export type DashboardStatus =
+    | "Not Created"
+    | "Pending"
+    | "Sent"
+    | "Requested"
+    | "Approved"
+    | "Rejected"
+    | "Returned"
+    | "Issued"
+    | "Dispatched"
+    | "Received"
+    | "Cancelled"
+    | "Refunded"
+    | "Encashed"
+    | "Extended";
+
+export interface DashboardRow {
+    id: number | null;
+    type: DashboardRowType;
+    purpose: string;
+    amountRequired: string;
+    status: DashboardStatus;
+    instrumentType: InstrumentType | null;
+    instrumentStatus: string | null;
+    favouring: string | null;
+    createdAt: string | null; // ISO string from API
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: string | null; // ISO string from API
+    teamMemberId: number | null;
+    teamMemberName: string | null;
+    requestedBy: string | null;
+}
+
+export interface DashboardCounts {
+    pending: number;
+    sent: number;
+    paid: number;
+    rejected: number;
+    returned: number;
+    fees: number;
+    others: number;
+    dnb: number;
+    total: number;
+}
+
+export interface DashboardResponse {
+    data: DashboardRow[];
+    counts: DashboardCounts;
+}
+
+export type DashboardTab = "pending" | "sent" | "paid" | "rejected" | "returned" | "fees" | "others" | "dnb";
+
+export type EmdDashboardFilters = {
+    search?: string;
+    tab?: 'pending' | 'sent' | 'paid' | 'rejected' | 'returned' | 'fees' | 'others' | 'dnb';
+    userId?: number;
+    teamId?: number;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+};
+
+export interface EmdDashboardRow {
+    id: number | null;
+    type: "request" | "missing";
+    purpose: "EMD" | "Tender Fee" | "Processing Fee" | "Security Deposit" | "Performance BG" | "Surety Bond" | "Other Payment";
+    amountRequired: string;
+    status: string;
+    instrumentType: string | null;
+    instrumentStatus: string | null;
+    createdAt: string | null;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    statusName: string;
+    dueDate: string | null;
+    teamMemberId: number | null;
+    teamMemberName: string | null;
+    requestedBy: string | null;
+}
+
+export interface EmdDashboardRowWithTimer extends EmdDashboardRow {
+    timer?: {
+        remainingSeconds: number;
+        status: TimerStatus;
+        stepName: string;
+    } | null;
+}
+
+export interface EmdDashboardCounts {
+    pending: number;
+    sent: number;
+    paid: number;
+    rejected: number;
+    returned: number;
+    fees: number;
+    others: number;
+    dnb: number;
+    total: number;
+}
+
+export interface PendingTenderRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: string | null;
+    gstValues: string | null;
+    status: number;
+    statusName: string | null;
+    teamMemberId: number | null;
+    teamMember: string | null;
+    emd: string | null;
+    emdMode: string | null;
+    tenderFee: string | null;
+    tenderFeeMode: string | null;
+    processingFee: string | null;
+    processingFeeMode: string | null;
+}
+
+export interface PendingTenderRowWithTimer extends PendingTenderRow {
+    timer?: {
+        remainingSeconds: number;
+        status: TimerStatus;
+        stepName: string;
+    } | null;
+}
+
+export interface PaymentRequestRow {
+    id: number;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    purpose: "EMD" | "Tender Fee" | "Processing Fee";
+    amountRequired: string;
+    requestType: string | null;
+    dueDate: string | null;
+    bidValid: Date | null;
+    bidSubmissionDate: string | null;
+    teamMemberId: number | null;
+    teamMember: string | null;
+    instrumentId: number | null;
+    instrumentType: string | null;
+    instrumentStatus: string | null;
+    displayStatus: string;
+    createdAt: string | null;
+    detailPurpose: string | null;
+    paidDate: string | null;
+    tenderStatus: string | null;
+    consentForPay: string;
+}
+
+export interface PaymentRequestRowWithTimer extends PaymentRequestRow {
+    timer?: {
+        remainingSeconds: number;
+        status: TimerStatus;
+        stepName: string;
+    } | null;
+}
+
+export interface PendingTabResponse {
+    data: PendingTenderRow[];
+    counts: EmdDashboardCounts;
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export interface RequestTabResponse {
+    data: PaymentRequestRow[];
+    counts: EmdDashboardCounts;
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export type EmdDashboardResponse = PendingTabResponse | RequestTabResponse;
+
+export type CreatePaymentRequestDto = {
+    emdMode?: string;
+    emd?: any;
+    tenderFeeMode?: string;
+    tenderFee?: any;
+    processingFeeMode?: string;
+    processingFee?: any;
+};
+
+export type UpdatePaymentRequestDto = CreatePaymentRequestDto;
+
+export type UpdateStatusDto = {
+    status: string;
+    remarks?: string;
+};
+
+// MOM (Minutes of Meeting) Remarks
+export interface MomRemark {
+    id: number;
+    requestId: number;
+    instrumentId: number | null;
+    remark: string;
+    addedBy: number;
+    addedByName: string;
+    createdAt: string;
+    updatedAt: string | null;
+}
+
+export interface CreateMomRemarkDto {
+    remark: string;
+    instrumentId?: number | null;
+}

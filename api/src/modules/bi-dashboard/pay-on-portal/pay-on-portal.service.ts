@@ -1,30 +1,78 @@
-import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, inArray, isNull, sql, asc, desc } from 'drizzle-orm';
+import { Inject, Injectable, Logger, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { eq, and, inArray, isNull, sql, asc, desc, or } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import {
-    paymentRequests,
-    paymentInstruments,
-    instrumentTransferDetails,
-} from '@db/schemas/tendering/emds.schema';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { users } from '@db/schemas/auth/users.schema';
-import { statuses } from '@db/schemas/master/statuses.schema';
-import { teams } from '@db/schemas/master/teams.schema';
+import { paymentRequests, paymentInstruments, instrumentTransferDetails } from '@db/schemas/tendering/payment-requests.schema';
+import { tenderInfos } from '@/db/schemas/tendering/tenders.schema';
+import { users } from '@/db/schemas/auth/users.schema';
+import { statuses } from '@/db/schemas/master/statuses.schema';
+import { followUps } from '@/db/schemas/shared/follow-ups.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { PayOnPortalDashboardRow, PayOnPortalDashboardCounts } from '@/modules/bi-dashboard/pay-on-portal/helpers/payOnPortal.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
+import { PORTAL_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
+import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
 
 @Injectable()
 export class PayOnPortalService {
     private readonly logger = new Logger(PayOnPortalService.name);
+    private readonly requesterUser = alias(users, 'requester');
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
+        private readonly notificationService: PaymentRequestsNotificationService,
     ) { }
+
+    private statusMap() {
+        return {
+            [PORTAL_STATUSES.PENDING]: 'Pending',
+            [PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
+            [PORTAL_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
+            [PORTAL_STATUSES.RETURN_VIA_BANK_TRANSFER]: 'Returned',
+            [PORTAL_STATUSES.SETTLED_WITH_PROJECT]: 'Settled',
+        };
+    }
+
+    private buildPopDashboardConditions(tab?: string) {
+        const conditions: any[] = [
+            eq(paymentInstruments.instrumentType, 'Portal Payment'),
+            eq(paymentInstruments.isActive, true),
+            sql`${paymentRequests.purpose} NOT IN ('Tender Fee', 'Processing Fee')`,
+        ];
+
+        if (tab === 'pending') {
+            conditions.push(
+                or(
+                    eq(paymentInstruments.action, 0),
+                    eq(paymentInstruments.status, PORTAL_STATUSES.PENDING)
+                )
+            );
+        } else if (tab === 'accepted') {
+            conditions.push(
+                inArray(paymentInstruments.action, [1, 2]),
+                inArray(paymentInstruments.status, [PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED, PORTAL_STATUSES.FOLLOWUP_INITIATED])
+            );
+        } else if (tab === 'rejected') {
+            conditions.push(
+                inArray(paymentInstruments.action, [1, 2]),
+                eq(paymentInstruments.status, PORTAL_STATUSES.ACCOUNTS_FORM_REJECTED)
+            );
+        } else if (tab === 'returned') {
+            conditions.push(
+                inArray(paymentInstruments.action, [3])
+            );
+        } else if (tab === 'settled') {
+            conditions.push(
+                inArray(paymentInstruments.action, [4])
+            );
+        }
+
+        return conditions;
+    }
 
     async getDashboardData(
         tab?: string,
@@ -34,47 +82,39 @@ export class PayOnPortalService {
             sortBy?: string;
             sortOrder?: 'asc' | 'desc';
             search?: string;
+            teamId?: number;
         },
     ): Promise<PaginatedResult<PayOnPortalDashboardRow>> {
         const page = options?.page || 1;
         const limit = options?.limit || 50;
         const offset = (page - 1) * limit;
 
-        const conditions: any[] = [
-            eq(paymentInstruments.instrumentType, 'Portal Payment'),
-            eq(paymentInstruments.isActive, true),
-        ];
+        const conditions = this.buildPopDashboardConditions(tab);
 
-        // Apply tab-specific filters
-        if (tab === 'pending') {
-            conditions.push(isNull(paymentInstruments.action));
-        } else if (tab === 'accepted') {
-            conditions.push(
-                inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, 'Accepted')
-            );
-        } else if (tab === 'rejected') {
-            conditions.push(
-                inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, 'Rejected')
-            );
-        } else if (tab === 'returned') {
-            conditions.push(inArray(paymentInstruments.action, [3, 4]));
-        } else if (tab === 'settled') {
-            conditions.push(eq(paymentInstruments.action, 4));
+        const searchTerm = options?.search?.trim();
+
+        // Team filter
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${this.requesterUser.team}) = ${teamId}`);
         }
 
-        // Search filter
-        if (options?.search) {
-            const searchStr = `%${options.search}%`;
-            conditions.push(
-                sql`(
-                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
-                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
-                    ${instrumentTransferDetails.utrNum} ILIKE ${searchStr} OR
-                    ${instrumentTransferDetails.portalName} ILIKE ${searchStr}
-                )`
-            );
+        // Search filter - search across all rendered columns
+        if (searchTerm) {
+            const searchStr = `%${searchTerm}%`;
+            const searchConditions: any[] = [
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${instrumentTransferDetails.utrNum} ILIKE ${searchStr}`,
+                sql`${instrumentTransferDetails.portalName} ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.amount}::text ILIKE ${searchStr}`,
+                sql`${instrumentTransferDetails.transactionDate}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${paymentInstruments.status} ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
 
         const whereClause = and(...conditions);
@@ -102,9 +142,13 @@ export class PayOnPortalService {
         const rows = await this.db
             .select({
                 id: paymentInstruments.id,
+                requestId: paymentRequests.id,
+                type: paymentRequests.type,
+                purpose: paymentRequests.purpose,
                 date: instrumentTransferDetails.transactionDate,
                 teamMember: users.name,
                 utrNo: instrumentTransferDetails.utrNum,
+                utr: paymentInstruments.utr,
                 portalName: instrumentTransferDetails.portalName,
                 tenderName: tenderInfos.tenderName,
                 tenderNo: tenderInfos.tenderNo,
@@ -112,113 +156,171 @@ export class PayOnPortalService {
                 tenderStatus: statuses.name,
                 amount: paymentInstruments.amount,
                 popStatus: paymentInstruments.status,
+                action: paymentInstruments.action,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .leftJoin(this.requesterUser, eq(this.requesterUser.id, paymentRequests.requestedBy))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
             .orderBy(orderClause)
             .limit(limit)
             .offset(offset);
 
-        // Count query
-        const [countResult] = await this.db
+        // Count query (join users and statuses when search is used so WHERE can reference them)
+        let countQueryBuilder = this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
-            .where(whereClause);
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id));
+        if (searchTerm || teamId) {
+            countQueryBuilder = countQueryBuilder
+                .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+                .leftJoin(this.requesterUser, eq(this.requesterUser.id, paymentRequests.requestedBy))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status));
+        }
+        const [countResult] = await countQueryBuilder.where(whereClause);
 
         const total = Number(countResult?.count || 0);
 
         const data: PayOnPortalDashboardRow[] = rows.map((row) => ({
             id: row.id,
+            requestId: row.requestId,
+            type: row.type,
+            purpose: row.purpose,
             date: row.date ? new Date(row.date) : null,
             teamMember: row.teamMember,
             utrNo: row.utrNo,
+            utr: row.utr,
             portalName: row.portalName,
             tenderName: row.tenderName,
             tenderNo: row.tenderNo,
             bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
             tenderStatus: row.tenderStatus,
             amount: row.amount ? Number(row.amount) : null,
-            popStatus: row.popStatus,
+            popStatus: this.statusMap()[row.popStatus],
+            action: row.action,
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
+    async getExportData(
+        tab?: string,
+        options?: {
+            teamId?: number;
+        },
+    ): Promise<{ data: any[] }> {
+        const conditions = this.buildPopDashboardConditions(tab);
+
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${this.requesterUser.team}) = ${teamId}`);
+        }
+
+        const whereClause = and(...conditions);
+
+        const rows = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentRequests.id,
+                type: paymentRequests.type,
+                purpose: paymentRequests.purpose,
+                projectName: paymentRequests.projectName,
+                projectNo: paymentRequests.tenderNo,
+                date: instrumentTransferDetails.transactionDate,
+                teamMember: users.name,
+                utrNo: instrumentTransferDetails.utrNum,
+                utr: paymentInstruments.utr,
+                portalName: instrumentTransferDetails.portalName,
+                tenderName: tenderInfos.tenderName,
+                tenderNo: tenderInfos.tenderNo,
+                bidValidity: tenderInfos.dueDate,
+                tenderStatus: statuses.name,
+                amount: paymentInstruments.amount,
+                popStatus: paymentInstruments.status,
+                action: paymentInstruments.action,
+                utrMsg: instrumentTransferDetails.utrMsg,
+                returnTransferDate: instrumentTransferDetails.returnTransferDate,
+                returnUtr: instrumentTransferDetails.returnUtr,
+                remarks: instrumentTransferDetails.remarks,
+                reason: instrumentTransferDetails.reason,
+                transactionDate: instrumentTransferDetails.transactionDate,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .leftJoin(this.requesterUser, eq(this.requesterUser.id, paymentRequests.requestedBy))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause)
+            .orderBy(desc(paymentInstruments.createdAt));
+
+        const data = rows.map((row) => ({
+            id: row.id,
+            requestId: row.requestId,
+            type: row.type,
+            purpose: row.purpose,
+            projectName: row.projectName,
+            projectNo: row.projectNo,
+            date: row.date ? new Date(row.date) : null,
+            teamMember: row.teamMember,
+            utrNo: row.utrNo,
+            utr: row.utr,
+            portalName: row.portalName,
+            tenderName: row.tenderName,
+            tenderNo: row.tenderNo,
+            bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
+            tenderStatus: row.tenderStatus,
+            amount: row.amount ? Number(row.amount) : null,
+            popStatus: this.statusMap()[row.popStatus],
+            action: row.action,
+            utrMsg: row.utrMsg,
+            returnTransferDate: row.returnTransferDate ? new Date(row.returnTransferDate) : null,
+            returnUtr: row.returnUtr,
+            remarks: row.remarks,
+            rejectionReason: row.reason,
+            transactionDate: row.transactionDate ? new Date(row.transactionDate) : null,
+        }));
+
+        return { data };
+    }
+
+    private async countPopByConditions(conditions: any[]) {
+        const [result] = await this.db
+            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .where(and(...conditions));
+
+        return Number(result?.count || 0);
+    }
+
     async getDashboardCounts(): Promise<PayOnPortalDashboardCounts> {
-        const baseConditions = [
-            eq(paymentInstruments.instrumentType, 'Portal Payment'),
-            eq(paymentInstruments.isActive, true),
-        ];
+        const pending = await this.countPopByConditions(
+            this.buildPopDashboardConditions('pending')
+        );
 
-        // Count pending
-        const pendingConditions = [
-            ...baseConditions,
-            isNull(paymentInstruments.action),
-        ];
-        const [pendingResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...pendingConditions));
-        const pending = Number(pendingResult?.count || 0);
+        const accepted = await this.countPopByConditions(
+            this.buildPopDashboardConditions('accepted')
+        );
 
-        // Count accepted
-        const acceptedConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, 'Accepted'),
-        ];
-        const [acceptedResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...acceptedConditions));
-        const accepted = Number(acceptedResult?.count || 0);
+        const rejected = await this.countPopByConditions(
+            this.buildPopDashboardConditions('rejected')
+        );
 
-        // Count rejected
-        const rejectedConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [1, 2]),
-            eq(paymentInstruments.status, 'Rejected'),
-        ];
-        const [rejectedResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...rejectedConditions));
-        const rejected = Number(rejectedResult?.count || 0);
+        const returned = await this.countPopByConditions(
+            this.buildPopDashboardConditions('returned')
+        );
 
-        // Count returned
-        const returnedConditions = [
-            ...baseConditions,
-            inArray(paymentInstruments.action, [3, 4]),
-        ];
-        const [returnedResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...returnedConditions));
-        const returned = Number(returnedResult?.count || 0);
-
-        // Count settled
-        const settledConditions = [
-            ...baseConditions,
-            eq(paymentInstruments.action, 4),
-        ];
-        const [settledResult] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...settledConditions));
-        const settled = Number(settledResult?.count || 0);
+        const settled = await this.countPopByConditions(
+            this.buildPopDashboardConditions('settled')
+        );
 
         return {
             pending,
@@ -232,7 +334,7 @@ export class PayOnPortalService {
 
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
-            'accounts-form-1': 1,
+            'accounts-form': 1,
             'initiate-followup': 2,
             'returned': 3,
             'settled': 4,
@@ -240,10 +342,42 @@ export class PayOnPortalService {
         return actionMap[action] || 1;
     }
 
+    /**
+     * Get file path from body if it's a string (from TenderFileUploader)
+     * Supports single string path, JSON string of array, and actual array of paths
+     */
+    private getFilePathFromBody(fieldname: string, body: any): string | null {
+        if (body[fieldname] === undefined) return null;
+        
+        const value = body[fieldname];
+        
+        // Handle string (could be plain path or JSON string)
+        if (typeof value === 'string') {
+            // Try to parse as JSON array
+            try {
+                const parsed = JSON.parse(value);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    return parsed[0];
+                }
+                // If parsed but not array, return as is
+                return parsed;
+            } catch {
+                // Not JSON, return as plain string path
+                return value;
+            }
+        }
+        
+        // Handle actual array
+        if (typeof value === 'object' && Array.isArray(value) && value.length > 0) {
+            return value[0] || null;
+        }
+        
+        return null;
+    }
+
     async updateAction(
         instrumentId: number,
         body: any,
-        files: Express.Multer.File[],
         user: any,
     ) {
         const [instrument] = await this.db
@@ -271,38 +405,36 @@ export class PayOnPortalService {
         }
 
         const filePaths: string[] = [];
-        if (files && files.length > 0) {
-            for (const file of files) {
-                const relativePath = `bi-dashboard/${file.filename}`;
-                filePaths.push(relativePath);
-            }
-        }
 
         const updateData: any = {
             action: actionNumber,
             updatedAt: new Date(),
         };
 
-        if (body.action === 'accounts-form-1') {
+        if (body.action === 'accounts-form') {
             if (body.pop_req === 'Accepted') {
-                updateData.status = 'ACCOUNTS_FORM_ACCEPTED';
+                updateData.status = PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED;
             } else if (body.pop_req === 'Rejected') {
-                updateData.status = 'ACCOUNTS_FORM_REJECTED';
+                updateData.status = PORTAL_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
             }
-            // Store date_time in legacyData for timer stop functionality
-            if (body.date_time) {
+            const dateTime = body.payment_datetime || body.date_time || body.payment_date;
+            if (dateTime) {
                 updateData.legacyData = {
                     ...(instrument.legacyData || {}),
-                    date_time: body.date_time,
+                    date_time: dateTime,
                 };
             }
+            const paymentProofPath = this.getFilePathFromBody('payment_proof', body);
+            if (paymentProofPath) {
+                updateData.generatedPdf = paymentProofPath;
+            }
         } else if (body.action === 'initiate-followup') {
-            updateData.status = 'FOLLOWUP_INITIATED';
+            updateData.status = PORTAL_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === 'returned') {
-            updateData.status = 'RETURNED';
+            updateData.status = PORTAL_STATUSES.RETURN_VIA_BANK_TRANSFER;
         } else if (body.action === 'settled') {
-            updateData.status = 'SETTLED';
+            updateData.status = PORTAL_STATUSES.SETTLED_WITH_PROJECT;
         }
 
         await this.db
@@ -312,135 +444,132 @@ export class PayOnPortalService {
 
         // Handle transfer details update or creation
         const transferDetailsUpdate: any = {};
-        if (body.action === 'accounts-form-1') {
+        if (body.action === 'accounts-form') {
             if (body.utr_no) transferDetailsUpdate.utrNum = body.utr_no;
             if (body.portal_name) transferDetailsUpdate.portalName = body.portal_name;
             if (body.amount) transferDetailsUpdate.amount = body.amount;
-            if (body.payment_date) transferDetailsUpdate.transactionDate = body.payment_date;
+            // Support both payment_datetime (from form) and payment_date (legacy)
+            const paymentDateStr = body.payment_datetime || body.payment_date;
+            if (paymentDateStr) {
+                const paymentDate = new Date(paymentDateStr);
+                if (isNaN(paymentDate.getTime())) {
+                    throw new BadRequestException('Invalid payment date');
+                }
+                transferDetailsUpdate.transactionDate = paymentDate;
+            }
             if (body.remarks) transferDetailsUpdate.remarks = body.remarks;
-            if (body.utr_mgs) transferDetailsUpdate.utrMsg = body.utr_mgs;
+            // Support both utr_message (from form) and utr_mgs (legacy)
+            const utrMsg = body.utr_message || body.utr_mgs;
+            if (utrMsg) transferDetailsUpdate.utrMsg = utrMsg;
         } else if (body.action === 'returned') {
-            if (body.return_date) transferDetailsUpdate.returnTransferDate = body.return_date;
-            if (body.return_reason) transferDetailsUpdate.reason = body.return_reason;
-            if (body.return_remarks) transferDetailsUpdate.remarks = body.return_remarks;
-            if (body.utr_no) transferDetailsUpdate.returnUtr = body.utr_no;
+            if (body.transfer_date) {
+                const returnDate = new Date(body.transfer_date);
+                if (isNaN(returnDate.getTime())) {
+                    throw new BadRequestException('Invalid return date');
+                }
+                transferDetailsUpdate.returnTransferDate = returnDate;
+            }
+            if (body.return_utr) transferDetailsUpdate.returnUtr = body.return_utr;
         } else if (body.action === 'settled') {
-            if (body.settlement_date) transferDetailsUpdate.transactionDate = body.settlement_date;
-            if (body.settlement_amount) transferDetailsUpdate.amount = body.settlement_amount;
-            if (body.settlement_reference_no) transferDetailsUpdate.transactionId = body.settlement_reference_no;
-        }
-
-        if (Object.keys(transferDetailsUpdate).length > 0) {
-            transferDetailsUpdate.updatedAt = new Date();
-
-            // Check if transfer details record exists
-            const [existingDetails] = await this.db
-                .select()
-                .from(instrumentTransferDetails)
-                .where(eq(instrumentTransferDetails.instrumentId, instrumentId))
-                .limit(1);
-
-            if (existingDetails) {
-                await this.db
-                    .update(instrumentTransferDetails)
-                    .set(transferDetailsUpdate)
-                    .where(eq(instrumentTransferDetails.instrumentId, instrumentId));
-            } else {
-                // Create new transfer details record
-                await this.db.insert(instrumentTransferDetails).values({
-                    instrumentId,
-                    ...transferDetailsUpdate,
-                    createdAt: new Date(),
-                });
+            this.logger.log(`Settled action - body: ${JSON.stringify(body)}`);
+            if (body.settle_remarks) {
+                this.logger.log(`Settle remarks received: ${body.settle_remarks}`);
+                transferDetailsUpdate.remarks = body.settle_remarks;
             }
         }
 
-        // Handle followup creation
-        if (body.action === 'initiate-followup') {
+        if (Object.keys(transferDetailsUpdate).length > 0) {
             try {
-                // Get payment request and tender info
-                const [request] = await this.db
-                    .select({
-                        requestId: paymentRequests.id,
-                        tenderId: paymentRequests.tenderId,
-                    })
-                    .from(paymentRequests)
-                    .where(eq(paymentRequests.id, instrument.requestId))
+                transferDetailsUpdate.updatedAt = new Date();
+
+                const [existingDetails] = await this.db
+                    .select()
+                    .from(instrumentTransferDetails)
+                    .where(eq(instrumentTransferDetails.instrumentId, instrumentId))
                     .limit(1);
 
-                if (request) {
-                    const [tender] = await this.db
-                        .select({
-                            teamId: tenderInfos.team,
-                            teamMemberId: tenderInfos.teamMember,
-                        })
-                        .from(tenderInfos)
-                        .where(eq(tenderInfos.id, request.tenderId))
-                        .limit(1);
-
-                    if (tender) {
-                        // Get team name
-                        const [team] = await this.db
-                            .select({ name: teams.name })
-                            .from(teams)
-                            .where(eq(teams.id, tender.teamId))
-                            .limit(1);
-
-                        const area = team?.name === 'AC' ? 'AC Team' : 'DC Team';
-
-                        // Identify proof image from files
-                        let proofImagePath: string | null = null;
-                        if (files && files.length > 0) {
-                            // Look for proof image by field name or filename pattern
-                            const proofImage = files.find(
-                                (f) => f.fieldname === 'proof_image' || f.filename?.includes('proof')
-                            );
-                            if (proofImage) {
-                                proofImagePath = proofImage.filename;
-                            }
-                        }
-
-                        // Map contacts to ContactPersonDto format and filter out invalid ones
-                        const mappedContacts = contacts
-                            .filter((contact) => contact.name && contact.name.trim().length > 0)
-                            .map((contact) => ({
-                                name: contact.name.trim(),
-                                email: contact.email || null,
-                                phone: contact.phone || null,
-                                org: contact.org || null,
-                            }));
-
-                        if (mappedContacts.length === 0) {
-                            throw new BadRequestException('At least one valid contact with name is required');
-                        }
-
-                        // Create followup DTO
-                        const followUpDto: CreateFollowUpDto = {
-                            area,
-                            partyName: body.organisation_name || '',
-                            amount: instrument.amount ? Number(instrument.amount) : 0,
-                            followupFor: 'Portal Payment',
-                            assignedToId: tender.teamMemberId || null,
-                            emdId: request.requestId,
-                            contacts: mappedContacts,
-                            frequency: body.frequency ? Number(body.frequency) : 1,
-                            startFrom: body.followup_start_date || undefined,
-                            stopReason: body.stop_reason ? Number(body.stop_reason) : null,
-                            proofText: body.proof_text || null,
-                            proofImagePath: proofImagePath,
-                            stopRemarks: body.stop_remarks || null,
-                            attachments: [],
-                            createdById: user.id,
-                            followUpHistory: [],
-                        };
-
-                        await this.followUpService.create(followUpDto, user.id);
-                        this.logger.log(`Follow-up created successfully for instrument ${instrumentId}`);
+                if (existingDetails) {
+                    const result = await this.db
+                        .update(instrumentTransferDetails)
+                        .set(transferDetailsUpdate)
+                        .where(eq(instrumentTransferDetails.instrumentId, instrumentId));
+                    
+                    if (!result) {
+                        throw new Error('Update operation failed - no rows affected');
                     }
+                    this.logger.log(`Updated transfer details for instrument ${instrumentId}`);
+                } else {
+                    throw new Error('Update operation failed - no existing transfer details found');
                 }
             } catch (error) {
-                this.logger.error(`Failed to create follow-up for instrument ${instrumentId}:`, error);
-                // Don't throw - allow the action to complete even if followup creation fails
+                this.logger.error(`Failed to save transfer details: ${error}`);
+                throw new InternalServerErrorException('Failed to save transfer details. Please try again.');
+            }
+        }
+
+        // Send email notification for accounts-form action
+        if (body.action === 'accounts-form' && body.pop_req) {
+            try {
+                await this.notificationService.sendPopActionEmail(
+                    instrumentId,
+                    body.purpose,
+                    body.pop_req,
+                    body.payment_datetime ? new Date(body.payment_datetime).toISOString() : undefined,
+                    body.utr_no || undefined,
+                    body.utr_message || undefined,
+                    body.reason_req || undefined
+                );
+            } catch (error) {
+                this.logger.warn(`Failed to send POP action email: ${error}`);
+            }
+        }
+
+        // Send email notification for returned action
+        if (body.action === 'returned' && body.return_utr) {
+            try {
+                await this.notificationService.sendPopReturnEmail(
+                    instrumentId,
+                    body.transfer_date || undefined,
+                    body.return_utr
+                );
+            } catch (error) {
+                this.logger.warn(`Failed to send POP return email: ${error}`);
+            }
+        }
+
+        if (body.action === 'initiate-followup' && body.emailBody) {
+            try {
+                let contacts: any[] = [];
+                if (body.contacts) {
+                    try {
+                        contacts = typeof body.contacts === 'string' ? JSON.parse(body.contacts) : body.contacts;
+                    } catch (e) {
+                        this.logger.warn('Failed to parse contacts for followup', e);
+                    }
+                }
+                const followupDto: CreateFollowUpDto = {
+                    area: (body.area || 'Accounts'),
+                    partyName: body.organisation_name || 'Unknown',
+                    details: body.emailBody,
+                    contacts: contacts.map((c: any) => ({
+                        name: c.name,
+                        email: c.email || null,
+                        phone: c.phone || null,
+                        org: body.organisation_name || null,
+                    })),
+                    frequency: body.frequency || null,
+                    startFrom: body.followup_start_date || undefined,
+                    emdId: instrumentId,
+                    followupFor: 'EMD Refund',
+                    assignedToId: null,
+                    createdById: null,
+                    amount: instrument.amount ? Number(instrument.amount) : 0,
+                    attachments: body.attachments || [],
+                    followUpHistory: []
+                };
+                await this.followUpService.create(followupDto, user.id || user.sub);
+            } catch (error) {
+                this.logger.warn(`Failed to create followup for POP instrument ${instrumentId}: ${error}`);
             }
         }
 
@@ -449,6 +578,210 @@ export class PayOnPortalService {
             instrumentId,
             action: body.action,
             actionNumber,
+        };
+    }
+
+    async getById(id: number) {
+        const [result] = await this.db
+            .select({
+                // Payment Instrument fields
+                instrumentId: paymentInstruments.id,
+                instrumentType: paymentInstruments.instrumentType,
+                purpose: paymentInstruments.purpose,
+                amount: paymentInstruments.amount,
+                utr: paymentInstruments.utr,
+                action: paymentInstruments.action,
+                status: paymentInstruments.status,
+                isActive: paymentInstruments.isActive,
+                createdAt: paymentInstruments.createdAt,
+                updatedAt: paymentInstruments.updatedAt,
+
+                // Payment Request fields
+                requestId: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                requestType: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                requestDueDate: paymentRequests.dueDate,
+                requestedBy: paymentRequests.requestedBy,
+                requestPurpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                requestStatus: paymentRequests.status,
+                requestRemarks: paymentRequests.remarks,
+                requestCreatedAt: paymentRequests.createdAt,
+                requestUpdatedAt: paymentRequests.updatedAt,
+
+                // Transfer Details (Portal Payment) - all fields
+                transferDetailsId: instrumentTransferDetails.id,
+                portalName: instrumentTransferDetails.portalName,
+                transactionDate: instrumentTransferDetails.transactionDate,
+                paymentMethod: instrumentTransferDetails.paymentMethod,
+                utrMsg: instrumentTransferDetails.utrMsg,
+                utrNum: instrumentTransferDetails.utrNum,
+                isNetbanking: instrumentTransferDetails.isNetbanking,
+                isDebit: instrumentTransferDetails.isDebit,
+                returnTransferDate: instrumentTransferDetails.returnTransferDate,
+                returnUtr: instrumentTransferDetails.returnUtr,
+                reason: instrumentTransferDetails.reason,
+                remarks: instrumentTransferDetails.remarks,
+                transferDetailsCreatedAt: instrumentTransferDetails.createdAt,
+                transferDetailsUpdatedAt: instrumentTransferDetails.updatedAt,
+
+                // User fields
+                requestedByName: users.name,
+                tenderName: tenderInfos.tenderName,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(and(
+                eq(paymentRequests.id, id),
+                eq(paymentInstruments.instrumentType, 'Portal Payment'),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .limit(1);
+
+        if (!result) {
+            throw new NotFoundException(`Payment Request with ID ${id} not found`);
+        }
+
+        return result;
+    }
+
+    async getActionFormData(id: number) {
+        const [result] = await this.db
+            .select({
+                id: paymentInstruments.id,
+                action: paymentInstruments.action,
+                status: paymentInstruments.status,
+                amount: paymentInstruments.amount,
+                utr: paymentInstruments.utr,
+                purpose: paymentInstruments.purpose,
+                rejectionReason: instrumentTransferDetails.reason,
+                legacyData: paymentInstruments.legacyData,
+                generatedPdf: paymentInstruments.generatedPdf,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                tenderId: paymentRequests.tenderId,
+                portalName: instrumentTransferDetails.portalName,
+                transactionDate: instrumentTransferDetails.transactionDate,
+                paymentMethod: instrumentTransferDetails.paymentMethod,
+                utrMsg: instrumentTransferDetails.utrMsg,
+                utrNum: instrumentTransferDetails.utrNum,
+                isNetbanking: instrumentTransferDetails.isNetbanking,
+                isDebit: instrumentTransferDetails.isDebit,
+                returnTransferDate: instrumentTransferDetails.returnTransferDate,
+                returnUtr: instrumentTransferDetails.returnUtr,
+                remarks: instrumentTransferDetails.remarks,
+                tenderStatusName: statuses.name,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(and(
+                eq(paymentInstruments.id, id),
+                eq(paymentInstruments.instrumentType, 'Portal Payment'),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .limit(1);
+
+        if (!result) {
+            throw new NotFoundException(`Payment Instrument with ID ${id} not found`);
+        }
+
+        const legacyData = result.legacyData as Record<string, any> | null;
+        const hasAccountsFormData = !!(
+            (result.status === 'Accepted' || result.status === 'Rejected') ||
+            result.rejectionReason ||
+            result.utr ||
+            result.transactionDate ||
+            result.utrMsg ||
+            legacyData?.date_time
+        );
+        const hasReturnedData = !!(result.returnTransferDate || result.returnUtr);
+        const hasSettledData = result.action === 4;
+
+        return {
+            id: result.id,
+            action: result.action,
+            popStatus: this.statusMap()[result.status],
+            tenderNo: result.tenderNo,
+            tenderName: result.tenderName,
+            tenderId: result.tenderId,
+            amount: result.amount ? Number(result.amount) : null,
+            portalName: result.portalName,
+            purpose: result.purpose,
+            utrNo: result.utr || result.utrNum,
+            transactionDate: result.transactionDate ? new Date(result.transactionDate) : null,
+            tenderStatusName: result.tenderStatusName,
+            paymentMethod: result.paymentMethod,
+            utrMsg: result.utrMsg,
+            isNetbanking: result.isNetbanking,
+            isDebit: result.isDebit,
+            returnTransferDate: result.returnTransferDate ? new Date(result.returnTransferDate) : null,
+            returnUtr: result.returnUtr,
+            remarks: result.remarks,
+            rejectionReason: result.rejectionReason,
+            paymentDateTime: legacyData?.date_time || null,
+            paymentProofPath: legacyData?.payment_proof || result.generatedPdf || null,
+            settledRemarks: hasSettledData ? result.remarks : null,
+            hasAccountsFormData,
+            hasReturnedData,
+            hasSettledData,
+        };
+    }
+
+    async getFollowupData(instrumentId: number) {
+        const [result] = await this.db
+            .select({
+                id: followUps.id,
+                emdId: followUps.emdId,
+                partyName: followUps.partyName,
+                area: followUps.area,
+                amount: followUps.amount,
+                contacts: followUps.contacts,
+                frequency: followUps.frequency,
+                startFrom: followUps.startFrom,
+                nextFollowUpDate: followUps.nextFollowUpDate,
+                stopReason: followUps.stopReason,
+                proofText: followUps.proofText,
+                stopRemarks: followUps.stopRemarks,
+                proofImagePath: followUps.proofImagePath,
+                assignmentStatus: followUps.assignmentStatus,
+                createdAt: followUps.createdAt,
+            })
+            .from(followUps)
+            .where(and(
+                eq(followUps.emdId, instrumentId),
+                isNull(followUps.deletedAt)
+            ))
+            .orderBy(desc(followUps.createdAt))
+            .limit(1);
+
+        if (!result) {
+            return null;
+        }
+
+        return {
+            id: result.id,
+            organisationName: result.partyName,
+            area: result.area,
+            amount: result.amount ? Number(result.amount) : null,
+            contacts: result.contacts,
+            frequency: result.frequency,
+            followupStartDate: result.startFrom ? new Date(result.startFrom) : null,
+            nextFollowUpDate: result.nextFollowUpDate ? new Date(result.nextFollowUpDate) : null,
+            stopReason: result.stopReason,
+            proofText: result.proofText,
+            stopRemarks: result.stopRemarks,
+            proofImagePath: result.proofImagePath,
+            assignmentStatus: result.assignmentStatus,
+            createdAt: result.createdAt,
         };
     }
 }

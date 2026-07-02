@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { rfqsService } from "@/services/api";
 import { vendorOrganizationsService } from "@/services/api";
 import type { CreateRfqDto, RfqDashboardFilters, UpdateRfqDto } from "@/modules/tendering/rfqs/helpers/rfq.types";
+import { useTeamFilter } from "@/hooks/useTeamFilter";
 
 export const rfqsKey = {
     all: ["rfqs"] as const,
@@ -14,12 +15,27 @@ export const rfqsKey = {
     detail: (id: number) => [...rfqsKey.details(), id] as const,
     byTender: (tenderId: number) => [...rfqsKey.all, "by-tender", tenderId] as const,
     dashboardCounts: () => [...rfqsKey.all, "dashboard-counts"] as const,
+
 };
 
 export const useRfqsDashboard = (filters?: RfqDashboardFilters) => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = teamId !== null ? teamId : undefined;
+
+    const effectiveFilters: RfqDashboardFilters | undefined = filters
+        ? { ...filters, ...(teamIdParam !== undefined ? { teamId: teamIdParam } : {}) }
+        : (teamIdParam !== undefined ? { teamId: teamIdParam } as RfqDashboardFilters : undefined);
+
+    const queryKeyFilters = {
+        ...filters,
+        dataScope,
+        teamId: teamId ?? null,
+        userId: userId ?? null,
+    };
+
     return useQuery({
-        queryKey: [...rfqsKey.all, 'dashboard', filters],
-        queryFn: () => rfqsService.getDashboard(filters),
+        queryKey: [...rfqsKey.all, 'dashboard', queryKeyFilters],
+        queryFn: () => rfqsService.getDashboard(effectiveFilters),
     });
 };
 
@@ -36,11 +52,11 @@ export const useRfqByTenderId = (tenderId: number | null) => {
         queryKey: rfqsKey.byTender(tenderId ?? 0),
         queryFn: async () => {
             try {
-                return await rfqsService.getByTenderId(tenderId ?? 0);
+                const list = await rfqsService.getByTenderId(tenderId ?? 0);
+                return Array.isArray(list) ? list : [];
             } catch (error: any) {
-                // Handle 404 gracefully - return null if resource doesn't exist
                 if (error?.response?.status === 404) {
-                    return null;
+                    return [];
                 }
                 throw error;
             }
@@ -95,6 +111,7 @@ export const useDeleteRfq = () => {
     });
 };
 
+
 export const useRfqVendors = (rfqToIds: string | undefined) => {
     return useQuery({
         queryKey: ["rfq-vendors", rfqToIds],
@@ -118,10 +135,21 @@ export const useRfqVendors = (rfqToIds: string | undefined) => {
     });
 };
 
-export const useRfqsDashboardCounts = () => {
+export const useResponseStatus = () => {
     return useQuery({
-        queryKey: rfqsKey.dashboardCounts(),
-        queryFn: () => rfqsService.getDashboardCounts(),
-        staleTime: 30000,
+        queryKey : ['response-statuses'],
+        queryFn: () => rfqsService.getResponseStatus(),
+    })
+}
+
+export const useRfqsDashboardCounts = () => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = teamId !== null ? teamId : undefined;
+    const queryKey = [...rfqsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
+
+    return useQuery({
+        queryKey,
+        queryFn: () => rfqsService.getDashboardCounts(teamIdParam),
+        staleTime: 0,
     });
 };

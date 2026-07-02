@@ -1,26 +1,30 @@
-export type DemandDraftDashboardTab = 'pending' | 'created' | 'rejected' | 'returned' | 'cancelled';
+export type DashboardTab = 'pending' | 'created' | 'rejected' | 'returned' | 'cancelled';
+export type ExportTab = DashboardTab | 'all';
 
-export type DemandDraftDashboardFilters = {
-    tab?: DemandDraftDashboardTab;
+export interface DashboardFilters {
+    tab?: DashboardTab;
     page?: number;
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     search?: string;
-};
+    team?: number;
+}
 
 export interface DemandDraftDashboardRow {
     id: number;
-    ddCreationDate: Date | null;
+    requestId: number;
+    purpose: string | null;
+    ddCreationDate: string | null;
     ddNo: string | null;
     beneficiaryName: string | null;
     ddAmount: number | null;
     tenderName: string | null;
     tenderNo: string | null;
-    bidValidity: Date | null;
+    bidValidity: string | null;
     tenderStatus: string | null;
-    member: string | null;
-    expiry: Date | null;
+    teamMember: string | null;
+    expiry: string | null;
     ddStatus: string | null;
 }
 
@@ -30,5 +34,175 @@ export interface DemandDraftDashboardCounts {
     rejected: number;
     returned: number;
     cancelled: number;
-    total: number;
+}
+
+export interface DDActionFormData {
+    id: number;
+    action: number;
+    ddStatus: string;
+    tenderNo: string;
+    tenderName: string;
+    tenderId: number;
+    amount: number | null;
+    favouring: string | null;
+    payableAt: string | null;
+    issueDate: string | null;
+    expiryDate: string | null;
+    ddNo: string | null;
+    ddDate: string | null;
+    reqNo: string | null;
+    ddNeeds: string | null;
+    ddPurpose: string | null;
+    ddRemarks: string | null;
+    courierAddress: string | null;
+    courierAddressJson: Record<string, any> | null;
+    courierDeadline: number | null;
+    deliverBy: string | null;
+    tenderStatusName: string | null;
+    utr: string | null;
+    docketNo: string | null;
+    generatedPdf: string | null;
+    cancelPdf: string | null;
+    docketSlip: string | null;
+    courierDetails: {
+        id: number;
+        toOrg: string | null;
+        toName: string | null;
+        toAddr: string | null;
+        toPin: string | null;
+        toMobile: string | null;
+        trackingNumber: string | null;
+        courierProvider: string | null;
+        docketNo: string | null;
+        status: string | null;
+        docketSlip: string | null;
+        deliveryPod: string | null;
+        deliveryDate: string | null;
+        pickupDate: string | null;
+        courierDocs: string[] | null;
+        courierStatusName: string | null;
+    } | null;
+    hasAccountsFormData: boolean;
+    hasReturnedData: boolean;
+    hasSettledData: boolean;
+    linkedCheque?: LinkedChequeData | null;
+}
+
+export interface LinkedChequeData {
+    chequeNo: string | null;
+    amount: number | null;
+    status: string | null;
+    requestId: number | null;
+}
+
+export interface DemandDraftViewProps {
+    data: DDActionFormData;
+    followupData?: DDFollowupData | null;
+    isLoading?: boolean;
+    className?: string;
+}
+
+export interface DDFollowupData {
+    id: number;
+    organisationName: string | null;
+    area: string | null;
+    amount: number | null;
+    contacts: any[];
+    frequency: number | null;
+    followupStartDate: string | null;
+    nextFollowUpDate: string | null;
+    stopReason: number | null;
+    proofText: string | null;
+    stopRemarks: string | null;
+    proofImagePath: string | null;
+    assignmentStatus: string | null;
+    createdAt: string | null;
+}
+
+export interface AccountsFormHistory {
+    ddReq?: 'Accepted' | 'Rejected';
+    reasonReq?: string;
+    ddNo?: string;
+    ddDate?: string;
+    reqNo?: string;
+    remarks?: string;
+    courierOrg?: string;
+    courierName?: string;
+    courierPhone?: string;
+    courierAddrLine1?: string;
+    courierAddrLine2?: string;
+    courierCity?: string;
+    courierState?: string;
+    courierPincode?: string;
+    empFrom?: string;
+    delDate?: string;
+    urgency?: string;
+}
+
+export interface FollowupHistory {
+    organisationName?: string;
+    contacts?: Array<{ name: string; phone?: string; email?: string }>;
+    followupStartDate?: string;
+    frequency?: number;
+}
+
+export interface ReturnedCourierHistory {
+    docketNo?: string;
+    docketSlip?: string;
+}
+
+export interface ReturnedBankTransferHistory {
+    transferDate?: string;
+    utr?: string;
+}
+
+export interface SettledHistory {
+    remarks?: string;
+}
+
+export interface CancellationHistory {
+    cancelRemark?: string;
+}
+
+export interface CancellationConfirmHistory {
+    cancellationDate?: string;
+    cancellationAmount?: string;
+    cancellationReferenceNo?: string;
+}
+
+export interface DDFormHistory {
+    accountsForm?: AccountsFormHistory;
+    initiateFollowup?: FollowupHistory;
+    returnedCourier?: ReturnedCourierHistory;
+    returnedBankTransfer?: ReturnedBankTransferHistory;
+    settled?: SettledHistory;
+    requestCancellation?: CancellationHistory;
+    cancellationConfirmation?: CancellationConfirmHistory;
+}
+
+export const ALL_DD_ACTION_OPTIONS = [
+    { value: 'accounts-form', label: 'Accounts Form' },
+    { value: 'initiate-followup', label: 'Initiate Followup' },
+    { value: 'returned-courier', label: 'Returned via Courier' },
+    { value: 'returned-bank-transfer', label: 'Returned via Bank Transfer' },
+    { value: 'settled', label: 'Settled with Project Account' },
+    { value: 'request-cancellation', label: 'Send DD Cancellation Request' },
+    { value: 'cancellation-confirmation', label: 'DD cancelled at Branch' },
+];
+
+export interface DDActionFormProps {
+    instrumentId: number;
+    action?: number | null;
+    tenderId?: number | null;
+    instrumentData?: {
+        tenderNo?: string;
+        tenderName?: string;
+        amount?: number;
+        utrNo?: string;
+        ddNo?: string;
+        ddDate?: string | Date;
+        tenderStatusName?: string;
+    };
+    formHistory?: DDFormHistory;
+    linkedCheque?: LinkedChequeData | null;
 }

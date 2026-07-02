@@ -21,16 +21,17 @@ export class EmailRetryCron {
      */
     @Cron(CronExpression.EVERY_5_MINUTES)
     async handleRetry() {
-        this.logger.debug('Running email retry job...');
+        // this.logger.debug('Running email retry job...');
 
         try {
             const result = await this.emailService.retryFailedEmails();
 
             if (result.retried > 0 || result.failed > 0) {
                 this.logger.log(`Email retry: ${result.retried} success, ${result.failed} failed`);
-            } else {
-                this.logger.log('No emails to retry');
-            }
+            } 
+            // else {
+            //     this.logger.log('No emails to retry');
+            // }
         } catch (error) {
             this.logger.error('Email retry job failed:', error instanceof Error ? error.stack : String(error));
         }

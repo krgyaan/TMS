@@ -9,11 +9,33 @@
         <li>Tender Number: {{data.tenderNo}}</li>
     </ul>
 
-    <p>Checked Documents</p>
-    <ul>
-        {{#each data.documents}}
-            <li>{{this}}</li>
-        {{/each}}
-    </ul>
+    {{#if data.selectedDocuments.length}}
+        <p>Standard Documents</p>
+        <ul>
+            {{#each data.selectedDocuments}}
+                <li>{{this.name}}</li>
+            {{else}}
+                <li>No standard documents selected</li>
+            {{/each}}
+        </ul>
+    {{/if}}
+
+    {{#if data.extraDocuments.length}}
+        <p>Additional Documents</p>
+        <ul>
+            {{#each data.extraDocuments}}
+                <li>
+                    {{#if this.url}}
+                        <a href="{{this.url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{this.name}}</a>
+                    {{else}}
+                        {{this.name}}
+                    {{/if}}
+                </li>
+            {{else}}
+                <li>No additional documents</li>
+            {{/each}}
+        </ul>
+    {{/if}}
+
     <p>Regards,<br />{{data.te}}</p>
 </div>

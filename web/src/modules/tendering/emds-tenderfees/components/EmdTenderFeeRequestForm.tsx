@@ -1,127 +1,25 @@
-import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm, FormProvider } from 'react-hook-form';
+import { useForm, FormProvider, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Save, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useTender } from '@/hooks/api/useTenders';
-import { useCreatePaymentRequest, useUpdatePaymentRequest } from '@/hooks/api/useEmds';
-import { EmdSection } from './EmdSection';
-import { TenderFeeSection } from './TenderFeeSection';
-import { ProcessingFeeSection } from './ProcessingFeeSection';
-import { formatDateTime } from '@/hooks/useFormatedDate';
+import { useCreatePaymentRequest, useUpdatePaymentRequest, useEmdTenderFeeDetails } from '@/hooks/api/usePaymentRequests';
+import { PaymentSection } from './PaymentSection';
 import { Button } from '@/components/ui/button';
-import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { toast } from 'sonner';
-import { formatINR } from '@/hooks/useINRFormatter';
-import { parseAllowedModes, DELIVERY_OPTIONS } from '../constants';
+import { parseAllowedModes } from '../constants';
 import { Skeleton } from '@/components/ui/skeleton';
+import { FieldWrapper } from '@/components/form/FieldWrapper';
+import { Input } from '@/components/ui/input';
+import { useAuth } from '@/contexts/AuthContext';
+import { PaymentRequestSchema, type PaymentRequestFormValues } from '../helpers/payment-request.schema';
 
-// Extract delivery option values for enum validation
-const DELIVERY_OPTION_VALUES = DELIVERY_OPTIONS.map(option => option.value) as ['TENDER_DUE', '24', '48', '72', '96', '120'];
-
-// Helper to create enum field that accepts empty strings and transforms them to undefined
-// Also handles cases where SelectField converts numeric strings to numbers
-const deliveryEnumField = () =>
-    z.preprocess(
-        (val) => {
-            // Handle empty/null/undefined
-            if (val === '' || val === null || val === undefined) {
-                return undefined;
-            }
-            // Convert numbers back to strings (SelectField converts "72" to 72)
-            if (typeof val === 'number') {
-                return String(val);
-            }
-            // Ensure string values match enum
-            return val;
-        },
-        z.enum(DELIVERY_OPTION_VALUES).optional()
-    );
-
-const PaymentDetailsSchema = z.object({
-    // DD fields
-    ddFavouring: z.string().optional(),
-    ddPayableAt: z.string().optional(),
-    ddDeliverBy: deliveryEnumField(),
-    ddPurpose: z.string().optional(),
-    ddCourierAddress: z.string().optional(),
-    ddCourierHours: z.coerce.number().optional(),
-    ddDate: z.string().optional(),
-    ddRemarks: z.string().optional(),
-
-    // FDR fields
-    fdrFavouring: z.string().optional(),
-    fdrExpiryDate: z.string().optional(),
-    fdrDeliverBy: deliveryEnumField(),
-    fdrPurpose: z.string().optional(),
-    fdrCourierAddress: z.string().optional(),
-    fdrCourierHours: z.coerce.number().optional(),
-    fdrDate: z.string().optional(),
-
-    // BG fields
-    bgNeededIn: z.string().optional(),
-    bgPurpose: z.string().optional(),
-    bgFavouring: z.string().optional(),
-    bgAddress: z.string().optional(),
-    bgExpiryDate: z.string().optional(),
-    bgClaimPeriod: z.string().optional(),
-    bgStampValue: z.coerce.number().optional(),
-    bgFormatFiles: z.array(z.string()).optional(),
-    bgPoFiles: z.array(z.string()).optional(),
-    bgClientUserEmail: z.string().email().optional().or(z.literal('')),
-    bgClientCpEmail: z.string().email().optional().or(z.literal('')),
-    bgClientFinanceEmail: z.string().email().optional().or(z.literal('')),
-    bgCourierAddress: z.string().optional(),
-    bgCourierDays: z.coerce.number().min(1).max(10).optional(),
-    bgBank: z.string().optional(),
-
-    // Bank Transfer fields
-    btPurpose: z.string().optional(),
-    btAccountName: z.string().optional(),
-    btAccountNo: z.string().optional(),
-    btIfsc: z.string().optional(),
-
-    // Portal fields
-    portalPurpose: z.string().optional(),
-    portalName: z.string().optional(),
-    portalNetBanking: z.enum(['YES', 'NO']).optional(),
-    portalDebitCard: z.enum(['YES', 'NO']).optional(),
-
-    // Cheque fields
-    chequeFavouring: z.string().optional(),
-    chequeDate: z.string().optional(),
-    chequeNeededIn: deliveryEnumField(),
-    chequePurpose: z.string().optional(),
-    chequeAccount: z.string().optional(),
-});
-
-const EmdRequestSchema = z.object({
-    // EMD
-    emd: z.object({
-        mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BT', 'POP', 'SURETY_BOND', 'NA']).optional(),
-        details: PaymentDetailsSchema.optional(),
-    }).optional(),
-
-    // Tender Fee
-    tenderFee: z.object({
-        mode: z.enum(['POP', 'BT', 'DD', 'NA']).optional(),
-        details: PaymentDetailsSchema.optional(),
-    }).optional(),
-
-    // Processing Fee
-    processingFee: z.object({
-        mode: z.enum(['POP', 'BT', 'DD', 'NA']).optional(),
-        details: PaymentDetailsSchema.optional(),
-    }).optional(),
-});
-
-type FormValues = z.infer<typeof EmdRequestSchema>;
+type FormValues = PaymentRequestFormValues;
 
 interface EmdTenderFeeRequestFormProps {
-    tenderId: number;
+    tenderId?: number;
     requestIds?: {
         emd?: number;
         tenderFee?: number;
@@ -131,14 +29,6 @@ interface EmdTenderFeeRequestFormProps {
     mode?: 'create' | 'edit';
 }
 
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-/**
- * Transform frontend mode codes to backend format
- * BT -> BANK_TRANSFER, POP -> PORTAL
- */
 function transformModeForBackend(mode: string): string {
     const mapping: Record<string, string> = {
         BT: 'BANK_TRANSFER',
@@ -147,33 +37,24 @@ function transformModeForBackend(mode: string): string {
     return mapping[mode] || mode;
 }
 
-// ============================================================================
-// Component
-// ============================================================================
-
-export function EmdTenderFeeRequestForm({
-    tenderId,
-    requestIds,
-    initialData,
-    mode = 'create'
-}: EmdTenderFeeRequestFormProps) {
+export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mode = 'create' }: EmdTenderFeeRequestFormProps) {
     const navigate = useNavigate();
-    const { data: tender, isLoading: isTenderLoading } = useTender(Number(tenderId));
-    const { data: infoSheet, isLoading: isInfoSheetLoading } = useInfoSheet(tenderId);
+    const { user } = useAuth();
+    const { data, isLoading: isDataLoading } = useEmdTenderFeeDetails(tenderId ? Number(tenderId) : null);
     const createRequest = useCreatePaymentRequest();
     const updateRequest = useUpdatePaymentRequest();
     const isEditMode = mode === 'edit';
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(EmdRequestSchema) as any,
+        resolver: zodResolver(PaymentRequestSchema) as Resolver<FormValues>,
         defaultValues: initialData || {
-            emd: { mode: undefined, details: {} },
-            tenderFee: { mode: undefined, details: {} },
-            processingFee: { mode: undefined, details: {} },
+            EMD: { mode: undefined, details: {} },
+            TENDER_FEES: { mode: undefined, details: {} },
+            PROCESSING_FEES: { mode: undefined, details: {} },
+            requestedBy: '',
         },
     });
 
-    // Populate form with initial data when provided
     useEffect(() => {
         if (initialData) {
             form.reset(initialData);
@@ -181,15 +62,17 @@ export function EmdTenderFeeRequestForm({
     }, [initialData, form]);
 
     const handleSubmit = async (values: FormValues) => {
+        console.log("Initial Form Values", initialData);
+        console.log("Updated Form Values", values);
+
         if (isEditMode) {
-            // Edit mode: update each request separately
             const updatePromises: Promise<any>[] = [];
 
-            if (values.emd?.mode && requestIds?.emd) {
+            if (values.EMD?.mode && requestIds?.emd) {
                 const payload = {
-                    emd: {
-                        mode: transformModeForBackend(values.emd.mode),
-                        details: values.emd.details || {},
+                    EMD: {
+                        mode: transformModeForBackend(values.EMD.mode),
+                        details: values.EMD.details || {},
                     },
                 };
                 updatePromises.push(
@@ -200,11 +83,11 @@ export function EmdTenderFeeRequestForm({
                 );
             }
 
-            if (values.tenderFee?.mode && requestIds?.tenderFee) {
+            if (values.TENDER_FEES?.mode && requestIds?.tenderFee) {
                 const payload = {
-                    tenderFee: {
-                        mode: transformModeForBackend(values.tenderFee.mode),
-                        details: values.tenderFee.details || {},
+                    TENDER_FEES: {
+                        mode: transformModeForBackend(values.TENDER_FEES.mode),
+                        details: values.TENDER_FEES.details || {},
                     },
                 };
                 updatePromises.push(
@@ -215,11 +98,11 @@ export function EmdTenderFeeRequestForm({
                 );
             }
 
-            if (values.processingFee?.mode && requestIds?.processingFee) {
+            if (values.PROCESSING_FEES?.mode && requestIds?.processingFee) {
                 const payload = {
-                    processingFee: {
-                        mode: transformModeForBackend(values.processingFee.mode),
-                        details: values.processingFee.details || {},
+                    PROCESSING_FEES: {
+                        mode: transformModeForBackend(values.PROCESSING_FEES.mode),
+                        details: values.PROCESSING_FEES.details || {},
                     },
                 };
                 updatePromises.push(
@@ -244,32 +127,30 @@ export function EmdTenderFeeRequestForm({
                 console.error(error);
             }
         } else {
-            // Create mode: transform modes and create
             const payload: any = {};
 
-            if (values.emd?.mode) {
-                payload.emd = {
-                    mode: transformModeForBackend(values.emd.mode),
-                    details: values.emd.details || {},
+            if (values.EMD?.mode) {
+                payload.EMD = {
+                    mode: transformModeForBackend(values.EMD.mode),
+                    details: values.EMD.details || {},
                 };
             }
 
-            if (values.tenderFee?.mode) {
-                payload.tenderFee = {
-                    mode: transformModeForBackend(values.tenderFee.mode),
-                    details: values.tenderFee.details || {},
+            if (values.TENDER_FEES?.mode) {
+                payload.TENDER_FEES = {
+                    mode: transformModeForBackend(values.TENDER_FEES.mode),
+                    details: values.TENDER_FEES.details || {},
                 };
             }
 
-            if (values.processingFee?.mode) {
-                payload.processingFee = {
-                    mode: transformModeForBackend(values.processingFee.mode),
-                    details: values.processingFee.details || {},
+            if (values.PROCESSING_FEES?.mode) {
+                payload.PROCESSING_FEES = {
+                    mode: transformModeForBackend(values.PROCESSING_FEES.mode),
+                    details: values.PROCESSING_FEES.details || {},
                 };
             }
 
-            // Check if at least one section is filled
-            if (!payload.emd && !payload.tenderFee && !payload.processingFee) {
+            if (!payload.EMD && !payload.TENDER_FEES && !payload.PROCESSING_FEES) {
                 toast.error('Please select at least one payment mode');
                 return;
             }
@@ -288,8 +169,7 @@ export function EmdTenderFeeRequestForm({
         }
     };
 
-    // Loading state
-    if (isTenderLoading || isInfoSheetLoading) {
+    if (isDataLoading) {
         return (
             <Card>
                 <CardHeader>
@@ -303,8 +183,7 @@ export function EmdTenderFeeRequestForm({
         );
     }
 
-    // No tender found
-    if (!tender) {
+    if (!data) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -313,16 +192,14 @@ export function EmdTenderFeeRequestForm({
         );
     }
 
-    // Parse amounts
-    const emdAmount = Number(tender.emd) || 0;
-    const tenderFeeAmount = Number(tender.tenderFees) || 0;
-    const processingFeeAmount = Number(infoSheet?.processingFeeAmount) || 0;
+    const emdAmount = data?.emd || 0;
+    const tenderFeeAmount = data?.tenderFees || 0;
+    const processingFeeAmount = data?.processingFeeAmount || 0;
 
-    const hasEmd = emdAmount > 0;
-    const hasTenderFee = tenderFeeAmount > 0;
-    const hasProcessingFee = processingFeeAmount > 0;
+    const hasEmd = isEditMode ? !!requestIds?.emd : emdAmount > 0;
+    const hasTenderFee = isEditMode ? !!requestIds?.tenderFee : tenderFeeAmount > 0;
+    const hasProcessingFee = isEditMode ? !!requestIds?.processingFee : processingFeeAmount > 0;
 
-    // Check if any payment is required
     if (!hasEmd && !hasTenderFee && !hasProcessingFee) {
         return (
             <Card>
@@ -344,10 +221,10 @@ export function EmdTenderFeeRequestForm({
         );
     }
 
-    // Parse allowed modes
-    const allowedEmdModes = parseAllowedModes(tender.emdMode);
-    const allowedTenderFeeModes = parseAllowedModes(tender.tenderFeeMode);
-    const allowedProcessingFeeModes = parseAllowedModes(infoSheet?.processingFeeMode);
+    const ALL_MODES = ['DD', 'FDR', 'BG', 'CHEQUE', 'BANK_TRANSFER', 'PORTAL'];
+    const allowedEmdModes = isEditMode ? ALL_MODES : parseAllowedModes(data?.emdMode);
+    const allowedTenderFeeModes = isEditMode ? ['PORTAL', 'BANK_TRANSFER', 'DD'] : parseAllowedModes(data?.tenderFeeMode);
+    const allowedProcessingFeeModes = isEditMode ? ['PORTAL', 'BANK_TRANSFER', 'DD'] : parseAllowedModes(data?.processingFeeMode);
 
     const isPending = isEditMode ? updateRequest.isPending : createRequest.isPending;
 
@@ -357,30 +234,6 @@ export function EmdTenderFeeRequestForm({
                 <CardTitle className="text-2xl">
                     {isEditMode ? 'Edit Payment Request' : 'Create Payment Request'}
                 </CardTitle>
-                <CardDescription>
-                    <div className="space-y-1">
-                        <p>
-                            <span className="text-muted-foreground">Tender:</span>{' '}
-                            <strong>{tender.tenderNo}</strong> - {tender.tenderName}
-                        </p>
-                        <p>
-                            <span className="text-muted-foreground">Assigned to:</span>{' '}
-                            <strong>{tender.teamMemberName || 'Unassigned'}</strong>
-                            {tender.dueDate && (
-                                <>
-                                    {' | '}
-                                    <span className="text-muted-foreground">Due:</span>{' '}
-                                    <strong>{formatDateTime(tender.dueDate)}</strong>
-                                </>
-                            )}
-                        </p>
-                        <p className="text-sm">
-                            {hasEmd && <span className="mr-4">EMD: <strong>{formatINR(emdAmount)}</strong></span>}
-                            {hasTenderFee && <span className="mr-4">Tender Fee: <strong>{formatINR(tenderFeeAmount)}</strong></span>}
-                            {hasProcessingFee && <span>Processing Fee: <strong>{formatINR(processingFeeAmount)}</strong></span>}
-                        </p>
-                    </div>
-                </CardDescription>
                 <CardAction>
                     <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
                         <ArrowLeft className="mr-2 h-4 w-4" />
@@ -391,40 +244,96 @@ export function EmdTenderFeeRequestForm({
 
             <CardContent>
                 <FormProvider {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+                    <form
+                        onSubmit={form.handleSubmit(handleSubmit, (errors) => {
+                            console.error('Form validation errors:', errors);
+                            toast.error('Please fix the errors in the form before submitting');
+                        })}
+                        className="space-y-8"
+                    >
+                        {/* Tender Related FormFields */}
+                        {tenderId && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg border">
+                                <FieldWrapper control={form.control} name="tenderNo" label="Tender Number">
+                                    {(field) => <Input {...field} value={field.value || data?.tenderNo || ''} readOnly className="bg-background" />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="tenderName" label="Tender Name">
+                                    {(field) => <Input {...field} value={field.value || data?.tenderName || ''} readOnly className="bg-background" />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="tenderDueDate" label="Due Date">
+                                    {(field) => {
+                                        const dateVal = field.value || data?.dueDate;
+                                        return <Input {...field} value={dateVal ? new Date(dateVal).toLocaleDateString('en-IN') : ''} readOnly className="bg-background" />;
+                                    }}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="requestedBy" label="Requested By">
+                                    {(field) => <Input {...field} value={field.value || user?.name || ''} readOnly className="bg-background" />}
+                                </FieldWrapper>
+                            </div>
+                        )}
 
-                        {/* EMD Section */}
                         {hasEmd && (
-                            <EmdSection
+                            <PaymentSection
+                                purpose="EMD"
                                 allowedModes={allowedEmdModes}
                                 amount={emdAmount}
+                                type="TMS"
+                                courierAddress={data?.courierAddress || undefined}
+                                courierData={data ? {
+                                    courierName: data.courierName,
+                                    courierPhone: data.courierPhone,
+                                    courierAddressLine1: data.courierAddressLine1 || data.courierAddress,
+                                    courierAddressLine2: data.courierAddressLine2,
+                                    courierCity: data.courierCity,
+                                    courierState: data.courierState,
+                                    courierPincode: data.courierPincode,
+                                } : undefined}
                                 defaultPurpose="EMD"
-                                courierAddress={infoSheet?.courierAddress || undefined}
+                                isEditMode={isEditMode}
                             />
                         )}
 
-                        {/* Tender Fee Section */}
                         {hasTenderFee && (
-                            <TenderFeeSection
-                                prefix="tenderFee"
-                                title="Tender Fee"
+                            <PaymentSection
+                                purpose="TENDER_FEES"
                                 allowedModes={allowedTenderFeeModes}
                                 amount={tenderFeeAmount}
+                                type="TMS"
+                                courierAddress={data?.courierAddress || undefined}
+                                courierData={data ? {
+                                    courierName: data.courierName,
+                                    courierPhone: data.courierPhone,
+                                    courierAddressLine1: data.courierAddressLine1 || data.courierAddress,
+                                    courierAddressLine2: data.courierAddressLine2,
+                                    courierCity: data.courierCity,
+                                    courierState: data.courierState,
+                                    courierPincode: data.courierPincode,
+                                } : undefined}
                                 defaultPurpose="TENDER_FEES"
-                                courierAddress={infoSheet?.courierAddress || undefined}
+                                isEditMode={isEditMode}
                             />
                         )}
 
-                        {/* Processing Fee Section */}
                         {hasProcessingFee && (
-                            <ProcessingFeeSection
-                                amount={processingFeeAmount}
+                            <PaymentSection
+                                purpose="PROCESSING_FEES"
                                 allowedModes={allowedProcessingFeeModes}
-                                courierAddress={infoSheet?.courierAddress || undefined}
+                                amount={processingFeeAmount}
+                                type="TMS"
+                                courierAddress={data?.courierAddress || undefined}
+                                courierData={data ? {
+                                    courierName: data.courierName,
+                                    courierPhone: data.courierPhone,
+                                    courierAddressLine1: data.courierAddressLine1 || data.courierAddress,
+                                    courierAddressLine2: data.courierAddressLine2,
+                                    courierCity: data.courierCity,
+                                    courierState: data.courierState,
+                                    courierPincode: data.courierPincode,
+                                } : undefined}
+                                isEditMode={isEditMode}
                             />
                         )}
 
-                        {/* Submit Buttons */}
                         <div className="flex items-center justify-end gap-4 pt-6 border-t">
                             <Button
                                 type="button"

@@ -334,7 +334,7 @@ export const EMD_WORKFLOW = {
             dependsOn: ['emd_requested'],
             canRunInParallel: false,
             isOptional: true,
-            conditional: { field: 'emdType', operator: 'equals' as const, value: 'POP' },
+            conditional: { field: 'emdType', operator: 'equals' as const, value: 'PORTAL' },
         },
         {
             stepKey: 'bt_acc_form',
@@ -350,7 +350,7 @@ export const EMD_WORKFLOW = {
             dependsOn: ['emd_requested'],
             canRunInParallel: false,
             isOptional: true,
-            conditional: { field: 'emdType', operator: 'equals' as const, value: 'BT' },
+            conditional: { field: 'emdType', operator: 'equals' as const, value: 'BANK_TRANSFER' },
         },
         {
             stepKey: 'cheque_acc_form',

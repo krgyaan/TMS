@@ -1,11 +1,13 @@
 import { BaseApiService } from './base.service';
 import type {
-    TenderCostingSheet,
+    CostingSheetWithDetails,
     CostingApprovalDashboardCounts,
     CostingApprovalListParams,
     CostingApprovalDashboardRow,
     ApproveCostingDto,
     RejectCostingDto,
+    UpdateApprovedCostingDto,
+    ApproveAllCostingDto,
 } from '@/modules/tendering/costing-approvals/helpers/costingApproval.types';
 import type { PaginatedResult } from '@/types/api.types';
 
@@ -16,7 +18,8 @@ class CostingApprovalsService extends BaseApiService {
     }
 
     async getAll(
-        params?: CostingApprovalListParams
+        params?: CostingApprovalListParams,
+        teamId?: number
     ): Promise<PaginatedResult<CostingApprovalDashboardRow>> {
         const search = new URLSearchParams();
 
@@ -36,30 +39,45 @@ class CostingApprovalsService extends BaseApiService {
             if (params.sortOrder) {
                 search.set('sortOrder', params.sortOrder);
             }
+            if (params.search) {
+                search.set('search', params.search);
+            }
+        }
+        if (teamId !== undefined && teamId !== null) {
+            search.set('teamId', String(teamId));
         }
 
         const queryString = search.toString();
         return this.get<PaginatedResult<CostingApprovalDashboardRow>>(queryString ? `/dashboard?${queryString}` : '/dashboard');
     }
 
-    async getById(id: number): Promise<TenderCostingSheet> {
-        return this.get<TenderCostingSheet>(`/${id}`);
+    async getById(id: number): Promise<CostingSheetWithDetails> {
+        return this.get<CostingSheetWithDetails>(`/${id}`);
     }
 
-    async approve(id: number, data: ApproveCostingDto): Promise<TenderCostingSheet> {
-        return this.post<TenderCostingSheet>(`/${id}/approve`, data);
+    async approve(id: number, data: ApproveCostingDto): Promise<any> {
+        return this.post<any>(`/${id}/approve`, data);
     }
 
-    async reject(id: number, data: RejectCostingDto): Promise<TenderCostingSheet> {
-        return this.post<TenderCostingSheet>(`/${id}/reject`, data);
+    async approveAll(id: number, data: ApproveAllCostingDto): Promise<any> {
+        return this.post<any>(`/${id}/approve-all`, data);
     }
 
-    async updateApproved(id: number, data: ApproveCostingDto): Promise<TenderCostingSheet> {
-        return this.patch<TenderCostingSheet>(`/${id}`, data);
+    async reject(id: number, data: RejectCostingDto): Promise<any> {
+        return this.post<any>(`/${id}/reject`, data);
     }
 
-    async getDashboardCounts(): Promise<CostingApprovalDashboardCounts> {
-        return this.get<CostingApprovalDashboardCounts>('/dashboard/counts');
+    async updateApproved(id: number, data: UpdateApprovedCostingDto): Promise<any> {
+        return this.patch<any>(`/${id}`, data);
+    }
+
+    async getDashboardCounts(teamId?: number): Promise<CostingApprovalDashboardCounts> {
+        const search = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            search.set('teamId', String(teamId));
+        }
+        const queryString = search.toString();
+        return this.get<CostingApprovalDashboardCounts>(queryString ? `/dashboard/counts?${queryString}` : '/dashboard/counts');
     }
 }
 

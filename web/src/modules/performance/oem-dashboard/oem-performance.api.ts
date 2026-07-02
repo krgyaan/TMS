@@ -11,3 +11,5 @@ export const fetchOemRfqs = (params: any) => api.get("/performance/oem/rfqs", { 
 export const fetchOemTrends = (params: any) => api.get("/performance/oem/trends", { params }).then(r => r.data);
 
 export const fetchOemScoring = (params: any) => api.get("/performance/oem/scoring", { params }).then(r => r.data);
+
+export const fetchOemOutcomes = (params: any) => api.get("/performance/oem/outcomes", { params }).then(r => r.data);

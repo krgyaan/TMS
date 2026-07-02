@@ -44,7 +44,6 @@ const ProfileSchema = z.object({
     gender: optionalString(20, "Gender too long"),
     employeeCode: optionalString(50, "Employee code too long"),
     designationId: optionalString(20, "Designation is not valid"),
-    primaryTeamId: optionalString(20, "Team is not valid"),
     altEmail: optionalEmail(),
     emergencyContactName: optionalString(255, "Contact name too long"),
     emergencyContactPhone: optionalString(20, "Contact phone too long"),
@@ -63,7 +62,6 @@ const PROFILE_DEFAULTS = {
     gender: "",
     employeeCode: "",
     designationId: "",
-    primaryTeamId: "",
     altEmail: "",
     emergencyContactName: "",
     emergencyContactPhone: "",
@@ -182,7 +180,6 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
                     gender: user.profile?.gender ?? "",
                     employeeCode: user.profile?.employeeCode ?? "",
                     designationId: user.profile?.designationId ? String(user.profile.designationId) : "",
-                    primaryTeamId: user.profile?.primaryTeamId ? String(user.profile.primaryTeamId) : "",
                     altEmail: user.profile?.altEmail ?? "",
                     emergencyContactName: user.profile?.emergencyContactName ?? "",
                     emergencyContactPhone: user.profile?.emergencyContactPhone ?? "",
@@ -256,7 +253,6 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
             gender: profile.gender ?? null,
             employeeCode: profile.employeeCode ?? null,
             designationId: profile.designationId ? Number(profile.designationId) : null,
-            primaryTeamId: profile.primaryTeamId ? Number(profile.primaryTeamId) : null,
             altEmail: profile.altEmail ?? null,
             emergencyContactName: profile.emergencyContactName ?? null,
             emergencyContactPhone: profile.emergencyContactPhone ?? null,
@@ -523,7 +519,6 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
                                     options={designationOptions}
                                     placeholder="Select designation"
                                 />
-                                <SelectField control={form.control} name="profile.primaryTeamId" label="Primary Team" options={teamOptions} placeholder="Select team" />
                                 <FieldWrapper control={form.control} name="profile.altEmail" label="Alternate Email">
                                     {field => <Input type="email" placeholder="example@company.com" {...field} value={field.value ?? ""} />}
                                 </FieldWrapper>

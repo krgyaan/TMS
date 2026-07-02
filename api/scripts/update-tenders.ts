@@ -14,7 +14,7 @@ import {
 // ============================================================================
 
 const config = {
-    postgres: process.env.PG_URL || 'postgresql://postgres:gyan@localhost:5432/new_tms',
+    postgres: process.env.PG_URL || 'postgresql://postgres:gyan@localhost:5432/tms_local',
     mysql: process.env.MYSQL_URL || 'mysql://root:gyan@localhost:3306/mydb',
 };
 

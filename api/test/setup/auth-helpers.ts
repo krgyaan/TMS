@@ -20,6 +20,8 @@ export function createMockJwtToken(user: Partial<ValidatedUser> = {}): string {
         dataScope: user.dataScope || DataScope.ALL,
         canSwitchTeams: user.canSwitchTeams ?? false,
         isActive: user.isActive ?? true,
+        id: user.id || 1,
+        permissions: user.permissions || [],
     };
 
     return jwtService.sign(payload);
@@ -46,6 +48,8 @@ export function createMockUser(overrides: Partial<ValidatedUser> = {}): Validate
         dataScope: overrides.dataScope || DataScope.ALL,
         canSwitchTeams: overrides.canSwitchTeams ?? false,
         isActive: overrides.isActive ?? true,
+        id: overrides.id || 1,
+        permissions: overrides.permissions || [],
     };
 }
 

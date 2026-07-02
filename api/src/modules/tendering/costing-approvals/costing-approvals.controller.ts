@@ -1,62 +1,46 @@
-import {
-    Controller,
-    Get,
-    Post,
-    Patch,
-    Body,
-    Param,
-    ParseIntPipe,
-    ForbiddenException,
-    Query,
-    Logger
-} from '@nestjs/common';
-import { CostingApprovalsService, type CostingApprovalFilters } from '@/modules/tendering/costing-approvals/costing-approvals.service';
-import type { ApproveCostingDto, RejectCostingDto, UpdateApprovedCostingDto } from './dto/costing-approval.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
+import { CostingApprovalsService } from '@/modules/tendering/costing-approvals/costing-approvals.service';
+import { getFrontendTimer } from '@/modules/timers/timer-helper';
+import { TimersService } from '@/modules/timers/timers.service';
+import { Body, Controller, Get, Logger, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import type { ApproveAllCostingDto, ApproveCostingDto, RejectCostingDto, UpdateApprovedCostingDto } from './dto/costing-approval.dto';
 
 @Controller('costing-approvals')
 export class CostingApprovalsController {
     private readonly logger = new Logger(CostingApprovalsController.name);
     constructor(
         private readonly costingApprovalsService: CostingApprovalsService,
-        private readonly workflowService: WorkflowService
+        private readonly timersService: TimersService
     ) { }
 
     @Get('dashboard')
     async getDashboard(
-        @CurrentUser() user: ValidatedUser,
         @Query('tab') tab?: 'pending' | 'approved' | 'tender-dnb',
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
+        @CurrentUser() user?: ValidatedUser,
+        @Query('teamId') teamId?: string,
     ) {
-        const result = await this.costingApprovalsService.getDashboardData((user as any).team, tab, {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        const result = await this.costingApprovalsService.getDashboardData(tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
             sortOrder,
             search,
-        });
+        }, user, parseNumber(teamId));
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
             result.data.map(async (tender) => {
-                let timer: TimerData | null = null;
-                try {
-                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'costing_approval');
-                    if (!timer.hasTimer) {
-                        timer = null;
-                    }
-                } catch (error) {
-                    this.logger.error(
-                        `Failed to get timer for tender ${tender.tenderId}:`,
-                        error
-                    );
-                }
-
+                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'costing_sheet_approval');
                 return {
                     ...tender,
                     timer
@@ -71,8 +55,16 @@ export class CostingApprovalsController {
     }
 
     @Get('dashboard/counts')
-    async getDashboardCounts() {
-        return this.costingApprovalsService.getDashboardCounts();
+    async getDashboardCounts(
+        @CurrentUser() user?: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        return this.costingApprovalsService.getDashboardCounts(user, parseNumber(teamId));
     }
 
     @Get(':id')
@@ -99,6 +91,21 @@ export class CostingApprovalsController {
         );
     }
 
+    @Post(':id/approve-all')
+    approveAll(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: ApproveAllCostingDto,
+        @CurrentUser() user: ValidatedUser
+    ) {
+        // this.validateTeamLeader(user);
+        return this.costingApprovalsService.approveAll(
+            id,
+            (user as any).team,
+            user.sub,
+            dto
+        );
+    }
+
     @Post(':id/reject')
     reject(
         @Param('id', ParseIntPipe) id: number,
@@ -110,7 +117,8 @@ export class CostingApprovalsController {
             id,
             (user as any).team,
             user.sub,
-            dto.rejectionReason
+            dto.rejectionReason,
+            dto.detailId,
         );
     }
 

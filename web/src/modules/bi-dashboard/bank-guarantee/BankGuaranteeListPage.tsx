@@ -1,19 +1,29 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { paths } from '@/app/routes/paths';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
+import { tenderNameCol } from '@/components/data-grid/columns';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, FileText, Shield, XCircle, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import DataTable from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
-import { useBankGuaranteeDashboard, useBankGuaranteeDashboardCounts, useBankGuaranteeCardStats } from '@/hooks/api/useBankGuarantees';
-import type { BankGuaranteeDashboardRow, BankGuaranteeDashboardTab } from './helpers/bankGuarantee.types';
-import { dateCol, currencyCol } from '@/components/data-grid/columns';
-import { BankGuaranteeActionForm } from './components/BankGuaranteeActionForm';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useBankGuaranteeCardStats, useBankGuaranteeDashboard, useBankGuaranteeDashboardCounts } from '@/hooks/api/useBankGuarantees';
+import { useBiExport } from '@/hooks/useBiExport';
+
+import { formatDate } from '@/hooks/useFormatedDate';
+import { formatINR } from '@/hooks/useINRFormatter';
+import { bankGuaranteesService } from '@/services/api/bank-guarantees.service';
+import type { ColDef } from 'ag-grid-community';
+import { AlertCircle, Edit, Eye, FileText, FileX2, MessageSquare, Plus, Search, Shield, XCircle } from 'lucide-react';
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import BankStatsCards from './components/BankStatsCards';
+import type { BankGuaranteeCardStats, BankGuaranteeDashboardRow, BankGuaranteeDashboardTab } from './helpers/bankGuarantee.types';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 
 const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -67,27 +77,84 @@ const getStatusVariant = (status: string | null): string => {
 };
 
 const BankGuaranteeListPage = () => {
-    const [activeTab, setActiveTab] = useState<BankGuaranteeDashboardTab>('new-requests');
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState<string>('');
-    const [actionFormOpen, setActionFormOpen] = useState(false);
-    const [selectedInstrument, setSelectedInstrument] = useState<BankGuaranteeDashboardRow | null>(null);
+    const {
+        activeTab, setActiveTab,
+        search, setSearch,
+        debouncedSearch,
+        pagination, setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState({
+        storageKey: 'bank-guarantees',
+        defaultTab: 'new-requests' as BankGuaranteeDashboardTab,
+    });
+    const navigate = useNavigate();
 
-    useEffect(() => {
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, search]);
+    const flattenFormData = (data: Record<string, any>): Record<string, any> => {
+        const out: Record<string, any> = {};
+        if (data.bgNo) out['BG No'] = data.bgNo;
+        if (data.bgDate) out['BG Date'] = new Date(data.bgDate).toLocaleDateString('en-GB');
+        if (data.beneficiaryName) out['Beneficiary'] = data.beneficiaryName;
+        if (data.bgPurpose) out['BG Purpose'] = data.bgPurpose;
+        if (data.bgNeeds) out['BG Needs'] = data.bgNeeds;
+        if (data.bankName) out['Bank'] = data.bankName;
+        if (data.issueDate) out['Issue Date'] = new Date(data.issueDate).toLocaleDateString('en-GB');
+        if (data.expiryDate) out['Expiry Date'] = new Date(data.expiryDate).toLocaleDateString('en-GB');
+        if (data.payableAt) out['Payable At'] = data.payableAt;
+        if (data.favouring) out['Favouring'] = data.favouring;
+        return out;
+    };
 
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
-            }));
-        setSortModel(sortModel);
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, []);
+    const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
+        getAllFn: (params) => bankGuaranteesService.getAll(params),
+        getExportDataFn: (params) => bankGuaranteesService.getExportData(params),
+        tabsConfig: TABS_CONFIG,
+        pendingTabKey: 'new-requests',
+        tabsWithForm: ['live-yes', 'live-pnb', 'live-bg-limit', 'cancelled', 'rejected'],
+        filenamePrefix: 'bank-guarantees',
+        flattenFormData,
+        mapPendingRow: (r: any) => ({
+            'Tender Name': r.projectName || '',
+            'Tender No': r.projectNo || '',
+            'BG Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
+            'BG No': r.bgNo || '',
+            'Beneficiary name': r.beneficiaryName || '',
+            'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+            'Amount': r.amount || '',
+            'Expiry Date': r.bgExpiryDate ? new Date(r.bgExpiryDate).toLocaleDateString('en-GB') : '',
+            'BG Claim Period': r.bgClaimPeriod ? `${r.bgClaimPeriod} days` : '',
+            'BG Charges paid': r.bgChargesPaid || '',
+            'BG Charges Calculated': r.bgChargesCalculated || '',
+            'FDR No': r.fdrNo || '',
+            'FDR Value': r.fdrValue || '',
+            'Tender Status': r.tenderStatus || '',
+            'Expiry': r.expiryStatus || '',
+            'BG Status': r.bgStatus || '',
+        }),
+        mapRow: (r: any, isAllTab: boolean) => {
+            const base: Record<string, any> = {
+                'Tender Name': r.projectName || r.tenderName || '',
+                'Tender No': r.tenderNo || r.projectNo || '',
+                'BG Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
+                'BG No': r.bgNo || '',
+                'Beneficiary name': r.beneficiaryName || '',
+                'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+                'Amount': r.amount || '',
+                'Expiry Date': r.bgExpiryDate ? new Date(r.bgExpiryDate).toLocaleDateString('en-GB') : '',
+                'BG Claim Period': r.bgClaimPeriod ? `${r.bgClaimPeriod} days` : '',
+                'BG Charges paid': r.bgChargesPaid || '',
+                'BG Charges Calculated': r.bgChargesCalculated || '',
+                'FDR No': r.fdrNo || '',
+                'FDR Value': r.fdrValue || '',
+                'Tender Status': r.tenderStatus || '',
+                'Expiry': r.expiryStatus || '',
+                'BG Status': r.bgStatus || '',
+            };
+            if (isAllTab) base['Tab'] = r._tab || '';
+            return base;
+        },
+    });
 
     const { data: apiResponse, isLoading, error } = useBankGuaranteeDashboard({
         tab: activeTab,
@@ -95,7 +162,7 @@ const BankGuaranteeListPage = () => {
         limit: pagination.pageSize,
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
     });
 
     const { data: counts } = useBankGuaranteeDashboardCounts();
@@ -104,101 +171,106 @@ const BankGuaranteeListPage = () => {
     const bgData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    // Bank name mappings
-    const bankNameMap: Record<string, string> = {
-        'YESBANK_2011': 'Yes Bank 2011',
-        'YESBANK_0771': 'Yes Bank 0771',
-        'PNB_6011': 'Punjab National Bank',
-        'BGLIMIT_0771': 'BG Limit',
-    };
-
-    const formatCurrency = (amount: number | null | undefined): string => {
-        if (!amount) return '₹ 0.00';
-        return `₹ ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    };
-
-    const handleViewDetails = useCallback((row: BankGuaranteeDashboardRow) => {
-        // TODO: Implement navigation to detail page
-        console.log('View details:', row);
-    }, []);
-
-    const handleOpenActionForm = useCallback((row: BankGuaranteeDashboardRow) => {
-        setSelectedInstrument(row);
-        setActionFormOpen(true);
-    }, []);
-
     const bgActions: ActionItem<BankGuaranteeDashboardRow>[] = useMemo(
         () => [
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: handleViewDetails,
+                onClick: (row: BankGuaranteeDashboardRow) => navigate(paths.bi.bankGuaranteeView(row.requestId)),
             },
             {
                 label: 'Action Form',
-                icon: <Edit className="h-4 w-4" />,
-                onClick: handleOpenActionForm,
+                icon: <FileText className="h-4 w-4" />,
+                onClick: (row: BankGuaranteeDashboardRow) => navigate(paths.bi.bankGuaranteeAction(row.id)),
             },
+            {
+                label: 'Edit',
+                icon: <Edit className="h-4 w-4" />,
+                onClick: (row: BankGuaranteeDashboardRow) => navigate(paths.bi.bankGuaranteeEdit(row.requestId)),
+            },
+            {
+                label: 'Meeting Remarks',
+                icon: <MessageSquare className="h-4 w-4" />,
+                onClick: (row: BankGuaranteeDashboardRow) => navigate(paths.bi.bankGuaranteeMeetingRemarks(row.requestId)),
+            }
         ],
-        [handleViewDetails, handleOpenActionForm]
+        [navigate]
     );
 
     const colDefs = useMemo<ColDef<BankGuaranteeDashboardRow>[]>(
         () => [
-            dateCol<BankGuaranteeDashboardRow>('bgDate', {
+            {
+                field: 'bgDate',
                 headerName: 'BG Date',
-                width: 120,
+                width: 110,
                 colId: 'bgDate',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
+                hide: activeTab === 'new-requests' || activeTab === 'rejected',
+            },
             {
                 field: 'bgNo',
                 headerName: 'BG No.',
-                width: 150,
+                width: 130,
                 colId: 'bgNo',
                 valueGetter: (params) => params.data?.bgNo || '—',
                 sortable: true,
                 filter: true,
+                hide: activeTab === 'new-requests' || activeTab === 'rejected',
             },
             {
                 field: 'beneficiaryName',
                 headerName: 'Beneficiary name',
                 width: 180,
+                maxWidth: 180,
                 colId: 'beneficiaryName',
                 valueGetter: (params) => params.data?.beneficiaryName || '—',
                 sortable: true,
                 filter: true,
             },
-            {
-                field: 'tenderNo',
-                headerName: 'Tender Name',
+            tenderNameCol<BankGuaranteeDashboardRow>('tenderNo', {
+                headerName: 'Tender Details',
+                filter: true,
                 width: 200,
-                colId: 'tenderNo',
-                sortable: true,
-                valueGetter: (params) => {
-                    const tenderNo = params.data?.tenderNo || '';
-                    const tenderName = params.data?.tenderName || '';
-                    return tenderNo && tenderName ? `${tenderNo} - ${tenderName}` : tenderNo || tenderName || '—';
-                },
-            },
-            dateCol<BankGuaranteeDashboardRow>('bidValidity', {
+                maxWidth: 200,
+            }),
+            {
+                field: 'bidValidity',
                 headerName: 'Bid Validity',
-                width: 130,
+                width: 110,
                 colId: 'bidValidity',
                 sortable: true,
-            }),
-            currencyCol<BankGuaranteeDashboardRow>('amount', {}, {
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+            },
+            {
+                field: 'amount',
                 headerName: 'Amount',
-                width: 130,
+                width: 110,
                 colId: 'amount',
                 sortable: true,
-            }),
-            dateCol<BankGuaranteeDashboardRow>('bgExpiryDate', {
-                headerName: 'BG Expiry Date',
-                width: 140,
+                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+            },
+            {
+                field: 'bgExpiryDate',
+                headerName: 'Expiry Date',
+                width: 110,
                 colId: 'bgExpiryDate',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
+                hide: activeTab === 'new-requests' || activeTab === 'rejected',
+            },
             {
                 field: 'bgClaimPeriod',
                 headerName: 'BG Claim Period',
@@ -210,40 +282,45 @@ const BankGuaranteeListPage = () => {
                 },
                 sortable: true,
                 filter: true,
+                hide: activeTab === 'new-requests' || activeTab === 'rejected',
             },
-            dateCol<BankGuaranteeDashboardRow>('expiryDate', {
-                headerName: 'Expiry Date',
-                width: 130,
-                colId: 'expiryDate',
-                sortable: true,
-            }),
-            currencyCol<BankGuaranteeDashboardRow>('bgChargesPaid', {}, {
+            {
+                field: 'bgChargesPaid',
                 headerName: 'BG Charges paid',
-                width: 150,
+                width: 100,
                 colId: 'bgChargesPaid',
                 sortable: true,
-            }),
-            currencyCol<BankGuaranteeDashboardRow>('bgChargesCalculated', {}, {
+                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+                hide: activeTab === 'new-requests' || activeTab === 'rejected',
+            },
+            {
+                field: 'bgChargesCalculated',
                 headerName: 'BG Charges Calculated',
-                width: 180,
+                width: 110,
                 colId: 'bgChargesCalculated',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+                hide: activeTab === 'new-requests' || activeTab === 'rejected',
+            },
             {
                 field: 'fdrNo',
                 headerName: 'FDR No',
-                width: 120,
+                width: 100,
                 colId: 'fdrNo',
                 valueGetter: (params) => params.data?.fdrNo || '—',
                 sortable: true,
                 filter: true,
+                hide: activeTab === 'new-requests' || activeTab === 'rejected',
             },
-            currencyCol<BankGuaranteeDashboardRow>('fdrValue', {}, {
+            {
+                field: 'fdrValue',
                 headerName: 'FDR Value',
-                width: 130,
+                width: 100,
                 colId: 'fdrValue',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+                hide: activeTab === 'new-requests' || activeTab === 'rejected',
+            },
             {
                 field: 'tenderStatus',
                 headerName: 'Tender Status',
@@ -290,7 +367,7 @@ const BankGuaranteeListPage = () => {
                 width: 57,
             },
         ],
-        [bgActions]
+        [bgActions, activeTab]
     );
 
     const tabsWithData = useMemo(() => {
@@ -348,30 +425,8 @@ const BankGuaranteeListPage = () => {
     return (
         <>
             {/* Bank Statistics Cards */}
-            {cardStats && cardStats.bankStats && Object.keys(cardStats.bankStats).length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
-                    {Object.entries(cardStats.bankStats).map(([bankName, stats]) => (
-                        <Card key={bankName} className="gap-2">
-                            <CardHeader>
-                                <CardTitle>{bankNameMap[bankName] || bankName}</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-sm font-medium text-green-600">BG: {formatCurrency(stats.amount)}</p>
-                                <p className="text-sm font-medium text-green-600">FDR (10%): {formatCurrency(stats.fdrAmount10)}</p>
-                                <p className="text-sm font-medium text-green-600">FDR (15%): {formatCurrency(stats.fdrAmount15)}</p>
-                                <p className="text-sm font-medium text-green-600">FDR (100%): {formatCurrency(stats.fdrAmount100)}</p>
-                                <div>
-                                    <Badge variant="outline" className="justify-center">
-                                        {stats.count} BGs Created
-                                    </Badge>
-                                    <Badge variant="outline" className="justify-center">
-                                        {stats.percentage.toFixed(2)}% of BGs
-                                    </Badge>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
+            {cardStats && (
+                <BankStatsCards cardStats={cardStats as BankGuaranteeCardStats} />
             )}
 
             <Card>
@@ -383,18 +438,21 @@ const BankGuaranteeListPage = () => {
                                 Track and manage bank guarantees for tenders.
                             </CardDescription>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="relative">
-                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-8 w-64"
+                        <CardAction>
+                            <div className="flex items-center gap-2">
+                                <ExportExcelDropdown
+                                    exportOptions={exportOptions}
+                                    exportTab={exportTab}
+                                    setExportTab={setExportTab}
+                                    exporting={exporting}
+                                    handleExport={handleExport}
                                 />
+                                <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForBG())}>
+                                    <Plus className="w-4 h-4" />
+                                    Add Old Entry
+                                </Button>
                             </div>
-                        </div>
+                        </CardAction>
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">
@@ -402,7 +460,7 @@ const BankGuaranteeListPage = () => {
                         value={activeTab}
                         onValueChange={(value) => setActiveTab(value as BankGuaranteeDashboardTab)}
                     >
-                        <TabsList className="m-auto">
+                        <TabsList className="m-auto mb-4">
                             {tabsWithData.map((tab) => (
                                 <TabsTrigger
                                     key={tab.key}
@@ -419,6 +477,25 @@ const BankGuaranteeListPage = () => {
                                 </TabsTrigger>
                             ))}
                         </TabsList>
+
+                        {/* Search Row: Quick Filters, Search Bar */}
+                        <div className="flex items-center gap-4 px-6 pb-4">
+                            {/* Quick Filters (Left) - Optional, can be added per page */}
+
+                            {/* Search Bar (Center) - Flex grow */}
+                            <div className="flex-1 flex justify-end">
+                                <div className="relative">
+                                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        type="text"
+                                        placeholder="Search..."
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        className="pl-8 w-64"
+                                    />
+                                </div>
+                            </div>
+                        </div>
 
                         {tabsWithData.map((tab) => (
                             <TabsContent key={tab.key} value={tab.key} className="px-0 m-0 data-[state=inactive]:hidden">
@@ -442,6 +519,9 @@ const BankGuaranteeListPage = () => {
                                                 rowCount={totalRows}
                                                 paginationState={pagination}
                                                 onPaginationChange={setPagination}
+                                                onPageSizeChange={handlePageSizeChange}
+                                                showTotalCount={true}
+                                                showLengthChange={true}
                                                 gridOptions={{
                                                     defaultColDef: {
                                                         editable: false,
@@ -461,22 +541,6 @@ const BankGuaranteeListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
-
-            {/* Action Form Dialog */}
-            {selectedInstrument && (
-                <BankGuaranteeActionForm
-                    open={actionFormOpen}
-                    onOpenChange={setActionFormOpen}
-                    instrumentId={selectedInstrument.id}
-                    instrumentData={{
-                        bgNo: selectedInstrument.bgNo || undefined,
-                        bgDate: selectedInstrument.bgDate || undefined,
-                        amount: selectedInstrument.amount || undefined,
-                        tenderName: selectedInstrument.tenderName || undefined,
-                        tenderNo: selectedInstrument.tenderNo || undefined,
-                    }}
-                />
-            )}
         </>
     );
 };

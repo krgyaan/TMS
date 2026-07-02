@@ -20,6 +20,7 @@ import { useFollowupCategories } from "@/hooks/api/useFollowupCategories";
 import { paths } from "@/app/routes/paths";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 /* -----------------------
    Mock Data (same as yours)
@@ -37,6 +38,7 @@ const AREAS = [
 const FollowUpCreatePage = () => {
     const { mutateAsync, isPending } = useCreateFollowUp();
     const navigate = useNavigate();
+    const { user } = useAuth();
 
     const form = useForm<CreateFollowUpFormValues>({
         resolver: zodResolver(CreateFollowUpFormSchema),
@@ -77,11 +79,14 @@ const FollowUpCreatePage = () => {
                 amount: values.amount ? Number(values.amount) : undefined,
                 assignedToId: Number(values.assignedTo),
                 comment: values.comment,
-                contacts: values.contacts.map(c => ({
-                    name: c.name,
-                    email: c.email || null,
-                    phone: c.phone || null,
-                })),
+                followupFor: values.followupFor,
+                contacts: values.contacts
+                    .map(c => ({
+                        name:  c.name?.trim() || "",
+                        email: c.email?.trim() === "" ? null : c.email?.trim() || null,
+                        phone: c.phone?.trim() === "" ? null : c.phone?.trim() || null,
+                    }))
+                    .filter(c => c.name !== "" || c.email !== null || c.phone !== null),
             };
 
             await mutateAsync(payload);
@@ -156,21 +161,39 @@ const FollowUpCreatePage = () => {
                                 </Button>
                             </div>
 
+                            {errors.contacts?.root?.message && (
+                                <p className="text-red-500 text-xs mt-1">{errors.contacts.root.message}</p>
+                            )}
+                            {errors.contacts?.message && !Array.isArray(errors.contacts) && (
+                                <p className="text-red-500 text-xs mt-1">{errors.contacts.message}</p>
+                            )}
+
                             {fields.map((cp, idx) => (
-                                <div key={cp.id} className="grid md:grid-cols-12 gap-3 mt-3 border p-3 rounded">
-                                    <div className="md:col-span-4">
-                                        <Input placeholder="Name" {...register(`contacts.${idx}.name`)} />
-                                    </div>
-                                    <div className="md:col-span-4">
-                                        <Input placeholder="Email" {...register(`contacts.${idx}.email`)} />
-                                    </div>
-                                    <div className="md:col-span-3">
-                                        <Input placeholder="Phone" {...register(`contacts.${idx}.phone`)} />
-                                    </div>
-                                    <div className="md:col-span-1">
-                                        <Button type="button" size="icon" variant="destructive" onClick={() => remove(idx)}>
-                                            <Trash className="h-4 w-4" />
-                                        </Button>
+                                <div key={cp.id} className="mt-3 border p-3 rounded">
+                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+                                        <div className="md:col-span-4 space-y-1">
+                                            <Input placeholder="Name" {...register(`contacts.${idx}.name`)} />
+                                            {errors.contacts?.[idx]?.name && (
+                                                <p className="text-red-500 text-xs">{errors.contacts[idx].name.message}</p>
+                                            )}
+                                        </div>
+                                        <div className="md:col-span-4 space-y-1">
+                                            <Input placeholder="Email" {...register(`contacts.${idx}.email`)} />
+                                            {errors.contacts?.[idx]?.email && (
+                                                <p className="text-red-500 text-xs">{errors.contacts[idx].email.message}</p>
+                                            )}
+                                        </div>
+                                        <div className="md:col-span-3 space-y-1">
+                                            <Input placeholder="Phone" {...register(`contacts.${idx}.phone`)} />
+                                            {errors.contacts?.[idx]?.phone && (
+                                                <p className="text-red-500 text-xs">{errors.contacts[idx].phone.message}</p>
+                                            )}
+                                        </div>
+                                        <div className="md:col-span-1">
+                                            <Button type="button" size="icon" variant="destructive" onClick={() => remove(idx)} className="w-full">
+                                                <Trash className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -186,12 +209,13 @@ const FollowUpCreatePage = () => {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {followUpCategories.map(r => (
-                                            <SelectItem key={r.id} value={String(r.id)}>
+                                            <SelectItem key={r.id} value={String(r.name)}>
                                                 {r.name}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
+                                {errors.followupFor && <p className="text-red-500 text-xs">{errors.followupFor.message}</p>}
                             </div>
 
                             <div>

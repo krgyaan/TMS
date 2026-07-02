@@ -1,16 +1,23 @@
-import { Controller, Delete, ForbiddenException, Get, Param, ParseIntPipe, Post, Query, Req, UseGuards, Body } from "@nestjs/common";
+import { Controller, Delete, ForbiddenException, Get, Param, ParseIntPipe, Post, Query, Req, UseGuards, Body, BadRequestException } from "@nestjs/common";
 
 import { ImprestAdminService } from "./imprest-admin.service";
 import { Roles } from "@/modules/auth/decorators/roles.decorator";
 import { RolesGuard } from "@/modules/auth/guards/roles.guard";
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
-import { CanRead, CurrentUser } from "../auth/decorators";
+import { CanDelete, CanRead, CanUpdate, CurrentUser } from "../auth/decorators";
 import { PermissionGuard } from "../auth/guards/permission.guard";
+import { CreateEmployeeImprestCreditSchema } from "./zod/create-employee-imprest-credit.schema";
+import { PermissionService, UserPermissionContext } from "../auth/services/permission.service";
+
+import { ValidatedUser } from "../auth/strategies/jwt.strategy";
 
 @Controller("accounts/imprest")
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class ImprestAdminController {
-    constructor(private readonly service: ImprestAdminService) {}
+    constructor(
+        private readonly service: ImprestAdminService,
+        private readonly permissionService: PermissionService
+    ) {}
 
     /**
      * ADMIN / ACCOUNT:
@@ -25,37 +32,77 @@ export class ImprestAdminController {
     // ========================
     // GET PAYMENT HISTORY (BY USER)
     // ========================
-    @Get("payment-history/:userId")
-    async getByUser(@Param("userId", ParseIntPipe) userId: number, @CurrentUser() user) {
-        // employee can only view their own history
-        if (user.role === "employee" && user.id !== userId) {
-            throw new ForbiddenException("Access denied");
+    // @Get("payment-history/:userId")
+    // async getByUser(@Param("userId", ParseIntPipe) userId: number, @CurrentUser() user) {
+    //     // employee can only view their own history
+    //     // if (user.role === "employee" && user.id !== userId) {
+    //     //     throw new ForbiddenException("Access denied");
+    //     // }
+
+    //     return this.service.getByUser(userId);
+    // }
+
+    @Get("payment-history")
+    async getPaymentHistory(@CurrentUser() user: any, @Query("userId") userId?: number) {
+        const canReadAll = await this.permissionService.hasPermission(
+            {
+                userId: user.sub,
+                roleId: user.roleId,
+                roleName: user.role,
+                teamId: user.teamId,
+                dataScope: user.dataScope,
+            },
+            { module: "accounts.imprests", action: "read" }
+        );
+
+        // 🔐 Admin / Accounts can see all or filter by user
+        if (canReadAll) {
+            return this.service.getPaymentHistory(userId);
         }
 
-        return this.service.getByUser(userId);
+        // 👤 Employee can only see their own
+        return this.service.getPaymentHistory(user.sub);
+    }
+
+    @Delete("payment-history/:id")
+    @CanDelete("accounts.imprests")
+    async deletePaymentHistory(@Param("id", ParseIntPipe) id: number, @CurrentUser() user: any) {
+        return this.service.deletePaymentHistory({
+            transactionId: id,
+            deletedBy: user.sub,
+        });
     }
 
     // ========================
     // LIST VOUCHERS
     // ========================
+
     @Get("voucher")
-    async listAllVouchers() {
-        return this.service.listVouchers({
-            user: undefined,
-        });
+    async listVouchers(@CurrentUser() user: any, @Query("userId") userId?: number) {
+        const canReadAll = await this.permissionService.hasPermission(
+            {
+                userId: user.sub,
+                roleId: user.roleId,
+                roleName: user.role,
+                teamId: user.teamId,
+                dataScope: user.dataScope,
+            },
+            { module: "accounts.imprests", action: "read" }
+        );
+
+        if (canReadAll) {
+            return this.service.listVouchersRaw(userId);
+        }
+
+        return this.service.listVouchersRaw(user.sub);
     }
 
-    @Get("voucher/:id")
-    async listUserVouchers(@Param("id", ParseIntPipe) userId: number, @Query("page") page = "1", @Query("limit") limit = "10") {
-        return this.service.listVouchers({
-            user: { id: userId },
-        });
-    }
     // ========================
     // CREATE VOUCHER
     // ========================
 
     @Post("voucher")
+    @CanUpdate("accounts.imprests")
     async createVoucher(@Req() req, @Body() body) {
         return this.service.createVoucher({
             user: req.user,
@@ -69,11 +116,30 @@ export class ImprestAdminController {
     // VIEW VOUCHER BY ID
     //=========================
 
-    @Get("voucher/view/:id")
-    async getVoucherById(@Param("id", ParseIntPipe) id: number, @Req() req) {
-        return this.service.getVoucherById({
+    @Get("voucher/view")
+    async getVoucherView(@Query("userId", ParseIntPipe) userId: number, @Query("from") from: string, @Query("to") to: string, @Req() req) {
+        const parsedFrom = new Date(decodeURIComponent(from));
+        const parsedTo = new Date(decodeURIComponent(to));
+
+        if (isNaN(parsedFrom.getTime()) || isNaN(parsedTo.getTime())) {
+            throw new BadRequestException("Invalid date range");
+        }
+
+        return this.service.getVoucherByPeriod({
             user: req.user,
-            voucherId: Number(id),
+            userId,
+            from: parsedFrom,
+            to: parsedTo,
+        });
+    }
+
+    @Get("voucher/proofs")
+    async getVoucherProofs(@Query("userId", ParseIntPipe) userId: number, @Query("year", ParseIntPipe) year: number, @Query("week", ParseIntPipe) week: number, @Req() req) {
+        return this.service.getVoucherProofs({
+            user: req.user,
+            userId,
+            year,
+            week,
         });
     }
 
@@ -81,6 +147,7 @@ export class ImprestAdminController {
     // APPROVE VOUCHER
     // ========================
     @Post("voucher/:id/account-approve")
+    @CanUpdate("accounts.imprests")
     accountApprove(@Req() req, @Param("id") id: string, @Body() body: { remark?: string; approve?: boolean }) {
         return this.service.accountApproveVoucher({
             user: req.user,
@@ -94,6 +161,7 @@ export class ImprestAdminController {
     // ADMIN APPROVE VOUCHER
     // ========================
     @Post("voucher/:id/admin-approve")
+    @CanUpdate("accounts.imprests")
     adminApprove(@Req() req, @Param("id") id: string, @Body() body: { remark?: string; approve?: boolean }) {
         return this.service.adminApproveVoucher({
             user: req.user,
@@ -107,8 +175,23 @@ export class ImprestAdminController {
     // DELETE TRANSACTION Payment History
     // ========================
     @Delete("/:id")
-    @Roles("admin", "account")
+    @CanDelete("accounts.imprests")
     async delete(@Param("id", ParseIntPipe) id: number) {
         return this.service.delete(id);
+    }
+
+    @Post("credit")
+    @CanDelete("accounts.imprests")
+    creditImprest(@Req() req) {
+        const parsed = CreateEmployeeImprestCreditSchema.safeParse(req.body);
+
+        if (!parsed.success) {
+            throw new BadRequestException(parsed.error.flatten());
+        }
+
+        return this.service.creditImprest(
+            parsed.data,
+            req.user.sub // admin who paid
+        );
     }
 }

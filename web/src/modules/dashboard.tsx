@@ -1,12 +1,40 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { paths } from "@/app/routes/paths";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, CheckCircle, Clock, Users, FileText, GanttChart } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
+import { 
+    ChevronRight, 
+    ChevronDown,
+    ChevronUp,
+    FileText, 
+    Landmark, 
+    Receipt,
+    Send, 
+    Truck, 
+    Wallet, 
+    Search, 
+    Loader2, 
+    AlertCircle, 
+    Check, 
+    Clock, 
+    AlertTriangle,
+    XCircle
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useIncompleteOnboarding, useMyOnboardingStatus } from "@/modules/hrms/onboarding/useOnboarding";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { useActiveCirculars } from "@/hooks/api/useCirculars";
+import { CircularViewModal } from "@/modules/master/circulars/components/CircularViewModal";
+import { Megaphone, FileDown, ExternalLink, Bell } from "lucide-react";
+
 
 // Types
 interface TenderInfo {
@@ -80,11 +108,550 @@ const mockUsers = [
     { id: "user3", name: "Mike Johnson" },
 ];
 
+const QuickActionCard = ({ icon: Icon, title, subtitle, color, bgColor, onClick }: any) => (
+    <button 
+        onClick={onClick}
+        className="group relative flex flex-col items-start p-4 bg-background border border-border/50 rounded-2xl hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 overflow-hidden text-left w-full"
+    >
+        <div className={cn("mb-3 p-2.5 rounded-xl transition-colors duration-300", bgColor, color)}>
+            <Icon className="h-5 w-5" />
+        </div>
+        <div className="space-y-0.5">
+            <h3 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{title}</h3>
+            <p className="text-[10px] text-muted-foreground leading-tight">{subtitle}</p>
+        </div>
+        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity translate-x-1 group-hover:translate-x-0">
+            <ChevronRight className="h-3 w-3 text-muted-foreground" />
+        </div>
+    </button>
+);
+
+const OnboardingTrackerWidget = () => {
+    const { data: incompleteList, isLoading, error } = useIncompleteOnboarding();
+    const [searchQuery, setSearchQuery] = useState("");
+    const [isExpanded, setIsExpanded] = useState(false);
+    const navigate = useNavigate();
+
+    const filteredList = useMemo(() => {
+        if (!incompleteList) return [];
+        return incompleteList.filter(user => 
+            (user.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (user.email || "").toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [incompleteList, searchQuery]);
+
+    const getStatusIndicator = (status: string | null | undefined, label: string) => {
+        const isCompleted = status === "submitted" || status === "resubmitted";
+        const isRejected = status === "rejected";
+        const isApproved = status === "approved";
+
+        let bgColor = "bg-muted text-muted-foreground border-muted-foreground/20";
+        let icon = <Clock className="h-3 w-3" />;
+        let text = "Pending";
+
+        if (isCompleted) {
+            bgColor = "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-400";
+            icon = <Check className="h-3 w-3" />;
+            text = status === "resubmitted" ? "Resubmitted" : "Submitted";
+        } else if (isApproved) {
+            bgColor = "bg-green-500/10 text-green-600 border-green-500/20 dark:bg-green-500/20 dark:text-green-400";
+            icon = <Check className="h-3 w-3" />;
+            text = "Approved";
+        } else if (isRejected) {
+            bgColor = "bg-rose-500/10 text-rose-600 border-rose-500/20 dark:bg-rose-500/20 dark:text-rose-400";
+            icon = <AlertTriangle className="h-3 w-3" />;
+            text = "Rejected";
+        } else if (status === "in_progress") {
+            bgColor = "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-500/20 dark:text-amber-400";
+            text = "In Progress";
+        }
+
+        return (
+            <div className="flex flex-col items-center gap-1 flex-1 min-w-[70px]">
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
+                <span className={cn(
+                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium w-full justify-center transition-all duration-300",
+                    bgColor
+                )}>
+                    {icon}
+                    <span className="truncate">{text}</span>
+                </span>
+            </div>
+        );
+    };
+
+    if (isLoading) {
+        return (
+            <Card className="border border-border/50 shadow-lg bg-card/60 backdrop-blur-xl rounded-2xl p-6">
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground animate-pulse">Loading onboarding submissions...</p>
+                </div>
+            </Card>
+        );
+    }
+
+    if (error) {
+        return (
+            <Card className="border border-border/50 shadow-lg bg-card/60 backdrop-blur-xl rounded-2xl p-6">
+                <div className="flex items-center space-x-3 text-red-500 justify-center py-6">
+                    <AlertCircle className="h-5 w-5" />
+                    <span className="text-sm font-semibold">Failed to load onboarding submissions</span>
+                </div>
+            </Card>
+        );
+    }
+
+    const totalIncomplete = incompleteList?.length || 0;
+
+    return (
+        <Card className="border border-border/50 shadow-xl bg-card/60 backdrop-blur-xl rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5">
+            <CardHeader 
+                className={cn(
+                    "pb-4 cursor-pointer hover:bg-muted/10 transition-colors select-none",
+                    isExpanded && "border-b border-border/40"
+                )}
+                onClick={() => setIsExpanded(!isExpanded)}
+            >
+                <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2.5">
+                            <CardTitle className="text-lg font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                                Onboarding Status Tracker
+                            </CardTitle>
+                            <Badge variant="destructive" className="animate-pulse font-mono font-bold text-xs px-2 py-0.5 rounded-full">
+                                {totalIncomplete} Pending
+                            </Badge>
+                        </div>
+                        {isExpanded && (
+                            <p className="text-xs text-muted-foreground">
+                                Employees who have not submitted all onboarding documents and details
+                            </p>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                        {isExpanded && (
+                            <div className="relative w-72 hidden sm:block">
+                                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search employee name/email..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-9 h-9 bg-background/50 border-border/50 rounded-xl text-xs focus:ring-primary/20 focus:border-primary"
+                                />
+                            </div>
+                        )}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setIsExpanded(!isExpanded)}
+                            className="h-8 w-8 rounded-lg"
+                        >
+                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </Button>
+                    </div>
+                </div>
+                {/* Mobile search input */}
+                {isExpanded && (
+                    <div className="relative w-full mt-3 sm:hidden" onClick={(e) => e.stopPropagation()}>
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search employee name/email..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-9 h-9 bg-background/50 border-border/50 rounded-xl text-xs focus:ring-primary/20 focus:border-primary"
+                        />
+                    </div>
+                )}
+            </CardHeader>
+            {isExpanded && (
+                <CardContent className="p-0">
+                    {filteredList.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center mb-4 border border-emerald-500/20">
+                                <Check className="h-6 w-6" />
+                            </div>
+                            <h3 className="text-sm font-bold text-foreground">
+                                {searchQuery ? "No matching employees found" : "All Caught Up!"}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-1 max-w-xs leading-normal">
+                                {searchQuery 
+                                    ? "No employees match your search query. Try another name or email."
+                                    : "Every employee has successfully submitted their complete onboarding!"}
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-border/40 max-h-[420px] overflow-y-auto custom-scrollbar">
+                            {filteredList.map((user) => {
+                                const statuses = [
+                                    user.profileStatus,
+                                    user.documentStatus,
+                                    user.educationStatus,
+                                    user.experienceStatus,
+                                    user.bankStatus,
+                                ];
+                                const submittedCount = statuses.filter(s => s === "submitted" || s === "resubmitted" || s === "approved").length;
+                                const progressPercent = Math.round((submittedCount / 5) * 100);
+
+                                const initials = (user.name || "")
+                                    .split(" ")
+                                    .map((n: string) => n[0])
+                                    .slice(0, 2)
+                                    .join("")
+                                    .toUpperCase() || "??";
+
+                                let hash = 0;
+                                const nameForHash = user.name || "Unknown";
+                                for (let i = 0; i < nameForHash.length; i++) {
+                                    hash = nameForHash.charCodeAt(i) + ((hash << 5) - hash);
+                                }
+                                const avatarColor = `hsl(${Math.abs(hash) % 360}, 65%, 45%)`;
+
+                                return (
+                                    <div 
+                                        key={user.id}
+                                        className="p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-5 hover:bg-muted/30 transition-all duration-300 group"
+                                    >
+                                        <div className="flex items-center gap-4 min-w-[240px]">
+                                            <Avatar className="h-10 w-10 rounded-xl ring-1 ring-border/50 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+                                                {user.avatar && <AvatarImage src={user.avatar} className="object-cover" />}
+                                                <AvatarFallback className="rounded-xl text-white font-bold text-xs" style={{ backgroundColor: avatarColor }}>
+                                                    {initials}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <div className="min-w-0">
+                                                <h4 className="text-xs font-bold text-foreground truncate group-hover:text-primary transition-colors">
+                                                    {user.name}
+                                                </h4>
+                                                <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>
+                                                <div className="flex items-center gap-2 mt-1.5">
+                                                    <div className="h-1.5 w-24 rounded-full bg-muted overflow-hidden">
+                                                        <div 
+                                                            className={cn(
+                                                                "h-full rounded-full transition-all duration-500",
+                                                                progressPercent >= 80 ? "bg-emerald-500" :
+                                                                progressPercent >= 40 ? "bg-amber-500" : "bg-orange-500"
+                                                            )}
+                                                            style={{ width: `${progressPercent}%` }}
+                                                        />
+                                                    </div>
+                                                    <span className="text-[9px] font-bold text-muted-foreground">{progressPercent}% Submitted</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 flex-1 justify-start xl:justify-center">
+                                            {getStatusIndicator(user.profileStatus, "Profile")}
+                                            {getStatusIndicator(user.documentStatus, "Documents")}
+                                            {getStatusIndicator(user.educationStatus, "Education")}
+                                            {getStatusIndicator(user.experienceStatus, "Experience")}
+                                            {getStatusIndicator(user.bankStatus, "Bank")}
+                                        </div>
+
+                                        <div className="flex items-center justify-end flex-shrink-0 pl-4">
+                                            <button
+                                                onClick={() => navigate(`/hrms/onboarding/dashboard`)}
+                                                className="inline-flex items-center justify-center p-2 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300"
+                                            >
+                                                <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </CardContent>
+            )}
+        </Card>
+    );
+};
+
+import type { Circular } from "@/types/api.types";
+
+const getCircularFileUrl = (path?: string | null) => {
+    if (!path) return "";
+    if (path.startsWith("http")) return path;
+    const baseUrl = import.meta.env.VITE_API_URL || "";
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return `${baseUrl}${normalizedPath}`;
+};
+
+const formatCircularDate = (dateStr?: string | Date | null) => {
+    if (!dateStr) return "N/A";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "N/A";
+    return d.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+    });
+};
+
+const CircularsWidget = () => {
+    const { data: activeCirculars, isLoading, error } = useActiveCirculars();
+    const [selectedCircular, setSelectedCircular] = useState<Circular | null>(null);
+
+    if (isLoading) {
+        return (
+            <Card className="border border-border/50 shadow-lg bg-card/60 backdrop-blur-xl rounded-2xl p-6">
+                <div className="flex flex-col items-center justify-center py-6 space-y-2">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground animate-pulse">Loading notice board announcements...</p>
+                </div>
+            </Card>
+        );
+    }
+
+    if (error) {
+        return null;
+    }
+
+    const notices = activeCirculars || [];
+
+    return (
+        <Card className="border border-border/50 shadow-xl bg-card/60 backdrop-blur-xl rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5">
+            <CardHeader className="pb-3 border-b border-border/40">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                        <div className="p-2 bg-primary/10 text-primary rounded-xl dark:bg-primary/20 dark:text-primary">
+                            <Megaphone className="h-5 w-5" />
+                        </div>
+                        <div className="space-y-0.5">
+                            <CardTitle className="text-lg font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                                Notice Board & Circulars
+                            </CardTitle>
+                            <p className="text-xs text-muted-foreground">Latest official updates and company policies</p>
+                        </div>
+                    </div>
+                    {notices.length > 0 && (
+                        <Badge variant="secondary" className="font-mono bg-primary/10 text-primary border-none rounded-full">
+                            {notices.length} Active
+                        </Badge>
+                    )}
+                </div>
+            </CardHeader>
+            <CardContent className="p-0">
+                {notices.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                        <Bell className="h-10 w-10 text-muted-foreground/40 mb-2" />
+                        <p className="text-sm font-semibold text-foreground">All caught up!</p>
+                        <p className="text-xs text-muted-foreground max-w-xs mt-1">No active announcements or circular notices currently published.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 p-5 max-h-[350px] overflow-y-auto">
+                        {notices.map((circular) => (
+                            <div 
+                                key={circular.id}
+                                onClick={() => setSelectedCircular(circular)}
+                                className="group flex items-center justify-between p-4 bg-muted/10 hover:bg-muted/20 border border-border/10 hover:border-primary/20 rounded-xl cursor-pointer transition-all duration-300 shadow-sm hover:shadow-md hover:scale-[1.01]"
+                            >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-all duration-300">
+                                        <FileText className="h-4.5 w-4.5" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+                                            {circular.title}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0 ml-3">
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        className="h-7 w-7 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            window.open(getCircularFileUrl(circular.file), "_blank");
+                                        }}
+                                    >
+                                        <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        className="h-7 w-7 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const a = document.createElement("a");
+                                            a.href = getCircularFileUrl(circular.file);
+                                            a.download = circular.title;
+                                            document.body.appendChild(a);
+                                            a.click();
+                                            document.body.removeChild(a);
+                                        }}
+                                    >
+                                        <FileDown className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </CardContent>
+
+            <CircularViewModal 
+                open={!!selectedCircular}
+                onOpenChange={(open) => !open && setSelectedCircular(null)}
+                circular={selectedCircular}
+            />
+        </Card>
+    );
+};
+
+
 const Dashboard = () => {
+
+    const navigate = useNavigate();
     const [dashboardData, setDashboardData] = useState<DashboardData>(mockDashboardData);
     const [selectedUser, setSelectedUser] = useState<string>("all");
     const [currentTime, setCurrentTime] = useState<string>("");
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+
+    const {teamName, teamId, isSuperUser, isAdmin} = useAuth();
+
+    const { data: myStatus } = useMyOnboardingStatus();
+    const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+
+    useEffect(() => {
+        // beautiful example of using session storage to show modal
+        if (myStatus && myStatus.hasRequest && !myStatus.isComplete) {
+            const isDismissed = sessionStorage.getItem("dismissed_onboarding_modal");
+            if (!isDismissed) {
+                setShowOnboardingModal(true);
+            }
+        }
+    }, [myStatus]);
+
+    const handleDismissModal = () => {
+        sessionStorage.setItem("dismissed_onboarding_modal", "true");
+        setShowOnboardingModal(false);
+    };
+
+    const getModalStepIndicator = (
+        status: string | null | undefined,
+        hrStatus: string | null | undefined,
+        label: string
+    ) => {
+        const isApproved = hrStatus === "approved";
+        const isResubmitted = status === "resubmitted";
+        const isSubmitted = status === "submitted";
+        const isRejected = hrStatus === "rejected";
+        
+        const isCompleted = isApproved || isResubmitted || isSubmitted;
+        
+        return (
+            <div className={cn(
+                "flex items-center gap-3 p-3 rounded-xl border transition-all duration-300",
+                isRejected 
+                    ? "bg-rose-500/10 border-rose-500/20 hover:border-rose-500/30" 
+                    : isCompleted
+                        ? "bg-emerald-500/5 border-emerald-500/15 hover:border-emerald-500/30"
+                        : "bg-muted/40 border-border/40 hover:border-primary/20"
+            )}>
+                <div className={cn(
+                    "h-6 w-6 rounded-full flex items-center justify-center border-2",
+                    isCompleted
+                        ? "bg-emerald-500/10 border-emerald-500 text-emerald-600" 
+                        : isRejected
+                            ? "bg-rose-500/10 border-rose-500 text-rose-600"
+                            : "bg-amber-500/10 border-amber-500 text-amber-600"
+                )}>
+                    {isCompleted ? (
+                        <Check className="h-3.5 w-3.5" />
+                    ) : isRejected ? (
+                        <XCircle className="h-3.5 w-3.5" />
+                    ) : (
+                        <Clock className="h-3.5 w-3.5" />
+                    )}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-foreground">{label}</p>
+                    <p className={cn(
+                        "text-[10px] leading-tight truncate",
+                        isRejected 
+                            ? "text-rose-600 font-semibold" 
+                            : isCompleted 
+                                ? "text-emerald-600 font-semibold" 
+                                : "text-muted-foreground"
+                    )}>
+                        {isApproved 
+                            ? "Approved" 
+                            : isResubmitted 
+                                ? "Resubmitted" 
+                                : isSubmitted 
+                                    ? "Submitted" 
+                                    : isRejected 
+                                        ? "Rejected" 
+                                        : "Pending"}
+                    </p>
+                </div>
+            </div>
+        );
+    };
+
+    const isTenderingTeam = teamId == 1 || teamId == 2 || isSuperUser || isAdmin;
+
+    const quickActions = [
+        {
+            title: "Add Imprest",
+            subtitle: "Create New Imprest Entry",
+            icon: Wallet,
+            color: "text-blue-600",
+            bgColor: "bg-blue-50 dark:bg-blue-950/30",
+            path: paths.shared.imprestCreate
+        },
+        {
+            title: "Add Courier",
+            subtitle: "Create New Courier Entry",
+            icon: Truck,
+            color: "text-purple-600",
+            bgColor: "bg-purple-50 dark:bg-purple-950/30",
+            path: paths.shared.courierCreate
+        },
+        {
+            title: "New Tender",
+            subtitle: "Create New Tender Entry",
+            icon: FileText,
+            color: "text-emerald-600",
+            bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
+            path: paths.tendering.tenderCreate
+        },
+        {
+            title: "New Follow-up",
+            subtitle: "Create New Follow Up",
+            icon: Send,
+            color: "text-orange-600",
+            bgColor: "bg-orange-50 dark:bg-orange-950/30",
+            path: paths.shared.followUpCreate
+        },
+        {
+            title: "BI Other Than EMDs",
+            subtitle: "Request New BI",
+            icon: Landmark,
+            color: "text-pink-600",
+            bgColor: "bg-pink-50 dark:bg-pink-950/30",
+            path: paths.tendering.biOtherThanEmdsCreate()
+        },
+        // {
+        //     title: "New Maker Request",
+        //     subtitle: "Create Non-Project Payment Request",
+        //     icon: Receipt,
+        //     color: "text-teal-600",
+        //     bgColor: "bg-teal-50 dark:bg-teal-950/30",
+        //     path: paths.accounts.makerRequestCreate
+        // },
+        {
+            title: "New Work Order",
+            subtitle: "Create Work Order Entry",
+            icon: FileText,
+            color: "text-indigo-600",
+            bgColor: "bg-indigo-50 dark:bg-indigo-950/30",
+            path: paths.operations.woBasicDetailCreatePage
+        },
+    ];
 
     // Update current time
     useEffect(() => {
@@ -168,11 +735,6 @@ const Dashboard = () => {
         return events.filter(event => selectedUser === "all" || event.user === selectedUser);
     }, [dashboardData, teamColors, selectedUser]);
 
-    const handleGoogleConnect = () => {
-        // Implement Google OAuth connection
-        console.log("Connect Google OAuth");
-    };
-
     const getEventBadge = (type: string) => {
         switch (type) {
             case "tender_due":
@@ -188,32 +750,37 @@ const Dashboard = () => {
 
     return (
         <div className="space-y-6 p-8">
-            {/* Google OAuth Alert */}
-            {!dashboardData.google_oauth_connected ? (
-                <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription className="flex items-center justify-between">
-                        <span>Google OAuth Not Connected! Please connect your Google account now</span>
-                        <Button variant="outline" size="sm" onClick={handleGoogleConnect}>
-                            Connect Now
-                        </Button>
-                    </AlertDescription>
-                </Alert>
-            ) : (
-                <Alert variant="default">
-                    <CheckCircle className="h-4 w-4" />
-                    <AlertDescription className="flex items-center justify-between">
-                        <span>Google OAuth Connected! You are connected. You may reconnect if needed.</span>
-                        <Button variant="outline" size="sm" onClick={handleGoogleConnect}>
-                            Reconnect
-                        </Button>
-                    </AlertDescription>
-                </Alert>
+            {/* Quick Actions */}
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {quickActions
+                    .filter(action => action.title !== "New Tender" || isTenderingTeam)
+                    .map((action) => (
+                    <QuickActionCard 
+                        key={action.title}
+                        {...action}
+                        onClick={() => navigate(action.path)}
+                    />
+                ))}
+            </div>
+
+            
+            {/* Notice Board & Circulars Section */}
+            <div className="grid grid-cols-1 gap-6">
+                <CircularsWidget />
+            </div>
+
+
+            {/* Onboarding Status Tracker Widget */}
+            {(teamName == "HR" || isSuperUser) && (
+                <div className="hidden md:block">
+                    <OnboardingTrackerWidget />
+                </div>
             )}
 
+
             {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {/* Total Employees - Only for Admin */}
+            {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {dashboardData.role === "Admin" && (
                     <Card className="relative overflow-hidden">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -226,7 +793,6 @@ const Dashboard = () => {
                     </Card>
                 )}
 
-                {/* Current Time - For non-admin */}
                 {dashboardData.role !== "Admin" && (
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -249,7 +815,6 @@ const Dashboard = () => {
                     </Card>
                 )}
 
-                {/* Total Tenders */}
                 <Card className="relative overflow-hidden">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Tenders</CardTitle>
@@ -260,7 +825,6 @@ const Dashboard = () => {
                     </CardContent>
                 </Card>
 
-                {/* Total Bids */}
                 <Card className="relative overflow-hidden">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Bids</CardTitle>
@@ -270,146 +834,216 @@ const Dashboard = () => {
                         <div className="text-2xl font-bold text-green-600">{dashboardData.bided}</div>
                     </CardContent>
                 </Card>
-            </div>
+            </div> */}
 
-            {/* Calendar Section */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Calendar Overview</CardTitle>
-                    {/* User Filter - Only for Admin */}
-                    {dashboardData.role === "Admin" && (
-                        <div className="flex items-center space-x-4">
-                            <Select value={selectedUser} onValueChange={setSelectedUser}>
-                                <SelectTrigger className="w-[180px]">
-                                    <SelectValue placeholder="Filter by user" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Users</SelectItem>
-                                    {mockUsers.map(user => (
-                                        <SelectItem key={user.id} value={user.id}>
-                                            {user.name}
-                                        </SelectItem>
+
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                {/* Calendar Section */}
+                <Card className="col-span-2">
+                    <CardHeader>
+                        {/* User Filter - Only for Admin */}
+                        {dashboardData.role === "Admin" && (
+                            <div className="flex items-center space-x-4">
+                                <Select value={selectedUser} onValueChange={setSelectedUser}>
+                                    <SelectTrigger className="w-[180px]">
+                                        <SelectValue placeholder="Filter by user" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Users</SelectItem>
+                                        {mockUsers.map(user => (
+                                            <SelectItem key={user.id} value={user.id}>
+                                                {user.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                {/* Color Legend */}
+                                <div className="flex items-center space-x-2">
+                                    {Object.entries(teamColors).map(([name, color]) => (
+                                        <div key={name} className="flex items-center space-x-1">
+                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color as string }} />
+                                            <span className="text-xs">{name}</span>
+                                        </div>
                                     ))}
-                                </SelectContent>
-                            </Select>
-
-                            {/* Color Legend */}
-                            <div className="flex items-center space-x-2">
-                                <span className="text-sm text-muted-foreground">Legendary:</span>
-                                {Object.entries(teamColors).map(([name, color]) => (
-                                    <div key={name} className="flex items-center space-x-1">
-                                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color as string }} />
-                                        <span className="text-xs">{name}</span>
-                                    </div>
-                                ))}
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </CardHeader>
-                <CardContent>
-                    <div className="w-full">
-                        <Tabs defaultValue="month">
-                            <div className="flex justify-center pb-2">
-                                <TabsList>
-                                    <TabsTrigger value="month">Month View</TabsTrigger>
-                                    <TabsTrigger value="week">Week View</TabsTrigger>
-                                    <TabsTrigger value="list">List View</TabsTrigger>
-                                </TabsList>
-                            </div>
-
-                            <TabsContent value="month" className="space-y-4">
-                                <div className="">
-                                    <Calendar
-                                        mode="single"
-                                        selected={selectedDate}
-                                        onSelect={setSelectedDate}
-                                        className="rounded-md border w-full"
-                                        modifiers={{
-                                            hasEvents: calendarEvents.map((event: { date: string }) => new Date(event.date)),
-                                        }}
-                                        modifiersStyles={{
-                                            hasEvents: {
-                                                fontWeight: "bold",
-                                                textDecoration: "underline",
-                                            },
-                                        }}
-                                    />
+                        )}
+                    </CardHeader>
+                    <CardContent>
+                        <div className="w-full">
+                            <Tabs defaultValue="week">
+                                <div className="flex justify-center pb-2">
+                                    <TabsList>
+                                        <TabsTrigger value="month">Month View</TabsTrigger>
+                                        <TabsTrigger value="week">Week View</TabsTrigger>
+                                        <TabsTrigger value="list">List View</TabsTrigger>
+                                    </TabsList>
                                 </div>
 
-                                {/* Events for selected date */}
-                                {selectedDate && (
-                                    <div className="space-y-2">
-                                        <h4 className="text-sm font-medium">
-                                            Events for {selectedDate.toLocaleDateString()}
-                                        </h4>
+                                <TabsContent value="month" className="space-y-4">
+                                    <div className="">
+                                        <Calendar
+                                            mode="single"
+                                            selected={selectedDate}
+                                            onSelect={setSelectedDate}
+                                            className="rounded-md border w-full"
+                                            modifiers={{
+                                                hasEvents: calendarEvents.map((event: { date: string }) => new Date(event.date)),
+                                            }}
+                                            modifiersStyles={{
+                                                hasEvents: {
+                                                    fontWeight: "bold",
+                                                    textDecoration: "underline",
+                                                },
+                                            }}
+                                        />
+                                    </div>
+
+                                    {/* Events for selected date */}
+                                    {selectedDate && (
+                                        <div className="space-y-2">
+                                            <h4 className="text-sm font-medium">
+                                                Events for {selectedDate.toLocaleDateString()}
+                                            </h4>
+                                            {calendarEvents
+                                                .filter((event: { date: string }) => event.date === selectedDate.toISOString().split("T")[0])
+                                                .map((event: { date: string; title: string; type: string; color: string }, index: number) => (
+                                                    <div
+                                                        key={index}
+                                                        className="flex items-center space-x-3 p-3 border rounded-lg"
+                                                    >
+                                                        <div
+                                                            className="w-3 h-3 rounded-full"
+                                                            style={{ backgroundColor: event.color as string }}
+                                                        />
+                                                        <div className="flex-1">
+                                                            <div className="font-medium">{event.title}</div>
+                                                        </div>
+                                                        {getEventBadge(event.type)}
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    )}
+                                </TabsContent>
+
+                                <TabsContent value="week">
+                                    <div className="text-center py-8 text-muted-foreground">
+                                        Week view implementation would go here
+                                    </div>
+                                </TabsContent>
+
+                                <TabsContent value="list">
+                                    <div className="space-y-3">
                                         {calendarEvents
-                                            .filter((event: { date: string }) => event.date === selectedDate.toISOString().split("T")[0])
+                                            .sort((a: { date: string }, b: { date: string }) => new Date(a.date).getTime() - new Date(b.date).getTime())
                                             .map((event: { date: string; title: string; type: string; color: string }, index: number) => (
                                                 <div
                                                     key={index}
-                                                    className="flex items-center space-x-3 p-3 border rounded-lg"
+                                                    className="flex items-center justify-between p-3 border rounded-lg"
                                                 >
-                                                    <div
-                                                        className="w-3 h-3 rounded-full"
-                                                        style={{ backgroundColor: event.color as string }}
-                                                    />
-                                                    <div className="flex-1">
-                                                        <div className="font-medium">{event.title}</div>
+                                                    <div className="flex items-center space-x-3">
+                                                        <div
+                                                            className="w-3 h-3 rounded-full"
+                                                            style={{ backgroundColor: event.color as string }}
+                                                        />
+                                                        <div>
+                                                            <div className="font-medium">{event.title}</div>
+                                                            <div className="text-sm text-muted-foreground">
+                                                                {new Date(event.date).toLocaleDateString()}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                     {getEventBadge(event.type)}
                                                 </div>
                                             ))}
                                     </div>
+                                </TabsContent>
+                            </Tabs>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Soon Expiring Tenders */}
+                <Card className="col-span-1">
+                    <CardHeader>
+                        <CardTitle>Soon Expiring Timers</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            <div className="text-center py-8 text-muted-foreground">
+                                Soon Expiring Timers of any step like Tender, RFQ, TQ, etc. implementation would go here
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Onboarding Status / Correction Modal */}
+            <Dialog open={showOnboardingModal} onOpenChange={setShowOnboardingModal}>
+                <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden rounded-2xl border border-border/50 shadow-2xl bg-card/90 backdrop-blur-xl">
+                    <div className="p-8 space-y-6">
+                        <DialogHeader className="space-y-3 text-center">
+                            {myStatus?.hrStatus === "rejected" ? (
+                                <div className="mx-auto w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center border border-rose-500/20">
+                                    <XCircle className="h-6 w-6 animate-pulse" />
+                                </div>
+                            ) : (
+                                <div className="mx-auto w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center border border-amber-500/20">
+                                    <AlertCircle className="h-6 w-6 animate-pulse" />
+                                </div>
+                            )}
+                            <DialogTitle className="text-xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                                {myStatus?.hrStatus === "rejected" ? "Correction Required" : "Onboarding Pending"}
+                            </DialogTitle>
+                            <DialogDescription className="text-xs text-muted-foreground leading-normal max-w-sm mx-auto">
+                                {myStatus?.hrStatus === "rejected"
+                                    ? "One or more of your onboarding sections have been rejected by HR. Please review and update the rejected sections below to resubmit."
+                                    : "You have not completed your onboarding submission yet. Please complete the pending sections below to ensure your profile is fully set up."}
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {myStatus && (
+                                <>
+                                    {getModalStepIndicator(myStatus.profileStatus, myStatus.profileHrStatus, "Profile Details")}
+                                    {getModalStepIndicator(myStatus.documentStatus, myStatus.documentHrStatus, "Documents")}
+                                    {getModalStepIndicator(myStatus.educationStatus, myStatus.educationHrStatus, "Education")}
+                                    {getModalStepIndicator(myStatus.experienceStatus, myStatus.experienceHrStatus, "Experience")}
+                                    {getModalStepIndicator(myStatus.bankStatus, myStatus.bankHrStatus, "Bank Details")}
+                                </>
+                            )}
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                            <Button 
+                                variant="ghost" 
+                                onClick={handleDismissModal}
+                                className="flex-1 rounded-xl h-10 text-xs border border-border/40 hover:bg-muted"
+                            >
+                                Remind Me Later
+                            </Button>
+                            <Button 
+                                onClick={() => {
+                                    handleDismissModal();
+                                    navigate("/profile");
+                                }}
+                                className={cn(
+                                    "flex-1 rounded-xl h-10 text-xs text-white shadow-lg hover:shadow-xl transition-all duration-300",
+                                    myStatus?.hrStatus === "rejected"
+                                        ? "bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 focus:ring-rose-500/20 shadow-rose-500/10"
+                                        : "bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 shadow-primary/10"
                                 )}
-                            </TabsContent>
-
-                            <TabsContent value="week">
-                                <div className="text-center py-8 text-muted-foreground">
-                                    Week view implementation would go here
-                                </div>
-                            </TabsContent>
-
-                            <TabsContent value="list">
-                                <div className="space-y-3">
-                                    {calendarEvents
-                                        .sort((a: { date: string }, b: { date: string }) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                                        .map((event: { date: string; title: string; type: string; color: string }, index: number) => (
-                                            <div
-                                                key={index}
-                                                className="flex items-center justify-between p-3 border rounded-lg"
-                                            >
-                                                <div className="flex items-center space-x-3">
-                                                    <div
-                                                        className="w-3 h-3 rounded-full"
-                                                        style={{ backgroundColor: event.color as string }}
-                                                    />
-                                                    <div>
-                                                        <div className="font-medium">{event.title}</div>
-                                                        <div className="text-sm text-muted-foreground">
-                                                            {new Date(event.date).toLocaleDateString()}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {getEventBadge(event.type)}
-                                            </div>
-                                        ))}
-                                </div>
-                            </TabsContent>
-                        </Tabs>
+                            >
+                                {myStatus?.hrStatus === "rejected" ? "Refill & Fix Details" : "Complete Onboarding"}
+                            </Button>
+                        </div>
                     </div>
-                </CardContent>
-            </Card>
+                </DialogContent>
+            </Dialog>
         </div>
     );
-};
-
-// Helper hook for useMemo
-const useMemo = (callback: any, deps: any[]) => {
-    const [value, setValue] = useState(callback());
-    useEffect(() => {
-        setValue(callback());
-    }, deps);
-    return value;
 };
 
 export default Dashboard;

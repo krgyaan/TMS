@@ -1,0 +1,274 @@
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { eq, desc, asc, sql, and, or, ilike, SQL } from 'drizzle-orm';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
+import { Pqr, pqrDocuments } from '@db/schemas/shared/pqr.schema';
+import type { CreatePqrDto, UpdatePqrDto } from './dto/pqr.dto';
+import { teams } from '@/db/schemas';
+
+export type PqrListFilters = {
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    search?: string;
+};
+export type PqrRow = Pqr;
+export type PqrResponse = {
+    id: number;
+    teamId: number | null;
+    teamName: string | null;
+    projectName: string | null;
+    value: string;
+    item: string | null;
+    poDate: string | null;
+    uploadPo: string[] | null;
+    sapGemPoDate: string | null;
+    uploadSapGemPo: string[] | null;
+    completionDate: string | null;
+    uploadCompletion: string[] | null;
+    performanceCertificate: string[] | null;
+    remarks: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+};
+
+@Injectable()
+export class PqrService {
+    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+
+    private parseDate(value: string | undefined): Date | null {
+        if (!value) return null;
+        const d = new Date(value);
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    private normalizeFilePaths(value: string[] | string | null | undefined): string[] | null {
+        if (!value) return null;
+
+        let paths: string[] = [];
+
+        if (Array.isArray(value)) {
+            paths = value;
+        } else if (typeof value === 'string') {
+            paths = [value];
+        }
+
+        // Normalize each path
+        const normalized = paths
+            .filter(p => p && typeof p === 'string' && p.trim() !== '')
+            .map(p =>
+                p.trim()
+                    .replace(/\\/g, '/')      // Replace backslashes
+                    .replace(/\/+/g, '/')     // Remove duplicate slashes
+            );
+
+        return normalized.length > 0 ? normalized : null;
+    }
+
+    private mapCreateToDb(data: CreatePqrDto) {
+        const now = new Date();
+        return {
+            teamId: data.teamId,
+            projectName: data.projectName ?? null,
+            value: String(data.value),
+            item: data.item ?? null,
+            poDate: this.parseDate(data.poDate),
+            uploadPo: this.normalizeFilePaths(data.uploadPo),
+            sapGemPoDate: this.parseDate(data.sapGemPoDate),
+            uploadSapGemPo: this.normalizeFilePaths(data.uploadSapGemPo),
+            completionDate: this.parseDate(data.completionDate),
+            uploadCompletion: this.normalizeFilePaths(data.uploadCompletion),
+            performanceCertificate: this.normalizeFilePaths(data.performanceCertificate),
+            remarks: data.remarks ?? null,
+            createdAt: now,
+            updatedAt: now,
+        };
+    }
+
+    private mapUpdateToDb(data: UpdatePqrDto) {
+        const out: Record<string, unknown> = { updatedAt: new Date() };
+
+        if (data.teamId !== undefined) out.teamId = data.teamId;
+        if (data.projectName !== undefined) out.projectName = data.projectName;
+        if (data.value !== undefined) out.value = String(data.value);
+        if (data.item !== undefined) out.item = data.item;
+        if (data.poDate !== undefined) out.poDate = this.parseDate(data.poDate);
+        if (data.uploadPo !== undefined) out.uploadPo = this.normalizeFilePaths(data.uploadPo);
+        if (data.sapGemPoDate !== undefined) out.sapGemPoDate = this.parseDate(data.sapGemPoDate);
+        if (data.uploadSapGemPo !== undefined) out.uploadSapGemPo = this.normalizeFilePaths(data.uploadSapGemPo);
+        if (data.completionDate !== undefined) out.completionDate = this.parseDate(data.completionDate);
+        if (data.uploadCompletion !== undefined) out.uploadCompletion = this.normalizeFilePaths(data.uploadCompletion);
+        if (data.performanceCertificate !== undefined) out.performanceCertificate = this.normalizeFilePaths(data.performanceCertificate);
+        if (data.remarks !== undefined) out.remarks = data.remarks;
+
+        return out as Partial<typeof pqrDocuments.$inferInsert>;
+    }
+
+    private mapRowToResponse(row: any): PqrResponse {
+        return {
+            id: row.id,
+            teamId: row.teamId,
+            teamName: row?.teamName ?? null,
+            projectName: row.projectName,
+            value: row.value,
+            item: row.item,
+            poDate: row.poDate,
+            uploadPo: row.uploadPo,
+            sapGemPoDate: row.sapGemPoDate,
+            uploadSapGemPo: row.uploadSapGemPo,
+            completionDate: row.completionDate,
+            uploadCompletion: row.uploadCompletion,
+            performanceCertificate: row.performanceCertificate,
+            remarks: row.remarks,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+        };
+    }
+
+    async findAll(filters?: PqrListFilters) {
+        const page = filters?.page ?? 1;
+        const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
+        const offset = (page - 1) * limit;
+        const sortOrder = filters?.sortOrder ?? 'desc';
+        const sortBy = filters?.sortBy ?? 'createdAt';
+        const search = filters?.search?.trim();
+
+        const orderColumn =
+            sortBy === 'projectName'
+                ? pqrDocuments.projectName
+                : sortBy === 'poDate'
+                    ? pqrDocuments.poDate
+                    : sortBy === 'value'
+                        ? pqrDocuments.value
+                        : pqrDocuments.createdAt;
+        const orderFn = sortOrder === 'desc' ? desc : asc;
+
+        const conditions: (SQL<any> | undefined)[] = [];
+        if (search) {
+            conditions.push(
+                or(
+                    ilike(pqrDocuments.projectName, `%${search}%`),
+                    ilike(pqrDocuments.item, `%${search}%`),
+                    ilike(teams.name, `%${search}%`),
+                    ilike(pqrDocuments.value, `%${search}%`),
+                    ilike(pqrDocuments.remarks, `%${search}%`),
+                ),
+            );
+        }
+        const whereClause = conditions.length > 0 ? and(...conditions.filter(Boolean)) : undefined;
+
+        // Build the base query with JOIN — needed for both count and data
+        // since search may reference the teams table
+        const baseQuery = this.db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(pqrDocuments)
+            .innerJoin(teams, eq(pqrDocuments.teamId, teams.id));
+
+        const [countResult, rows] = await Promise.all([
+            baseQuery
+                .where(whereClause)
+                .then(([r]) => Number(r?.count ?? 0)),
+            this.db
+                .select({
+                    id: pqrDocuments.id,
+                    teamId: pqrDocuments.teamId,
+                    teamName: teams.name,
+                    projectName: pqrDocuments.projectName,
+                    value: pqrDocuments.value,
+                    item: pqrDocuments.item,
+                    poDate: pqrDocuments.poDate,
+                    uploadPo: pqrDocuments.uploadPo,
+                    sapGemPoDate: pqrDocuments.sapGemPoDate,
+                    uploadSapGemPo: pqrDocuments.uploadSapGemPo,
+                    completionDate: pqrDocuments.completionDate,
+                    uploadCompletion: pqrDocuments.uploadCompletion,
+                    performanceCertificate: pqrDocuments.performanceCertificate,
+                    remarks: pqrDocuments.remarks,
+                    createdAt: pqrDocuments.createdAt,
+                    updatedAt: pqrDocuments.updatedAt,
+                })
+                .from(pqrDocuments)
+                .innerJoin(teams, eq(pqrDocuments.teamId, teams.id))
+                .where(whereClause)
+                .orderBy(orderFn(orderColumn))
+                .limit(limit)
+                .offset(offset),
+        ]);
+
+        const total = countResult;
+        const data = rows.map((r) => this.mapRowToResponse(r));
+
+        return {
+            data,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit) || 1,
+            },
+        };
+    }
+
+    async findById(id: number) {
+        const [row] = await this.db.select({
+                id: pqrDocuments.id,
+                teamId: pqrDocuments.teamId,
+                teamName: teams.name,
+                projectName: pqrDocuments.projectName,
+                value: pqrDocuments.value,
+                item: pqrDocuments.item,
+                poDate: pqrDocuments.poDate,
+                uploadPo: pqrDocuments.uploadPo,
+                sapGemPoDate: pqrDocuments.sapGemPoDate,
+                uploadSapGemPo: pqrDocuments.uploadSapGemPo,
+                completionDate: pqrDocuments.completionDate,
+                uploadCompletion: pqrDocuments.uploadCompletion,
+                performanceCertificate: pqrDocuments.performanceCertificate,
+                remarks: pqrDocuments.remarks,
+                createdAt: pqrDocuments.createdAt,
+                updatedAt: pqrDocuments.updatedAt,
+            })
+            .from(pqrDocuments)
+            .innerJoin(teams, eq(pqrDocuments.teamId, teams.id))
+            .where(eq(pqrDocuments.id, id))
+            .limit(1);
+
+        if (!row) {
+            throw new NotFoundException(`PQR with ID ${id} not found`);
+        }
+
+        return this.mapRowToResponse(row);
+    }
+
+    async create(data: CreatePqrDto) {
+        const insertValues = this.mapCreateToDb(data);
+        const [inserted] = await this.db
+            .insert(pqrDocuments)
+            .values(insertValues as never)
+            .returning({ id: pqrDocuments.id });
+
+        return this.findById(inserted.id);
+    }
+
+    async update(id: number, data: UpdatePqrDto) {
+        const updateValues = this.mapUpdateToDb(data);
+        await this.db
+        .update(pqrDocuments)
+        .set(updateValues)
+        .where(eq(pqrDocuments.id, id));
+
+        return this.findById(id);
+    }
+
+    async delete(id: number): Promise<void> {
+        const [row] = await this.db
+            .delete(pqrDocuments)
+            .where(eq(pqrDocuments.id, id))
+            .returning();
+
+        if (!row) {
+            throw new NotFoundException(`PQR with ID ${id} not found`);
+        }
+    }
+}

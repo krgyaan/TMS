@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { PhysicalDocsFormSchema } from './physicalDocs.schema';
 import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
+import { useMemo } from 'react';
+import { useDocumentsSubmitted } from '@/hooks/api/useDocumentsSubmitted';
 
 // Form Values Type
 export type PhysicalDocsFormValues = z.infer<typeof PhysicalDocsFormSchema>;
@@ -13,12 +15,17 @@ export interface PhysicalDocsPerson {
     phone: string;
 }
 
+export type SubmittedDoc = {
+    id: number;
+    name: string;
+};
+
 // Response from API - Physical Docs with Persons
 export interface PhysicalDocsResponse {
     id: number;
     tenderId: number;
     courierNo: number;
-    submittedDocs: string | null;
+    submittedDocs: SubmittedDoc[] | null;
     persons: Array<{
         id: number;
         physicalDocId: number;
@@ -52,7 +59,7 @@ export interface PhysicalDocs {
     id: number;
     tenderId: number;
     courierNo: number;
-    submittedDocs: string | null;
+    submittedDocs: SubmittedDoc[] | null;
     persons: PhysicalDocsPerson[];
     createdAt?: string;
     updatedAt?: string;
@@ -97,7 +104,7 @@ export interface PhysicalDocWithPersons {
     id: number;
     tenderId: number;
     courierNo: number;
-    submittedDocs: string | null;
+    submittedDocs: SubmittedDoc[] | null;
     persons: PhysicalDocsPerson[];
 }
 
@@ -108,19 +115,11 @@ export interface PhysicalDocsDashboardCounts {
     total: number;
 }
 
-// Constants - Courier Options
-export const courierOptions = [
-    { value: '1', label: '1' },
-    { value: '2', label: '2' },
-    { value: '3', label: '3' },
-    { value: '4', label: '4' },
-    { value: '5', label: '5' },
-];
+export const useDocumentSubmittedOptions = () => {
+    const { data: documentSubmitted = [] } = useDocumentsSubmitted();
 
-// Constants - Submitted Docs Options
-export const submittedDocsOptions = [
-    { value: 'technicalBid', label: 'Technical Bid' },
-    { value: 'financialBid', label: 'Financial Bid' },
-    { value: 'emd', label: 'EMD' },
-    { value: 'other', label: 'Other' },
-];
+    return useMemo(
+        () => documentSubmitted.map((d) => ({ value: String(d.id), label: d.name })),
+        [documentSubmitted]
+    );
+};

@@ -1,31 +1,32 @@
-import { useEffect, useMemo } from 'react';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { type SubmitHandler, useForm, useFieldArray, type Resolver } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Form } from '@/components/ui/form';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
+import { paths } from '@/app/routes/paths';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
-import { Input } from '@/components/ui/input';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { SelectField } from '@/components/form/SelectField';
-import { ArrowLeft, Save, AlertCircle, Plus, Trash2, User, Mail, Phone, MapPin } from 'lucide-react';
-import { paths } from '@/app/routes/paths';
-import { useCreatePhysicalDoc, useUpdatePhysicalDoc } from '@/hooks/api/usePhysicalDocs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
-
+import { useCreatePhysicalDoc, useUpdatePhysicalDoc } from '@/hooks/api/usePhysicalDocs';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { AlertCircle, ArrowLeft, Mail, MapPin, Phone, Plus, Save, Trash2, User } from 'lucide-react';
+import { useEffect, useMemo } from 'react';
+import { useFieldArray, useForm, type Resolver, type SubmitHandler } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
 // Import from helpers
+import { Label } from '@/components/ui/label';
+import { useUsers } from '@/hooks/api/useUsers';
+import { useCreateCourier, useCourierOptions } from '@/modules/shared/courier/courier.hooks';
+import { Upload, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { buildDefaultValues, mapFormToCreatePayload, mapFormToUpdatePayload, mapResponseToForm } from '../helpers/physicalDocs.mappers';
 import { PhysicalDocsFormSchema } from '../helpers/physicalDocs.schema';
 import type { PhysicalDocsFormValues, PhysicalDocsResponse } from '../helpers/physicalDocs.types';
-import { courierOptions, submittedDocsOptions } from '../helpers/physicalDocs.types';
-import {
-    buildDefaultValues,
-    mapResponseToForm,
-    mapFormToCreatePayload,
-    mapFormToUpdatePayload
-} from '../helpers/physicalDocs.mappers';
+import { useDocumentSubmittedOptions } from '../helpers/physicalDocs.types';
 
 interface PhysicalDocsFormProps {
     tenderId: number;
@@ -48,11 +49,17 @@ const FormLoadingSkeleton = () => (
 export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsFormProps) {
     const navigate = useNavigate();
 
+    const documentSubmittedOptions = useDocumentSubmittedOptions();
     // Fetch info sheet to pre-fill clients
     const { data: infoSheet, isLoading: isInfoSheetLoading } = useInfoSheet(tenderId);
 
     const createMutation = useCreatePhysicalDoc();
     const updateMutation = useUpdatePhysicalDoc();
+    const createCourierMutation = useCreateCourier();
+    const { data: employees = [] } = useUsers();
+
+    const [files, setFiles] = useState<File[]>([]);
+    const hasSubmittedRef = useRef(false);
 
     // Compute initial values
     const initialValues = useMemo(() => {
@@ -77,29 +84,68 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
         name: 'physicalDocsPersons',
     });
 
-    const isSubmitting = createMutation.isPending || updateMutation.isPending;
-
-    // Check if clients were pre-filled from info sheet
-    const hasPrefilledClients = useMemo(() => {
-        return infoSheet?.clients && infoSheet.clients.length > 0;
-    }, [infoSheet]);
+    const isSubmitting = createMutation.isPending || updateMutation.isPending || createCourierMutation.isPending;
+    const courierOptions = useCourierOptions();
+    const watchIsCourierRequested = form.watch('isCourierRequested');
 
     const handleAddPerson = () => {
         append({ name: '', email: '', phone: '' });
     };
 
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const selectedFiles = Array.from(event.target.files || []);
+        if (selectedFiles.length === 0) return;
+        setFiles(prev => [...prev, ...selectedFiles]);
+        event.target.value = '';
+    };
+
+    const removeFile = (index: number) => {
+        setFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
     const handleSubmit: SubmitHandler<PhysicalDocsFormValues> = async (values) => {
+        console.log("Form Values: ", values);
+        
+        if (hasSubmittedRef.current) return;
+        hasSubmittedRef.current = true;
+
         try {
+            let courierId = values.courierNo;
+
+            // Step 1: Create Courier Request only if creating a new courier
+            if (values.isCourierRequested === 'no') {
+                const courierData = {
+                    toOrg: values.toOrg!,
+                    toName: values.toName!,
+                    toAddr: values.toAddr!,
+                    toPin: values.toPin!,
+                    toMobile: values.toMobile!,
+                    empFrom: values.empFrom!,
+                    delDate: values.delDate!,
+                    urgency: values.urgency!,
+                };
+                const createdCourier = await createCourierMutation.mutateAsync({ data: courierData, files });
+                courierId = createdCourier.id;
+            }
+
+
+            // Step 2: Create/Update Physical Docs
+            const finalValues = { ...values, courierNo: courierId };
             if (mode === 'create') {
-                const payload = mapFormToCreatePayload(values);
+                const payload = mapFormToCreatePayload(finalValues);
+                console.log("Create Payload: ", payload);
+                
                 await createMutation.mutateAsync(payload);
             } else if (existingData?.id) {
-                const payload = mapFormToUpdatePayload(existingData.id, values);
+                const payload = mapFormToUpdatePayload(existingData.id, finalValues);
+                console.log("Update Payload: ", payload);
                 await updateMutation.mutateAsync(payload);
             }
+            toast.success('Physical documents submitted successfully');
             navigate(paths.tendering.physicalDocs);
         } catch (error) {
             console.error('Error submitting physical docs:', error);
+            hasSubmittedRef.current = false;
         }
     };
 
@@ -137,36 +183,133 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
                             <h4 className="font-semibold text-base text-primary border-b pb-2">
                                 Courier Information
                             </h4>
-                            <div className="grid gap-4 md:grid-cols-3">
-                                <SelectField
-                                    control={form.control}
-                                    name="courierNo"
-                                    label="Courier/Tracking Number"
-                                    options={courierOptions}
-                                    placeholder="Select courier number"
-                                />
-                                <MultiSelectField
-                                    control={form.control}
-                                    name="submittedDocs"
-                                    label="Submitted Documents"
-                                    options={submittedDocsOptions}
-                                    placeholder="Select documents"
-                                />
-                                {/* Courier Address from Info Sheet */}
-                                {infoSheet?.courierAddress && (
-                                    <div className="space-y-4">
-                                        <div className="border rounded-lg p-4 bg-muted/30">
-                                            <div className="flex items-start gap-3">
-                                                <MapPin className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
-                                                <div className="flex-1">
-                                                    <p className="text-sm text-muted-foreground mb-1">From Info Sheet</p>
-                                                    <p className="text-sm whitespace-pre-wrap">{infoSheet.courierAddress}</p>
-                                                </div>
+
+                            <FieldWrapper control={form.control} name="isCourierRequested" label="Courier Status">
+                                {(field) => (
+                                    <RadioGroup value={field.value} onValueChange={field.onChange} className="flex gap-6">
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="yes" id="courier_yes" />
+                                            <Label htmlFor="courier_yes">Use Existing Courier</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="no" id="courier_no" />
+                                            <Label htmlFor="courier_no">Create New Courier Request</Label>
+                                        </div>
+                                    </RadioGroup>
+                                )}
+                            </FieldWrapper>
+
+                            {watchIsCourierRequested === 'yes' ? (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <SelectField
+                                        control={form.control}
+                                        name="courierNo"
+                                        label="Select Courier"
+                                        options={courierOptions}
+                                        placeholder="Select an existing courier"
+                                    />
+                                    <MultiSelectField
+                                        control={form.control}
+                                        name="submittedDocs"
+                                        label="Submitted Documents"
+                                        options={documentSubmittedOptions}
+                                        placeholder="Select documents"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <FieldWrapper control={form.control} name="toOrg" label="Organization Name">
+                                            {(fieldProps) => <Input {...fieldProps} placeholder="Enter organization name" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="toName" label="Name">
+                                            {(fieldProps) => <Input {...fieldProps} placeholder="Enter name" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="toAddr" label="Address">
+                                            {(fieldProps) => <Input {...fieldProps} placeholder="Enter complete address" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="toPin" label="Pin Code">
+                                            {(fieldProps) => <Input {...fieldProps} placeholder="Enter 6-digit pin code" maxLength={6} />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="toMobile" label="Mobile Number">
+                                            {(fieldProps) => <Input {...fieldProps} placeholder="Enter 10-digit mobile number" maxLength={10} />}
+                                        </FieldWrapper>
+                                        <SelectField
+                                            control={form.control}
+                                            name="empFrom"
+                                            label="Courier From"
+                                            options={employees.map(e => ({ value: String(e.id), label: e.name }))}
+                                            placeholder="Select Employee"
+                                        />
+                                        <FieldWrapper control={form.control} name="delDate" label="Expected Delivery Date">
+                                            {(fieldProps) => <Input {...fieldProps} type="date" min={new Date().toISOString().split('T')[0]} />}
+                                        </FieldWrapper>
+                                        <SelectField
+                                            control={form.control}
+                                            name="urgency"
+                                            label="Dispatch Urgency"
+                                            options={[
+                                                { value: '1', label: 'Same Day (Urgent)' },
+                                                { value: '2', label: 'Next Day' }
+                                            ]}
+                                            placeholder="Select Urgency"
+                                        />
+                                        <MultiSelectField
+                                            control={form.control}
+                                            name="submittedDocs"
+                                            label="Submitted Documents"
+                                            options={documentSubmittedOptions}
+                                            placeholder="Select documents"
+                                        />
+                                    </div>
+
+                                    {/* File Upload Section */}
+                                    <div className="space-y-2">
+                                        <Label>Soft Copy of the documents</Label>
+                                        <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center hover:border-muted-foreground/50 transition-colors">
+                                            <Input
+                                                id="courier_docs"
+                                                type="file"
+                                                className="hidden"
+                                                multiple
+                                                onChange={handleFileChange}
+                                                disabled={isSubmitting}
+                                            />
+                                            <Label htmlFor="courier_docs" className="cursor-pointer flex flex-col items-center justify-center space-y-1">
+                                                <Upload className="h-6 w-6 text-muted-foreground" />
+                                                <div className="text-sm text-muted-foreground">Click to upload or drag and drop</div>
+                                            </Label>
+                                        </div>
+                                        {files.length > 0 && (
+                                            <div className="flex flex-wrap gap-2 mt-2">
+                                                {files.map((file, index) => (
+                                                    <div key={index} className="flex items-center gap-2 bg-muted px-2 py-1 rounded text-xs">
+                                                        <span className="truncate max-w-[150px]">{file.name}</span>
+                                                        <button type="button" onClick={() => removeFile(index)} className="text-destructive">
+                                                            <X className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Courier Address from Info Sheet */}
+                            {infoSheet?.courierAddress && (
+                                <div className="space-y-4">
+                                    <div className="border rounded-lg p-4 bg-muted/30">
+                                        <div className="flex items-start gap-3">
+                                            <MapPin className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                                            <div className="flex-1">
+                                                <p className="text-sm text-muted-foreground mb-1">From Info Sheet</p>
+                                                <p className="text-sm whitespace-pre-wrap">{infoSheet.courierAddress}</p>
                                             </div>
                                         </div>
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
 
 
@@ -291,10 +434,7 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
                             >
                                 Reset
                             </Button>
-                            <Button
-                                type="submit"
-                                disabled={isSubmitting || fields.length === 0}
-                            >
+                            <Button type="submit">
                                 {isSubmitting && <span className="animate-spin mr-2">⏳</span>}
                                 <Save className="mr-2 h-4 w-4" />
                                 {mode === 'create' ? 'Submit' : 'Update'} Physical Docs

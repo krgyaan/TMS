@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { costingSheetsService } from '@/services/api/costing-sheets.service';
 import type { PaginatedResult } from '@/types/api.types';
 import { toast } from 'sonner';
-import type { CostingSheetDashboardCounts, CostingSheetDashboardRow, TabKey, CostingSheetListParams } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
+import type { CostingSheetDashboardCounts, CostingSheetDashboardRow, CostingSheetTab, CostingSheetListParams, CreateCostingDetailDto, SubmitCostingSheetDto } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
+import { useTeamFilter } from '@/hooks/useTeamFilter';
 
 export const costingSheetsKey = {
     all: ['costing-sheets'] as const,
@@ -14,21 +15,33 @@ export const costingSheetsKey = {
 };
 
 export const useCostingSheets = (
-    tab?: TabKey,
-    pagination: { page: number; limit: number } = { page: 1, limit: 50 },
+    tab?: CostingSheetTab,
+    pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
+    const teamIdParam = teamId !== null ? teamId : undefined;
+
     const params: CostingSheetListParams = {
         ...(tab && { tab }),
         page: pagination.page,
         limit: pagination.limit,
         ...(sort?.sortBy && { sortBy: sort.sortBy }),
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
+        ...(pagination.search && { search: pagination.search }),
+    };
+
+    const queryKeyFilters = {
+        ...params,
+        dataScope,
+        teamId: teamId ?? null,
+        userId: userId ?? null,
     };
 
     return useQuery<PaginatedResult<CostingSheetDashboardRow>>({
-        queryKey: costingSheetsKey.list(params),
-        queryFn: () => costingSheetsService.getAll(params),
+        queryKey: costingSheetsKey.list(queryKeyFilters),
+        queryFn: () => costingSheetsService.getAll(params, teamIdParam),
         placeholderData: (previousData) => {
             if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
                 return previousData;
@@ -58,7 +71,7 @@ export const useSubmitCostingSheet = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: costingSheetsService.submit,
+        mutationFn: (data: SubmitCostingSheetDto) => costingSheetsService.submit(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: costingSheetsKey.all });
             queryClient.invalidateQueries({ queryKey: costingSheetsKey.dashboardCounts() });
@@ -88,10 +101,18 @@ export const useUpdateCostingSheet = () => {
 };
 
 export const useCostingSheetsCounts = () => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
+    const teamIdParam = teamId !== null ? teamId : undefined;
+    
+    // Include all filter context in query key to ensure proper cache invalidation
+    // Use explicit values (including null) so React Query can properly differentiate cache entries
+    const queryKey = [...costingSheetsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
+    
     return useQuery<CostingSheetDashboardCounts>({
-        queryKey: costingSheetsKey.dashboardCounts(),
-        queryFn: () => costingSheetsService.getDashboardCounts(),
-        staleTime: 30000, // Cache for 30 seconds
+        queryKey,
+        queryFn: () => costingSheetsService.getDashboardCounts(teamIdParam),
+        staleTime: 0, // Always refetch when query key changes to ensure counts are up-to-date
     });
 };
 
@@ -141,3 +162,54 @@ export const useCreateCostingSheetWithName = () => {
         },
     });
 };
+
+// --- Costing Detail Hooks (merged from useCostingDetails) ---
+
+export const costingDetailsKey = {
+    all: ['costing-details'] as const,
+    byTender: (tenderId: number) => [...costingDetailsKey.all, 'byTender', tenderId] as const,
+    combined: (tenderId: number) => [...costingDetailsKey.all, 'combined', tenderId] as const,
+    detail: (id: number) => [...costingDetailsKey.all, 'detail', id] as const,
+};
+
+export const useCostingDetailById = (id: number) => {
+    return useQuery({
+        queryKey: costingDetailsKey.detail(id),
+        queryFn: () => costingSheetsService.getDetailById(id),
+        enabled: !!id,
+    });
+};
+
+export const useCostingDetailsByTender = (tenderId: number) => {
+    return useQuery({
+        queryKey: costingDetailsKey.byTender(tenderId),
+        queryFn: () => costingSheetsService.getDetailsByTender(tenderId),
+        enabled: !!tenderId,
+    });
+};
+
+export const useCostingDetailsCombined = (tenderId: number) => {
+    return useQuery({
+        queryKey: costingDetailsKey.combined(tenderId),
+        queryFn: () => costingSheetsService.getCombinedPricing(tenderId),
+        enabled: !!tenderId,
+    });
+};
+
+export const useCreateCostingDetail = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: CreateCostingDetailDto) => costingSheetsService.submit(data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: costingDetailsKey.byTender(variables.tenderId) });
+            queryClient.invalidateQueries({ queryKey: costingDetailsKey.combined(variables.tenderId) });
+            toast.success('Costing detail added successfully');
+        },
+        onError: (error: any) => {
+            toast.error(error?.response?.data?.message || 'Failed to add costing detail');
+        },
+    });
+};
+
+

@@ -232,6 +232,48 @@
       "when": 1766130446324,
       "tag": "0057_first_photon",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1766352000000,
+      "tag": "0058_increase_client_mobile_length",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1766352100000,
+      "tag": "0059_add_delivery_method_to_cheque",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1767869778000,
+      "tag": "0063_drop_budget_from_wo_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1748900000000,
+      "tag": "0067_fix_payment_instrument_default_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1781940291054,
+      "tag": "0070_add_tender_costing_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1781940292054,
+      "tag": "0071_drop_old_costing_sheet_columns",
+      "breakpoints": true
     }
   ]
 }

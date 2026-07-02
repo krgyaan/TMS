@@ -55,8 +55,8 @@ export interface PerformanceTrends {
 }
 
 export interface ExecutiveScoring {
-    velocity: number;
-    accuracy: number;
-    outcome: number;
+    workCompletion: number;
+    onTimeWork: number;
+    winRate: number;
     total: number;
 }

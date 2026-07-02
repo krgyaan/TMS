@@ -1,202 +1,463 @@
-<div>
+<div style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #222;">
     <p>Dear Team Leader,</p>
 
-    <p>
-        Please find the tender info sheet filled, please review the details and decide if the tender should be bid.
-    </p>
+    {{#if data.is_recommended}}
+        <p>
+            Please find the tender info sheet filled by TE. Kindly review the
+            details and decide whether the tender should be bid.
+        </p>
+    {{else}}
+        <p>
+            Please find the tender info sheet marked as
+            <b>Not Recommended</b> by TE. Kindly review the rejection details
+            and take your decision.
+        </p>
+    {{/if}}
 
-    <table style="border: 1px solid black; text-align: left; border-collapse: collapse;">
+    <table width="100%" cellpadding="6" cellspacing="0"
+        style="border: 1px solid #444; border-collapse: collapse; margin-bottom: 16px;">
         <tbody>
             <tr>
-                <th style="border: 1px solid black; text-align: left;">Organization</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="6">{{data.organization}}</td>
+                <th style="border: 1px solid #444; text-align: left; width: 16%; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Organization</th>
+                <td style="border: 1px solid #444; text-align: left; width: 17%; padding: 8px;">{{data.organization}}</td>
+                <th style="border: 1px solid #444; text-align: left; width: 17%; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Website</th>
+                <td style="border: 1px solid #444; text-align: left; width: 17%; padding: 8px;">{{data.website}}</td>
+                <th style="border: 1px solid #444; text-align: left; width: 16%; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Tender Name</th>
+                <td style="border: 1px solid #444; text-align: left; width: 17%; padding: 8px;">{{data.tender_name}}</td>
             </tr>
-            <tr>
-                <th style="border: 1px solid black; text-align: left;">Tender Name</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="6">{{data.tender_name}}</td>
+            <tr style="background-color: #f9f9f9;">
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Tender No</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.tender_no}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Bid Due Date &amp; Time</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.dueDate}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Recommendation By TE</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.recommendation_by_te}}</td>
             </tr>
+        </tbody>
+    </table>
+
+    {{#if data.is_recommended}}
+
+    <table width="100%" cellpadding="6" cellspacing="0"
+        style="border: 1px solid #444; border-collapse: collapse; margin-bottom: 16px;">
+        <tbody>
             <tr>
-                <th style="border: 1px solid black; text-align: left;">Tender</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="6">{{data.tender_no}}</td>
-            </tr>
-            <tr>
-                <th style="border: 1px solid black; text-align: left;">Website</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="6">{{data.website}}</td>
-            </tr>
-            <tr>
-                <th style="border: 1px solid black; text-align: left;">Bill Due Date & Time</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="6">{{data.dueDate}}</td>
-            </tr>
-            <tr>
-                <th style="border: 1px solid black; text-align: left;">Recommendation By TE</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.recommendation_by_te}}</td>
-                <th style="border: 1px solid black; text-align: left;">Reason</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="4">{{data.reason}}</td>
-            </tr>
-            <tr>
-                <td style="border: 1px solid black; text-align: center;" colspan="7">
+                <td colspan="6" style="border: 1px solid #444; text-align: center;
+                    background-color: #2c3e50; color: #fff; padding: 10px;">
                     <b>Tender Information</b>
                 </td>
             </tr>
+
+            <!-- Processing Fee -->
             <tr>
-                <th style="border: 1px solid black; text-align: left;">Tender Fees</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.tender_fees}}</td>
-                <td style="border: 1px solid black; text-align: left;">Rs.</td>
-                <th style="border: 1px solid black; text-align: left;">Tender Fees in form of</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="3">{{data.tender_fees_in_form_of}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Processing Fee Required</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.processing_fee_required}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Processing Fee Amount</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.processing_fee_required_bool}}{{data.processing_fee_amount}}{{else}}—{{/if}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Processing Fee Mode</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.processing_fee_required_bool}}{{data.processing_fee_modes}}{{else}}—{{/if}}</td>
             </tr>
-            <tr>
-                <th style="border: 1px solid black; text-align: left;">EMD</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.emd}}</td>
-                <td style="border: 1px solid black; text-align: left;">Rs.</td>
-                <th style="border: 1px solid black; text-align: left;">EMD Required</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="3">{{data.emd_required}}</td>
+
+            <!-- Tender Fee -->
+            <tr style="background-color: #f9f9f9;">
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Tender Fee Required</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.tender_fee_required}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Tender Fee Amount</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.tender_fee_required_bool}}{{data.tender_fees}}{{else}}—{{/if}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Tender Fee Mode</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.tender_fee_required_bool}}{{data.tender_fees_in_form_of}}{{else}}—{{/if}}</td>
             </tr>
+
+            <!-- EMD -->
             <tr>
-                <th style="border: 1px solid black; text-align: left;">Tender Value (GST Incl.)</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.tender_value}}</td>
-                <td style="border: 1px solid black; text-align: left;">Rs.</td>
-                <th style="border: 1px solid black; text-align: left;">EMD in form of</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="3">{{data.emd_in_form_of}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">EMD Required</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.emd_required}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">EMD Amount</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.emd_required_bool}}{{data.emd}}{{else}}—{{/if}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">EMD Mode</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.emd_required_bool}}{{data.emd_in_form_of}}{{else}}—{{/if}}</td>
             </tr>
-            <tr>
-                <th style="border: 1px solid black; text-align: left;">Bid Validity</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.bid_validity}}</td>
-                <td style="border: 1px solid black; text-align: left;">Days</td>
-                <th style="border: 1px solid black; text-align: left;">Commercial Evaluation</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.commercial_evaluation}}</td>
-                <th style="border: 1px solid black; text-align: left;">RA Applicable</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.ra_applicable}}</td>
+
+            <!-- Tender Value / Bid / OEM -->
+            <tr style="background-color: #f9f9f9;">
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Tender Value (GST Incl.)</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.tender_value}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">OEM Experience</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.oem_experience}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Bid Validity</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.bid_validity}}</td>
             </tr>
+
+            <!-- RA / MAF / Commercial -->
             <tr>
-                <th style="border: 1px solid black; text-align: left;">MAF Required</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="2">{{data.maf_required}}</td>
-                <th style="border: 1px solid black; text-align: left;">Delivery Time (supply/total)</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.delivery_time}} Days</td>
-                <th style="border: 1px solid black; text-align: left;">Delivery Time (I&C)</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.delivery_time_ic}} Days</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Commercial Evaluation</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.commercial_evaluation}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Reverse Auction Applicable</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.ra_applicable}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">MAF Required</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.maf_required}}</td>
             </tr>
-            <tr>
-                <th style="border: 1px solid black; text-align: left;">PBG %age</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="2">{{data.pbg_percentage}}%</td>
-                <th style="border: 1px solid black; text-align: left;">Payment Terms (supply)</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.payment_terms}} %</td>
-                <th style="border: 1px solid black; text-align: left;">Payment Terms (I&C)</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.payment_terms_ic}} %</td>
-            </tr>
-            <tr>
-                <th style="border: 1px solid black; text-align: left;">PBG Duration</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="2">{{data.pbg_duration}} Months</td>
-                <th style="border: 1px solid black; text-align: left;">LD % (per week)</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.ld_percentage}}%</td>
-                <th style="border: 1px solid black; text-align: left;">Max LD%</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.max_ld}} %</td>
-            </tr>
-            <tr>
-                <th style="border: 1px solid black; text-align: left;">Physical Docs Submission Required</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.phydocs_submission_required}}</td>
-                <td style="border: 1px solid black; text-align: left;"></td>
-                <th style="border: 1px solid black; text-align: left;">Physical Docs Submission Deadline</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="3">
-                    {{#if data.phydocsRequired}}
-                        {{data.phydocs_submission_deadline}}
+
+            <!-- Delivery -->
+            <tr style="background-color: #f9f9f9;">
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Delivery Time (Supply/Total)</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.delivery_time}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Delivery Time (I&amp;C) Inclusive</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.delivery_time_ic_inclusive}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Delivery Time (I&amp;C)</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">
+                    {{#if data.delivery_time_ic_inclusive_bool}}
+                        Inclusive in Supply/Total time
                     {{else}}
-                        NA
+                        {{data.delivery_time_ic}}
                     {{/if}}
                 </td>
             </tr>
+
+            <!-- PBG -->
             <tr>
-                <th style="border: 1px solid black; text-align: left;">Eligibility Criterion</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.eligibility_criterion}}</td>
-                <td style="border: 1px solid black; text-align: left;"> Age (in yrs)</td>
-                <td style="border: 1px solid black; text-align: center;" colspan="4">
-                    <b>Financial Criterion</b>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">PBG Required</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.pbg_required}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">PBG Form</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.pbg_required_bool}}{{data.pbg_form}}{{else}}—{{/if}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">PBG Duration</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.pbg_required_bool}}{{data.pbg_duration}}{{else}}—{{/if}}</td>
+            </tr>
+            
+            <!-- Payment Terms -->
+            <tr style="background-color: #f9f9f9;">
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Payment Terms (Supply)</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.payment_terms}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Payment Terms (I&amp;C)</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.payment_terms_ic}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">SD Required</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.sd_required}}</td>
+            </tr>
+
+            <!-- SD Details -->
+            <tr>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">SD Form</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.sd_required_bool}}{{data.sd_form}}{{else}}—{{/if}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">SD Percentage</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.sd_required_bool}}{{data.sd_percentage}}{{else}}—{{/if}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">SD Duration</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.sd_required_bool}}{{data.sd_duration}}{{else}}—{{/if}}</td>
+            </tr>
+
+            <!-- LD -->
+            <tr style="background-color: #f9f9f9;">
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">LD Applicable</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.ld_required}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">LD % Per Week</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.ld_percentage}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Max LD %</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.max_ld}}</td>
+            </tr>
+
+            <!-- Physical Docs -->
+            <tr>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Physical Docs Required</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.phydocs_submission_required}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Physical Document Type</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.phydocs_required_bool}}{{data.phydocs_doc_type}}{{else}}—{{/if}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Submission Deadline</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.phydocs_required_bool}}{{data.phydocs_submission_deadline}}{{else}}—{{/if}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Eligibility & Financial Criteria -->
+    <table width="100%" cellpadding="6" cellspacing="0"
+        style="border: 1px solid #444; border-collapse: collapse; margin-bottom: 16px;">
+        <tbody>
+            <tr>
+                <td colspan="6" style="border: 1px solid #444; text-align: center;
+                    background-color: #2c3e50; color: #fff; padding: 10px;">
+                    <b>Eligibility &amp; Financial Criteria</b>
+                </td>
+            </tr>
+
+            <tr>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Eligibility Criterion (Age)</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.eligibility_criterion}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Work Value Type</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.work_value_type}}</td>
+            </tr>
+
+            {{#if data.custom_eligibility_criteria}}
+            <tr>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Custom Eligibility Criteria</th>
+                <td colspan="5" style="border: 1px solid #444; text-align: left; padding: 8px;">
+                    <pre style="white-space: pre-wrap; margin: 0;">{{data.custom_eligibility_criteria}}</pre>
+                </td>
+            </tr>
+            {{else}}
+            <tr style="background-color: #f9f9f9;">
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">1 Work Value</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.work_value1}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">2 Work Value</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.work_value2}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">3 Work Value</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.work_value3}}</td>
+                <td colspan="2" style="border: 1px solid #444;"></td>
+            </tr>
+            {{/if}}
+
+            <tr>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Annual Avg. Turnover</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.aat_display}}</td>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.aat_amt}}{{data.aat_amt}}{{else}}—{{/if}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Working Capital</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.wc_display}}</td>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.wc_amt}}{{data.wc_amt}}{{else}}—{{/if}}</td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Net Worth</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.nw_display}}</td>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.nw_amt}}{{data.nw_amt}}{{else}}—{{/if}}</td>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Solvency Certificate</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.sc_display}}</td>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{#if data.sc_amt}}{{data.sc_amt}}{{else}}—{{/if}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Documents -->
+    <table width="100%" cellpadding="6" cellspacing="0"
+        style="border: 1px solid #444; border-collapse: collapse; margin-bottom: 16px;">
+        <tbody>
+            <tr>
+                <td colspan="2" style="border: 1px solid #444; text-align: center;
+                    background-color: #2c3e50; color: #fff; padding: 10px;">
+                    <b>Documents</b>
                 </td>
             </tr>
             <tr>
-                <th style="border: 1px solid black; text-align: left;">3 Work Value</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.work_value1}}</td>
-                <td style="border: 1px solid black; text-align: left;">{{data.name1}}</td>
-                <th style="border: 1px solid black; text-align: left;">Annual Avg. Turnover</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.aat_display}}</td>
-                <td style="border: 1px solid black; text-align: left;">{{data.aat_amt}}</td>
-                <td style="border: 1px solid black; text-align: left;"></td>
-            </tr>
-            <tr>
-                <th style="border: 1px solid black; text-align: left;">2 Work Value</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.work_value2}}</td>
-                <td style="border: 1px solid black; text-align: left;">{{data.name2}}</td>
-                <th style="border: 1px solid black; text-align: left;">Working Capital</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.wc_display}}</td>
-                <td style="border: 1px solid black; text-align: left;">{{data.wc_amt}}</td>
-                <td style="border: 1px solid black; text-align: left;"></td>
-            </tr>
-            <tr>
-                <th style="border: 1px solid black; text-align: left;">1 Work Value</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.work_value3}}</td>
-                <td style="border: 1px solid black; text-align: left;">{{data.name3}}</td>
-                <th style="border: 1px solid black; text-align: left;">Net Worth</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.nw_display}}</td>
-                <td style="border: 1px solid black; text-align: left;">{{data.nw_amt}}</td>
-                <td style="border: 1px solid black; text-align: left;"></td>
-            </tr>
-            <tr>
-                <th style="border: 1px solid black; text-align: left;">Document for Technical Eligibility</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="2">
-                    <ul>
-                        {{data.te_docs}}
+                <th style="border: 1px solid #444; text-align: left; width: 25%; background-color: #e8e8e8; font-weight: bold; padding: 8px;">
+                    Technical Eligibility Documents
+                </th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">
+                    <ul style="margin: 0; padding-left: 18px;">
+                        {{#each data.te_docs}}
+                            <li>
+                                {{#if this.url}}
+                                    <a href="{{this.url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{this.name}}</a>
+                                {{else}}
+                                    {{this.name}}
+                                {{/if}}
+                            </li>
+                        {{else}}
+                            <li>No Technical Eligibility Documents Available</li>
+                        {{/each}}
                     </ul>
                 </td>
-                <th style="border: 1px solid black; text-align: left;">Solvency Certificate</th>
-                <td style="border: 1px solid black; text-align: left;">{{data.sc_display}}</td>
-                <td style="border: 1px solid black; text-align: left;">{{data.sc_amt}}</td>
-                <td style="border: 1px solid black; text-align: left;"></td>
             </tr>
-            <tr>
-                <th style="border: 1px solid black; text-align: left;">Tender Documents</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="3">
-                    <ul>
-                        {{data.tender_docs}}
+            <tr style="background-color: #f9f9f9;">
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Tender Documents</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">
+                    <ul style="margin: 0; padding-left: 18px;">
+                        {{#each data.tender_docs_urls}}
+                            <li>
+                                <a href="{{this}}" target="_blank" style="color: #0066cc; text-decoration: underline;">Open File</a>
+                            </li>
+                        {{else}}
+                            <li>No Tender Documents Available</li>
+                        {{/each}}
                     </ul>
                 </td>
-                <th style="border: 1px solid black; text-align: left;">Document for CommercialEligibility</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="3">
-                    <ul>
-                        {{data.ce_docs}}
+            </tr>
+            <tr>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">
+                    Commercial Eligibility Documents
+                </th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">
+                    <ul style="margin: 0; padding-left: 18px;">
+                        {{#each data.ce_docs}}
+                            <li>
+                                {{#if this.url}}
+                                    <a href="{{this.url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{this.name}}</a>
+                                {{else}}
+                                    {{this.name}}
+                                {{/if}}
+                            </li>
+                        {{else}}
+                            <li>No Commercial Eligibility Documents Available</li>
+                        {{/each}}
                     </ul>
                 </td>
             </tr>
         </tbody>
     </table>
 
-    <table style="border: 1px solid black; text-align: left; border-collapse: collapse; width: 100%;">
+    <!-- Client Details -->
+    <table width="100%" cellpadding="6" cellspacing="0"
+        style="border: 1px solid #444; border-collapse: collapse; margin-bottom: 16px;">
         <thead>
             <tr>
-                <th colspan="4" style="text-align: center;">Client Details</th>
+                <th colspan="4" style="border: 1px solid #444; text-align: center;
+                    background-color: #2c3e50; color: #fff; padding: 10px;">
+                    Client Details
+                </th>
             </tr>
             <tr>
-                <th style="border: 1px solid black; text-align: left;">Name</th>
-                <th style="border: 1px solid black; text-align: left;">Designation</th>
-                <th style="border: 1px solid black; text-align: left;">Email</th>
-                <th style="border: 1px solid black; text-align: left;">Phone</th>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Name</th>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Designation</th>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Email</th>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Phone</th>
             </tr>
-            {{#if data.clients}}
-                {{#each data.clients}}
-                    <tr>
-                        <td style="border: 1px solid black; text-align: left;">{{this.client_name}}</td>
-                        <td style="border: 1px solid black; text-align: left;">{{this.client_designation}}</td>
-                        <td style="border: 1px solid black; text-align: left;">{{this.client_email}}</td>
-                        <td style="border: 1px solid black; text-align: left;">{{this.client_mobile}}</td>
-                    </tr>
-                {{/each}}
-            {{/if}}
         </thead>
+        <tbody>
+            {{#each data.clients}}
+            <tr>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{this.client_name}}</td>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{this.client_designation}}</td>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{this.client_email}}</td>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{this.client_mobile}}</td>
+            </tr>
+            {{else}}
+            <tr>
+                <td colspan="4" style="border: 1px solid #444; text-align: center; padding: 8px;">
+                    No client details available
+                </td>
+            </tr>
+            {{/each}}
+        </tbody>
     </table>
 
+    <!-- Courier Address -->
+    <table width="100%" cellpadding="6" cellspacing="0"
+        style="border: 1px solid #444; border-collapse: collapse; margin-bottom: 16px;">
+        <tbody>
+            <tr>
+                <td colspan="6" style="border: 1px solid #444; text-align: center;
+                    background-color: #2c3e50; color: #fff; padding: 10px;">
+                    <b>Courier Details</b>
+                </td>
+            </tr>
+
+            {{#if data.courier_name}}
+                <tr>
+                    <th style="border: 1px solid #444; background-color: #e8e8e8;">Name</th>
+                    <td style="border: 1px solid #444;">{{data.courier_name}}</td>
+
+                    <th style="border: 1px solid #444; background-color: #e8e8e8;">Phone</th>
+                    <td style="border: 1px solid #444;">{{data.courier_phone}}</td>
+
+                    <th style="border: 1px solid #444; background-color: #e8e8e8;">City</th>
+                    <td style="border: 1px solid #444;">{{data.courier_city}}</td>
+                </tr>
+
+                <tr>
+                    <th style="border: 1px solid #444; background-color: #e8e8e8;">Address Line 1</th>
+                    <td colspan="2" style="border: 1px solid #444;">{{data.courier_address_line_1}}</td>
+
+                    <th style="border: 1px solid #444; background-color: #e8e8e8;">Address Line 2</th>
+                    <td colspan="2" style="border: 1px solid #444;">{{data.courier_address_line_2}}</td>
+                </tr>
+
+                <tr>
+                    <th style="border: 1px solid #444; background-color: #e8e8e8;">State</th>
+                    <td style="border: 1px solid #444;">{{data.courier_state}}</td>
+
+                    <th style="border: 1px solid #444; background-color: #e8e8e8;">Pincode</th>
+                    <td style="border: 1px solid #444;">{{data.courier_pincode}}</td>
+
+                    <!-- Empty cells to maintain 6 columns -->
+                    <td colspan="2" style="border: 1px solid #444;"></td>
+                </tr>
+            {{else}}
+                <tr>
+                    <th style="border: 1px solid #444; background-color: #e8e8e8;">Address</th>
+                    <td colspan="5" style="border: 1px solid #444;">{{data.courier_address}}</td>
+                </tr>
+            {{/if}}
+        </tbody>
+    </table>
+
+    <!-- TE Final Remark -->
+    {{#if data.te_final_remark}}
+        <p><b>TE Final Remark:</b></p>
+        <pre style="white-space: pre-wrap; background-color: #f5f5f5; padding: 10px;
+            border: 1px solid #444; border-radius: 4px;">{{data.te_final_remark}}</pre>
+    {{/if}}
+
+    {{else}}
+
+    <table width="100%" cellpadding="6" cellspacing="0"
+        style="border: 1px solid #444; border-collapse: collapse; margin-bottom: 16px;">
+        <tbody>
+            <tr>
+                <td colspan="2" style="border: 1px solid #444; text-align: center;
+                    background-color: #c0392b; color: #fff; padding: 10px;">
+                    <b>Rejection Details</b>
+                </td>
+            </tr>
+            <tr>
+                <th style="border: 1px solid #444; text-align: left; width: 25%; background-color: #e8e8e8; font-weight: bold; padding: 8px;">
+                    Rejection Reason
+                </th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">
+                    {{data.recommendation_reason}}
+                </td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Rejection Remarks</th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">
+                    <pre style="white-space: pre-wrap; margin: 0;">{{data.rejection_remarks}}</pre>
+                </td>
+            </tr>
+            <tr>
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">
+                    Proof of Rejection
+                </th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">
+                    <ul style="margin: 0; padding-left: 18px;">
+                        {{#each data.rejection_proofs}}
+                            <li>
+                                {{#if this.url}}
+                                    <a href="{{this.url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">Open Proof</a>
+                                {{else}}
+                                    {{this.path}}
+                                {{/if}}
+                            </li>
+                        {{else}}
+                            <li>No Proof of Rejection Available</li>
+                        {{/each}}
+                    </ul>
+                </td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+                <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">
+                    Tender Documents
+                </th>
+                <td style="border: 1px solid #444; text-align: left; padding: 8px;">
+                    <ul style="margin: 0; padding-left: 18px;">
+                        {{#each data.tender_docs_urls}}
+                            <li>
+                                <a href="{{this}}" target="_blank" style="color: #0066cc; text-decoration: underline;">Open File</a>
+                            </li>
+                        {{else}}
+                            <li>No Tender Documents Available</li>
+                        {{/each}}
+                    </ul>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    {{/if}}
+
+    <!-- Footer -->
     <p>
         Please take your decision using the form link:
-        <a href="{{data.link}}">click here</a>
-        Please decide within the next 24 hours, so that I can prepare and bid this tender on time.
+        <a href="{{data.link}}">click here</a>.
+        {{#if data.is_recommended}}
+            Please decide within the next 24 hours so that I can prepare and
+            bid this tender on time.
+        {{else}}
+            Please review the rejection details and decide within the next
+            24 hours.
+        {{/if}}
     </p>
 
     <br />

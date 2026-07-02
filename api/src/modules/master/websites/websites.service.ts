@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, like } from 'drizzle-orm';
+import { eq, ilike, like } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import {
@@ -59,6 +59,6 @@ export class WebsitesService {
         return this.db
             .select()
             .from(websites)
-            .where(like(websites.name, searchPattern));
+            .where(ilike(websites.name, searchPattern));
     }
 }

@@ -1,10 +1,14 @@
-// zod/oem-performance.dto.ts
-
 import { z } from "zod";
 
-export const OemPerformanceQuerySchema = z.object({
-    oemId: z.coerce.number(),
-    fromDate: z.coerce.date(),
-    toDate: z.coerce.date(),
-});
-export type OemPerformanceQueryDto = z.infer<typeof OemPerformanceQuerySchema>;
+export const oemPerformanceQuerySchema = z
+    .object({
+        oem: z.coerce.number().int().positive({ message: "A valid OEM must be selected" }),
+        fromDate: z.string().date("Invalid from date"),
+        toDate: z.string().date("Invalid to date"),
+    })
+    .refine(data => new Date(data.fromDate) <= new Date(data.toDate), {
+        message: "fromDate must be before or equal to toDate",
+        path: ["fromDate"],
+    });
+
+export type OemPerformanceQuery = z.infer<typeof oemPerformanceQuerySchema>;

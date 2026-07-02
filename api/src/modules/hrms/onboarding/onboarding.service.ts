@@ -1,0 +1,1935 @@
+// src/modules/hrms/onboarding/onboarding.service.ts
+
+import {
+  Injectable,
+  Inject,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
+import type { DbInstance } from '@/db';
+import { DRIZZLE } from '@/db/database.module';
+import {
+  onboardingRequests,
+  onboardingDocuments,
+  onboardingInduction,
+  onboardingActivityLogs,
+  type NewOnboardingRequest,
+  type NewOnboardingProfile,
+  onboardingProfiles,
+  onboardingEducation,
+  onboardingExperience,
+  onboardingBankDetails,
+  OnboardingRequest,
+} from '@/db/schemas/hrms/onboarding';
+import { users } from '@/db/schemas/auth/users.schema';
+import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
+import { employeeProfiles } from '@/db/schemas/hrms/employee-profiles.schema';
+import { employeeEducation } from '@/db/schemas/hrms/employee-education.schema';
+import { employeeExperience } from '@/db/schemas/hrms/employee-experience.schema';
+import { employeeDocuments } from '@/db/schemas/hrms/employee-documents.schema';
+import { employeeBankDetails } from '@/db/schemas/hrms/employee-bank-details.schema';
+import { eq, desc, aliasedTable, inArray, and, ne, or } from 'drizzle-orm';
+import { designations } from '@/db/schemas/master/designations.schema';
+import { teams } from '@/db/schemas/master/teams.schema';
+import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
+import { Logger } from 'winston';
+import * as crypto from 'crypto';
+import * as argon2 from 'argon2';
+import { oauthAccounts } from '@/db/schemas';
+
+// ─── DTOs ─────────────────────────────────────────────────────────────────────
+
+export interface UpdateStatusDto {
+  status: 'approved' | 'rejected';
+  note?: string;
+}
+
+export interface UpdateProfileDto {
+  // Employment
+  employeeType?: string;
+  workLocation?: string;
+  dateOfJoining?: string;
+  probationMonths?: number;
+  probationEndDate?: string;
+  // Core HR
+  designationId?: number;
+  departmentId?: number;
+  reportingTl?: number;
+  // Compensation
+  salaryType?: string;
+  basicSalary?: string;
+  // Bank
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  // Completion flag
+  hrCompleted?: boolean;
+}
+
+// ─── Service ──────────────────────────────────────────────────────────────────
+
+@Injectable()
+export class OnboardingService {
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DbInstance,
+    @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
+  ) {}
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  /**
+   * Helper to recalculate the progress of an onboarding request across all three stages.
+   * Auto-flips statuses to 'completed' when conditions are met.
+   */
+  private async recalculateProgress(tx: any, onboardingId: number): Promise<void> {
+    // 1. Profile
+    const [profile] = await tx
+      .select()
+      .from(onboardingProfiles)
+      .where(eq(onboardingProfiles.onboardingId, onboardingId))
+      .orderBy(desc(onboardingProfiles.id))
+      .limit(1);
+    
+    const profileCompleted = (profile?.status === 'submitted' || profile?.status === 'resubmitted') && profile?.hrStatus === 'approved';
+    const profileRejected = profile?.hrStatus === 'rejected';
+    
+    let newProfileStatus: string;
+    if (profile?.hrStatus === 'approved') newProfileStatus = 'approved';
+    else if (profile?.hrStatus === 'rejected') newProfileStatus = 'rejected';
+    else if (profile?.status === 'resubmitted') newProfileStatus = 'resubmitted';
+    else if (profile?.status === 'submitted') newProfileStatus = 'submitted';
+    else if (profile?.firstName) newProfileStatus = 'in_progress';
+    else newProfileStatus = 'pending';
+
+    // 2. Documents
+    const docs = await tx
+      .select()
+      .from(onboardingDocuments)
+      .where(eq(onboardingDocuments.onboardingId, onboardingId));
+    
+    const docsApproved = docs.length > 0 && docs.every((d: any) => d.hrStatus === 'approved');
+    const docsRejected = docs.some((d: any) => d.hrStatus === 'rejected');
+    const docsResubmitted = docs.some((d: any) => d.status === 'resubmitted');
+    
+    let newDocumentStatus: string;
+    if (docsApproved) newDocumentStatus = 'approved';
+    else if (docsRejected) newDocumentStatus = 'rejected';
+    else if (docsResubmitted) newDocumentStatus = 'resubmitted';
+    else if (docs.length > 0) newDocumentStatus = 'submitted';
+    else newDocumentStatus = 'pending';
+
+    // 3. Education
+    const education = await tx
+      .select()
+      .from(onboardingEducation)
+      .where(eq(onboardingEducation.onboardingId, onboardingId));
+    
+    const eduApproved = education.length > 0 && education.every((e: any) => e.hrStatus === 'approved');
+    const eduRejected = education.some((e: any) => e.hrStatus === 'rejected');
+    const eduResubmitted = education.some((e: any) => e.status === 'resubmitted');
+    
+    let newEducationStatus: string;
+    if (eduApproved) newEducationStatus = 'approved';
+    else if (eduRejected) newEducationStatus = 'rejected';
+    else if (eduResubmitted) newEducationStatus = 'resubmitted';
+    else if (education.length > 0) newEducationStatus = 'submitted';
+    else newEducationStatus = 'pending';
+
+    // 4. Experience
+    const experience = await tx
+      .select()
+      .from(onboardingExperience)
+      .where(eq(onboardingExperience.onboardingId, onboardingId));
+    
+    const expApproved = experience.length > 0 && experience.every((e: any) => e.hrStatus === 'approved');
+    const expRejected = experience.some((e: any) => e.hrStatus === 'rejected');
+    const expResubmitted = experience.some((e: any) => e.status === 'resubmitted');
+    
+    let newExperienceStatus: string;
+    if (expApproved) newExperienceStatus = 'approved';
+    else if (expRejected) newExperienceStatus = 'rejected';
+    else if (expResubmitted) newExperienceStatus = 'resubmitted';
+    else if (experience.length > 0) newExperienceStatus = 'submitted';
+    else newExperienceStatus = 'pending';
+
+    // 5. Bank Details
+    const bank = await tx
+      .select()
+      .from(onboardingBankDetails)
+      .where(eq(onboardingBankDetails.onboardingId, onboardingId));
+    
+    const bankApproved = bank.length > 0 && bank.every((b: any) => b.hrStatus === 'approved');
+    const bankRejected = bank.some((b: any) => b.hrStatus === 'rejected');
+    const bankResubmitted = bank.some((b: any) => b.status === 'resubmitted');
+    
+    let newBankStatus: string;
+    if (bankApproved) newBankStatus = 'approved';
+    else if (bankRejected) newBankStatus = 'rejected';
+    else if (bankResubmitted) newBankStatus = 'resubmitted';
+    else if (bank.length > 0) newBankStatus = 'submitted';
+    else newBankStatus = 'pending';
+
+    // 6. Induction
+    const tasks = await tx
+      .select()
+      .from(onboardingInduction)
+      .where(eq(onboardingInduction.onboardingId, onboardingId));
+      
+    const inductionCompleted = tasks.length > 0 && tasks.every((t: any) => t.status === 'completed');
+    const newInductionStatus = inductionCompleted ? 'completed' : (tasks.length > 0 ? 'in_progress' : 'pending');
+
+    // 7. Progress %
+    let progress = 0;
+    if (profileCompleted) progress += 20;
+    if (docsApproved) progress += 20;
+    if (eduApproved) progress += 20;
+    if (expApproved) progress += 20;
+    if (bankApproved) progress += 20;
+
+    let hrStatus = 'pending';
+    if (profileRejected || docsRejected || eduRejected || expRejected || bankRejected) {
+      hrStatus = 'rejected';
+    } else if (profileCompleted && docsApproved && eduApproved && expApproved && bankApproved) {
+      hrStatus = 'approved';
+    }
+    
+    await tx
+      .update(onboardingRequests)
+      .set({
+        profileStatus: newProfileStatus,
+        documentStatus: newDocumentStatus,
+        educationStatus: newEducationStatus,
+        experienceStatus: newExperienceStatus,
+        bankStatus: newBankStatus,
+        inductionStatus: newInductionStatus,
+        hrStatus,
+        progress: Math.floor(progress),
+        updatedAt: new Date(),
+      })
+      .where(eq(onboardingRequests.id, onboardingId));
+
+    const allDone = profileCompleted && docsApproved && eduApproved && expApproved && bankApproved && inductionCompleted;
+    if (allDone) {
+      const [req] = await tx.select({ requestType: onboardingRequests.requestType, userId: onboardingRequests.userId })
+        .from(onboardingRequests).where(eq(onboardingRequests.id, onboardingId)).limit(1);
+      
+      if (req?.userId) {
+        if (req.requestType === 're_onboarding') {
+          await this.completeReOnboarding(onboardingId, 0, tx); // 0 = system-triggered
+        } else {
+          // Complete new_hire onboarding
+          await tx.update(onboardingRequests)
+            .set({ status: 'fully_completed', updatedAt: new Date() })
+            .where(eq(onboardingRequests.id, onboardingId));
+
+          await tx.update(userProfiles)
+            .set({ profileCompleted: true, updatedAt: new Date() })
+            .where(eq(userProfiles.userId, req.userId));
+
+          await tx.insert(onboardingActivityLogs).values({
+            onboardingId,
+            action: 'ONBOARDING_COMPLETED',
+            performedBy: null, // system-triggered
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Helper to seed default induction tasks for an onboarding request.
+   */
+  private async seedInductionTasks(tx: any, onboardingId: number): Promise<void> {
+    const defaultTasks = [
+      ...['Documents collection form completed', 'DISC form completed', 'Workstation identified', 
+        'Email ID created', 'Employee added to systems', 'Visiting card ordered', 'ID card ordered']
+        .map(t => ({ onboardingId, taskName: t, taskType: 'BEFORE', status: 'pending' })),
+      ...['HR policy training completed', 'Leave policy training completed', 'Attendance training completed', 
+        'Laptop allotted', 'Office tour completed', 'Reporting manager introduction completed', 
+        'PF initiation (if applicable)', 'Candidate profile shared', 'Buddy assigned', 'Training needs identified', 
+        'Welcome session completed', 'Employee database updated', 'PF office updated', 'ID / Visiting card provided', 
+        'Welcome kit arranged']
+        .map(t => ({ onboardingId, taskName: t, taskType: 'AFTER', status: 'pending' }))
+    ];
+
+    await tx.insert(onboardingInduction).values(defaultTasks as any);
+  }
+
+
+
+  // ── Public API ────────────────────────────────────────────────────────────
+
+  async initializeEmployeeOnboarding(userId: number, adminId: number): Promise<{ onboardingId: number }> {
+    return this.db.transaction(async (tx) => {
+      // 1. Fetch user
+      const [user] = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!user) throw new NotFoundException('User not found');
+
+      // Guard condition
+      const [userProfile] = await tx.select().from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1);
+      if (userProfile?.profileCompleted) {
+        throw new ConflictException('Profile already completed');
+      }
+
+      // Check for active re_onboarding requests to avoid duplicates
+      const existingReqs = await tx.select()
+        .from(onboardingRequests)
+        .where(eq(onboardingRequests.userId, userId))
+        .orderBy(desc(onboardingRequests.createdAt))
+        .limit(1);
+        
+      if (existingReqs.length > 0 && existingReqs[0].status !== 'fully_completed') {
+        return { onboardingId: existingReqs[0].id };
+      }
+
+      const [employeeProfile] = await tx.select().from(employeeProfiles).where(eq(employeeProfiles.userId, userId)).limit(1);
+
+      // INSERT onboardingRequests
+      const [request] = await tx.insert(onboardingRequests).values({
+        userId,
+        name: user.name,
+        email: user.email as string,
+        phone: user.mobile || null,
+        status: 'approved',
+        requestType: 're_onboarding',
+        approvedBy: adminId,
+        approvedAt: new Date(),
+        profileStatus: 'in_progress',
+        documentStatus: 'pending',
+        inductionStatus: 'pending',
+      } as any).returning();
+
+      // INSERT onboardingProfiles
+      const currentAddress = (userProfile?.currentAddress as any) || {};
+      const permanentAddress = (userProfile?.permanentAddress as any) || {};
+      const emergencyContact = (userProfile?.emergencyContact as any) || {};
+
+      await tx.insert(onboardingProfiles).values({
+        onboardingId: request.id,
+        firstName: userProfile?.firstName || user.name.split(' ')[0],
+        middleName: userProfile?.middleName || null,
+        lastName: userProfile?.lastName || user.name.split(' ').slice(1).join(' ') || null,
+        dob: userProfile?.dateOfBirth || null,
+        gender: userProfile?.gender || null,
+        maritalStatus: userProfile?.maritalStatus || null,
+        nationality: userProfile?.nationality || null,
+        email: userProfile?.altEmail || user.email,
+        phone: userProfile?.phone || user.mobile || null,
+        aadharNumber: userProfile?.aadharNumber || null,
+        panNumber: userProfile?.panNumber || null,
+        pfNumber: userProfile?.pfNumber || null,
+        bloodGroup: userProfile?.bloodGroup || null,
+        linkedinProfile: userProfile?.linkedinProfile || null,
+        currentAddress,
+        permanentAddress,
+        emergencyContact,
+
+        employeeType: employeeProfile?.employeeType || null,
+        workLocation: employeeProfile?.workLocation || null,
+        designationId: userProfile?.designationId || null,
+        departmentId: user.primaryTeamId || null,
+        reportingTl: employeeProfile?.reportingTl || null,
+        probationMonths: employeeProfile?.probationMonths || null,
+        probationEndDate: employeeProfile?.probationEndDate || null,
+        salaryType: employeeProfile?.salaryType || null,
+        basicSalary: employeeProfile?.basicSalary || null,
+
+        employeeCompleted: false,
+        hrCompleted: false,
+      } as any);
+
+      // Education
+      const eduRows = await tx.select().from(employeeEducation).where(eq(employeeEducation.userId, userId));
+      if (eduRows.length > 0) {
+        await tx.insert(onboardingEducation).values(
+          eduRows.map(e => ({
+            onboardingId: request.id,
+            degree: e.degree,
+            institution: e.institution,
+            fieldOfStudy: e.fieldOfStudy,
+            yearOfCompletion: e.yearOfCompletion,
+            grade: e.grade,
+            status: 'pending',
+          })) as any
+        );
+      }
+
+      // Experience
+      const expRows = await tx.select().from(employeeExperience).where(eq(employeeExperience.userId, userId));
+      if (expRows.length > 0) {
+        await tx.insert(onboardingExperience).values(
+          expRows.map(e => ({
+            onboardingId: request.id,
+            companyName: e.companyName,
+            designation: e.designation,
+            fromDate: e.fromDate,
+            toDate: e.toDate,
+            currentlyWorking: e.currentlyWorking,
+            responsibilities: e.responsibilities,
+            status: 'pending',
+          })) as any
+        );
+      }
+
+      // Bank Details
+      const bankRows = await tx.select().from(employeeBankDetails).where(eq(employeeBankDetails.userId, userId));
+      if (bankRows.length > 0) {
+        await tx.insert(onboardingBankDetails).values(
+          bankRows.map(b => ({
+            onboardingId: request.id,
+            bankName: b.bankName,
+            accountHolderName: b.accountHolderName,
+            accountNumber: b.accountNumber,
+            ifscCode: b.ifscCode,
+            branchName: b.branchName,
+            branchAddress: b.branchAddress,
+            upiId: b.upiId,
+            isPrimary: b.isPrimary,
+            status: 'pending',
+          })) as any
+        );
+      }
+
+      // Documents
+      const docRows = await tx.select().from(employeeDocuments).where(eq(employeeDocuments.userId, userId));
+      if (docRows.length > 0) {
+        await tx.insert(onboardingDocuments).values(
+          docRows.map(d => ({
+            onboardingId: request.id,
+            docCategory: d.docCategory,
+            docType: d.docType,
+            docNumber: d.docNumber,
+            fileUrl: d.fileUrl,
+            issueDate: d.issueDate,
+            expiryDate: d.expiryDate,
+            status: d.verificationStatus,
+            verifiedBy: d.verifiedBy,
+            verificationDate: d.verificationDate,
+            remarks: d.remarks,
+          })) as any
+        );
+      }
+
+      await this.seedInductionTasks(tx, request.id);
+
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: request.id,
+        action: 'RE_ONBOARDING_INITIATED',
+        performedBy: adminId,
+      });
+
+      return { onboardingId: request.id };
+    });
+  }
+
+  async bulkInitializeOnboarding(adminId: number) {
+    const allUsers = await this.db.select({ id: users.id }).from(users);
+    
+    let created = 0;
+    let skipped = 0;
+    const errors: any[] = [];
+
+    for (const u of allUsers) {
+      try {
+        await this.initializeEmployeeOnboarding(u.id, adminId);
+        created++;
+      } catch (err: any) {
+        if (err instanceof ConflictException) {
+          skipped++;
+        } else {
+          errors.push({ userId: u.id, error: err.message });
+        }
+      }
+    }
+
+    return { total: allUsers.length, created, skipped, errors };
+  }
+
+  async completeReOnboarding(onboardingId: number, adminId: number, existingTx?: any) {
+    const doWork = async (tx: any) => {
+      const [req] = await tx.select().from(onboardingRequests).where(eq(onboardingRequests.id, onboardingId)).limit(1);
+      if (!req || req.requestType !== 're_onboarding' || !req.userId) {
+        throw new BadRequestException('Invalid re-onboarding request');
+      }
+      const userId = req.userId;
+
+      const [obProfile] = await tx.select().from(onboardingProfiles).where(eq(onboardingProfiles.onboardingId, onboardingId)).limit(1);
+      if (!obProfile) throw new BadRequestException('Profile missing');
+
+      const obEdu = await tx.select().from(onboardingEducation).where(eq(onboardingEducation.onboardingId, onboardingId));
+      const obExp = await tx.select().from(onboardingExperience).where(eq(onboardingExperience.onboardingId, onboardingId));
+      const obBank = await tx.select().from(onboardingBankDetails).where(eq(onboardingBankDetails.onboardingId, onboardingId));
+      const obDocs = await tx.select().from(onboardingDocuments).where(eq(onboardingDocuments.onboardingId, onboardingId));
+
+      // UPSERT user_profiles
+      const [existingProfile] = await tx.select().from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1);
+      const profileData = {
+        firstName: obProfile.firstName,
+        middleName: obProfile.middleName,
+        lastName: obProfile.lastName,
+        dateOfBirth: obProfile.dob,
+        gender: obProfile.gender,
+        maritalStatus: obProfile.maritalStatus,
+        nationality: obProfile.nationality,
+        phone: obProfile.phone,
+        altEmail: obProfile.email,
+        aadharNumber: obProfile.aadharNumber,
+        panNumber: obProfile.panNumber,
+        pfNumber: obProfile.pfNumber,
+        bloodGroup: obProfile.bloodGroup,
+        linkedinProfile: obProfile.linkedinProfile,
+        currentAddress: obProfile.currentAddress,
+        permanentAddress: obProfile.permanentAddress,
+        emergencyContact: obProfile.emergencyContact,
+        profileCompleted: true,
+        updatedAt: new Date(),
+      };
+
+      if (existingProfile) {
+        await tx.update(userProfiles).set(profileData).where(eq(userProfiles.userId, userId));
+      } else {
+        await tx.insert(userProfiles).values({ userId, ...profileData } as any);
+      }
+
+      // UPDATE employee_profiles
+      const [existingEmp] = await tx.select().from(employeeProfiles).where(eq(employeeProfiles.userId, userId)).limit(1);
+      const empData = {
+        employeeType: obProfile.employeeType,
+        workLocation: obProfile.workLocation,
+        probationMonths: obProfile.probationMonths,
+        probationEndDate: obProfile.probationEndDate,
+        salaryType: obProfile.salaryType,
+        basicSalary: obProfile.basicSalary,
+        pfNumber: obProfile.pfNumber,
+      };
+
+      if (existingEmp) {
+        await tx.update(employeeProfiles).set(empData).where(eq(employeeProfiles.userId, userId));
+      } else {
+        await tx.insert(employeeProfiles).values({ userId, ...empData } as any);
+      }
+
+      // Education Full Replace
+      await tx.delete(employeeEducation).where(eq(employeeEducation.userId, userId));
+      if (obEdu.length > 0) {
+        await tx.insert(employeeEducation).values(obEdu.map(e => ({
+          userId,
+          degree: e.degree,
+          institution: e.institution,
+          fieldOfStudy: e.fieldOfStudy,
+          yearOfCompletion: e.yearOfCompletion,
+          grade: e.grade,
+        })) as any);
+      }
+
+      // Experience Full Replace
+      await tx.delete(employeeExperience).where(eq(employeeExperience.userId, userId));
+      if (obExp.length > 0) {
+        await tx.insert(employeeExperience).values(obExp.map(e => ({
+          userId,
+          companyName: e.companyName,
+          designation: e.designation,
+          fromDate: e.fromDate,
+          toDate: e.toDate,
+          currentlyWorking: e.currentlyWorking,
+          responsibilities: e.responsibilities,
+        })) as any);
+      }
+
+      // Bank Details Full Replace
+      await tx.delete(employeeBankDetails).where(eq(employeeBankDetails.userId, userId));
+      if (obBank.length > 0) {
+        await tx.insert(employeeBankDetails).values(obBank.map(b => ({
+          userId,
+          bankName: b.bankName,
+          accountHolderName: b.accountHolderName,
+          accountNumber: b.accountNumber,
+          ifscCode: b.ifscCode,
+          branchName: b.branchName,
+          branchAddress: b.branchAddress,
+          upiId: b.upiId,
+          isPrimary: b.isPrimary,
+        })) as any);
+      }
+
+      // Documents Full Replace
+      await tx.delete(employeeDocuments).where(eq(employeeDocuments.userId, userId));
+      if (obDocs.length > 0) {
+        await tx.insert(employeeDocuments).values(obDocs.map(d => ({
+          userId,
+          docCategory: d.docCategory,
+          docType: d.docType,
+          docNumber: d.docNumber,
+          fileUrl: d.fileUrl,
+          issueDate: d.issueDate,
+          expiryDate: d.expiryDate,
+          verificationStatus: d.status,
+          verifiedBy: d.verifiedBy,
+          verificationDate: d.verificationDate,
+          remarks: d.remarks,
+        })) as any);
+      }
+
+      await tx.update(onboardingRequests)
+        .set({ status: 'fully_completed', updatedAt: new Date() })
+        .where(eq(onboardingRequests.id, onboardingId));
+
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId,
+        action: 'RE_ONBOARDING_COMPLETED',
+        performedBy: adminId,
+      });
+    };
+
+    if (existingTx) {
+      await doWork(existingTx);
+    } else {
+      await this.db.transaction(doWork);
+    }
+  }
+
+  //writing the function to get the profile submission status progress
+  async findSubmissionProgress(onboardingRequest : OnboardingRequest) {
+    // we need to calculate the total progress of each request
+    const statuses = [
+      onboardingRequest?.profileStatus,
+      onboardingRequest?.documentStatus,
+      onboardingRequest?.educationStatus,
+      onboardingRequest?.experienceStatus,
+      onboardingRequest?.bankStatus,
+      onboardingRequest?.inductionStatus,
+    ];
+
+    // Filter out undefined/null statuses to handle optional fields safely
+    const validStatuses = statuses.filter((s) => s !== undefined && s !== null);
+    if (validStatuses.length === 0) return 0;
+
+    // A detail is considered submitted if the status is not 'pending'
+    const submittedCount = validStatuses.filter((s) => s == 'submitted').length;
+    
+    // If all details are submitted, progress is 100%
+    const progress = Math.round((submittedCount / validStatuses.length) * 100);
+
+    return progress;
+  }
+
+  /**
+   * GET /hrms/onboarding/dashboard
+   * All requests joined with reviewer name — used by the HR dashboard.
+   */
+  async findAll(): Promise<any[]> {
+    try {
+      const rows = await this.db
+        .select({
+          id: onboardingRequests.id,
+          name: onboardingRequests.name,
+          userId : onboardingRequests.userId,
+          email: onboardingRequests.email,
+          phone: onboardingRequests.phone,
+          status: onboardingRequests.status,
+          hrStatus: onboardingRequests.hrStatus,
+          profileStatus: onboardingRequests.profileStatus,
+          documentStatus: onboardingRequests.documentStatus,
+          educationStatus: onboardingRequests.educationStatus,
+          experienceStatus: onboardingRequests.experienceStatus,
+          bankStatus: onboardingRequests.bankStatus,
+          inductionStatus: onboardingRequests.inductionStatus,
+          progress: onboardingRequests.progress,
+          approvedAt: onboardingRequests.approvedAt,
+          createdAt: onboardingRequests.createdAt,
+          updatedAt: onboardingRequests.updatedAt,
+          reviewedBy: users.name,
+        })
+        .from(onboardingRequests)
+        .leftJoin(users, eq(onboardingRequests.approvedBy, users.id))
+        .orderBy(desc(onboardingRequests.createdAt));
+
+      if (rows.length === 0) {
+        return [];
+      }
+
+      const requestIds = rows.map((r) => r.id);
+      const userIds = rows.map((r) => r.userId).filter(Boolean) as number[];
+
+      const [profiles, documents, education, experience, bankDetails, induction, oauthAccs] = await Promise.all([
+        this.db.select().from(onboardingProfiles).where(inArray(onboardingProfiles.onboardingId, requestIds)),
+        this.db.select().from(onboardingDocuments).where(inArray(onboardingDocuments.onboardingId, requestIds)),
+        this.db.select().from(onboardingEducation).where(inArray(onboardingEducation.onboardingId, requestIds)),
+        this.db.select().from(onboardingExperience).where(inArray(onboardingExperience.onboardingId, requestIds)),
+        this.db.select().from(onboardingBankDetails).where(inArray(onboardingBankDetails.onboardingId, requestIds)),
+        this.db.select().from(onboardingInduction).where(inArray(onboardingInduction.onboardingId, requestIds)),
+        userIds.length > 0 ? this.db.select().from(oauthAccounts).where(inArray(oauthAccounts.userId, userIds)) : Promise.resolve([] as any[]),
+      ]);
+
+
+      const calculateHrStatus = (items: any[]) => {
+        if (!items || items.length === 0) return 'pending';
+        if (items.some((i) => i.hrStatus === 'rejected')) return 'rejected';
+        if (items.every((i) => i.hrStatus === 'approved')) return 'approved';
+        return 'pending';
+      };
+
+      const calculateHrRate = (items: any[]) => {
+        if (!items || items.length === 0) return { text: '0/0', percentage: 0 };
+        const approvedCount = items.filter((i) => i.hrStatus === 'approved').length;
+        const totalPercentage = Math.round((approvedCount / items.length) * 100);
+        return { text: `${approvedCount}/${items.length}`, percentage: totalPercentage };
+      };
+
+      // Induction uses 'status' instead of 'hrStatus'
+      const calculateInductionHrStatus = (items: any[]) => {
+        if (!items || items.length === 0) return 'pending';
+        if (items.every((i) => i.status === 'completed')) return 'approved';
+        return 'pending';
+      };
+
+      const calculateInductionRate = (items: any[]) => {
+        if (!items || items.length === 0) return { text: '0/0', percentage: 0 };
+        const completedCount = items.filter((i) => i.status === 'completed').length;
+        const totalPercentage = Math.round((completedCount / items.length) * 100);
+        return { text: `${completedCount}/${items.length}`, percentage: totalPercentage };
+      };
+
+      const enrichedRows = rows.map((row) => {
+        // 1. Filter child items for this row
+        const rowProfile = profiles.find((p) => p.onboardingId === row.id) || null;
+        const rowDocs = documents.filter((d) => d.onboardingId === row.id);
+        const rowEdu = education.filter((e) => e.onboardingId === row.id);
+        const rowExp = experience.filter((e) => e.onboardingId === row.id);
+        const rowBank = bankDetails.filter((b) => b.onboardingId === row.id);
+        const rowInduction = induction.filter((i) => i.onboardingId === row.id);
+
+        // 2. Employee Progress %
+        // We look at the 5 main statuses tracked on the base request
+        const statuses = [
+          row.profileStatus,
+          row.documentStatus,
+          row.educationStatus,
+          row.experienceStatus,
+          row.bankStatus,
+          // row.inductionStatus,
+        ];
+
+        const submittedCount = statuses.filter((s) => s == 'submitted').length;
+        const employeeProgressPercent = Math.round((submittedCount / statuses.length) * 100);
+
+        // 3. HR Progress Calculations
+        let profileHrStatus = 'pending';
+        let profileHrRate = { text: '0/0', percentage: 0 };
+        if (rowProfile) {
+          if (rowProfile.hrStatus === 'rejected') profileHrStatus = 'rejected';
+          else if (rowProfile.hrStatus === 'approved') {
+            profileHrStatus = 'approved';
+            profileHrRate = { text: '1/1', percentage: 100 };
+          } else {
+            profileHrRate = { text: '0/1', percentage: 0 };
+          }
+        }
+
+        const oauthPhoto = oauthAccs.find((o) => o.userId === row.userId)?.avatar;
+        const docProfilePhoto = rowDocs.find((d) => d.docType === 'Passport Size Photo')?.fileUrl;
+        const profilePhoto = docProfilePhoto || oauthPhoto || null;
+
+        return {
+          ...row,
+          progress: row.progress === 'pending' || !row.progress ? 0 : Number(row.progress) || 0,
+          employeeProgress: employeeProgressPercent,
+          profilePhoto : profilePhoto,
+
+          // The raw arrays/objects so the frontend can display remarks/details
+          profile: rowProfile,
+          documents: rowDocs,
+          education: rowEdu,
+          experience: rowExp,
+          bankDetails: rowBank,
+          // induction: rowInduction,
+
+          // Aggregated top-level statuses (rejected if one rejected, etc.)
+          hrStatuses: {
+            profile: profileHrStatus,
+            documents: calculateHrStatus(rowDocs),
+            education: calculateHrStatus(rowEdu),
+            experience: calculateHrStatus(rowExp),
+            bankDetails: calculateHrStatus(rowBank),
+            induction: calculateInductionHrStatus(rowInduction),
+          },
+
+          // HR Approval fractions & percentages
+          hrRates: {
+            profile: profileHrRate,
+            documents: calculateHrRate(rowDocs),
+            education: calculateHrRate(rowEdu),
+            experience: calculateHrRate(rowExp),
+            bankDetails: calculateHrRate(rowBank),
+            induction: calculateInductionRate(rowInduction),
+          },
+        };
+      });
+
+      return enrichedRows;
+    } catch (err) {
+      this.logger.error('OnboardingService.findAll failed', { err });
+      throw err;
+    }
+  }
+
+  /**
+   * Get list of employees who have not submitted their complete onboarding.
+   * Checks profileStatus, documentStatus, bankStatus, educationStatus, and experienceStatus.
+   */
+  async findIncompleteOnboarding(): Promise<any[]> {
+    try {
+      const rows = await this.db
+        .select({
+          id: onboardingRequests.id,
+          userId: onboardingRequests.userId,
+          name: onboardingRequests.name,
+          email: onboardingRequests.email,
+          phone: onboardingRequests.phone,
+          status: onboardingRequests.status,
+          hrStatus: onboardingRequests.hrStatus,
+          profileStatus: onboardingRequests.profileStatus,
+          documentStatus: onboardingRequests.documentStatus,
+          educationStatus: onboardingRequests.educationStatus,
+          experienceStatus: onboardingRequests.experienceStatus,
+          bankStatus: onboardingRequests.bankStatus,
+          progress: onboardingRequests.progress,
+          createdAt: onboardingRequests.createdAt,
+          updatedAt: onboardingRequests.updatedAt,
+          avatar: userProfiles.image,
+        })
+        .from(onboardingRequests)
+        .leftJoin(userProfiles, eq(onboardingRequests.userId, userProfiles.userId))
+        .orderBy(desc(onboardingRequests.createdAt));
+
+      return rows.filter((row) => {
+        const statuses = [
+          row.profileStatus,
+          row.documentStatus,
+          row.educationStatus,
+          row.experienceStatus,
+          row.bankStatus,
+        ];
+        // At least one status is NOT 'submitted' and NOT 'resubmitted'
+        return statuses.some((status) => status !== 'submitted' && status !== 'resubmitted');
+      });
+    } catch (err) {
+      this.logger.error('OnboardingService.findIncompleteOnboarding failed', { err });
+      throw err;
+    }
+  }
+
+  /**
+   * Check onboarding status of a specific user.
+   */
+  async findUserOnboardingStatus(userId: number): Promise<any> {
+    try {
+      const [request] = await this.db
+        .select({
+          id: onboardingRequests.id,
+          profileStatus: onboardingRequests.profileStatus,
+          documentStatus: onboardingRequests.documentStatus,
+          educationStatus: onboardingRequests.educationStatus,
+          experienceStatus: onboardingRequests.experienceStatus,
+          bankStatus: onboardingRequests.bankStatus,
+          hrStatus: onboardingRequests.hrStatus,
+        })
+        .from(onboardingRequests)
+        .where(eq(onboardingRequests.userId, userId))
+        .orderBy(desc(onboardingRequests.createdAt))
+        .limit(1);
+
+      if (!request) {
+        return { isComplete: true, hasRequest: false };
+      }
+
+      // Query child table entry hrStatuses for individual rejection/approval checks
+      const [profile] = await this.db
+        .select({ hrStatus: onboardingProfiles.hrStatus })
+        .from(onboardingProfiles)
+        .where(eq(onboardingProfiles.onboardingId, request.id))
+        .orderBy(desc(onboardingProfiles.id))
+        .limit(1);
+
+      const docs = await this.db
+        .select({ hrStatus: onboardingDocuments.hrStatus })
+        .from(onboardingDocuments)
+        .where(eq(onboardingDocuments.onboardingId, request.id));
+
+      const edu = await this.db
+        .select({ hrStatus: onboardingEducation.hrStatus })
+        .from(onboardingEducation)
+        .where(eq(onboardingEducation.onboardingId, request.id));
+
+      const exp = await this.db
+        .select({ hrStatus: onboardingExperience.hrStatus })
+        .from(onboardingExperience)
+        .where(eq(onboardingExperience.onboardingId, request.id));
+
+      const bank = await this.db
+        .select({ hrStatus: onboardingBankDetails.hrStatus })
+        .from(onboardingBankDetails)
+        .where(eq(onboardingBankDetails.onboardingId, request.id));
+
+      const profileHrStatus = profile?.hrStatus || 'pending';
+      const documentHrStatus = docs.some(d => d.hrStatus === 'rejected') ? 'rejected' : (docs.length > 0 && docs.every(d => d.hrStatus === 'approved') ? 'approved' : 'pending');
+      const educationHrStatus = edu.some(e => e.hrStatus === 'rejected') ? 'rejected' : (edu.length > 0 && edu.every(e => e.hrStatus === 'approved') ? 'approved' : 'pending');
+      const experienceHrStatus = exp.some(e => e.hrStatus === 'rejected') ? 'rejected' : (exp.length > 0 && exp.every(e => e.hrStatus === 'approved') ? 'approved' : 'pending');
+      const bankHrStatus = bank.some(b => b.hrStatus === 'rejected') ? 'rejected' : (bank.length > 0 && bank.every(b => b.hrStatus === 'approved') ? 'approved' : 'pending');
+
+      const statuses = [
+        request.profileStatus,
+        request.documentStatus,
+        request.educationStatus,
+        request.experienceStatus,
+        request.bankStatus,
+      ];
+
+      // Onboarding is incomplete if at least one status is NOT 'submitted' and NOT 'resubmitted'
+      const isIncomplete = statuses.some((status) => status !== 'submitted' && status !== 'resubmitted');
+
+      return {
+        isComplete: !isIncomplete,
+        hasRequest: true,
+        requestId: request.id,
+        profileStatus: request.profileStatus,
+        documentStatus: request.documentStatus,
+        educationStatus: request.educationStatus,
+        experienceStatus: request.experienceStatus,
+        bankStatus: request.bankStatus,
+        hrStatus: request.hrStatus, // overall marker
+        profileHrStatus,
+        documentHrStatus,
+        educationHrStatus,
+        experienceHrStatus,
+        bankHrStatus,
+      };
+    } catch (err) {
+      this.logger.error('OnboardingService.findUserOnboardingStatus failed', { err, userId });
+      throw err;
+    }
+  }
+
+  /**
+   * GET /hrms/onboarding/profiles
+   * All approved onboarding requests joined with their profile data.
+   * Used by the Profile Details tracker dashboard.
+   */
+  async getProfileList(): Promise<any[]> {
+    const rows = await this.db
+      .select({
+        id: onboardingRequests.id,
+        name: onboardingRequests.name,
+        email: onboardingRequests.email,
+        personalEmail: onboardingProfiles.email,
+        phone: onboardingProfiles.phone,
+        profileStatus: onboardingRequests.profileStatus,
+        hrStatus: onboardingProfiles.hrStatus,
+        progress: onboardingRequests.progress,
+        approvedAt: onboardingRequests.approvedAt,
+        updatedAt: onboardingRequests.updatedAt,
+        // Profile HR fields
+        employeeType: onboardingProfiles.employeeType,
+        workLocation: onboardingProfiles.workLocation,
+        dateOfJoining: onboardingProfiles.dateOfJoining,
+        salaryType: onboardingProfiles.salaryType,
+        basicSalary: onboardingProfiles.basicSalary,
+        hrCompleted: onboardingProfiles.hrCompleted,
+        employeeCompleted: onboardingProfiles.employeeCompleted,
+        // Employee personal fields
+        firstName: onboardingProfiles.firstName,
+        lastName: onboardingProfiles.lastName,
+        hrRemark: onboardingProfiles.hrRemark,
+        // Reviewer name (who approved)
+        reviewedBy: users.name,
+      })
+      .from(onboardingRequests)
+      .innerJoin(onboardingProfiles, eq(onboardingProfiles.onboardingId, onboardingRequests.id))
+      .leftJoin(users, eq(onboardingRequests.approvedBy, users.id))
+      .where(
+        and(
+          // eq(onboardingProfiles.hrStatus, "approved"),
+          inArray(onboardingRequests.profileStatus, ['submitted', 'resubmitted']),
+        ),
+      )
+      .orderBy(desc(onboardingRequests.approvedAt));
+
+    return rows;
+  }
+
+  /**
+   * GET /hrms/onboarding/:id/profile
+   * Full profile for a single onboarding request.
+   */
+  async getProfile(id: number): Promise<any> {
+    const reportingTl = aliasedTable(users, 'reportingTl');
+
+    const [profileRow] = await this.db
+      .select({
+        profile: onboardingProfiles,
+        designationName: designations.name,
+        departmentName: teams.name,
+        reportingTlName: reportingTl.name,
+      })
+      .from(onboardingProfiles)
+      .leftJoin(designations, eq(onboardingProfiles.designationId, designations.id))
+      .leftJoin(teams, eq(onboardingProfiles.departmentId, teams.id))
+      .leftJoin(reportingTl, eq(onboardingProfiles.reportingTl, reportingTl.id))
+      .where(eq(onboardingProfiles.onboardingId, id))
+      .limit(1);
+
+    if (!profileRow) throw new NotFoundException(`Profile not found for onboarding #${id}`);
+
+    const [request] = await this.db
+      .select({
+        name: onboardingRequests.name,
+        email: onboardingRequests.email,
+        phone: onboardingRequests.phone,
+        status: onboardingRequests.status,
+        hrStatus: onboardingRequests.hrStatus,
+        profileStatus: onboardingRequests.profileStatus,
+        documentStatus: onboardingRequests.documentStatus,
+        educationStatus: onboardingRequests.educationStatus,
+        experienceStatus: onboardingRequests.experienceStatus,
+        bankStatus: onboardingRequests.bankStatus,
+        inductionStatus: onboardingRequests.inductionStatus,
+        progress: onboardingRequests.progress,
+        approvedAt: onboardingRequests.approvedAt,
+        reviewedBy: users.name,
+      })
+      .from(onboardingRequests)
+      .leftJoin(users, eq(onboardingRequests.approvedBy, users.id))
+      .where(eq(onboardingRequests.id, id))
+      .limit(1);
+
+    const education = await this.db
+      .select()
+      .from(onboardingEducation)
+      .where(eq(onboardingEducation.onboardingId, id))
+      .orderBy(desc(onboardingEducation.id));
+
+    const experience = await this.db
+      .select()
+      .from(onboardingExperience)
+      .where(eq(onboardingExperience.onboardingId, id))
+      .orderBy(desc(onboardingExperience.id));
+
+    const bankDetails = await this.db
+      .select()
+      .from(onboardingBankDetails)
+      .where(eq(onboardingBankDetails.onboardingId, id))
+      .orderBy(desc(onboardingBankDetails.id));
+
+    const documents = await this.db
+      .select()
+      .from(onboardingDocuments)
+      .where(eq(onboardingDocuments.onboardingId, id))
+      .orderBy(desc(onboardingDocuments.id));
+
+    return {
+      ...profileRow.profile,
+      // request fields
+      onboardingStatus: request.status,
+      onboardingHrStatus: request.hrStatus,
+      profileStatus: request.profileStatus,
+      documentStatus: request.documentStatus,
+      educationStatus: request.educationStatus,
+      experienceStatus: request.experienceStatus,
+      bankStatus: request.bankStatus,
+      inductionStatus: request.inductionStatus,
+      progress: request.progress,
+      approvedAt: request.approvedAt,
+      reviewedBy: request.reviewedBy,
+      
+      // Explicit overrides for profile fields to ensure they are not overwritten by request fields
+      id: profileRow.profile.id,
+      onboardingId: id,
+      name: request.name,
+      email: request.email,
+      personalEmail: profileRow.profile.email,
+      phone: profileRow.profile.phone || request.phone,
+      status: profileRow.profile.status,
+      hrStatus: profileRow.profile.hrStatus,
+      hrRemark: profileRow.profile.hrRemark,
+      
+      designation: profileRow.designationName,
+      department: profileRow.departmentName,
+      reportingTl: profileRow.reportingTlName,
+      education,
+      experience,
+      bankDetails,
+      documents: documents.map(d => ({
+        ...d,
+        fileName: d.fileUrl ? d.fileUrl.split('/').pop() : null,
+      })),
+    };
+  }
+
+  /**
+   * PATCH /hrms/onboarding/:id/profile
+   * HR fills employment, compensation, and bank details.
+   * Automatically updates profileStatus on the request row.
+   */
+  async updateProfile(id: number, dto: UpdateProfileDto, adminId: number): Promise<any> {
+    return this.db.transaction(async (tx) => {
+      // Update the profile row
+      const [updated] = await tx
+        .update(onboardingProfiles)
+        .set({ ...dto, updatedAt: new Date() })
+        .where(eq(onboardingProfiles.onboardingId, id))
+        .returning();
+
+      if (!updated) throw new NotFoundException(`Profile not found for onboarding #${id}`);
+
+      // We rely on recalculateProgress to handle the progress % and status changes
+      await this.recalculateProgress(tx, id);
+
+      // Log the action
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: 'PROFILE_UPDATED',
+        performedBy: adminId,
+        metadata: { fields: Object.keys(dto), hrCompleted: dto.hrCompleted ?? false },
+      });
+
+      return updated;
+    });
+  }
+
+  /**
+   * GET /hrms/onboarding/documents
+   * All approved onboarding requests with their profile basic info and all fetched documents.
+   * Grouped and returned as EmployeeDocRecord[] for tracker.
+   */
+  async getDocumentTrackerList(): Promise<any[]> {
+    const rows = await this.db
+      .select({
+        id: onboardingRequests.id,
+        name: onboardingRequests.name,
+        email: onboardingRequests.email,
+        documentStatus: onboardingRequests.documentStatus,
+        hrStatus: onboardingRequests.hrStatus,
+        progress: onboardingRequests.progress,
+        firstName: onboardingProfiles.firstName,
+        lastName: onboardingProfiles.lastName,
+        designation: onboardingProfiles.employeeType, // Sticking to basic profile fields as designation proxy
+        department: onboardingProfiles.departmentId, 
+        dateOfJoining: onboardingProfiles.dateOfJoining,
+      })
+      .from(onboardingRequests)
+      .leftJoin(onboardingProfiles, eq(onboardingProfiles.onboardingId, onboardingRequests.id))
+      .where(eq(onboardingRequests.status, 'approved'))
+      .orderBy(desc(onboardingRequests.approvedAt));
+
+    const docRows = await this.db
+      .select()
+      .from(onboardingDocuments);
+
+    const docsByEmpId = docRows.reduce((acc, doc) => {
+      const eId = doc.onboardingId;
+      if (!acc[eId]) acc[eId] = [];
+      acc[eId].push({
+        id: doc.id.toString(),
+        name: doc.docType || 'Unknown Document',
+        category: doc.docCategory || 'other',
+        required: true, // Assuming true for now or driven by dictionary
+        status: doc.status,
+        uploadedAt: doc.createdAt?.toISOString(),
+        verifiedBy: doc.verifiedBy?.toString(),
+        verifiedAt: doc.verificationDate,
+        rejectedReason: doc.hrRemark,
+        fileName: doc.fileUrl ? doc.fileUrl.split('/').pop() : 'document.pdf',
+        fileSize: '1.2 MB', // Dummy
+        fileType: 'application/pdf',
+      });
+      return acc;
+    }, {} as Record<number, any[]>);
+
+    return rows.map((r) => ({
+      ...r,
+      employeeId: `EMP-${r.id.toString().padStart(4, '0')}`,
+      documents: docsByEmpId[r.id] || [],
+    }));
+  }
+
+  /**
+   * GET /hrms/onboarding/:id/documents
+   */
+  async getEmployeeDocuments(onboardingId: number): Promise<any[]> {
+    const docRows = await this.db
+      .select({
+        id: onboardingDocuments.id,
+        docType: onboardingDocuments.docType,
+        docCategory: onboardingDocuments.docCategory,
+        status: onboardingDocuments.status,
+        hrStatus: onboardingDocuments.hrStatus,
+        createdAt: onboardingDocuments.createdAt,
+        verifiedBy: users.name,
+        verificationDate: onboardingDocuments.verificationDate,
+        hrRemark: onboardingDocuments.hrRemark,
+        fileUrl: onboardingDocuments.fileUrl,
+      })
+      .from(onboardingDocuments)
+      .leftJoin(users, eq(onboardingDocuments.verifiedBy, users.id))
+      .where(eq(onboardingDocuments.onboardingId, onboardingId));
+
+    // Remap to frontend expected format
+    return docRows.map(doc => ({
+      id: doc.id.toString(),
+      name: doc.docType || 'Unknown Document',
+      category: doc.docCategory || 'other',
+      required: true,
+      status: doc.status,
+      hrStatus: doc.hrStatus,
+      uploadedAt: doc.createdAt?.toISOString(),
+      verifiedBy: doc.verifiedBy,
+      verifiedAt: doc.verificationDate,
+      rejectedReason: doc.hrRemark,
+      hrRemark: doc.hrRemark,
+      fileName: doc.fileUrl ? doc.fileUrl.split('/').pop() : 'document.pdf',
+      fileSize: '2.4 MB',
+      fileType: 'application/pdf',
+      fileUrl: doc.fileUrl,
+    }));
+  }
+
+
+  // ─── Induction Endpoints ──────────────────────────────────────────────────
+
+  /**
+   * GET /hrms/onboarding/induction-tracker
+   */
+  async getInductionTrackerList(): Promise<any[]> {
+    const rows = await this.db
+      .select({
+        id: onboardingRequests.id,
+        userId: onboardingRequests.userId,
+        email: onboardingRequests.email,
+        inductionStatus: onboardingRequests.inductionStatus,
+        hrStatus: onboardingRequests.hrStatus,
+        progress: onboardingRequests.progress,
+        approvedAt: onboardingRequests.approvedAt,
+        firstName: onboardingProfiles.firstName,
+        lastName: onboardingProfiles.lastName,
+        middleName: onboardingProfiles.middleName,
+        designation: onboardingProfiles.employeeType,
+        department: onboardingProfiles.departmentId, 
+        dateOfJoining: onboardingProfiles.dateOfJoining,
+      })
+      .from(onboardingRequests)
+      .leftJoin(onboardingProfiles, eq(onboardingProfiles.onboardingId, onboardingRequests.id))
+      .where(eq(onboardingRequests.status, 'approved'))
+      .orderBy(desc(onboardingRequests.approvedAt));
+
+    const requestIds = rows.map((r) => r.id);
+    const userIds = rows.map((r) => r.userId).filter(Boolean) as number[];
+
+    const documents = requestIds.length > 0
+      ? await this.db.select().from(onboardingDocuments).where(inArray(onboardingDocuments.onboardingId, requestIds))
+      : [];
+
+    const oauthAccs = userIds.length > 0
+      ? await this.db.select().from(oauthAccounts).where(inArray(oauthAccounts.userId, userIds))
+      : [];
+
+    const taskRows = await this.db
+      .select()
+      .from(onboardingInduction);
+
+    const tasksByEmpId = taskRows.reduce((acc, task) => {
+      const eId = task.onboardingId;
+      if (!acc[eId]) acc[eId] = [];
+      acc[eId].push({
+        id: task.id.toString(),
+        name: task.taskName || 'Unknown Task',
+        phase: task.taskType === 'AFTER' ? 'after_joining' : 'before_joining',
+        assignedTo: 'HR', // Simplified for now since assignedTo is bigint in DB
+        required: true,
+        status: task.status || 'pending',
+        completedAt: task.completedAt?.toISOString(),
+        remarks: task.remarks,
+      });
+      return acc;
+    }, {} as Record<number, any[]>);
+
+    return rows.map((r) => {
+      const rowDocs = documents.filter((d) => d.onboardingId === r.id);
+      const oauthPhoto = oauthAccs.find((o) => o.userId === r.userId)?.avatar;
+      const docProfilePhoto = rowDocs.find((d) => d.docType === 'Passport Size Photo')?.fileUrl;
+      const profilePhoto = docProfilePhoto || oauthPhoto || null;
+
+      return {
+        ...r,
+        employeeId: `EMP-${r.id.toString().padStart(4, '0')}`,
+        tasks: tasksByEmpId[r.id] || [],
+        inductionCoordinator: 'System Admin',
+        profilePhoto,
+      };
+    });
+  }
+
+  /**
+   * GET /hrms/onboarding/:id/induction
+   */
+  async getEmployeeInduction(onboardingId: number): Promise<any[]> {
+    const taskRows = await this.db
+      .select({
+        id: onboardingInduction.id,
+        taskName: onboardingInduction.taskName,
+        taskType: onboardingInduction.taskType,
+        assignedTo: onboardingInduction.assignedTo,
+        status: onboardingInduction.status,
+        completedAt: onboardingInduction.completedAt,
+        remarks: onboardingInduction.remarks,
+        completedBy: users.name,
+      })
+      .from(onboardingInduction)
+      .leftJoin(users, eq(onboardingInduction.assignedTo, users.id))
+      .where(eq(onboardingInduction.onboardingId, onboardingId));
+
+    return taskRows.map(task => ({
+      id: task.id.toString(),
+      name: task.taskName || 'Unknown Task',
+      phase: task.taskType === 'AFTER' ? 'after_joining' : 'before_joining',
+      assignedTo: 'HR', // Simplified or logic based on role
+      required: true,
+      status: task.status || 'pending',
+      completedAt: task.completedAt?.toISOString(),
+      completedBy: task.completedBy,
+      remarks: task.remarks,
+    }));
+  }
+
+  /**
+   * PATCH /hrms/onboarding/:id/induction/:taskId
+   */
+  async updateInductionTask(onboardingId: number, taskId: number, updates: { status?: string; remarks?: string }, adminId: number): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      const updateData: any = { updatedAt: new Date() };
+
+      if (updates.status) {
+        updateData.status = updates.status;
+        if (updates.status === 'completed') {
+          updateData.completedAt = new Date();
+          updateData.assignedTo = adminId;
+        } else {
+          updateData.completedAt = null;
+        }
+      }
+
+      if (updates.remarks !== undefined) {
+        updateData.remarks = updates.remarks;
+      }
+
+      await tx
+        .update(onboardingInduction)
+        .set(updateData)
+        .where(eq(onboardingInduction.id, taskId));
+
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId,
+        action: `INDUCTION_TASK_UPDATED`,
+        performedBy: adminId,
+        metadata: { taskId, updates },
+      });
+      
+      await this.recalculateProgress(tx, onboardingId);
+    });
+  }
+
+
+
+  /**
+   * PATCH /hrms/onboarding/:id/status
+   * Approve or reject a pending request (HR action).
+   */
+  async updateStatus(
+    id: number,
+    dto: UpdateStatusDto,
+    adminId: number,
+  ): Promise<any> {
+    return this.db.transaction(async (tx) => {
+      const [request] = await tx
+        .select()
+        .from(onboardingRequests)
+        .where(eq(onboardingRequests.id, id))
+        .limit(1);
+
+      if (!request) throw new NotFoundException(`Onboarding request #${id} not found`);
+
+      if (request.status !== 'pending') {
+        throw new BadRequestException(
+          `Request is already "${request.status}" and cannot be actioned again.`,
+        );
+      }
+
+      // ── 1. Create User and Seed Tasks if Approved ────────────────────────
+      let newUserId: number | null = null;
+      
+      if (dto.status === 'approved') {
+        if ((request as any).requestType === 're_onboarding') {
+          // User already exists — just seed tasks
+          await this.seedInductionTasks(tx, id);
+          // userId is already set on the request — no need to update it
+        } else {
+          const [onProf] = await tx
+            .select()
+            .from(onboardingProfiles)
+            .where(eq(onboardingProfiles.onboardingId, id))
+            .limit(1);
+
+          if (onProf) {
+            // Generate a temporary password
+            // Rather than creating pass like this we will use firstname + @123
+            const tempPassword = (onProf.firstName || '').trim() + "@123";
+
+            // Hash using Argon2
+            const hashedPassword = await argon2.hash(tempPassword, {
+              type: argon2.argon2id, // recommended variant
+              memoryCost: 2 ** 16,   // 64 MB
+              timeCost: 3,           // iterations
+              parallelism: 1,        // threads
+            });
+
+            const fullName = [onProf.firstName, onProf.middleName, onProf.lastName].filter(Boolean).join(' ');
+            const baseUsername = onProf.email?.split('@')[0] || `user${Date.now()}`;
+            const username = `${baseUsername}_${Math.floor(Math.random() * 1000)}`;
+
+            this.logger.info(`Generated temporary password for ${onProf.email}: ${tempPassword}`);
+
+            // Insert into Users schema
+            const [newUser] = await tx
+              .insert(users)
+              .values({
+                name: fullName,
+                username: username,
+                email: onProf.email as string,
+                mobile: onProf.phone,
+                password: hashedPassword,
+                isActive: true, // Login enabled immediately per requirements
+                createdAt: new Date(),
+              })
+              .returning({ id: users.id });
+              
+            newUserId = newUser.id;
+
+            // Create a default user profile
+            await tx.insert(userProfiles).values({
+              userId: newUser.id,
+              firstName: onProf.firstName,
+              middleName: onProf.middleName,
+              lastName: onProf.lastName,
+              phone: onProf.phone,
+              altEmail: onProf.email,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+
+            // Seed default induction tasks
+            await this.seedInductionTasks(tx, id);
+          }
+        }
+      }
+
+      // ── 2. Update Request Status ─────────────────────────────────────────
+      const updateData: any = {
+        status: dto.status,
+        approvedBy: adminId,
+        approvedAt: new Date(),
+        updatedAt: new Date(),
+      };
+      
+      if (newUserId) {
+        updateData.userId = newUserId;
+      }
+
+      const [updated] = await tx
+        .update(onboardingRequests)
+        .set(updateData)
+        .where(eq(onboardingRequests.id, id))
+        .returning();
+
+      // ── 3. Log the HR action ─────────────────────────────────────────────
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: dto.status === 'approved' ? 'APPROVED' : 'REJECTED',
+        performedBy: adminId,
+        metadata: {
+          note: dto.note ?? null,
+          previousStatus: request.status,
+        },
+      });
+      this.logger.info(`Onboarding request #${id} ${dto.status}`, {
+        adminId,
+        note: dto.note,
+      });
+
+      return updated;
+    });
+  }
+
+  // ─── Per-Section HR Approval ───────────────────────────────────────────────
+
+  async approveProfileSection(id: number, hrStatus: 'approved' | 'rejected', hrRemark: string, adminId: number) {
+    return this.db.transaction(async (tx) => {
+      const [latestProfile] = await tx.select().from(onboardingProfiles)
+        .where(eq(onboardingProfiles.onboardingId, id))
+        .orderBy(desc(onboardingProfiles.id))
+        .limit(1);
+
+      if (!latestProfile) throw new NotFoundException('Profile record not found');
+
+      await tx.update(onboardingProfiles).set({
+        hrStatus,
+        hrRemark,
+        hrCompleted: hrStatus === 'approved',
+        updatedAt: new Date(),
+      }).where(eq(onboardingProfiles.id, latestProfile.id));
+
+      if (hrStatus === 'approved') {
+        const [req] = await tx.select({ userId: onboardingRequests.userId }).from(onboardingRequests).where(eq(onboardingRequests.id, id)).limit(1);
+        if (req?.userId) {
+          await this.syncProfileToEmployee(tx, req.userId, latestProfile);
+        }
+      }
+
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: hrStatus === 'approved' ? 'PROFILE_APPROVED' : 'PROFILE_REJECTED',
+        performedBy: adminId,
+        metadata: {
+          data: {
+            firstName: latestProfile.firstName,
+            lastName: latestProfile.lastName,
+            email: latestProfile.email,
+          },
+          action: hrStatus,
+          comment: hrRemark || null,
+        },
+      });
+
+      await this.recalculateProgress(tx, id);
+      return { success: true };
+    });
+  }
+
+  async approveEducationRecord(id: number, eduId: number, hrStatus: 'approved' | 'rejected', adminId: number, hrRemark?: string, ) {
+    return this.db.transaction(async (tx) => {
+      const [edu] = await tx.select().from(onboardingEducation).where(eq(onboardingEducation.id, eduId)).limit(1);
+      if (!edu) throw new NotFoundException('Education record not found');
+
+      await tx.update(onboardingEducation).set({
+        hrStatus,
+        hrRemark,
+        updatedAt: new Date(),
+      }).where(eq(onboardingEducation.id, eduId));
+
+      const [req] = await tx.select({ userId: onboardingRequests.userId }).from(onboardingRequests).where(eq(onboardingRequests.id, id)).limit(1);
+      
+      if (hrStatus === 'approved') {
+        if (req?.userId) {
+          await this.syncEducationToEmployee(tx, req.userId, edu);
+        }
+      }
+
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: hrStatus === 'approved' ? 'EDUCATION_APPROVED' : 'EDUCATION_REJECTED',
+        performedBy: adminId,
+        metadata: {
+          data: {
+            id: edu.id,
+            degree: edu.degree,
+            institution: edu.institution,
+          },
+          action: hrStatus,
+          comment: hrRemark || null,
+        },
+      });
+
+      await this.recalculateProgress(tx, id);
+      return { success: true };
+    });
+  }
+
+  async approveExperienceRecord(id: number, expId: number, hrStatus: 'approved' | 'rejected', hrRemark: string, adminId: number) {
+    return this.db.transaction(async (tx) => {
+      const [exp] = await tx.select().from(onboardingExperience).where(eq(onboardingExperience.id, expId)).limit(1);
+      if (!exp) throw new NotFoundException('Experience record not found');
+
+      await tx.update(onboardingExperience).set({
+        hrStatus,
+        hrRemark,
+        updatedAt: new Date(),
+      }).where(eq(onboardingExperience.id, expId));
+
+      const [req] = await tx.select({ userId: onboardingRequests.userId }).from(onboardingRequests).where(eq(onboardingRequests.id, id)).limit(1);
+
+      if (hrStatus === 'approved') {
+        if (req?.userId) {
+          await this.syncExperienceToEmployee(tx, req.userId, exp);
+        }
+      }
+
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: hrStatus === 'approved' ? 'EXPERIENCE_APPROVED' : 'EXPERIENCE_REJECTED',
+        performedBy: adminId,
+        metadata: {
+          data: {
+            id: exp.id,
+            companyName: exp.companyName,
+            designation: exp.designation,
+          },
+          action: hrStatus,
+          comment: hrRemark || null,
+        },
+      });
+
+      await this.recalculateProgress(tx, id);
+      return { success: true };
+    });
+  }
+
+  async approveBankRecord(id: number, bankId: number, hrStatus: 'approved' | 'rejected', hrRemark: string, adminId: number) {
+    return this.db.transaction(async (tx) => {
+      const [bank] = await tx.select().from(onboardingBankDetails).where(eq(onboardingBankDetails.id, bankId)).limit(1);
+      if (!bank) throw new NotFoundException('Bank record not found');
+
+      await tx.update(onboardingBankDetails).set({
+        hrStatus,
+        hrRemark,
+        updatedAt: new Date(),
+      }).where(eq(onboardingBankDetails.id, bankId));
+
+      if (hrStatus === 'approved') {
+        const [req] = await tx.select({ userId: onboardingRequests.userId }).from(onboardingRequests).where(eq(onboardingRequests.id, id)).limit(1);
+        if (req?.userId) {
+          await this.syncBankToEmployee(tx, req.userId, bank);
+        }
+      }
+
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: hrStatus === 'approved' ? 'BANK_APPROVED' : 'BANK_REJECTED',
+        performedBy: adminId,
+        metadata: {
+          data: {
+            id: bank.id,
+            bankName: bank.bankName,
+            accountHolderName: bank.accountHolderName,
+            accountNumber: bank.accountNumber,
+          },
+          action: hrStatus,
+          comment: hrRemark || null,
+        },
+      });
+
+      await this.recalculateProgress(tx, id);
+      return { success: true };
+    });
+  }
+
+
+  async verifyDocument(id: number, docId: number, status: string, reason: string | undefined, adminId: number) {
+    return this.db.transaction(async (tx) => {
+      const [doc] = await tx.select().from(onboardingDocuments).where(eq(onboardingDocuments.id, docId)).limit(1);
+      if (!doc) throw new NotFoundException('Document record not found');
+
+      // Sync profile photo to userProfiles when a Passport Size Photo is approved
+      if (status === 'approved' && doc.docType == 'Passport Size Photo') {
+        const [onboardingRequest] = await tx
+          .select({ userId: onboardingRequests.userId })
+          .from(onboardingRequests)
+          .where(eq(onboardingRequests.id, id))
+          .limit(1);
+
+        if (onboardingRequest?.userId) {
+          const [existingProfile] = await tx
+            .select()
+            .from(userProfiles)
+            .where(eq(userProfiles.userId, onboardingRequest.userId))
+            .limit(1);
+
+          if (existingProfile) {
+            await tx.update(userProfiles).set({
+              image: doc.fileUrl,
+              updatedAt: new Date(),
+            }).where(eq(userProfiles.userId, onboardingRequest.userId));
+          } else {
+            await tx.insert(userProfiles).values({
+              userId: onboardingRequest.userId,
+              image: doc.fileUrl,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            } as any);
+          }
+        }
+      }
+
+      await tx.update(onboardingDocuments).set({
+        status: status === 'approved' ? 'submitted' : 'pending', // map internal status
+        hrStatus: status,
+        hrRemark: reason || null,
+        verifiedBy: adminId,
+        verificationDate: new Date().toISOString().split('T')[0],
+        updatedAt: new Date(),
+      }).where(eq(onboardingDocuments.id, docId));
+
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: status === 'approved' ? 'DOCUMENT_APPROVED' : 'DOCUMENT_REJECTED',
+        performedBy: adminId,
+        metadata: {
+          data: {
+            id: doc.id,
+            docCategory: doc.docCategory,
+            docType: doc.docType,
+            fileUrl: doc.fileUrl,
+          },
+          action: status,
+          comment: reason || null,
+        },
+      });
+
+      // Sync document to employeeDocuments when approved
+      if (status === 'approved') {
+        const [onboardingRequest] = await tx
+          .select({ userId: onboardingRequests.userId })
+          .from(onboardingRequests)
+          .where(eq(onboardingRequests.id, id))
+          .limit(1);
+
+        if (onboardingRequest?.userId) {
+          // Delete existing permanent document of the same type for this user to prevent duplicates
+          await tx
+            .delete(employeeDocuments)
+            .where(
+              and(
+                eq(employeeDocuments.userId, onboardingRequest.userId),
+                eq(employeeDocuments.docType, doc.docType!),
+              ),
+            );
+
+          // Insert into employeeDocuments
+          await tx.insert(employeeDocuments).values({
+            userId: onboardingRequest.userId,
+            docCategory: doc.docCategory!,
+            docType: doc.docType!,
+            docNumber: doc.docNumber,
+            fileUrl: doc.fileUrl!,
+            issueDate: doc.issueDate,
+            expiryDate: doc.expiryDate,
+            verificationStatus: 'approved',
+            verifiedBy: adminId,
+            verificationDate: new Date().toISOString().split('T')[0],
+            remarks: reason || null,
+          } as any);
+        }
+      } else {
+        const [onboardingRequest] = await tx
+          .select({ userId: onboardingRequests.userId })
+          .from(onboardingRequests)
+          .where(eq(onboardingRequests.id, id))
+          .limit(1);
+
+        if (onboardingRequest?.userId) {
+          await tx
+            .delete(employeeDocuments)
+            .where(
+              and(
+                eq(employeeDocuments.userId, onboardingRequest.userId),
+                eq(employeeDocuments.docType, doc.docType!),
+              ),
+            );
+        }
+      }
+
+      await this.recalculateProgress(tx, id);
+      return { success: true };
+    });
+  }
+
+  // ─── Data Sync Helpers (Onboarding -> Employee) ──────────────────────────────
+
+  private async syncProfileToEmployee(tx: any, userId: number, onProf: any) {
+    const sanitize = (val: any) => (val === '' || val === null || val === undefined ? null : val);
+    const sanitizeNum = (val: any) => {
+      if (val === '' || val === null || val === undefined) return null;
+      const num = Number(val);
+      return isNaN(num) ? null : num;
+    };
+
+    // 1. Update team/department on Users record
+    const sanitizedDeptId = sanitizeNum(onProf.departmentId);
+    if (sanitizedDeptId) {
+      await tx
+        .update(users)
+        .set({
+          team: sanitizedDeptId,
+          primaryTeamId: sanitizedDeptId,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+    }
+
+    // 2. Upsert userProfiles
+    const [existingProfile] = await tx
+      .select()
+      .from(userProfiles)
+      .where(eq(userProfiles.userId, userId))
+      .limit(1);
+
+    const profileData = {
+      firstName: sanitize(onProf.firstName),
+      middleName: sanitize(onProf.middleName),
+      lastName: sanitize(onProf.lastName),
+      dateOfBirth: sanitize(onProf.dob),
+      gender: sanitize(onProf.gender),
+      maritalStatus: sanitize(onProf.maritalStatus),
+      nationality: sanitize(onProf.nationality),
+      aadharNumber: sanitize(onProf.aadharNumber),
+      panNumber: sanitize(onProf.panNumber),
+      pfNumber: sanitize(onProf.pfNumber),
+      phone: sanitize(onProf.phone),
+      altEmail: sanitize(onProf.email),
+      bloodGroup: sanitize(onProf.bloodGroup),
+      linkedinProfile: sanitize(onProf.linkedinProfile),
+      currentAddress: onProf.currentAddress,
+      permanentAddress: onProf.permanentAddress,
+      emergencyContact: onProf.emergencyContact,
+      designationId: sanitizeNum(onProf.designationId),
+      updatedAt: new Date(),
+    };
+
+    if (existingProfile) {
+      await tx.update(userProfiles).set(profileData).where(eq(userProfiles.userId, userId));
+    } else {
+      await tx.insert(userProfiles).values({ userId, ...profileData, createdAt: new Date() } as any);
+    }
+
+    // 3. Upsert employeeProfiles
+    const [existingEmp] = await tx.select().from(employeeProfiles).where(eq(employeeProfiles.userId, userId)).limit(1);
+    const empData = {
+      userId,
+      employeeType: onProf.employeeType === '' || !onProf.employeeType ? undefined : onProf.employeeType,
+      status: onProf.employeeStatus === '' || !onProf.employeeStatus ? undefined : onProf.employeeStatus,
+      reportingTl: sanitizeNum(onProf.reportingTl),
+      workLocation: sanitize(onProf.workLocation),
+      dateOfJoining: sanitize(onProf.dateOfJoining),
+      probationMonths: sanitizeNum(onProf.probationMonths),
+      probationEndDate: sanitize(onProf.probationEndDate),
+      salaryType: sanitize(onProf.salaryType),
+      basicSalary: sanitize(onProf.basicSalary),
+      pfNumber: sanitize(onProf.pfNumber),
+      hra: sanitize(onProf.hra),
+      allowances: sanitize(onProf.allowances),
+      bonus: sanitize(onProf.bonus),
+      pfApplicable: onProf.pfApplicable ?? false,
+      esicApplicable: onProf.esicApplicable ?? false,
+      updatedAt: new Date(),
+    };
+
+    if (existingEmp) {
+      await tx.update(employeeProfiles).set(empData).where(eq(employeeProfiles.userId, userId));
+    } else {
+      await tx.insert(employeeProfiles).values({ ...empData, createdAt: new Date() });
+    }
+  }
+
+  private async syncEducationToEmployee(tx: any, userId: number, edu: any) {
+    const sanitize = (val: any) => (val === '' || val === null || val === undefined ? null : val);
+    let yearOfCompletion = new Date().getFullYear();
+    if (edu.endDate) {
+      const parsedYear = new Date(edu.endDate).getFullYear();
+      if (!isNaN(parsedYear)) {
+        yearOfCompletion = parsedYear;
+      }
+    }
+
+    await tx.insert(employeeEducation).values({
+      userId,
+      degree: edu.degree || '',
+      institution: edu.institution || '',
+      fieldOfStudy: sanitize(edu.fieldOfStudy),
+      yearOfCompletion,
+      grade: sanitize(edu.grade),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+
+  private async syncExperienceToEmployee(tx: any, userId: number, exp: any) {
+    const sanitize = (val: any) => (val === '' || val === null || val === undefined ? null : val);
+    await tx.insert(employeeExperience).values({
+      userId,
+      companyName: sanitize(exp.companyName),
+      designation: sanitize(exp.designation),
+      fromDate: sanitize(exp.fromDate),
+      toDate: sanitize(exp.toDate),
+      currentlyWorking: exp.currentlyWorking === true || exp.currentlyWorking === 'true',
+      responsibilities: sanitize(exp.responsibilities),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+
+  private async syncBankToEmployee(tx: any, userId: number, bank: any) {
+    const sanitize = (val: any) => (val === '' || val === null || val === undefined ? null : val);
+    await tx.insert(employeeBankDetails).values({
+      userId,
+      bankName: bank.bankName || '',
+      accountHolderName: bank.accountHolderName || '',
+      accountNumber: bank.accountNumber || '',
+      ifscCode: bank.ifscCode || '',
+      branchName: sanitize(bank.branchName),
+      branchAddress: sanitize(bank.branchAddress),
+      upiId: sanitize(bank.upiId),
+      isPrimary: bank.isPrimary === true || bank.isPrimary === 'true',
+      status: 'active',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+
+  /**
+   * DELETE /hrms/onboarding/:id
+   */
+  async delete(id: number): Promise<void> {
+    await this.db.delete(onboardingRequests).where(eq(onboardingRequests.id, id));
+  }
+
+  // ── Stage Details Getters ──────────────────────────────────────────────────
+
+  async getEmployeeEducation(onboardingId: number) {
+    return this.db.select().from(onboardingEducation).where(eq(onboardingEducation.onboardingId, onboardingId)).orderBy(desc(onboardingEducation.id));
+  }
+
+  async getEmployeeExperience(onboardingId: number) {
+    return this.db.select().from(onboardingExperience).where(eq(onboardingExperience.onboardingId, onboardingId)).orderBy(desc(onboardingExperience.id));
+  }
+
+  async getEmployeeBankDetails(onboardingId: number) {
+    return this.db.select().from(onboardingBankDetails).where(eq(onboardingBankDetails.onboardingId, onboardingId)).orderBy(desc(onboardingBankDetails.id));
+  }
+
+  async rejectOnboardingRequest(requestId: number) {
+    const onboardingRequest = await this.db
+      .select()
+      .from(onboardingRequests)
+      .where(eq(onboardingRequests.id, requestId));
+
+    if (!onboardingRequest || onboardingRequest.length === 0) {
+      throw new NotFoundException('Onboarding Request Not Found.');
+    }
+
+    await this.db
+      .update(onboardingRequests)
+      .set({
+        status: 'rejected',
+        hrStatus: 'rejected',
+      })
+      .where(eq(onboardingRequests.id, requestId));
+  }
+}

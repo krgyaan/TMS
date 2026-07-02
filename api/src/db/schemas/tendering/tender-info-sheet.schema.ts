@@ -49,6 +49,7 @@ export const tenderInformation = pgTable("tender_information", {
     maxLdPercentage: numeric("max_ld_percentage", { precision: 5, scale: 2 }),
 
     physicalDocsRequired: varchar("physical_docs_required", { length: 5 }),
+    physicalDocType: varchar("physical_doc_type", { length: 50 }),
     physicalDocsDeadline: timestamp("physical_docs_deadline"),
     techEligibilityAge: integer("technical_eligibility_age"),
 
@@ -71,8 +72,20 @@ export const tenderInformation = pgTable("tender_information", {
     netWorthValue: numeric("net_worth_value", { precision: 12, scale: 2 }),
 
     courierAddress: text("courier_address"),
+    courierName: varchar("courier_name", { length: 255 }),
+    courierPhone: varchar("courier_phone", { length: 20 }),
+    courierAddressLine1: text("courier_address_line_1"),
+    courierAddressLine2: text("courier_address_line_2"),
+    courierCity: varchar("courier_city", { length: 100 }),
+    courierState: varchar("courier_state", { length: 100 }),
+    courierPincode: varchar("courier_pincode", { length: 20 }),
+    
+    clientDetailsPresent: varchar("client_details_present", { length: 5 }),
+    customerInContact: varchar("customer_in_contact", { length: 5 }),
+    courierDetailsPresent: varchar("courier_details_present", { length: 5 }),
 
     teFinalRemark: text("te_final_remark"),
+    teRejectionProof: text("te_rejection_proof").array(),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull()
@@ -85,7 +98,7 @@ export const tenderClients = pgTable("tender_clients", {
     tenderId: bigint("tender_id", { mode: "number" }).notNull(),
     clientName: varchar("client_name", { length: 255 }),
     clientDesignation: varchar("client_designation", { length: 255 }),
-    clientMobile: varchar("client_mobile", { length: 50 }),
+    clientMobile: varchar("client_mobile", { length: 255 }),
     clientEmail: varchar("client_email", { length: 255 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull()

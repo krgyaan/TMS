@@ -1,21 +1,20 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
-import { ArrowLeft, FileText, Pencil } from "lucide-react";
-import type { TenderInfoWithNames } from "@/modules/tendering/tenders/helpers/tenderInfo.types";
-import { formatDateTime } from "@/hooks/useFormatedDate";
-import { formatINR } from "@/hooks/useINRFormatter";
+import { Button } from "@/components/ui/button";
+import { AlertCircle, FileText } from "lucide-react";
+import { InstrumentBiView } from "./InstrumentBiView";
+import { useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
 
 interface PaymentRequest {
     id: number;
     tenderId: number;
-    purpose: 'EMD' | 'Tender Fee' | 'Processing Fee';
+    purpose: "EMD" | "Tender Fee" | "Processing Fee";
     amountRequired: string | number;
     dueDate: string | Date | null;
-    status: string;
-    remarks?: string | null;
+    createdAt: string | Date | null;
+    requestedBy?: string | number | null;
+    requestedByName?: string | null;
     instruments?: Array<{
         id: number;
         instrumentType: string;
@@ -29,451 +28,115 @@ interface PaymentRequest {
         courierDeadline?: number | null;
         status: string;
         details?: any;
+        action?: number | null;
+        generatedPdf?: string | null;
+        cancelPdf?: string | null;
+        docketSlip?: string | null;
+        coveringLetter?: string | null;
+        extraPdfPaths?: string | null;
+        extensionRequestPdf?: string | null;
+        cancellationRequestPdf?: string | null;
     }>;
 }
 
 interface EmdTenderFeeShowProps {
     paymentRequests?: PaymentRequest[] | null;
-    tender?: TenderInfoWithNames | null;
-    isLoading?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
+    text: string;
 }
 
-const formatValue = (value?: string | number | null) => {
-    if (value === null || value === undefined || value === "") return "—";
-    return value;
-};
+export const EmdTenderFeeShow = ({ paymentRequests, text }: EmdTenderFeeShowProps) => {
+    const navigate = useNavigate();
 
-const getStatusBadgeVariant = (status: string) => {
-    const statusLower = status.toLowerCase();
-    if (statusLower === 'pending') return 'secondary';
-    if (statusLower === 'approved' || statusLower === 'received') return 'default';
-    if (statusLower === 'rejected' || statusLower === 'cancelled') return 'destructive';
-    return 'outline';
-};
+    if (!paymentRequests || !Array.isArray(paymentRequests)) return null;
 
-const hasValue = (value?: string | Date | number | null) => {
-    return value !== null && value !== undefined && value !== "";
-};
+    const emdRequests = paymentRequests.filter(r => r.purpose === "EMD");
+    const tenderFeeRequests = paymentRequests.filter(r => r.purpose === "Tender Fee");
+    const processingFeeRequests = paymentRequests.filter(r => r.purpose === "Processing Fee");
 
-export const EmdTenderFeeShow = ({
-    paymentRequests,
-    isLoading,
-    onEdit,
-    onBack,
-}: EmdTenderFeeShowProps) => {
-    if (isLoading) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>
-                        <Skeleton className="h-6 w-48" />
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableBody>
-                            {Array.from({ length: 6 }).map((_, idx) => (
-                                <TableRow key={idx}>
-                                    <TableCell colSpan={4}>
-                                        <Skeleton className="h-12 w-full" />
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    if (!paymentRequests || paymentRequests.length === 0) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
-                        Payment Requests Details
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableBody>
-                            <TableRow>
-                                <TableCell className="text-muted-foreground">
-                                    No payment requests available for this tender.
-                                </TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    const emdRequest = paymentRequests.find(r => r.purpose === 'EMD');
-    const tenderFeeRequest = paymentRequests.find(r => r.purpose === 'Tender Fee');
-    const processingFeeRequest = paymentRequests.find(r => r.purpose === 'Processing Fee');
-
-    const renderInstrumentRows = (instruments: PaymentRequest['instruments'], purposeLabel: string) => {
-        if (!instruments || instruments.length === 0) return null;
-
-        return (
-            <>
-                <TableRow className="bg-muted/30">
-                    <TableCell colSpan={4} className="font-medium text-sm italic">
-                        {purposeLabel} - Instrument Details
-                    </TableCell>
-                </TableRow>
-                {instruments.map((instrument, idx) => (
-                    <>
-                        {/* Instrument Header Row */}
-                        <TableRow key={`${instrument.id || idx}-header`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Instrument Type
-                            </TableCell>
-                            <TableCell className="text-sm font-semibold">
-                                {instrument.instrumentType}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Status
-                            </TableCell>
-                            <TableCell>
-                                <Badge variant={getStatusBadgeVariant(instrument.status) as any}>
-                                    {instrument.status}
-                                </Badge>
-                            </TableCell>
-                        </TableRow>
-
-                        {/* Instrument Amount & Favouring Row */}
-                        <TableRow key={`${instrument.id || idx}-amount`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Amount
-                            </TableCell>
-                            <TableCell className="text-sm font-semibold" colSpan={hasValue(instrument.favouring) ? 1 : 3}>
-                                {formatINR(instrument.amount)}
-                            </TableCell>
-                            {hasValue(instrument.favouring) && (
-                                <>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Favouring
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatValue(instrument.favouring)}
-                                    </TableCell>
-                                </>
-                            )}
-                        </TableRow>
-
-                        {/* Instrument Payable At & Issue Date Row */}
-                        {(hasValue(instrument.payableAt) || hasValue(instrument.issueDate)) && (
-                            <TableRow key={`${instrument.id || idx}-payable`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
-                                {hasValue(instrument.payableAt) ? (
-                                    <>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Payable At
-                                        </TableCell>
-                                        <TableCell className="text-sm" colSpan={hasValue(instrument.issueDate) ? 1 : 3}>
-                                            {formatValue(instrument.payableAt)}
-                                        </TableCell>
-                                    </>
-                                ) : (
-                                    <>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Issue Date
-                                        </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
-                                            {formatDateTime(instrument.issueDate)}
-                                        </TableCell>
-                                    </>
-                                )}
-                                {hasValue(instrument.payableAt) && hasValue(instrument.issueDate) && (
-                                    <>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Issue Date
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {formatDateTime(instrument.issueDate)}
-                                        </TableCell>
-                                    </>
-                                )}
-                            </TableRow>
-                        )}
-
-                        {/* Instrument Expiry Dates Row */}
-                        {(hasValue(instrument.expiryDate) || hasValue(instrument.claimExpiryDate)) && (
-                            <TableRow key={`${instrument.id || idx}-expiry`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
-                                {hasValue(instrument.expiryDate) ? (
-                                    <>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Expiry Date
-                                        </TableCell>
-                                        <TableCell className="text-sm" colSpan={hasValue(instrument.claimExpiryDate) ? 1 : 3}>
-                                            {formatDateTime(instrument.expiryDate)}
-                                        </TableCell>
-                                    </>
-                                ) : (
-                                    <>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Claim Expiry Date
-                                        </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
-                                            {formatDateTime(instrument.claimExpiryDate)}
-                                        </TableCell>
-                                    </>
-                                )}
-                                {hasValue(instrument.expiryDate) && hasValue(instrument.claimExpiryDate) && (
-                                    <>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Claim Expiry Date
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {formatDateTime(instrument.claimExpiryDate)}
-                                        </TableCell>
-                                    </>
-                                )}
-                            </TableRow>
-                        )}
-
-                        {/* Instrument Courier Details Row */}
-                        {(instrument.courierAddress || instrument.courierDeadline) && (
-                            <TableRow key={`${instrument.id || idx}-courier`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Courier Address
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {formatValue(instrument.courierAddress)}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Courier Deadline
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {instrument.courierDeadline ? `${instrument.courierDeadline} days` : "—"}
-                                </TableCell>
-                            </TableRow>
-                        )}
-
-                        {/* Instrument Additional Details Rows */}
-                        {instrument.details && Object.entries(instrument.details).length > 0 && (
-                            <>
-                                {(() => {
-                                    const entries = Object.entries(instrument.details).filter(([, value]) => value);
-                                    const rows = [];
-                                    for (let i = 0; i < entries.length; i += 2) {
-                                        const [key1, value1] = entries[i];
-                                        const [key2, value2] = entries[i + 1] || [null, null];
-                                        rows.push(
-                                            <TableRow key={`${instrument.id || idx}-details-${i}`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
-                                                <TableCell className="text-sm font-medium text-muted-foreground capitalize">
-                                                    {key1.replace(/([A-Z])/g, ' $1').trim()}
-                                                </TableCell>
-                                                <TableCell className="text-sm">
-                                                    {value1 instanceof Date || (typeof value1 === "string" && !isNaN(Date.parse(value1)))
-                                                        ? formatDateTime(value1)
-                                                        : String(value1)}
-                                                </TableCell>
-                                                {key2 ? (
-                                                    <>
-                                                        <TableCell className="text-sm font-medium text-muted-foreground capitalize">
-                                                            {key2.replace(/([A-Z])/g, ' $1').trim()}
-                                                        </TableCell>
-                                                        <TableCell className="text-sm">
-                                                            {value2 instanceof Date || (typeof value2 === "string" && !isNaN(Date.parse(value2)))
-                                                                ? formatDateTime(value2)
-                                                                : String(value2)}
-                                                        </TableCell>
-                                                    </>
-                                                ) : (
-                                                    <TableCell colSpan={2} />
-                                                )}
-                                            </TableRow>
-                                        );
-                                    }
-                                    return rows;
-                                })()}
-                            </>
-                        )}
-
-                        {/* Spacer Row between instruments */}
-                        {idx < instruments.length - 1 && (
-                            <TableRow key={`${instrument.id || idx}-spacer`}>
-                                <TableCell colSpan={4} className="h-2 bg-muted/10" />
-                            </TableRow>
-                        )}
-                    </>
-                ))}
-            </>
-        );
-    };
+    const renderInstruments = (requests: PaymentRequest[]) =>
+        requests.flatMap(r => (r.instruments ?? []).map(inst => ({ requestId: r.id, instrument: inst })))
+            .map(({ requestId, instrument: inst }) => (
+                <div key={inst.id} className="space-y-2">
+                    <InstrumentBiView instrumentId={inst.id} instrumentType={inst.instrumentType} />
+                    <div className="flex justify-end">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(paths.tendering.emdsTenderFeesFollowUp(requestId))}
+                        >
+                            Initiate Followup
+                        </Button>
+                    </div>
+                </div>
+            ));
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Payment Requests Details
-                </CardTitle>
-                <CardAction className="flex gap-2">
-                    {onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
-            </CardHeader>
-            <CardContent>
-                <Table>
-                    <TableBody>
-                        {/* EMD Section */}
-                        {emdRequest && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        EMD Payment
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Status
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant={getStatusBadgeVariant(emdRequest.status) as any}>
-                                            {emdRequest.status}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Amount Required
-                                    </TableCell>
-                                    <TableCell className="text-sm font-semibold">
-                                        {formatINR(emdRequest.amountRequired)}
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Due Date
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatDateTime(emdRequest.dueDate)}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Remarks
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatValue(emdRequest.remarks)}
-                                    </TableCell>
-                                </TableRow>
-                                {renderInstrumentRows(emdRequest.instruments, "EMD")}
-                            </>
-                        )}
+        <div className="space-y-4">
+            {text && (
+                <Alert variant="default" className="border-amber-500/30 text-amber-950 dark:border-amber-500/30 dark:text-amber-50 bg-amber-50 dark:bg-amber-950/20">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{text} {text.split(",").length > 1 ? "are" : "is"} not applicable for this tender.</AlertDescription>
+                </Alert>
+            )}
 
-                        {/* Tender Fee Section */}
-                        {tenderFeeRequest && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Tender Fee Payment
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Status
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant={getStatusBadgeVariant(tenderFeeRequest.status) as any}>
-                                            {tenderFeeRequest.status}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Amount Required
-                                    </TableCell>
-                                    <TableCell className="text-sm font-semibold">
-                                        {formatINR(tenderFeeRequest.amountRequired)}
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Due Date
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatDateTime(tenderFeeRequest.dueDate)}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Remarks
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatValue(tenderFeeRequest.remarks)}
-                                    </TableCell>
-                                </TableRow>
-                                {renderInstrumentRows(tenderFeeRequest.instruments, "Tender Fee")}
-                            </>
-                        )}
-
-                        {/* Processing Fee Section */}
-                        {processingFeeRequest && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Processing Fee Payment
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Status
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant={getStatusBadgeVariant(processingFeeRequest.status) as any}>
-                                            {processingFeeRequest.status}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Amount Required
-                                    </TableCell>
-                                    <TableCell className="text-sm font-semibold">
-                                        {formatINR(processingFeeRequest.amountRequired)}
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Due Date
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatDateTime(processingFeeRequest.dueDate)}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Remarks
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatValue(processingFeeRequest.remarks)}
-                                    </TableCell>
-                                </TableRow>
-                                {renderInstrumentRows(processingFeeRequest.instruments, "Processing Fee")}
-                            </>
-                        )}
-
-                        {/* Summary Row */}
-                        <TableRow className="bg-primary/10">
-                            <TableCell colSpan={2} className="font-bold text-sm">
-                                Total Amount Required
-                            </TableCell>
-                            <TableCell colSpan={2} className="font-bold text-sm">
-                                {formatINR(
-                                    (Number(emdRequest?.amountRequired) || 0) +
-                                    (Number(tenderFeeRequest?.amountRequired) || 0) +
-                                    (Number(processingFeeRequest?.amountRequired) || 0)
-                                )}
-                            </TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
+            {renderInstruments(emdRequests)}
+            {renderInstruments(tenderFeeRequests)}
+            {renderInstruments(processingFeeRequests)}
+        </div>
     );
 };
+
+import { usePaymentRequestsByTender } from '@/hooks/api/usePaymentRequests';
+import { useInfoSheet } from "@/hooks/api/useInfoSheets";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+export function EmdTenderFeeSection({ tenderId }: { tenderId: number | null }) {
+    const { data: paymentRequests, isLoading: isLoadingPaymentRequests } = usePaymentRequestsByTender(tenderId);
+    const { data: infoSheet, isLoading: isLoadingInfoSheet } = useInfoSheet(tenderId);
+
+    if (isLoadingPaymentRequests || isLoadingInfoSheet) {
+        return (
+            <Card>
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
+                </CardHeader>
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, idx) => (
+                            <Skeleton key={idx} className="h-10 w-full" />
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    let text = "";
+    if (infoSheet?.emdRequired == 'NO' || infoSheet?.emdRequired == 'EXEMPT' || infoSheet?.emdRequired == null) text += "EMD, ";
+    if (infoSheet?.tenderFeeRequired == 'NO' || infoSheet?.tenderFeeRequired == null) text += "Tender Fee, ";
+    if (infoSheet?.processingFeeRequired == 'NO' || infoSheet?.processingFeeRequired == null) text += "Processing Fee";
+
+    if (!paymentRequests || !Array.isArray(paymentRequests) || paymentRequests.length === 0) {
+        return (
+            <Card>
+                <CardContent className="pt-0">
+                    {
+                        text && (
+                            <Alert variant="default" className="border-amber-500/30 text-amber-950 dark:border-amber-500/30 dark:text-amber-50 bg-amber-50 dark:bg-amber-950/20">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>{text} {text.split(",").length > 1 ? "are" : "is"} not applicable for this tender.</AlertDescription>
+                            </Alert>
+                        )
+                    }
+                    <div className="flex flex-col items-center justify-center py-6 ">
+                        <FileText className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm text-muted-foreground">No {['EMD', 'Tender Fee', 'Processing Fee'].filter((t) => !text.includes(t)).join(", ")} requests available for this tender.</p>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return <EmdTenderFeeShow paymentRequests={paymentRequests ?? null} text={text} />;
+}

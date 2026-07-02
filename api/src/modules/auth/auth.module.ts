@@ -17,6 +17,9 @@ import { RolesGuard } from '@/modules/auth/guards/roles.guard';
 import { PermissionGuard } from '@/modules/auth/guards/permission.guard';
 import { ResourceAccessGuard } from '@/modules/auth/guards/resource-access.guard';
 
+import type { StringValue } from 'ms';
+
+
 @Global()
 @Module({
     imports: [
@@ -28,7 +31,7 @@ import { ResourceAccessGuard } from '@/modules/auth/guards/resource-access.guard
             inject: [authConfig.KEY],
             useFactory: (config: AuthConfig) => ({
                 secret: config.jwtAccessSecret,
-                signOptions: { expiresIn: config.jwtAccessExpiresIn },
+                signOptions: { expiresIn: config.jwtAccessExpiresIn as StringValue },
             }),
         }),
         UsersModule,

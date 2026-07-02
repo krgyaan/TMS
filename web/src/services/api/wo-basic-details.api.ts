@@ -1,0 +1,97 @@
+import { BaseApiService } from './base.service';
+import type { WoBasicDetail, WoBasicDetailWithRelations, CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, WoBasicDetailsFilters, OeAssignments, DashboardSummary, PaginatedResult, WoBasicDetailPrefillData } from '@/modules/operations/types/wo.types';
+
+class WoBasicDetailsService extends BaseApiService {
+  constructor() {
+    super('/wo-basic-details');
+  }
+
+  private buildQueryString(filters?: WoBasicDetailsFilters): string {
+    if (!filters) return '';
+
+    const params = new URLSearchParams();
+
+    if (filters.page) params.set('page', String(filters.page));
+    if (filters.limit) params.set('limit', String(filters.limit));
+    if (filters.sortBy) params.set('sortBy', filters.sortBy);
+    if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
+    if (filters.search) params.set('search', filters.search);
+    if (filters.tab) params.set('tab', filters.tab);
+    if (filters.teamId) params.set('teamId', String(filters.teamId));
+    if (filters.userId) params.set('userId', String(filters.userId));
+    if (filters.dataScope) params.set('dataScope', filters.dataScope);
+    if (filters.isWorkflowPaused !== undefined) {
+      params.set('isWorkflowPaused', String(filters.isWorkflowPaused));
+    }
+    if (filters.woDateFrom) params.set('woDateFrom', filters.woDateFrom);
+    if (filters.woDateTo) params.set('woDateTo', filters.woDateTo);
+    if (filters.createdAtFrom) params.set('createdAtFrom', filters.createdAtFrom);
+    if (filters.createdAtTo) params.set('createdAtTo', filters.createdAtTo);
+
+    const queryString = params.toString();
+    return queryString ? `?${queryString}` : '';
+  }
+
+  // CRUD Operations
+  async getAll(filters?: WoBasicDetailsFilters): Promise<PaginatedResult<WoBasicDetail>> {
+    return this.get<PaginatedResult<WoBasicDetail>>(this.buildQueryString(filters));
+  }
+
+  async getById(id: number): Promise<WoBasicDetail> {
+    return this.get<WoBasicDetail>(`/${id}`);
+  }
+
+  async getByIdWithRelations(id: number): Promise<WoBasicDetailWithRelations> {
+    return this.get<WoBasicDetailWithRelations>(`/${id}/with-relations`);
+  }
+
+  async create(data: CreateWoBasicDetailDto): Promise<WoBasicDetail> {
+    return this.post<WoBasicDetail>('', data);
+  }
+
+  async update(id: number, data: UpdateWoBasicDetailDto): Promise<WoBasicDetail> {
+    return this.patch<WoBasicDetail>(`/${id}`, data);
+  }
+
+  async remove(id: number): Promise<void> {
+    return this.delete(`/${id}`);
+  }
+
+  // OE Assignment Operations
+  async assignOe(id: number, data: AssignOeDto): Promise<WoBasicDetail> {
+    return this.post<WoBasicDetail>(`/${id}/assign-oe`, data);
+  }
+
+  async getOeAssignments(id: number): Promise<OeAssignments> {
+    return this.get<OeAssignments>(`/${id}/oe-assignments`);
+  }
+
+  // Utility Operations
+  async checkProjectCodeExists(projectCode: string): Promise<{ exists: boolean; projectCode: string }> {
+    return this.get<{ exists: boolean; projectCode: string }>(`/check-project-code/${projectCode}`);
+  }
+
+  async calculateGrossMargin(id: number): Promise<WoBasicDetail & { calculatedGrossMargin: string }> {
+    return this.post<WoBasicDetail & { calculatedGrossMargin: string }>(`/${id}/calculate-gross-margin`, {});
+  }
+
+  async getByTenderId(tenderId: number): Promise<WoBasicDetail[]> {
+    return this.get<WoBasicDetail[]>(`/by-tender/${tenderId}`);
+  }
+
+  async getByEnquiryId(enquiryId: number): Promise<WoBasicDetail[]> {
+    return this.get<WoBasicDetail[]>(`/by-enquiry/${enquiryId}`);
+  }
+
+  async getPrefillData(tenderId: number): Promise<WoBasicDetailPrefillData> {
+    return this.get<WoBasicDetailPrefillData>(`/prefill/${tenderId}`);
+  }
+
+  // Dashboard/Reporting
+  async getDashboardSummary(teamId?: number): Promise<DashboardSummary> {
+    const query = teamId ? `?teamId=${teamId}` : '';
+    return this.get<DashboardSummary>(`/dashboard/summary${query}`);
+  }
+}
+
+export const woBasicDetailsService = new WoBasicDetailsService();

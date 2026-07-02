@@ -1,43 +1,52 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import type { RfqDashboardRow, RfqDashboardRowWithTimer } from '@/modules/tendering/rfqs/helpers/rfq.types';
+import type { RfqDashboardRowWithTimer } from '@/modules/tendering/rfqs/helpers/rfq.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, FileX2, Trash2, Search } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, FileX2, Trash2, Search, RefreshCw, ClipboardList, List, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useRfqsDashboard, useRfqsDashboardCounts, useDeleteRfq } from '@/hooks/api/useRfqs';
 import { dateCol, tenderNameCol } from '@/components/data-grid';
 import { Input } from '@/components/ui/input';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
+import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
 
 const Rfqs = () => {
-    const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb'>('pending');
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState<string>('');
     const navigate = useNavigate();
 
-    useEffect(() => {
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, search]);
+    const {
+        activeTab,
+        setActiveTab,
+        search,
+        setSearch,
+        debouncedSearch,
+        pagination,
+        setPagination,
+        handleSortChanged,
+        handlePageSizeChange,
+        sortModel,
+    } = usePersistentTableState({
+        storageKey: 'rfqs',
+        defaultTab: 'pending' as 'pending' | 'sent' | 'responses' | 'rfq-rejected' | 'tender-dnb',
+    });
 
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
-            }));
-        setSortModel(sortModel);
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, []);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
+    const { hasTenderingPermission } = useTenderingPermissions();
 
     const { data: apiResponse, isLoading: loading, error } = useRfqsDashboard({
         tab: activeTab,
@@ -45,7 +54,7 @@ const Rfqs = () => {
         limit: pagination.pageSize,
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
     });
 
     const { data: counts } = useRfqsDashboardCounts();
@@ -55,11 +64,21 @@ const Rfqs = () => {
 
     const deleteMutation = useDeleteRfq();
 
-    const rfqsActions: ActionItem<RfqDashboardRowWithTimer>[] = [
+    const rfqsActions = useMemo<ActionItem<RfqDashboardRowWithTimer>[]>(() => [
+        {
+            label: 'Record Receipt',
+            onClick: (row: RfqDashboardRowWithTimer) => {
+                if (row.rfqId) navigate(paths.tendering.rfqsResponseNew(row.rfqId));
+            },
+            icon: <ClipboardList className="h-4 w-4" />,
+            //we will only show the rfq record receipt for the sent tab
+            visible: (row: RfqDashboardRowWithTimer) => (activeTab === 'sent') && row.rfqId != null,
+        },
         {
             label: 'Send',
             onClick: (row: RfqDashboardRowWithTimer) => navigate(paths.tendering.rfqsCreate(row.tenderId)),
             icon: <CheckCircle className="h-4 w-4" />,
+            visible : () => ['sent','pending'].includes(activeTab),
         },
         {
             label: 'View',
@@ -68,6 +87,15 @@ const Rfqs = () => {
             },
             icon: <Eye className="h-4 w-4" />,
         },
+        // NOT REQUIRED ANYMORE
+        // {
+        //     label: 'Mark as Missed',
+        //     onClick: (row) => {
+        //         navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'rfq'));
+        //     },
+        //     icon: <XCircle className="h-4 w-4" />,
+        //     visible: () => hasTenderingPermission && activeTab !== 'tender-dnb',
+        // },
         {
             label: 'Delete',
             onClick: (row: RfqDashboardRowWithTimer) => {
@@ -76,9 +104,9 @@ const Rfqs = () => {
                 }
             },
             icon: <Trash2 className="h-4 w-4" />,
-            // show: (row: RfqDashboardRowWithTimer) => row.rfqId !== null,
+            visible: () => hasTenderingPermission,
         },
-    ];
+    ], [activeTab, navigate, deleteMutation]);
 
     const tabsConfig = useMemo(() => {
         return [
@@ -91,6 +119,11 @@ const Rfqs = () => {
                 key: 'sent' as const,
                 name: 'RFQ Sent',
                 count: counts?.sent ?? 0,
+            },
+            {
+                key: 'responses' as const,
+                name: 'RFQ Quotations',
+                count: counts?.responses ?? 0,
             },
             {
                 key: 'rfq-rejected' as const,
@@ -106,11 +139,12 @@ const Rfqs = () => {
     }, [counts]);
 
     const colDefs = useMemo<ColDef<RfqDashboardRowWithTimer>[]>(() => [
-        tenderNameCol<RfqDashboardRowWithTimer>('tenderNo', {
+        tenderNameCol<RfqDashboardRowWithTimer>('tenderName', {
             headerName: 'Tender Details',
+            colId: 'tenderName',
+            field: 'tenderName',
             filter: true,
             width: 250,
-            colId: 'tenderNo',
             sortable: true,
         }),
         {
@@ -122,25 +156,101 @@ const Rfqs = () => {
             sortable: true,
             filter: true,
         },
-        dateCol<RfqDashboardRowWithTimer>('dueDate', {
+        dateCol<RfqDashboardRowWithTimer>('dueDate', { includeTime: true }, {
             headerName: 'Due Date',
             width: 150,
             colId: 'dueDate',
         }),
         {
+            field: 'rfqCount',
+            headerName: 'Total RFQs',
+            width: 120,
+            colId: 'rfqCount',
+            cellRenderer: (params: any) => {
+                const { data } = params;
+                const count = data?.rfqCount ?? 0;
+                return (
+                    <Badge variant="outline">
+                        {count} sent
+                    </Badge>
+                );
+            },
+            hide: activeTab !== 'sent',
+            sortable: true,
+            filter: true,
+        },
+        {
+            field: 'responseCount',
+            headerName: 'Resp Recorded',
+            width: 130,
+            colId: 'responseCount',
+            cellRenderer: (params: any) => {
+                const count = params.data?.responseCount ?? 0;
+                return (
+                    <Badge variant={count > 0 ? 'success' : 'secondary'}>
+                        {count} Responses
+                    </Badge>
+                );
+            },
+            hide: activeTab == 'pending' || activeTab ==  'responses' || activeTab == 'rfq-rejected',
+            sortable: true,
+            filter: true,
+        },
+        {
             field: 'vendorOrganizationNames',
             headerName: 'Vendor',
             width: 150,
             colId: 'vendorOrganizationNames',
-            valueGetter: (params) => {
-                const names = params.data?.vendorOrganizationNames;
-                if (!names) return '—';
+            cellRenderer: (params: any) => {
+                const orgs = params.data?.vendorOrganizations || [];
+                const names = orgs.map((org: any) => org.name);
 
-                return names;
+                if (names.length === 0) return '—';
+
+                if (activeTab === 'responses') {
+                    return <span className="font-medium text-sm">{names[0] || '—'}</span>;
+                }
+
+                return (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Badge variant="secondary" className="cursor-default">
+                                {names.length} {names.length === 1 ? 'vendor' : 'vendors'}
+                            </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <ul className="list-disc list-inside font-medium text-xs py-1">
+                                {names.map((name: string, idx: number) => (
+                                    <li key={`${name}-${idx}`}>{name}</li>
+                                ))}
+                            </ul>
+                        </TooltipContent>
+                    </Tooltip>
+                );
             },
             sortable: true,
             filter: true,
+            hide: activeTab == "rfq-rejected",
         },
+        // {
+        //     field: 'rfqStatus',
+        //     headerName: 'RFQ Status',
+        //     width: 200,
+        //     colId: 'rfqStatus',
+        //     valueGetter: (params: any) => params.data?.responseStatus ? params.data.responseStatus : '—',
+        //     cellRenderer: (params: any) => {
+        //         const status = params.value;
+        //         if (!status) return '—';
+        //         return (
+        //             <Badge variant="default">
+        //                 {status}
+        //             </Badge>
+        //         );
+        //     },
+        //     sortable: true,
+        //     filter: true,
+        //     hide: activeTab !== 'responses',
+        // },
         {
             field: 'statusName',
             headerName: 'Tender Status',
@@ -190,7 +300,7 @@ const Rfqs = () => {
             pinned: 'right',
             width: 57,
         },
-    ], [rfqsActions]);
+    ], [rfqsActions, activeTab]);
 
     if (loading) {
         return (
@@ -241,23 +351,17 @@ const Rfqs = () => {
                             Review and approve RFQs.
                         </CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="relative">
-                            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                type="text"
-                                placeholder="Search..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="pl-8 w-64"
-                            />
-                        </div>
-                    </div>
+                    {/* <CardAction>
+                        <Button variant="outline" onClick={() => navigate(paths.tendering.rfqsResponses)}>
+                            <List className="h-4 w-4" />
+                            View All Responses
+                        </Button>
+                    </CardAction> */}
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'sent' | 'rfq-rejected' | 'tender-dnb')}>
-                    <TabsList className="m-auto">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'sent' | 'responses' | 'rfq-rejected' | 'tender-dnb')}>
+                    <TabsList className="m-auto mb-4 flex flex-wrap justify-center h-auto">
                         {tabsConfig.map((tab) => (
                             <TabsTrigger
                                 key={tab.key}
@@ -271,6 +375,31 @@ const Rfqs = () => {
                             </TabsTrigger>
                         ))}
                     </TabsList>
+
+                    {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                    <div className="flex items-center gap-4 px-6 pb-4">
+                        {/* Quick Filters (Left) */}
+                        <QuickFilter options={[
+                            { label: 'This Week', value: 'this-week' },
+                            { label: 'This Month', value: 'this-month' },
+                            { label: 'This Year', value: 'this-year' },
+                        ]} value={search} onChange={(value) => setSearch(value)} />
+
+                        {/* Search Bar (Center) - Flex grow */}
+                        <div className="flex-1 flex justify-end">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-8 w-64"
+                                />
+                            </div>
+                        </div>
+
+                    </div>
 
                     {tabsConfig.map((tab) => (
                         <TabsContent
@@ -289,9 +418,11 @@ const Rfqs = () => {
                                                     ? 'Tenders requiring RFQs will appear here'
                                                     : tab.key === 'sent'
                                                         ? 'Sent RFQs will be shown here'
-                                                        : tab.key === 'rfq-rejected'
-                                                            ? 'Rejected RFQs will be shown here'
-                                                            : 'Tender DNB RFQs will be shown here'}
+                                                        : tab.key === 'responses'
+                                                            ? 'RFQs with recorded responses will be shown here'
+                                                            : tab.key === 'rfq-rejected'
+                                                                ? 'Rejected RFQs will be shown here'
+                                                                : 'Tender DNB RFQs will be shown here'}
                                             </p>
                                         </div>
                                     ) : (
@@ -303,6 +434,9 @@ const Rfqs = () => {
                                             rowCount={totalRows}
                                             paginationState={pagination}
                                             onPaginationChange={setPagination}
+                                            onPageSizeChange={handlePageSizeChange}
+                                            showTotalCount={true}
+                                            showLengthChange={true}
                                             gridOptions={{
                                                 defaultColDef: {
                                                     editable: false,
@@ -321,6 +455,15 @@ const Rfqs = () => {
                     ))}
                 </Tabs>
             </CardContent>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </Card>
     );
 };

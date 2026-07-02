@@ -5,9 +5,10 @@ import { ReverseAuctionService } from '@/modules/tendering/reverse-auction/rever
 import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
 import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-history/tender-status-history.module';
 import { EmailModule } from '@/modules/email/email.module';
+import { TenderResultModule } from '@/modules/tendering/tender-result/tender-result.module';
 
 @Module({
-    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, EmailModule],
+    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, EmailModule, TenderResultModule],
     controllers: [ReverseAuctionController],
     providers: [ReverseAuctionService],
     exports: [ReverseAuctionService],

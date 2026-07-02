@@ -1,22 +1,22 @@
 // imprest-admin.index.tsx
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
-import { Loader2, ExternalLink, Receipt, LayoutDashboard, FileText } from "lucide-react";
+import { ExternalLink, FileText, IndianRupee, LayoutDashboard, Loader2, Plus, Receipt } from "lucide-react";
 
 import { paths } from "@/app/routes/paths";
-import { useEmployeeImprestSummary } from "./imprest-admin.hooks";
-import type { EmployeeImprestSummary } from "./imprest-admin.types";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEmployeeImprestSummary } from "./imprest-admin.hooks";
+import type { EmployeeImprestSummary } from "./imprest-admin.types";
 
-import type { GridApi } from "ag-grid-community";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import type { GridApi } from "ag-grid-community";
+import { PayImprestDialog } from "./components/PayImprestDialog";
 /** INR formatter */
 const formatINR = (num: number) =>
     new Intl.NumberFormat("en-IN", {
@@ -29,44 +29,126 @@ const ImprestAdminIndex: React.FC = () => {
     const [searchText, setSearchText] = useState("");
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
 
+    const [payImprestUser, setPayImprestUser] = useState<{
+        userId: number;
+        userName: string;
+    } | null>(null);
+
+    const { isAdmin, isSuperUser, canRead } = useAuth();
+
     console.log("Rendering ImprestAdminIndex...");
     const loggedInUser = useAuth().user;
-    const { isAdmin, isSuperUser } = useAuth();
     const isAuthorized = isAdmin || isSuperUser;
     const navigate = useNavigate();
+    const currentFinancialYear = useMemo(() => {
+        const now = new Date();
+        const month = now.getMonth();
+        const startYear = month >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+        const endYear = (startYear + 1) % 100;
+        return `${startYear}-${String(endYear).padStart(2, "0")}`;
+    }, []);
     const { data = [], isLoading, error } = useEmployeeImprestSummary();
     console.log("Fetched employee imprest summary data:", data);
+
+    const canView = canRead("accounts.imprests");
+
+    useEffect(() => {
+        if (!canView) {
+            navigate(paths.shared.imprest);
+        }
+    }, [canView, navigate]);
 
     const imprestActions: ActionItem<EmployeeImprestSummary>[] = [
         {
             label: "Dashboard",
             icon: <LayoutDashboard className="h-4 w-4" />,
-            onClick: row => navigate(paths.accounts.imprestsUserView(row.userId)),
+            onClick: row => navigate(paths.shared.imprestUser(row.userId)),
         },
         {
             label: "Payment History",
             icon: <Receipt className="h-4 w-4" />,
-            onClick: row => navigate(paths.accounts.imprestPaymentHistory(row.userId)),
+            onClick: row => navigate(paths.shared.imprestPaymentHistoryByUser(row.userId)),
         },
         {
             label: "Voucher",
             icon: <FileText className="h-4 w-4" />,
-            onClick: row => navigate(paths.shared.imprestVoucher(row.userId)),
+            onClick: row => navigate(paths.shared.imprestVoucherByUser(row.userId)),
+        },
+        {
+            label: "Pay Imprest",
+            icon: <IndianRupee className="h-4 w-4" />,
+            onClick: row =>
+                setPayImprestUser({
+                    userId: row.userId,
+                    userName: row.userName,
+                }),
         },
     ];
 
     /* -------------------- GLOBAL SUMMARY -------------------- */
     const totals = useMemo(() => {
-        return data.reduce(
-            (acc, e) => {
-                acc.received += e.amountReceived;
-                acc.spent += e.amountSpent;
-                acc.approved += e.amountApproved;
-                acc.left += e.amountLeft;
-                return acc;
-            },
-            { received: 0, spent: 0, approved: 0, left: 0 }
-        );
+        const current = {
+            received: 0,
+            spent: 0,
+            approved: 0,
+            left: 0,
+            totalVouchers: 0,
+            accountsApproved: 0,
+            adminApproved: 0,
+        };
+
+        const previousMap: Record<number, {
+            financialYear: string;
+            fyStartYear: number;
+            received: number;
+            spent: number;
+            approved: number;
+            left: number;
+            totalVouchers: number;
+            accountsApproved: number;
+            adminApproved: number;
+        }> = {};
+
+        data.forEach(e => {
+            current.received += e.current.amountReceived;
+            current.spent += e.current.amountSpent;
+            current.approved += e.current.amountApproved;
+            current.left += e.current.amountLeft;
+            current.totalVouchers += e.current.voucherInfo?.totalVouchers || 0;
+            current.accountsApproved += e.current.voucherInfo?.accountsApproved || 0;
+            current.adminApproved += e.current.voucherInfo?.adminApproved || 0;
+
+            e.previous?.forEach(prev => {
+                if (!previousMap[prev.fyStartYear]) {
+                    previousMap[prev.fyStartYear] = {
+                        financialYear: prev.financialYear,
+                        fyStartYear: prev.fyStartYear,
+                        received: 0,
+                        spent: 0,
+                        approved: 0,
+                        left: 0,
+                        totalVouchers: 0,
+                        accountsApproved: 0,
+                        adminApproved: 0,
+                    };
+                }
+                const entry = previousMap[prev.fyStartYear];
+                entry.received += prev.amountReceived;
+                entry.spent += prev.amountSpent;
+                entry.approved += prev.amountApproved;
+                entry.left += prev.amountLeft;
+                entry.totalVouchers += prev.voucherInfo?.totalVouchers || 0;
+                entry.accountsApproved += prev.voucherInfo?.accountsApproved || 0;
+                entry.adminApproved += prev.voucherInfo?.adminApproved || 0;
+            });
+        });
+
+        const previousList = Object.values(previousMap).sort((a, b) => b.fyStartYear - a.fyStartYear);
+
+        return {
+            current,
+            previous: previousList,
+        };
     }, [data]);
 
     /* -------------------- TABLE COLUMNS -------------------- */
@@ -79,7 +161,7 @@ const ImprestAdminIndex: React.FC = () => {
                     const userId = p.data.userId;
 
                     return (
-                        <a href={paths.accounts.imprestsUserView(userId)} className="underline inline-flex items-center gap-1">
+                        <a href={paths.shared.imprestUser(userId)} className="underline inline-flex items-center gap-1">
                             {p.value}
                             <ExternalLink className="h-3 w-3" />
                         </a>
@@ -107,54 +189,37 @@ const ImprestAdminIndex: React.FC = () => {
                 valueFormatter: (p: any) => formatINR(p.value),
             },
             {
-                headerName: "Vouchers",
-                field: "voucherInfo",
-                autoHeight: true,
-                cellRenderer: (params: any) => {
-                    const v = params.value;
-                    if (!v) return "-";
-
-                    return (
-                        <TooltipProvider delayDuration={150}>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <div
-                                        className="
-                inline-flex items-center gap-2
-                rounded-full border px-3 py-1
-                text-sm font-medium
-                cursor-default
-              "
-                                    >
-                                        <span>{v.totalVouchers}</span>
-                                        <span className="text-xs opacity-60">vouchers</span>
-                                    </div>
-                                </TooltipTrigger>
-
-                                <TooltipContent side="right" align="center" className="w-52">
-                                    <div className="space-y-2">
-                                        <p className="text-sm font-semibold">Voucher Summary</p>
-
-                                        <div className="text-xs space-y-1">
-                                            <div className="flex justify-between">
-                                                <span>Total</span>
-                                                <span>{v.totalVouchers}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Accounts Approved</span>
-                                                <span>{v.accountsApproved}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Admin Approved</span>
-                                                <span>{v.adminApproved}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                    );
+                headerName: "Total Vouchers",
+                field: "voucherInfo.totalVouchers",
+                filter: "agNumberColumnFilter",
+                width: 140,
+                cellStyle: { textAlign: "center" },
+            },
+            {
+                headerName: "Accounts Pending",
+                wrapHeaderText: true,
+                autoHeaderHeight: true,
+                valueGetter: (p: any) => {
+                    const total = p.data?.voucherInfo?.totalVouchers || 0;
+                    const approved = p.data?.voucherInfo?.accountsApproved || 0;
+                    return total - approved;
                 },
+                filter: "agNumberColumnFilter",
+                width: 160,
+                cellStyle: { textAlign: "center" },
+            },
+            {
+                headerName: "Admin Pending",
+                wrapHeaderText: true,
+                autoHeaderHeight: true,
+                valueGetter: (p: any) => {
+                    const total = p.data?.voucherInfo?.totalVouchers || 0;
+                    const approved = p.data?.voucherInfo?.adminApproved || 0;
+                    return total - approved;
+                },
+                filter: "agNumberColumnFilter",
+                width: 160,
+                cellStyle: { textAlign: "center" },
             },
 
             {
@@ -165,27 +230,6 @@ const ImprestAdminIndex: React.FC = () => {
                 width: 80,
                 pinned: "right",
             },
-            // {
-            //     headerName: "Action",
-            //     sortable: false,
-            //     filter: false,
-            //     cellRenderer: (p: any) => (
-            //         <div className="flex gap-2">
-            //             {/* <Button size="sm" onClick={() => navigate(paths.accounts.employeeImprestDashboard(p.data.userId))}> */}
-            //             <Button size="sm">Dashboard</Button>
-
-            //             {/* <Button size="sm" variant="secondary" onClick={() => navigate(paths.accounts.imprestPaymentHistory(p.data.userId))}> */}
-            //             <Button size="sm" variant="secondary">
-            //                 Payment History
-            //             </Button>
-
-            //             <Button size="sm" variant="outline">
-            //                 {/* <Button size="sm" variant="outline" onClick={() => navigate(paths.accounts.imprestVoucher(p.data.userId))}> */}
-            //                 Voucher
-            //             </Button>
-            //         </div>
-            //     ),
-            // },
         ],
         [navigate]
     );
@@ -209,28 +253,167 @@ const ImprestAdminIndex: React.FC = () => {
         <div className="space-y-6">
             {/* SUMMARY */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card>
-                    <CardContent>
-                        <h6>Amount Received</h6>
-                        <p>{formatINR(totals.received)}</p>
+                <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+                    <CardContent className="p-0">
+                        <div className="p-3 pb-2">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="p-2 bg-chart-3/10 rounded-lg text-chart-3 ring-1 ring-inset ring-chart-3/20">
+                                    <IndianRupee className="h-4 w-4" />
+                                </div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">{currentFinancialYear}</span>
+                            </div>
+                            <div>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Amount Received</p>
+                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.current.received)}</h3>
+                            </div>
+                        </div>
+                        {totals.previous.map(prev => (
+                            <div key={prev.fyStartYear} className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{prev.financialYear}</span>
+                                <span className="text-[11px] font-bold text-foreground">{formatINR(prev.received)}</span>
+                            </div>
+                        ))}
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardContent>
-                        <h6>Amount Spent</h6>
-                        <p>{formatINR(totals.spent)}</p>
+
+                <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+                    <CardContent className="p-0">
+                        <div className="p-3 pb-2">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="p-2 bg-primary/10 rounded-lg text-primary ring-1 ring-inset ring-primary/20">
+                                    <Receipt className="h-4 w-4" />
+                                </div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">{currentFinancialYear}</span>
+                            </div>
+                            <div>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Amount Spent</p>
+                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.current.spent)}</h3>
+                            </div>
+                        </div>
+                        {totals.previous.map(prev => (
+                            <div key={prev.fyStartYear} className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{prev.financialYear}</span>
+                                <span className="text-[11px] font-bold text-foreground">{formatINR(prev.spent)}</span>
+                            </div>
+                        ))}
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardContent>
-                        <h6>Amount Approved</h6>
-                        <p>{formatINR(totals.approved)}</p>
+
+                <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+                    <CardContent className="p-0">
+                        <div className="p-3 pb-2">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="p-2 bg-chart-2/10 rounded-lg text-chart-2 ring-1 ring-inset ring-chart-2/20">
+                                    <FileText className="h-4 w-4" />
+                                </div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">{currentFinancialYear}</span>
+                            </div>
+                            <div>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Amount Approved</p>
+                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.current.approved)}</h3>
+                            </div>
+                        </div>
+                        {totals.previous.map(prev => (
+                            <div key={prev.fyStartYear} className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{prev.financialYear}</span>
+                                <span className="text-[11px] font-bold text-foreground">{formatINR(prev.approved)}</span>
+                            </div>
+                        ))}
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardContent>
-                        <h6>Amount Left</h6>
-                        <p>{formatINR(totals.left)}</p>
+
+                <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+                    <CardContent className="p-0">
+                        <div className="p-3 pb-2">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="p-2 bg-chart-5/10 rounded-lg text-chart-5 ring-1 ring-inset ring-chart-5/20">
+                                    <LayoutDashboard className="h-4 w-4" />
+                                </div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">{currentFinancialYear}</span>
+                            </div>
+                            <div>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Amount Left</p>
+                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.current.left)}</h3>
+                            </div>
+                        </div>
+                        {totals.previous.map(prev => (
+                            <div key={prev.fyStartYear} className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{prev.financialYear}</span>
+                                <span className="text-[11px] font-bold text-foreground">{formatINR(prev.left)}</span>
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* VOUCHER SUMMARY */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+                    <CardContent className="p-0">
+                        <div className="p-3 pb-2 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-muted rounded-lg text-muted-foreground ring-1 ring-inset ring-border/50">
+                                    <FileText className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Total Vouchers</p>
+                                    <p className="text-2xl font-bold text-foreground tracking-tight leading-none mt-1">{totals.current.totalVouchers}</p>
+                                </div>
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">{currentFinancialYear}</span>
+                        </div>
+                        {totals.previous.map(prev => (
+                            <div key={prev.fyStartYear} className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{prev.financialYear}</span>
+                                <span className="text-[11px] font-bold text-foreground">{prev.totalVouchers}</span>
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
+
+                <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+                    <CardContent className="p-0">
+                        <div className="p-3 pb-2 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-primary/10 rounded-lg text-primary ring-1 ring-inset ring-primary/20">
+                                    <FileText className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Accounts Approved</p>
+                                    <p className="text-2xl font-bold text-foreground tracking-tight leading-none mt-1">{totals.current.accountsApproved}</p>
+                                </div>
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">{currentFinancialYear}</span>
+                        </div>
+                        {totals.previous.map(prev => (
+                            <div key={prev.fyStartYear} className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{prev.financialYear}</span>
+                                <span className="text-[11px] font-bold text-foreground">{prev.accountsApproved}</span>
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
+
+                <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+                    <CardContent className="p-0">
+                        <div className="p-3 pb-2 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-chart-2/10 rounded-lg text-chart-2 ring-1 ring-inset ring-chart-2/20">
+                                    <FileText className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Admin Approved</p>
+                                    <p className="text-2xl font-bold text-foreground tracking-tight leading-none mt-1">{totals.current.adminApproved}</p>
+                                </div>
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">{currentFinancialYear}</span>
+                        </div>
+                        {totals.previous.map(prev => (
+                            <div key={prev.fyStartYear} className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{prev.financialYear}</span>
+                                <span className="text-[11px] font-bold text-foreground">{prev.adminApproved}</span>
+                            </div>
+                        ))}
                     </CardContent>
                 </Card>
             </div>
@@ -254,6 +437,15 @@ const ImprestAdminIndex: React.FC = () => {
                             }}
                             className="w-64"
                         />
+
+                        <Button size="sm" onClick={() => navigate(paths.shared.imprestPaymentHistory)}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            All Payment History
+                        </Button>
+                        <Button size="sm" onClick={() => navigate(paths.shared.imprestVoucher)}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            All Vouchers
+                        </Button>
                     </div>
                 </CardHeader>
 
@@ -269,6 +461,10 @@ const ImprestAdminIndex: React.FC = () => {
                     />
                 </CardContent>
             </Card>
+
+            {payImprestUser && (
+                <PayImprestDialog open={!!payImprestUser} onOpenChange={() => setPayImprestUser(null)} userId={payImprestUser.userId} userName={payImprestUser.userName} />
+            )}
         </div>
     );
 };

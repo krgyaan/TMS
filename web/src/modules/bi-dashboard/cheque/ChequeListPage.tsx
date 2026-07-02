@@ -1,48 +1,57 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { paths } from '@/app/routes/paths';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, Shield, Link, Calendar, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import DataTable from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useChequeDashboard, useChequeDashboardCounts } from '@/hooks/api/useCheques';
+import { useBiExport } from '@/hooks/useBiExport';
+
+import { formatDate } from '@/hooks/useFormatedDate';
+import { formatINR } from '@/hooks/useINRFormatter';
+import { chequesService } from '@/services/api/cheques.service';
+import type { ColDef } from 'ag-grid-community';
+import { AlertCircle, Calendar, CheckCircle, Clock, Edit, Eye, FileX2, Link, MessageSquare, Plus, Search, Shield, XCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { ChequeDashboardRow, ChequeDashboardTab } from './helpers/cheque.types';
-import { dateCol, currencyCol } from '@/components/data-grid/columns';
-import { ChequeActionForm } from './components/ChequeActionForm';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 
 const TABS_CONFIG: Array<{ key: ChequeDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
         key: 'cheque-pending',
-        name: 'Cheque Pending',
+        name: 'Pending',
         icon: <Clock className="h-4 w-4" />,
         description: 'Pending cheques',
     },
     {
         key: 'cheque-payable',
-        name: 'Cheque Payable',
+        name: 'Payable',
         icon: <CheckCircle className="h-4 w-4" />,
         description: 'Payable cheques',
     },
     {
         key: 'cheque-paid-stop',
-        name: 'Cheque Paid/stop',
+        name: 'Paid/stop',
         icon: <CheckCircle className="h-4 w-4" />,
         description: 'Paid or stopped cheques',
     },
     {
         key: 'cheque-for-security',
-        name: 'Cheque for Security',
+        name: 'For Security',
         icon: <Shield className="h-4 w-4" />,
         description: 'Cheques for security deposits',
     },
     {
         key: 'cheque-for-dd-fdr',
-        name: 'Cheque for DD/FDR',
+        name: 'For DD/FDR',
         icon: <Link className="h-4 w-4" />,
         description: 'Cheques for DD/FDR',
     },
@@ -69,37 +78,93 @@ const TABS_CONFIG: Array<{ key: ChequeDashboardTab; name: string; icon: React.Re
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
-    if (statusLower.includes('payable') || statusLower.includes('paid')) {
+    if (statusLower.includes('created')) {
         return 'default';
     }
-    if (statusLower.includes('cancelled') || statusLower.includes('rejected') || statusLower.includes('expired')) {
+    if (statusLower.includes('cancelled') || statusLower.includes('rejected')) {
         return 'destructive';
     }
     return 'secondary';
 };
 
 const ChequeListPage = () => {
-    const [activeTab, setActiveTab] = useState<ChequeDashboardTab>('cheque-pending');
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState<string>('');
-    const [actionFormOpen, setActionFormOpen] = useState(false);
-    const [selectedInstrument, setSelectedInstrument] = useState<ChequeDashboardRow | null>(null);
+    const {
+        activeTab, setActiveTab,
+        search, setSearch,
+        debouncedSearch,
+        pagination, setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState({
+        storageKey: 'cheques',
+        defaultTab: 'cheque-pending' as ChequeDashboardTab,
+    });
+    const navigate = useNavigate();
+    const [teamFilter, setTeamFilter] = useState<string>('All');
+    const teamId = teamFilter === 'All' ? undefined : teamFilter === 'AC' ? 1 : 2;
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, search]);
+    }, [teamFilter]);
 
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
-            }));
-        setSortModel(sortModel);
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, []);
+    const flattenFormData = (data: Record<string, any>): Record<string, any> => {
+        const out: Record<string, any> = {};
+        if (data.chequeNo) out['Cheque No'] = data.chequeNo;
+        if (data.chequeDate) out['Cheque Date'] = new Date(data.chequeDate).toLocaleDateString('en-GB');
+        if (data.dueDate) out['Due Date'] = new Date(data.dueDate).toLocaleDateString('en-GB');
+        if (data.payeeName) out['Payee Name'] = data.payeeName;
+        if (data.amount) out['Amount'] = data.amount;
+        if (data.utr) out['UTR'] = data.utr;
+        if (data.rejectionReason) out['Rejection Reason'] = data.rejectionReason;
+        if (data.issueDate) out['Issue Date'] = new Date(data.issueDate).toLocaleDateString('en-GB');
+        if (data.expiryDate) out['Expiry Date'] = new Date(data.expiryDate).toLocaleDateString('en-GB');
+        return out;
+    };
+
+    const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
+        getAllFn: (params) => chequesService.getAll(params),
+        getExportDataFn: (params) => chequesService.getExportData(params),
+        tabsConfig: TABS_CONFIG,
+        pendingTabKey: 'cheque-pending',
+        tabsWithForm: ['cheque-payable', 'cheque-paid-stop', 'cheque-for-security', 'cheque-for-dd-fdr', 'rejected', 'cancelled', 'expired'],
+        filenamePrefix: 'cheques',
+        flattenFormData,
+        mapPendingRow: (r: any) => ({
+            'Tender Name': r.projectName || '',
+            'Tender No': r.projectNo || '',
+            'Cheque Date': r.cheque ? new Date(r.cheque).toLocaleDateString('en-GB') : '',
+            'Cheque No': r.chequeNo || '',
+            'Payee name': r.payeeName || '',
+            'Requested By': r.requestedBy || '',
+            'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+            'Amount': r.amount || '',
+            'Type': r.type || '',
+            'Due Date': r.dueDate ? new Date(r.dueDate).toLocaleDateString('en-GB') : '',
+            'Member': r.requestedBy || '',
+            'Expiry': r.expiry || '',
+            'Cheque Status': r.chequeStatus || '',
+        }),
+        mapRow: (r: any, isAllTab: boolean) => {
+            const base: Record<string, any> = {
+                'Tender Name': r.projectName || r.tenderName || '',
+                'Tender No': r.tenderNo || r.projectNo || '',
+                'Cheque Date': r.cheque ? new Date(r.cheque).toLocaleDateString('en-GB') : '',
+                'Cheque No': r.chequeNo || '',
+                'Payee name': r.payeeName || '',
+                'Requested By': r.requestedBy || '',
+                'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+                'Amount': r.amount || '',
+                'Type': r.type || '',
+                'Due Date': r.dueDate ? new Date(r.dueDate).toLocaleDateString('en-GB') : '',
+                'Member': r.requestedBy || '',
+                'Expiry': r.expiry || '',
+                'Cheque Status': r.chequeStatus || '',
+            };
+            if (isAllTab) base['Tab'] = r._tab || '';
+            return base;
+        },
+    });
 
     const { data: apiResponse, isLoading, error } = useChequeDashboard({
         tab: activeTab,
@@ -107,7 +172,8 @@ const ChequeListPage = () => {
         limit: pagination.pageSize,
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
+        team: teamId,
     });
 
     const { data: counts } = useChequeDashboardCounts();
@@ -115,104 +181,179 @@ const ChequeListPage = () => {
     const chequeData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const handleViewDetails = useCallback((row: ChequeDashboardRow) => {
-        // TODO: Implement navigation to detail page
-        console.log('View details:', row);
-    }, []);
-
-    const handleOpenActionForm = useCallback((row: ChequeDashboardRow) => {
-        setSelectedInstrument(row);
-        setActionFormOpen(true);
-    }, []);
-
     const chequeActions: ActionItem<ChequeDashboardRow>[] = useMemo(
         () => [
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: handleViewDetails,
+                onClick: (row: ChequeDashboardRow) => navigate(paths.bi.chequeView(row.requestId)),
             },
             {
                 label: 'Action Form',
                 icon: <Edit className="h-4 w-4" />,
-                onClick: handleOpenActionForm,
+                onClick: (row: ChequeDashboardRow) => navigate(paths.bi.chequeAction(row.id)),
             },
+            {
+                label: 'Meeting Remarks',
+                icon: <MessageSquare className="h-4 w-4" />,
+                onClick: (row: ChequeDashboardRow) => navigate(paths.bi.chequeMeetingRemarks(row.requestId)),
+            }
         ],
-        [handleViewDetails, handleOpenActionForm]
+        [navigate]
     );
 
     const colDefs = useMemo<ColDef<ChequeDashboardRow>[]>(
         () => [
-            dateCol<ChequeDashboardRow>('date', {
-                headerName: 'Date',
-                width: 120,
-                colId: 'date',
-                sortable: true,
-            }),
             {
-                field: 'chequeNo',
-                headerName: 'Cheque No',
-                width: 130,
-                colId: 'chequeNo',
-                valueGetter: (params) => params.data?.chequeNo || '—',
+                field: 'tenderNo',
+                colId: 'tenderNo',
+                headerName: 'Tender Details',
+                width: 200,
+                sortable: true,
+                filter: true,
+                cellRenderer: (params: any) => {
+                    const data = params.data;
+                    if (!data) return null;
+                    if (data.tenderNo) {
+                        return (
+                            <div className="flex flex-col gap-0.5">
+                                <p className="text-xs">{data.tenderName}</p>
+                                <p className="text-xs text-[10px] text-muted-foreground truncate">{data.tenderNo}</p>
+                            </div>
+                        );
+                    }
+                    return <Badge variant="outline">{data.requestType || '—'}</Badge>;
+                },
+            },
+            {
+                field: 'tenderStatus',
+                headerName: 'Tender Status',
+                width: 140,
+                maxWidth: 130,
+                colId: 'tenderStatus',
+                valueGetter: (params) => params.data?.tenderStatus || '—',
                 sortable: true,
                 filter: true,
             },
             {
+                field: 'requestedBy',
+                headerName: 'Requested By',
+                width: 140,
+                maxWidth: 140,
+                colId: 'requestedBy',
+                valueGetter: (params) => params.data?.requestedBy || '—',
+                sortable: true,
+                filter: true,
+            },
+            {
+                field: 'cheque',
+                headerName: 'Cheque Date',
+                width: 130,
+                colId: 'cheque',
+                sortable: true,
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
+                hide: activeTab === 'cheque-pending' || activeTab === 'rejected',
+            },
+            {
+                field: 'chequeNo',
+                headerName: 'Cheque No',
+                width: 120,
+                colId: 'chequeNo',
+                valueGetter: (params) => params.data?.chequeNo || '—',
+                sortable: true,
+                filter: true,
+                hide: activeTab === 'cheque-pending' || activeTab === 'rejected',
+            },
+            {
                 field: 'payeeName',
                 headerName: 'Payee name',
-                width: 180,
+                maxWidth: 230,
                 colId: 'payeeName',
                 valueGetter: (params) => params.data?.payeeName || '—',
                 sortable: true,
                 filter: true,
             },
-            dateCol<ChequeDashboardRow>('bidValidity', {
+            {
+                field: 'bidValidity',
                 headerName: 'Bid Validity',
-                width: 130,
+                width: 120,
+                maxWidth: 120,
                 colId: 'bidValidity',
                 sortable: true,
-            }),
-            currencyCol<ChequeDashboardRow>('amount', {
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
+            },
+            {
+                field: 'amount',
                 headerName: 'Amount',
-                width: 130,
+                width: 100,
+                maxWidth: 100,
                 colId: 'amount',
                 sortable: true,
-            }),
+                filter: true,
+                cellRenderer: (params: any) => {
+                    const amount = params.data?.amount;
+                    if (!amount) return '—';
+                    return <span className="text-right">{formatINR(parseFloat(amount.toString()))}</span>;
+                },
+            },
             {
                 field: 'type',
                 headerName: 'Type',
                 width: 120,
+                maxWidth: 120,
                 colId: 'type',
                 valueGetter: (params) => params.data?.type || '—',
                 sortable: true,
                 filter: true,
             },
             {
-                field: 'cheque',
-                headerName: 'Cheque',
-                width: 120,
-                colId: 'cheque',
-                valueGetter: (params) => params.data?.cheque || '—',
-                sortable: true,
-                filter: true,
-            },
-            dateCol<ChequeDashboardRow>('dueDate', {
+                field: 'dueDate',
                 headerName: 'Due Date',
                 width: 130,
+                maxWidth: 130,
                 colId: 'dueDate',
                 sortable: true,
-            }),
-            dateCol<ChequeDashboardRow>('expiry', {
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
+            },
+            {
+                field: 'expiry',
                 headerName: 'Expiry',
                 width: 120,
+                maxWidth: 140,
                 colId: 'expiry',
                 sortable: true,
-            }),
+                filter: true,
+                cellRenderer: (params: any) => {
+                    const status = params.value;
+                    if (!status) return '—';
+                    if (status === 'No date') return <Badge variant="secondary">No date</Badge>;
+                    if (status === 'Expired') return <Badge variant="destructive">Expired</Badge>;
+                    return <Badge variant="default">{status}</Badge>;
+                },
+            },
             {
                 field: 'chequeStatus',
                 headerName: 'Cheque Status',
-                width: 150,
+                width: 160,
+                maxWidth: 160,
                 colId: 'chequeStatus',
                 sortable: true,
                 filter: true,
@@ -231,7 +372,7 @@ const ChequeListPage = () => {
                 width: 57,
             },
         ],
-        [chequeActions]
+        [chequeActions, activeTab]
     );
 
     const tabsWithData = useMemo(() => {
@@ -297,18 +438,21 @@ const ChequeListPage = () => {
                                 Track and manage cheques for tenders.
                             </CardDescription>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="relative">
-                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-8 w-64"
+                        <CardAction>
+                            <div className="flex items-center gap-2">
+                                <ExportExcelDropdown
+                                    exportOptions={exportOptions}
+                                    exportTab={exportTab}
+                                    setExportTab={setExportTab}
+                                    exporting={exporting}
+                                    handleExport={handleExport}
                                 />
+                                <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForCHEQUE())}>
+                                    <Plus className="w-4 h-4" />
+                                    Add Old Entry
+                                </Button>
                             </div>
-                        </div>
+                        </CardAction>
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">
@@ -316,7 +460,7 @@ const ChequeListPage = () => {
                         value={activeTab}
                         onValueChange={(value) => setActiveTab(value as ChequeDashboardTab)}
                     >
-                        <TabsList className="m-auto">
+                        <TabsList className="m-auto mb-4">
                             {tabsWithData.map((tab) => (
                                 <TabsTrigger
                                     key={tab.key}
@@ -333,6 +477,33 @@ const ChequeListPage = () => {
                                 </TabsTrigger>
                             ))}
                         </TabsList>
+
+                        {/* Search Row: Quick Filters, Search Bar */}
+                        <div className="flex items-center gap-4 px-6 pb-4">
+                            {/* Quick Filters (Left) */}
+                            <QuickFilter options={[
+                                { label: 'AC Team', value: 'AC' },
+                                { label: 'DC Team', value: 'DC' },
+                                { label: 'All Team', value: 'All' },
+                            ]}
+                                value={teamFilter}
+                                onChange={(value) => setTeamFilter(value)}
+                            />
+
+                            {/* Search Bar (Center) - Flex grow */}
+                            <div className="flex-1 flex justify-end">
+                                <div className="relative">
+                                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        type="text"
+                                        placeholder="Search..."
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        className="pl-8 w-64"
+                                    />
+                                </div>
+                            </div>
+                        </div>
 
                         {tabsWithData.map((tab) => (
                             <TabsContent key={tab.key} value={tab.key} className="px-0 m-0 data-[state=inactive]:hidden">
@@ -356,6 +527,9 @@ const ChequeListPage = () => {
                                                 rowCount={totalRows}
                                                 paginationState={pagination}
                                                 onPaginationChange={setPagination}
+                                                onPageSizeChange={handlePageSizeChange}
+                                                showTotalCount={true}
+                                                showLengthChange={true}
                                                 gridOptions={{
                                                     defaultColDef: {
                                                         editable: false,
@@ -375,22 +549,6 @@ const ChequeListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
-
-            {/* Action Form Dialog */}
-            {selectedInstrument && (
-                <ChequeActionForm
-                    open={actionFormOpen}
-                    onOpenChange={setActionFormOpen}
-                    instrumentId={selectedInstrument.id}
-                    instrumentData={{
-                        chequeNo: selectedInstrument.chequeNo || undefined,
-                        chequeDate: selectedInstrument.date || undefined,
-                        amount: selectedInstrument.amount || undefined,
-                        tenderName: selectedInstrument.tenderName || undefined,
-                        tenderNo: selectedInstrument.tenderNo || undefined,
-                    }}
-                />
-            )}
         </>
     );
 };

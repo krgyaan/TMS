@@ -1,0 +1,40 @@
+<div>
+    <p>Dear {{data.requestedBy}},</p>
+
+    <p>The request for Cheque creation has been {{data.status}}.</p>
+
+    {{#if data.chequePdfUrl}}
+    <p>
+        Cheque soft copy: <a href="{{data.chequePdfUrl}}">Download Cheque soft copy</a>
+    </p>
+    {{/if}}
+
+    {{#if data.remarks}}
+    <p>Remarks: {{data.remarks}}</p>
+    {{/if}}
+
+    {{#if data.reason}}
+    <p>Reason for rejection: {{data.reason}}</p>
+    {{/if}}
+
+    <p>“Ensuring all cheques are cleared on time builds the company's credibility.”</p>
+
+    {{#if data.chequeDeliveryMethod === 'HANDOVER'}}
+    <p>The cheque has been handed over to the team.</p>
+    {{/if}}
+
+    {{#if data.chequeDeliveryMethod === 'COURIER'}}
+    <p>The cheque has been sent via courier.</p>
+    {{/if}}
+    
+    {{#if data.receivingPdfUrl}}
+    <p>
+        Receiving Form: <a href="{{data.receivingPdfUrl}}">Download Receiving Form</a>
+    </p>
+    {{/if}}
+
+    <p>
+        Regards,<br />
+        {{'Account Team'}}
+    </p>
+</div>

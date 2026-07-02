@@ -1,0 +1,1632 @@
+import { statuses } from '@/db/schemas/master/statuses.schema';
+import { couriers } from '@/db/schemas/shared/couriers.schema';
+import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { StatusCache } from '@/utils/status-cache';
+import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
+import { users } from '@db/schemas/auth/users.schema';
+import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
+import { instrumentBgDetails, instrumentChequeDetails, instrumentDdDetails, instrumentFdrDetails, instrumentTransferDetails, paymentInstruments, paymentRequestMom, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { Inject, Injectable, Logger, NotFoundException, StreamableFile } from '@nestjs/common';
+import { and, asc, desc, eq, gt, gte, inArray, or, sql } from 'drizzle-orm';
+import { createReadStream, existsSync } from 'fs';
+import * as path from 'path';
+import type { MomRemarkResponseType } from '../dto/payment-mom.dto';
+import type { DashboardCounts, PaymentRequestRow, PendingTabResponse, PendingTenderRow, RequestTabResponse } from '../dto/payment-requests.dto';
+import type { InstrumentResponse, PaymentRequestEditResponseType } from '../dto/payment-response.dto';
+import { buildRequestRoleFilters, buildTenderRoleFilters, deriveDisplayStatus, getDefaultSortByTab, getTabSqlCondition } from './payment-requests.shared';
+
+@Injectable()
+export class PaymentRequestsQueryService {
+    private readonly logger = new Logger(PaymentRequestsQueryService.name);
+
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly tenderInfosService: TenderInfosService,
+    ) {}
+
+    // ============================================================================
+    // Dashboard Methods
+    // ============================================================================
+
+    async getDashboardData(
+        tab: string = 'pending',
+        user?: ValidatedUser,
+        teamId?: number,
+        pagination?: { page?: number; limit?: number },
+        sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
+        search?: string
+    ): Promise<PendingTabResponse | RequestTabResponse> {
+        const counts = await this.getDashboardCounts(user, teamId);
+
+        if (tab === 'pending') return this.getPendingTenders(user, teamId, pagination, sort, counts, search);
+        if (tab === 'dnb') return this.getTenderDnbTenders(user, teamId, pagination, sort, counts, search);
+
+        return this.getPaymentRequestsByTab(tab, user, teamId, pagination, sort, counts, search);
+    }
+
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<DashboardCounts> {
+        const pendingCount = await this.countPendingTenders(user, teamId);
+        const requestCounts = await this.countRequestsByStatus(user, teamId);
+        const tenderDnbCount = await this.countTenderDnb(user, teamId);
+
+        return {
+            pending: pendingCount,
+            sent: requestCounts.sent,
+            paid: requestCounts.paid,
+            rejected: requestCounts.rejected,
+            returned: requestCounts.returned,
+            fees: requestCounts.fees,
+            others: requestCounts.others,
+            dnb: tenderDnbCount,
+            total: pendingCount + requestCounts.sent + requestCounts.paid + requestCounts.rejected + requestCounts.returned + requestCounts.fees + requestCounts.others + tenderDnbCount,
+        };
+    }
+
+    // ============================================================================
+    // Count Methods
+    // ============================================================================
+
+    private async countPendingTenders(user?: ValidatedUser, teamId?: number): Promise<number> {
+        const roleFilterConditions = buildTenderRoleFilters(user, teamId);
+
+        const [result] = await this.db
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+            .from(tenderInfos)
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .where(and(
+                TenderInfosService.getActiveCondition(),
+                TenderInfosService.getApprovedCondition(),
+                TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+                or(
+                    inArray(tenderInformation.emdRequired, ['Yes', 'YES']),
+                    inArray(tenderInformation.tenderFeeRequired, ['Yes', 'YES']),
+                    inArray(tenderInformation.processingFeeRequired, ['Yes', 'YES'])
+                ),
+                or(
+                    gt(tenderInfos.emd, sql`0`),
+                    gt(tenderInfos.tenderFees, sql`0`),
+                    gt(tenderInformation.processingFeeAmount, sql`0`)
+                ),
+                sql`${tenderInfos.id} NOT IN (SELECT tender_id FROM payment_requests)`,
+                ...roleFilterConditions
+            ));
+
+        return Number(result?.count || 0);
+    }
+
+    private async countRequestsByStatus(
+        user?: ValidatedUser, 
+        teamId?: number
+    ): Promise<{ sent: number; paid: number; rejected: number; returned: number; fees: number; others: number; }> {
+        const roleFilterConditions = buildRequestRoleFilters(user, teamId);
+
+        const [result] = await this.db
+            .select({
+                sent: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('sent')} THEN 1 ELSE 0 END), 0)`,
+                paid: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('paid')} THEN 1 ELSE 0 END), 0)`,
+                rejected: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('rejected')} THEN 1 ELSE 0 END), 0)`,
+                returned: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('returned')} THEN 1 ELSE 0 END), 0)`,
+                fees: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('fees')} THEN 1 ELSE 0 END), 0)`,
+                others: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('others')} THEN 1 ELSE 0 END), 0)`,
+            })
+            .from(paymentRequests)
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(paymentInstruments, and(
+                eq(paymentInstruments.requestId, paymentRequests.id),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(and(
+                sql`NOT (${paymentInstruments.instrumentType} = 'Cheque' AND (${instrumentChequeDetails.linkedDdId} IS NOT NULL OR ${instrumentChequeDetails.linkedFdrId} IS NOT NULL))`,
+                ...(roleFilterConditions.length > 0 ? roleFilterConditions : [])
+            ));
+
+        return {
+            sent: Number(result?.sent || 0),
+            paid: Number(result?.paid || 0),
+            rejected: Number(result?.rejected || 0),
+            returned: Number(result?.returned || 0),
+            fees: Number(result?.fees || 0),
+            others: Number(result?.others || 0),
+        };
+    }
+
+    private async countTenderDnb(user?: ValidatedUser, teamId?: number): Promise<number> {
+        const roleFilterConditions = buildTenderRoleFilters(user, teamId);
+        const dnbStatusIds = StatusCache.getIds('dnb');
+
+        const [result] = await this.db
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+            .from(tenderInfos)
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .where(and(
+                TenderInfosService.getActiveCondition(),
+                TenderInfosService.getApprovedCondition(),
+                TenderInfosService.getExcludeStatusCondition(['lost']),
+                inArray(tenderInfos.status, dnbStatusIds),
+                or(
+                    inArray(tenderInformation.emdRequired, ['Yes', 'YES']),
+                    inArray(tenderInformation.tenderFeeRequired, ['Yes', 'YES']),
+                    inArray(tenderInformation.processingFeeRequired, ['Yes', 'YES'])
+                ),
+                ...roleFilterConditions
+            ));
+
+        return Number(result?.count || 0);
+    }
+
+    // ============================================================================
+    // Pending Tenders
+    // ============================================================================
+
+    async getPendingTenders(
+        user?: ValidatedUser,
+        teamId?: number,
+        pagination?: { page?: number; limit?: number },
+        sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
+        counts?: DashboardCounts,
+        search?: string
+    ): Promise<PendingTabResponse> {
+        const roleFilterConditions = buildTenderRoleFilters(user, teamId);
+        const page = pagination?.page || 1;
+        const limit = pagination?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        const searchTerm = search?.trim();
+        const searchConditions: any[] = [];
+        if (searchTerm) {
+            const searchStr = `%${searchTerm}%`;
+            searchConditions.push(
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${tenderInfos.gstValues}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.emd}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderFees}::text ILIKE ${searchStr}`,
+                sql`${tenderInformation.processingFeeAmount}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`
+            );
+        }
+
+        const whereClause = and(
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            or(
+                inArray(tenderInformation.emdRequired, ['Yes', 'YES']),
+                inArray(tenderInformation.tenderFeeRequired, ['Yes', 'YES']),
+                inArray(tenderInformation.processingFeeRequired, ['Yes', 'YES'])
+            ),
+            or(
+                gt(tenderInfos.emd, sql`0`),
+                gt(tenderInfos.tenderFees, sql`0`),
+                gt(tenderInformation.processingFeeAmount, sql`0`)
+            ),
+            sql`${tenderInfos.id} NOT IN (SELECT tender_id FROM payment_requests)`,
+            ...roleFilterConditions,
+            searchConditions.length > 0 ? sql`(${sql.join(searchConditions, sql` OR `)})` : undefined
+        );
+
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+            .from(tenderInfos)
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause);
+
+        const totalCount = Number(countResult?.count || 0);
+
+        let orderClause: any;
+        if (sort?.sortBy) {
+            const direction = sort.sortOrder === 'desc' ? desc : asc;
+            switch (sort.sortBy) {
+                case 'tenderNo':
+                    orderClause = direction(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderClause = direction(tenderInfos.tenderName);
+                    break;
+                case 'dueDate':
+                    orderClause = direction(tenderInfos.dueDate);
+                    break;
+                case 'teamMember':
+                    orderClause = direction(users.name);
+                    break;
+                case 'emdRequired':
+                    orderClause = direction(tenderInfos.emd);
+                    break;
+                default:
+                    orderClause = getDefaultSortByTab('pending');
+            }
+        } else {
+            orderClause = getDefaultSortByTab('pending');
+        }
+
+        const rows = await this.db
+            .select({
+                tenderId: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                gstValues: tenderInfos.gstValues,
+                status: tenderInfos.status,
+                statusName: statuses.name,
+                dueDate: tenderInfos.dueDate,
+                teamMemberId: tenderInfos.teamMember,
+                teamMember: users.name,
+                emd: tenderInfos.emd,
+                emdMode: tenderInfos.emdMode,
+                tenderFee: tenderInfos.tenderFees,
+                tenderFeeMode: tenderInfos.tenderFeeMode,
+                processingFee: tenderInformation.processingFeeAmount,
+                processingFeeMode: tenderInformation.processingFeeMode,
+            })
+            .from(tenderInfos)
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause)
+            .orderBy(orderClause)
+            .limit(limit)
+            .offset(offset);
+
+        const data: PendingTenderRow[] = rows.map(row => ({
+            tenderId: row.tenderId,
+            tenderNo: row.tenderNo?.toString() || '',
+            tenderName: row.tenderName?.toString() || '',
+            gstValues: row.gstValues,
+            status: row.status || 0,
+            statusName: row.statusName?.toString() || null,
+            dueDate: row.dueDate,
+            teamMemberId: row.teamMemberId,
+            teamMember: row.teamMember?.toString() || null,
+            emd: row.emd?.toString() || null,
+            emdMode: row.emdMode?.toString() || null,
+            tenderFee: row.tenderFee?.toString() || null,
+            tenderFeeMode: row.tenderFeeMode?.toString() || null,
+            processingFee: row.processingFee?.toString() || null,
+            processingFeeMode: row.processingFeeMode?.toString() || null,
+        }));
+
+        const wrapped = wrapPaginatedResponse(data, totalCount, page, limit);
+        return {
+            ...wrapped,
+            counts: counts || await this.getDashboardCounts(user, teamId),
+        };
+    }
+
+    // ============================================================================
+    // Payment Requests By Tab
+    // ============================================================================
+
+    async getPaymentRequestsByTab(
+        tab: string,
+        user?: ValidatedUser,
+        teamId?: number,
+        pagination?: { page?: number; limit?: number },
+        sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
+        counts?: DashboardCounts,
+        search?: string
+    ): Promise<RequestTabResponse> {
+        const roleFilterConditions = buildRequestRoleFilters(user, teamId);
+        const page = pagination?.page || 1;
+        const limit = pagination?.limit || 50;
+        const offset = (page - 1) * limit;
+
+        const searchTerm = search?.trim();
+        const searchConditions: any[] = [];
+        if (searchTerm) {
+            const searchStr = `%${searchTerm}%`;
+            searchConditions.push(
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${paymentRequests.tenderNo} ILIKE ${searchStr}`,
+                sql`${paymentRequests.projectName} ILIKE ${searchStr}`,
+                sql`${paymentRequests.purpose}::text ILIKE ${searchStr}`,
+                sql`${paymentRequests.type}::text ILIKE ${searchStr}`,
+                sql`${paymentRequests.amountRequired}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${paymentRequests.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.instrumentType}::text ILIKE ${searchStr}`,
+                sql`${paymentInstruments.status} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.favouring} ILIKE ${searchStr}`
+            );
+        }
+
+        let orderClause: any;
+        if (sort?.sortBy) {
+            const direction = sort.sortOrder === 'desc' ? desc : asc;
+            switch (sort.sortBy) {
+                case 'tenderNo':
+                    orderClause = direction(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderClause = direction(tenderInfos.tenderName);
+                    break;
+                case 'dueDate':
+                    orderClause = direction(tenderInfos.dueDate);
+                    break;
+                case 'amountRequired':
+                    orderClause = direction(paymentRequests.amountRequired);
+                    break;
+                case 'purpose':
+                    orderClause = direction(paymentRequests.purpose);
+                    break;
+                case 'teamMember':
+                    orderClause = direction(users.name);
+                    break;
+                default:
+                    orderClause = getDefaultSortByTab(tab);
+            }
+        } else {
+            orderClause = getDefaultSortByTab(tab);
+        }
+
+        const excludeAutoCheque = sql`NOT (${paymentInstruments.instrumentType} = 'Cheque' AND (${instrumentChequeDetails.linkedDdId} IS NOT NULL OR ${instrumentChequeDetails.linkedFdrId} IS NOT NULL))`;
+
+        const whereClause = and(
+            getTabSqlCondition(tab),
+            eq(paymentInstruments.isActive, true),
+            excludeAutoCheque,
+            ...roleFilterConditions,
+            searchConditions.length > 0 ? sql`(${sql.join(searchConditions, sql` OR `)})` : undefined
+        );
+
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(paymentRequests)
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(paymentInstruments, and(
+                eq(paymentInstruments.requestId, paymentRequests.id),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(whereClause);
+
+        const totalCount = Number(countResult?.count || 0);
+
+        const rows = await this.db
+            .select({
+                id: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                tenderNo: tenderInfos.tenderNo,
+                projectNo: paymentRequests.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                projectName: paymentRequests.projectName,
+                purpose: paymentRequests.purpose,
+                requestType: paymentRequests.type,
+                amountRequired: paymentRequests.amountRequired,
+                dueDate: tenderInfos.dueDate,
+                dueDate2: paymentRequests.dueDate,
+                bidValid: tenderInformation.bidValidityDays,
+                teamMember: users.name,
+                teamMemberId: users.id,
+                instrumentId: paymentInstruments.id,
+                instrumentType: paymentInstruments.instrumentType,
+                instrumentStatus: paymentInstruments.status,
+                favouring: paymentInstruments.favouring,
+                bidSubmissionDate: bidSubmissions.submissionDatetime,
+                createdAt: paymentRequests.createdAt,
+                detailPurpose: sql<string>`
+                    CASE
+                        WHEN ${paymentInstruments.instrumentType} = 'DD' THEN ${instrumentDdDetails.ddPurpose}
+                        WHEN ${paymentInstruments.instrumentType} = 'FDR' THEN ${instrumentFdrDetails.fdrPurpose}
+                        WHEN ${paymentInstruments.instrumentType} = 'BG' THEN ${instrumentBgDetails.bgPurpose}
+                        WHEN ${paymentInstruments.instrumentType} = 'Cheque' THEN ${instrumentChequeDetails.chequeReason}
+                        ELSE NULL
+                    END
+                `,
+                paidDate: sql<Date>`
+                    CASE
+                        WHEN ${paymentInstruments.instrumentType} = 'DD' THEN ${instrumentDdDetails.ddDate}
+                        WHEN ${paymentInstruments.instrumentType} = 'FDR' THEN ${instrumentFdrDetails.fdrDate}
+                        WHEN ${paymentInstruments.instrumentType} = 'BG' THEN ${instrumentBgDetails.bgDate}
+                        WHEN ${paymentInstruments.instrumentType} = 'Cheque' THEN ${instrumentChequeDetails.chequeDate}
+                        WHEN ${paymentInstruments.instrumentType} = 'Bank Transfer' THEN ${instrumentTransferDetails.transactionDate}
+                        WHEN ${paymentInstruments.instrumentType} = 'Portal Payment' THEN ${instrumentTransferDetails.transactionDate}
+                        ELSE NULL
+                    END
+                `,
+                tenderStatus: statuses.name,
+                consentForPay: paymentInstruments.consentForPay,
+            })
+            .from(paymentRequests)
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+            .leftJoin(bidSubmissions, and(
+                eq(bidSubmissions.tenderId, tenderInfos.id),
+            ))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .leftJoin(paymentInstruments, and(
+                eq(paymentInstruments.requestId, paymentRequests.id),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause)
+            .orderBy(orderClause)
+            .limit(limit)
+            .offset(offset);
+
+        const data: PaymentRequestRow[] = rows.map(row => {
+            const effectiveDueDate = row.dueDate ?? row.dueDate2;
+            return {
+                id: row.id,
+                tenderId: row.tenderId,
+                tenderNo: row.tenderNo?.toString() ?? row.projectNo?.toString() ?? '',
+                tenderName: row.tenderName?.toString() ?? row.projectName?.toString() ?? '',
+                purpose: row.purpose as any,
+                requestType: row.requestType,
+                amountRequired: row.amountRequired ?? '0',
+                dueDate: effectiveDueDate,
+                bidValid: row.bidValid && effectiveDueDate
+                    ? (() => {
+                        const date = new Date(effectiveDueDate);
+                        date.setDate(date.getDate() + row.bidValid);
+                        return date;
+                    })()
+                    : null,
+                teamMemberId: row.teamMemberId,
+                teamMember: row.teamMember?.toString() ?? null,
+                instrumentId: row.instrumentId,
+                instrumentType: row.instrumentType as any,
+                instrumentStatus: row.instrumentStatus,
+                favouring: row.favouring,
+                detailPurpose: (row as any).detailPurpose,
+                displayStatus: deriveDisplayStatus(row.instrumentStatus),
+                bidSubmissionDate: row.bidSubmissionDate,
+                createdAt: row.createdAt,
+                paidDate: (row as any).paidDate,
+                tenderStatus: (row as any).tenderStatus ?? null,
+                consentForPay: row.consentForPay ?? '',
+            };
+        });
+
+        const wrapped = wrapPaginatedResponse(data, totalCount, page, limit);
+        return {
+            ...wrapped,
+            counts: counts || await this.getDashboardCounts(user, teamId),
+        };
+    }
+
+    // ============================================================================
+    // Tender DNB
+    // ============================================================================
+
+    async getTenderDnbTenders(
+        user?: ValidatedUser,
+        teamId?: number,
+        pagination?: { page?: number; limit?: number },
+        sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
+        counts?: DashboardCounts,
+        search?: string
+    ): Promise<PendingTabResponse> {
+        const roleFilterConditions = buildTenderRoleFilters(user, teamId);
+        const page = pagination?.page || 1;
+        const limit = pagination?.limit || 50;
+        const offset = (page - 1) * limit;
+        const dnbStatusIds = StatusCache.getIds('dnb');
+
+        const searchTerm = search?.trim();
+        const searchConditions: any[] = [];
+        if (searchTerm) {
+            const searchStr = `%${searchTerm}%`;
+            searchConditions.push(
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${tenderInfos.gstValues}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.emd}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderFees}::text ILIKE ${searchStr}`,
+                sql`${tenderInformation.processingFeeAmount}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`
+            );
+        }
+
+        const whereClause = and(
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            TenderInfosService.getExcludeStatusCondition(['lost']),
+            inArray(tenderInfos.status, dnbStatusIds),
+            or(
+                inArray(tenderInformation.emdRequired, ['Yes', 'YES']),
+                inArray(tenderInformation.tenderFeeRequired, ['Yes', 'YES']),
+                inArray(tenderInformation.processingFeeRequired, ['Yes', 'YES'])
+            ),
+            ...roleFilterConditions,
+            searchConditions.length > 0 ? sql`(${sql.join(searchConditions, sql` OR `)})` : undefined
+        );
+
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+            .from(tenderInfos)
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause);
+
+        const totalCount = Number(countResult?.count || 0);
+
+        let orderClause: any;
+        if (sort?.sortBy) {
+            const direction = sort.sortOrder === 'desc' ? desc : asc;
+            switch (sort.sortBy) {
+                case 'tenderNo':
+                    orderClause = direction(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderClause = direction(tenderInfos.tenderName);
+                    break;
+                case 'dueDate':
+                    orderClause = direction(tenderInfos.dueDate);
+                    break;
+                case 'teamMember':
+                    orderClause = direction(users.name);
+                    break;
+                case 'emdRequired':
+                    orderClause = direction(tenderInfos.emd);
+                    break;
+                default:
+                    orderClause = getDefaultSortByTab('dnb');
+            }
+        } else {
+            orderClause = getDefaultSortByTab('dnb');
+        }
+
+        const rows = await this.db
+            .select({
+                tenderId: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                gstValues: tenderInfos.gstValues,
+                status: tenderInfos.status,
+                statusName: statuses.name,
+                dueDate: tenderInfos.dueDate,
+                teamMemberId: tenderInfos.teamMember,
+                teamMember: users.name,
+                emd: tenderInfos.emd,
+                emdMode: tenderInfos.emdMode,
+                tenderFee: tenderInfos.tenderFees,
+                tenderFeeMode: tenderInfos.tenderFeeMode,
+                processingFee: tenderInformation.processingFeeAmount,
+                processingFeeMode: tenderInformation.processingFeeMode,
+            })
+            .from(tenderInfos)
+            .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause)
+            .orderBy(orderClause)
+            .limit(limit)
+            .offset(offset);
+
+        const data: PendingTenderRow[] = rows.map(row => ({
+            tenderId: row.tenderId,
+            tenderNo: row.tenderNo?.toString() || '',
+            tenderName: row.tenderName?.toString() || '',
+            gstValues: row.gstValues,
+            status: row.status || 0,
+            statusName: row.statusName?.toString() || null,
+            dueDate: row.dueDate,
+            teamMemberId: row.teamMemberId,
+            teamMember: row.teamMember?.toString() || null,
+            emd: row.emd?.toString() || null,
+            emdMode: row.emdMode?.toString() || null,
+            tenderFee: row.tenderFee?.toString() || null,
+            tenderFeeMode: row.tenderFeeMode?.toString() || null,
+            processingFee: row.processingFee?.toString() || null,
+            processingFeeMode: row.processingFeeMode?.toString() || null,
+        }));
+
+        const wrapped = wrapPaginatedResponse(data, totalCount, page, limit);
+        return {
+            ...wrapped,
+            counts: counts || await this.getDashboardCounts(user, teamId),
+        };
+    }
+
+    // ============================================================================
+    // Find Methods
+    // ============================================================================
+
+    async findByTenderId(tenderId: number) {
+        const requests = await this.db
+            .select({
+                id: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                type: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                dueDate: paymentRequests.dueDate,
+                requestedBy: paymentRequests.requestedBy,
+                requestedByName: users.name,
+                purpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                status: paymentRequests.status,
+                remarks: paymentRequests.remarks,
+                createdAt: paymentRequests.createdAt,
+                updatedAt: paymentRequests.updatedAt,
+            })
+            .from(paymentRequests)
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(eq(paymentRequests.tenderId, tenderId));
+
+        if (requests.length === 0) return null;
+
+        const prInstruments = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentInstruments.requestId,
+                instrumentType: paymentInstruments.instrumentType,
+                purpose: paymentInstruments.purpose,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
+                courierDeadline: paymentInstruments.courierDeadline,
+                status: paymentInstruments.status,
+                isActive: paymentInstruments.isActive,
+                reqNo: paymentInstruments.reqNo,
+            })
+            .from(paymentInstruments)
+            .where(and(
+                inArray(paymentInstruments.requestId, requests.map(r => r.id)),
+                eq(paymentInstruments.isActive, true)
+            ));
+
+        const instrumentsWithDetails = await Promise.all(prInstruments.map(async (instrument) => {
+            const base = this.mapInstrumentBase(instrument);
+            let details: any = null;
+            if (instrument.instrumentType === 'DD') {
+                [details] = await this.db.select({
+                    reqNo: instrumentDdDetails.reqNo,
+                }).from(instrumentDdDetails).where(eq(instrumentDdDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'BG') {
+                [details] = await this.db.select({
+                    courierNo: instrumentBgDetails.courierNo,
+                }).from(instrumentBgDetails).where(eq(instrumentBgDetails.instrumentId, instrument.id)).limit(1);
+            }
+            return {
+                ...base,
+                reqNo: base.reqNo || details?.reqNo || null,
+                courierNo: details?.courierNo || null,
+            };
+        }));
+
+        return {
+            requests: requests.map(req => ({
+                ...this.mapPaymentRequest(req),
+                instruments: instrumentsWithDetails.filter(i => i.requestId === req.id),
+            })),
+        };
+    }
+
+    async findByTenderIdWithTender(tenderId: number) {
+        const requests = await this.db
+            .select({
+                id: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                type: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                dueDate: paymentRequests.dueDate,
+                requestedBy: paymentRequests.requestedBy,
+                requestedByName: users.name,
+                purpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                status: paymentRequests.status,
+                remarks: paymentRequests.remarks,
+                createdAt: paymentRequests.createdAt,
+                updatedAt: paymentRequests.updatedAt,
+            })
+            .from(paymentRequests)
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(eq(paymentRequests.tenderId, tenderId));
+
+        if (requests.length === 0) return null;
+
+        const [tender] = await this.db
+            .select({
+                id: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                team: tenderInfos.team,
+                organization: tenderInfos.organization,
+                item: tenderInfos.item,
+                gstValues: tenderInfos.gstValues,
+                tenderFees: tenderInfos.tenderFees,
+                emd: tenderInfos.emd,
+                teamMember: tenderInfos.teamMember,
+                dueDate: tenderInfos.dueDate,
+                status: tenderInfos.status,
+                location: tenderInfos.location,
+                website: tenderInfos.website,
+                emdMode: tenderInfos.emdMode,
+                tenderFeeMode: tenderInfos.tenderFeeMode,
+                deleteStatus: tenderInfos.deleteStatus,
+            })
+            .from(tenderInfos)
+            .where(eq(tenderInfos.id, tenderId))
+            .limit(1);
+
+        const tenderInstruments = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentInstruments.requestId,
+                instrumentType: paymentInstruments.instrumentType,
+                purpose: paymentInstruments.purpose,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
+                courierDeadline: paymentInstruments.courierDeadline,
+                status: paymentInstruments.status,
+                isActive: paymentInstruments.isActive,
+                reqNo: paymentInstruments.reqNo,
+            })
+            .from(paymentInstruments)
+            .where(and(
+                inArray(paymentInstruments.requestId, requests.map(r => r.id)),
+                eq(paymentInstruments.isActive, true)
+            ));
+
+        return {
+            tender: this.mapTenderBasic(tender),
+            requests: requests.map(req => ({
+                ...this.mapPaymentRequest(req),
+                instruments: tenderInstruments.filter(i => i.requestId === req.id).map(i => this.mapInstrumentBase(i)),
+            })),
+        };
+    }
+
+    async findById(requestId: number) {
+        const [request] = await this.db
+            .select({
+                id: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                type: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                dueDate: paymentRequests.dueDate,
+                requestedBy: paymentRequests.requestedBy,
+                requestedByName: users.name,
+                purpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                status: paymentRequests.status,
+                remarks: paymentRequests.remarks,
+                createdAt: paymentRequests.createdAt,
+                updatedAt: paymentRequests.updatedAt,
+            })
+            .from(paymentRequests)
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(eq(paymentRequests.id, requestId))
+            .limit(1);
+
+        if (!request) return null;
+
+        const instruments = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentInstruments.requestId,
+                instrumentType: paymentInstruments.instrumentType,
+                purpose: paymentInstruments.purpose,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
+                courierDeadline: paymentInstruments.courierDeadline,
+                status: paymentInstruments.status,
+                isActive: paymentInstruments.isActive,
+                reqNo: paymentInstruments.reqNo,
+                consentForPay: paymentInstruments.consentForPay,
+            })
+            .from(paymentInstruments)
+            .where(and(
+                inArray(paymentInstruments.requestId, [request.id]),
+                eq(paymentInstruments.isActive, true)
+            ));
+
+        const instrumentsWithDetails = await Promise.all(instruments.map(async (instrument) => {
+            let details: any = null;
+            if (instrument.instrumentType === 'DD') {
+                [details] = await this.db.select({
+                    ddNo: instrumentDdDetails.ddNo,
+                    ddDate: instrumentDdDetails.ddDate,
+                    reqNo: instrumentDdDetails.reqNo,
+                    ddNeeds: instrumentDdDetails.ddNeeds,
+                    ddPurpose: instrumentDdDetails.ddPurpose,
+                    ddRemarks: instrumentDdDetails.ddRemarks,
+                }).from(instrumentDdDetails).where(eq(instrumentDdDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'FDR') {
+                [details] = await this.db.select({
+                    fdrNo: instrumentFdrDetails.fdrNo,
+                    fdrDate: instrumentFdrDetails.fdrDate,
+                    fdrSource: instrumentFdrDetails.fdrSource,
+                    fdrPurpose: instrumentFdrDetails.fdrPurpose,
+                    fdrExpiryDate: instrumentFdrDetails.fdrExpiryDate,
+                    fdrNeeds: instrumentFdrDetails.fdrNeeds,
+                    fdrRemark: instrumentFdrDetails.fdrRemark,
+                }).from(instrumentFdrDetails).where(eq(instrumentFdrDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'BG') {
+                [details] = await this.db.select({
+                    bgNo: instrumentBgDetails.bgNo,
+                    bgDate: instrumentBgDetails.bgDate,
+                    validityDate: instrumentBgDetails.validityDate,
+                    claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                    beneficiaryName: instrumentBgDetails.beneficiaryName,
+                    beneficiaryAddress: instrumentBgDetails.beneficiaryAddress,
+                    bankName: instrumentBgDetails.bankName,
+                    bgNeeds: instrumentBgDetails.bgNeeds,
+                    bgPurpose: instrumentBgDetails.bgPurpose,
+                }).from(instrumentBgDetails).where(eq(instrumentBgDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'Cheque') {
+                [details] = await this.db.select({
+                    chequeNo: instrumentChequeDetails.chequeNo,
+                    chequeDate: instrumentChequeDetails.chequeDate,
+                    bankName: instrumentChequeDetails.bankName,
+                    chequeNeeds: instrumentChequeDetails.chequeNeeds,
+                    chequeReason: instrumentChequeDetails.chequeReason,
+                }).from(instrumentChequeDetails).where(eq(instrumentChequeDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'Bank Transfer' || instrument.instrumentType === 'Portal Payment') {
+                [details] = await this.db.select({
+                    utrNum: instrumentTransferDetails.utrNum,
+                    transactionDate: instrumentTransferDetails.transactionDate,
+                    accountName: instrumentTransferDetails.accountName,
+                    accountNumber: instrumentTransferDetails.accountNumber,
+                    ifsc: instrumentTransferDetails.ifsc,
+                    reason: instrumentTransferDetails.reason,
+                    remarks: instrumentTransferDetails.remarks,
+                    portalName: instrumentTransferDetails.portalName,
+                    isNetbanking: instrumentTransferDetails.isNetbanking,
+                    isDebit: instrumentTransferDetails.isDebit,
+                }).from(instrumentTransferDetails).where(eq(instrumentTransferDetails.instrumentId, instrument.id)).limit(1);
+            }
+            return this.mapInstrumentResponse(instrument, details);
+        }));
+
+        return {
+            ...this.mapPaymentRequest(request),
+            requestedByName: request.requestedByName,
+            instruments: instrumentsWithDetails,
+        };
+    }
+
+    async findByIdWithTender(requestId: number) {
+        const [request] = await this.db
+            .select({
+                id: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                type: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                dueDate: paymentRequests.dueDate,
+                requestedBy: paymentRequests.requestedBy,
+                requestedByName: users.name,
+                purpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                status: paymentRequests.status,
+                remarks: paymentRequests.remarks,
+                createdAt: paymentRequests.createdAt,
+            })
+            .from(paymentRequests)
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(eq(paymentRequests.id, requestId))
+            .limit(1);
+
+        if (!request) return null;
+
+        console.log("request in findByIdWithTender", request);
+
+        const instruments = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentInstruments.requestId,
+                instrumentType: paymentInstruments.instrumentType,
+                purpose: paymentInstruments.purpose,
+                amount: paymentInstruments.amount,
+                courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
+                courierDeadline: paymentInstruments.courierDeadline,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                status: paymentInstruments.status,
+                isActive: paymentInstruments.isActive,
+            })
+            .from(paymentInstruments)
+            .where(and(
+                eq(paymentInstruments.requestId, requestId),
+                eq(paymentInstruments.isActive, true)
+            ));
+
+        console.log("instruments in findByIdWithTender", instruments);
+
+        const instrumentsWithDetails = await Promise.all(instruments.map(async (instrument) => {
+            let details: any = null;
+            if (instrument.instrumentType === 'DD') {
+                [details] = await this.db.select({
+                    ddNo: instrumentDdDetails.ddNo,
+                    ddDate: instrumentDdDetails.ddDate,
+                    reqNo: instrumentDdDetails.reqNo,
+                    ddNeeds: instrumentDdDetails.ddNeeds,
+                    ddPurpose: instrumentDdDetails.ddPurpose,
+                    ddRemarks: instrumentDdDetails.ddRemarks,
+                }).from(instrumentDdDetails).where(eq(instrumentDdDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'FDR') {
+                [details] = await this.db.select({
+                    fdrNo: instrumentFdrDetails.fdrNo,
+                    fdrDate: instrumentFdrDetails.fdrDate,
+                    fdrSource: instrumentFdrDetails.fdrSource,
+                    fdrPurpose: instrumentFdrDetails.fdrPurpose,
+                    fdrExpiryDate: instrumentFdrDetails.fdrExpiryDate,
+                    fdrNeeds: instrumentFdrDetails.fdrNeeds,
+                    fdrRemark: instrumentFdrDetails.fdrRemark,
+                }).from(instrumentFdrDetails).where(eq(instrumentFdrDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'BG') {
+                [details] = await this.db.select({
+                    bgNo: instrumentBgDetails.bgNo,
+                    bgDate: instrumentBgDetails.bgDate,
+                    validityDate: instrumentBgDetails.validityDate,
+                    claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                    beneficiaryName: instrumentBgDetails.beneficiaryName,
+                    beneficiaryAddress: instrumentBgDetails.beneficiaryAddress,
+                    bankName: instrumentBgDetails.bankName,
+                    bgNeeds: instrumentBgDetails.bgNeeds,
+                    bgPurpose: instrumentBgDetails.bgPurpose,
+                    bgSoftCopy: instrumentBgDetails.bgSoftCopy,
+                    bgPo: instrumentBgDetails.bgPo,
+                    bgBankAcc: instrumentBgDetails.bgBankAcc,
+                    bgBankIfsc: instrumentBgDetails.bgBankIfsc,
+                    bgClientUser: instrumentBgDetails.bgClientUser,
+                    bgClientCp: instrumentBgDetails.bgClientCp,
+                    bgClientFin: instrumentBgDetails.bgClientFin,
+                }).from(instrumentBgDetails).where(eq(instrumentBgDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'Cheque') {
+                [details] = await this.db.select({
+                    chequeNo: instrumentChequeDetails.chequeNo,
+                    chequeDate: instrumentChequeDetails.chequeDate,
+                    bankName: instrumentChequeDetails.bankName,
+                    chequeNeeds: instrumentChequeDetails.chequeNeeds,
+                    chequeReason: instrumentChequeDetails.chequeReason,
+                    linkedDdId: instrumentChequeDetails.linkedDdId,
+                    linkedFdrId: instrumentChequeDetails.linkedFdrId,
+                }).from(instrumentChequeDetails).where(eq(instrumentChequeDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'Bank Transfer' || instrument.instrumentType === 'Portal Payment') {
+                [details] = await this.db.select({
+                    utrNum: instrumentTransferDetails.utrNum,
+                    transactionDate: instrumentTransferDetails.transactionDate,
+                    accountName: instrumentTransferDetails.accountName,
+                    accountNumber: instrumentTransferDetails.accountNumber,
+                    ifsc: instrumentTransferDetails.ifsc,
+                    reason: instrumentTransferDetails.reason,
+                    remarks: instrumentTransferDetails.remarks,
+                    portalName: instrumentTransferDetails.portalName,
+                    isNetbanking: instrumentTransferDetails.isNetbanking,
+                    isDebit: instrumentTransferDetails.isDebit,
+                }).from(instrumentTransferDetails).where(eq(instrumentTransferDetails.instrumentId, instrument.id)).limit(1);
+            }
+            return this.mapInstrumentResponse(instrument, details);
+        }));
+
+        console.log("instrumentsWithDetails in findByIdWithTender", instrumentsWithDetails);
+        
+        return {
+            ...this.mapPaymentRequest(request),
+            requestedByName: request.requestedByName,
+            instruments: instrumentsWithDetails,
+        };
+    }
+
+    async findInstrumentsByPaymentRequestId(paymentRequestId: number) {
+        const [request] = await this.db
+            .select({
+                id: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                type: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                dueDate: paymentRequests.dueDate,
+                requestedBy: paymentRequests.requestedBy,
+                purpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                status: paymentRequests.status,
+                remarks: paymentRequests.remarks,
+                createdAt: paymentRequests.createdAt,
+            })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, paymentRequestId))
+            .limit(1);
+
+        if (!request) return null;
+
+        const instruments = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentInstruments.requestId,
+                instrumentType: paymentInstruments.instrumentType,
+                purpose: paymentInstruments.purpose,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                issueDate: paymentInstruments.issueDate,
+                expiryDate: paymentInstruments.expiryDate,
+                claimExpiryDate: paymentInstruments.claimExpiryDate,
+                utr: paymentInstruments.utr,
+                docketNo: paymentInstruments.docketNo,
+                courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
+                courierDeadline: paymentInstruments.courierDeadline,
+                action: paymentInstruments.action,
+                status: paymentInstruments.status,
+                isActive: paymentInstruments.isActive,
+                generatedPdf: paymentInstruments.generatedPdf,
+                cancelPdf: paymentInstruments.cancelPdf,
+                docketSlip: paymentInstruments.docketSlip,
+                coveringLetter: paymentInstruments.coveringLetter,
+                extraPdfPaths: paymentInstruments.extraPdfPaths,
+                extensionRequestPdf: paymentInstruments.extensionRequestPdf,
+                cancellationRequestPdf: paymentInstruments.cancellationRequestPdf,
+                reqNo: paymentInstruments.reqNo,
+                referenceNo: paymentInstruments.referenceNo,
+                transferDate: paymentInstruments.transferDate,
+            })
+            .from(paymentInstruments)
+            .where(and(
+                eq(paymentInstruments.requestId, paymentRequestId),
+                eq(paymentInstruments.isActive, true)
+            ));
+
+        const instrumentsWithDetails = await Promise.all(instruments.map(async (instrument) => {
+            let details: any = null;
+            if (instrument.instrumentType === 'DD') {
+                [details] = await this.db.select({
+                    ddNo: instrumentDdDetails.ddNo,
+                    ddDate: instrumentDdDetails.ddDate,
+                    reqNo: instrumentDdDetails.reqNo,
+                    ddNeeds: instrumentDdDetails.ddNeeds,
+                    ddPurpose: instrumentDdDetails.ddPurpose,
+                    ddRemarks: instrumentDdDetails.ddRemarks,
+                }).from(instrumentDdDetails).where(eq(instrumentDdDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'FDR') {
+                [details] = await this.db.select({
+                    fdrNo: instrumentFdrDetails.fdrNo,
+                    fdrDate: instrumentFdrDetails.fdrDate,
+                    fdrSource: instrumentFdrDetails.fdrSource,
+                    fdrPurpose: instrumentFdrDetails.fdrPurpose,
+                    fdrExpiryDate: instrumentFdrDetails.fdrExpiryDate,
+                    fdrNeeds: instrumentFdrDetails.fdrNeeds,
+                    fdrRemark: instrumentFdrDetails.fdrRemark,
+                }).from(instrumentFdrDetails).where(eq(instrumentFdrDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'BG') {
+                [details] = await this.db.select({
+                    bgNo: instrumentBgDetails.bgNo,
+                    bgDate: instrumentBgDetails.bgDate,
+                    validityDate: instrumentBgDetails.validityDate,
+                    claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                    beneficiaryName: instrumentBgDetails.beneficiaryName,
+                    beneficiaryAddress: instrumentBgDetails.beneficiaryAddress,
+                    bankName: instrumentBgDetails.bankName,
+                    bgNeeds: instrumentBgDetails.bgNeeds,
+                    bgPurpose: instrumentBgDetails.bgPurpose,
+                    bgSoftCopy: instrumentBgDetails.bgSoftCopy,
+                    bgPo: instrumentBgDetails.bgPo,
+                    courierNo: instrumentBgDetails.courierNo,
+                    stampCharge: instrumentBgDetails.stampCharge,
+                    extensionLetter: instrumentBgDetails.extensionLetter,
+                    newBgClaim: instrumentBgDetails.newBgClaim,
+                    extendedAmount: instrumentBgDetails.extendedAmount,
+                    extendedValidityDate: instrumentBgDetails.extendedValidityDate,
+                    extendedClaimExpiryDate: instrumentBgDetails.extendedClaimExpiryDate,
+                    extendedBankName: instrumentBgDetails.extendedBankName,
+                }).from(instrumentBgDetails).where(eq(instrumentBgDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'Cheque') {
+                [details] = await this.db.select({
+                    chequeNo: instrumentChequeDetails.chequeNo,
+                    chequeDate: instrumentChequeDetails.chequeDate,
+                    bankName: instrumentChequeDetails.bankName,
+                    chequeNeeds: instrumentChequeDetails.chequeNeeds,
+                    chequeReason: instrumentChequeDetails.chequeReason,
+                    linkedDdId: instrumentChequeDetails.linkedDdId,
+                    linkedFdrId: instrumentChequeDetails.linkedFdrId,
+                }).from(instrumentChequeDetails).where(eq(instrumentChequeDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'Bank Transfer' || instrument.instrumentType === 'Portal Payment') {
+                [details] = await this.db.select({
+                    utrNum: instrumentTransferDetails.utrNum,
+                    transactionDate: instrumentTransferDetails.transactionDate,
+                    accountName: instrumentTransferDetails.accountName,
+                    accountNumber: instrumentTransferDetails.accountNumber,
+                    ifsc: instrumentTransferDetails.ifsc,
+                    reason: instrumentTransferDetails.reason,
+                    remarks: instrumentTransferDetails.remarks,
+                    portalName: instrumentTransferDetails.portalName,
+                    isNetbanking: instrumentTransferDetails.isNetbanking,
+                    isDebit: instrumentTransferDetails.isDebit,
+                }).from(instrumentTransferDetails).where(eq(instrumentTransferDetails.instrumentId, instrument.id)).limit(1);
+            }
+            return this.mapInstrumentResponse(instrument, details);
+        }));
+
+        const instrumentsWithCourier = await Promise.all(instrumentsWithDetails.map(async (inst: any) => {
+            if ((inst.instrumentType === 'DD' || inst.instrumentType === 'FDR') && inst.details?.reqNo) {
+                const courierId = Number(inst.details.reqNo);
+                if (!isNaN(courierId)) {
+                    const [courier] = await this.db
+                        .select()
+                        .from(couriers)
+                        .where(eq(couriers.id, courierId))
+                        .limit(1);
+                    if (courier) {
+                        return {
+                            ...inst,
+                            courierDetails: {
+                                id: courier.id,
+                                toOrg: courier.toOrg,
+                                toName: courier.toName,
+                                toAddr: courier.toAddr,
+                                toPin: courier.toPin,
+                                toMobile: courier.toMobile,
+                                trackingNumber: courier.trackingNumber,
+                                courierProvider: courier.courierProvider,
+                                docketNo: courier.docketNo,
+                                status: courier.status,
+                            },
+                        };
+                    }
+                }
+            }
+            return inst;
+        }));
+
+        return {
+            request: this.mapPaymentRequest(request),
+            tenderId: request.tenderId,
+            type: request.type,
+            tenderNo: request.tenderNo,
+            projectName: request.projectName,
+            purpose: request.purpose,
+            amountRequired: request.amountRequired?.toString() || '0',
+            status: request.status,
+            createdAt: request.createdAt ? request.createdAt.toISOString() : null,
+            instruments: instrumentsWithCourier,
+        };
+    }
+
+    // ============================================================================
+    // MOM (Minutes of Meeting) Remarks
+    // ============================================================================
+
+    async getRemarksByRequestId(requestId: number): Promise<MomRemarkResponseType[]> {
+        const remarks = await this.db
+            .select({
+                id: paymentRequestMom.id,
+                requestId: paymentRequestMom.requestId,
+                instrumentId: paymentRequestMom.instrumentId,
+                remark: paymentRequestMom.remark,
+                addedBy: paymentRequestMom.addedBy,
+                createdAt: paymentRequestMom.createdAt,
+                username: users.name
+            })
+            .from(paymentRequestMom)
+            .leftJoin(users, eq(users.id, paymentRequestMom.addedBy))
+            .where(eq(paymentRequestMom.requestId, requestId))
+            .orderBy(desc(paymentRequestMom.createdAt));
+
+        return remarks.map(r => ({
+            id: r.id,
+            requestId: r.requestId,
+            instrumentId: r.instrumentId,
+            remark: r.remark,
+            addedBy: r.addedBy,
+            addedByName: r.username ?? '',
+            createdAt: r.createdAt ? r.createdAt.toISOString() : '',
+        }));
+    }
+
+    async getRemarksByInstrumentId(instrumentId: number): Promise<MomRemarkResponseType[]> {
+        const remarks = await this.db
+            .select({
+                id: paymentRequestMom.id,
+                requestId: paymentRequestMom.requestId,
+                instrumentId: paymentRequestMom.instrumentId,
+                remark: paymentRequestMom.remark,
+                addedBy: paymentRequestMom.addedBy,
+                createdAt: paymentRequestMom.createdAt,
+                username: users.name
+            })
+            .from(paymentRequestMom)
+            .leftJoin(users, eq(users.id, paymentRequestMom.addedBy))
+            .where(eq(paymentRequestMom.instrumentId, instrumentId))
+            .orderBy(desc(paymentRequestMom.createdAt));
+
+        return remarks.map(r => ({
+            id: r.id,
+            requestId: r.requestId,
+            instrumentId: r.instrumentId,
+            remark: r.remark,
+            addedBy: r.addedBy,
+            addedByName: r.username ?? '',
+            createdAt: r.createdAt ? r.createdAt.toISOString() : '',
+        }));
+    }
+
+    async getTodayRemarks(): Promise<MomRemarkResponseType[]> {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const remarks = await this.db
+            .select({
+                id: paymentRequestMom.id,
+                requestId: paymentRequestMom.requestId,
+                instrumentId: paymentRequestMom.instrumentId,
+                remark: paymentRequestMom.remark,
+                addedBy: paymentRequestMom.addedBy,
+                createdAt: paymentRequestMom.createdAt,
+                username: users.name
+            })
+            .from(paymentRequestMom)
+            .leftJoin(users, eq(users.id, paymentRequestMom.addedBy))
+            .where(gte(paymentRequestMom.createdAt, today))
+            .orderBy(desc(paymentRequestMom.createdAt));
+
+        return remarks.map(r => ({
+            id: r.id,
+            requestId: r.requestId,
+            instrumentId: r.instrumentId,
+            remark: r.remark,
+            addedBy: r.addedBy,
+            addedByName: r.username ?? '',
+            createdAt: r.createdAt ? r.createdAt.toISOString() : '',
+        }));
+    }
+
+    // ============================================================================
+    // Response Mapping Helpers
+    // ============================================================================
+
+    private mapTenderBasic(tender: any) {
+        if (!tender) return null;
+        return {
+            id: tender.id,
+            tenderNo: tender.tenderNo?.toString() || '',
+            tenderName: tender.tenderName?.toString() || '',
+            team: tender.team,
+            organization: tender.organization,
+            item: tender.item,
+            gstValues: tender.gstValues?.toString() || '0',
+            tenderFees: tender.tenderFees?.toString() || '0',
+            emd: tender.emd?.toString() || '0',
+            teamMember: tender.teamMember,
+            dueDate: tender.dueDate ? tender.dueDate.toISOString() : null,
+            status: tender.status || 1,
+            location: tender.location,
+            website: tender.website,
+            emdMode: tender.emdMode?.toString() || null,
+            tenderFeeMode: tender.tenderFeeMode?.toString() || null,
+            processingFeeMode: tender.processingFeeMode?.toString() || null,
+            deleteStatus: tender.deleteStatus || 0,
+        };
+    }
+
+    private mapPaymentRequest(request: any) {
+        return {
+            id: request.id,
+            tenderId: request.tenderId,
+            type: request.type,
+            tenderNo: request.tenderNo?.toString() || '',
+            projectName: request.projectName,
+            dueDate: request.dueDate ? request.dueDate.toISOString() : null,
+            requestedBy: request.requestedBy,
+            requestedByName: request.requestedByName?.toString() || null,
+            purpose: request.purpose,
+            amountRequired: request.amountRequired?.toString() || '0',
+            status: request.status,
+            remarks: request.remarks,
+            createdAt: request.createdAt ? request.createdAt.toISOString() : null,
+            updatedAt: request.updatedAt ? request.updatedAt.toISOString() : null,
+        };
+    }
+
+    private mapInstrumentBase(instrument: any) {
+        return {
+            id: instrument.id,
+            requestId: instrument.requestId,
+            instrumentType: instrument.instrumentType,
+            purpose: instrument.purpose,
+            amount: instrument.amount?.toString() || '0',
+            favouring: instrument.favouring,
+            payableAt: instrument.payableAt,
+            courierAddress: instrument.courierAddress,
+            courierDeadline: instrument.courierDeadline != null ? Number(instrument.courierDeadline) : null,
+            status: instrument.status,
+            isActive: instrument.isActive,
+            reqNo: instrument.reqNo,
+            details: null, // to be filled in mapInstrumentResponse
+        };
+    }
+
+    private mapInstrumentResponse(instrument: any, details: any): InstrumentResponse {
+        const base = this.mapInstrumentBase(instrument);
+        
+        switch (instrument.instrumentType) {
+            case 'DD':
+                return {
+                    ...base,
+                    instrumentType: 'DD' as const,
+                    details: details ? {
+                        ddNo: details.ddNo,
+                        ddDate: details.ddDate,
+                        reqNo: details.reqNo,
+                        ddNeeds: details.ddNeeds,
+                        ddPurpose: details.ddPurpose,
+                        ddRemarks: details.ddRemarks,
+                    } : null,
+                };
+            case 'FDR':
+                return {
+                    ...base,
+                    instrumentType: 'FDR' as const,
+                    details: details ? {
+                        fdrNo: details.fdrNo,
+                        fdrDate: details.fdrDate,
+                        fdrSource: details.fdrSource,
+                        fdrPurpose: details.fdrPurpose,
+                        fdrExpiryDate: details.fdrExpiryDate,
+                        fdrNeeds: details.fdrNeeds,
+                        fdrRemark: details.fdrRemark,
+                        reqNo: instrument.reqNo,
+                    } : null,
+                };
+            case 'BG':
+                return {
+                    ...base,
+                    instrumentType: 'BG' as const,
+                    details: details ? {
+                        bgNo: details.bgNo,
+                        bgDate: details.bgDate,
+                        validityDate: details.validityDate,
+                        claimExpiryDate: details.claimExpiryDate,
+                        beneficiaryName: details.beneficiaryName,
+                        beneficiaryAddress: details.beneficiaryAddress,
+                        bankName: details.bankName,
+                        bgNeeds: details.bgNeeds,
+                        bgPurpose: details.bgPurpose,
+                    } : null,
+                };
+            case 'Cheque':
+                return {
+                    ...base,
+                    instrumentType: 'Cheque' as const,
+                    details: details ? {
+                        chequeNo: details.chequeNo,
+                        chequeDate: details.chequeDate,
+                        bankName: details.bankName,
+                        chequeNeeds: details.chequeNeeds,
+                        chequeReason: details.chequeReason,
+                    } : null,
+                };
+            case 'Bank Transfer':
+                return {
+                    ...base,
+                    instrumentType: 'Bank Transfer' as const,
+                    details: details ? {
+                        utrNum: details.utrNum,
+                        accountName: details.accountName,
+                        accountNumber: details.accountNumber,
+                        ifsc: details.ifsc,
+                        reason: details.reason,
+                        remarks: details.remarks,
+                    } : null,
+                };
+            case 'Portal Payment':
+                return {
+                    ...base,
+                    instrumentType: 'Portal Payment' as const,
+                    details: details ? {
+                        reason: details.reason,
+                        utrNum: details.utrNum,
+                        remarks: details.remarks,
+                        portalName: details.portalName,
+                        portalNetBanking: details.isNetbanking,
+                        portalDebitCard: details.isDebit,
+                    } : null,
+                };
+            default:
+                return base as InstrumentResponse;
+        }
+    }
+
+    async findByIdForEdit(id: number): Promise<PaymentRequestEditResponseType> {
+        const request = await this.findByIdWithTender(id);
+        if (!request) {
+            throw new NotFoundException(`Payment request ${id} not found`);
+        }
+
+        const instrument = request.instruments?.[0];
+        if (!instrument) {
+            throw new NotFoundException(`No instrument found for payment request ${id}`);
+        }
+
+        const details = instrument.details as any;
+        const instrumentType = instrument.instrumentType;
+
+        // Base response with common fields
+        const response: any = {
+            id: request.id,
+            tenderId: request.tenderId,
+            tenderNo: request.tenderNo,
+            tenderName: request.projectName,
+            tenderDueDate: request.dueDate,
+            requestedBy: request.requestedByName || '',
+            purpose: request.purpose,
+            mode: instrumentType,
+        };
+
+        // Dynamically add only relevant fields based on the instrument type
+        switch (instrumentType) {
+            case 'DD':
+                Object.assign(response, this.mapDdDetails(details, request.amountRequired, instrument));
+                break;
+            case 'FDR':
+                Object.assign(response, this.mapFdrDetails(details, request.amountRequired, instrument));
+                break;
+            case 'BG':
+                Object.assign(response, this.mapBgDetails(details, request.amountRequired, instrument));
+                break;
+            case 'Bank Transfer':
+                Object.assign(response, this.mapBankTransferDetails(details, request.amountRequired));
+                break;
+            case 'Portal Payment':
+                Object.assign(response, this.mapPortalDetails(details, request.amountRequired));
+                break;
+            case 'Cheque':
+                Object.assign(response, this.mapChequeDetails(details, request.amountRequired, instrument));
+                break;
+        }
+
+        return response as PaymentRequestEditResponseType;
+    }
+
+    private mapDdDetails(details: any, amount: string, instrument?: any) {
+        const addrJson = instrument?.courierAddressJson as Record<string, any> | null;
+        return {
+            ddFavouring: instrument?.favouring || '',
+            ddPayableAt: instrument?.payableAt || '',
+            ddDeliverBy: details?.ddNeeds || '',
+            ddPurpose: details?.ddPurpose || '',
+            ddAmount: amount,
+            ddCourierAddress: instrument?.courierAddress || '',
+            ddCourierName: addrJson?.name || '',
+            ddCourierPhone: addrJson?.phone || '',
+            ddCourierAddressLine1: addrJson?.line1 || '',
+            ddCourierAddressLine2: addrJson?.line2 || '',
+            ddCourierCity: addrJson?.city || '',
+            ddCourierState: addrJson?.state || '',
+            ddCourierPincode: addrJson?.pincode || '',
+            ddCourierHours: instrument?.courierDeadline || null,
+            ddDate: details?.ddDate || instrument?.issueDate || null,
+            ddRemarks: details?.ddRemarks || '',
+        };
+    }
+
+    private mapFdrDetails(details: any, amount: string, instrument?: any) {
+        const addrJson = instrument?.courierAddressJson as Record<string, any> | null;
+        return {
+            fdrFavouring: instrument?.favouring || '',
+            fdrAmount: amount,
+            fdrExpiryDate: details?.fdrExpiryDate || instrument?.expiryDate || null,
+            fdrDeliverBy: details?.fdrNeeds || '',
+            fdrPurpose: details?.fdrPurpose || '',
+            fdrCourierAddress: instrument?.courierAddress || '',
+            fdrCourierName: addrJson?.name || '',
+            fdrCourierPhone: addrJson?.phone || '',
+            fdrCourierAddressLine1: addrJson?.line1 || '',
+            fdrCourierAddressLine2: addrJson?.line2 || '',
+            fdrCourierCity: addrJson?.city || '',
+            fdrCourierState: addrJson?.state || '',
+            fdrCourierPincode: addrJson?.pincode || '',
+            fdrCourierHours: instrument?.courierDeadline || null,
+            fdrDate: details?.fdrDate || instrument?.issueDate || null,
+        };
+    }
+
+    private mapBgDetails(details: any, amount: string, instrument?: any) {
+        return {
+            bgNeededIn: details?.bgNeeds || '',
+            bgAmount: amount,
+            bgPurpose: details?.bgPurpose || '',
+            bgFavouring: details?.beneficiaryName || instrument?.favouring || '',
+            bgAddress: details?.beneficiaryAddress || '',
+            bgExpiryDate: details?.bgDate || instrument?.expiryDate || null,
+            bgClaimPeriod: details?.claimExpiryDate || null,
+            bgStampValue: details?.stampCharges ? Number(details.stampCharges) : null,
+            bgFormatFiles: details?.bgSoftCopy ? [details.bgSoftCopy] : [],
+            bgPoFiles: details?.bgPo ? [details.bgPo] : [],
+            bgClientUserEmail: details?.bgClientUser || '',
+            bgClientCpEmail: details?.bgClientCp || '',
+            bgClientFinanceEmail: details?.bgClientFin || '',
+            bgBankAccountName: details?.beneficiaryName || '',
+            bgBankAccountNo: details?.bgBankAcc || '',
+            bgBankIfsc: details?.bgBankIfsc || '',
+            bgCourierAddress: instrument?.courierAddress || '',
+            bgCourierDays: instrument?.courierDeadline || null,
+            bgBank: details?.bankName || instrument?.bankName || '',
+        };
+    }
+    
+    private mapBankTransferDetails(details: any, amount: string) {
+        return {
+            btPurpose: details?.btPurpose || details?.reason || details?.purpose || '',
+            btAmount: amount,
+            btAccountName: details?.accountName || '',
+            btAccountNo: details?.accountNumber || '',
+            btIfsc: details?.ifsc || '',
+        };
+    }
+
+    private mapPortalDetails(details: any, amount: string) {
+        return {
+            portalPurpose: details?.portalPurpose || details?.reason || details?.purpose || '',
+            portalAmount: amount,
+            portalName: details?.portalName || '',
+            portalNetBanking: details?.portalNetBanking || details?.isNetbanking || null,
+            portalDebitCard: details?.portalDebitCard || details?.isDebit || null,
+        };
+    }
+
+    private mapChequeDetails(details: any, amount: string, instrument?: any) {
+        return {
+            chequeFavouring: instrument?.favouring || '',
+            chequeAmount: amount,
+            chequeDate: details?.chequeDate || instrument?.issueDate || null,
+            chequeNeededIn: details?.chequeNeeds || '',
+            chequePurpose: details?.chequeReason || '',
+            chequeAccount: details?.bankName || instrument?.bankName || '',
+        };
+    }
+
+    async serveGeneratedPdf(instrumentId: number): Promise<StreamableFile> {
+        const [instrument] = await this.db
+            .select({ generatedPdf: paymentInstruments.generatedPdf })
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument?.generatedPdf) {
+            throw new NotFoundException('No generated PDF found for this instrument');
+        }
+
+        const absolutePath = path.join(process.cwd(), 'uploads', 'tendering', instrument.generatedPdf);
+
+        if (!existsSync(absolutePath)) {
+            throw new NotFoundException('PDF file not found on disk');
+        }
+
+        const fileStream = createReadStream(absolutePath);
+        return new StreamableFile(fileStream, {
+            type: 'application/pdf',
+            disposition: `inline; filename="${path.basename(absolutePath)}"`,
+        });
+    }
+}

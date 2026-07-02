@@ -38,6 +38,8 @@ import {
 import { VendorOrganizationDrawer } from './components/VendorOrganizationDrawer';
 import { VendorOrganizationViewModal } from './components/VendorOrganizationViewModal';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
 
 const VendorOrganizationsPage = () => {
     const { data: organizations, isLoading, error, refetch } = useVendorOrganizationsWithRelations();
@@ -144,6 +146,7 @@ const OrganizationCard = ({
 }: {
     organization: VendorOrganizationWithRelations;
 }) => {
+    const navigate = useNavigate();
     return (
         <AccordionItem value={`org-${organization.id}`} className="border rounded-lg bg-white">
             <Card className="border-0 shadow-none">
@@ -210,10 +213,13 @@ const OrganizationCard = ({
                                 >
                                     Edit Organization
                                 </DropdownMenuItem>
-                                <DropdownMenuItem>Add Person</DropdownMenuItem>
-                                <DropdownMenuItem>Add GST</DropdownMenuItem>
-                                <DropdownMenuItem>Add Bank Account</DropdownMenuItem>
-                                <DropdownMenuItem className="text-red-600">Delete</DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => {
+                                        navigate(paths.master.vendors_edit(organization.id));
+                                    }}
+                                >
+                                    Manage Relations
+                                </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -240,17 +246,17 @@ const OrganizationCard = ({
 
                             {/* Persons Tab */}
                             <TabsContent value="persons" className="mt-4">
-                                <PersonsTable persons={organization.persons} />
+                                <PersonsTable persons={organization.persons} orgId={organization.id} />
                             </TabsContent>
 
                             {/* GST Tab */}
                             <TabsContent value="gst" className="mt-4">
-                                <GSTTable gsts={organization.gsts} />
+                                <GSTTable gsts={organization.gsts} orgId={organization.id} />
                             </TabsContent>
 
                             {/* Accounts Tab */}
                             <TabsContent value="accounts" className="mt-4">
-                                <AccountsTable accounts={organization.accounts} />
+                                <AccountsTable accounts={organization.accounts} orgId={organization.id} />
                             </TabsContent>
                         </Tabs>
                     </CardContent>
@@ -261,13 +267,15 @@ const OrganizationCard = ({
 };
 
 // Persons Table Component
-const PersonsTable = ({ persons }: { persons: any[] }) => {
+const PersonsTable = ({ persons, orgId }: { persons: any[], orgId: number }) => {
+    const navigate = useNavigate();
+
     if (persons.length === 0) {
         return (
             <div className="text-center py-8 text-muted-foreground">
                 <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>No persons added yet</p>
-                <Button variant="outline" size="sm" className="mt-2">
+                <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate(paths.master.vendors_edit(orgId))}>
                     Add Person
                 </Button>
             </div>
@@ -296,9 +304,14 @@ const PersonsTable = ({ persons }: { persons: any[] }) => {
                             </div>
                         )}
                     </div>
-                    <Badge variant={person.status ? 'default' : 'secondary'}>
-                        {person.status ? 'Active' : 'Inactive'}
-                    </Badge>
+                    <div className="flex items-center gap-4">
+                        <Badge variant={person.status ? 'default' : 'secondary'}>
+                            {person.status ? 'Active' : 'Inactive'}
+                        </Badge>
+                        <Button variant="ghost" size="sm" onClick={() => navigate(paths.master.vendors_edit(orgId))}>
+                            Edit
+                        </Button>
+                    </div>
                 </div>
             ))}
         </div>
@@ -306,13 +319,15 @@ const PersonsTable = ({ persons }: { persons: any[] }) => {
 };
 
 // GST Table Component
-const GSTTable = ({ gsts }: { gsts: any[] }) => {
+const GSTTable = ({ gsts, orgId }: { gsts: any[], orgId: number }) => {
+    const navigate = useNavigate();
+
     if (gsts.length === 0) {
         return (
             <div className="text-center py-8 text-muted-foreground">
                 <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>No GST numbers added yet</p>
-                <Button variant="outline" size="sm" className="mt-2">
+                <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate(paths.master.vendors_edit(orgId))}>
                     Add GST
                 </Button>
             </div>
@@ -341,7 +356,7 @@ const GSTTable = ({ gsts }: { gsts: any[] }) => {
                                 </Badge>
                             </td>
                             <td className="p-3 text-right">
-                                <Button variant="ghost" size="sm">
+                                <Button variant="ghost" size="sm" onClick={() => navigate(paths.master.vendors_edit(orgId))}>
                                     Edit
                                 </Button>
                             </td>
@@ -354,13 +369,15 @@ const GSTTable = ({ gsts }: { gsts: any[] }) => {
 };
 
 // Accounts Table Component
-const AccountsTable = ({ accounts }: { accounts: any[] }) => {
+const AccountsTable = ({ accounts, orgId }: { accounts: any[], orgId: number }) => {
+    const navigate = useNavigate();
+
     if (accounts.length === 0) {
         return (
             <div className="text-center py-8 text-muted-foreground">
                 <CreditCard className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>No bank accounts added yet</p>
-                <Button variant="outline" size="sm" className="mt-2">
+                <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate(paths.master.vendors_edit(orgId))}>
                     Add Bank Account
                 </Button>
             </div>
@@ -382,16 +399,16 @@ const AccountsTable = ({ accounts }: { accounts: any[] }) => {
                 <tbody>
                     {accounts.map((account) => (
                         <tr key={account.id} className="border-b last:border-0 hover:bg-accent/50">
-                            <td className="p-3">{account.accountName}</td>
-                            <td className="p-3 font-mono text-sm">{account.accountNum}</td>
-                            <td className="p-3 font-mono text-sm">{account.accountIfsc}</td>
+                             <td className="p-3">{account.bankAccountName}</td>
+                             <td className="p-3 font-mono text-sm">{account.accountNum}</td>
+                             <td className="p-3 font-mono text-sm">{account.ifscCode}</td>
                             <td className="p-3">
                                 <Badge variant={account.status ? 'default' : 'secondary'} className="text-xs">
                                     {account.status ? 'Active' : 'Inactive'}
                                 </Badge>
                             </td>
                             <td className="p-3 text-right">
-                                <Button variant="ghost" size="sm">
+                                <Button variant="ghost" size="sm" onClick={() => navigate(paths.master.vendors_edit(orgId))}>
                                     Edit
                                 </Button>
                             </td>

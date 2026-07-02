@@ -1,0 +1,31 @@
+<div>
+    <p>Dear {{followUpInitiator}},</p>
+
+    <p>
+        The followup for
+        {{followUpFor}}, with the team of
+        {{organizationName}}
+        has been stopped.
+    </p>
+
+    <p>
+        The reason is
+        {{#if isRemarks}}
+            {{remarks}}
+        {{else}}
+            {{reason}}
+        {{/if}}
+    </p>
+
+    {{#if isObjectiveAchieved}}
+        <p>Please find the proofs below or same attachment:</p>
+        "{{proofs}}"
+    {{else}}
+        <p>We will reinitiate the auto follow-up after a few days of manual follow-up.</p>
+    {{/if}}
+
+    <p>
+        <b>Best Regards,</b><br />
+        {{teamMember}}
+    </p>
+</div>

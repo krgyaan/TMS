@@ -1,10 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { demandDraftsService } from '@/services/api/demand-drafts.service';
-import type {
-    DemandDraftDashboardRow,
-    DemandDraftDashboardCounts,
-    DemandDraftDashboardFilters,
-} from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
+import type { DemandDraftDashboardRow, DemandDraftDashboardCounts, DashboardFilters } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
 import type { PaginatedResult } from '@/types/api.types';
 
 export const demandDraftsKey = {
@@ -14,16 +10,26 @@ export const demandDraftsKey = {
     details: () => [...demandDraftsKey.all, 'detail'] as const,
     detail: (id: number) => [...demandDraftsKey.details(), id] as const,
     counts: () => [...demandDraftsKey.all, 'counts'] as const,
+    actionForm: (id: number) => [...demandDraftsKey.all, 'action-form', id] as const,
+    followup: (id: number) => [...demandDraftsKey.all, 'followup', id] as const,
 };
 
 export const useDemandDraftDashboard = (
-    filters?: DemandDraftDashboardFilters
+    filters?: DashboardFilters
 ) => {
-    const params: DemandDraftDashboardFilters = {
+    const params: DashboardFilters = {
         ...filters,
     };
 
-    const queryKeyFilters = { tab: filters?.tab, page: filters?.page, limit: filters?.limit, search: filters?.search };
+    const queryKeyFilters = { 
+        tab: filters?.tab, 
+        page: filters?.page, 
+        limit: filters?.limit, 
+        search: filters?.search,
+        sortBy: filters?.sortBy,
+        sortOrder: filters?.sortOrder,
+        team: filters?.team,
+    };
 
     const query = useQuery<PaginatedResult<DemandDraftDashboardRow>>({
         queryKey: demandDraftsKey.list(queryKeyFilters),
@@ -54,12 +60,47 @@ export const useDemandDraftDashboardCounts = () => {
     return query;
 };
 
+export const useDemandDraftDetails = (id: number) => {
+    const query = useQuery({
+        queryKey: demandDraftsKey.detail(id),
+        queryFn: async () => {
+            const result = await demandDraftsService.getById(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+
+    return query;
+};
+
+export const useDDActionFormData = (id: number) => {
+    return useQuery({
+        queryKey: demandDraftsKey.actionForm(id),
+        queryFn: async () => {
+            const result = await demandDraftsService.getActionFormData(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+};
+
+export const useDDFollowupData = (id: number) => {
+    return useQuery({
+        queryKey: demandDraftsKey.followup(id),
+        queryFn: async () => {
+            const result = await demandDraftsService.getFollowupData(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+};
+
 export const useUpdateDemandDraftAction = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
-            demandDraftsService.updateAction(id, formData),
+        mutationFn: ({ id, data }: { id: number; data: any }) =>
+            demandDraftsService.updateAction(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: demandDraftsKey.all });
             queryClient.invalidateQueries({ queryKey: demandDraftsKey.counts() });

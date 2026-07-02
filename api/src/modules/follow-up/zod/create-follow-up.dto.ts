@@ -4,10 +4,19 @@ import { z } from "zod";
 export const contactPersonSchema = z.object({
     id: z.number().optional(),
     followUpId: z.number().optional(),
-    name: z.string().min(1, "Contact name is required"),
-    email: z.string().email().nullable().optional(),
-    phone: z.string().nullable().optional(),
-    org: z.string().nullable().optional(),
+    name: z.string().optional(),
+    email: z.preprocess(
+        (val) => (typeof val === "string" && val.trim() === "" ? null : val),
+        z.string().trim().email().nullable().optional()
+    ),
+    phone: z.preprocess(
+        (val) => (typeof val === "string" && val.trim() === "" ? null : val),
+        z.string().trim().nullable().optional()
+    ),
+    org: z.preprocess(
+        (val) => (typeof val === "string" && val.trim() === "" ? null : val),
+        z.string().trim().nullable().optional()
+    ),
 });
 
 // Create follow-up schema
@@ -22,13 +31,15 @@ export const createFollowUpSchema = z.object({
         .default(0),
 
     // VARCHAR(50) in DB
-    followupFor: z.string().nullable().optional(),
+    followupFor: z.string().min(1, "Followup reason is required"),
 
-    assignedToId: z.number().positive().nullable(), // DB allows NULL
-    createdById: z.number().positive().nullable(), // DB allows NULL
+    assignedToId: z.number().nonnegative().nullable(), // DB allows NULL
+    createdById: z.number().nonnegative().nullable(), // DB allows NULL
 
     comment: z.string().nullable().optional(),
     details: z.string().nullable().optional(),
+
+    assignmentStatus: z.string().optional(),
 
     contacts: z.array(contactPersonSchema).min(1, "At least one contact person is required"),
 

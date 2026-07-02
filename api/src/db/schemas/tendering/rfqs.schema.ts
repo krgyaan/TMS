@@ -1,16 +1,4 @@
-import {
-    pgTable,
-    bigserial,
-    bigint,
-    varchar,
-    text,
-    timestamp,
-    integer,
-    numeric,
-    jsonb,
-} from "drizzle-orm/pg-core";
-import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
-import { vendors } from "@db/schemas/vendors/vendors.schema";
+import { pgTable, bigserial, bigint, varchar, text, timestamp, integer, numeric, jsonb } from "drizzle-orm/pg-core";
 
 // RFQs
 export const rfqs = pgTable("rfqs", {
@@ -18,6 +6,7 @@ export const rfqs = pgTable("rfqs", {
     tenderId: bigint("tender_id", { mode: "number" }).notNull(),
     dueDate: timestamp("due_date", { withTimezone: true }),
     docList: text("doc_list"),
+    requestedOrganization: varchar("requested_organization", { length: 255 }),
     requestedVendor: varchar("requested_vendor", { length: 255 }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
@@ -48,6 +37,8 @@ export const rfqDocuments = pgTable("rfq_documents", {
 export const rfqResponses = pgTable("rfq_responses", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     rfqId: bigint("rfq_id", { mode: "number" }).notNull(),
+    responseStatus: bigint("response_status", {mode: "number"}),
+    organizationId: bigint("organization_id", { mode: "number" }),
     vendorId: bigint("vendor_id", { mode: "number" }).notNull(),
     receiptDatetime: timestamp("receipt_datetime", { withTimezone: true }).notNull(),
     gstPercentage: numeric("gst_percentage", { precision: 5, scale: 2 }),
@@ -55,6 +46,7 @@ export const rfqResponses = pgTable("rfq_responses", {
     deliveryTime: integer("delivery_time"),
     freightType: varchar("freight_type", { length: 50 }),
     notes: text("notes"),
+    remarks: text("remarks"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });

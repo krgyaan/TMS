@@ -91,9 +91,9 @@ const Master_LoanParty_Create = lazy(() => import("@/modules/master/loan-party/c
 const Master_LoanParty_Edit = lazy(() => import("@/modules/master/loan-party/edit"));
 
 // Projects
-const Master_Project = lazy(() => import("@/modules/master/project"));
-const Master_Project_Create = lazy(() => import("@/modules/master/project/create"));
-const Master_Project_Edit = lazy(() => import("@/modules/master/project/edit"));
+// const Master_Project = lazy(() => import("@/modules/shared/master-project"));
+// const Master_Project_Create = lazy(() => import("@/modules/shared/master-project/create"));
+// const Master_Project_Edit = lazy(() => import("@/modules/shared/master-project/edit"));
 
 // States
 const Master_State = lazy(() => import("@/modules/master/state"));
@@ -112,6 +112,9 @@ const Master_LeadType_Edit = lazy(() => import("@/modules/master/lead-type/edit"
 const Master_Vendors = lazy(() => import("@/modules/master/vendors"));
 const Master_Vendors_Create = lazy(() => import("@/modules/master/vendors/create"));
 const Master_Vendors_Edit = lazy(() => import("@/modules/master/vendors/edit"));
+
+//Circulars
+const Master_Circular = lazy(() => import("@/modules/master/circulars/CircularDashboardSection"))
 
 // ==================== ROUTES ====================
 export default function MasterRoutes() {
@@ -578,7 +581,7 @@ export default function MasterRoutes() {
             </Route>
 
             {/* Projects */}
-            <Route path="projects">
+            {/* <Route path="projects">
                 <Route
                     index
                     element={
@@ -603,7 +606,7 @@ export default function MasterRoutes() {
                         </RouteWrapper>
                     }
                 />
-            </Route>
+            </Route> */}
 
             {/* States */}
             <Route path="states">
@@ -697,6 +700,19 @@ export default function MasterRoutes() {
                         </RouteWrapper>
                     }
                 />
+            </Route>
+
+            {/* Circular (Unified) */}
+            <Route path="circular">
+                <Route
+                    index
+                    element={
+                        <RouteWrapper>
+                            <Master_Circular />
+                        </RouteWrapper>
+                    }
+                />
+
             </Route>
         </Routes>
     );

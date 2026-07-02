@@ -33,6 +33,23 @@ function getPermissionModule(title: string, parentMenuTitle?: string): string | 
             return 'shared.imprests';
         }
     }
+    if (title === 'Purchase Orders') {
+        if (parentMenuTitle === 'Operations') {
+            return 'ops.purchase-orders';
+        }
+        if (parentMenuTitle === 'Accounts') {
+            return 'accounts.purchase-orders';
+        }
+    }
+
+    if (title === 'Payment Requests') {
+        if (parentMenuTitle === 'Operations') {
+            return 'ops.payment-requests';
+        }
+        if (parentMenuTitle === 'Accounts') {
+            return 'accounts.payment-requests';
+        }
+    }
 
     // Standard mapping for unique titles
     const MENU_PERMISSION_MAP: Record<string, string> = {
@@ -46,8 +63,8 @@ function getPermissionModule(title: string, parentMenuTitle?: string): string | 
         'Costing Sheets': 'costing-sheets',
         'Costing Approval': 'costing-approvals',
         'Bid Submissions': 'bid-submissions',
-        'TQs': 'tq-management',
-        'RA': 'reverse-auction',
+        'TQ Management': 'tq-management',
+        'RA Management': 'reverse-auction',
         'Results': 'tender-result',
 
         // Operations sub-items

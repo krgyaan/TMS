@@ -6,4 +6,4 @@ import { OemPerformanceService } from "./oem-performance.service";
     controllers: [OemPerformanceController],
     providers: [OemPerformanceService],
 })
-export class OemDashboardModule {}
+export class OemPerformanceModule {}

@@ -1,21 +1,31 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { paths } from '@/app/routes/paths';
+import { tenderNameCol } from '@/components/data-grid/columns';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, RotateCcw, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import DataTable from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDemandDraftDashboard, useDemandDraftDashboardCounts } from '@/hooks/api/useDemandDrafts';
-import type { DemandDraftDashboardRow, DemandDraftDashboardTab } from './helpers/demandDraft.types';
-import { dateCol, currencyCol } from '@/components/data-grid/columns';
-import { DemandDraftActionForm } from './components/DemandDraftActionForm';
 
-const TABS_CONFIG: Array<{ key: DemandDraftDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
+import { useBiExport } from '@/hooks/useBiExport';
+import { formatDate } from '@/hooks/useFormatedDate';
+import { formatINR } from '@/hooks/useINRFormatter';
+import { demandDraftsService } from '@/services/api/demand-drafts.service';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
+import type { ColDef } from 'ag-grid-community';
+import { AlertCircle, CheckCircle, Clock, Edit, Eye, FileX2, MessageSquare, Plus, RotateCcw, Search, XCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import type { DashboardTab, DemandDraftDashboardRow } from './helpers/demandDraft.types';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
+
+const TABS_CONFIG: Array<{ key: DashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
         key: 'pending',
         name: 'Pending',
@@ -51,40 +61,93 @@ const TABS_CONFIG: Array<{ key: DemandDraftDashboardTab; name: string; icon: Rea
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
-    if (statusLower.includes('created') || statusLower.includes('active')) {
+    if (statusLower.includes('created')) {
         return 'default';
     }
     if (statusLower.includes('cancelled') || statusLower.includes('rejected')) {
         return 'destructive';
     }
-    if (statusLower.includes('returned')) {
-        return 'secondary';
-    }
     return 'secondary';
 };
 
 const DemandDraftListPage = () => {
-    const [activeTab, setActiveTab] = useState<DemandDraftDashboardTab>('pending');
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState<string>('');
-    const [actionFormOpen, setActionFormOpen] = useState(false);
-    const [selectedInstrument, setSelectedInstrument] = useState<DemandDraftDashboardRow | null>(null);
+    const {
+        activeTab, setActiveTab,
+        search, setSearch,
+        debouncedSearch,
+        pagination, setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState({
+        storageKey: 'demand-drafts',
+        defaultTab: 'pending' as DashboardTab,
+    });
+    const navigate = useNavigate();
+    const [teamFilter, setTeamFilter] = useState<string>('All');
+    const teamId = teamFilter === 'All' ? undefined : teamFilter === 'AC' ? 1 : 2;
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, search]);
+    }, [teamFilter]);
 
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
-            }));
-        setSortModel(sortModel);
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, []);
+    const flattenFormData = (data: Record<string, any>): Record<string, any> => {
+        const out: Record<string, any> = {};
+        if (data.ddNo) out['DD No'] = data.ddNo;
+        if (data.ddDate) out['DD Date'] = new Date(data.ddDate).toLocaleDateString('en-GB');
+        if (data.reqNo) out['Courier Req No'] = data.reqNo;
+        if (data.ddNeeds) out['Deliver By'] = data.ddNeeds;
+        if (data.ddPurpose) out['Purpose Detail'] = data.ddPurpose;
+        if (data.ddRemarks) out['Remarks'] = data.ddRemarks;
+        if (data.utr) out['UTR'] = data.utr;
+        if (data.issueDate) out['Issue Date'] = new Date(data.issueDate).toLocaleDateString('en-GB');
+        if (data.expiryDate) out['Expiry Date'] = new Date(data.expiryDate).toLocaleDateString('en-GB');
+        if (data.payableAt) out['Payable At'] = data.payableAt;
+        if (data.docketNo) out['Docket No'] = data.docketNo;
+        return out;
+    };
+
+    const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
+        getAllFn: (params) => demandDraftsService.getAll(params),
+        getExportDataFn: (params) => demandDraftsService.getExportData(params),
+        tabsConfig: TABS_CONFIG,
+        pendingTabKey: 'pending',
+        tabsWithForm: ['created', 'rejected', 'returned', 'cancelled'],
+        filenamePrefix: 'demand-drafts',
+        flattenFormData,
+        mapPendingRow: (r: any) => ({
+            'Tender Name': r.projectName || '',
+            'Tender No': r.projectNo || '',
+            'DD Date': r.ddCreationDate ? new Date(r.ddCreationDate).toLocaleDateString('en-GB') : '',
+            'DD No': r.ddNo || '',
+            'Tender Status': r.tenderStatus || '',
+            'Beneficiary name': r.beneficiaryName || '',
+            'Purpose': r.purpose || '',
+            'DD Amount': r.ddAmount || '',
+            'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+            'Member': r.teamMember || '',
+            'Expiry': r.expiry || '',
+            'DD Status': r.ddStatus || '',
+        }),
+        mapRow: (r: any, isAllTab: boolean) => {
+            const base: Record<string, any> = {
+                'Tender Name': r.projectName || r.tenderName || '',
+                'Tender No': r.tenderNo || r.projectNo || '',
+                'Tender Status': r.tenderStatus || '',
+                'Beneficiary name': r.beneficiaryName || '',
+                'Purpose': r.purpose || '',
+                'DD Amount': r.ddAmount || '',
+                'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+                'Member': r.teamMember || '',
+                'Expiry': r.expiry || '',
+                'DD Status': r.ddStatus || '',
+            };
+            if (isAllTab) base['Tab'] = r._tab || '';
+            if (r.ddCreationDate) base['DD Date'] = new Date(r.ddCreationDate).toLocaleDateString('en-GB');
+            if (r.ddNo) base['DD No'] = r.ddNo;
+            return base;
+        },
+    });
 
     const { data: apiResponse, isLoading, error } = useDemandDraftDashboard({
         tab: activeTab,
@@ -92,7 +155,8 @@ const DemandDraftListPage = () => {
         limit: pagination.pageSize,
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
+        team: teamId,
     });
 
     const { data: counts } = useDemandDraftDashboardCounts();
@@ -100,80 +164,59 @@ const DemandDraftListPage = () => {
     const ddData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const handleViewDetails = useCallback((row: DemandDraftDashboardRow) => {
-        // TODO: Implement navigation to detail page
-        console.log('View details:', row);
-    }, []);
-
-    const handleOpenActionForm = useCallback((row: DemandDraftDashboardRow) => {
-        setSelectedInstrument(row);
-        setActionFormOpen(true);
-    }, []);
-
     const ddActions: ActionItem<DemandDraftDashboardRow>[] = useMemo(
         () => [
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: handleViewDetails,
+                onClick: (row: DemandDraftDashboardRow) => navigate(paths.bi.demandDraftView(row.requestId)),
             },
             {
                 label: 'Action Form',
                 icon: <Edit className="h-4 w-4" />,
-                onClick: handleOpenActionForm,
+                onClick: (row: DemandDraftDashboardRow) => navigate(paths.bi.demandDraftAction(row.id))
             },
+            {
+                label: "Meeting Remark",
+                icon: <MessageSquare className='h-4 w-4' />,
+                onClick: (row: DemandDraftDashboardRow) => navigate(paths.bi.DDMeetingRemarks(row.requestId))
+            }
         ],
-        [handleViewDetails, handleOpenActionForm]
+        [navigate]
     );
 
     const colDefs = useMemo<ColDef<DemandDraftDashboardRow>[]>(
         () => [
-            dateCol<DemandDraftDashboardRow>('ddCreationDate', {
-                headerName: 'DD Creation Date',
-                width: 150,
+            {
+                field: 'ddCreationDate',
+                headerName: 'DD Date',
+                width: 110,
                 colId: 'ddCreationDate',
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
                 sortable: true,
-            }),
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
+                hide: activeTab === 'pending' || activeTab === 'rejected',
+            },
             {
                 field: 'ddNo',
                 headerName: 'DD No',
-                width: 120,
+                width: 100,
                 colId: 'ddNo',
                 valueGetter: (params) => params.data?.ddNo || '—',
                 sortable: true,
                 filter: true,
+                hide: activeTab === 'pending' || activeTab === 'rejected',
             },
-            {
-                field: 'beneficiaryName',
-                headerName: 'Beneficiary name',
-                width: 180,
-                colId: 'beneficiaryName',
-                valueGetter: (params) => params.data?.beneficiaryName || '—',
-                sortable: true,
+            tenderNameCol<DemandDraftDashboardRow>('tenderNo', {
+                headerName: 'Tender Details',
                 filter: true,
-            },
-            currencyCol<DemandDraftDashboardRow>('ddAmount', {}, {
-                headerName: 'DD Amount',
-                width: 130,
-                colId: 'ddAmount',
-                sortable: true,
-            }),
-            {
-                field: 'tenderNo',
-                headerName: 'Tender Name',
                 width: 200,
-                colId: 'tenderNo',
-                sortable: true,
-                valueGetter: (params) => {
-                    const tenderNo = params.data?.tenderNo || '';
-                    const tenderName = params.data?.tenderName || '';
-                    return tenderNo && tenderName ? `${tenderNo} - ${tenderName}` : tenderNo || tenderName || '—';
-                },
-            },
-            dateCol<DemandDraftDashboardRow>('bidValidity', {
-                headerName: 'Bid Validity',
-                width: 130,
-                colId: 'bidValidity',
+                maxWidth: 200,
                 sortable: true,
             }),
             {
@@ -184,26 +227,82 @@ const DemandDraftListPage = () => {
                 valueGetter: (params) => params.data?.tenderStatus || '—',
                 sortable: true,
                 filter: true,
+                maxWidth: 130,
             },
             {
-                field: 'member',
-                headerName: 'Member',
-                width: 120,
-                colId: 'member',
-                valueGetter: (params) => params.data?.member || '—',
+                field: 'beneficiaryName',
+                headerName: 'Beneficiary name',
+                maxWidth: 200,
+                colId: 'beneficiaryName',
+                valueGetter: (params) => params.data?.beneficiaryName || '—',
                 sortable: true,
                 filter: true,
             },
-            dateCol<DemandDraftDashboardRow>('expiry', {
-                headerName: 'Expiry',
+            {
+                field: 'purpose',
+                headerName: 'Purpose',
+                width: 100,
+                colId: 'purpose',
+                valueGetter: (params) => params.data?.purpose || '—',
+                sortable: true,
+                filter: true,
+            },
+            {
+                field: 'ddAmount',
+                headerName: 'DD Amount',
                 width: 120,
+                maxWidth: 120,
+                colId: 'ddAmount',
+                sortable: true,
+                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+            },
+            {
+                field: 'bidValidity',
+                headerName: 'Bid Validity',
+                width: 110,
+                maxWidth: 110,
+                colId: 'bidValidity',
+                sortable: true,
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                filter: true,
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
+            },
+            {
+                field: 'teamMember',
+                headerName: 'Member',
+                width: 120,
+                maxWidth: 120,
+                colId: 'teamMember',
+                valueGetter: (params) => params.data?.teamMember || '—',
+                sortable: true,
+                filter: true,
+            },
+            {
+                field: 'expiry',
+                headerName: 'Expiry',
+                width: 90,
+                maxWidth: 90,
                 colId: 'expiry',
                 sortable: true,
-            }),
+                valueGetter: (params) => params.data?.expiry || '—',
+                cellRenderer: (params: any) => {
+                    const status = params.value;
+                    if (!status) return '—';
+                    if (status === 'No date') return <Badge variant="secondary">No date</Badge>;
+                    if (status === 'Expired') return <Badge variant="destructive">Expired</Badge>;
+                    return <Badge variant="default">{status}</Badge>;
+                },
+            },
             {
                 field: 'ddStatus',
                 headerName: 'DD Status',
                 width: 130,
+                maxWidth: 130,
                 colId: 'ddStatus',
                 sortable: true,
                 filter: true,
@@ -222,7 +321,7 @@ const DemandDraftListPage = () => {
                 width: 57,
             },
         ],
-        [ddActions]
+        [ddActions, activeTab]
     );
 
     const tabsWithData = useMemo(() => {
@@ -288,26 +387,29 @@ const DemandDraftListPage = () => {
                                 Track and manage demand drafts for tenders.
                             </CardDescription>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="relative">
-                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-8 w-64"
+                        <CardAction>
+                            <div className="flex items-center gap-2">
+                                <ExportExcelDropdown
+                                    exportOptions={exportOptions}
+                                    exportTab={exportTab}
+                                    setExportTab={setExportTab}
+                                    exporting={exporting}
+                                    handleExport={handleExport}
                                 />
+                                <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForDD())}>
+                                    <Plus className="w-4 h-4" />
+                                    Add Old Entry
+                                </Button>
                             </div>
-                        </div>
+                        </CardAction>
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">
                     <Tabs
                         value={activeTab}
-                        onValueChange={(value) => setActiveTab(value as DemandDraftDashboardTab)}
+                        onValueChange={(value) => setActiveTab(value as DashboardTab)}
                     >
-                        <TabsList className="m-auto">
+                        <TabsList className="m-auto mb-4">
                             {tabsWithData.map((tab) => (
                                 <TabsTrigger
                                     key={tab.key}
@@ -324,6 +426,33 @@ const DemandDraftListPage = () => {
                                 </TabsTrigger>
                             ))}
                         </TabsList>
+
+                        {/* Search Row: Quick Filters, Search Bar */}
+                        <div className="flex items-center gap-4 px-6 pb-4">
+                            {/* Quick Filters (Left) */}
+                            <QuickFilter options={[
+                                { label: 'AC Team', value: 'AC' },
+                                { label: 'DC Team', value: 'DC' },
+                                { label: 'All Team', value: 'All' },
+                            ]}
+                                value={teamFilter}
+                                onChange={(value) => setTeamFilter(value)}
+                            />
+
+                            {/* Search Bar (Center) - Flex grow */}
+                            <div className="flex-1 flex justify-end">
+                                <div className="relative">
+                                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        type="text"
+                                        placeholder="Search..."
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        className="pl-8 w-64"
+                                    />
+                                </div>
+                            </div>
+                        </div>
 
                         {tabsWithData.map((tab) => (
                             <TabsContent key={tab.key} value={tab.key} className="px-0 m-0 data-[state=inactive]:hidden">
@@ -347,6 +476,9 @@ const DemandDraftListPage = () => {
                                                 rowCount={totalRows}
                                                 paginationState={pagination}
                                                 onPaginationChange={setPagination}
+                                                onPageSizeChange={handlePageSizeChange}
+                                                showTotalCount={true}
+                                                showLengthChange={true}
                                                 gridOptions={{
                                                     defaultColDef: {
                                                         editable: false,
@@ -366,22 +498,6 @@ const DemandDraftListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
-
-            {/* Action Form Dialog */}
-            {selectedInstrument && (
-                <DemandDraftActionForm
-                    open={actionFormOpen}
-                    onOpenChange={setActionFormOpen}
-                    instrumentId={selectedInstrument.id}
-                    instrumentData={{
-                        ddNo: selectedInstrument.ddNo || undefined,
-                        ddDate: selectedInstrument.ddCreationDate || undefined,
-                        amount: selectedInstrument.ddAmount || undefined,
-                        tenderName: selectedInstrument.tenderName || undefined,
-                        tenderNo: selectedInstrument.tenderNo || undefined,
-                    }}
-                />
-            )}
         </>
     );
 };

@@ -14,6 +14,8 @@ export const fdrsKey = {
     details: () => [...fdrsKey.all, 'detail'] as const,
     detail: (id: number) => [...fdrsKey.details(), id] as const,
     counts: () => [...fdrsKey.all, 'counts'] as const,
+    actionForm: (id: number) => [...fdrsKey.all, 'action-form', id] as const,
+    followup: (id: number) => [...fdrsKey.all, 'followup', id] as const,
 };
 
 export const useFdrDashboard = (
@@ -23,7 +25,15 @@ export const useFdrDashboard = (
         ...filters,
     };
 
-    const queryKeyFilters = { tab: filters?.tab, page: filters?.page, limit: filters?.limit, search: filters?.search };
+    const queryKeyFilters = { 
+        tab: filters?.tab, 
+        page: filters?.page, 
+        limit: filters?.limit, 
+        search: filters?.search,
+        sortBy: filters?.sortBy,
+        sortOrder: filters?.sortOrder,
+        team: filters?.team,
+    };
 
     const query = useQuery<PaginatedResult<FdrDashboardRow>>({
         queryKey: fdrsKey.list(queryKeyFilters),
@@ -54,12 +64,47 @@ export const useFdrDashboardCounts = () => {
     return query;
 };
 
+export const useFdrDetails = (id: number) => {
+    const query = useQuery({
+        queryKey: fdrsKey.detail(id),
+        queryFn: async () => {
+            const result = await fdrsService.getById(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+
+    return query;
+};
+
+export const useFDRActionFormData = (id: number) => {
+    return useQuery({
+        queryKey: fdrsKey.actionForm(id),
+        queryFn: async () => {
+            const result = await fdrsService.getActionFormData(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+};
+
+export const useFDRFollowupData = (id: number) => {
+    return useQuery({
+        queryKey: fdrsKey.followup(id),
+        queryFn: async () => {
+            const result = await fdrsService.getFollowupData(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+};
+
 export const useUpdateFdrAction = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
-            fdrsService.updateAction(id, formData),
+        mutationFn: ({ id, data }: { id: number; data: any }) =>
+            fdrsService.updateAction(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: fdrsKey.all });
             queryClient.invalidateQueries({ queryKey: fdrsKey.counts() });

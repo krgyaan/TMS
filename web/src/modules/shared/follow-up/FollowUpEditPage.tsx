@@ -11,7 +11,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { TiptapEditor } from "@/components/tiptapeditor";
 import { MockUploadDropzone } from "@/components/mock-uploadthing";
-import { DatePicker } from "@/components/ui/date-picker";
 import { FilePond, registerPlugin } from "react-filepond";
 import FilePondPluginFileValidateType from "filepond-plugin-file-validate-type";
 import FilePondPluginImagePreview from "filepond-plugin-image-preview";
@@ -34,10 +33,12 @@ import { FileUploadField } from "@/components/form/FileUploadField";
 export const FREQUENCY_LABELS: Record<number, string> = {
     1: "Daily",
     2: "Alternate Days",
-    3: "Weekly",
-    4: "Bi-Weekly",
-    5: "Monthly",
-    6: "Stopped",
+    3: "2 times a day",
+    4: "Weekly (every Mon)",
+    5: "Twice a Week (every Mon & Thu)",
+    6: "Stop",
+    7 : "Once in 15 Days (Alternate Mondays)",
+    8 : "Once a Month (First Monday of the Month)"
 };
 
 export const STOP_REASON_LABELS: Record<number, string> = {
@@ -72,6 +73,7 @@ const FollowUpEditPage: React.FC = () => {
     const [existingAttachments, setExistingAttachments] = useState<string[]>([]);
     const [removedAttachments, setRemovedAttachments] = useState<string[]>([]);
     const [newFiles, setNewFiles] = useState<File[]>([]);
+    const [proofImage, setProofImage] = useState<File | null>(null);
 
     /* ✅ HYDRATE FORM FROM API */
     useEffect(() => {
@@ -109,12 +111,19 @@ const FollowUpEditPage: React.FC = () => {
 
     const removeNewPersonRow = (idx: number) => setPersons(p => p.filter((_, i) => i !== idx));
 
-    const removeExistingPerson = (personId: number) => {
-        setExistingPersons(prev => prev.filter(p => p.id !== personId));
+    const removeExistingPerson = (idx: number) => {
+        setExistingPersons(prev => prev.filter((_, i) => i !== idx));
     };
 
     const handleFiles = (items: any[]) => {
-        setNewFiles(items.map(i => i.file).filter(Boolean));
+        items.forEach(item => {
+            console.log({
+                name: item.file?.name,
+                type: item.file?.type,
+            });
+        });
+
+        setNewFiles(items.map(item => item.file).filter(Boolean));
     };
 
     /* ✅ SUBMIT HANDLER */
@@ -135,14 +144,42 @@ const FollowUpEditPage: React.FC = () => {
             }
         });
 
-        // 2️⃣ Contacts (existing + new)
-        formData.append("contacts", JSON.stringify([...existingPersons, ...persons]));
+        // 2️⃣ Clean, trim, and filter contacts (existing + new)
+        const cleanedContacts = [...existingPersons, ...persons]
+            .map(c => ({
+                id: c.id,
+                name: c.name?.trim() || "",
+                email: c.email?.trim() === "" ? null : c.email?.trim() || null,
+                phone: c.phone?.trim() === "" ? null : c.phone?.trim() || null,
+                org: c.org?.trim() === "" ? null : c.org?.trim() || null,
+            }))
+            // Filter out completely empty contact rows (where name is blank and other fields are blank/null)
+            .filter(c => c.name !== "" || c.email !== null || c.phone !== null);
+
+        // 3️⃣ Frontend validation for contacts
+        for (const [index, contact] of cleanedContacts.entries()) {
+            if (!contact.email) {
+                toast.error(`Contact #${index + 1} Email is required`);
+                return;
+            }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) {
+                toast.error(`Contact #${index + 1} has an invalid email address`);
+                return;
+            }
+        }
+
+        formData.append("contacts", JSON.stringify(cleanedContacts));
 
         // 3️⃣ Removed attachments
         removedAttachments.forEach(file => formData.append("removedAttachments[]", file));
 
         // 4️⃣ New files
         newFiles.forEach(file => formData.append("attachments", file));
+
+        // 5️⃣ Proof image (only when stop reason is Objective Achieved)
+        if (proofImage) {
+            formData.append("proofImage", proofImage);
+        }
 
         updateMutation.mutateAsync(
             { id: followupId, data: formData },
@@ -152,7 +189,8 @@ const FollowUpEditPage: React.FC = () => {
                     navigate(paths.shared.followUp);
                 },
                 onError: (err: any) => {
-                    toast.error(err?.message || "Failed to update followup");
+                    const message = err?.response?.data?.message || err?.message || "Failed to update followup";
+                    toast.error(typeof message === "object" ? JSON.stringify(message) : message);
                 },
             }
         );
@@ -249,9 +287,10 @@ const FollowUpEditPage: React.FC = () => {
 
                                 <div className="space-y-2">
                                     <Label>Next Follow-up Date</Label>
-                                    <DatePicker
-                                        date={form.watch("startFrom") ? new Date(form.watch("startFrom")!) : undefined}
-                                        onChange={date => form.setValue("startFrom", date ? date.toISOString().slice(0, 10) : undefined)}
+                                    <Input
+                                        type="date"
+                                        value={form.watch("startFrom") ? String(form.watch("startFrom")).split("T")[0] : ""}
+                                        onChange={e => form.setValue("startFrom", e.target.value || undefined)}
                                     />
 
                                     <p className="text-xs text-muted-foreground">Must be today or a future date</p>
@@ -277,8 +316,8 @@ const FollowUpEditPage: React.FC = () => {
                                 <div className="space-y-3">
                                     <h4 className="font-medium">Existing Contacts</h4>
                                     <div className="space-y-2">
-                                        {existingPersons.map(p => (
-                                            <div key={p.id} className="flex items-center justify-between p-3 border rounded-md">
+                                        {existingPersons.map((p, idx) => (
+                                            <div key={idx} className="flex items-center justify-between p-3 border rounded-md">
                                                 <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
                                                     <div>
                                                         <div className="font-medium">{p.name}</div>
@@ -293,7 +332,7 @@ const FollowUpEditPage: React.FC = () => {
                                                         <div className="text-xs text-muted-foreground">Email</div>
                                                     </div>
                                                 </div>
-                                                <Button size="sm" variant="ghost" onClick={() => removeExistingPerson(p.id)} className="text-destructive">
+                                                <Button size="sm" variant="ghost" onClick={() => removeExistingPerson(idx)} className="text-destructive">
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
@@ -350,11 +389,17 @@ const FollowUpEditPage: React.FC = () => {
                                         </SelectTrigger>
 
                                         <SelectContent>
-                                            {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
-                                                <SelectItem key={value} value={value}>
-                                                    {label}
-                                                </SelectItem>
-                                            ))}
+                                            {Object.entries(FREQUENCY_LABELS)
+                                                .sort(([a], [b]) => {
+                                                    if (Number(a) === 6) return 1;
+                                                    if (Number(b) === 6) return -1;
+                                                    return Number(a) - Number(b);
+                                                })
+                                                .map(([value, label]) => (
+                                                    <SelectItem key={value} value={value}>
+                                                        {label}
+                                                    </SelectItem>
+                                                ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -394,6 +439,14 @@ const FollowUpEditPage: React.FC = () => {
                                                         placeholder={stopReason === 2 ? "Provide proof of objective achievement..." : "Enter remarks..."}
                                                         className="min-h-[80px]"
                                                     />
+                                                    {/* ✅ NEW: Proof image upload for Objective Achieved */}
+                                                    {stopReason === 2 && (
+                                                        <div className="space-y-1 mt-2">
+                                                            <Label>Proof Image</Label>
+                                                            <Input type="file" accept="image/*" onChange={e => setProofImage(e.target.files?.[0] ?? null)} />
+                                                            {proofImage && <p className="text-xs text-muted-foreground">{proofImage.name}</p>}
+                                                        </div>
+                                                    )}
                                                 </>
                                             )}
                                         </div>
@@ -424,12 +477,46 @@ const FollowUpEditPage: React.FC = () => {
                                 allowMultiple
                                 instantUpload={false}
                                 acceptedFileTypes={[
+                                    /* ===== Images ===== */
                                     "image/*",
+
+                                    /* ===== PDFs ===== */
                                     "application/pdf",
+
+                                    /* ===== Word ===== */
                                     "application/msword",
                                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+
+                                    /* ===== PowerPoint ===== */
                                     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+
+                                    /* ===== Excel (ALL formats) ===== */
+                                    "application/vnd.ms-excel",
+                                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    "application/vnd.ms-excel.sheet.macroEnabled.12",
+                                    "application/vnd.ms-excel.template.macroEnabled.12",
+                                    "application/vnd.ms-excel.addin.macroEnabled.12",
+                                    "application/vnd.ms-excel.sheet.binary.macroEnabled.12",
+
+                                    /* ===== Text / Data Excel formats ===== */
+                                    "text/csv",
+                                    "text/tab-separated-values",
                                     "text/plain",
+
+                                    /* ===== Browser fallbacks ===== */
+                                    "application/octet-stream",
+
+                                    /* ===== Extension-based safety net ===== */
+                                    ".xls",
+                                    ".xlsx",
+                                    ".xlsm",
+                                    ".xlsb",
+                                    ".xltx",
+                                    ".xltm",
+                                    ".xlam",
+                                    ".csv",
+                                    ".tsv",
+                                    ".txt",
                                 ]}
                             />
                         </div>

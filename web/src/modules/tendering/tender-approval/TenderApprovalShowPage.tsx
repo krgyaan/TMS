@@ -1,111 +1,72 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useTender } from '@/hooks/api/useTenders';
-import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
-import { useInfoSheet } from '@/hooks/api/useInfoSheets';
-import { TenderApprovalView } from './components/TenderApprovalView';
-import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
+import { useState, useCallback } from 'react';
+import { paths } from '@/app/routes/paths';
+import { TenderDetailsSection } from '../tenders/components/TenderView';
+import { PhysicalDocsSection } from '@/modules/tendering/physical-docs/components/PhysicalDocsView';
+import { RfqSection } from '@/modules/tendering/rfqs/components/RfqView';
+import { EmdTenderFeeSection } from '@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow';
+import { DocumentChecklistSection } from '@/modules/tendering/checklists/components/DocumentChecklistView';
+import { CostingSheetSection } from '@/modules/tendering/costing-sheets/components/CostingSheetView';
+import { BidSubmissionSection } from '@/modules/tendering/bid-submissions/components/BidSubmissionView';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { paths } from '@/app/routes/paths';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
-import { TenderView } from '../tenders/components/TenderView';
+import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
 
 export default function TenderApprovalShowPage() {
-    const { id } = useParams<{ id: string }>();
+    const { tenderId: tenderIdParam } = useParams<{ tenderId: string }>();
     const navigate = useNavigate();
-    const parsedId = id ? Number(id) : NaN;
-    const tenderId = Number.isNaN(parsedId) ? null : parsedId;
+    const tenderId = tenderIdParam ? Number(tenderIdParam) : null;
 
-    const { data: tender, isLoading: tenderLoading, error: tenderError } = useTender(tenderId);
-    const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
-    const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId);
+    const { steps: tenderSteps } = useTenderStepStatuses(tenderId);
 
-    const isLoading = tenderLoading || approvalLoading;
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["tender-details"]));
 
-    // Determine which tabs have data
-    const hasInfoSheet = !infoSheetLoading && !!infoSheet;
+    const toggleSection = useCallback((id: string) => {
+        setExpandedSections((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
 
-    if (!tenderId || tenderError || (!tenderLoading && !tender)) {
+    const expandAll = useCallback(() => setExpandedSections(new Set(tenderSteps.map((s) => s.id))), [tenderSteps]);
+    const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
+
+    const renderSectionContent = (stepId: string) => {
+        if (!tenderId) return null;
+        switch (stepId) {
+            case "tender-details":   return <TenderDetailsSection tenderId={tenderId} />;
+            case "physical-docs":    return <PhysicalDocsSection tenderId={tenderId} />;
+            case "rfq":              return <RfqSection tenderId={tenderId} />;
+            case "emd-fees":         return <EmdTenderFeeSection tenderId={tenderId} />;
+            case "checklist":        return <DocumentChecklistSection tenderId={tenderId} />;
+            case "costing":          return <CostingSheetSection tenderId={tenderId} />;
+            case "bid":              return <BidSubmissionSection tenderId={tenderId} />;
+            default: return null;
+        }
+    };
+
+    if (!tenderId) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                    Tender not found or failed to load.
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="ml-4"
-                        onClick={() => navigate(paths.tendering.tenderApproval)}
-                    >
-                        Back to List
-                    </Button>
-                </AlertDescription>
+                <AlertDescription>Invalid Tender ID.</AlertDescription>
             </Alert>
         );
     }
 
-    // Combine tender and approval into TenderWithRelations
-    const tenderWithRelations: TenderWithRelations = {
-        ...tender!,
-        approval: approval || null,
-    };
-
     return (
-        <div className="space-y-6">
-            <Tabs defaultValue="approval" className="space-y-4">
-                <TabsList className="grid w-fit grid-cols-3 gap-2">
-                    <TabsTrigger value="tender">Tender</TabsTrigger>
-                    <TabsTrigger value="info-sheet" disabled={!hasInfoSheet && !infoSheetLoading}>
-                        Info Sheet
-                    </TabsTrigger>
-                    <TabsTrigger value="approval">Tender Approval</TabsTrigger>
-                </TabsList>
-
-                {/* Tender */}
-                <TabsContent value="tender">
-                    <TenderView
-                        tender={tenderWithRelations}
-                        isLoading={isLoading}
-                        showEditButton
-                        showBackButton
-                        onEdit={() => navigate(paths.tendering.tenderApprovalCreate(tenderId!))}
-                        onBack={() => navigate(paths.tendering.tenderApproval)}
-                    />
-                </TabsContent>
-
-                {/* Info Sheet */}
-                <TabsContent value="info-sheet">
-                    {infoSheetLoading ? (
-                        <InfoSheetView isLoading />
-                    ) : infoSheet ? (
-                        <InfoSheetView
-                            infoSheet={infoSheet}
-                            onEdit={() => navigate(paths.tendering.infoSheetEdit(tenderId!))}
-                        />
-                    ) : (
-                        <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>
-                                No info sheet exists for this tender yet.
-                            </AlertDescription>
-                        </Alert>
-                    )}
-                </TabsContent>
-
-                {/* Tender Approval */}
-                <TabsContent value="approval">
-                    <TenderApprovalView
-                        tender={tenderWithRelations}
-                        isLoading={isLoading}
-                        showEditButton
-                        showBackButton
-                        onEdit={() => navigate(paths.tendering.tenderApprovalCreate(tenderId!))}
-                        onBack={() => navigate(paths.tendering.tenderApproval)}
-                    />
-                </TabsContent>
-            </Tabs>
-        </div>
+        <ShowPageLayout
+            steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "rfq", "emd-fees", "checklist", "costing", "bid"].includes(s.id))}
+            expandedSections={expandedSections}
+            onToggleSection={toggleSection}
+            onExpandAll={expandAll}
+            onCollapseAll={collapseAll}
+            onBack={() => navigate(paths.tendering.tenderApproval)}
+            backLabel="Back to Tender Approvals"
+            renderSectionContent={renderSectionContent}
+        />
     );
 }

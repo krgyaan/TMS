@@ -1,0 +1,97 @@
+import { BaseApiService } from './base.service';
+import type {
+    EmdDashboardResponse,
+    EmdDashboardCounts,
+    CreatePaymentRequestDto,
+    UpdatePaymentRequestDto,
+    UpdateStatusDto,
+    EmdDashboardRow,
+    EmdDashboardFilters,
+} from '@/modules/tendering/emds-tenderfees/helpers/payment-request.types';
+
+class PaymentRequestsService extends BaseApiService {
+    constructor() {
+        super('/payment-requests');
+    }
+
+    // Dashboard endpoints
+    async getDashboard(filters?: EmdDashboardFilters): Promise<EmdDashboardResponse> {
+        const params = new URLSearchParams();
+        if (filters?.tab) params.append('tab', filters.tab);
+        if (filters?.userId) params.append('userId', filters.userId.toString());
+        if (filters?.page) params.append('page', filters.page.toString());
+        if (filters?.limit) params.append('limit', filters.limit.toString());
+        if (filters?.sortBy) params.append('sortBy', filters.sortBy);
+        if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
+        if (filters?.teamId !== undefined && filters?.teamId !== null) {
+            params.append('teamId', filters.teamId.toString());
+        }
+        if (filters?.search) params.append('search', filters.search);
+        const query = params.toString();
+        return this.get<EmdDashboardResponse>(`${query ? `?${query}` : ''}`);
+    }
+
+    async getDashboardCounts(teamId?: number): Promise<EmdDashboardCounts> {
+        const params = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            params.append('teamId', teamId.toString());
+        }
+        const query = params.toString();
+        return this.get<EmdDashboardCounts>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
+    }
+
+    // Existing endpoints
+    async create(tenderId: number, data: CreatePaymentRequestDto) {
+        return this.post<any[], CreatePaymentRequestDto>(`/tenders/${tenderId}`, data);
+    }
+
+    async getByTenderId(tenderId: number) {
+        return this.get<any>(`/tenders/${tenderId}`);
+    }
+
+    async getInstrumentsByPaymentRequestId(paymentRequestId: number) {
+        return this.get<any>(`/${paymentRequestId}/instruments`);
+    }
+
+    async getById(id: number) {
+        return this.get<any>(`/${id}`);
+    }
+
+    async getByIdForEdit(id: number) {
+        return this.get<any>(`/${id}/edit`);
+    }
+
+    async update(id: number, data: UpdatePaymentRequestDto) {
+        return this.patch<any, UpdatePaymentRequestDto>(`/${id}`, data);
+    }
+
+    async updateStatus(id: number, data: UpdateStatusDto) {
+        return this.patch<any, UpdateStatusDto>(`/${id}/status`, data);
+    }
+
+    async updateConsentForPay(instrumentId: number, consentRemark: string) {
+        return this.patch<{ consentForPay: string }, { consentRemark: string }>(
+            `/instruments/${instrumentId}/consent`, { consentRemark }
+        );
+    }
+
+    // MOM Remarks
+    async getMomRemarks(requestId: number) {
+        return this.get<any[]>(`/${requestId}/mom`);
+    }
+
+    async addMomRemark(requestId: number, data: { remark: string; instrumentId?: number | null }) {
+        return this.post<any, typeof data>(`/${requestId}/mom`, data);
+    }
+
+    async getTodayMomRemarks() {
+        return this.get<any[]>('/mom/today');
+    }
+
+    async getInstrumentMomRemarks(requestId: number, instrumentId: number) {
+        return this.get<any[]>(`/${requestId}/mom/instruments/${instrumentId}`);
+    }
+}
+
+export const paymentRequestsService = new PaymentRequestsService();
+export type { EmdDashboardRow, EmdDashboardCounts, EmdDashboardResponse };

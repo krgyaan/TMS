@@ -7,7 +7,7 @@ export const clientDirectory = pgTable(
 
         name: varchar("name", { length: 255 }).notNull(),
         email: varchar("email", { length: 255 }),
-        phone: varchar("phone", { length: 20 }),
+        phone: varchar("phone", { length: 200 }),
         organization: varchar("organization", { length: 255 }),
 
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

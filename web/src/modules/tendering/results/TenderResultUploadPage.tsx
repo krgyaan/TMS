@@ -1,63 +1,70 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import UploadResultFormPage from './components/UploadResultFormPage';
 import { useTender } from '@/hooks/api/useTenders';
-import { useBidSubmissionByTender } from '@/hooks/api/useBidSubmissions';
-import { useTenderResult } from '@/hooks/api/useTenderResults';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { paths } from '@/app/routes/paths';
-import React from 'react';
-import apiClient from '@/lib/axios';
+import { useTenderResult, useTenderResultByTenderId } from '@/hooks/api/useTenderResults';
+import { Skeleton } from '@/components/ui/skeleton';
+import { SubmissionChecklist, type Checkpoint } from '@/components/tendering/SubmissionChecklist';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
 export default function TenderResultUploadPage() {
-    const { tenderId } = useParams<{ tenderId: string }>();
+    const { tenderId, id } = useParams<{ tenderId?: string; id?: string }>();
     const navigate = useNavigate();
-    const { data: tenderDetails, isLoading: tenderLoading } = useTender(Number(tenderId));
-    const { data: bidSubmission, isLoading: bidLoading } = useBidSubmissionByTender(Number(tenderId));
-    const { data: result, isLoading: resultLoading } = useTenderResult(0); // Will fetch by tenderId below
+    const isEditMode = !!id;
 
-    // Fetch or create result entry
-    const [resultId, setResultId] = React.useState<number | null>(null);
-    const [isCreatingResult, setIsCreatingResult] = React.useState(false);
+    const resultId = id ? Number(id) : null;
+    const tenderIdNum = tenderId ? Number(tenderId) : null;
 
-    React.useEffect(() => {
-        if (tenderId && bidSubmission) {
-            // Check if result exists for this tender
-            apiClient.get(`/tender-results/tender/${tenderId}`)
-                .then((response) => {
-                    if (response.data) {
-                        setResultId(response.data.id);
-                    } else {
-                        // Create result entry if it doesn't exist
-                        setIsCreatingResult(true);
-                        apiClient.post(`/tender-results/create/${tenderId}`)
-                            .then((createResponse) => {
-                                setResultId(createResponse.data.id);
-                                setIsCreatingResult(false);
-                            })
-                            .catch(() => {
-                                setIsCreatingResult(false);
-                            });
-                    }
-                })
-                .catch(() => {
-                    // If error, try to create
-                    setIsCreatingResult(true);
-                    apiClient.post(`/tender-results/create/${tenderId}`)
-                        .then((createResponse) => {
-                            setResultId(createResponse.data.id);
-                            setIsCreatingResult(false);
-                        })
-                        .catch(() => {
-                            setIsCreatingResult(false);
-                        });
-                });
-        }
-    }, [tenderId, bidSubmission]);
+    // Fetch result by ID if in edit mode
+    const { data: editResult, isLoading: editResultLoading, error: editResultError } = useTenderResult(resultId);
 
-    if (tenderLoading || bidLoading || isCreatingResult) return <Skeleton className="h-[800px]" />;
+    // Fetch result by tender ID if in upload mode
+    const { data: uploadResult, isLoading: uploadResultLoading } = useTenderResultByTenderId(isEditMode ? null : tenderIdNum);
+
+    const result = isEditMode ? editResult : uploadResult;
+    const resultLoading = isEditMode ? editResultLoading : uploadResultLoading;
+
+    // The effective tender ID to fetch tender details
+    const effectiveTenderId = isEditMode ? result?.tenderId : tenderIdNum;
+
+    const { data: tenderDetails, isLoading: tenderLoading } = useTender(effectiveTenderId ?? null);
+
+    if (resultLoading || tenderLoading || (isEditMode && !result)) {
+        return (
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-48" />
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        {Array.from({ length: 8 }).map((_, i) => (
+                            <Skeleton key={i} className="h-12 w-full" />
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (isEditMode && (editResultError || !result)) {
+        return (
+            <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                    Result not found or failed to load.
+                    <br />
+                    {editResultError?.message}
+                    <br />
+                    <Button variant="outline" size="sm" className="ml-4" onClick={() => navigate(paths.tendering.results)}>
+                        Back to List
+                    </Button>
+                </AlertDescription>
+            </Alert>
+        );
+    }
 
     if (!tenderDetails) {
         return (
@@ -73,37 +80,45 @@ export default function TenderResultUploadPage() {
         );
     }
 
-    if (!bidSubmission) {
-        return (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                    This tender does not have a bid submission. Please submit the bid first.
-                    <Button variant="outline" onClick={() => navigate(paths.tendering.results)} className="ml-4">
-                        Back to List
-                    </Button>
-                </AlertDescription>
-            </Alert>
-        );
-    }
+    const raStatus = result ? result?.raStatus : 'pending';
+    const tqStatus = result ? result?.tqStatus : 'pending';
 
-    // Check if this is an RA tender - if so, redirect to RA dashboard
-    // We'll check this after getting the result, but for now we'll proceed
-    // The form component will handle the validation
+    // for status checks--
+    //                   |
+    //                   v
+    // we will check simply the tender_result-> ra_status && tender_result->tq_status
 
-    if (!resultId) {
-        return <Skeleton className="h-[800px]" />;
-    }
+
+    const checkpoints: Checkpoint[] = [
+        {
+            id: 'tq',
+            label : 'TQ Status',
+            status: tqStatus === 'pending' ? 'pending' : 'fulfilled',
+            description: tqStatus === 'pending' ? 'TQ not completed' : (tqStatus ?? undefined),
+        },
+        {
+            id: 'ra',
+            label : 'RA Status',
+            status: raStatus === 'pending' ? 'pending' : 'fulfilled',
+            description: raStatus === 'pending' ? 'RA not completed' : (raStatus ?? undefined),
+        },
+    ];
 
     return (
-        <UploadResultFormPage
-            resultId={resultId}
-            tenderDetails={{
-                tenderNo: tenderDetails.tenderNo,
-                tenderName: tenderDetails.tenderName,
-            }}
-            isEditMode={false}
-            onSuccess={() => navigate(paths.tendering.resultsShow(resultId))}
-        />
+        <>
+            <SubmissionChecklist checkpoints={checkpoints} />
+
+            <UploadResultFormPage
+                tenderId={effectiveTenderId!}
+                tenderDetails={{
+                    tenderNo: tenderDetails.tenderNo,
+                    tenderName: tenderDetails.tenderName,
+                    partiesCount: result?.qualifiedPartiesCount || '',
+                    partiesNames: result?.qualifiedPartiesNames || [],
+                }}
+                isEditMode={isEditMode}
+                onSuccess={() => navigate(paths.tendering.results)}
+            />
+        </>
     );
 }

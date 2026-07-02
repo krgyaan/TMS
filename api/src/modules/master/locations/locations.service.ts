@@ -1,22 +1,19 @@
-﻿import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, like, and } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import {
-    locations,
-    type Location,
-    type NewLocation,
-} from '@db/schemas/master/locations.schema';
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { eq, ilike, like, and } from "drizzle-orm";
+import { DRIZZLE } from "@db/database.module";
+import type { DbInstance } from "@db";
+import { locations, type Location, type NewLocation } from "@db/schemas/master/locations.schema";
 
 @Injectable()
 export class LocationsService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
     async findAll(): Promise<Location[]> {
-        return this.db
-            .select()
-            .from(locations)
-            .orderBy(locations.status);
+        return this.db.select().from(locations).orderBy(locations.status);
+    }
+
+    async findAllTrue(): Promise<Location[]> {
+        return this.db.select().from(locations).where(eq(locations.status, true)).orderBy(locations.name);
     }
 
     async findById(id: number): Promise<Location | null> {
@@ -29,10 +26,7 @@ export class LocationsService {
     }
 
     async create(data: NewLocation): Promise<Location> {
-        const rows = await this.db
-            .insert(locations)
-            .values(data)
-            .returning();
+        const rows = await this.db.insert(locations).values(data).returning();
         return rows[0];
     }
 
@@ -50,11 +44,7 @@ export class LocationsService {
     }
 
     async delete(id: number): Promise<void> {
-        const result = await this.db
-            .update(locations)
-            .set({ status: false })
-            .where(eq(locations.id, id))
-            .returning();
+        const result = await this.db.update(locations).set({ status: false }).where(eq(locations.id, id)).returning();
 
         if (!result[0]) {
             throw new NotFoundException(`Location with ID ${id} not found`);
@@ -70,8 +60,8 @@ export class LocationsService {
                 and(
                     eq(locations.status, true),
                     // Search in name OR city
-                    like(locations.name, searchPattern),
-                ),
+                    ilike(locations.name, searchPattern)
+                )
             );
     }
 }

@@ -42,27 +42,45 @@ export class GoogleController {
     @Get('callback')
     async handleCallback(
         @Query() query: Record<string, unknown>,
-        @Res({ passthrough: true }) res: Response,
+        @Res() res: Response,
     ) {
-        const parsed = CallbackQuerySchema.parse(query);
         try {
+            const parsed = CallbackQuerySchema.parse(query);
             const connection = await this.googleService.handleOAuthCallback(parsed);
-            const redirectUrl = this.googleService.buildRedirectUrl('success', {
-                userId: connection.userId,
-                connectionId: connection.id,
-            });
-            res.redirect(redirectUrl);
-            return { status: 'success' };
+            res.type('text/html').send(`
+                <script>
+                    if (window.opener) {
+                        window.opener.postMessage({
+                            type: 'GOOGLE_DRIVE_AUTH',
+                            status: 'success',
+                            userId: ${connection.userId},
+                            connectionId: ${connection.id}
+                        }, '*');
+                        window.close();
+                    } else {
+                        window.location.href = '${this.googleService.buildRedirectUrl('success', { userId: connection.userId, connectionId: connection.id })}';
+                    }
+                </script>
+            `);
         } catch (error) {
             const message =
                 error instanceof Error
                     ? error.message
                     : 'Unable to connect Google account';
-            const redirectUrl = this.googleService.buildRedirectUrl('error', {
-                error: message,
-            });
-            res.redirect(redirectUrl);
-            return { status: 'error', message };
+            res.type('text/html').send(`
+                <script>
+                    if (window.opener) {
+                        window.opener.postMessage({
+                            type: 'GOOGLE_DRIVE_AUTH',
+                            status: 'error',
+                            error: ${JSON.stringify(message)}
+                        }, '*');
+                        window.close();
+                    } else {
+                        window.location.href = '${this.googleService.buildRedirectUrl('error', { error: message })}';
+                    }
+                </script>
+            `);
         }
     }
 
@@ -136,32 +154,50 @@ export class GoogleController {
     @UseGuards(JwtAuthGuard)
     async handleAccountLinkCallback(
         @Query() query: Record<string, unknown>,
-        @Res({ passthrough: true }) res: Response,
+        @Res() res: Response,
         @CurrentUser() user: ValidatedUser,
     ) {
-        const parsed = CallbackQuerySchema.parse(query);
         try {
+            const parsed = CallbackQuerySchema.parse(query);
             const connection = await this.googleService.handleAccountLinkCallback(
                 parsed.code,
                 parsed.state || '',
                 user.sub,
             );
-            const redirectUrl = this.googleService.buildRedirectUrl('success', {
-                userId: connection.userId,
-                connectionId: connection.id,
-            });
-            res.redirect(redirectUrl);
-            return { status: 'success' };
+            res.type('text/html').send(`
+                <script>
+                    if (window.opener) {
+                        window.opener.postMessage({
+                            type: 'GOOGLE_DRIVE_AUTH',
+                            status: 'success',
+                            userId: ${connection.userId},
+                            connectionId: ${connection.id}
+                        }, '*');
+                        window.close();
+                    } else {
+                        window.location.href = '${this.googleService.buildRedirectUrl('success', { userId: connection.userId, connectionId: connection.id })}';
+                    }
+                </script>
+            `);
         } catch (error) {
             const message =
                 error instanceof Error
                     ? error.message
                     : 'Unable to link Google account';
-            const redirectUrl = this.googleService.buildRedirectUrl('error', {
-                error: message,
-            });
-            res.redirect(redirectUrl);
-            return { status: 'error', message };
+            res.type('text/html').send(`
+                <script>
+                    if (window.opener) {
+                        window.opener.postMessage({
+                            type: 'GOOGLE_DRIVE_AUTH',
+                            status: 'error',
+                            error: ${JSON.stringify(message)}
+                        }, '*');
+                        window.close();
+                    } else {
+                        window.location.href = '${this.googleService.buildRedirectUrl('error', { error: message })}';
+                    }
+                </script>
+            `);
         }
     }
 

@@ -22,7 +22,8 @@ export default function SubmitBidForm({
     tenderId,
     tenderDetails,
     mode,
-    existingData
+    existingData,
+    isChecklistFulfilled = true
 }: SubmitBidFormProps) {
     const navigate = useNavigate();
     const submitMutation = useSubmitBid();
@@ -238,6 +239,11 @@ export default function SubmitBidForm({
                         </div>
 
                         {/* Form Actions */}
+                        {!isChecklistFulfilled && (
+                            <p className="text-[10px] text-red-500 font-medium mt-1 text-right italic">
+                                * Complete all checkpoints to enable submission
+                            </p>
+                        )}
                         <div className="flex justify-end gap-2 pt-6 border-t">
                             <Button
                                 type="button"
@@ -257,7 +263,9 @@ export default function SubmitBidForm({
                             </Button>
                             <Button
                                 type="submit"
-                                disabled={isSubmitting}
+                                disabled={isSubmitting || !isChecklistFulfilled}
+                                className={!isChecklistFulfilled ? "cursor-not-allowed opacity-50" : ""}
+                                title={!isChecklistFulfilled ? "Please complete all mandatory checkpoints first" : ""}
                             >
                                 {isSubmitting && <span className="animate-spin mr-2">⏳</span>}
                                 <Save className="mr-2 h-4 w-4" />

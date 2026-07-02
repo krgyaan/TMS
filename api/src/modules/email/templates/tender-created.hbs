@@ -14,8 +14,18 @@
         <li>Remarks: {{data.remarks}}</li>
     </ul>
 
-    <p>
-        The tender documents are attached to the mail. Please submit the
+    {{#if data.documentUrls.length}}
+        <p>The following tender documents are available:</p>
+        <ul>
+            {{#each data.documentUrls}}
+                <li><a href="{{this}}" target="_blank" style="color: #0066cc; text-decoration: underline;">Download Document</a></li>
+            {{/each}}
+        </ul>
+    {{else}}
+        <p>No tender documents were attached.</p>
+    {{/if}}
+
+    <p>Please submit the
         <a href="{{data.tenderInfoSheet}}">Tender Info Sheet</a>
         for your team leader's approval of the tender.
     </p>

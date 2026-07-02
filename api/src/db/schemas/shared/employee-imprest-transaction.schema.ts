@@ -17,6 +17,8 @@ export const employeeImprestTransactions = pgTable("employee_imprest_transaction
     ip: varchar("ip", { length: 255 }),
     strtotime: integer("strtotime"),
 
+    imprestId: integer("imprest_id"),
+
     createdAt: timestamp("created_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }),
 });

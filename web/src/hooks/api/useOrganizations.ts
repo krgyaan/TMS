@@ -19,6 +19,13 @@ export const useOrganizations = () => {
     });
 };
 
+export const useOrganizationsTrue = () => {
+    return useQuery({
+        queryKey: organizationsKey.lists(),
+        queryFn: () => organizationsService.getAllTrue(),
+    });
+};
+
 export const useOrganization = (id: number | null) => {
     return useQuery({
         queryKey: organizationsKey.detail(id!),

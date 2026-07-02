@@ -215,12 +215,15 @@ const ImprestAdminUserView: React.FC = () => {
             Date: new Date(r.createdAt).toLocaleDateString("en-GB"),
             Party: r.partyName,
             Project: r.projectName,
+            Category: r.category,
             Amount: r.amount,
             Approved: r.approvalStatus === 1 ? "Yes" : "No",
             Tallied: r.tallyStatus === 1 ? "Yes" : "No",
             "Proof Verified": r.proofStatus === 1 ? "Yes" : "No",
             "Proof Count": r.invoiceProof.length,
         }));
+
+        console.log("excelData", excelData, rows);
 
         const ws = XLSX.utils.json_to_sheet(excelData);
         const wb = XLSX.utils.book_new();

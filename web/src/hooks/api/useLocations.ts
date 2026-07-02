@@ -19,6 +19,13 @@ export const useLocations = () => {
     });
 };
 
+export const useLocationsTrue = () => {
+    return useQuery({
+        queryKey: locationKey.lists(),
+        queryFn: () => locationsService.getAllTrue(),
+    });
+};
+
 export const useLocation = (id: number) => {
     return useQuery({
         queryKey: locationKey.detail(id),

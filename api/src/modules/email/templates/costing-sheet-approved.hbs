@@ -1,4 +1,4 @@
-<div>
+<div style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #222;">
     <p>Dear {{data.te_name}},</p>
     <p>
         The costing of the Tender
@@ -6,20 +6,43 @@
         of work, and the quotations received from the vendor. Please submit the Tender using the costing sheet.
     </p>
     <p>Link: <a href="{{data.costing_sheet_link}}">Costing sheet</a></p>
-    <ul style="list-style: none; margin: 0; padding: 0;">
-        <li style="border-bottom: 1px solid #ddd; padding: 5px 0;">
-            <strong>Tender Value (GST Inclusive):</strong>
-            {{data.tender_value}}
-        </li>
-        <li style="border-bottom: 1px solid #ddd; padding: 5px 0;">
-            <strong>Approved Final Price (GST Inclusive):</strong>
-            {{data.approved_final_price}}
-        </li>
-        <li style="border-bottom: 1px solid #ddd; padding: 5px 0;">
-            <strong>Remarks:</strong>
-            {{data.remarks}}
-        </li>
-    </ul>
+
+    <p><strong>Tender Value (GST Inclusive):</strong> {{data.tender_value}}</p>
+
+    <table width="100%" cellpadding="6" cellspacing="0"
+        style="border: 1px solid #444; border-collapse: collapse; margin-bottom: 16px;">
+        <thead>
+            <tr>
+                <th style="border: 1px solid #444; background-color: #2c3e50; color: #fff; padding: 8px; text-align: left;">#</th>
+                <th style="border: 1px solid #444; background-color: #2c3e50; color: #fff; padding: 8px; text-align: left;">Approved Final Price (GST Incl.)</th>
+                <th style="border: 1px solid #444; background-color: #2c3e50; color: #fff; padding: 8px; text-align: left;">Approved Receipt (Pre GST)</th>
+                <th style="border: 1px solid #444; background-color: #2c3e50; color: #fff; padding: 8px; text-align: left;">Approved Budget (Pre GST)</th>
+                <th style="border: 1px solid #444; background-color: #2c3e50; color: #fff; padding: 8px; text-align: left;">Approved Gross Margin %</th>
+                <th style="border: 1px solid #444; background-color: #2c3e50; color: #fff; padding: 8px; text-align: left;">TL Remarks</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#each data.details}}
+            <tr>
+                <td style="border: 1px solid #444; padding: 8px; text-align: left;">{{this.index}}</td>
+                <td style="border: 1px solid #444; padding: 8px; text-align: left;">{{this.approvedFinalPrice}}</td>
+                <td style="border: 1px solid #444; padding: 8px; text-align: left;">{{this.approvedReceipt}}</td>
+                <td style="border: 1px solid #444; padding: 8px; text-align: left;">{{this.approvedBudget}}</td>
+                <td style="border: 1px solid #444; padding: 8px; text-align: left;">{{this.approvedGrossMargin}}</td>
+                <td style="border: 1px solid #444; padding: 8px; text-align: left;">{{this.tlRemarks}}</td>
+            </tr>
+            {{/each}}
+            <tr style="background-color: #e8e8e8; font-weight: bold;">
+                <td style="border: 1px solid #444; padding: 8px; text-align: left;">Total</td>
+                <td style="border: 1px solid #444; padding: 8px; text-align: left;">{{data.totalApprovedFinalPrice}}</td>
+                <td style="border: 1px solid #444; padding: 8px; text-align: left;">{{data.totalApprovedReceipt}}</td>
+                <td style="border: 1px solid #444; padding: 8px; text-align: left;">{{data.totalApprovedBudget}}</td>
+                <td style="border: 1px solid #444; padding: 8px; text-align: left;">—</td>
+                <td style="border: 1px solid #444; padding: 8px; text-align: left;">—</td>
+            </tr>
+        </tbody>
+    </table>
+
     <p>
         The tender due date and time is
         {{data.due_date_time}}. Please submit the tender at least 24 hours before the tender due date and time.

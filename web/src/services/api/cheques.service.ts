@@ -31,6 +31,9 @@ class ChequesService extends BaseApiService {
             if (params.search) {
                 search.set('search', params.search);
             }
+            if (params.team) {
+                search.set('teamId', String(params.team));
+            }
         }
 
         const queryString = search.toString();
@@ -57,8 +60,35 @@ class ChequesService extends BaseApiService {
         }
     }
 
-    async updateAction(id: number, formData: FormData): Promise<any> {
-        return this.put<any, FormData>(`/instruments/${id}/action`, formData);
+    async getById(id: number): Promise<any> {
+        try {
+            const result = await this.get<any>(`/requests/${id}`);
+            return result;
+        } catch (error) {
+            console.error('=== chequesService.getById Error ===');
+            console.error('error:', error);
+            throw error;
+        }
+    }
+
+    async getActionFormData(id: number): Promise<any> {
+        return this.get<any>(`/instruments/${id}/action-form`);
+    }
+
+    async getExportData(params?: { tab?: string; teamId?: number }): Promise<{ data: any[] }> {
+        const search = new URLSearchParams();
+        if (params?.tab) search.set('tab', params.tab);
+        if (params?.teamId) search.set('teamId', String(params.teamId));
+        const queryString = search.toString();
+        return this.get(`/dashboard/export${queryString ? `?${queryString}` : ''}`);
+    }
+
+    async getFollowupData(id: number): Promise<any> {
+        return this.get<any>(`/instruments/${id}/followup`);
+    }
+
+    async updateAction(id: number, data: Record<string, unknown>): Promise<any> {
+        return this.put<any>(`/instruments/${id}/action`, data);
     }
 }
 

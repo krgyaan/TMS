@@ -2,6 +2,7 @@ import {
     pgTable,
     bigserial,
     bigint,
+    integer,
     text,
     timestamp,
     decimal,
@@ -41,8 +42,12 @@ export const bidSubmissions = pgTable('bid_submissions', {
 
     // For Tender Missed
     reasonForMissing: text('reason_for_missing'),
+    reasonStatus : integer('reason_status'),
+
     preventionMeasures: text('prevention_measures'),
     tmsImprovements: text('tms_improvements'),
+
+    statusHistoryMetatag : jsonb('status_history_metatag'),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

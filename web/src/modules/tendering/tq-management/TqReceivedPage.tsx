@@ -1,7 +1,7 @@
+import { Skeleton } from '@/components/ui/skeleton';
+import { useTender } from '@/hooks/api/useTenders';
 import { useParams } from 'react-router-dom';
 import TqReceivedForm from './components/TqReceivedForm';
-import { useTender } from '@/hooks/api/useTenders';
-import { Skeleton } from '@/components/ui/skeleton';
 
 export default function TqReceivedPage() {
     const { tenderId } = useParams<{ tenderId: string }>();

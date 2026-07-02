@@ -16,6 +16,8 @@ export const bankGuaranteesKey = {
     detail: (id: number) => [...bankGuaranteesKey.details(), id] as const,
     counts: () => [...bankGuaranteesKey.all, 'counts'] as const,
     cardStats: () => [...bankGuaranteesKey.all, 'card-stats'] as const,
+    actionForm: (id: number) => [...bankGuaranteesKey.all, 'action-form', id] as const,
+    followup: (id: number) => [...bankGuaranteesKey.all, 'followup', id] as const,
 };
 
 export const useBankGuaranteeDashboard = (
@@ -25,7 +27,14 @@ export const useBankGuaranteeDashboard = (
         ...filters,
     };
 
-    const queryKeyFilters = { tab: filters?.tab, page: filters?.page, limit: filters?.limit, search: filters?.search };
+    const queryKeyFilters = { 
+        tab: filters?.tab, 
+        page: filters?.page, 
+        limit: filters?.limit, 
+        search: filters?.search,
+        sortBy: filters?.sortBy,
+        sortOrder: filters?.sortOrder
+    };
 
     const query = useQuery<PaginatedResult<BankGuaranteeDashboardRow>>({
         queryKey: bankGuaranteesKey.list(queryKeyFilters),
@@ -66,6 +75,54 @@ export const useBankGuaranteeCardStats = () => {
     });
 
     return query;
+};
+
+export const useBankGuaranteeDetails = (id: number) => {
+    const query = useQuery({
+        queryKey: bankGuaranteesKey.detail(id),
+        queryFn: async () => {
+            const result = await bankGuaranteesService.getById(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+
+    return query;
+};
+
+export const useBGActionFormData = (id: number) => {
+    return useQuery({
+        queryKey: bankGuaranteesKey.actionForm(id),
+        queryFn: async () => {
+            const result = await bankGuaranteesService.getActionFormData(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+};
+
+export const useBGFollowupData = (id: number) => {
+    return useQuery({
+        queryKey: bankGuaranteesKey.followup(id),
+        queryFn: async () => {
+            const result = await bankGuaranteesService.getFollowupData(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+};
+
+export const useUpdateBankGuarantee = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
+            bankGuaranteesService.update(id, formData),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.all });
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.counts() });
+        },
+    });
 };
 
 export const useUpdateBankGuaranteeAction = () => {

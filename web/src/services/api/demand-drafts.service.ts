@@ -1,4 +1,4 @@
-import type { DemandDraftDashboardFilters } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
+import type { DashboardFilters } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
 import { BaseApiService } from './base.service';
 import type { PaginatedResult } from '@/types/api.types';
 import type { DemandDraftDashboardRow } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
@@ -9,7 +9,7 @@ class DemandDraftsService extends BaseApiService {
         super('/demand-drafts');
     }
 
-    async getAll(params?: DemandDraftDashboardFilters): Promise<PaginatedResult<DemandDraftDashboardRow>> {
+    async getAll(params?: DashboardFilters): Promise<PaginatedResult<DemandDraftDashboardRow>> {
         const search = new URLSearchParams();
 
         if (params) {
@@ -30,6 +30,9 @@ class DemandDraftsService extends BaseApiService {
             }
             if (params.search) {
                 search.set('search', params.search);
+            }
+            if (params.team) {
+                search.set('teamId', String(params.team));
             }
         }
 
@@ -57,8 +60,35 @@ class DemandDraftsService extends BaseApiService {
         }
     }
 
-    async updateAction(id: number, formData: FormData): Promise<any> {
-        return this.put<any, FormData>(`/instruments/${id}/action`, formData);
+    async getById(id: number): Promise<any> {
+        try {
+            const result = await this.get<any>(`/requests/${id}`);
+            return result;
+        } catch (error) {
+            console.error('=== demandDraftsService.getById Error ===');
+            console.error('error:', error);
+            throw error;
+        }
+    }
+
+    async getExportData(params?: { tab?: string; teamId?: number }): Promise<{ data: any[] }> {
+        const search = new URLSearchParams();
+        if (params?.tab) search.set('tab', params.tab);
+        if (params?.teamId) search.set('teamId', String(params.teamId));
+        const queryString = search.toString();
+        return this.get(`/dashboard/export${queryString ? `?${queryString}` : ''}`);
+    }
+
+    async getActionFormData(id: number): Promise<any> {
+        return this.get<any>(`/instruments/${id}/action-form`);
+    }
+
+    async getFollowupData(id: number): Promise<any> {
+        return this.get<any>(`/instruments/${id}/followup`);
+    }
+
+    async updateAction(id: number, data: any): Promise<any> {
+        return this.patch<any, any>(`/instruments/${id}/action`, data);
     }
 }
 

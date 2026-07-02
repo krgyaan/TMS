@@ -65,6 +65,35 @@ class BankGuaranteesService extends BaseApiService {
         }
     }
 
+    async getById(id: number): Promise<any> {
+        try {
+            const result = await this.get<any>(`/requests/${id}`);
+            return result;
+        } catch (error) {
+            console.error('error:', error);
+            throw error;
+        }
+    }
+
+    async getExportData(params?: { tab?: string }): Promise<{ data: any[] }> {
+        const search = new URLSearchParams();
+        if (params?.tab) search.set('tab', params.tab);
+        const queryString = search.toString();
+        return this.get(`/dashboard/export${queryString ? `?${queryString}` : ''}`);
+    }
+
+    async getActionFormData(id: number): Promise<any> {
+        return this.get<any>(`/instruments/${id}/action-form`);
+    }
+
+    async getFollowupData(id: number): Promise<any> {
+        return this.get<any>(`/instruments/${id}/followup`);
+    }
+
+    async update(id: number, formData: FormData): Promise<any> {
+        return this.put<any, FormData>(`/${id}`, formData);
+    }
+
     async updateAction(id: number, formData: FormData): Promise<any> {
         return this.put<any, FormData>(`/instruments/${id}/action`, formData);
     }

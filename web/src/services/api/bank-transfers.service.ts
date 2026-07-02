@@ -1,4 +1,4 @@
-import type { BankTransferDashboardFilters } from '@/modules/bi-dashboard/bank-tranfer/helpers/bankTransfer.types';
+import type { BankTransferDashboardFilters, BankTransferActionFormData, BankTransferFollowupData } from '@/modules/bi-dashboard/bank-tranfer/helpers/bankTransfer.types';
 import { BaseApiService } from './base.service';
 import type { PaginatedResult } from '@/types/api.types';
 import type { BankTransferDashboardRow } from '@/modules/bi-dashboard/bank-tranfer/helpers/bankTransfer.types';
@@ -31,6 +31,9 @@ class BankTransfersService extends BaseApiService {
             if (params.search) {
                 search.set('search', params.search);
             }
+            if (params.team) {
+                search.set('teamId', String(params.team));
+            }
         }
 
         const queryString = search.toString();
@@ -57,8 +60,49 @@ class BankTransfersService extends BaseApiService {
         }
     }
 
-    async updateAction(id: number, formData: FormData): Promise<any> {
-        return this.put<any, FormData>(`/instruments/${id}/action`, formData);
+    async getById(id: number): Promise<any> {
+        try {
+            const result = await this.get<any>(`/requests/${id}`);
+            return result;
+        } catch (error) {
+            console.error('=== bankTransfersService.getById Error ===');
+            console.error('error:', error);
+            throw error;
+        }
+    }
+
+    async getExportData(params?: { tab?: string; teamId?: number }): Promise<{ data: any[] }> {
+        const search = new URLSearchParams();
+        if (params?.tab) search.set('tab', params.tab);
+        if (params?.teamId) search.set('teamId', String(params.teamId));
+        const queryString = search.toString();
+        return this.get(`/dashboard/export${queryString ? `?${queryString}` : ''}`);
+    }
+
+    async getActionFormData(id: number): Promise<BankTransferActionFormData> {
+        try {
+            const result = await this.get<BankTransferActionFormData>(`/instruments/${id}/action-form`);
+            return result;
+        } catch (error) {
+            console.error('=== bankTransfersService.getActionFormData Error ===');
+            console.error('error:', error);
+            throw error;
+        }
+    }
+
+    async getFollowupData(id: number): Promise<BankTransferFollowupData | null> {
+        try {
+            const result = await this.get<BankTransferFollowupData | null>(`/instruments/${id}/followup`);
+            return result;
+        } catch (error) {
+            console.error('=== bankTransfersService.getFollowupData Error ===');
+            console.error('error:', error);
+            throw error;
+        }
+    }
+
+    async updateAction(id: number, data: Record<string, unknown>): Promise<any> {
+        return this.patch<any>(`/instruments/${id}/action`, data);
     }
 }
 

@@ -45,6 +45,8 @@ interface AuthContextValue {
     isAdmin: boolean;
     isSuperUser: boolean;
     isTeamLeader: boolean;
+    
+    teamName : string | null;
 }
 
 // ==================== Constants ====================
@@ -87,9 +89,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const dataScope = (user?.role?.dataScope ?? 'self') as DataScope;
         const canSwitchTeams = user?.role?.canSwitchTeams ?? false;
         const permissions = user?.permissions ?? [];
+        const teamName = user?.team?.name ?? null; 
 
         // Extract team info
-        const teamId = user?.team?.id ?? user?.profile?.primaryTeamId ?? null;
+        const teamId = user?.team?.id ?? null;
 
         // Calculate effective team ID
         const effectiveTeamId = canSwitchTeams ? activeTeamId : teamId;
@@ -144,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             isSuperUser,
             isAdmin,
             isTeamLeader,
+            teamName: teamName,
         };
     }, [user, isLoading, activeTeamId, setActiveTeamId]);
 

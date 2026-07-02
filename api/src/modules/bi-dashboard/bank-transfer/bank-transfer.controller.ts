@@ -1,20 +1,5 @@
-import { Controller, Get, Query, Put, Param, ParseIntPipe, UseInterceptors, UploadedFiles, Body, Req, BadRequestException } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { Controller, Get, Query, Patch, Param, ParseIntPipe, Body, Req, BadRequestException } from '@nestjs/common';
 import { BankTransferService } from './bank-transfer.service';
-
-const biDashboardMulterConfig = {
-    storage: diskStorage({
-        destination: './uploads/bi-dashboard',
-        filename: (req, file, callback) => {
-            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-            const ext = extname(file.originalname);
-            callback(null, `bt-${uniqueSuffix}${ext}`);
-        },
-    }),
-    limits: { fileSize: 25 * 1024 * 1024 },
-};
 
 @Controller('bank-transfers')
 export class BankTransferController {
@@ -28,6 +13,7 @@ export class BankTransferController {
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
+        @Query('teamId') teamId?: string,
     ) {
         return this.bankTransferService.getDashboardData(tab, {
             page: page ? parseInt(page, 10) : undefined,
@@ -35,6 +21,17 @@ export class BankTransferController {
             sortBy,
             sortOrder,
             search,
+            teamId: teamId ? parseInt(teamId, 10) : undefined,
+        });
+    }
+
+    @Get('dashboard/export')
+    getExportData(
+        @Query('tab') tab?: string,
+        @Query('teamId') teamId?: string,
+    ) {
+        return this.bankTransferService.getExportData(tab, {
+            teamId: teamId ? parseInt(teamId, 10) : undefined,
         });
     }
 
@@ -43,17 +40,30 @@ export class BankTransferController {
         return this.bankTransferService.getDashboardCounts();
     }
 
-    @Put('instruments/:id/action')
-    @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
+    @Get('requests/:id')
+    async getById(@Param('id', ParseIntPipe) id: number) {
+        return this.bankTransferService.getById(id);
+    }
+
+    @Get('instruments/:id/action-form')
+    async getActionFormData(@Param('id', ParseIntPipe) id: number) {
+        return this.bankTransferService.getActionFormData(id);
+    }
+
+    @Get('instruments/:id/followup')
+    async getFollowupData(@Param('id', ParseIntPipe) id: number) {
+        return this.bankTransferService.getFollowupData(id);
+    }
+
+    @Patch('instruments/:id/action')
     async updateAction(
         @Param('id', ParseIntPipe) id: number,
         @Body() body: any,
-        @UploadedFiles() files: Express.Multer.File[],
         @Req() req: any,
     ) {
         if (!body.action) {
             throw new BadRequestException('Action is required');
         }
-        return this.bankTransferService.updateAction(id, body, files || [], req.user);
+        return this.bankTransferService.updateAction(id, body, req.user);
     }
 }

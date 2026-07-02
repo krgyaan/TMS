@@ -13,6 +13,7 @@ export const UploadResultSchema = z.object({
     qualifiedPartiesCount: optionalTextField(50),
     qualifiedPartiesNames: z.array(z.string()).optional(),
     result: z.enum(['Won', 'Lost']).optional(),
+    resultReason: optionalString,
     l1Price: optionalNumber(z.coerce.number().min(0, 'L1 price must be non-negative')),
     l2Price: optionalNumber(z.coerce.number().min(0, 'L2 price must be non-negative')),
     ourPrice: optionalNumber(z.coerce.number().min(0, 'Our price must be non-negative')),
@@ -20,4 +21,11 @@ export const UploadResultSchema = z.object({
     finalResultScreenshot: optionalString,
 });
 
+export const UploadChangeStatusResultSchema = z.object({
+    statusId: z.number({ required_error: "Status ID is required" }),
+    finalResultScreenshot : z.string({ required_error: "No screenshot uploaded" }),
+    resultReason: z.string({ required_error: "Reason for Cancellation is required" }),
+});
+
 export type UploadResultDto = z.infer<typeof UploadResultSchema>;
+export type UploadChangeStatusResultDto = z.infer<typeof UploadChangeStatusResultSchema>;

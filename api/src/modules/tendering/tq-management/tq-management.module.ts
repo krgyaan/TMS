@@ -6,9 +6,10 @@ import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
 import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-history/tender-status-history.module';
 import { EmailModule } from '@/modules/email/email.module';
 import { TimersModule } from '@/modules/timers/timers.module';
+import { TenderResultModule } from '../tender-result/tender-result.module';
 
 @Module({
-    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, EmailModule, TimersModule],
+    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, EmailModule, TimersModule, TenderResultModule],
     controllers: [TqManagementController],
     providers: [TqManagementService],
     exports: [TqManagementService],

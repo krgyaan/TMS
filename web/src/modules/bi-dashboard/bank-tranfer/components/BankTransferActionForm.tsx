@@ -1,308 +1,399 @@
-import { useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, type Resolver } from 'react-hook-form';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
-import { SelectField } from '@/components/form/SelectField';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { ContactPersonFields } from '@/components/form/ContactPersonFields';
 import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySelect';
-import { StopReasonFields } from '@/components/form/StopReasonFields';
 import { ConditionalSection } from '@/components/form/ConditionalSection';
-import { BankTransferActionFormSchema, type BankTransferActionFormValues } from '../helpers/bankTransferActionForm.schema';
+import { FollowupEmailEditor } from '@/components/form/FollowupEmailEditor';
+import DateInput from '@/components/form/DateInput';
+import DateTimeInput from '@/components/form/DateTimeInput';
+import { BankTransferActionFormSchema, type BankTransferActionFormValues, type BankTransferActionPayload } from '../helpers/bankTransferActionForm.schema';
 import { useUpdateBankTransferAction } from '@/hooks/api/useBankTransfers';
 import { toast } from 'sonner';
 import { useWatch } from 'react-hook-form';
-import { DatePicker } from '@/components/ui/date-picker';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { FileText, Users, Banknote, CheckCircle, CheckCircle2, Info } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ALL_ACTION_OPTIONS, type BankTransferActionFormProps } from '../helpers/bankTransfer.types';
+import { infoSheetsService } from '@/services/api/info-sheet.service';
 
-const ACTION_OPTIONS = [
-    { value: 'accounts-form-1', label: 'Accounts Form (BT) 1 - Request to Bank' },
-    { value: 'initiate-followup', label: 'Initiate Followup' },
-    { value: 'returned', label: 'Returned' },
-    { value: 'settled', label: 'Settled' },
-];
-
-interface BankTransferActionFormProps {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    instrumentId: number;
-    instrumentData?: {
-        utrNo?: string;
-        accountName?: string;
-        amount?: number;
-        tenderName?: string;
-        tenderNo?: string;
-    };
-}
-
-export function BankTransferActionForm({
-    open,
-    onOpenChange,
-    instrumentId,
-    instrumentData,
-}: BankTransferActionFormProps) {
+export function BankTransferActionForm({ instrumentId, action: propAction, formHistory, tenderId, instrumentData }: BankTransferActionFormProps) {
+    const navigate = useNavigate();
     const updateMutation = useUpdateBankTransferAction();
+
+    const hasAccountsFormData = !!(formHistory?.accountsForm?.btReq);
+    const hasFollowupData = !!(formHistory?.initiateFollowup?.organisationName);
+    const hasReturnedData = !!(formHistory?.returned?.transferDate);
+    const hasSettledData = !!(formHistory?.settled?.remarks);
+
+    const getSubmittedBadge = (hasData: boolean) => {
+        if (!hasData) return <Badge variant={'secondary'} className="rounded-full p-2">
+            <Info className="h-3 w-3" />
+        </Badge>;
+        return (
+            <Badge variant={'success'} className="rounded-full p-2">
+                <CheckCircle className="h-3 w-3" />
+            </Badge>
+        );
+    };
+
+    const availableActions = propAction === 0
+        ? ALL_ACTION_OPTIONS.filter(opt => opt.value === 'accounts-form')
+        : ALL_ACTION_OPTIONS;
+
+    const defaultValues: BankTransferActionFormValues = {
+        action: '',
+        contacts: [],
+    };
+
+    if (formHistory?.accountsForm) {
+        defaultValues.bt_req = formHistory.accountsForm.btReq;
+        defaultValues.reason_req = formHistory.accountsForm.reasonReq;
+        defaultValues.payment_datetime = formHistory.accountsForm.paymentDatetime;
+        defaultValues.utr_no = formHistory.accountsForm.utrNo;
+        defaultValues.utr_message = formHistory.accountsForm.utrMessage;
+    }
+
+    if (formHistory?.initiateFollowup) {
+        defaultValues.organisation_name = formHistory.initiateFollowup.organisationName;
+        defaultValues.contacts = formHistory.initiateFollowup.contacts?.map(c => ({
+            name: c.name,
+            phone: c.phone ?? '',
+            email: c.email ?? '',
+        })) || [];
+        defaultValues.followup_start_date = formHistory.initiateFollowup.followupStartDate;
+        defaultValues.frequency = formHistory.initiateFollowup.frequency;
+    }
+
+    if (formHistory?.returned) {
+        defaultValues.transfer_date = formHistory.returned.transferDate;
+        defaultValues.return_utr = formHistory.returned.returnUtr;
+    }
+
+    if (formHistory?.settled) {
+        defaultValues.settle_remarks = formHistory.settled.remarks;
+    }
 
     const form = useForm<BankTransferActionFormValues>({
         resolver: zodResolver(BankTransferActionFormSchema) as Resolver<BankTransferActionFormValues>,
-        defaultValues: {
-            action: '',
-            contacts: [],
-        },
+        defaultValues,
     });
 
-    const action = useWatch({ control: form.control, name: 'action' });
+    const selectedAction = useWatch({ control: form.control, name: 'action' });
     const btReq = useWatch({ control: form.control, name: 'bt_req' });
+    const emailBody = useWatch({ control: form.control, name: 'emailBody' });
+
+    useEffect(() => {
+        if (formHistory?.accountsForm?.btReq) {
+            form.setValue('bt_req', formHistory.accountsForm.btReq, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.reasonReq) {
+            form.setValue('reason_req', formHistory.accountsForm.reasonReq, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.paymentDatetime) {
+            form.setValue('payment_datetime', formHistory.accountsForm.paymentDatetime, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.utrNo) {
+            form.setValue('utr_no', formHistory.accountsForm.utrNo, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.utrMessage) {
+            form.setValue('utr_message', formHistory.accountsForm.utrMessage, { shouldValidate: false });
+        }
+
+        if (formHistory?.initiateFollowup?.organisationName) {
+            form.setValue('organisation_name', formHistory.initiateFollowup.organisationName, { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.contacts) {
+            form.setValue('contacts', formHistory.initiateFollowup.contacts.map(c => ({
+                name: c.name,
+                phone: c.phone ?? '',
+                email: c.email ?? '',
+            })), { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.followupStartDate) {
+            form.setValue('followup_start_date', formHistory.initiateFollowup.followupStartDate, { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.frequency) {
+            form.setValue('frequency', formHistory.initiateFollowup.frequency, { shouldValidate: false });
+        }
+
+        if (formHistory?.returned?.transferDate) {
+            form.setValue('transfer_date', formHistory.returned.transferDate, { shouldValidate: false });
+        }
+        if (formHistory?.returned?.returnUtr) {
+            form.setValue('return_utr', formHistory.returned.returnUtr, { shouldValidate: false });
+        }
+
+        if (formHistory?.settled?.remarks) {
+            form.setValue('settle_remarks', formHistory.settled.remarks, { shouldValidate: false });
+        }
+    }, [formHistory, form]);
+
+    useEffect(() => {
+        if (selectedAction === 'initiate-followup' && tenderId && tenderId > 0) {
+            (async () => {
+                try {
+                    const result = await infoSheetsService.getTenderContacts(tenderId);
+                    if (result?.organisationName) {
+                        const currentOrg = form.getValues('organisation_name');
+                        if (!currentOrg) {
+                            form.setValue('organisation_name', result.organisationName, { shouldValidate: false });
+                        }
+                    }
+                    if (result?.contacts?.length > 0) {
+                        const currentContacts = form.getValues('contacts');
+                        if (!currentContacts || currentContacts.length === 0) {
+                            form.setValue('contacts', result.contacts.map(c => ({
+                                name: c.name,
+                                phone: c.phone ?? '',
+                                email: c.email ?? '',
+                            })), { shouldValidate: false });
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to load tender contacts:', err);
+                }
+            })();
+        }
+    }, [selectedAction, tenderId, form]);
 
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
     const handleSubmit = async (values: BankTransferActionFormValues) => {
         try {
-            const formData = new FormData();
+            const payload: BankTransferActionPayload = {
+                action: values.action,
+                ...(values.bt_req && { bt_req: values.bt_req }),
+                ...(values.reason_req && { reason_req: values.reason_req }),
+                ...(values.payment_datetime && { payment_datetime: values.payment_datetime }),
+                ...(values.utr_no && { utr_no: values.utr_no }),
+                ...(values.utr_message && { utr_message: values.utr_message }),
+                ...(values.organisation_name && { organisation_name: values.organisation_name }),
+                ...(values.contacts && { contacts: values.contacts }),
+                ...(values.followup_start_date && { followup_start_date: values.followup_start_date }),
+                ...(values.frequency && { frequency: Number(values.frequency) }),
+                ...(values.transfer_date && { transfer_date: values.transfer_date }),
+                ...(values.return_utr && { return_utr: values.return_utr }),
+                ...(values.settle_remarks && { settle_remarks: values.settle_remarks }),
+                ...(values.emailBody && { emailBody: values.emailBody }),
+            };
 
-            Object.entries(values).forEach(([key, value]) => {
-                if (key === 'contacts' || key.includes('proof_image')) {
-                    return;
-                }
-                if (value === undefined || value === null || value === '') return;
-                if (value instanceof Date) {
-                    formData.append(key, value.toISOString());
-                } else if (typeof value === 'object' && !Array.isArray(value)) {
-                    formData.append(key, JSON.stringify(value));
-                } else {
-                    formData.append(key, String(value));
-                }
-            });
-
-            if (values.contacts && values.contacts.length > 0) {
-                formData.append('contacts', JSON.stringify(values.contacts));
-            }
-
-            await updateMutation.mutateAsync({ id: instrumentId, formData });
-            toast.success('Action submitted successfully');
-            onOpenChange(false);
+            await updateMutation.mutateAsync({ id: instrumentId, data: payload });
+            toast.success('Payment data updated successfully');
+            localStorage.removeItem('bank_transfer_action_data');
+            navigate(-1);
             form.reset();
         } catch (error: any) {
-            toast.error(error?.message || 'Failed to submit action');
-            console.error('Error submitting action:', error);
+            toast.error(error?.message || 'Failed to update payment data');
+            console.error('Error updating payment data:', error);
         }
     };
 
-    useEffect(() => {
-        if (!open) {
-            form.reset();
-        }
-    }, [open, form]);
-
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Bank Transfer Action Form</DialogTitle>
-                    <DialogDescription>
-                        {instrumentData?.tenderNo && instrumentData?.tenderName
-                            ? `${instrumentData.tenderNo} - ${instrumentData.tenderName}`
-                            : `Instrument ID: ${instrumentId}`}
-                    </DialogDescription>
-                </DialogHeader>
+        <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                <div className="space-y-3">
+                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        Choose What to do
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                        {availableActions.map((option) => {
+                            const hasHistory =
+                                (option.value === 'accounts-form' && hasAccountsFormData) ||
+                                (option.value === 'initiate-followup' && hasFollowupData) ||
+                                (option.value === 'returned' && hasReturnedData) ||
+                                (option.value === 'settled' && hasSettledData);
 
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                        <FieldWrapper control={form.control} name="action" label="Action *">
-                            {(_field) => (
-                                <SelectField
-                                    label="Choose What to do"
-                                    control={form.control}
-                                    name="action"
-                                    options={ACTION_OPTIONS}
-                                    placeholder="Select an action"
-                                />
+                            return (
+                                <div
+                                    key={option.value}
+                                    className={`relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:bg-muted/50 ${selectedAction === option.value ? 'border-primary' : '' }`}
+                                    onClick={() => form.setValue('action', option.value, { shouldValidate: true })}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {getSubmittedBadge(hasHistory)}
+                                        <div className="font-medium text-sm flex items-center">
+                                            {option.label}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    {form.formState.errors.action && (
+                        <p className="text-sm text-destructive mt-1">{form.formState.errors.action.message}</p>
+                    )}
+                </div>
+
+                <ConditionalSection show={selectedAction === 'accounts-form'}>
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <FileText className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Accounts Form</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Process the payment request through accounts department
+                        </p>
+
+                        <FieldWrapper control={form.control} name="bt_req" label="Bank Transfer Request">
+                            {(field) => (
+                                <RadioGroup
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                    className="flex gap-6"
+                                >
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="Accepted" id="bt_req_accepted" />
+                                        <Label htmlFor="bt_req_accepted">Accepted</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="Rejected" id="bt_req_rejected" />
+                                        <Label htmlFor="bt_req_rejected">Rejected</Label>
+                                    </div>
+                                </RadioGroup>
                             )}
                         </FieldWrapper>
 
-                        {/* Accounts Form (BT) 1 */}
-                        <ConditionalSection show={action === 'accounts-form-1'}>
-                            <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Accounts Form (BT) 1 - Request to Bank</h4>
-
-                                <FieldWrapper control={form.control} name="bt_req" label="BT Request">
-                                    {(field) => (
-                                        <RadioGroup
-                                            value={field.value}
-                                            onValueChange={field.onChange}
-                                            className="flex gap-6"
-                                        >
-                                            <div className="flex items-center space-x-2">
-                                                <RadioGroupItem value="Accepted" id="bt_req_accepted" />
-                                                <Label htmlFor="bt_req_accepted">Accepted</Label>
-                                            </div>
-                                            <div className="flex items-center space-x-2">
-                                                <RadioGroupItem value="Rejected" id="bt_req_rejected" />
-                                                <Label htmlFor="bt_req_rejected">Rejected</Label>
-                                            </div>
-                                        </RadioGroup>
-                                    )}
-                                </FieldWrapper>
-
-                                {btReq === 'Rejected' && (
-                                    <FieldWrapper control={form.control} name="reason_req" label="Reason for Rejection *">
-                                        {(field) => (
-                                            <Textarea
-                                                {...field}
-                                                placeholder="Enter reason for rejection"
-                                                className="min-h-[80px]"
-                                            />
-                                        )}
-                                    </FieldWrapper>
+                        {btReq === 'Rejected' && (
+                            <FieldWrapper control={form.control} name="reason_req" label="Reason for Rejection *">
+                                {(field) => (
+                                    <Textarea
+                                        {...field}
+                                        placeholder="Enter reason for rejection"
+                                        className="min-h-[80px]"
+                                    />
                                 )}
+                            </FieldWrapper>
+                        )}
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="utr_no" label="UTR No.">
-                                        {(field) => <Input {...field} placeholder="Enter UTR number" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="account_name" label="Account Name">
-                                        {(field) => <Input {...field} placeholder="Enter account name" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="account_no" label="Account No.">
-                                        {(field) => <Input {...field} placeholder="Enter account number" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="ifsc_code" label="IFSC Code">
-                                        {(field) => <Input {...field} placeholder="Enter IFSC code" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="amount" label="Amount">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter amount" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="payment_date" label="Payment Date">
+                        {btReq === 'Accepted' && (
+                            <div className="space-y-4 pt-3">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <FieldWrapper control={form.control} name="payment_datetime" label="Date and Time of Payment">
                                         {(field) => (
-                                            <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
+                                            <DateTimeInput
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                                placeholder="Select date and time"
                                             />
                                         )}
                                     </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="utr_no" label="UTR for the transaction">
+                                        {(field) => <Input {...field} placeholder="Enter UTR number" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="utr_message" label="UTR Message">
+                                        {(field) => <Input {...field} placeholder="Enter UTR message" />}
+                                    </FieldWrapper>
                                 </div>
-
-                                <FieldWrapper control={form.control} name="remarks" label="Remarks">
-                                    {(field) => (
-                                        <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
-                                    )}
-                                </FieldWrapper>
                             </div>
-                        </ConditionalSection>
+                        )}
+                    </div>
+                </ConditionalSection>
 
-                        {/* Initiate Followup */}
-                        <ConditionalSection show={action === 'initiate-followup'}>
-                            <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Initiate Followup</h4>
+                <ConditionalSection show={selectedAction === 'initiate-followup'}>
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <Users className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Initiate Followup</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Start a follow-up process with organisation contacts
+                        </p>
 
-                                <FieldWrapper control={form.control} name="organisation_name" label="Organisation Name">
-                                    {(field) => <Input {...field} placeholder="Enter organisation name" />}
-                                </FieldWrapper>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <FieldWrapper control={form.control} name="organisation_name" label="Organisation Name">
+                                {(field) => <Input {...field} placeholder="Enter organisation name" />}
+                            </FieldWrapper>
+                        </div>
 
-                                <ContactPersonFields control={form.control} name="contacts" />
+                        <div>
+                            <ContactPersonFields control={form.control} name="contacts" />
+                        </div>
 
-                                <FieldWrapper control={form.control} name="followup_start_date" label="Follow-up Start Date">
-                                    {(field) => (
-                                        <DatePicker
-                                            date={field.value ? new Date(field.value) : undefined}
-                                            onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                        />
-                                    )}
-                                </FieldWrapper>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <FieldWrapper control={form.control} name="followup_start_date" label="Follow-up Start Date">
+                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
+                            </FieldWrapper>
+                            <FollowUpFrequencySelect control={form.control} name="frequency" />
+                        </div>
 
-                                <FollowUpFrequencySelect control={form.control} name="frequency" />
+                        <div className="pt-4 border-t">
+                            <FollowupEmailEditor
+                                instrumentType="Bank Transfer"
+                                templateData={{
+                                    tenderNo: instrumentData?.tenderNo,
+                                    projectName: instrumentData?.tenderName,
+                                    amount: instrumentData?.amount,
+                                    utrNo: instrumentData?.utrNo,
+                                    status: instrumentData?.tenderStatusName,
+                                    transactionDate: instrumentData?.transactionDate ? new Date(instrumentData.transactionDate).toISOString() : undefined,
+                                }}
+                                onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
+                                initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}
+                            />
+                        </div>
+                    </div>
+                </ConditionalSection>
 
-                                <StopReasonFields
-                                    control={form.control}
-                                    frequencyFieldName="frequency"
-                                    stopReasonFieldName="stop_reason"
-                                    proofTextFieldName="proof_text"
-                                    stopRemarksFieldName="stop_remarks"
-                                    proofImageFieldName="proof_image"
+                <ConditionalSection show={selectedAction === 'returned'}>
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <Banknote className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Returned via Bank Transfer</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Record return of payment through bank transfer
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <FieldWrapper control={form.control} name="transfer_date" label="Transfer Date">
+                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
+                            </FieldWrapper>
+                            <FieldWrapper control={form.control} name="return_utr" label="Return UTR">
+                                {(field) => <Input {...field} placeholder="Enter Return UTR number" />}
+                            </FieldWrapper>
+                        </div>
+                    </div>
+                </ConditionalSection>
+
+                <ConditionalSection show={selectedAction === 'settled'}>
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <CheckCircle2 className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Settled with Project Account</h4>
+                            {getSubmittedBadge(hasSettledData)}
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Mark payment as settled with project account
+                        </p>
+                        <FieldWrapper control={form.control} name="settle_remarks" label="Remarks">
+                            {(field) => (
+                                <Textarea
+                                    {...field}
+                                    placeholder="Enter settlement remarks"
+                                    className="min-h-[80px]"
                                 />
-                            </div>
-                        </ConditionalSection>
+                            )}
+                        </FieldWrapper>
+                    </div>
+                </ConditionalSection>
 
-                        {/* Returned */}
-                        <ConditionalSection show={action === 'returned'}>
-                            <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Returned</h4>
-
-                                <FieldWrapper control={form.control} name="return_reason" label="Return Reason">
-                                    {(field) => (
-                                        <Textarea {...field} placeholder="Enter return reason" className="min-h-[80px]" />
-                                    )}
-                                </FieldWrapper>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="return_date" label="Return Date">
-                                        {(field) => (
-                                            <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="utr_num" label="UTR Number">
-                                        {(field) => <Input {...field} placeholder="Enter UTR number" />}
-                                    </FieldWrapper>
-                                </div>
-
-                                <FieldWrapper control={form.control} name="return_remarks" label="Return Remarks">
-                                    {(field) => (
-                                        <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />
-                                    )}
-                                </FieldWrapper>
-                            </div>
-                        </ConditionalSection>
-
-                        {/* Settled */}
-                        <ConditionalSection show={action === 'settled'}>
-                            <div className="space-y-4 border rounded-lg p-4">
-                                <h4 className="font-semibold text-base">Settled</h4>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FieldWrapper control={form.control} name="settlement_date" label="Settlement Date">
-                                        {(field) => (
-                                            <DatePicker
-                                                date={field.value ? new Date(field.value) : undefined}
-                                                onChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="settlement_amount" label="Settlement Amount">
-                                        {(field) => <Input {...field} type="number" placeholder="Enter amount" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="settlement_reference_no" label="Reference No.">
-                                        {(field) => <Input {...field} placeholder="Enter reference number" />}
-                                    </FieldWrapper>
-                                </div>
-                            </div>
-                        </ConditionalSection>
-
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                                Cancel
-                            </Button>
-                            <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting ? 'Submitting...' : 'Submit'}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
-            </DialogContent>
-        </Dialog>
+                <div className="flex justify-end gap-4 pt-4 border-t">
+                    <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
+                        Cancel
+                    </Button>
+                    <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? 'Submitting...' : 'Submit'}
+                    </Button>
+                </div>
+            </form>
+        </Form>
     );
 }

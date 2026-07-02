@@ -64,6 +64,12 @@ class UsersService extends BaseApiService {
     async getUsersByRole(roleId: number): Promise<User[]> {
         return this.get<User[]>(`/by-role/${roleId}`);
     }
+
+    async getUsersOfOps(team?: number): Promise<User[]> {
+        // Only add ?team= if it's a valid number
+        const params = (team !== undefined && !isNaN(team)) ? `?team=${team}` : "";
+        return this.get<User[]>(`/of-ops${params}`);
+    }
 }
 
 export const usersService = new UsersService();

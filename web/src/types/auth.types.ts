@@ -33,7 +33,6 @@ export interface UserProfile {
     gender: string | null;
     employeeCode: string | null;
     designationId: number | null;
-    primaryTeamId: number | null;
     altEmail: string | null;
     emergencyContactName: string | null;
     emergencyContactPhone: string | null;
@@ -43,6 +42,17 @@ export interface UserProfile {
     dateOfExit: string | null;
     timezone: string | null;
     locale: string | null;
+    middleName: string | null;
+    phone: string | null;
+    maritalStatus: string | null;
+    nationality: string | null;
+    aadharNumber: string | null;
+    panNumber: string | null;
+    currentAddress: any;
+    permanentAddress: any;
+    emergencyContact: any;
+    profilePhoto: string | null;
+    googlePhoto : string | null;
     createdAt: string | null;
     updatedAt: string | null;
 }
