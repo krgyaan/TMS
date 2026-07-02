@@ -1,6 +1,6 @@
 import { Inject, Injectable, OnModuleInit } from "@nestjs/common";
 import { Worker } from "bullmq";
-import { redisConnection } from "@/config/redis.config";
+import { ConfigService } from "@nestjs/config";
 import { AccountChecklistService } from "./account-checklist.service";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -9,11 +9,15 @@ import { Logger } from "winston";
 export class AccountChecklistWorker implements OnModuleInit {
     constructor(
         private readonly service: AccountChecklistService,
+        private readonly configService: ConfigService,
         @Inject(WINSTON_MODULE_PROVIDER)
         private readonly logger: Logger
     ) {}
 
     onModuleInit() {
+        const host = this.configService.get<string>('redis.host');
+        const port = this.configService.get<number>('redis.port');
+
         const worker = new Worker(
             "checklist-mail-queue",
             async (job) => {
@@ -37,7 +41,7 @@ export class AccountChecklistWorker implements OnModuleInit {
                 }
             },
             {
-                connection: redisConnection,
+                connection: { host, port },
                 concurrency: 2,
             }
         );
