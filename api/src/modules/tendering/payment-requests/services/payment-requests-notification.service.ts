@@ -4,11 +4,12 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
-import { instrumentChequeDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import * as path from 'path';
 import { ConfigService } from '@nestjs/config';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, notInArray, isNull } from 'drizzle-orm';
+import { differenceInDays } from 'date-fns';
 
 @Injectable()
 export class PaymentRequestsNotificationService {
@@ -1242,6 +1243,346 @@ export class PaymentRequestsNotificationService {
             }
         } catch (error) {
             this.logger.error(`Failed to send POP return email for instrument ${instrumentId}:`, error);
+        }
+    }
+
+    async processChequeDueDateReminders() {
+        this.logger.log('Processing cheque due date reminders...');
+
+        const cheques = await this.db
+            .select({
+                instrument: paymentInstruments,
+                chequeDetails: instrumentChequeDetails,
+                request: paymentRequests,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .innerJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .where(and(
+                eq(paymentInstruments.instrumentType, 'Cheque'),
+                eq(paymentInstruments.isActive, true),
+                isNull(instrumentChequeDetails.linkedDdId),
+                isNull(instrumentChequeDetails.linkedFdrId),
+            ));
+
+        this.logger.log(`Found ${cheques.length} active cheques for due date check`);
+
+        const reminderDays = [15, 7, 3, 2, 1];
+
+        for (const cheque of cheques) {
+            if (!cheque.chequeDetails.dueDate) {
+                this.logger.debug(`Cheque #${cheque.instrument.id} has no due date, skipping`);
+                continue;
+            }
+
+            const dueDate = new Date(cheque.chequeDetails.dueDate);
+            const today = new Date();
+            const daysUntilDue = differenceInDays(dueDate, today);
+
+            this.logger.debug(`Cheque #${cheque.instrument.id}: dueDate=${cheque.chequeDetails.dueDate}, today=${today.toISOString()}, daysUntilDue=${daysUntilDue}`);
+
+            if (!reminderDays.includes(daysUntilDue)) {
+                this.logger.debug(`Cheque #${cheque.instrument.id}: ${daysUntilDue} days left, not in reminder schedule`);
+                continue;
+            }
+
+            const tenderTeamId = await this.getTenderTeamId(cheque.request.tenderId || 0, cheque.request.requestedBy || 0);
+
+            const data = {
+                purpose: cheque.chequeDetails.chequeReason || cheque.request.purpose || '',
+                chequeNo: cheque.chequeDetails.chequeNo || 'N/A',
+                partyName: cheque.instrument.favouring || 'N/A',
+                amount: this.formatCurrency(Number(cheque.instrument.amount) || 0),
+                dueDate: this.formatDateDDMMYYYY(cheque.chequeDetails.dueDate),
+                daysLeft: daysUntilDue,
+            };
+
+            this.logger.log(`Sending cheque due date reminder for Cheque #${cheque.instrument.id}, ${daysUntilDue} days before due date`);
+
+            try {
+                const result = await this.emailService.sendPaymentEmail({
+                    requestId: cheque.request.id,
+                    tenderId: cheque.request.tenderId || undefined,
+                    eventType: 'CHEQUE_DUE_DATE_REMINDER',
+                    fromUserId: 1,
+                    subject: `Cheque Due Date Reminder - ${data.chequeNo} (${data.daysLeft} days left)`,
+                    template: 'cheque-due-date-reminder',
+                    data,
+                    to: [{ type: 'emails', emails: ['kailash@volksenergie.in'] }],
+                    cc: [
+                        { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                        { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                    ],
+                });
+
+                if (result.success) {
+                    this.logger.log(`Cheque due date reminder sent for Cheque #${cheque.instrument.id} (logId: ${result.emailLogId})`);
+                } else {
+                    this.logger.warn(`Cheque due date reminder failed for Cheque #${cheque.instrument.id}: ${result.error}`);
+                }
+            } catch (error) {
+                this.logger.error(`Failed to send cheque due date reminder for Cheque #${cheque.instrument.id}:`, error);
+            }
+        }
+    }
+
+    async processBgClaimPeriodReminders() {
+        this.logger.log('Processing BG claim period reminders...');
+
+        const bgs = await this.db
+            .select({
+                instrument: paymentInstruments,
+                bgDetails: instrumentBgDetails,
+                request: paymentRequests,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .innerJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .where(and(
+                eq(paymentInstruments.instrumentType, 'BG'),
+                eq(paymentInstruments.isActive, true),
+                notInArray(paymentInstruments.action, [4, 5, 6, 7, 8, 9]),
+            ));
+
+        this.logger.log(`Found ${bgs.length} active BGs for claim period check`);
+
+        for (const bg of bgs) {
+            if (!bg.instrument.validityDate) {
+                this.logger.debug(`BG #${bg.instrument.id} has no validity date, skipping`);
+                continue;
+            }
+
+            const currentDate = new Date();
+            const bgExpiryDate = new Date(bg.instrument.validityDate);
+
+            if (currentDate <= bgExpiryDate) {
+                this.logger.debug(`BG #${bg.instrument.id} has not crossed expiry date yet, skipping`);
+                continue;
+            }
+
+            const tenderId = bg.request.tenderId || 0;
+            let user;
+
+            if (tenderId > 0) {
+                const [tender] = await this.db
+                    .select({ teamMember: tenderInfos.teamMember })
+                    .from(tenderInfos)
+                    .where(eq(tenderInfos.id, tenderId))
+                    .limit(1);
+
+                if (tender?.teamMember) {
+                    [user] = await this.db
+                        .select()
+                        .from(users)
+                        .where(and(eq(users.id, Number(tender.teamMember)), eq(users.isActive, true)))
+                        .limit(1);
+                }
+            }
+
+            if (!user && bg.request.requestedBy) {
+                [user] = await this.db
+                    .select()
+                    .from(users)
+                    .where(and(eq(users.id, bg.request.requestedBy), eq(users.isActive, true)))
+                    .limit(1);
+            }
+
+            if (!user) {
+                this.logger.warn(`BG #${bg.instrument.id}: No user found for this BG, skipping`);
+                continue;
+            }
+
+            const apiUrl = this.configService.get<string>('app.apiUrl') || '';
+            const baseUrl = apiUrl.replace('/api/v1', '');
+            const softCopyUrl = bg.bgDetails.bgSoftCopy
+                ? `${baseUrl}/uploads/tendering/${bg.bgDetails.bgSoftCopy}`
+                : '';
+
+            const data = {
+                assignee: user.name || 'User',
+                bg_no: bg.bgDetails.bgNo || 'N/A',
+                favor: bg.instrument.favouring || 'N/A',
+                bg_validity: this.formatDateDDMMYYYY(bg.instrument.validityDate),
+                bg_claim_period_expiry: bg.instrument.claimExpiryDate
+                    ? this.formatDateDDMMYYYY(bg.instrument.claimExpiryDate)
+                    : 'N/A',
+                amount: this.formatCurrency(Number(bg.instrument.amount) || 0),
+                form_link: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantees/${bg.instrument.id}`,
+                soft_copy: softCopyUrl,
+            };
+
+            const ccEmails = [
+                'accounts@volksenergie.in', 'goyal@volksenergie.in', 'kainaat@volksenergie.in',
+                'aditya@volksenergie.in', 'arathi@volksenergie.in', 'priyanka@volksenergie.in', 'ahkamul@volksenergie.in',
+            ];
+
+            const [sender] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, 'imran@volksenergie.in'))
+                .limit(1);
+
+            this.logger.log(`Sending BG claim period notification for BG #${bg.instrument.id}`);
+
+            try {
+                const result = await this.emailService.sendPaymentEmail({
+                    requestId: bg.request.id,
+                    tenderId: bg.request.tenderId || undefined,
+                    eventType: 'BG_CLAIM_PERIOD',
+                    fromUserId: sender?.id || 33,
+                    subject: `BG Claim Period Notification - ${data.bg_no}`,
+                    template: 'bg-claim-period',
+                    data,
+                    to: [{ type: 'emails', emails: [user.email] }],
+                    cc: [{ type: 'emails', emails: ccEmails }],
+                });
+
+                if (result.success) {
+                    this.logger.log(`BG claim period notification sent for BG #${bg.instrument.id} (logId: ${result.emailLogId})`);
+                } else {
+                    this.logger.warn(`BG claim period notification failed for BG #${bg.instrument.id}: ${result.error}`);
+                }
+            } catch (error) {
+                this.logger.error(`Failed to send BG claim period notification for BG #${bg.instrument.id}:`, error);
+            }
+        }
+    }
+
+    async processBgExpiryReminders() {
+        this.logger.log('Processing BG expiry reminders...');
+
+        const bgs = await this.db
+            .select({
+                instrument: paymentInstruments,
+                bgDetails: instrumentBgDetails,
+                request: paymentRequests,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .innerJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .where(and(
+                eq(paymentInstruments.instrumentType, 'BG'),
+                eq(paymentInstruments.isActive, true),
+                notInArray(paymentInstruments.action, [4, 5, 6, 7, 8, 9]),
+            ));
+
+        this.logger.log(`Found ${bgs.length} active BGs for expiry reminder check`);
+
+        const reminderDays = [90, 60, 45, 30, 15, 7, 1];
+
+        for (const bg of bgs) {
+            if (!bg.instrument.validityDate) {
+                this.logger.debug(`BG #${bg.instrument.id} has no validity date, skipping`);
+                continue;
+            }
+
+            const dueDate = new Date(bg.instrument.validityDate);
+            const today = new Date();
+            const daysUntilDue = differenceInDays(dueDate, today);
+
+            this.logger.debug(`BG #${bg.instrument.id}: bg_expiry=${bg.instrument.validityDate}, today=${today.toISOString()}, daysUntilDue=${daysUntilDue}`);
+
+            if (!reminderDays.includes(daysUntilDue)) {
+                this.logger.debug(`BG #${bg.instrument.id}: ${daysUntilDue} days left, not in reminder schedule`);
+                continue;
+            }
+
+            const tenderId = bg.request.tenderId || 0;
+            let user;
+
+            if (tenderId > 0) {
+                const [tender] = await this.db
+                    .select({ teamMember: tenderInfos.teamMember })
+                    .from(tenderInfos)
+                    .where(eq(tenderInfos.id, tenderId))
+                    .limit(1);
+
+                if (tender?.teamMember) {
+                    [user] = await this.db
+                        .select()
+                        .from(users)
+                        .where(and(eq(users.id, Number(tender.teamMember)), eq(users.isActive, true)))
+                        .limit(1);
+                }
+            }
+
+            if (!user && bg.request.requestedBy) {
+                [user] = await this.db
+                    .select()
+                    .from(users)
+                    .where(and(eq(users.id, bg.request.requestedBy), eq(users.isActive, true)))
+                    .limit(1);
+            }
+
+            if (!user) {
+                this.logger.warn(`BG #${bg.instrument.id}: No user found for this BG, skipping`);
+                continue;
+            }
+
+
+            const apiUrl = this.configService.get<string>('app.apiUrl') || '';
+            const baseUrl = apiUrl.replace('/api/v1', '');
+            const softCopyUrl = bg.bgDetails.bgSoftCopy
+                ? `${baseUrl}/uploads/tendering/${bg.bgDetails.bgSoftCopy}`
+                : '';
+
+            const data = {
+                days: daysUntilDue,
+                assignee: user.name || 'User',
+                bg_no: bg.bgDetails.bgNo || 'N/A',
+                project_name: bg.request.projectName || 'N/A',
+                favor: bg.instrument.favouring || 'N/A',
+                bg_validity: this.formatDateDDMMYYYY(bg.instrument.validityDate),
+                bg_claim_period_expiry: bg.instrument.claimExpiryDate
+                    ? this.formatDateDDMMYYYY(bg.instrument.claimExpiryDate)
+                    : 'N/A',
+                amount: this.formatCurrency(Number(bg.instrument.amount) || 0),
+                form_link: `${this.getFrontendUrl()}/bi-dashboard/bank-guarantees/${bg.instrument.id}`,
+                soft_copy: softCopyUrl,
+            };
+
+            const ccEmails = [
+                'accounts@volksenergie.in', 'goyal@volksenergie.in', 'kainaat@volksenergie.in',
+                'aditya@volksenergie.in', 'arathi@volksenergie.in', 'priyanka@volksenergie.in', 'ahkamul@volksenergie.in',
+            ];
+
+            const tenderTeamId = await this.getTenderTeamId(bg.request.tenderId || 0, bg.request.requestedBy || 0);
+
+            const ccSources: any[] = [
+                { type: 'emails', emails: ccEmails },
+                { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                { type: 'role', role: 'Coordinator', teamId: tenderTeamId },
+            ];
+
+            const [sender] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.email, 'imran@volksenergie.in'))
+                .limit(1);
+
+            this.logger.log(`Sending BG expiry reminder for BG #${bg.instrument.id}, ${daysUntilDue} days before expiry`);
+
+            try {
+                const result = await this.emailService.sendPaymentEmail({
+                    requestId: bg.request.id,
+                    tenderId: bg.request.tenderId || undefined,
+                    eventType: 'BG_EXPIRY_REMINDER',
+                    fromUserId: sender?.id || 33,
+                    subject: `BG Expiry Reminder - ${data.bg_no} (${data.days} days left)`,
+                    template: 'bg-expiry-reminder',
+                    data,
+                    to: [{ type: 'emails', emails: [user.email] }],
+                    cc: ccSources,
+                });
+
+                if (result.success) {
+                    this.logger.log(`BG expiry reminder sent for BG #${bg.instrument.id} (logId: ${result.emailLogId})`);
+                } else {
+                    this.logger.warn(`BG expiry reminder failed for BG #${bg.instrument.id}: ${result.error}`);
+                }
+            } catch (error) {
+                this.logger.error(`Failed to send BG expiry reminder for BG #${bg.instrument.id}:`, error);
+            }
         }
     }
 }

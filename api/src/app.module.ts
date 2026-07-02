@@ -109,6 +109,7 @@ import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employe
 import { AssetsModule } from "@/modules/hrms/assets/assets.module";
 import { AccountChecklistModule } from './modules/accounts/account-checklist/account-checklist.module';
 import { AccountChecklistSchedulerModule } from "./modules/accounts/account-checklist/account-checklist-scheduler.module";
+import { SchedulerModule } from "@/modules/scheduler/scheduler.module";
 import { OnboardingModule } from './modules/hrms/onboarding/onboarding.module';
 import { EmployeeOnboardingModule } from './modules/hrms/employee-onboarding/employee-onboarding.module';
 import { ProfileModule } from './modules/profile/profile.module';
@@ -232,6 +233,7 @@ import { CircularsModule } from './modules/master/circulars/circulars.module';
         AssetsModule,
         AccountChecklistModule,
         AccountChecklistSchedulerModule,
+        SchedulerModule,
         OnboardingModule,
         EmployeeOnboardingModule,
         ProfileModule,
