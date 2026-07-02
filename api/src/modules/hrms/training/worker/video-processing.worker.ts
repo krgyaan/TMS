@@ -1,6 +1,6 @@
 import { Inject, Injectable, OnModuleInit } from "@nestjs/common";
 import { Worker } from "bullmq";
-import { redisConnection } from "@/config/redis.config";
+import { ConfigService } from "@nestjs/config";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { DRIZZLE } from "@/db/database.module";
@@ -18,10 +18,14 @@ import * as fs from "fs";
 export class VideoProcessingWorker implements OnModuleInit {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly configService: ConfigService,
         @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger
     ) {}
 
     onModuleInit() {
+        const host = this.configService.get<string>('redis.host');
+        const port = this.configService.get<number>('redis.port');
+
         const worker = new Worker(
             "video-processing-queue",
             async job => {
@@ -113,8 +117,8 @@ export class VideoProcessingWorker implements OnModuleInit {
                 }
             },
             {
-                connection: redisConnection,
-                concurrency: 1,
+                connection: { host, port },
+                concurrency: 2,
             }
         );
 
