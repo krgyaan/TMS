@@ -1,19 +1,18 @@
 import { Module, Global } from "@nestjs/common";
 import { Queue } from "bullmq";
 import IORedis from "ioredis";
-import { redisConnection } from "@/config/redis.config";
+import { ConfigService } from "@nestjs/config";
 
 @Global()
 @Module({
     providers: [
         {
             provide: "REDIS_CONNECTION",
-            useFactory: () => {
-
-                return new IORedis({
-                    host: redisConnection.host,
-                    port: redisConnection.port,
-                });
+            inject: [ConfigService],
+            useFactory: (configService: ConfigService) => {
+                const host = configService.get<string>('redis.host');
+                const port = configService.get<number>('redis.port');
+                return new IORedis({ host, port });
             },
         },
         {
@@ -26,7 +25,6 @@ import { redisConnection } from "@/config/redis.config";
                         },
                     } as unknown as Queue;
                 }
-
                 return new Queue("followup-mail-queue", { connection });
             },
         },
