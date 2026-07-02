@@ -10,14 +10,14 @@ import { PaymentReminderScheduler } from "./payment-reminder.scheduler";
 
 @Module({
     imports: [
-        FollowUpModule,
+        // FollowUpModule,
         QueueModule,
         AccountChecklistModule,
         LoggerModule,
         PaymentRequestsModule,
     ],
     providers: [
-        FollowupScheduler,
+        // FollowupScheduler,
         AccountChecklistScheduler,
         PaymentReminderScheduler,
     ],

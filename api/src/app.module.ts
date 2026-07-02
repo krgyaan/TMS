@@ -5,6 +5,7 @@ import appConfig, { validateAppEnv } from "@/config/app.config";
 import authConfig, { validateAuthEnv } from "@/config/auth.config";
 import googleConfig, { validateGoogleEnv } from "@/config/google.config";
 import dbConfig, { validateDbEnv } from "@/config/db.config";
+import redisConfig, { validateRedisEnv } from "@/config/redis.config";
 import { DatabaseModule } from "@/db/database.module";
 import { UsersModule } from "@/modules/master/users/users.module";
 import { HealthModule } from "@/modules/master/health/health.module";
@@ -129,12 +130,13 @@ import { CircularsModule } from './modules/master/circulars/circulars.module';
         ConfigModule.forRoot({
             isGlobal: true,
             expandVariables: true,
-            load: [appConfig, dbConfig, googleConfig, authConfig],
+            load: [appConfig, dbConfig, googleConfig, authConfig, redisConfig],
             validate: env => ({
                 ...validateAppEnv(env),
                 ...validateDbEnv(env),
                 ...validateGoogleEnv(env),
                 ...validateAuthEnv(env),
+                ...validateRedisEnv(env),
             }),
         }),
         LoggerModule,
