@@ -11,6 +11,15 @@ const appEnvSchema = z.object({
     API_PREFIX: z.string().optional().default('api/v1'),
     PUBLIC_APP_URL: z.string().optional().default('http://localhost:5173'),
     API_URL: z.string().optional().default('http://localhost:3000/api/v1'),
+    LOG_LEVEL: z
+        .enum(["error", "warn", "info", "debug", "silly"])
+        .optional()
+        .default("info"),
+    NODE_ENV: z
+        .enum(["development", "production", "test"])
+        .optional()
+        .default("development"),
+    LOG_DIR: z.string().optional().default("logs"),
 });
 
 export type AppConfig = z.infer<typeof appEnvSchema>;
@@ -27,5 +36,8 @@ export default registerAs('app', () => {
         apiPrefix: parsed.API_PREFIX,
         publicAppUrl: parsed.PUBLIC_APP_URL,
         apiUrl: parsed.API_URL,
-    } as { port: number; apiPrefix: string; publicAppUrl: string; apiUrl: string };
+        logLevel: parsed.LOG_LEVEL,
+        nodeEnv: parsed.NODE_ENV,
+        logDir: parsed.LOG_DIR,
+    } as { port: number; apiPrefix: string; publicAppUrl: string; apiUrl: string; logLevel: string; nodeEnv: string; logDir: string };
 });

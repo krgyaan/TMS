@@ -14,3 +14,5 @@ import { winstonLogger } from "./logger.config";
     exports: [WinstonModule],
 })
 export class LoggerModule {}
+
+export { HttpLoggerMiddleware } from "./http-logger.middleware";

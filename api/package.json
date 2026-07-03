@@ -74,6 +74,7 @@
         "sharp": "^0.34.5",
         "uuid": "^13.0.0",
         "winston": "^3.19.0",
+        "winston-daily-rotate-file": "^5.0.0",
         "yet-another-react-lightbox": "^3.25.0",
         "zod": "^3.25.76"
     },

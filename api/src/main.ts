@@ -1,25 +1,27 @@
-import { NestFactory } from "@nestjs/core";
-import * as Sentry from "@sentry/node";
-import { ValidationPipe } from "@nestjs/common";
 import { AppModule } from "@/app.module";
-import { ConfigService } from "@nestjs/config";
-import { NestExpressApplication } from "@nestjs/platform-express";
-import { join } from "path";
-import cookieParser from "cookie-parser";
-import { AllExceptionsFilter } from "@/logger/all-exception.filter";
-import { requestIdMiddleware } from "@/logger/request-id.middleware";
-import { WINSTON_MODULE_NEST_PROVIDER } from "nest-winston";
-
 import { DRIZZLE } from "@/db/database.module";
+import { AllExceptionsFilter } from "@/logger/all-exception.filter";
+import { winstonLogger } from "@/logger/logger.config";
+import { requestIdMiddleware } from "@/logger/request-id.middleware";
 import { StatusCache } from "@/utils/status-cache";
 import type { DbInstance } from "@db";
+import { ValidationPipe } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
+import { NestExpressApplication } from "@nestjs/platform-express";
+import * as Sentry from "@sentry/node";
+import cookieParser from "cookie-parser";
+import { WINSTON_MODULE_PROVIDER } from "nest-winston";
+import { join } from "path";
+import { HttpLoggerMiddleware } from "./logger/http-logger.middleware";
 
 async function bootstrap() {
-    Sentry.init({
-        dsn: process.env.SENTRY_DSN,
-        environment: process.env.NODE_ENV,
-        tracesSampleRate: 1.0,
-    });
+    if (process.env.SENTRY_DSN) {
+        Sentry.init({
+            dsn: process.env.SENTRY_DSN,
+            environment: process.env.NODE_ENV,
+            tracesSampleRate: 1.0,
+        });
+    }
 
     // ✅ IMPORTANT: Use NestExpressApplication
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -28,16 +30,11 @@ async function bootstrap() {
 
     app.useGlobalFilters(app.get(AllExceptionsFilter));
 
-    const config = app.get(ConfigService);
-    const appCfg = config.get<{ port: number; apiPrefix: string }>("app", {
-        infer: true,
-    });
+    // Register HTTP logger middleware
+    const httpLoggerInstance = new HttpLoggerMiddleware(app.get(WINSTON_MODULE_PROVIDER));
 
-    /**
-     * ✅ Serve uploaded files
-     * This makes /uploads/* accessible publicly
-     * Works both locally and on VPS
-     */
+    app.use((req, res, next) => httpLoggerInstance.use(req, res, next));
+
     app.useStaticAssets(join(process.cwd(), "uploads"), {
         prefix: "/uploads",
     });
@@ -47,7 +44,7 @@ async function bootstrap() {
      * APIs → /api/v1/*
      * Files → /uploads/*
      */
-    app.setGlobalPrefix(appCfg?.apiPrefix ?? "api/v1");
+    app.setGlobalPrefix("api/v1");
 
     // Global validation pipe with transform enabled
     app.useGlobalPipes(
@@ -82,14 +79,19 @@ async function bootstrap() {
         allowedHeaders: ["Content-Type", "Authorization"],
     });
 
-    process.on('SIGINT', () => console.log('SIGINT'));
-    process.on('SIGTERM', () => console.log('SIGTERM'));
+    // Set up signal handlers
+    process.on('SIGINT', () => {
+        winstonLogger.warn('SIGINT');
+    });
+    process.on('SIGTERM', () => {
+        winstonLogger.warn('SIGTERM');
+    });
 
-    const port = appCfg?.port ?? 3000;
+    const port = 3000;
     await app.listen(port);
 
-    console.log(`🚀 API running at http://localhost:${port}`);
-    console.log(`📁 Uploads served at /uploads/*`);
+    winstonLogger.info(`API running at http://localhost:${port}`);
+    winstonLogger.info(`Uploads served at /uploads/*`);
 }
 
 bootstrap();
