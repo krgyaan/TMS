@@ -5,3 +5,4 @@ myenv
 */samples
 ml-ocr/samples
 ml-ocr/__pycache__
+logs

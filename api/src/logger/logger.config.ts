@@ -51,7 +51,7 @@ const dailyFileFormat = winston.format.combine(
     winston.format.json()
 );
 
-const logDir = process.env.LOG_DIR || "logs";
+const logDir = process.env.LOG_DIR || "../logs";
 
 export const winstonLogger = winston.createLogger({
     level: process.env.LOG_LEVEL || "info",

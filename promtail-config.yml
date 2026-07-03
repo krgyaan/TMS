@@ -17,10 +17,3 @@ scrape_configs:
           __path__: /logs/tms-*.log
     pipeline_stages:
       - json: {}
-
-  - job_name: promtail-self
-    static_configs:
-      - targets: [localhost]
-        labels:
-          job: promtail-self
-          __path__: /proc/promtail-config.yml
