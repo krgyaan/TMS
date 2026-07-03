@@ -1,0 +1,35 @@
+apiVersion: 1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+type: Opaque
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki:3100
+        version: 1
+        editable: true
+        jsonData:
+          maxLines: 1000
+---
+apiVersion: 1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+type: Opaque
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: 'tms'
+        type: file
+        default: true
+        options:
+          path: /etc/grafana/provisioning/dashboards
+          readOnly: true

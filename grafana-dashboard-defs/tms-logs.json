@@ -1,0 +1,117 @@
+apiVersion: 1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-defs
+data:
+  tms-logs.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "TMS API Logs - Debug",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Error Rate",
+            "type": "stat",
+            "gridPos": { "x": 0, "y": 0, "w": 8, "h": 8 },
+            "fieldConfig": {
+              "defaults": {
+                "color": { "mode": "thresholds" },
+                "mappings": [],
+                "thresholds": {
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "red", "value": 1 }
+                  ]
+                }
+              }
+            },
+            "targets": [
+              {
+                "expr": "sum(rate({job=\"tms-api\"} |~ \"error\")[5m])",
+                "legendFormat": "Errors per second"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Slow Requests (>500ms)",
+            "type": "stat",
+            "gridPos": { "x": 8, "y": 0, "w": 8, "h": 8 },
+            "fieldConfig": {
+              "defaults": {
+                "color": { "mode": "thresholds" },
+                "mappings": [],
+                "thresholds": {
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 1 },
+                    { "color": "red", "value": 5 }
+                  ]
+                }
+              }
+            },
+            "targets": [
+              {
+                "expr": "sum(rate({job=\"tms-api\"} |~ \"outgoing response\" | json | duration > 500)[5m])",
+                "legendFormat": "Slow requests per second"
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Requests Per Minute",
+            "type": "graph",
+            "gridPos": { "x": 16, "y": 0, "w": 12, "h": 8 },
+            "targets": [
+              {
+                "expr": "rate({job=\"tms-api\"} |~ \"outgoing response\")[5m]",
+                "legendFormat": "Requests per second"
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Log Volume by Level",
+            "type": "table",
+            "gridPos": { "x": 0, "y": 8, "w": 24, "h": 8 },
+            "targets": [
+              {
+                "expr": "count_over_time({job=\"tms-api\"} [1h])",
+                "format": "time_series",
+                "legendFormat": "{{level}}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "custom": {
+                  "hideFrom": { "legend": false, "tooltip": false, "vis": false }
+                }
+              }
+            }
+          },
+          {
+            "id": 5,
+            "title": "Recent Error Details",
+            "type": "table",
+            "gridPos": { "x": 0, "y": 16, "w": 24, "h": 12 },
+            "targets": [
+              {
+                "expr": "({job=\"tms-api\"} |~ \"error\" | json)",
+                "format": "time_series",
+                "instant": true
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "custom": {
+                  "hideFrom": { "legend": false, "tooltip": false, "vis": false }
+                }
+              }
+            }
+          }
+        ],
+        "time": { "from": "now-1h", "to": "now" },
+        "refresh": "5m"
+      }
+    }

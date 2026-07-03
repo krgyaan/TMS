@@ -1,0 +1,26 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://localhost:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: tms-api
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: tms-api
+          __path__: /logs/tms-*.log
+    pipeline_stages:
+      - json: {}
+
+  - job_name: promtail-self
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: promtail-self
+          __path__: /proc/promtail-config.yml

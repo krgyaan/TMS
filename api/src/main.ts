@@ -1,3 +1,4 @@
+import "./instrument";
 import { AppModule } from "@/app.module";
 import { DRIZZLE } from "@/db/database.module";
 import { AllExceptionsFilter } from "@/logger/all-exception.filter";
@@ -8,7 +9,6 @@ import type { DbInstance } from "@db";
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { NestExpressApplication } from "@nestjs/platform-express";
-import * as Sentry from "@sentry/node";
 import cookieParser from "cookie-parser";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { join } from "path";
