@@ -22,27 +22,22 @@ export class GenericMailWorker implements OnModuleInit {
             const { type } = job.data;
             this.logger.info("Processing generic mail job", { jobId: job.id, type });
 
-            try {
-                switch (type) {
-                    case 'cheque_due_date':
-                        await this.notificationService.processChequeDueDateReminders();
-                        break;
-                    case 'bg_claim_period':
-                        await this.notificationService.processBgClaimPeriodReminders();
-                        break;
-                    case 'bg_expiry':
-                        await this.notificationService.processBgExpiryReminders();
-                        break;
-                    default:
-                        this.logger.warn(`Unknown job type: ${type}`);
-                        throw new Error(`Unknown job type: ${type}`);
-                }
-
-                this.logger.info("Generic mail job completed", { jobId: job.id, type });
-            } catch (err: any) {
-                this.logger.error("Generic mail job failed", { jobId: job.id, type, error: err.message });
-                throw err;
+            switch (type) {
+                case 'cheque_due_date':
+                    await this.notificationService.processChequeDueDateReminders();
+                    break;
+                case 'bg_claim_period':
+                    await this.notificationService.processBgClaimPeriodReminders();
+                    break;
+                case 'bg_expiry':
+                    await this.notificationService.processBgExpiryReminders();
+                    break;
+                default:
+                    this.logger.warn(`Unknown job type: ${type}`);
+                    throw new Error(`Unknown job type: ${type}`);
             }
+
+            this.logger.info("Generic mail job completed", { jobId: job.id, type });
         }, { connection: { host, port }, concurrency: 2 });
 
         worker.on("failed", (job, err) => {
