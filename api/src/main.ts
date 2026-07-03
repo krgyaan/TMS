@@ -15,13 +15,6 @@ import { join } from "path";
 import { HttpLoggerMiddleware } from "./logger/http-logger.middleware";
 
 async function bootstrap() {
-    if (process.env.SENTRY_DSN) {
-        Sentry.init({
-            dsn: process.env.SENTRY_DSN,
-            environment: process.env.NODE_ENV,
-            tracesSampleRate: 1.0,
-        });
-    }
 
     // ✅ IMPORTANT: Use NestExpressApplication
     const app = await NestFactory.create<NestExpressApplication>(AppModule);

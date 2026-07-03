@@ -1,8 +1,8 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Inject } from "@nestjs/common";
+import { ExceptionFilter, Catch, HttpException, HttpStatus, Inject, type ArgumentsHost } from "@nestjs/common";
 import { Response } from "express";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
-import * as Sentry from "@sentry/node";
+import { SentryExceptionCaptured } from "@sentry/nestjs";
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -11,6 +11,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         private readonly logger: Logger
     ) {}
 
+    @SentryExceptionCaptured()
     catch(exception: unknown, host: ArgumentsHost) {
         const ctx = host.switchToHttp();
         const response = ctx.getResponse<Response>();
@@ -26,15 +27,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
                       message: "Internal server error",
                   };
 
-        // 🔹 Logging (unchanged)
-        Sentry.setContext("request", {
-            url: request?.url,
-            method: request?.method,
-            body: request?.body,
-        });
-
-        Sentry.captureException(exception);
-
         this.logger.error("Unhandled exception", {
             status,
             url: request?.url,
@@ -45,7 +37,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
             exceptionName: exception instanceof Error ? exception.name : typeof exception,
         });
 
-        // ✅ THIS IS THE MISSING PIECE
         return response.status(status).json(errorResponse);
     }
 }
