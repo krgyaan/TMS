@@ -1,48 +1,40 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Inject } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
-import { PaymentRequestsNotificationService } from "@/modules/tendering/payment-requests/services/payment-requests-notification.service";
+import { Queue } from "bullmq";
 
 @Injectable()
 export class PaymentReminderScheduler {
     private readonly logger = new Logger(PaymentReminderScheduler.name);
 
     constructor(
-        private readonly notificationService: PaymentRequestsNotificationService,
+        @Inject("GENERIC_QUEUE")
+        private readonly queue: Queue,
     ) {}
 
     // Cheque due date reminder: Mon-Fri 17:10
     @Cron("10 17 * * 1-5")
     async handleChequeDueDateReminder() {
-        this.logger.log("Running cheque due date reminder...");
-        try {
-            await this.notificationService.processChequeDueDateReminders();
-            this.logger.log("Cheque due date reminders processed successfully");
-        } catch (error: any) {
-            this.logger.error("Cheque due date reminder failed", error instanceof Error ? error.stack : String(error));
-        }
+        await this.queue.add("cheque_due_date", { type: "cheque_due_date" }, {
+            attempts: 3,
+            backoff: { type: "exponential", delay: 30000 },
+        });
     }
 
     // BG claim period check: Mon-Fri 16:20
     @Cron("20 16 * * 1-5")
     async handleBgClaimPeriod() {
-        this.logger.log("Running BG claim period check...");
-        try {
-            await this.notificationService.processBgClaimPeriodReminders();
-            this.logger.log("BG claim period reminders processed successfully");
-        } catch (error: any) {
-            this.logger.error("BG claim period reminder failed", error instanceof Error ? error.stack : String(error));
-        }
+        await this.queue.add("bg_claim_period", { type: "bg_claim_period" }, {
+            attempts: 3,
+            backoff: { type: "exponential", delay: 30000 },
+        });
     }
 
     // BG expiry reminder: Mon-Fri 17:20
     @Cron("20 17 * * 1-5")
     async handleBgExpiryReminder() {
-        this.logger.log("Running BG expiry reminder...");
-        try {
-            await this.notificationService.processBgExpiryReminders();
-            this.logger.log("BG expiry reminders processed successfully");
-        } catch (error: any) {
-            this.logger.error("BG expiry reminder failed", error instanceof Error ? error.stack : String(error));
-        }
+        await this.queue.add("bg_expiry", { type: "bg_expiry" }, {
+            attempts: 3,
+            backoff: { type: "exponential", delay: 30000 },
+        });
     }
 }

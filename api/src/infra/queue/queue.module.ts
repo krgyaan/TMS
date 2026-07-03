@@ -52,7 +52,17 @@ import { ConfigService } from "@nestjs/config";
                 return new Queue("video-processing-queue", { connection });
             },
         },
+        {
+            provide: "GENERIC_QUEUE",
+            inject: ["REDIS_CONNECTION"],
+            useFactory: (connection: IORedis | null) => {
+                if (!connection) {
+                    return { add: async () => {} } as unknown as Queue;
+                }
+                return new Queue("generic-mail-queue", { connection });
+            },
+        },
     ],
-    exports: ["FOLLOWUP_QUEUE", "CHECKLIST_QUEUE", "VIDEO_PROCESSING_QUEUE", "REDIS_CONNECTION"],
+    exports: ["FOLLOWUP_QUEUE", "CHECKLIST_QUEUE", "VIDEO_PROCESSING_QUEUE", "GENERIC_QUEUE", "REDIS_CONNECTION"],
 })
 export class QueueModule { }

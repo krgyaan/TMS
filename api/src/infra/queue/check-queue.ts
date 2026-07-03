@@ -9,7 +9,8 @@ const port = Number(process.env.REDIS_PORT || 6379);
 const QUEUE_NAMES = [
     "followup-mail-queue",
     "checklist-mail-queue",
-    "video-processing-queue"
+    "video-processing-queue",
+    "generic-mail-queue"
 ];
 
 async function inspect() {
