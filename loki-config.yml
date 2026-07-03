@@ -1,40 +1,28 @@
 auth_enabled: false
 server:
   http_listen_port: 3100
+  log_level: info
+
 ingester:
   wal:
     dir: /loki/wal
-  lifecycler:
-    ring:
-      kvstore:
-        store: inmemory
-  chunk_idle_period: 15m
-  chunk_retain_period: 5m
+
 schema_config:
   configs:
     - from: 2024-01-01
-      store: boltdb-shipper
+      store: tsdb
       object_store: filesystem
-      schema: v11
+      schema: v13
       index:
         prefix: index_
         period: 24h
+
 storage_config:
-  boltdb_shipper:
+  tsdb_shipper:
     active_index_directory: /loki/index
     cache_location: /loki/cache
-    shared_store: filesystem
   filesystem:
     directory: /loki/chunks
+
 limits_config:
-  retention_period: 336h  # ← 14 days
-  # Disable index downsampling for better search
-  max_query_lookback: 336h
-  max_streams_per_user: 1000
-  max_entries_limit_per_query: 5000
-compactor:
-  working_directory: /loki/compactor
-  retention_enabled: true
-chunk_store_config:
-  max_chunk_idle: 24h
-  max_chunk_count: 100000
+  retention_period: 336h

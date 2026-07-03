@@ -16,4 +16,5 @@ scrape_configs:
           job: tms-api
           __path__: /logs/tms-*.log
     pipeline_stages:
-      - json: {}
+      - json:
+          expression: {}
