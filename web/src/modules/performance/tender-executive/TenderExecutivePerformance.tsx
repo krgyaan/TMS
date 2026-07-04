@@ -376,7 +376,7 @@ export default function TenderExecutivePerformance() {
                 {scope.view === "user" && (
                     <>
                         {/* ===== KPI CARDS ===== */}
-                        <div className="space-y-6">
+                        <div className="space-y-6 hidden">
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase">Pre-Bid</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{PRE_BID_KPIS.map(renderKpiCard)}</div>
@@ -616,111 +616,6 @@ export default function TenderExecutivePerformance() {
                                         </TableBody>
                                     </Table>
                                 </div>
-                            </Card>
-                        </div>
-
-                        {/* ===== METRICS & SCORING (Side by Side) ===== */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Performance Trends */}
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50 h-full">
-                                <CardHeader>
-                                    <div className="flex items-center justify-between">
-                                        <div className="space-y-1">
-                                            <CardTitle className="text-lg flex items-center gap-2">
-                                                <TrendingUp className="h-5 w-5 text-primary" />
-                                                Performance Trends
-                                            </CardTitle>
-                                            <CardDescription>Completion rate vs On-time rate over the last 5 periods</CardDescription>
-                                        </div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="h-[300px] w-full">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={trends}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                                                <XAxis dataKey="label" axisLine={false} tickLine={false} dy={10} fontSize={12} />
-                                                <YAxis axisLine={false} tickLine={false} fontSize={12} />
-                                                <RechartsTooltip contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
-                                                <Legend />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="completion"
-                                                    name="Completion %"
-                                                    stroke="#0ea5e9"
-                                                    strokeWidth={3}
-                                                    dot={{ r: 4 }}
-                                                    activeDot={{ r: 6 }}
-                                                />
-                                                <Line type="monotone" dataKey="onTime" name="On-Time %" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    </div>
-
-                                    <div className="grid grid-cols-3 gap-4 mt-6">
-                                        <div className="p-3 bg-muted/20 rounded-lg text-center">
-                                            <div className="text-xs text-muted-foreground uppercase font-semibold">Avg Completion</div>
-                                            <div className="text-xl font-bold text-foreground"> {summary?.completionRate ?? 0}%</div>
-                                            {/* <div className="text-xs text-rose-500 font-medium">-2% vs Target</div> */}
-                                        </div>
-                                        <div className="p-3 bg-muted/20 rounded-lg text-center">
-                                            <div className="text-xs text-muted-foreground uppercase font-semibold">Avg On-Time</div>
-                                            <div className="text-xl font-bold text-foreground">{summary?.onTimeRate ?? 0}%</div>
-                                            {/* <div className="text-xs text-emerald-500 font-medium">+4% vs Target</div> */}
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Executive Scoring */}
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50 h-full">
-                                <CardHeader>
-                                    <div className="space-y-1">
-                                        <CardTitle className="text-lg flex items-center gap-2">
-                                            <Target className="h-5 w-5 text-primary" />
-                                            Executive Scoring
-                                        </CardTitle>
-                                        <CardDescription>Weighted scores based on Work Completion, On Time Work and Win Rate</CardDescription>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex flex-col md:flex-row items-center gap-8">
-                                        <div className="h-[250px] w-full md:w-1/2">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie data={SCORING_DATA} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="score">
-                                                        {SCORING_DATA.map((entry, index) => (
-                                                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                                                        ))}
-                                                    </Pie>
-                                                    <RechartsTooltip />
-                                                    <Legend verticalAlign="bottom" height={36} />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                        <div className="w-full md:w-1/2 space-y-4">
-                                            {SCORING_DATA.map((item, idx) => (
-                                                <div key={idx} className="space-y-1">
-                                                    <div className="flex justify-between text-sm">
-                                                        <span className="font-medium text-muted-foreground">{item.name}</span>
-                                                        <span className="font-bold">{item.score}/100</span>
-                                                    </div>
-                                                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                                                        <div className="h-full rounded-full" style={{ width: `${item.score}%`, backgroundColor: item.fill }} />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            <div className="pt-4 border-t">
-                                                <div className="flex justify-between items-center">
-                                                    {/* <span className="font-semibold text-lg">Total Score</span> */}
-                                                    {/* <Badge variant="default" className="text-lg px-3 py-1">
-                                                {totalScore}
-                                            </Badge> */}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </CardContent>
                             </Card>
                         </div>
                     </>
