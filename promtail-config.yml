@@ -26,3 +26,5 @@ scrape_configs:
       - timestamp:
           source: timestamp
           format: RFC3339Nano
+      - structured_metadata:
+          {}
