@@ -1,53 +1,43 @@
-import React, { useState, useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
+import { useMemo, useState } from "react";
+import { CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, Tooltip as RechartsTooltip, ResponsiveContainer, XAxis, YAxis } from "recharts";
 
 /* UI Components */
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { usePerformanceOutcomes, useStageMatrix, usePerformanceSummary, usePerformanceTrends, useExecutiveScoring } from "./tender-executive.hooks";
-import type { TenderKpiKey } from "./tender-executive.types";
 import { ROW_HELP_TEXT } from "./stage-matrix-help";
+import { useExecutiveScoring, usePerformanceOutcomes, usePerformanceSummary, usePerformanceTrends, useStageMatrix } from "./tender-executive.hooks";
+import type { TenderKpiKey } from "./tender-executive.types";
 
 /* Icons */
+import { paths } from "@/app/routes/paths";
+import { Combobox } from "@/components/form/SelectField";
+import { useUsersByRole } from "@/hooks/api/useUsers";
 import {
-    Filter,
-    Download,
-    Calendar as CalendarIcon,
-    Search,
-    Trophy,
-    XCircle,
     AlertTriangle,
-    FileText,
+    Briefcase,
+    Calendar as CalendarIcon,
+    CheckCircle2,
     Clock,
+    Download,
+    Eye,
+    FileText,
+    Info,
+    Search,
     Target,
     TrendingUp,
-    CheckCircle2,
-    Briefcase,
-    Eye,
-    ArrowRight,
-    Info,
+    Trophy,
+    XCircle
 } from "lucide-react";
-import { useUser, useUsers, useUsersByRole } from "@/hooks/api/useUsers";
 import { useNavigate } from "react-router-dom";
-import { paths } from "@/app/routes/paths";
-import { StageBacklogTable } from "./components/StageBacklogTable";
-import { EmdBalanceTable } from "./components/EmdBalanceTable";
-import { EmdPaidTable } from "./components/EmdPaidTable";
-import { EmdReceivedTable } from "./components/EmdReceivedTable";
-import { StageBacklogV2Table } from "./components/StageBacklogV2Table";
 import { EmdBacklogTable } from "./components/EmdBacklogTable";
 import { StageBacklogV4Table } from "./components/StageBacklogV4Table";
-import { Combobox } from "@/components/form/SelectField";
 
 /* ================================
    HELPERS
@@ -78,11 +68,11 @@ const formatLabel = (label: string) => {
 
 export type Scope = { view: "user"; userId: number } | { view: "team"; teamId: number } | { view: null };
 
-const TEAM_OPTIONS = [
-    { label: "All Teams", value: "all" },
-    { label: "AC Team", value: 1 }, // ← actual team ID
-    { label: "DC Team", value: 2 }, // ← actual team ID
-];
+// const TEAM_OPTIONS = [
+//     { label: "All Teams", value: "all" },
+//     { label: "AC Team", value: 1 }, // ← actual team ID
+//     { label: "DC Team", value: 2 }, // ← actual team ID
+// ];
 
 /* ================================
    MAIN PAGE COMPONENT
@@ -138,7 +128,7 @@ export default function TenderExecutivePerformance() {
           }))
         : [];
 
-    const totalScore = scoring?.total ?? (SCORING_DATA.length ? Math.round(SCORING_DATA.reduce((sum, item) => sum + item.score, 0) / SCORING_DATA.length) : 0);
+    // const totalScore = scoring?.total ?? (SCORING_DATA.length ? Math.round(SCORING_DATA.reduce((sum, item) => sum + item.score, 0) / SCORING_DATA.length) : 0);
 
     const PRE_BID_KPIS = useMemo(() => {
         if (!outcomes) return [];

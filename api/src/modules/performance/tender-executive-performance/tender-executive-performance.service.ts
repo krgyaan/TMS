@@ -1187,18 +1187,20 @@ export class TenderExecutiveService {
                     WHERE bs.tender_id = ti.id
                       AND bs.status = 'Bid Submitted'
                 )
-                THEN COALESCE(tcs.final_price, ti.gst_values)
+                THEN COALESCE(tcd.final_price, ti.gst_values)
                 ELSE ti.gst_values
             END AS effective_value
         FROM tender_infos ti
         LEFT JOIN LATERAL (
-            SELECT final_price
-            FROM tender_costing_sheets
-            WHERE tender_id = ti.id
-              AND status = 'Approved'
-            ORDER BY approved_at DESC NULLS LAST
+            SELECT tcd.final_price
+            FROM tender_costing_sheets tcs
+            INNER JOIN tender_costing_details tcd
+                ON tcd.tender_costing_sheets_id = tcs.id
+            WHERE tcs.tender_id = ti.id
+              AND tcd.status = 'Approved'
+            ORDER BY tcd.approved_at DESC NULLS LAST, tcd.id DESC
             LIMIT 1
-        ) tcs ON true
+        ) tcd ON true
     `;
 
         const missedStatus = [8, 10, 11];
