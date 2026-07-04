@@ -18,3 +18,14 @@ scrape_configs:
     pipeline_stages:
       - json:
           expression: {}
+pipeline_stages:
+  - json:
+      expressions:
+        level: level
+        message: message
+        timestamp: timestamp
+  - labels:
+      level:
+  - timestamp:
+      source: timestamp
+      format: RFC3339Nano
