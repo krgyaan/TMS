@@ -15,6 +15,6 @@ export class AppController {
     // In any controller temporarily
     @Get("test-error")
     testError() {
-    throw new Error("Sentry test error from TMS API");
+        throw new Error("Sentry test error from TMS API");
     }
 }
