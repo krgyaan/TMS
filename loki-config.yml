@@ -33,8 +33,8 @@ schema_config:
         prefix: index_
         period: 24h
 
-ruler:
-  alertmanager_url: http://localhost:9093
-
 limits_config:
   allow_structured_metadata: false
+
+ruler:
+  alertmanager_url: http://localhost:9093
