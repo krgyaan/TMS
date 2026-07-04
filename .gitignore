@@ -6,3 +6,4 @@ myenv
 ml-ocr/samples
 ml-ocr/__pycache__
 logs
+grafana-dashboard.json

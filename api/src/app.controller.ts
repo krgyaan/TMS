@@ -11,4 +11,10 @@ export class AppController {
     getHello(): string {
         return this.appService.getHello();
     }
+
+    // In any controller temporarily
+    @Get("test-error")
+    testError() {
+    throw new Error("Sentry test error from TMS API");
+    }
 }
