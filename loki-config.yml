@@ -34,6 +34,7 @@ schema_config:
         period: 24h
 
 limits_config:
+  retention_period: 336h  # 14 days
   allow_structured_metadata: true
 
 ruler:
