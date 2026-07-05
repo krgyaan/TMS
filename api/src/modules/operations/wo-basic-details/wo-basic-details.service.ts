@@ -1,15 +1,16 @@
-import { Inject, Injectable, NotFoundException, ConflictException, Logger, BadRequestException } from '@nestjs/common';
-import { eq, desc, asc, sql, and, or, ilike, isNull } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import { woBasicDetails, woContacts, woDetails } from '@db/schemas/operations';
-import { users } from '@db/schemas/auth/users.schema';
-import type { CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, BulkAssignOeDto, RemoveOeAssignmentDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
+import { items, locations, organizations, projects, teams, tenderClients, tenderCostingDetails, tenderCostingSheets, tenderInfos } from '@/db/schemas';
+import { AppLogger } from '@/logger/app-logger.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { projects, teams, tenderInfos, organizations, items, locations, tenderClients, tenderCostingSheets, tenderCostingDetails } from '@/db/schemas';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
+import { users } from '@db/schemas/auth/users.schema';
+import { woBasicDetails, woContacts, woDetails } from '@db/schemas/operations';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, asc, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
+import type { AssignOeDto, BulkAssignOeDto, CreateWoBasicDetailDto, RemoveOeAssignmentDto, UpdateWoBasicDetailDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 
 const oeFirstUser = alias(users, 'oeFirstUser');
 const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
@@ -19,12 +20,15 @@ export type WoBasicDetailRow = typeof woBasicDetails.$inferSelect;
 
 @Injectable()
 export class WoBasicDetailsService {
-    private readonly logger = new Logger(WoBasicDetailsService.name);
+    private readonly logger;
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
-    ) {}
+    ) {
+        this.logger = this.appLogger.withContext(WoBasicDetailsService.name);
+    }
 
     private mapCreateToDb(data: CreateWoBasicDetailDto) {
         const now = new Date();

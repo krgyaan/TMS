@@ -1,17 +1,21 @@
-import { Inject, Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { eq, and, desc, sql } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
+import { AppLogger } from '@/logger/app-logger.service';
 import type { DbInstance } from '@db';
-import { woDetails, woBasicDetails, woAmendments, woContacts, woAcceptance } from '@db/schemas/operations';
+import { DRIZZLE } from '@db/database.module';
+import { woAcceptance, woAmendments, woBasicDetails, woContacts, woDetails } from '@db/schemas/operations';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, desc, eq } from 'drizzle-orm';
 import type { WoAcceptanceDecisionDto } from './dto/wo-acceptance.dto';
 
 @Injectable()
 export class WoAcceptanceService {
-  private readonly logger = new Logger(WoAcceptanceService.name);
+  private readonly logger;
 
   constructor(
+    private readonly appLogger: AppLogger,
     @Inject(DRIZZLE) private readonly db: DbInstance,
-  ) {}
+  ) {
+    this.logger = this.appLogger.withContext(WoAcceptanceService.name);
+  }
 
   async getAcceptanceDetails(woDetailId: number) {
     const [detail] = await this.db

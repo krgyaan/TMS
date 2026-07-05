@@ -1,13 +1,14 @@
+import { users } from '@/db/schemas/auth/users.schema';
+import { AppLogger } from '@/logger/app-logger.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { ClientDirectorySyncService } from '@/modules/shared/client-directory/client-directory-sync.service';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
-import { ClientDirectorySyncService } from '@/modules/shared/client-directory/client-directory-sync.service';
 import { woAcceptance, woAmendments, woBasicDetails, woBillingAddresses, woBillingBoq, woBuybackBoq, woContacts, woDetails, woDocuments, woKickoffMeetings, woQueries, woShippingAddresses } from '@db/schemas/operations';
-import { rfqs, rfqResponseDocuments, rfqResponses, tenderCostingSheets, tenderInfos } from '@db/schemas/tendering';
-import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { rfqResponseDocuments, rfqResponses, rfqs, tenderCostingSheets, tenderInfos } from '@db/schemas/tendering';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, ilike, isNull, ne, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import { users } from '@/db/schemas/auth/users.schema';
 import type { Page1ContactDto, SavePage1Dto, SubmitPage1Dto } from './dto/page1-handover.dto';
 import type { SavePage2Dto, SubmitPage2Dto } from './dto/page2-compliance.dto';
 import type { SavePage3Dto, SubmitPage3Dto } from './dto/page3-swot.dto';
@@ -58,11 +59,14 @@ type PageData =
 
 @Injectable()
 export class WoDetailsService {
-  private readonly logger = new Logger(WoDetailsService.name);
+  private readonly logger;
   constructor(
+    private readonly appLogger: AppLogger,
     @Inject(DRIZZLE) private readonly db: DbInstance,
     private readonly clientDirectorySyncService: ClientDirectorySyncService,
-  ) {}
+  ) {
+    this.logger = this.appLogger.withContext(WoDetailsService.name);
+  }
 
   private mapRowToResponse(row: WoDetailRow) {
     return {
