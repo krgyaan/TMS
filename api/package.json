@@ -43,6 +43,7 @@
         "@nestjs/schedule": "^6.1.0",
         "@nestjs/serve-static": "^5.0.5",
         "@sentry/nestjs": "^10.63.0",
+        "@sentry/profiling-node": "^10.63.0",
         "argon2": "^0.40.3",
         "bullmq": "^5.66.2",
         "class-transformer": "^0.5.1",

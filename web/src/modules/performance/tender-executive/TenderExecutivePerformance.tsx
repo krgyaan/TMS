@@ -1,53 +1,43 @@
-import React, { useState, useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
+import { useMemo, useState } from "react";
+import { CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, Tooltip as RechartsTooltip, ResponsiveContainer, XAxis, YAxis } from "recharts";
 
 /* UI Components */
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { usePerformanceOutcomes, useStageMatrix, usePerformanceSummary, usePerformanceTrends, useExecutiveScoring } from "./tender-executive.hooks";
-import type { TenderKpiKey } from "./tender-executive.types";
 import { ROW_HELP_TEXT } from "./stage-matrix-help";
+import { useExecutiveScoring, usePerformanceOutcomes, usePerformanceSummary, usePerformanceTrends, useStageMatrix } from "./tender-executive.hooks";
+import type { TenderKpiKey } from "./tender-executive.types";
 
 /* Icons */
+import { paths } from "@/app/routes/paths";
+import { Combobox } from "@/components/form/SelectField";
+import { useUsersByRole } from "@/hooks/api/useUsers";
 import {
-    Filter,
-    Download,
-    Calendar as CalendarIcon,
-    Search,
-    Trophy,
-    XCircle,
     AlertTriangle,
-    FileText,
+    Briefcase,
+    Calendar as CalendarIcon,
+    CheckCircle2,
     Clock,
+    Download,
+    Eye,
+    FileText,
+    Info,
+    Search,
     Target,
     TrendingUp,
-    CheckCircle2,
-    Briefcase,
-    Eye,
-    ArrowRight,
-    Info,
+    Trophy,
+    XCircle
 } from "lucide-react";
-import { useUser, useUsers, useUsersByRole } from "@/hooks/api/useUsers";
 import { useNavigate } from "react-router-dom";
-import { paths } from "@/app/routes/paths";
-import { StageBacklogTable } from "./components/StageBacklogTable";
-import { EmdBalanceTable } from "./components/EmdBalanceTable";
-import { EmdPaidTable } from "./components/EmdPaidTable";
-import { EmdReceivedTable } from "./components/EmdReceivedTable";
-import { StageBacklogV2Table } from "./components/StageBacklogV2Table";
 import { EmdBacklogTable } from "./components/EmdBacklogTable";
 import { StageBacklogV4Table } from "./components/StageBacklogV4Table";
-import { Combobox } from "@/components/form/SelectField";
 
 /* ================================
    HELPERS
@@ -78,11 +68,11 @@ const formatLabel = (label: string) => {
 
 export type Scope = { view: "user"; userId: number } | { view: "team"; teamId: number } | { view: null };
 
-const TEAM_OPTIONS = [
-    { label: "All Teams", value: "all" },
-    { label: "AC Team", value: 1 }, // ← actual team ID
-    { label: "DC Team", value: 2 }, // ← actual team ID
-];
+// const TEAM_OPTIONS = [
+//     { label: "All Teams", value: "all" },
+//     { label: "AC Team", value: 1 }, // ← actual team ID
+//     { label: "DC Team", value: 2 }, // ← actual team ID
+// ];
 
 /* ================================
    MAIN PAGE COMPONENT
@@ -138,7 +128,7 @@ export default function TenderExecutivePerformance() {
           }))
         : [];
 
-    const totalScore = scoring?.total ?? (SCORING_DATA.length ? Math.round(SCORING_DATA.reduce((sum, item) => sum + item.score, 0) / SCORING_DATA.length) : 0);
+    // const totalScore = scoring?.total ?? (SCORING_DATA.length ? Math.round(SCORING_DATA.reduce((sum, item) => sum + item.score, 0) / SCORING_DATA.length) : 0);
 
     const PRE_BID_KPIS = useMemo(() => {
         if (!outcomes) return [];
@@ -386,7 +376,7 @@ export default function TenderExecutivePerformance() {
                 {scope.view === "user" && (
                     <>
                         {/* ===== KPI CARDS ===== */}
-                        <div className="space-y-6">
+                        <div className="space-y-6 hidden">
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase">Pre-Bid</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{PRE_BID_KPIS.map(renderKpiCard)}</div>
@@ -626,111 +616,6 @@ export default function TenderExecutivePerformance() {
                                         </TableBody>
                                     </Table>
                                 </div>
-                            </Card>
-                        </div>
-
-                        {/* ===== METRICS & SCORING (Side by Side) ===== */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Performance Trends */}
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50 h-full">
-                                <CardHeader>
-                                    <div className="flex items-center justify-between">
-                                        <div className="space-y-1">
-                                            <CardTitle className="text-lg flex items-center gap-2">
-                                                <TrendingUp className="h-5 w-5 text-primary" />
-                                                Performance Trends
-                                            </CardTitle>
-                                            <CardDescription>Completion rate vs On-time rate over the last 5 periods</CardDescription>
-                                        </div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="h-[300px] w-full">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <LineChart data={trends}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                                                <XAxis dataKey="label" axisLine={false} tickLine={false} dy={10} fontSize={12} />
-                                                <YAxis axisLine={false} tickLine={false} fontSize={12} />
-                                                <RechartsTooltip contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
-                                                <Legend />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="completion"
-                                                    name="Completion %"
-                                                    stroke="#0ea5e9"
-                                                    strokeWidth={3}
-                                                    dot={{ r: 4 }}
-                                                    activeDot={{ r: 6 }}
-                                                />
-                                                <Line type="monotone" dataKey="onTime" name="On-Time %" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    </div>
-
-                                    <div className="grid grid-cols-3 gap-4 mt-6">
-                                        <div className="p-3 bg-muted/20 rounded-lg text-center">
-                                            <div className="text-xs text-muted-foreground uppercase font-semibold">Avg Completion</div>
-                                            <div className="text-xl font-bold text-foreground"> {summary?.completionRate ?? 0}%</div>
-                                            {/* <div className="text-xs text-rose-500 font-medium">-2% vs Target</div> */}
-                                        </div>
-                                        <div className="p-3 bg-muted/20 rounded-lg text-center">
-                                            <div className="text-xs text-muted-foreground uppercase font-semibold">Avg On-Time</div>
-                                            <div className="text-xl font-bold text-foreground">{summary?.onTimeRate ?? 0}%</div>
-                                            {/* <div className="text-xs text-emerald-500 font-medium">+4% vs Target</div> */}
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Executive Scoring */}
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50 h-full">
-                                <CardHeader>
-                                    <div className="space-y-1">
-                                        <CardTitle className="text-lg flex items-center gap-2">
-                                            <Target className="h-5 w-5 text-primary" />
-                                            Executive Scoring
-                                        </CardTitle>
-                                        <CardDescription>Weighted scores based on Work Completion, On Time Work and Win Rate</CardDescription>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex flex-col md:flex-row items-center gap-8">
-                                        <div className="h-[250px] w-full md:w-1/2">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie data={SCORING_DATA} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="score">
-                                                        {SCORING_DATA.map((entry, index) => (
-                                                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                                                        ))}
-                                                    </Pie>
-                                                    <RechartsTooltip />
-                                                    <Legend verticalAlign="bottom" height={36} />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                        <div className="w-full md:w-1/2 space-y-4">
-                                            {SCORING_DATA.map((item, idx) => (
-                                                <div key={idx} className="space-y-1">
-                                                    <div className="flex justify-between text-sm">
-                                                        <span className="font-medium text-muted-foreground">{item.name}</span>
-                                                        <span className="font-bold">{item.score}/100</span>
-                                                    </div>
-                                                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                                                        <div className="h-full rounded-full" style={{ width: `${item.score}%`, backgroundColor: item.fill }} />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            <div className="pt-4 border-t">
-                                                <div className="flex justify-between items-center">
-                                                    {/* <span className="font-semibold text-lg">Total Score</span> */}
-                                                    {/* <Badge variant="default" className="text-lg px-3 py-1">
-                                                {totalScore}
-                                            </Badge> */}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </CardContent>
                             </Card>
                         </div>
                     </>

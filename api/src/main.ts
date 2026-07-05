@@ -1,3 +1,4 @@
+import "dotenv/config";
 import "./instrument";
 import { AppModule } from "@/app.module";
 import { DRIZZLE } from "@/db/database.module";

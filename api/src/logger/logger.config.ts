@@ -3,7 +3,7 @@ import DailyRotateFile from "winston-daily-rotate-file";
 import { getRequestId } from "./request-context";
 
 const serviceName = "tms-api";
-const version = "0.0.1";
+const version = "1.0.1";
 const environment = process.env.NODE_ENV || "development";
 
 const addRequestId = winston.format(info => {
@@ -53,21 +53,30 @@ const dailyFileFormat = winston.format.combine(
 
 const logDir = process.env.LOG_DIR || "../logs";
 
+const isProduction = (process.env.NODE_ENV || "development").toLowerCase() === "production";
+
+const transports: winston.transport[] = [
+  new winston.transports.Console({
+    format: environment === "production" ? prodConsoleFormat : devConsoleFormat,
+  }),
+];
+
+if (isProduction) {
+  transports.unshift(
+    new DailyRotateFile({
+      dirname: logDir,
+      filename: "tms-%DATE%.log",
+      datePattern: "YYYY-MM-DD",
+      maxSize: "20m",
+      maxFiles: "14d",
+      zippedArchive: true,
+      format: dailyFileFormat,
+      level: "info",
+    })
+  );
+}
+
 export const winstonLogger = winston.createLogger({
     level: process.env.LOG_LEVEL || "info",
-    transports: [
-        new DailyRotateFile({
-            dirname: logDir,
-            filename: "tms-%DATE%.log",
-            datePattern: "YYYY-MM-DD",
-            maxSize: "20m",
-            maxFiles: "14d",
-            zippedArchive: true,
-            format: dailyFileFormat,
-            level: "info",
-        }),
-        new winston.transports.Console({
-            format: environment === "production" ? prodConsoleFormat : devConsoleFormat,
-        }),
-    ],
+    transports,
 });

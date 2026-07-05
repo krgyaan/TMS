@@ -6,7 +6,7 @@ positions:
   filename: /tmp/positions.yaml
 
 clients:
-  - url: http://localhost:3100/loki/api/v1/push
+  - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
   - job_name: tms-api
@@ -16,4 +16,15 @@ scrape_configs:
           job: tms-api
           __path__: /logs/tms-*.log
     pipeline_stages:
-      - json: {}
+      - json:
+          expressions:
+            level: level
+            message: message
+            timestamp: timestamp
+      - labels:
+          level:
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      - structured_metadata:
+          {}

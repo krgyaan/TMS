@@ -82,9 +82,9 @@ import { TqManagementModule } from "@/modules/tendering/tq-management/tq-managem
 import { TimersModule } from "@/modules/timers/timers.module";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_FILTER, APP_GUARD } from "@nestjs/core";
 import { ServeStaticModule } from "@nestjs/serve-static";
-import { SentryModule } from "@sentry/nestjs/setup";
+import { SentryGlobalFilter, SentryModule } from "@sentry/nestjs/setup";
 import { join } from "path";
 import { AllExceptionsFilter } from "./logger/all-exception.filter";
 import { AccountChecklistSchedulerModule } from "./modules/accounts/account-checklist/account-checklist-scheduler.module";
@@ -250,6 +250,14 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         {
             provide: APP_GUARD,
             useClass: JwtAuthGuard,
+        },
+        {
+            provide: APP_FILTER,
+            useClass: SentryGlobalFilter,
+        },
+        {
+            provide: APP_FILTER,
+            useClass: AllExceptionsFilter,
         },
         AllExceptionsFilter
     ],

@@ -1,40 +1,30 @@
 import * as Sentry from "@sentry/nestjs";
+import { nodeProfilingIntegration } from "@sentry/profiling-node";
 
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  environment: process.env.NODE_ENV,
+const isProduction = (process.env.NODE_ENV || "development").toLowerCase() === "production";
 
-  tracesSampler: (samplingContext) => {
-    if (samplingContext.parentSampled) {
-      return 1.0;
-    }
-    if (samplingContext.transactionContext?.name?.includes("health")) {
-      return 0;
-    }
-    return 0.1;
-  },
+if (isProduction) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: "production",
+    release: process.env.SENTRY_RELEASE || "tms-api@0.0.1",
+    enabled: true,
+    tracesSampleRate: 1.0,
+    profilesSampleRate: 1.0,
+    sampleRate: 1.0,
+    attachStacktrace: true,
+    debug: false,
+    integrations: [nodeProfilingIntegration()],
+    enableLogs: true,
+  });
+} else {
+  console.log("[Sentry] Disabled in non-production environment");
+}
 
-  beforeSend(event, hint) {
-    if (event.request) {
-      const sensitiveHeaders = ["authorization", "cookie", "x-csrf-token"];
-      event.request.headers = Object.fromEntries(
-        Object.entries(event.request.headers || {}).filter(
-          ([k]) => !sensitiveHeaders.includes(k.toLowerCase())
-        )
-      );
-      if (!hint?.originalException && event.request.data) {
-        delete event.request.data;
-      }
-    }
-    return event;
-  },
-
-  ignoreErrors: [
-    "ECONNRESET",
-    "ETIMEDOUT",
-    "Request failed with status code 404",
-    /^Cannot GET/,
-  ],
-
-  release: process.env.APP_VERSION || "0.0.1",
+// Profiling happens automatically after setting it up with `Sentry.init()`.
+// All spans (unless those discarded by sampling) will have profiling data attached to them.
+Sentry.startSpan({
+  name: "My Span",
+}, () => {
+  // The code executed here will be profiled
 });
