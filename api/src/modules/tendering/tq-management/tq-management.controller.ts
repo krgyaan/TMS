@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { TqManagementService, type TqManagementFilters, type TenderQueryStatus } from '@/modules/tendering/tq-management/tq-management.service';
 import type {
     CreateTqReceivedDto,
@@ -12,14 +12,18 @@ import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TimersService } from '@/modules/timers/timers.service';
 import { getFrontendTimer } from '@/modules/timers/timer-helper';
+import { AppLogger } from '@/logger/app-logger.service';
 
 @Controller('tq-management')
 export class TqManagementController {
-    private readonly logger = new Logger(TqManagementController.name);
+    private readonly logger;
     constructor(
+        private readonly appLogger: AppLogger,
         private readonly tqManagementService: TqManagementService,
         private readonly timersService: TimersService
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(TqManagementController.name);
+    }
 
     @Get('dashboard')
     async getDashboard(
