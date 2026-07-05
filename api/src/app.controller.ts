@@ -13,6 +13,7 @@ export class AppController {
     }
 
     // In any controller temporarily
+    @Public()
     @Get("test-error")
     testError() {
         throw new Error("Sentry test error from TMS API");
