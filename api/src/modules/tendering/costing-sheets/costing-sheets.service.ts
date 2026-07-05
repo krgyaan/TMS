@@ -15,6 +15,7 @@ import { GoogleDriveService } from '@/modules/integrations/google/google-drive.s
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { AppLogger } from '@/logger/app-logger.service';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { TimersService } from '@/modules/timers/timers.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -48,8 +49,9 @@ export type CostingSheetFilters = {
 
 @Injectable()
 export class CostingSheetsService {
-    private readonly logger = new Logger(CostingSheetsService.name);
+    private readonly logger;
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
@@ -57,7 +59,9 @@ export class CostingSheetsService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly timersService: TimersService,
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(CostingSheetsService.name);
+    }
 
     private buildDashboardConditions(user?: ValidatedUser, teamId?: number, tab?: string): any[] {
         const baseCondition = TenderInfosService.getActiveCondition();
