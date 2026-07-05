@@ -1,28 +1,27 @@
-import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray, SQL, ne, or, ilike } from "drizzle-orm";
-import { DRIZZLE } from "@db/database.module";
-import type { DbInstance } from "@db";
-import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
-import { statuses } from "@db/schemas/master/statuses.schema";
-import { users } from "@db/schemas/auth/users.schema";
-import { physicalDocs, physicalDocsPersons, type NewPhysicalDocs } from "@db/schemas/tendering/physical-docs.schema";
-import { tenderInformation } from "@db/schemas/tendering/tender-info-sheet.schema";
+import { bidSubmissions, documentsSubmitted } from "@/db/schemas";
+import { AppLogger } from "@/logger/app-logger.service";
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
+import { EmailService } from "@/modules/email/email.service";
+import { RecipientResolver } from "@/modules/email/recipient.resolver";
+import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
 import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from "@/modules/tendering/physical-docs/dto/physical-docs.dto";
+import { TenderStatusHistoryService } from "@/modules/tendering/tender-status-history/tender-status-history.service";
 import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
 import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
-import { items } from "@db/schemas/master/items.schema";
-import { TenderStatusHistoryService } from "@/modules/tendering/tender-status-history/tender-status-history.service";
-import { EmailService } from "@/modules/email/email.service";
-import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
-import { RecipientResolver } from "@/modules/email/recipient.resolver";
-import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
-import { Logger } from "@nestjs/common";
-import { tenderClients } from "@db/schemas/tendering/tender-info-sheet.schema";
-import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import { TimersService } from "@/modules/timers/timers.service";
+import { wrapPaginatedResponse } from "@/utils/responseWrapper";
+import type { DbInstance } from "@db";
+import { DRIZZLE } from "@db/database.module";
+import { users } from "@db/schemas/auth/users.schema";
+import { items } from "@db/schemas/master/items.schema";
+import { statuses } from "@db/schemas/master/statuses.schema";
 import { couriers } from "@db/schemas/shared/couriers.schema";
-import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
-import { bidSubmissions, documentsSubmitted } from "@/db/schemas";
+import { physicalDocs, physicalDocsPersons, type NewPhysicalDocs } from "@db/schemas/tendering/physical-docs.schema";
+import { tenderClients, tenderInformation } from "@db/schemas/tendering/tender-info-sheet.schema";
+import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql, SQL } from "drizzle-orm";
 
 export type PhysicalDocFilters = {
     physicalDocsSent?: boolean;
@@ -76,9 +75,10 @@ export type PhysicalDocWithPersons = {
 
 @Injectable()
 export class PhysicalDocsService {
-    private readonly logger = new Logger(PhysicalDocsService.name);
+    private readonly logger;
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
