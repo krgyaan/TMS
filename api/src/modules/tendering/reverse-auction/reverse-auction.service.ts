@@ -17,7 +17,7 @@ import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-hi
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
-import { Logger } from '@nestjs/common';
+import { AppLogger } from '@/logger/app-logger.service';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TenderResultService } from '@/modules/tendering/tender-result/tender-result.service';
@@ -83,16 +83,19 @@ const RA_STATUS = {
 
 @Injectable()
 export class ReverseAuctionService {
-    private readonly logger = new Logger(ReverseAuctionService.name);
+    private readonly logger;
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly tenderResultService: TenderResultService,
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(ReverseAuctionService.name);
+    }
 
     /**
      * Build role-based filter conditions for tender queries
