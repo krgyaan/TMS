@@ -16,7 +16,7 @@ import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-hi
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
-import { Logger } from '@nestjs/common';
+import { AppLogger } from '@/logger/app-logger.service';
 import type { PaginatedResult, TenderInfoWithNames, TenderReference, TenderForPayment, TenderForRfq, TenderForPhysicalDocs, TenderForApproval } from '@/modules/tendering/types/shared.types';
 import { TimersService } from '@/modules/timers/timers.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -38,16 +38,19 @@ export type TenderListFilters = {
 
 @Injectable()
 export class TenderInfosService {
-    private readonly logger = new Logger(TenderInfosService.name);
+    private readonly logger;
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly timersService: TimersService,
         private readonly configService: ConfigService,
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(TenderInfosService.name);
+    }
 
     static getExcludeStatusCondition(categories: string[]) {
         const statusIds = categories
