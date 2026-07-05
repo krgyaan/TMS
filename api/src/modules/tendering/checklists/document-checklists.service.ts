@@ -1,26 +1,25 @@
-import { Inject, Injectable, BadRequestException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray, ne, or } from "drizzle-orm";
-import { DRIZZLE } from "@db/database.module";
-import type { DbInstance } from "@db";
-import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
-import { statuses } from "@db/schemas/master/statuses.schema";
-import { users } from "@db/schemas/auth/users.schema";
-import { items } from "@db/schemas/master/items.schema";
-import { tenderInformation } from "@db/schemas/tendering/tender-info-sheet.schema";
-import { tenderDocumentChecklists } from "@db/schemas/tendering/tender-document-checklists.schema";
-import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
-import { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from "@/modules/tendering/checklists/dto/document-checklist.dto";
-import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
+import { bidSubmissions } from "@/db/schemas";
+import { AppLogger } from "@/logger/app-logger.service";
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
 import { EmailService } from "@/modules/email/email.service";
 import { RecipientResolver } from "@/modules/email/recipient.resolver";
-import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
-import { Logger } from "@nestjs/common";
-import { StatusCache } from "@/utils/status-cache";
-import { wrapPaginatedResponse } from "@/utils/responseWrapper";
+import { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from "@/modules/tendering/checklists/dto/document-checklist.dto";
+import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
+import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
 import { TimersService } from "@/modules/timers/timers.service";
-import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
-import { bidSubmissions } from "@/db/schemas";
+import { wrapPaginatedResponse } from "@/utils/responseWrapper";
+import type { DbInstance } from "@db";
+import { DRIZZLE } from "@db/database.module";
+import { users } from "@db/schemas/auth/users.schema";
+import { items } from "@db/schemas/master/items.schema";
+import { statuses } from "@db/schemas/master/statuses.schema";
+import { tenderDocumentChecklists } from "@db/schemas/tendering/tender-document-checklists.schema";
+import { tenderInformation } from "@db/schemas/tendering/tender-info-sheet.schema";
+import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { and, asc, desc, eq, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 
 type TenderDocumentChecklistDashboardRow = {
     tenderId: number;
@@ -45,16 +44,19 @@ export type DocumentChecklistFilters = {
 
 @Injectable()
 export class DocumentChecklistsService {
-    private readonly logger = new Logger(DocumentChecklistsService.name);
+    private readonly logger;
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly configService: ConfigService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly tenderInfosService: TenderInfosService,
         private readonly timersService: TimersService
-    ) {}
+    ) {
+        this.logger = this.appLogger.withContext(DocumentChecklistsService.name);
+    }
 
     /**
      * Get dashboard data by tab

@@ -1,19 +1,23 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query, UsePipes, ValidationPipe, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query, UsePipes, ValidationPipe } from '@nestjs/common';
 import { DocumentChecklistsService, type DocumentChecklistFilters } from '@/modules/tendering/checklists/document-checklists.service';
 import type { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/modules/tendering/checklists/dto/document-checklist.dto';
 import { TimersService } from '@/modules/timers/timers.service';
 import { getFrontendTimer } from '@/modules/timers/timer-helper';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { AppLogger } from '@/logger/app-logger.service';
 
 @Controller('document-checklists')
 @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
 export class DocumentChecklistsController {
-    private readonly logger = new Logger(DocumentChecklistsController.name);
+    private readonly logger;
     constructor(
+        private readonly appLogger: AppLogger,
         private readonly documentChecklistsService: DocumentChecklistsService,
         private readonly timersService: TimersService
-    ) { }
+    ) { 
+        this.logger = this.appLogger.withContext(DocumentChecklistsController.name);
+    }
 
     @Get('dashboard')
     async getDashboard(
