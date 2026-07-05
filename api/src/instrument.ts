@@ -1,29 +1,25 @@
-import * as Sentry from "@sentry/nestjs"
+import * as Sentry from "@sentry/nestjs";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
 
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  environment: process.env.NODE_ENV || "development",
-  debug: true,
-  integrations: [
-    nodeProfilingIntegration(),
-  ],
+const isProduction = (process.env.NODE_ENV || "development").toLowerCase() === "production";
 
-  // Send structured logs to Sentry
-  enableLogs: true,
-  // Tracing
-  tracesSampleRate: 1.0, //  Capture 100% of the transactions
-  // Set sampling rate for profiling - this is evaluated only once per SDK.init call
-  profileSessionSampleRate: 1.0,
-  // Trace lifecycle automatically enables profiling during active traces
-  profileLifecycle: 'trace',
-  dataCollection: {
-    // To disable sending user data and HTTP bodies, uncomment the lines below. For more info visit:
-    // https://docs.sentry.io/platforms/javascript/guides/node/configuration/options/#dataCollection
-    // userInfo: false,
-    // httpBodies: [],
-  },
-});
+if (isProduction) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: "production",
+    release: process.env.SENTRY_RELEASE || "tms-api@0.0.1",
+    enabled: true,
+    tracesSampleRate: 1.0,
+    profilesSampleRate: 1.0,
+    sampleRate: 1.0,
+    attachStacktrace: true,
+    debug: false,
+    integrations: [nodeProfilingIntegration()],
+    enableLogs: true,
+  });
+} else {
+  console.log("[Sentry] Disabled in non-production environment");
+}
 
 // Profiling happens automatically after setting it up with `Sentry.init()`.
 // All spans (unless those discarded by sampling) will have profiling data attached to them.
