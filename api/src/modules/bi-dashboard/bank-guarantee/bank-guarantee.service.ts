@@ -1,32 +1,34 @@
-import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, or, inArray, isNull, sql, asc, desc, ne } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
+import { followUps } from '@/db/schemas/shared/follow-ups.schema';
+import { AppLogger } from '@/logger/app-logger.service';
+import type { BankGuaranteeDashboardCounts, BankGuaranteeDashboardRow } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
+import { FollowUpService } from '@/modules/follow-up/follow-up.service';
+import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
+import { users } from '@db/schemas/auth/users.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
 import {
-    paymentRequests,
-    paymentInstruments,
     instrumentBgDetails,
+    paymentInstruments,
+    paymentRequests,
 } from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { statuses } from '@db/schemas/master/statuses.schema';
-import { teams } from '@db/schemas/master/teams.schema';
-import { users } from '@db/schemas/auth/users.schema';
-import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
-import type { BankGuaranteeDashboardRow, BankGuaranteeDashboardCounts } from '@/modules/bi-dashboard/bank-guarantee/helpers/bankGuarantee.types';
-import { BG_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
-import { FollowUpService } from '@/modules/follow-up/follow-up.service';
-import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
-import { followUps } from '@/db/schemas/shared/follow-ups.schema';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 
 @Injectable()
 export class BankGuaranteeService {
-    private readonly logger = new Logger(BankGuaranteeService.name);
+    private readonly logger;
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(BankGuaranteeService.name);
+    }
 
     private statusMap() {
         return {

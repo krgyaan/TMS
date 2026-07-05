@@ -1,5 +1,6 @@
 import { couriers } from '@/db/schemas/shared/couriers.schema';
 import { followUps } from '@/db/schemas/shared/follow-ups.schema';
+import { AppLogger } from '@/logger/app-logger.service';
 import type { DemandDraftDashboardCounts, DemandDraftDashboardRow } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
@@ -13,18 +14,21 @@ import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { instrumentChequeDetails, instrumentDdDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 
 @Injectable()
 export class DemandDraftService {
-    private readonly logger = new Logger(DemandDraftService.name);
+    private readonly logger;
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
         private readonly notificationService: PaymentRequestsNotificationService,
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(DemandDraftService.name);
+    }
 
     private deriveDdStatus(status: string | null): string {
         const map: Record<string, string> = {
