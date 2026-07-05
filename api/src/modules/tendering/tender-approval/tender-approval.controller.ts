@@ -5,15 +5,18 @@ import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TimersService } from '@/modules/timers/timers.service';
 import { getFrontendTimer } from '@/modules/timers/timer-helper';
-import { Logger } from '@nestjs/common';
+import { AppLogger } from '@/logger/app-logger.service';
 
 @Controller('tender-approvals')
 export class TenderApprovalController {
-    private readonly logger = new Logger(TenderApprovalController.name);
+    private readonly logger;
     constructor(
+        private readonly appLogger: AppLogger,
         private readonly tenderApprovalService: TenderApprovalService,
         private readonly timersService: TimersService
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(TenderApprovalController.name);
+    }
 
     @Get('dashboard')
     async getDashboard(

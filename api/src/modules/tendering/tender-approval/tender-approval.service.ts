@@ -17,7 +17,7 @@ import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-hi
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
-import { Logger } from '@nestjs/common';
+import { AppLogger } from '@/logger/app-logger.service';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { TimersService } from '@/modules/timers/timers.service';
 import { TenderInfoSheetsService } from '../info-sheets/info-sheets.service';
@@ -61,9 +61,10 @@ export const rejectedStatuses = [9, 10, 11, 12, 13, 14, 15, 31, 32];
 
 @Injectable()
 export class TenderApprovalService {
-    private readonly logger = new Logger(TenderApprovalService.name);
+    private readonly logger;
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
@@ -72,7 +73,9 @@ export class TenderApprovalService {
         private readonly timersService: TimersService,
         private readonly tenderInfoSheetsService: TenderInfoSheetsService,
         private readonly configService: ConfigService
-    ) {}
+    ) {
+        this.logger = this.appLogger.withContext(TenderApprovalService.name);
+    }
 
     private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
         const roleFilterConditions: any[] = [];
