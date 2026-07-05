@@ -5,15 +5,18 @@ import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TimersService } from '@/modules/timers/timers.service';
 import { getFrontendTimer } from '@/modules/timers/timer-helper';
-import { Logger } from '@nestjs/common';
+import { AppLogger } from '@/logger/app-logger.service';
 
 @Controller('bid-submissions')
 export class BidSubmissionsController {
-    private readonly logger = new Logger(BidSubmissionsController.name);
+    private readonly logger;
     constructor(
+        private readonly appLogger: AppLogger,
         private readonly bidSubmissionsService: BidSubmissionsService,
         private readonly timersService: TimersService
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(BidSubmissionsController.name);
+    }
 
     @Get('dashboard')
     async getDashboard(
