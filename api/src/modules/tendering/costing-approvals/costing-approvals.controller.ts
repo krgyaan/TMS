@@ -1,18 +1,22 @@
+import { AppLogger } from '@/logger/app-logger.service';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { CostingApprovalsService } from '@/modules/tendering/costing-approvals/costing-approvals.service';
 import { getFrontendTimer } from '@/modules/timers/timer-helper';
 import { TimersService } from '@/modules/timers/timers.service';
-import { Body, Controller, Get, Logger, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import type { ApproveAllCostingDto, ApproveCostingDto, RejectCostingDto, UpdateApprovedCostingDto } from './dto/costing-approval.dto';
 
 @Controller('costing-approvals')
 export class CostingApprovalsController {
-    private readonly logger = new Logger(CostingApprovalsController.name);
+    private readonly logger;
     constructor(
+        private readonly appLogger: AppLogger,
         private readonly costingApprovalsService: CostingApprovalsService,
         private readonly timersService: TimersService
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(CostingApprovalsController.name);
+    }
 
     @Get('dashboard')
     async getDashboard(

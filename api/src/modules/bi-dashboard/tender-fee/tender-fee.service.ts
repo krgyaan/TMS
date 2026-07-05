@@ -1,27 +1,30 @@
-import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, inArray, isNull, sql, asc, desc, or } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import { couriers } from '@/db/schemas/shared/couriers.schema';
 import { followUps } from '@/db/schemas/shared/follow-ups.schema';
-import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentTransferDetails, instrumentChequeDetails } from '@db/schemas/tendering/payment-requests.schema';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { AppLogger } from '@/logger/app-logger.service';
+import type { TenderFeeDDDashboardCounts, TenderFeeDDDashboardRow, TenderFeePortalDashboardCounts, TenderFeePortalDashboardRow, TenderFeeTransferDashboardCounts, TenderFeeTransferDashboardRow } from '@/modules/bi-dashboard/tender-fee/helpers/tenderFee.types';
+import { BT_STATUSES, DD_STATUSES, PORTAL_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
 import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
-import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
-import type { TenderFeeDDDashboardRow, TenderFeeDDDashboardCounts, TenderFeePortalDashboardRow, TenderFeePortalDashboardCounts, TenderFeeTransferDashboardRow, TenderFeeTransferDashboardCounts } from '@/modules/bi-dashboard/tender-fee/helpers/tenderFee.types';
-import { DD_STATUSES, BT_STATUSES, PORTAL_STATUSES, CHEQUE_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
+import { instrumentDdDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 @Injectable()
 export class TenderFeeService {
-    private readonly logger = new Logger(TenderFeeService.name);
+    private readonly logger;
     private readonly requesterUser = alias(users, 'requester');
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(TenderFeeService.name);
+    }
 
     // ───────────────────── DD Dashboard ─────────────────────
 

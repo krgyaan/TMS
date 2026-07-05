@@ -1,31 +1,35 @@
-import { Inject, Injectable, Logger, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
-import { eq, and, inArray, isNull, sql, asc, desc, or } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import { paymentRequests, paymentInstruments, instrumentTransferDetails } from '@db/schemas/tendering/payment-requests.schema';
-import { tenderInfos } from '@/db/schemas/tendering/tenders.schema';
 import { users } from '@/db/schemas/auth/users.schema';
 import { statuses } from '@/db/schemas/master/statuses.schema';
 import { followUps } from '@/db/schemas/shared/follow-ups.schema';
-import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
-import type { PayOnPortalDashboardRow, PayOnPortalDashboardCounts } from '@/modules/bi-dashboard/pay-on-portal/helpers/payOnPortal.types';
+import { tenderInfos } from '@/db/schemas/tendering/tenders.schema';
+import { AppLogger } from '@/logger/app-logger.service';
+import type { PayOnPortalDashboardCounts, PayOnPortalDashboardRow } from '@/modules/bi-dashboard/pay-on-portal/helpers/payOnPortal.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
-import { PORTAL_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
+import { PORTAL_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
+import { instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { BadRequestException, Inject, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 @Injectable()
 export class PayOnPortalService {
-    private readonly logger = new Logger(PayOnPortalService.name);
+    private readonly logger;
     private readonly requesterUser = alias(users, 'requester');
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
         private readonly notificationService: PaymentRequestsNotificationService,
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(PayOnPortalService.name);
+    }
 
     private statusMap() {
         return {

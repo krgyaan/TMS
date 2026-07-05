@@ -11,7 +11,6 @@ import {
     HttpStatus,
     NotFoundException,
     Query,
-    Logger,
 } from '@nestjs/common';
 import { PhysicalDocsService } from '@/modules/tendering/physical-docs/physical-docs.service';
 import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
@@ -19,15 +18,18 @@ import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TimersService } from '@/modules/timers/timers.service';
 import { getFrontendTimer } from '@/modules/timers/timer-helper';
-
+import { AppLogger } from '@/logger/app-logger.service';
 
 @Controller('physical-docs')
 export class PhysicalDocsController {
-    private readonly logger = new Logger(PhysicalDocsController.name);
+    private readonly logger;
     constructor(
+        private readonly appLogger: AppLogger,
         private readonly physicalDocsService: PhysicalDocsService,
         private readonly timersService: TimersService
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(PhysicalDocsController.name);
+    }
 
     @Get('dashboard')
     async getDashboard(

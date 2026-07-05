@@ -1,29 +1,33 @@
-import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, inArray, isNull, sql, asc, desc, or } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import { paymentRequests, paymentInstruments, instrumentTransferDetails } from '@db/schemas/tendering/payment-requests.schema';
-import { followUps } from '@/db/schemas/shared/follow-ups.schema';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { users } from '@/db/schemas/auth/users.schema';
 import { statuses } from '@/db/schemas/master/statuses.schema';
-import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
-import type { BankTransferDashboardRow, BankTransferDashboardCounts } from '@/modules/bi-dashboard/bank-transfer/helpers/bankTransfer.types';
-import { BT_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
+import { followUps } from '@/db/schemas/shared/follow-ups.schema';
+import { AppLogger } from '@/logger/app-logger.service';
+import type { BankTransferDashboardCounts, BankTransferDashboardRow } from '@/modules/bi-dashboard/bank-transfer/helpers/bankTransfer.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
+import { BT_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
+import { instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 
 @Injectable()
 export class BankTransferService {
-    private readonly logger = new Logger(BankTransferService.name);
+    private readonly logger;
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
         private readonly notificationService: PaymentRequestsNotificationService,
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(BankTransferService.name);
+    }
 
     private statusMap() {
         return {

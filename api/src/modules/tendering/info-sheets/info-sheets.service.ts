@@ -1,24 +1,24 @@
-import { Inject, Injectable, NotFoundException, ConflictException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import { eq, inArray, or } from 'drizzle-orm';
-import { tenderInformation, tenderClients, tenderTechnicalDocuments, tenderFinancialDocuments, type TenderInformation, type TenderClient } from '@db/schemas/tendering/tender-info-sheet.schema';
-import type { TenderInfoSheetPayload } from '@/modules/tendering/info-sheets/dto/info-sheet.dto';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
-import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { AppLogger } from '@/logger/app-logger.service';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
-import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
-import { Logger } from '@nestjs/common';
 import { ClientDirectorySyncService } from '@/modules/shared/client-directory/client-directory-sync.service';
-import { organizations } from '@db/schemas/master/organizations.schema';
-import { websites } from '@db/schemas/master/websites.schema';
-import { statuses } from '@db/schemas/master/statuses.schema';
+import type { TenderInfoSheetPayload } from '@/modules/tendering/info-sheets/dto/info-sheet.dto';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { TimersService } from '@/modules/timers/timers.service';
-import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
+import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
+import { organizations } from '@db/schemas/master/organizations.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
+import { websites } from '@db/schemas/master/websites.schema';
 import { financeDocuments } from '@db/schemas/shared/finance_docs.schema';
+import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
+import { tenderClients, tenderFinancialDocuments, tenderInformation, tenderTechnicalDocuments, type TenderClient, type TenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { eq, inArray, or } from 'drizzle-orm';
 
 export type TechnicalDocument = {
     id: number;
@@ -41,9 +41,10 @@ export type TenderInfoSheetWithRelations = Omit<TenderInformation, 'pbgMode' | '
 
 @Injectable()
 export class TenderInfoSheetsService {
-    private readonly logger = new Logger(TenderInfoSheetsService.name);
+    private readonly logger;
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly configService: ConfigService,
         private readonly tenderInfosService: TenderInfosService,

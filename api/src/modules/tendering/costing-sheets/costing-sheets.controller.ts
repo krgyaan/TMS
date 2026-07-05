@@ -1,18 +1,22 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Query, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { CostingSheetsService, type CostingSheetFilters } from '@/modules/tendering/costing-sheets/costing-sheets.service';
 import type { SubmitCostingSheetDto, UpdateCostingSheetDto, CreateSheetDto, CreateSheetWithNameDto } from './dto/costing-sheet.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TimersService } from '@/modules/timers/timers.service';
 import { getFrontendTimer } from '@/modules/timers/timer-helper';
+import { AppLogger } from '@/logger/app-logger.service';
 
 @Controller('costing-sheets')
 export class CostingSheetsController {
-    private readonly logger = new Logger(CostingSheetsController.name);
+    private readonly logger;
     constructor(
+        private readonly appLogger: AppLogger,
         private readonly costingSheetsService: CostingSheetsService,
         private readonly timersService: TimersService
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(CostingSheetsController.name);
+    }
 
     @Get('dashboard')
     async getDashboard(

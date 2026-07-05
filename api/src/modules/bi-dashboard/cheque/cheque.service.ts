@@ -1,4 +1,5 @@
 import { followUps } from '@/db/schemas/shared/follow-ups.schema';
+import { AppLogger } from '@/logger/app-logger.service';
 import type { ChequeDashboardCounts, ChequeDashboardRow } from '@/modules/bi-dashboard/cheque/helpers/cheque.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
@@ -18,20 +19,23 @@ import {
     paymentRequests,
 } from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { BadRequestException, forwardRef, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 @Injectable()
 export class ChequeService {
-    private readonly logger = new Logger(ChequeService.name);
+    private readonly logger;
     private readonly requestedByUser = alias(users, 'requested_by_user');
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         @Inject(forwardRef(() => PaymentRequestsNotificationService)) private readonly notificationService: PaymentRequestsNotificationService,
         private readonly followUpService: FollowUpService,
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(ChequeService.name);
+    }
 
     private deriveChequeStatus(status: string | null, chequeReason: string | null): string {
         if (status === CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED) {

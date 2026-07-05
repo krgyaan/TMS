@@ -1,31 +1,35 @@
-import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from "@nestjs/common";
-import { eq, and, inArray, isNull, sql, asc, desc } from "drizzle-orm";
-import { DRIZZLE } from "@db/database.module";
+import { couriers } from "@/db/schemas/shared/couriers.schema";
+import { followUps } from "@/db/schemas/shared/follow-ups.schema";
+import { AppLogger } from "@/logger/app-logger.service";
+import type { FdrDashboardCounts, FdrDashboardRow } from "@/modules/bi-dashboard/fdr/helpers/fdr.types";
+import { FollowUpService } from "@/modules/follow-up/follow-up.service";
+import type { CreateFollowUpDto } from "@/modules/follow-up/zod/create-follow-up.dto";
+import { CHEQUE_STATUSES, FDR_STATUSES } from "@/modules/tendering/payment-requests/constants/payment-request-statuses";
+import { PaymentRequestsNotificationService } from "@/modules/tendering/payment-requests/services/payment-requests-notification.service";
+import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
+import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import type { DbInstance } from "@db";
-import { paymentRequests, paymentInstruments, instrumentFdrDetails, instrumentChequeDetails, instrumentBgDetails } from "@db/schemas/tendering/payment-requests.schema";
-import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
+import { DRIZZLE } from "@db/database.module";
 import { users } from "@db/schemas/auth/users.schema";
 import { statuses } from "@db/schemas/master/statuses.schema";
 import { teams } from "@db/schemas/master/teams.schema";
-import { wrapPaginatedResponse } from "@/utils/responseWrapper";
-import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
-import type { FdrDashboardRow, FdrDashboardCounts } from "@/modules/bi-dashboard/fdr/helpers/fdr.types";
-import { FDR_STATUSES, CHEQUE_STATUSES } from "@/modules/tendering/payment-requests/constants/payment-request-statuses";
-import { FollowUpService } from "@/modules/follow-up/follow-up.service";
-import type { CreateFollowUpDto } from "@/modules/follow-up/zod/create-follow-up.dto";
-import { followUps } from "@/db/schemas/shared/follow-ups.schema";
-import { couriers } from "@/db/schemas/shared/couriers.schema";
-import { PaymentRequestsNotificationService } from "@/modules/tendering/payment-requests/services/payment-requests-notification.service";
+import { instrumentBgDetails, instrumentChequeDetails, instrumentFdrDetails, paymentInstruments, paymentRequests } from "@db/schemas/tendering/payment-requests.schema";
+import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 @Injectable()
 export class FdrService {
-    private readonly logger = new Logger(FdrService.name);
+    private readonly logger;
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
         private readonly notificationService: PaymentRequestsNotificationService,
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(FdrService.name);
+    }
 
     private deriveFdrStatus(status: string | null): string {
         const map: Record<string, string> = {

@@ -11,7 +11,7 @@ import { users } from '@db/schemas/auth/users.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentDdDetails, instrumentFdrDetails, instrumentTransferDetails, paymentInstruments, paymentRequestMom, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { Inject, Injectable, Logger, NotFoundException, StreamableFile } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, StreamableFile } from '@nestjs/common';
 import { and, asc, desc, eq, gt, gte, inArray, or, sql } from 'drizzle-orm';
 import { createReadStream, existsSync } from 'fs';
 import * as path from 'path';
@@ -19,15 +19,19 @@ import type { MomRemarkResponseType } from '../dto/payment-mom.dto';
 import type { DashboardCounts, PaymentRequestRow, PendingTabResponse, PendingTenderRow, RequestTabResponse } from '../dto/payment-requests.dto';
 import type { InstrumentResponse, PaymentRequestEditResponseType } from '../dto/payment-response.dto';
 import { buildRequestRoleFilters, buildTenderRoleFilters, deriveDisplayStatus, getDefaultSortByTab, getTabSqlCondition } from './payment-requests.shared';
+import { AppLogger } from '@/logger/app-logger.service';
 
 @Injectable()
 export class PaymentRequestsQueryService {
-    private readonly logger = new Logger(PaymentRequestsQueryService.name);
+    private readonly logger;
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
-    ) {}
+    ) {
+        this.logger = this.appLogger.withContext(PaymentRequestsQueryService.name);
+    }
 
     // ============================================================================
     // Dashboard Methods
