@@ -1,13 +1,13 @@
 import {
     Injectable,
     BadRequestException,
-    Logger,
     OnModuleInit,
 } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import sharp from 'sharp';
 import { PDFDocument } from 'pdf-lib';
+import { AppLogger } from '@/logger/app-logger.service';
 import { getFileConfig, formatBytes, isImage, type TenderFileContext, type FileConfig, FILE_CONFIGS, isPdf } from './config/file-configs';
 
 export interface UploadedFile {
@@ -28,11 +28,12 @@ export interface UploadResult {
 
 @Injectable()
 export class TenderFilesService implements OnModuleInit {
-    private readonly logger = new Logger(TenderFilesService.name);
+    private readonly logger;
     private readonly baseUploadPath: string;
 
-    constructor() {
+    constructor(private readonly appLogger: AppLogger) {
         this.baseUploadPath = path.join(process.cwd(), 'uploads', 'tendering');
+        this.logger = this.appLogger.withContext(TenderFilesService.name);
     }
 
     async onModuleInit() {
