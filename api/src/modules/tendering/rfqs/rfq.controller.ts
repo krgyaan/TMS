@@ -1,18 +1,22 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, HttpCode, HttpStatus, NotFoundException, Query, Logger } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, HttpCode, HttpStatus, NotFoundException, Query } from "@nestjs/common";
 import { RfqsService } from "@/modules/tendering/rfqs/rfq.service";
 import type { CreateRfqDto, UpdateRfqDto } from "@/modules/tendering/rfqs/dto/rfq.dto";
 import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 import { TimersService } from "@/modules/timers/timers.service";
 import { getFrontendTimer } from "@/modules/timers/timer-helper";
+import { AppLogger } from "@/logger/app-logger.service";
 
 @Controller("rfqs")
 export class RfqsController {
-    private readonly logger = new Logger(RfqsController.name);
+    private readonly logger;
     constructor(
+        private readonly appLogger: AppLogger,
         private readonly rfqsService: RfqsService,
         private readonly timersService: TimersService
-    ) {}
+    ) {
+        this.logger = this.appLogger.withContext(RfqsController.name);
+    }
 
     @Get("dashboard")
     async getDashboard(
