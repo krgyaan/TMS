@@ -1,6 +1,7 @@
 import { Controller, Get } from "@nestjs/common";
 import { AppService } from '@/app.service';
 import { Public } from '@/modules/auth/decorators/public.decorator';
+import * as Sentry from "@sentry/nestjs";
 
 @Controller()
 export class AppController {
@@ -12,10 +13,11 @@ export class AppController {
         return this.appService.getHello();
     }
 
-    // In any controller temporarily
     @Public()
     @Get("test-error")
     testError() {
-        throw new Error("Sentry test error from TMS API");
+        const error = new Error("Sentry test error from TMS API");
+        Sentry.captureException(error);
+        throw error;
     }
 }
