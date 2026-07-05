@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, Logger, Res, StreamableFile } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, Res, StreamableFile } from '@nestjs/common';
 import type { Response } from 'express';
 import { PaymentRequestsQueryService } from './services/payment-requests.query.service';
 import { PaymentRequestsCommandService } from './services/payment-requests.command.service';
@@ -8,16 +8,20 @@ import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TimersService } from '@/modules/timers/timers.service';
 import { getFrontendTimer } from '@/modules/timers/timer-helper';
+import { AppLogger } from '@/logger/app-logger.service';
 
 @Controller('payment-requests')
 export class PaymentRequestsController {
-    private readonly logger = new Logger(PaymentRequestsController.name);
+    private readonly logger;
 
     constructor(
+        private readonly appLogger: AppLogger,
         private readonly queryService: PaymentRequestsQueryService,
         private readonly commandService: PaymentRequestsCommandService,
         private readonly timersService: TimersService
-    ) {}
+    ) {
+        this.logger = this.appLogger.withContext(PaymentRequestsController.name);
+    }
 
     @Get('/')
     async getDashboard(

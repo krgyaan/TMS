@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { eq, and, sql } from 'drizzle-orm';
@@ -13,18 +13,22 @@ import { tenderInformation } from '@/db/schemas';
 import { PaymentRequestsNotificationService } from './payment-requests-notification.service';
 import { TimersService } from '@/modules/timers/timers.service';
 import { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { AppLogger } from '@/logger/app-logger.service';
 
 @Injectable()
 export class PaymentRequestsCommandService {
-    private readonly logger = new Logger(PaymentRequestsCommandService.name);
+    private readonly logger;
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
         @Inject(forwardRef(() => PaymentRequestsNotificationService))
         private readonly notificationService: PaymentRequestsNotificationService,
         private readonly timersService: TimersService,
-    ) {}
+    ) {
+        this.logger = this.appLogger.withContext(PaymentRequestsCommandService.name);
+    }
 
     // ============================================================================
     // Create Methods

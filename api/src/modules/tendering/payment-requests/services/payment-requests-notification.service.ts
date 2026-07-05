@@ -5,23 +5,27 @@ import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import * as path from 'path';
 import { ConfigService } from '@nestjs/config';
 import { and, eq, notInArray, isNull } from 'drizzle-orm';
 import { differenceInDays } from 'date-fns';
+import { AppLogger } from '@/logger/app-logger.service';
 
 @Injectable()
 export class PaymentRequestsNotificationService {
-    private readonly logger = new Logger(PaymentRequestsNotificationService.name);
+    private readonly logger;
 
     constructor(
+        private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly pdfGenerator: PdfGeneratorService,
         private readonly configService: ConfigService,
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(PaymentRequestsNotificationService.name);
+    }
 
     private async getTenderTeamId(tenderId: number, requestedBy: number): Promise<number> {
         if (tenderId > 0) {
