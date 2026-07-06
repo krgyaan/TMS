@@ -72,24 +72,28 @@ export const formToApi = {
   page4(form: Page4FormValues) {
     return {
       buybackBoqApplicable: stringToBool(form.buybackBoqApplicable),
-      billingBoq: form.billingBoq?.map((item) => ({
-        id: item.id,
-        srNo: item.srNo,
-        itemDescription: item.itemDescription,
-        quantity: item.quantity,
-        rate: item.rate,
-        amount: item.amount,
-        sortOrder: item.sortOrder,
-      })),
-      buybackBoq: form.buybackBoq?.map((item) => ({
-        id: item.id,
-        srNo: item.srNo,
-        itemDescription: item.itemDescription,
-        quantity: item.quantity,
-        rate: item.rate,
-        amount: item.amount,
-        sortOrder: item.sortOrder,
-      })),
+      billingBoq: form.billingBoq
+        ?.filter((item) => item.itemDescription?.trim())
+        .map((item) => ({
+          id: item.id,
+          srNo: item.srNo,
+          itemDescription: item.itemDescription,
+          quantity: item.quantity,
+          rate: item.rate,
+          amount: item.amount,
+          sortOrder: item.sortOrder,
+        })),
+      buybackBoq: form.buybackBoq
+        ?.filter((item) => item.itemDescription?.trim())
+        .map((item) => ({
+          id: item.id,
+          srNo: item.srNo,
+          itemDescription: item.itemDescription,
+          quantity: item.quantity,
+          rate: item.rate,
+          amount: item.amount,
+          sortOrder: item.sortOrder,
+        })),
       billingAddresses: form.billingAddresses?.map((a) => ({
         id: a.id,
         srNos: a.srNos,

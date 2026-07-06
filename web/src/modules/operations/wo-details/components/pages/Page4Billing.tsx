@@ -17,6 +17,7 @@ import { useAutoSave } from "@/hooks/api/useWoDetails";
 import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
 import { WIZARD_CONFIG, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
 import { Page4FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
+import { formToApi } from "../../helpers/woDetail.mapper";
 
 import type { Address, BOQItem, Page4FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
 
@@ -88,7 +89,7 @@ export function Page4Billing({
         remove: removeShippingAddress,
     } = useFieldArray({ control: form.control, name: "shippingAddresses" });
 
-    const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 4);
+    const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 4, true, 4000, formToApi.page4);
 
     const watchBillingBoq = form.watch("billingBoq");
     const watchBuybackBoq = form.watch("buybackBoq");
