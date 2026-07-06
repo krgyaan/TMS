@@ -8,7 +8,7 @@ import { DRIZZLE } from '@db/database.module';
 import { users } from '@db/schemas/auth/users.schema';
 import { woBasicDetails, woContacts, woDetails } from '@db/schemas/operations';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, asc, desc, eq, ilike, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { AssignOeDto, BulkAssignOeDto, CreateWoBasicDetailDto, RemoveOeAssignmentDto, UpdateWoBasicDetailDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 
@@ -147,6 +147,10 @@ export class WoBasicDetailsService {
             oeFirstName: row.oeFirstUser?.name ?? null,
             oeSiteVisitName: row.oeSiteVisitUser?.name ?? null,
             oeDocsPrepName: row.oeDocsPrepUser?.name ?? null,
+            currentPage: row.woDetails?.currentPage ?? null,
+            completedPages: row.woDetails?.completedPages ?? null,
+            skippedPages: row.woDetails?.skippedPages ?? null,
+            woDetailsStatus: row.woDetails?.status ?? null,
         };
     }
 
@@ -167,6 +171,10 @@ export class WoBasicDetailsService {
             },
             woDetails: {
                 id: woDetails.id,
+                currentPage: woDetails.currentPage,
+                completedPages: woDetails.completedPages,
+                skippedPages: woDetails.skippedPages,
+                status: woDetails.status,
             },
             oeFirstUser: {
                 name: oeFirstUser.name,
@@ -210,7 +218,6 @@ export class WoBasicDetailsService {
         // Resolve tab to backend filters
         const tab = filters?.tab;
         const currentStage = filters?.currentStage;
-        const woDetailsStatus = filters?.woDetailsStatus ?? (tab === 'wo_details' ? 'wo_details_filled' : undefined);
 
         if (tab && !['basic_details', 'wo_details', 'completed'].includes(tab)) {
             throw new BadRequestException(`Invalid tab: ${tab}`);
@@ -226,12 +233,14 @@ export class WoBasicDetailsService {
 
         if (currentStage) {
             conditions.push(eq(woBasicDetails.currentStage, currentStage));
-        } else if (tab === 'completed') {
-            conditions.push(eq(woBasicDetails.currentStage, 'completed'));
-        }
-
-        if (woDetailsStatus) {
-            conditions.push(eq(woDetails.status, woDetailsStatus));
+        } else if (tab) {
+            if (tab === 'basic_details') {
+                conditions.push(eq(woBasicDetails.currentStage, 'basic_details'));
+            } else if (tab === 'completed') {
+                conditions.push(eq(woBasicDetails.currentStage, 'completed'));
+            } else if (tab === 'wo_details') {
+                conditions.push(isNotNull(woDetails.id));
+            }
         }
 
         // Search condition (Expanded to joined fields)
@@ -256,7 +265,7 @@ export class WoBasicDetailsService {
             .select({ count: sql<number>`count(distinct ${woBasicDetails.id})::int` })
             .from(woBasicDetails);
 
-        if (woDetailsStatus) {
+        if (tab === 'wo_details') {
             countQuery = countQuery.leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id));
         }
 
@@ -894,10 +903,10 @@ export class WoBasicDetailsService {
         const [stageCounts] = await this.db
             .select({
                 total: sql<number>`count(distinct ${woBasicDetails.id})::int`,
-                basicDetails: sql<number>`count(distinct ${woBasicDetails.id})::int`,
-                woDetails: sql<number>`count(distinct ${woBasicDetails.id}) filter (where ${woDetails.status} = 'wo_details_filled')::int`,
-                completed: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'completed')::int`,
-                paused: sql<number>`count(*) filter (where ${woBasicDetails.isWorkflowPaused} = true)::int`,
+                basicDetails: sql<number>`count(distinct ${woBasicDetails.id}) filter (where ${woBasicDetails.currentStage} = 'basic_details')::int`,
+                woDetails: sql<number>`count(distinct ${woBasicDetails.id}) filter (where ${woDetails.id} is not null)::int`,
+                completed: sql<number>`count(distinct ${woBasicDetails.id}) filter (where ${woBasicDetails.currentStage} = 'completed')::int`,
+                paused: sql<number>`count(distinct ${woBasicDetails.id}) filter (where ${woBasicDetails.isWorkflowPaused} = true)::int`,
             })
             .from(woBasicDetails)
             .leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))

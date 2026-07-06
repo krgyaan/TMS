@@ -253,6 +253,12 @@ export const WoBasicDetailsResponseSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
 
+  // Wizard progress from joined wo_details
+  currentPage: z.number().int().nullable(),
+  completedPages: z.array(z.number()).nullable(),
+  skippedPages: z.array(z.number()).nullable(),
+  woDetailsStatus: z.string().nullable(),
+
   // Related data (optional, populated on demand)
   contacts: z.array(z.any()).optional(),
   woDetail: z.any().optional(),

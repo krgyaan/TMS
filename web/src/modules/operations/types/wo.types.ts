@@ -122,6 +122,10 @@ export interface WoBasicDetail {
   isWorkflowPaused: boolean;
   workflowPausedAt: string | null;
   workflowResumedAt: string | null;
+  currentPage: number | null;
+  completedPages: number[] | null;
+  skippedPages: number[] | null;
+  woDetailsStatus: string | null;
   createdAt: string;
   updatedAt: string;
   createdBy: number | null;

@@ -235,6 +235,57 @@ const BasicDetailListPage = () => {
                 cellRenderer: (params: any) => getStageBadge(params.value),
             },
             {
+                field: 'woDetailsStatus',
+                colId: 'woDetailsStatus',
+                headerName: 'WO Status',
+                width: 130,
+                sortable: false,
+                filter: false,
+                cellRenderer: (params: { value: string | null; data: WoBasicDetail }) => {
+                    const { woDetailsStatus, completedPages, skippedPages, currentPage } = params.data;
+
+                    if (!woDetailsStatus) return <Badge variant="secondary">—</Badge>;
+
+                    const badgeConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+                        draft: { label: 'Draft', variant: 'secondary' },
+                        in_progress: { label: 'In Progress', variant: 'default' },
+                        wo_details_filled: { label: 'Filled', variant: 'outline' },
+                    };
+
+                    const config = badgeConfig[woDetailsStatus] || { label: woDetailsStatus, variant: 'secondary' as const };
+
+                    const completedCount = completedPages?.length ?? 0;
+                    const skippedCount = skippedPages?.length ?? 0;
+
+                    return (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Badge variant={config.variant} className="cursor-pointer">
+                                    {config.label}
+                                    {(completedCount > 0 || skippedCount > 0) && (
+                                        <span className="ml-1 text-xs opacity-70">({completedCount}/{completedCount + skippedCount})</span>
+                                    )}
+                                </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" align="center">
+                                <div className="text-xs space-y-1">
+                                    <p><strong>Current Page:</strong> {currentPage ?? '—'}</p>
+                                    {completedPages && completedPages.length > 0 && (
+                                        <p><strong>Completed:</strong> Pages {[...completedPages].sort((a: number, b: number) => a - b).join(', ')}</p>
+                                    )}
+                                    {skippedPages && skippedPages.length > 0 && (
+                                        <p><strong>Skipped:</strong> Pages {[...skippedPages].sort((a: number, b: number) => a - b).join(', ')}</p>
+                                    )}
+                                    {completedPages?.length === 0 && skippedPages?.length === 0 && (
+                                        <p className="text-muted-foreground">No pages completed yet</p>
+                                    )}
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    );
+                },
+            },
+            {
                 headerName: '',
                 filter: false,
                 cellRenderer: createActionColumnRenderer(rowActions),
