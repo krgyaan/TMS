@@ -2,12 +2,13 @@ import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query, UseInte
 import { TenderResultService } from '@/modules/tendering/tender-result/tender-result.service';
 import type { ResultDashboardType } from '@/modules/tendering/types/shared.types';
 import type { UploadResultDto, UploadChangeStatusResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
-import { UploadChangeStatusResultSchema } from '@/modules/tendering/tender-result/dto/tender-result.dto';
+import { UploadResultSchema, UploadChangeStatusResultSchema } from '@/modules/tendering/tender-result/dto/tender-result.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { ZodValidationPipe } from 'nestjs-zod';
 
 //defining the multer config
 const multerConfig = {
@@ -100,7 +101,7 @@ export class TenderResultController {
     @Post('upload/:tenderId')
     async uploadResultByTenderId(
         @Param('tenderId', ParseIntPipe) tenderId: number,
-        @Body() dto: UploadResultDto,
+        @Body(new ZodValidationPipe(UploadResultSchema)) dto: UploadResultDto,
         @CurrentUser() user: ValidatedUser
     ) {
         const existingResult = await this.tenderResultService.findByTenderId(tenderId);
@@ -119,7 +120,7 @@ export class TenderResultController {
     @Post(':id/upload-result')
     async uploadResult(
         @Param('id', ParseIntPipe) id: number,
-        @Body() dto: UploadResultDto,
+        @Body(new ZodValidationPipe(UploadResultSchema)) dto: UploadResultDto,
         @CurrentUser() user: ValidatedUser
     ) {
         const result = await this.tenderResultService.findById(id);
