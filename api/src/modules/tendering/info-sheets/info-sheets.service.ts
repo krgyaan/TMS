@@ -53,7 +53,9 @@ export class TenderInfoSheetsService {
         private readonly recipientResolver: RecipientResolver,
         private readonly timersService: TimersService,
         private readonly clientDirectorySyncService: ClientDirectorySyncService,
-    ) { }
+    ) {
+        this.logger = this.appLogger.withContext(TenderInfoSheetsService.name);
+    }
 
     async findByTenderId(tenderId: number): Promise<TenderInfoSheetWithRelations | null> {
         const info = await this.db
