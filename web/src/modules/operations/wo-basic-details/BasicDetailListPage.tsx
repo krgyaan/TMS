@@ -254,27 +254,21 @@ const BasicDetailListPage = () => {
 
                     const config = badgeConfig[woDetailsStatus] || { label: woDetailsStatus, variant: 'secondary' as const };
 
-                    const completedCount = completedPages?.length ?? 0;
-                    const skippedCount = skippedPages?.length ?? 0;
-
                     return (
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Badge variant={config.variant} className="cursor-pointer">
                                     {config.label}
-                                    {(completedCount > 0 || skippedCount > 0) && (
-                                        <span className="ml-1 text-xs opacity-70">({completedCount}/{completedCount + skippedCount})</span>
-                                    )}
                                 </Badge>
                             </TooltipTrigger>
-                            <TooltipContent side="right" align="center">
+                            <TooltipContent side="top" align="center">
                                 <div className="text-xs space-y-1">
                                     <p><strong>Current Page:</strong> {currentPage ?? '—'}</p>
                                     {completedPages && completedPages.length > 0 && (
-                                        <p><strong>Completed:</strong> Pages {[...completedPages].sort((a: number, b: number) => a - b).join(', ')}</p>
+                                        <p><strong>Completed Pages:</strong> {[...completedPages].sort((a: number, b: number) => a - b).join(', ')}</p>
                                     )}
                                     {skippedPages && skippedPages.length > 0 && (
-                                        <p><strong>Skipped:</strong> Pages {[...skippedPages].sort((a: number, b: number) => a - b).join(', ')}</p>
+                                        <p><strong>Skipped Pages:</strong> {[...skippedPages].sort((a: number, b: number) => a - b).join(', ')}</p>
                                     )}
                                     {completedPages?.length === 0 && skippedPages?.length === 0 && (
                                         <p className="text-muted-foreground">No pages completed yet</p>
@@ -284,6 +278,7 @@ const BasicDetailListPage = () => {
                         </Tooltip>
                     );
                 },
+                hide: activeTab === 'basic_details', // Hide this column in the "Basic Details" tab
             },
             {
                 headerName: '',
