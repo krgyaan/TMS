@@ -1,10 +1,10 @@
-import { Injectable, Inject, BadRequestException, NotFoundException, ConflictException, Logger } from '@nestjs/common';
-import { eq, and, sql } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
-import { timerTrackers, timerEvents } from '@db/schemas/workflow/timer.schema';
-import { StartTimerInput, TimerActionInput, ExtendTimerInput, TimerWithComputed, hoursToMs } from './timer.types';
-import type { TimerTracker, TimerEvent } from '@db/schemas/workflow/timer.schema';
 import type { DbInstance } from '@/db';
+import { DRIZZLE } from '@db/database.module';
+import type { TimerTracker } from '@db/schemas/workflow/timer.schema';
+import { timerEvents, timerTrackers } from '@db/schemas/workflow/timer.schema';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { and, eq, inArray, sql } from 'drizzle-orm';
+import { ExtendTimerInput, StartTimerInput, TimerActionInput, TimerWithComputed, hoursToMs } from './timer.types';
 
 @Injectable()
 export class TimersService {
@@ -372,6 +372,31 @@ export class TimersService {
             .orderBy(timerTrackers.createdAt);
 
         return timers.map(t => this.computeTimer(t));
+    }
+
+    async getTimersByEntityIds(entityType: string, entityIds: number[], stage?: string): Promise<Map<number, TimerWithComputed>> {
+        if (entityIds.length === 0) {
+            return new Map();
+        }
+
+        const conditions = [
+            eq(timerTrackers.entityType, entityType),
+            inArray(timerTrackers.entityId, entityIds),
+        ];
+        if (stage) {
+            conditions.push(eq(timerTrackers.stage, stage));
+        }
+
+        const timers = await this.db
+            .select()
+            .from(timerTrackers)
+            .where(and(...conditions));
+
+        const timerMap = new Map<number, TimerWithComputed>();
+        for (const timer of timers) {
+            timerMap.set(timer.entityId, this.computeTimer(timer));
+        }
+        return timerMap;
     }
 
     async getActiveTimers(entityType: string, entityId: number): Promise<TimerWithComputed[]> {

@@ -2,7 +2,7 @@ import { AppLogger } from '@/logger/app-logger.service';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { CostingApprovalsService } from '@/modules/tendering/costing-approvals/costing-approvals.service';
-import { getFrontendTimer } from '@/modules/timers/timer-helper';
+import { getFrontendTimersBatch } from '@/modules/timers/timer-helper';
 import { TimersService } from '@/modules/timers/timers.service';
 import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import type { ApproveAllCostingDto, ApproveCostingDto, RejectCostingDto, UpdateApprovedCostingDto } from './dto/costing-approval.dto';
@@ -41,16 +41,13 @@ export class CostingApprovalsController {
             sortOrder,
             search,
         }, user, parseNumber(teamId));
-        // Add timer data to each tender
-        const dataWithTimers = await Promise.all(
-            result.data.map(async (tender) => {
-                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'costing_sheet_approval');
-                return {
-                    ...tender,
-                    timer
-                };
-            })
-        );
+        // Batch-fetch timer data for all tenders
+        const tenderIds = result.data.map(t => t.tenderId);
+        const timerMap = await getFrontendTimersBatch(this.timersService, 'TENDER', tenderIds, 'costing_sheet_approval');
+        const dataWithTimers = result.data.map(tender => ({
+            ...tender,
+            timer: timerMap.get(tender.tenderId)
+        }));
 
         return {
             ...result,

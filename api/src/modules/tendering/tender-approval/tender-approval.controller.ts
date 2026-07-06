@@ -1,11 +1,11 @@
-import { Controller, Get, Put, Param, Body, ParseIntPipe, Query } from '@nestjs/common';
-import { TenderApprovalService, type TenderApprovalFilters } from '@/modules/tendering/tender-approval/tender-approval.service';
-import { TenderApprovalPayloadSchema, type TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
+import { AppLogger } from '@/logger/app-logger.service';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { TenderApprovalPayloadSchema } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
+import { TenderApprovalService } from '@/modules/tendering/tender-approval/tender-approval.service';
+import { getFrontendTimersBatch } from '@/modules/timers/timer-helper';
 import { TimersService } from '@/modules/timers/timers.service';
-import { getFrontendTimer } from '@/modules/timers/timer-helper';
-import { AppLogger } from '@/logger/app-logger.service';
+import { Body, Controller, Get, Param, ParseIntPipe, Put, Query } from '@nestjs/common';
 
 @Controller('tender-approvals')
 export class TenderApprovalController {
@@ -41,16 +41,13 @@ export class TenderApprovalController {
             sortOrder,
             search,
         });
-        // Add timer data to each tender
-        const dataWithTimers = await Promise.all(
-            result.data.map(async (tender) => {
-                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'tender_approval');
-                return {
-                    ...tender,
-                    timer
-                };
-            })
-        );
+        // Batch-fetch timer data for all tenders
+        const tenderIds = result.data.map(t => t.tenderId);
+        const timerMap = await getFrontendTimersBatch(this.timersService, 'TENDER', tenderIds, 'tender_approval');
+        const dataWithTimers = result.data.map(tender => ({
+            ...tender,
+            timer: timerMap.get(tender.tenderId)
+        }));
 
         return {
             ...result,

@@ -1,14 +1,14 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, Res, StreamableFile } from '@nestjs/common';
-import type { Response } from 'express';
-import { PaymentRequestsQueryService } from './services/payment-requests.query.service';
-import { PaymentRequestsCommandService } from './services/payment-requests.command.service';
-import { CreatePaymentRequestSchema, UpdatePaymentRequestSchema, UpdateStatusSchema, DashboardQuerySchema, type DashboardResponse, type DashboardCounts, type DashboardTab } from './dto/payment-requests.dto';
-import { CreateMomRemarkSchema } from './dto/payment-mom.dto';
+import { AppLogger } from '@/logger/app-logger.service';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { getFrontendTimersBatch } from '@/modules/timers/timer-helper';
 import { TimersService } from '@/modules/timers/timers.service';
-import { getFrontendTimer } from '@/modules/timers/timer-helper';
-import { AppLogger } from '@/logger/app-logger.service';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, Res, StreamableFile } from '@nestjs/common';
+import type { Response } from 'express';
+import { CreateMomRemarkSchema } from './dto/payment-mom.dto';
+import { CreatePaymentRequestSchema, DashboardQuerySchema, UpdatePaymentRequestSchema, UpdateStatusSchema, type DashboardCounts, type DashboardResponse, type DashboardTab } from './dto/payment-requests.dto';
+import { PaymentRequestsCommandService } from './services/payment-requests.command.service';
+import { PaymentRequestsQueryService } from './services/payment-requests.query.service';
 
 @Controller('payment-requests')
 export class PaymentRequestsController {
@@ -43,16 +43,13 @@ export class PaymentRequestsController {
             parsed.sortBy ? { sortBy: parsed.sortBy, sortOrder: parsed.sortOrder } : undefined,
             parsed.search
         );
-        // Add timer data to each tender
-        const dataWithTimers = await Promise.all(
-            result.data.map(async (tender: any) => {
-                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'emd_request');
-                return {
-                    ...tender,
-                    timer
-                };
-            })
-        );
+        // Batch-fetch timer data for all tenders
+        const tenderIds = result.data.map((t: any) => t.tenderId);
+        const timerMap = await getFrontendTimersBatch(this.timersService, 'TENDER', tenderIds, 'emd_request');
+        const dataWithTimers = result.data.map((tender: any) => ({
+            ...tender,
+            timer: timerMap.get(tender.tenderId)
+        }));
 
         return {
             ...result,
