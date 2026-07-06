@@ -135,6 +135,7 @@ export class WoBasicDetailsService {
         return {
             id: row.woBasicDetails.id,
             projectId: row.woBasicDetails.projectId,
+            woDetailId: row.woDetails?.id ?? null,
             woNumber: row.woBasicDetails.woNumber,
             woDate: row.woBasicDetails.woDate,
             projectName: row.woBasicDetails.projectName,
@@ -164,6 +165,9 @@ export class WoBasicDetailsService {
                 grossMargin: woBasicDetails.grossMargin,
                 stage: woBasicDetails.currentStage,
             },
+            woDetails: {
+                id: woDetails.id,
+            },
             oeFirstUser: {
                 name: oeFirstUser.name,
             },
@@ -180,6 +184,7 @@ export class WoBasicDetailsService {
         return this.db
             .select(this.getWoBaseSelect())
             .from(woBasicDetails)
+            .leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
             .leftJoin(oeFirstUser, eq(oeFirstUser.id, woBasicDetails.oeFirst))
             .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
             .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep));
@@ -306,11 +311,7 @@ export class WoBasicDetailsService {
         }
 
         // 4. Get Data
-        let query = this.getBaseQueryBuilder();
-        if (woDetailsStatus) {
-            query = query.leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id));
-        }
-        const rows = await query
+        const rows = await this.getBaseQueryBuilder()
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)

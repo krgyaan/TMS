@@ -1,25 +1,25 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useMemo } from 'react';
+import { paths } from '@/app/routes/paths';
+import { currencyCol, dateCol } from '@/components/data-grid';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useNavigate } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, FileX2, Search, Edit, UserPlus, Plus, FileText, LayoutDashboard } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { useWoBasicDetails, useWoBasicDetailsDashboardSummary } from '@/hooks/api/useWoBasicDetails';
-import type { WoBasicDetail, WoBasicDetailsFilters, WorkflowStage } from '@/modules/operations/types/wo.types';
-import { currencyCol, dateCol } from '@/components/data-grid';
-import { usePersistentTableState } from '@/hooks/usePersistentTableState';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import DataTable from '@/components/ui/data-table';
+import { Input } from '@/components/ui/input';
 import { QuickFilter } from '@/components/ui/quick-filter';
-import { Tooltip, TooltipTrigger } from '@radix-ui/react-tooltip';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TooltipContent } from '@/components/ui/tooltip';
+import { useWoBasicDetails, useWoBasicDetailsDashboardSummary } from '@/hooks/api/useWoBasicDetails';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
+import type { WoBasicDetail, WoBasicDetailsFilters, WorkflowStage } from '@/modules/operations/types/wo.types';
+import { Tooltip, TooltipTrigger } from '@radix-ui/react-tooltip';
+import type { ColDef } from 'ag-grid-community';
+import { AlertCircle, Edit, Eye, FileText, FileX2, LayoutDashboard, Plus, Search, UserPlus } from 'lucide-react';
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 type TabKey = 'basic_details' | 'wo_details' | 'completed';
 
@@ -76,7 +76,11 @@ const BasicDetailListPage = () => {
         },
         {
             label: 'WO Details',
-            onClick: (row) => navigate(paths.operations.woDetailCreatePage(row.id)),
+            onClick: (row) => navigate(
+                row.woDetailId
+                    ? paths.operations.woDetailEditPage(row.woDetailId)
+                    : paths.operations.woDetailCreatePage(row.id)
+            ),
             icon: <FileText className="h-4 w-4" />,
         },
         {
