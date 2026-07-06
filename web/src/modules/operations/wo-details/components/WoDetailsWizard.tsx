@@ -122,7 +122,14 @@ export function WoDetailsWizard({
         try {
             const mappedData = applyMapper(data, wizardState.currentPage);
             await submitPage.mutateAsync({ woDetailId, pageNum: wizardState.currentPage, data: mappedData });
-            return [];
+            // After successful save, advance to next page
+            if (wizardState.currentPage < WIZARD_CONFIG.TOTAL_PAGES) {
+                setWizardState((prev) => ({
+                    ...prev,
+                    currentPage: prev.currentPage + 1,
+                    status: "in_progress",
+                }));
+            }
         } catch (error: any) {
             const serverErrors = error?.response?.data?.errors;
             if (serverErrors?.length) {
