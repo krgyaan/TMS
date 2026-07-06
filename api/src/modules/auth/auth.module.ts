@@ -2,7 +2,6 @@
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
 import authConfig, { type AuthConfig } from '@/config/auth.config';
 import { UsersModule } from '@/modules/master/users/users.module';
 import { GoogleIntegrationModule } from '@/modules/integrations/google/google.module';
@@ -46,10 +45,6 @@ import type { StringValue } from 'ms';
         RolesGuard,
         PermissionGuard,
         ResourceAccessGuard,
-        {
-            provide: APP_GUARD,
-            useClass: JwtAuthGuard,
-        },
     ],
     exports: [
         AuthService,

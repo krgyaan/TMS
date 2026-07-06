@@ -1,20 +1,5 @@
-// src/modules/hrms/onboarding/onboarding.controller.ts
-
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  ParseIntPipe,
-  Patch,
-  Post,
-  Req,
-  UseGuards,
-  BadRequestException,
-} from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req } from '@nestjs/common';
 import { z } from 'zod';
-import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { OnboardingService, type UpdateProfileDto } from './onboarding.service';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
@@ -56,7 +41,6 @@ export class OnboardingController {
    * GET /hrms/onboarding/dashboard  — Protected: HR only
    */
   @Get('dashboard')
-  @UseGuards(JwtAuthGuard)
   async listAll() {
     return this.onboardingService.findAll();
   }
@@ -66,7 +50,6 @@ export class OnboardingController {
    * Bulk init for all existing users without completed profiles
    */
   @Post('initialize-employees')
-  @UseGuards(JwtAuthGuard)
   async bulkInitialize(@Req() req: any) {
     return this.onboardingService.bulkInitializeOnboarding(req.user.id);
   }
@@ -76,7 +59,6 @@ export class OnboardingController {
    * Init for a single specific user
    */
   @Post('initialize-employees/:userId')
-  @UseGuards(JwtAuthGuard)
   async initializeSingle(@Param('userId', ParseIntPipe) userId: number, @Req() req: any) {
     return this.onboardingService.initializeEmployeeOnboarding(userId, req.user.id);
   }
@@ -86,13 +68,11 @@ export class OnboardingController {
    * Returns all approved employees joined with profile completion data.
    */
   @Get('profiles')
-  @UseGuards(JwtAuthGuard)
   async listProfiles() {
     return this.onboardingService.getProfileList();
   }
 
   @Get('incomplete')
-  @UseGuards(JwtAuthGuard)
   async getIncomplete() {
     return this.onboardingService.findIncompleteOnboarding();
   }
@@ -102,7 +82,6 @@ export class OnboardingController {
    * Checks the logged-in user's onboarding status.
    */
   @Get('my-status')
-  @UseGuards(JwtAuthGuard)
   async getMyStatus(@Req() req: any) {
     return this.onboardingService.findUserOnboardingStatus(req.user.id);
   }
@@ -112,7 +91,6 @@ export class OnboardingController {
    * Returns a single employee's full profile.
    */
   @Get(':id/profile')
-  @UseGuards(JwtAuthGuard)
   async getProfile(@Param('id', ParseIntPipe) id: number) {
     return this.onboardingService.getProfile(id);
   }
@@ -122,7 +100,6 @@ export class OnboardingController {
    * HR fills employment, compensation, and bank details.
    */
   @Patch(':id/profile')
-  @UseGuards(JwtAuthGuard)
   async updateProfile(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: unknown,
@@ -136,7 +113,6 @@ export class OnboardingController {
    * GET /hrms/onboarding/documents-tracker  — Protected: HR only
    */
   @Get('documents-tracker')
-  @UseGuards(JwtAuthGuard)
   async listDocumentsTracker() {
     return this.onboardingService.getDocumentTrackerList();
   }
@@ -145,7 +121,6 @@ export class OnboardingController {
    * GET /hrms/onboarding/:id/documents  — Protected: HR only
    */
   @Get(':id/documents')
-  @UseGuards(JwtAuthGuard)
   async getEmployeeDocuments(@Param('id', ParseIntPipe) id: number) {
     return this.onboardingService.getEmployeeDocuments(id);
   }
@@ -154,7 +129,6 @@ export class OnboardingController {
    * GET /hrms/onboarding/:id/education  — Protected: HR only
    */
   @Get(':id/education')
-  @UseGuards(JwtAuthGuard)
   async getEmployeeEducation(@Param('id', ParseIntPipe) id: number) {
     return this.onboardingService.getEmployeeEducation(id);
   }
@@ -163,7 +137,6 @@ export class OnboardingController {
    * GET /hrms/onboarding/:id/experience  — Protected: HR only
    */
   @Get(':id/experience')
-  @UseGuards(JwtAuthGuard)
   async getEmployeeExperience(@Param('id', ParseIntPipe) id: number) {
     return this.onboardingService.getEmployeeExperience(id);
   }
@@ -172,7 +145,6 @@ export class OnboardingController {
    * GET /hrms/onboarding/:id/bank-details  — Protected: HR only
    */
   @Get(':id/bank-details')
-  @UseGuards(JwtAuthGuard)
   async getEmployeeBankDetails(@Param('id', ParseIntPipe) id: number) {
     return this.onboardingService.getEmployeeBankDetails(id);
   }
@@ -183,7 +155,6 @@ export class OnboardingController {
    * GET /hrms/onboarding/induction-tracker
    */
   @Get('induction-tracker')
-  @UseGuards(JwtAuthGuard)
   async listInductionTracker() {
     return this.onboardingService.getInductionTrackerList();
   }
@@ -192,7 +163,6 @@ export class OnboardingController {
    * GET /hrms/onboarding/:id/induction
    */
   @Get(':id/induction')
-  @UseGuards(JwtAuthGuard)
   async getEmployeeInduction(@Param('id', ParseIntPipe) id: number) {
     return this.onboardingService.getEmployeeInduction(id);
   }
@@ -201,7 +171,6 @@ export class OnboardingController {
    * PATCH /hrms/onboarding/:id/induction/:taskId
    */
   @Patch(':id/induction/:taskId')
-  @UseGuards(JwtAuthGuard)
   async updateInductionTask(
     @Param('id', ParseIntPipe) id: number,
     @Param('taskId', ParseIntPipe) taskId: number,
@@ -215,7 +184,6 @@ export class OnboardingController {
    * PATCH /hrms/onboarding/:id/status  — Protected: HR only
    */
   @Patch(':id/status')
-  @UseGuards(JwtAuthGuard)
   async updateStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: unknown,
@@ -230,7 +198,6 @@ export class OnboardingController {
    * DELETE /hrms/onboarding/:id  — Protected: HR only
    */
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
   async delete(@Param('id', ParseIntPipe) id: number) {
     await this.onboardingService.delete(id);
     return { success: true };
@@ -242,7 +209,6 @@ export class OnboardingController {
    * PATCH /hrms/onboarding/:id/approve-profile
    */
   @Patch(':id/approve-profile')
-  @UseGuards(JwtAuthGuard)
   async approveProfile(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { status: 'approved' | 'rejected'; remark: string },
@@ -256,7 +222,6 @@ export class OnboardingController {
    * Dynamic endpoint for approving or rejecting stage entries (education, experience, bank-details, documents)
    */
   @Patch(':id/:stage/:entryId/approve')
-  @UseGuards(JwtAuthGuard)
   async approveStageEntry(
     @Param('id', ParseIntPipe) id: number,
     @Param('stage') stage: string,

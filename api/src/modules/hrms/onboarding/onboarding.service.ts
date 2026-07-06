@@ -1,42 +1,24 @@
-// src/modules/hrms/onboarding/onboarding.service.ts
-
-import {
-  Injectable,
-  Inject,
-  NotFoundException,
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
 import type { DbInstance } from '@/db';
 import { DRIZZLE } from '@/db/database.module';
-import {
-  onboardingRequests,
-  onboardingDocuments,
-  onboardingInduction,
-  onboardingActivityLogs,
-  type NewOnboardingRequest,
-  type NewOnboardingProfile,
-  onboardingProfiles,
-  onboardingEducation,
-  onboardingExperience,
-  onboardingBankDetails,
-  OnboardingRequest,
-} from '@/db/schemas/hrms/onboarding';
-import { users } from '@/db/schemas/auth/users.schema';
+import { oauthAccounts } from '@/db/schemas';
 import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
-import { employeeProfiles } from '@/db/schemas/hrms/employee-profiles.schema';
+import { users } from '@/db/schemas/auth/users.schema';
+import { employeeBankDetails } from '@/db/schemas/hrms/employee-bank-details.schema';
+import { employeeDocuments } from '@/db/schemas/hrms/employee-documents.schema';
 import { employeeEducation } from '@/db/schemas/hrms/employee-education.schema';
 import { employeeExperience } from '@/db/schemas/hrms/employee-experience.schema';
-import { employeeDocuments } from '@/db/schemas/hrms/employee-documents.schema';
-import { employeeBankDetails } from '@/db/schemas/hrms/employee-bank-details.schema';
-import { eq, desc, aliasedTable, inArray, and, ne, or } from 'drizzle-orm';
+import { employeeProfiles } from '@/db/schemas/hrms/employee-profiles.schema';
+import { 
+  onboardingActivityLogs, onboardingBankDetails, onboardingDocuments, onboardingEducation, 
+  onboardingExperience, onboardingInduction, onboardingProfiles, OnboardingRequest, onboardingRequests 
+} from '@/db/schemas/hrms/onboarding';
 import { designations } from '@/db/schemas/master/designations.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import * as argon2 from 'argon2';
+import { aliasedTable, and, desc, eq, inArray } from 'drizzle-orm';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
-import * as crypto from 'crypto';
-import * as argon2 from 'argon2';
-import { oauthAccounts } from '@/db/schemas';
 
 // ─── DTOs ─────────────────────────────────────────────────────────────────────
 
@@ -845,32 +827,30 @@ export class OnboardingService {
       }
 
       // Query child table entry hrStatuses for individual rejection/approval checks
-      const [profile] = await this.db
-        .select({ hrStatus: onboardingProfiles.hrStatus })
-        .from(onboardingProfiles)
-        .where(eq(onboardingProfiles.onboardingId, request.id))
-        .orderBy(desc(onboardingProfiles.id))
-        .limit(1);
-
-      const docs = await this.db
-        .select({ hrStatus: onboardingDocuments.hrStatus })
-        .from(onboardingDocuments)
-        .where(eq(onboardingDocuments.onboardingId, request.id));
-
-      const edu = await this.db
-        .select({ hrStatus: onboardingEducation.hrStatus })
-        .from(onboardingEducation)
-        .where(eq(onboardingEducation.onboardingId, request.id));
-
-      const exp = await this.db
-        .select({ hrStatus: onboardingExperience.hrStatus })
-        .from(onboardingExperience)
-        .where(eq(onboardingExperience.onboardingId, request.id));
-
-      const bank = await this.db
-        .select({ hrStatus: onboardingBankDetails.hrStatus })
-        .from(onboardingBankDetails)
-        .where(eq(onboardingBankDetails.onboardingId, request.id));
+      const [[profile], docs, edu, exp, bank] = await Promise.all([
+        this.db
+          .select({ hrStatus: onboardingProfiles.hrStatus })
+          .from(onboardingProfiles)
+          .where(eq(onboardingProfiles.onboardingId, request.id))
+          .orderBy(desc(onboardingProfiles.id))
+          .limit(1),
+        this.db
+          .select({ hrStatus: onboardingDocuments.hrStatus })
+          .from(onboardingDocuments)
+          .where(eq(onboardingDocuments.onboardingId, request.id)),
+        this.db
+          .select({ hrStatus: onboardingEducation.hrStatus })
+          .from(onboardingEducation)
+          .where(eq(onboardingEducation.onboardingId, request.id)),
+        this.db
+          .select({ hrStatus: onboardingExperience.hrStatus })
+          .from(onboardingExperience)
+          .where(eq(onboardingExperience.onboardingId, request.id)),
+        this.db
+          .select({ hrStatus: onboardingBankDetails.hrStatus })
+          .from(onboardingBankDetails)
+          .where(eq(onboardingBankDetails.onboardingId, request.id)),
+      ]);
 
       const profileHrStatus = profile?.hrStatus || 'pending';
       const documentHrStatus = docs.some(d => d.hrStatus === 'rejected') ? 'rejected' : (docs.length > 0 && docs.every(d => d.hrStatus === 'approved') ? 'approved' : 'pending');
