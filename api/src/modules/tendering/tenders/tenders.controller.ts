@@ -5,7 +5,7 @@ import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { CreateTenderSchema, UpdateTenderSchema, UpdateStatusSchema, GenerateTenderNameSchema, type CreateTenderDto } from './dto/tender.dto';
 import { TimersService } from '@/modules/timers/timers.service';
-import { getFrontendTimer } from '@/modules/timers/timer-helper';
+import { getFrontendTimersBatch, getFrontendTimer } from '@/modules/timers/timer-helper';
 import { ValidatedBody } from '@/decorators/validated-body.decorator';
 
 @Controller('tenders')
@@ -68,15 +68,11 @@ export class TenderInfoController {
             user,
         });
 
-        const tendersWithTimers = await Promise.all(
-            tenders.data.map(async (tender) => {
-                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.id, 'tender_info_sheet');
-                return {
-                    ...tender,
-                    timer
-                };
-            })
-        );
+        const timerMap = await getFrontendTimersBatch(this.timersService, 'TENDER', tenders.data.map(t => t.id), 'tender_info_sheet');
+        const tendersWithTimers = tenders.data.map(tender => ({
+            ...tender,
+            timer: timerMap.get(tender.id)!,
+        }));
 
         return {
             ...tenders,
