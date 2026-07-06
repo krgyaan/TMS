@@ -674,32 +674,65 @@ export class WoDetailsService {
     woBasicDetailId: number,
     userId?: number,
   ): Promise<WizardInitResponse> {
-    const existing = await this.findByWoBasicDetailId(woBasicDetailId);
+    const [basicDetail] = await this.db
+      .select({ id: woBasicDetails.id })
+      .from(woBasicDetails)
+      .where(eq(woBasicDetails.id, woBasicDetailId))
+      .limit(1);
 
-    if (existing) {
+    if (!basicDetail) {
+      throw new NotFoundException(
+        `WO Basic Detail with ID ${woBasicDetailId} not found`,
+      );
+    }
+
+    const now = new Date();
+
+    const [row] = await this.db
+      .insert(woDetails)
+      .values({
+        woBasicDetailId,
+        currentPage: 1,
+        completedPages: [],
+        skippedPages: [],
+        status: 'draft',
+        startedAt: now,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: userId ?? null,
+      })
+      .onConflictDoNothing()
+      .returning();
+
+    if (row) {
+      await this.db
+        .update(woBasicDetails)
+        .set({ currentStage: 'wo_details', updatedAt: now })
+        .where(eq(woBasicDetails.id, woBasicDetailId));
+
+      const mapped = this.mapRowToResponse(row);
       return {
-        id: existing.id,
-        woBasicDetailId: existing.woBasicDetailId,
-        status: existing.status,
-        currentPage: existing.currentPage,
-        completedPages: existing.completedPages as number[],
-        skippedPages: existing.skippedPages as number[],
-        createdAt: existing.createdAt,
-        isExisting: true,
+        id: mapped.id,
+        woBasicDetailId: mapped.woBasicDetailId,
+        status: mapped.status,
+        currentPage: mapped.currentPage,
+        completedPages: mapped.completedPages as number[],
+        skippedPages: mapped.skippedPages as number[],
+        createdAt: mapped.createdAt,
+        isExisting: false,
       };
     }
 
-    const result = await this.create({ woBasicDetailId }, userId);
-
+    const existing = await this.findByWoBasicDetailId(woBasicDetailId);
     return {
-      id: result.id,
-      woBasicDetailId: result.woBasicDetailId,
-      status: result.status,
-      currentPage: result.currentPage,
-      completedPages: result.completedPages as number[],
-      skippedPages: result.skippedPages as number[],
-      createdAt: result.createdAt,
-      isExisting: false,
+      id: existing!.id,
+      woBasicDetailId: existing!.woBasicDetailId,
+      status: existing!.status,
+      currentPage: existing!.currentPage,
+      completedPages: existing!.completedPages as number[],
+      skippedPages: existing!.skippedPages as number[],
+      createdAt: existing!.createdAt,
+      isExisting: true,
     };
   }
 
