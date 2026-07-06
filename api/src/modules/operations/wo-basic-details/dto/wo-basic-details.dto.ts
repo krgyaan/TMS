@@ -206,6 +206,7 @@ export const WoBasicDetailsResponseSchema = z.object({
   id: z.number(),
   tenderId: z.number().nullable(),
   enquiryId: z.number().nullable(),
+  woDetailId: z.number().nullable(),
   woNumber: z.string().nullable(),
   woDate: z.string().nullable(),
   projectCode: z.string(),

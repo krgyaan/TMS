@@ -7,18 +7,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { formToApi } from "../../helpers/woDetail.mapper";
 import { useAutoSave } from "@/hooks/api/useWoDetails";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FileText, Info, Receipt, ShieldCheck } from "lucide-react";
+import { FileText, Info, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { WIZARD_CONFIG, YES_NO_OPTIONS } from "../../helpers/constants";
+import { formToApi } from "../../helpers/woDetail.mapper";
 import { Page2FormSchema } from "../../helpers/woDetail.schema";
 import { WizardNavigation } from "../WizardNavigation";
 
-import type { Page2FormValues, PageFormProps } from "../../helpers/woDetail.types";
 import FieldWrapper from "@/components/form/FieldWrapper";
+import type { Page2FormValues, PageFormProps } from "../../helpers/woDetail.types";
 
 interface Page2ComplianceProps extends PageFormProps {
     initialData?: Partial<Page2FormValues>;
@@ -153,14 +153,13 @@ export function Page2Compliance({
 
                         <Separator />
 
-                        {/* PBG Section */}
+                        {/* PBG & Contract Agreement Section */}
                         <div>
                             <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
                                 <FileText className="h-4 w-4 text-muted-foreground" />
-                                Performance Bank Guarantee (PBG)
+                                PBG and Contract Agreement
                             </h3>
-                            <p className="text-xs text-muted-foreground mb-4">Security deposit requirements for project performance.</p>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
                                 <SelectField
                                     control={form.control}
                                     name="isPbgApplicable"
@@ -178,27 +177,6 @@ export function Page2Compliance({
                                         />
                                     </div>
                                 </ConditionalSection>
-                            </div>
-                            <ConditionalSection show={watchPbgApplicable === "true"}>
-                                <Alert className="mt-3">
-                                    <Info className="h-4 w-4" />
-                                    <AlertDescription>
-                                        Please fill the BG form (other than tender). This is compulsory for project compliance.
-                                    </AlertDescription>
-                                </Alert>
-                            </ConditionalSection>
-                        </div>
-
-                        <Separator />
-
-                        {/* Contract Agreement Section */}
-                        <div>
-                            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                                <Receipt className="h-4 w-4 text-muted-foreground" />
-                                Formal Contract Agreement
-                            </h3>
-                            <p className="text-xs text-muted-foreground mb-4">Legal contract requirement between client and company.</p>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <SelectField
                                     control={form.control}
                                     name="isContractAgreement"

@@ -1,10 +1,23 @@
-import { WoDetailsWizard } from "./components/WoDetailsWizard";
+import { paths } from "@/app/routes/paths";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { useWoDetailByBasicDetail } from "@/hooks/api/useWoDetails";
+import { AlertCircle, Loader2 } from "lucide-react";
+import { useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { WoDetailsWizard } from "./components/WoDetailsWizard";
 
 const WoDetailCreatePage = () => {
     const { woBasicDetailId } = useParams<{ woBasicDetailId: string }>();
+    const navigate = useNavigate();
+    const numericId = woBasicDetailId ? Number(woBasicDetailId) : null;
+
+    const { data: existingDetail, isLoading } = useWoDetailByBasicDetail(numericId ?? 0);
+
+    useEffect(() => {
+        if (!isLoading && existingDetail?.id && numericId) {
+            navigate(paths.operations.woDetailEditPage(existingDetail.id), { replace: true });
+        }
+    }, [isLoading, existingDetail, navigate, numericId]);
 
     if (!woBasicDetailId) {
         return (
@@ -18,6 +31,19 @@ const WoDetailCreatePage = () => {
                 </Alert>
             </div>
         );
+    }
+
+    if (isLoading) {
+        return (
+            <div className="flex flex-col gap-4 items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-muted-foreground">Checking existing WO Details...</p>
+            </div>
+        );
+    }
+
+    if (existingDetail?.id) {
+        return null;
     }
 
     return (
