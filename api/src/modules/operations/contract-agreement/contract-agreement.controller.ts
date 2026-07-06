@@ -1,13 +1,11 @@
-import { Controller, Get, Patch, Body, Param, ParseIntPipe, UseGuards, Query } from '@nestjs/common';
-import { ContractAgreementService } from './contract-agreement.service';
-import { SaveContractAgreementSchema } from './dto/contract-agreement.dto';
-import type { SaveContractAgreementDto } from './dto/contract-agreement.dto';
-import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Query } from '@nestjs/common';
+import { ContractAgreementService } from './contract-agreement.service';
+import type { SaveContractAgreementDto } from './dto/contract-agreement.dto';
+import { SaveContractAgreementSchema } from './dto/contract-agreement.dto';
 
 @Controller('contract-agreement')
-@UseGuards(JwtAuthGuard)
 export class ContractAgreementController {
   constructor(private readonly contractAgreementService: ContractAgreementService) {}
 

@@ -1,13 +1,11 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, UseGuards, Query } from '@nestjs/common';
-import { KickOffMeetingService } from './kick-off-meeting.service';
-import { SaveKickOffMeetingSchema, UpdateKickOffMeetingMomSchema } from './dto/kick-off-meeting.dto';
-import type { SaveKickOffMeetingDto, UpdateKickOffMeetingMomDto } from './dto/kick-off-meeting.dto';
-import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import type { SaveKickOffMeetingDto, UpdateKickOffMeetingMomDto } from './dto/kick-off-meeting.dto';
+import { SaveKickOffMeetingSchema, UpdateKickOffMeetingMomSchema } from './dto/kick-off-meeting.dto';
+import { KickOffMeetingService } from './kick-off-meeting.service';
 
 @Controller('kick-off-meeting')
-@UseGuards(JwtAuthGuard)
 export class KickOffMeetingController {
   constructor(private readonly kickOffMeetingService: KickOffMeetingService) {}
 

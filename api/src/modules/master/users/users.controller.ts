@@ -1,12 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Patch, Post, UseGuards, ForbiddenException, Query } from "@nestjs/common";
-import { z } from "zod";
-import { UsersService } from "@/modules/master/users/users.service";
-import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
-import { RequirePermissions, CanCreate, CanRead, CanUpdate, CanDelete } from "@/modules/auth/decorators/permissions.decorator";
-import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
-import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 import { RoleName, hasMinimumRole } from "@/common/constants/roles.constant";
 import { Public } from "@/modules/auth/decorators";
+import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
+import { CanDelete, CanRead, CanUpdate } from "@/modules/auth/decorators/permissions.decorator";
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import { UsersService } from "@/modules/master/users/users.service";
+import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Patch, Post, Query } from "@nestjs/common";
+import { z } from "zod";
 
 const CreateUserSchema = z.object({
     name: z.string().min(1, "Name is required").max(255, "Name cannot exceed 255 characters"),
@@ -27,7 +26,6 @@ const UpdateUserSchema = CreateUserSchema.partial().extend({
 type UpdateUserDto = z.infer<typeof UpdateUserSchema>;
 
 @Controller("users")
-@UseGuards(JwtAuthGuard)
 export class UsersController {
     constructor(private readonly usersService: UsersService) {}
 

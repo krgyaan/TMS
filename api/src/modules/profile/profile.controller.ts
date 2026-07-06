@@ -1,16 +1,7 @@
-import {
-  Controller,
-  Get,
-  Patch,
-  Req,
-  Body,
-  UseGuards,
-} from '@nestjs/common';
-import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
+import { Body, Controller, Get, Patch, Req } from '@nestjs/common';
 import { ProfileService } from './profile.service';
 
 @Controller('profile')
-@UseGuards(JwtAuthGuard)
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 

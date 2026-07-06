@@ -1,26 +1,10 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  ParseIntPipe,
-  Patch,
-  Post,
-  Put,
-  Req,
-  UseGuards,
-  BadRequestException,
-  UseInterceptors,
-  UploadedFile,
-} from '@nestjs/common';
+import { Public } from '@/modules/auth/decorators';
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { z } from 'zod';
-import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { EmployeeOnboardingService } from './employee-onboarding.service';
-import { Public } from '@/modules/auth/decorators';
 
 // ─── Multer Config ────────────────────────────────────────────────────────────
 
@@ -122,7 +106,7 @@ export class EmployeeOnboardingController {
    * Retrieves the current employee's onboarding draft.
    */
   @Get('me')
-  @UseGuards(JwtAuthGuard)
+
   async getMyOnboardingDraft(@Req() req: any) {
     return this.employeeOnboardingService.getMyOnboardingDraft(req.user.id);
   }
@@ -132,7 +116,7 @@ export class EmployeeOnboardingController {
    * Updates draft onboarding profile details.
    */
   @Patch('me/profile')
-  @UseGuards(JwtAuthGuard)
+
   async updateMyOnboardingProfile(@Req() req: any, @Body() body: any) {
     return this.employeeOnboardingService.updateMyOnboardingProfile(req.user.id, body);
   }
@@ -142,7 +126,7 @@ export class EmployeeOnboardingController {
    * Employee final submission of onboarding details.
    */
   @Post('me/submit')
-  @UseGuards(JwtAuthGuard)
+
   async submitOnboarding(@Req() req: any) {
     return this.employeeOnboardingService.submitOnboarding(req.user.id);
   }
@@ -151,7 +135,7 @@ export class EmployeeOnboardingController {
    * POST /hrms/onboarding/education
    */
   @Post('education')
-  @UseGuards(JwtAuthGuard)
+
   async addOnboardingEducation(@Req() req: any, @Body() body: any) {
     return this.employeeOnboardingService.addOnboardingEducation(req.user.id, body);
   }
@@ -160,7 +144,7 @@ export class EmployeeOnboardingController {
    * PATCH /hrms/onboarding/education/:id
    */
   @Patch('education/:id')
-  @UseGuards(JwtAuthGuard)
+
   async updateOnboardingEducation(@Req() req: any, @Param('id', ParseIntPipe) eduId: number, @Body() body: any) {
     return this.employeeOnboardingService.updateOnboardingEducation(req.user.id, eduId, body);
   }
@@ -169,7 +153,7 @@ export class EmployeeOnboardingController {
    * PUT /hrms/onboarding/me/educations
    */
   @Put('me/educations')
-  @UseGuards(JwtAuthGuard)
+
   async updateMyOnboardingEducations(@Req() req: any, @Body() body: any) {
     return this.employeeOnboardingService.updateMyOnboardingEducations(req.user.id, body);
   }
@@ -178,7 +162,7 @@ export class EmployeeOnboardingController {
    * POST /hrms/onboarding/experience
    */
   @Post('experience')
-  @UseGuards(JwtAuthGuard)
+
   async addOnboardingExperience(@Req() req: any, @Body() body: any) {
     return this.employeeOnboardingService.addOnboardingExperience(req.user.id, body);
   }
@@ -187,7 +171,7 @@ export class EmployeeOnboardingController {
    * PATCH /hrms/onboarding/experience/:id
    */
   @Patch('experience/:id')
-  @UseGuards(JwtAuthGuard)
+
   async updateOnboardingExperience(@Req() req: any, @Param('id', ParseIntPipe) expId: number, @Body() body: any) {
     return this.employeeOnboardingService.updateOnboardingExperience(req.user.id, expId, body);
   }
@@ -196,7 +180,7 @@ export class EmployeeOnboardingController {
    * PUT /hrms/onboarding/me/experiences
    */
   @Put('me/experiences')
-  @UseGuards(JwtAuthGuard)
+
   async updateMyOnboardingExperiences(@Req() req: any, @Body() body: any) {
     return this.employeeOnboardingService.updateMyOnboardingExperiences(req.user.id, body);
   }
@@ -206,7 +190,7 @@ export class EmployeeOnboardingController {
    * Bulk sync bank accounts for the current employee's onboarding.
    */
   @Put('me/bank-accounts')
-  @UseGuards(JwtAuthGuard)
+
   async updateMyOnboardingBankAccounts(@Req() req: any, @Body() body: any) {
     return this.employeeOnboardingService.updateMyOnboardingBankAccounts(req.user.id, body);
   }
@@ -215,7 +199,7 @@ export class EmployeeOnboardingController {
    * POST /hrms/onboarding/bank-accounts
    */
   @Post('bank-accounts')
-  @UseGuards(JwtAuthGuard)
+
   async addOnboardingBankDetails(@Req() req: any, @Body() body: any) {
     return this.employeeOnboardingService.addOnboardingBankDetails(req.user.id, body);
   }
@@ -224,7 +208,7 @@ export class EmployeeOnboardingController {
    * PATCH /hrms/onboarding/bank-accounts/:id
    */
   @Patch('bank-accounts/:id')
-  @UseGuards(JwtAuthGuard)
+
   async updateOnboardingBankDetails(@Req() req: any, @Param('id', ParseIntPipe) bankId: number, @Body() body: any) {
     return this.employeeOnboardingService.updateOnboardingBankDetails(req.user.id, bankId, body);
   }
@@ -234,7 +218,7 @@ export class EmployeeOnboardingController {
    * Upload a new draft onboarding document.
    */
   @Post('documents')
-  @UseGuards(JwtAuthGuard)
+
   @UseInterceptors(FileInterceptor('file', documentMulter))
   async uploadOnboardingDocument(
     @Req() req: any,
@@ -264,7 +248,7 @@ export class EmployeeOnboardingController {
    * Re-upload a rejected draft onboarding document.
    */
   @Patch('documents/:id')
-  @UseGuards(JwtAuthGuard)
+
   @UseInterceptors(FileInterceptor('file', documentMulter))
   async reuploadOnboardingDocument(
     @Req() req: any,
@@ -287,7 +271,7 @@ export class EmployeeOnboardingController {
    * Delete an uploaded draft onboarding document.
    */
   @Delete('documents/:id')
-  @UseGuards(JwtAuthGuard)
+
   async deleteOnboardingDocument(
     @Req() req: any,
     @Param('id', ParseIntPipe) docId: number,

@@ -1,7 +1,6 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post } from "@nestjs/common";
 import { z } from "zod";
 import { EmployeeProfilesService } from "./employee-profiles.service";
-import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 
 const CreateEmployeeProfileSchema = z.object({
     userId: z.number(),
@@ -41,7 +40,6 @@ function toDateString(date?: Date | null): string | null {
 }
 
 @Controller("employee-profiles")
-@UseGuards(JwtAuthGuard)
 export class EmployeeProfilesController {
     constructor(private readonly employeeProfilesService: EmployeeProfilesService) {}
 

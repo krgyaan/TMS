@@ -1,12 +1,10 @@
-// src/modules/hrms/assets/assets.controller.ts
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, UseGuards, UseInterceptors, UploadedFiles, Req } from "@nestjs/common";
-import { z } from "zod";
-import { AssetsService, StatusUpdateDto } from "./assets.service";
-import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req, UploadedFiles, UseInterceptors } from "@nestjs/common";
 import { AnyFilesInterceptor } from "@nestjs/platform-express";
+import * as fs from "fs";
 import { diskStorage } from "multer";
 import { extname, join } from "path";
-import * as fs from "fs";
+import { z } from "zod";
+import { AssetsService, StatusUpdateDto } from "./assets.service";
 
 const ASSET_UPLOAD_DIR = "uploads/hrms/assets";
 
@@ -120,7 +118,6 @@ const multerConfig = {
 };
 
 @Controller("assets")
-@UseGuards(JwtAuthGuard)
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
 

@@ -1,12 +1,11 @@
-﻿import { Controller, Delete, Get, Param, Query, Res, UseGuards, Post } from '@nestjs/common';
+﻿import { DRIVE_SCOPES } from '@/config/google.config';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import { RequirePermissions } from '@/modules/auth/decorators/permissions.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { GoogleService } from '@/modules/integrations/google/google.service';
+import { Controller, Delete, Get, Param, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { z } from 'zod';
-import { GoogleService } from '@/modules/integrations/google/google.service';
-import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
-import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
-import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { RequirePermissions } from '@/modules/auth/decorators/permissions.decorator';
-import { DRIVE_SCOPES } from '@/config/google.config';
 
 const AuthUrlQuerySchema = z.object({
     userId: z.coerce.number().int().positive(),
@@ -92,7 +91,6 @@ export class GoogleController {
     }
 
     @Get('drive-auth-url')
-    @UseGuards(JwtAuthGuard)
     async getDriveAuthUrl(@CurrentUser() user: ValidatedUser) {
         // Check if user already has drive scopes
         const scopeCheck = await this.googleService.checkUserScopes(
@@ -116,7 +114,6 @@ export class GoogleController {
     }
 
     @Get('check-drive-scopes')
-    @UseGuards(JwtAuthGuard)
     async checkDriveScopes(@CurrentUser() user: ValidatedUser) {
         const scopeCheck = await this.googleService.checkUserScopes(
             user.sub,
@@ -143,7 +140,6 @@ export class GoogleController {
 
     // Account Linking Endpoints (for authenticated users)
     @Get('accounts/auth-url')
-    @UseGuards(JwtAuthGuard)
     @RequirePermissions({ module: 'integrations', action: 'create' })
     async getAccountLinkUrl(@CurrentUser() user: ValidatedUser) {
         const url = await this.googleService.createAuthUrl(user.sub);
@@ -151,7 +147,6 @@ export class GoogleController {
     }
 
     @Get('accounts/callback')
-    @UseGuards(JwtAuthGuard)
     async handleAccountLinkCallback(
         @Query() query: Record<string, unknown>,
         @Res() res: Response,
@@ -202,14 +197,12 @@ export class GoogleController {
     }
 
     @Get('accounts')
-    @UseGuards(JwtAuthGuard)
     async listUserConnections(@CurrentUser() user: ValidatedUser) {
         const connections = await this.googleService.listConnections(user.sub);
         return { connections };
     }
 
     @Delete('accounts/:id')
-    @UseGuards(JwtAuthGuard)
     @RequirePermissions({ module: 'integrations', action: 'delete' })
     async unlinkAccount(
         @Param() params: Record<string, unknown>,

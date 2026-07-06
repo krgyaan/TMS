@@ -1,10 +1,9 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, UseGuards, BadRequestException } from "@nestjs/common";
-import { z } from "zod";
-import { UserProfilesService } from "@/modules/master/user-profiles/user-profiles.service";
-import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
-import { ProfileEditGuard } from "./guards/profile-edit.guard";
 import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import { UserProfilesService } from "@/modules/master/user-profiles/user-profiles.service";
+import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Patch, Post, UseGuards } from "@nestjs/common";
+import { z } from "zod";
+import { ProfileEditGuard } from "./guards/profile-edit.guard";
 
 function toDateString(date?: Date | null): string | null {
     return date ? date.toISOString().split("T")[0] : null;
@@ -47,7 +46,6 @@ const UpdateUserProfileSchema = CreateUserProfileSchema.partial().omit({
 type UpdateUserProfileDto = z.infer<typeof UpdateUserProfileSchema>;
 
 @Controller("user-profiles")
-@UseGuards(JwtAuthGuard)
 export class UserProfilesController {
     constructor(private readonly userProfilesService: UserProfilesService) {}
 
