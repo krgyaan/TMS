@@ -515,7 +515,7 @@ export class CostingSheetsService {
             .where(eq(tenderCostingDetails.tenderCostingSheetId, id))
             .orderBy(asc(tenderCostingDetails.id));
 
-        const [result] = await this.db.transaction(async (tx) => {
+        const result = await this.db.transaction(async (tx) => {
             const updated: any[] = [];
 
             for (let i = 0; i < detailsInput.length; i++) {
