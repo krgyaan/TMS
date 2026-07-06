@@ -1248,37 +1248,32 @@ export class TenderInfosService {
         const tenderWonStatusIds = StatusCache.getIds('won');
         const tenderLostStatusIds = StatusCache.getIds('lost');
 
-        // Count for each tab
-        const counts = await Promise.all([
-            this.countTabItems(and(baseConditions, inArray(tenderInfos.status, underPreparationStatusIds))),
-            this.countTabItems(and(baseConditions, inArray(tenderInfos.status, didNotBidStatusIds))),
-            this.countTabItems(and(baseConditions, inArray(tenderInfos.status, tendersBidStatusIds))),
-            this.countTabItems(and(baseConditions, inArray(tenderInfos.status, tenderWonStatusIds))),
-            this.countTabItems(and(baseConditions, inArray(tenderInfos.status, tenderLostStatusIds))),
-            this.countTabItems(and(baseConditions, isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1))),
-        ]);
+        // Single aggregated query using FILTER (WHERE ...) for each tab
+        const [counts] = await this.db
+            .select({
+                underPreparation: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${inArray(tenderInfos.status, underPreparationStatusIds)})`,
+                didNotBid: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${inArray(tenderInfos.status, didNotBidStatusIds)})`,
+                tendersBid: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${inArray(tenderInfos.status, tendersBidStatusIds)})`,
+                tenderWon: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${inArray(tenderInfos.status, tenderWonStatusIds)})`,
+                tenderLost: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${inArray(tenderInfos.status, tenderLostStatusIds)})`,
+                unallocated: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${and(isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1))})`,
+            })
+            .from(tenderInfos)
+            .where(baseConditions);
 
         return {
-            'under-preparation': counts[0],
-            'did-not-bid': counts[1],
-            'tenders-bid': counts[2],
-            'tender-won': counts[3],
-            'tender-lost': counts[4],
-            'unallocated': counts[5],
-            total: counts.slice(0, 5).reduce((sum, count) => sum + count, 0),
+            'under-preparation': counts?.underPreparation ?? 0,
+            'did-not-bid': counts?.didNotBid ?? 0,
+            'tenders-bid': counts?.tendersBid ?? 0,
+            'tender-won': counts?.tenderWon ?? 0,
+            'tender-lost': counts?.tenderLost ?? 0,
+            'unallocated': counts?.unallocated ?? 0,
+            total: (counts?.underPreparation ?? 0)
+                 + (counts?.didNotBid ?? 0)
+                 + (counts?.tendersBid ?? 0)
+                 + (counts?.tenderWon ?? 0)
+                 + (counts?.tenderLost ?? 0),
         };
-    }
-
-    /**
-     * Helper method to count items with given conditions
-     */
-    private async countTabItems(whereClause: any): Promise<number> {
-        const [result] = await this.db
-            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
-            .from(tenderInfos)
-            .where(whereClause);
-
-        return result?.count ?? 0;
     }
 
     async getMailingLogs(tenderId: number) {
