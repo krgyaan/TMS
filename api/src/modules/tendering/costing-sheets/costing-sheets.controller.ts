@@ -1,11 +1,11 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
-import { CostingSheetsService, type CostingSheetFilters } from '@/modules/tendering/costing-sheets/costing-sheets.service';
-import type { SubmitCostingSheetDto, UpdateCostingSheetDto, CreateSheetDto, CreateSheetWithNameDto } from './dto/costing-sheet.dto';
+import { AppLogger } from '@/logger/app-logger.service';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { CostingSheetsService } from '@/modules/tendering/costing-sheets/costing-sheets.service';
+import { getFrontendTimersBatch } from '@/modules/timers/timer-helper';
 import { TimersService } from '@/modules/timers/timers.service';
-import { getFrontendTimer } from '@/modules/timers/timer-helper';
-import { AppLogger } from '@/logger/app-logger.service';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import type { CreateSheetDto, CreateSheetWithNameDto } from './dto/costing-sheet.dto';
 
 @Controller('costing-sheets')
 export class CostingSheetsController {
@@ -41,16 +41,13 @@ export class CostingSheetsController {
             sortOrder,
             search,
         }, user, parseNumber(teamId));
-        // Add timer data to each tender
-        const dataWithTimers = await Promise.all(
-            result.data.map(async (tender) => {
-                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'costing_sheet');
-                return {
-                    ...tender,
-                    timer
-                };
-            })
-        );
+        // Batch-fetch timer data for all tenders
+        const tenderIds = result.data.map(t => t.tenderId);
+        const timerMap = await getFrontendTimersBatch(this.timersService, 'TENDER', tenderIds, 'costing_sheet');
+        const dataWithTimers = result.data.map(tender => ({
+            ...tender,
+            timer: timerMap.get(tender.tenderId)
+        }));
 
         return {
             ...result,

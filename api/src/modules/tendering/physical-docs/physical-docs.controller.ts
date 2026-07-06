@@ -1,24 +1,11 @@
-import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-    HttpCode,
-    HttpStatus,
-    NotFoundException,
-    Query,
-} from '@nestjs/common';
-import { PhysicalDocsService } from '@/modules/tendering/physical-docs/physical-docs.service';
-import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
+import { AppLogger } from '@/logger/app-logger.service';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
+import { PhysicalDocsService } from '@/modules/tendering/physical-docs/physical-docs.service';
+import { getFrontendTimersBatch } from '@/modules/timers/timer-helper';
 import { TimersService } from '@/modules/timers/timers.service';
-import { getFrontendTimer } from '@/modules/timers/timer-helper';
-import { AppLogger } from '@/logger/app-logger.service';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 
 @Controller('physical-docs')
 export class PhysicalDocsController {
@@ -54,16 +41,13 @@ export class PhysicalDocsController {
             sortOrder,
             search,
         });
-        // Add timer data to each tender
-        const dataWithTimers = await Promise.all(
-            result.data.map(async (tender) => {
-                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'physical_docs');
-                return {
-                    ...tender,
-                    timer
-                };
-            })
-        );
+        // Batch-fetch timer data for all tenders
+        const tenderIds = result.data.map(t => t.tenderId);
+        const timerMap = await getFrontendTimersBatch(this.timersService, 'TENDER', tenderIds, 'physical_docs');
+        const dataWithTimers = result.data.map(tender => ({
+            ...tender,
+            timer: timerMap.get(tender.tenderId)
+        }));
 
         return {
             ...result,

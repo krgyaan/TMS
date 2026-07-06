@@ -1,18 +1,11 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
-import { TqManagementService, type TqManagementFilters, type TenderQueryStatus } from '@/modules/tendering/tq-management/tq-management.service';
-import type {
-    CreateTqReceivedDto,
-    UpdateTqRepliedDto,
-    UpdateTqMissedDto,
-    MarkAsNoTqDto,
-    UpdateTqReceivedDto,
-    TqQualifiedDto
-} from './dto/tq-management.dto';
+import { AppLogger } from '@/logger/app-logger.service';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { TqManagementService } from '@/modules/tendering/tq-management/tq-management.service';
+import { getFrontendTimersBatch } from '@/modules/timers/timer-helper';
 import { TimersService } from '@/modules/timers/timers.service';
-import { getFrontendTimer } from '@/modules/timers/timer-helper';
-import { AppLogger } from '@/logger/app-logger.service';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import type { CreateTqReceivedDto, MarkAsNoTqDto, TqQualifiedDto, UpdateTqMissedDto, UpdateTqReceivedDto, UpdateTqRepliedDto } from './dto/tq-management.dto';
 
 @Controller('tq-management')
 export class TqManagementController {
@@ -52,16 +45,13 @@ export class TqManagementController {
             sortOrder,
             search,
         });
-        // Add timer data to each tender
-        const dataWithTimers = await Promise.all(
-            result.data.map(async (tender) => {
-                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'tq_replied');
-                return {
-                    ...tender,
-                    timer
-                };
-            })
-        );
+        // Batch-fetch timer data for all tenders
+        const tenderIds = result.data.map(t => t.tenderId);
+        const timerMap = await getFrontendTimersBatch(this.timersService, 'TENDER', tenderIds, 'tq_replied');
+        const dataWithTimers = result.data.map(tender => ({
+            ...tender,
+            timer: timerMap.get(tender.tenderId)
+        }));
 
         return {
             ...result,
