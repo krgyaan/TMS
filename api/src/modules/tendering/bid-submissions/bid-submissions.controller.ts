@@ -1,11 +1,11 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
-import { BidSubmissionsService } from '@/modules/tendering/bid-submissions/bid-submissions.service';
-import type { SubmitBidDto, MarkAsMissedDto, UpdateBidSubmissionDto, MarkAsMissedGlobalDto } from './dto/bid-submission.dto';
+import { AppLogger } from '@/logger/app-logger.service';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { BidSubmissionsService } from '@/modules/tendering/bid-submissions/bid-submissions.service';
+import { getFrontendTimersBatch } from '@/modules/timers/timer-helper';
 import { TimersService } from '@/modules/timers/timers.service';
-import { getFrontendTimer } from '@/modules/timers/timer-helper';
-import { AppLogger } from '@/logger/app-logger.service';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import type { MarkAsMissedDto, MarkAsMissedGlobalDto, SubmitBidDto, UpdateBidSubmissionDto } from './dto/bid-submission.dto';
 
 @Controller('bid-submissions')
 export class BidSubmissionsController {
@@ -41,19 +41,13 @@ export class BidSubmissionsController {
             sortOrder,
             search,
         });
-        // Add timer data to each tender
-        const dataWithTimers = await Promise.all(
-            result.data.map(async (tender) => {
-                // this.logger.debug(`Fetching timer for tender ${tender.tenderId}, stage bid_submission`);
-                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'bid_submission');
-                // this.logger.debug(`Timer for tender ${tender.tenderId}: ${JSON.stringify(timer)}`);
-
-                return {
-                    ...tender,
-                    timer
-                };
-            })
-        );
+        // Batch-fetch timer data for all tenders
+        const tenderIds = result.data.map(t => t.tenderId);
+        const timerMap = await getFrontendTimersBatch(this.timersService, 'TENDER', tenderIds, 'bid_submission');
+        const dataWithTimers = result.data.map(tender => ({
+            ...tender,
+            timer: timerMap.get(tender.tenderId)
+        }));
 
         return {
             ...result,
