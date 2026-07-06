@@ -6,6 +6,7 @@ import type {
   Page5FormValues,
   Page6FormValues,
   Page7FormValues,
+  WoDetailData,
 } from "./woDetail.types";
 
 const stringToBool = (val: string | undefined | null): boolean | undefined => {
@@ -146,7 +147,7 @@ export const formToApi = {
   },
 };
 
-type ApiResponse = Record<string, unknown>;
+type ApiResponse = Partial<WoDetailData>;
 
 export const apiToForm = {
   page1(api: ApiResponse): Partial<Page1FormValues> {
