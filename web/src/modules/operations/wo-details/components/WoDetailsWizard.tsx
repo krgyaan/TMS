@@ -11,7 +11,7 @@ import { WizardStepper } from "./WizardStepper";
 
 import { useWoBasicDetailById } from "@/hooks/api/useWoBasicDetails";
 import { useInitializeWizard, useSavePageDraft, useSkipPage, useSubmitAllPages, useSubmitPage, useWoDetailByBasicDetail } from "@/hooks/api/useWoDetails";
-import type { WizardState, WoDetailData } from "../helpers/woDetail.types";
+import type { WizardState } from "../helpers/woDetail.types";
 
 const Page1Handover = lazy(() => import("./pages/Page1Handover").then((m) => ({ default: m.Page1Handover })));
 const Page2Compliance = lazy(() => import("./pages/Page2Compliance").then((m) => ({ default: m.Page2Compliance })));
@@ -53,7 +53,7 @@ interface WoDetailsWizardProps {
     mode: "create" | "edit";
     woBasicDetailId: number;
     woDetailId?: number;
-    existingData?: WoDetailData;
+    existingData?: any;
     initialPage?: number;
 }
 
