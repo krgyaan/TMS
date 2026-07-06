@@ -396,7 +396,15 @@ export class WoDetailsService {
       throw new NotFoundException(`WO Detail with ID ${id} not found`);
     }
 
-    return this.mapRowToResponse(row);
+    const contacts = await this.db
+      .select()
+      .from(woContacts)
+      .where(eq(woContacts.woBasicDetailId, row.woBasicDetailId));
+
+    return {
+      ...this.mapRowToResponse(row),
+      contacts,
+    };
   }
 
   async findByIdWithRelations(id: number) {

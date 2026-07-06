@@ -311,6 +311,7 @@ export interface WoDetail {
   tenderDocumentsChecklist: TenderDocumentsChecklist | null;
   checklistCompletedAt: string | null;
   checklistIncompleteNotifiedAt: string | null;
+  contacts?: WoContact[];
 
   // Page 2: Compliance Obligations
   ldApplicable: boolean;
