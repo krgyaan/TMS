@@ -278,44 +278,93 @@ export class CostingSheetsService {
     }
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; submitted: number; 'tender-dnb': number; total: number }> {
-        const counts = await Promise.all([
-            this.db
-                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
-                .from(tenderInfos)
-                .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
-                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-                .where(and(...this.buildDashboardConditions(user, teamId, 'pending')))
-                .then(([result]) => Number(result?.count || 0)),
-            this.db
-                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
-                .from(tenderInfos)
-                .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
-                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-                .where(and(...this.buildDashboardConditions(user, teamId, 'submitted')))
-                .then(([result]) => Number(result?.count || 0)),
-            this.db
-                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
-                .from(tenderInfos)
-                .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
-                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-                .where(and(...this.buildDashboardConditions(user, teamId, 'tender-dnb')))
-                .then(([result]) => Number(result?.count || 0)),
-        ]);
+        const roleFilterConditions: any[] = [];
+        if (user && user.roleId) {
+            if (user.dataScope === 'all') {
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+            } else if (user.canSwitchTeams && teamId !== undefined && teamId !== null) {
+                roleFilterConditions.push(eq(tenderInfos.team, teamId));
+            } else if (user.dataScope === 'team') {
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`);
+                }
+            } else {
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`);
+                }
+            }
+        } else {
+            roleFilterConditions.push(sql`1 = 0`);
+        }
+
+        const baseWhere = and(
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            ...roleFilterConditions,
+        );
+
+        const notTenderMissed = or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions));
+
+        const pendingFilter = and(
+            TenderInfosService.getExcludeStatusCondition(['lost']),
+            sql`(
+                EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                        WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                        AND ${tenderCostingDetails.status} IN ('Pending', 'Rejected/Redo'))
+                OR
+                NOT EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                            WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                            AND ${tenderCostingDetails.submittedFinalPrice} IS NOT NULL)
+            )`,
+            notTenderMissed,
+        );
+
+        const submittedFilter = and(
+            TenderInfosService.getExcludeStatusCondition(['dnb']),
+            sql`(
+                EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                        WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                        AND ${tenderCostingDetails.status} = 'Submitted')
+                OR
+                EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                        WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                        AND ${tenderCostingDetails.submittedFinalPrice} IS NOT NULL)
+            )`,
+            notTenderMissed,
+        );
+
+        const dnbFilter = and(
+            eq(bidSubmissions.status, "Tender Missed"),
+        );
+
+        const [counts] = await this.db.select({
+            pending: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${pendingFilter})`,
+            submitted: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${submittedFilter})`,
+            'tender-dnb': sql<number>`count(distinct ${tenderInfos.id}) filter (where ${dnbFilter})`,
+        })
+            .from(tenderInfos)
+            .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .where(baseWhere);
+
+        const pending = Number(counts?.pending ?? 0);
+        const submitted = Number(counts?.submitted ?? 0);
+        const dnb = Number(counts?.['tender-dnb'] ?? 0);
 
         return {
-            pending: counts[0],
-            submitted: counts[1],
-            'tender-dnb': counts[2],
-            total: counts.reduce((sum, count) => sum + count, 0),
+            pending,
+            submitted,
+            'tender-dnb': dnb,
+            total: pending + submitted + dnb,
         };
     }
 
