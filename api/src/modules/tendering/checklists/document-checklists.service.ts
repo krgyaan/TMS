@@ -17,7 +17,7 @@ import { statuses } from "@db/schemas/master/statuses.schema";
 import { tenderDocumentChecklists } from "@db/schemas/tendering/tender-document-checklists.schema";
 import { tenderInformation } from "@db/schemas/tendering/tender-info-sheet.schema";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
-import { BadRequestException, Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { and, asc, desc, eq, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 
@@ -386,8 +386,11 @@ export class DocumentChecklistsService {
             });
             this.logger.log(`Successfully stopped document_checklist timer for tender ${createDocumentChecklistDto.tenderId}`);
         } catch (error) {
-            this.logger.error(`Failed to stop timer for tender ${createDocumentChecklistDto.tenderId} after document checklist submitted:`, error);
-            // Don't fail the entire operation if timer transition fails
+            if (error instanceof ConflictException) {
+                this.logger.warn(`Timer conflict for tender ${createDocumentChecklistDto.tenderId} after document checklist submitted — skipping`);
+            } else {
+                this.logger.error(`Failed to stop timer for tender ${createDocumentChecklistDto.tenderId} after document checklist submitted:`, error);
+            }
         }
 
         return result;
