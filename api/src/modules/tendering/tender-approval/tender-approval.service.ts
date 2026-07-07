@@ -310,67 +310,67 @@ export class TenderApprovalService {
     async getCounts(user?: ValidatedUser, teamId?: number) {
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
 
-        // Base conditions for all tabs
-        const baseConditions = [
+        const baseWhere = and(
             TenderInfosService.getActiveCondition(),
-            // TenderInfosService.getExcludeStatusCondition(['lost']),
             ...roleFilterConditions,
-        ];
+        );
 
-        // Build conditions for each tab
-        const pendingConditions = [
-            ...baseConditions,
+        const notTenderMissed = or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status));
+
+        const pendingFilter = and(
             or(eq(tenderInfos.tlStatus, 0), eq(tenderInfos.tlStatus, 3), isNull(tenderInfos.tlStatus)),
-            or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)),
-            ,
-        ];
-        
-        const acceptedConditions = [...baseConditions, eq(tenderInfos.tlStatus, 1), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status))];
-        
-        const rejectedConditions = [...baseConditions, eq(tenderInfos.tlStatus, 2), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status))];
-        
-        const tenderDnbConditions = [...baseConditions, eq(bidSubmissions.status, "Tender Missed") , or(notInArray(bidSubmissions.reasonStatus, [10,15,35]) , isNull(bidSubmissions.reasonStatus))];
-        
-        const tenderRejectedLaterCounts = [...baseConditions, eq(bidSubmissions.status, "Tender Missed"), inArray(bidSubmissions.reasonStatus, [10, 14, 35])];
-        
-        
+            notTenderMissed,
+        );
 
+        const acceptedFilter = and(
+            eq(tenderInfos.tlStatus, 1),
+            notTenderMissed,
+        );
 
-        // const tenderDnbConditions = [...baseConditions, inArray(tenderInfos.status, [8, 34]), inArray(tenderInfos.tlStatus, [1, 2, 3])];
-        // ---------------------------- NEW LOGIC TO GET MISSED BIDS -------------------------------//
+        const rejectedFilter = and(
+            eq(tenderInfos.tlStatus, 2),
+            notTenderMissed,
+        );
 
-        // Count for each tab
-        const [pendingCount, acceptedCount, rejectedCount, rejectedLaterCount, tenderDnbCount] = await Promise.all([
-            this.countTabItems(and(...pendingConditions)),
-            this.countTabItems(and(...acceptedConditions)),
-            this.countTabItems(and(...rejectedConditions)),
-            this.countTabItems(and(...tenderRejectedLaterCounts)),
-            this.countTabItems(and(...tenderDnbConditions)),
-        ]);
+        const rejectedLaterFilter = and(
+            eq(bidSubmissions.status, "Tender Missed"),
+            inArray(bidSubmissions.reasonStatus, [10, 14, 35]),
+        );
 
-        return {
-            pending: pendingCount,
-            accepted: acceptedCount,
-            rejected: rejectedCount,
-            rejected_later: rejectedLaterCount,
-            "tender-dnb": tenderDnbCount,
-            total: pendingCount + acceptedCount + rejectedCount + tenderDnbCount,
-        };
-    }
+        const dnbFilter = and(
+            eq(bidSubmissions.status, "Tender Missed"),
+            or(notInArray(bidSubmissions.reasonStatus, [10, 15, 35]), isNull(bidSubmissions.reasonStatus)),
+        );
 
-    private async countTabItems(whereClause: any): Promise<number> {
-        const countQuery = this.db
-            .select({ count: sql<number>`count(*)` })
+        const [counts] = await this.db.select({
+            pending: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${pendingFilter})`,
+            accepted: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${acceptedFilter})`,
+            rejected: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${rejectedFilter})`,
+            rejected_later: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${rejectedLaterFilter})`,
+            'tender-dnb': sql<number>`count(distinct ${tenderInfos.id}) filter (where ${dnbFilter})`,
+        })
             .from(tenderInfos)
             .leftJoin(users, eq(tenderInfos.teamMember, users.id))
             .leftJoin(statuses, eq(tenderInfos.status, statuses.id))
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .leftJoin(items, eq(tenderInfos.item, items.id))
             .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-            .where(whereClause);
+            .where(baseWhere);
 
-        const [result] = await countQuery;
-        return Number(result?.count || 0);
+        const pending = Number(counts?.pending ?? 0);
+        const accepted = Number(counts?.accepted ?? 0);
+        const rejected = Number(counts?.rejected ?? 0);
+        const rejectedLater = Number(counts?.rejected_later ?? 0);
+        const dnb = Number(counts?.['tender-dnb'] ?? 0);
+
+        return {
+            pending,
+            accepted,
+            rejected,
+            rejected_later: rejectedLater,
+            "tender-dnb": dnb,
+            total: pending + accepted + rejected + dnb,
+        };
     }
 
     async getByTenderId(tenderId: number) {
