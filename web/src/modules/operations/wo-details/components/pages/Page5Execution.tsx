@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -8,16 +8,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ExternalLink, FileText, FolderOpen, MapPinned, Plus, Trash2, User } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { useFieldArray, useForm, type Resolver } from "react-hook-form";
-
 import { ConditionalSection } from "@/components/form/ConditionalSection";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { useAutoSave, useTenderConsolidatedData } from "@/hooks/api/useWoDetails";
-import { tenderFilesService } from "@/services/api/tender-files.service";
 import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
 import { WIZARD_CONFIG, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
 import { formToApi } from "@/modules/operations/wo-details/helpers/woDetail.mapper";
 import { Page5FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
+import { tenderFilesService } from "@/services/api/tender-files.service";
 
 import type { Page5FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
 
@@ -48,7 +47,7 @@ export function Page5Execution({
         defaultValues: { ...defaultValues, ...initialData },
     });
 
-    const { data: consolidatedData } = useTenderConsolidatedData(tenderId);
+    const { data: consolidatedData } = useTenderConsolidatedData(Number(tenderId));
 
     const tenderFormDocs = consolidatedData?.tenderDocuments ?? [];
     const rfqResponseDocs = consolidatedData?.rfqResponseDocuments?.map((d) => d.path) ?? [];
@@ -87,6 +86,13 @@ export function Page5Execution({
             form.reset({ ...defaultValues, ...initialData });
         }
     }, [initialData, form]);
+
+    useEffect(() => {
+        if (watchSiteVisitNeeded !== "true") {
+            form.setValue("siteVisitPerson", { name: "", phone: "", email: "" }, { shouldValidate: false });
+            form.clearErrors(["siteVisitPerson.name", "siteVisitPerson.phone", "siteVisitPerson.email"]);
+        }
+    }, [watchSiteVisitNeeded, form]);
 
     const handleSaveAndContinue = useCallback(async () => {
         const errors = await onSaveDraft(form.getValues());

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { ExternalLink, Link2, AlertCircle, Info } from "lucide-react";
-
 import { Page6FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
 import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
 import { YES_NO_OPTIONS, WIZARD_CONFIG } from "@/modules/operations/wo-details/helpers/constants";
@@ -45,7 +44,7 @@ export function Page6Profitability({
     });
 
     const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 6, true, 4000, formToApi.page6);
-    const { data: consolidatedData } = useTenderConsolidatedData(tenderId);
+    const { data: consolidatedData } = useTenderConsolidatedData(Number(tenderId));
 
     const watchHasDiscrepancies = form.watch("hasDiscrepancies");
 
@@ -67,6 +66,13 @@ export function Page6Profitability({
             form.reset({ ...defaultValues, ...initialData });
         }
     }, [initialData, form]);
+
+    useEffect(() => {
+        if (watchHasDiscrepancies !== "true") {
+            form.setValue("discrepancyComments", "", { shouldValidate: false });
+            form.clearErrors("discrepancyComments");
+        }
+    }, [watchHasDiscrepancies, form]);
 
     const handleSaveAndContinue = useCallback(async () => {
         const errors = await onSaveDraft(form.getValues());

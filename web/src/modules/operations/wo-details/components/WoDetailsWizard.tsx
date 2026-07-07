@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -116,6 +116,20 @@ export function WoDetailsWizard({
         }
     }, [mode, woDetailId, existingDetail, isLoadingExisting, isFetchingExisting, woBasicDetailId, initializeWizard]);
 
+    const pageInitialData = useMemo(() => {
+        if (!existingData) return undefined;
+        switch (wizardState.currentPage) {
+            case 1: return apiToForm.page1(existingData) as Record<string, unknown>;
+            case 2: return apiToForm.page2(existingData) as Record<string, unknown>;
+            case 3: return apiToForm.page3(existingData) as Record<string, unknown>;
+            case 4: return apiToForm.page4(existingData) as Record<string, unknown>;
+            case 5: return apiToForm.page5(existingData) as Record<string, unknown>;
+            case 6: return apiToForm.page6(existingData) as Record<string, unknown>;
+            case 7: return apiToForm.page7(existingData) as Record<string, unknown>;
+            default: return undefined;
+        }
+    }, [existingData, wizardState.currentPage]);
+
     const handleSaveAndContinue = async (data: Record<string, unknown>) => {
         if (!woDetailId) return;
         setIsSavingDraft(true);
@@ -228,19 +242,19 @@ export function WoDetailsWizard({
 
         switch (currentPage) {
             case 1:
-                return <Page1Handover {...commonProps} initialData={existingData ? apiToForm.page1(existingData) : undefined} />;
+                return <Page1Handover {...commonProps} initialData={pageInitialData as any} />;
             case 2:
-                return <Page2Compliance {...commonProps} initialData={existingData ? apiToForm.page2(existingData) : undefined} />;
+                return <Page2Compliance {...commonProps} initialData={pageInitialData as any} />;
             case 3:
-                return <Page3Swot {...commonProps} initialData={existingData ? apiToForm.page3(existingData) : undefined} />;
+                return <Page3Swot {...commonProps} initialData={pageInitialData as any} />;
             case 4:
-                return <Page4Billing {...commonProps} initialData={existingData ? apiToForm.page4(existingData) : undefined} />;
+                return <Page4Billing {...commonProps} initialData={pageInitialData as any} />;
             case 5:
-                return <Page5Execution {...commonProps} initialData={existingData ? apiToForm.page5(existingData) : undefined} />;
+                return <Page5Execution {...commonProps} initialData={pageInitialData as any} />;
             case 6:
-                return <Page6Profitability {...commonProps} initialData={existingData ? apiToForm.page6(existingData) : undefined} />;
+                return <Page6Profitability {...commonProps} initialData={pageInitialData as any} />;
             case 7:
-                return <Page7Acceptance {...commonProps} initialData={existingData ? apiToForm.page7(existingData) : undefined} />;
+                return <Page7Acceptance {...commonProps} initialData={pageInitialData as any} />;
             default:
                 return null;
         }

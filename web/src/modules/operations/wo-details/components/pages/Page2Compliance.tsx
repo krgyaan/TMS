@@ -69,6 +69,29 @@ export function Page2Compliance({
         }
     }, [initialData, form]);
 
+    useEffect(() => {
+        if (watchLdApplicable !== "true") {
+            form.resetField("maxLd", { defaultValue: "" });
+            form.resetField("ldStartDate", { defaultValue: "" });
+            form.resetField("maxLdDate", { defaultValue: "" });
+            form.clearErrors(["maxLd", "ldStartDate", "maxLdDate"]);
+        }
+    }, [watchLdApplicable, form]);
+
+    useEffect(() => {
+        if (watchPbgApplicable !== "true") {
+            form.setValue("filledBgFormat", [], { shouldValidate: false });
+            form.clearErrors("filledBgFormat");
+        }
+    }, [watchPbgApplicable, form]);
+
+    useEffect(() => {
+        if (watchContractAgreement !== "true") {
+            form.setValue("contractAgreementFormat", [], { shouldValidate: false });
+            form.clearErrors("contractAgreementFormat");
+        }
+    }, [watchContractAgreement, form]);
+
     const handleSaveAndContinue = useCallback(async () => {
         const errors = await onSaveDraft(form.getValues());
         if (errors?.length) {

@@ -1,13 +1,13 @@
+import { handleQueryError } from '@/lib/react-query';
+import type { CreateWoDetailDto, RequestAmendmentDto, UpdateWoDetailDto, WoAcceptanceDecisionDto, WoDetailsFilters } from '@/modules/operations/types/wo.types';
+import type { Page1FormValues, Page2FormValues, Page3FormValues, Page4FormValues, Page5FormValues, Page6FormValues, Page7FormValues, PageData, WizardValidationResult } from '@/modules/operations/wo-details/helpers/woDetail.types';
+import { woDetailsService } from '@/services/api/wo-details.api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
-import { useDebouncedCallback } from 'use-debounce';
-import { woDetailsService } from '@/services/api/wo-details.api';
 import { toast } from 'sonner';
-import { handleQueryError } from '@/lib/react-query';
+import { useDebouncedCallback } from 'use-debounce';
 import { useTeamFilter } from '../useTeamFilter';
 import { woBasicDetailsKeys } from './useWoBasicDetails';
-import type { WoDetailsFilters, CreateWoDetailDto, UpdateWoDetailDto, RequestAmendmentDto, WoAcceptanceDecisionDto } from '@/modules/operations/types/wo.types';
-import type { Page1FormValues, Page2FormValues, Page3FormValues, Page4FormValues, Page5FormValues, Page6FormValues, Page7FormValues, WizardValidationResult, PageData } from '@/modules/operations/wo-details/helpers/woDetail.types';
 
 // QUERY KEYS
 export const woDetailsKeys = {
@@ -192,7 +192,11 @@ export const useSubmitPage = () => {
       return result;
     },
     onError: (error: any) => {
-      toast.error(handleQueryError(error));
+      // Validation errors are returned to page components for inline display — skip toast
+      const hasValidationErrors = error?.response?.data?.errors?.length;
+      if (!hasValidationErrors) {
+        toast.error(handleQueryError(error));
+      }
     },
   });
 };
