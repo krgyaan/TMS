@@ -1,30 +1,29 @@
-import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, and, asc, desc, inArray, sql, isNull, or, isNotNull } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
+import { paymentInstruments, paymentRequests } from '@/db/schemas';
+import { AppLogger } from '@/logger/app-logger.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { UploadChangeStatusResultDto, UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import type { EmdDetails, PaginatedResult, ResultDashboardCounts, ResultDashboardFilters, ResultDashboardRow, ResultDashboardType } from '@/modules/tendering/types/shared.types';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { DbInstance } from '@db';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { tenderResults } from '@db/schemas/tendering/tender-result.schema';
-import { reverseAuctions } from '@db/schemas/tendering/reverse-auction.schema';
-import { bidSubmissions, bidSubmissionStatusEnum } from '@db/schemas/tendering/bid-submissions.schema';
-import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
-import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
-import { tenderCostingDetails } from '@db/schemas/tendering/tender-costing-details.schema';
+import { DRIZZLE } from '@db/database.module';
 import { users } from '@db/schemas/auth/users.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { woBasicDetails } from '@db/schemas/operations';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
-import type { PaginatedResult, ResultDashboardType, ResultDashboardFilters, ResultDashboardRow, ResultDashboardCounts, EmdDetails } from '@/modules/tendering/types/shared.types';
-import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
-import { EmailService } from '@/modules/email/email.service';
-import { RecipientResolver } from '@/modules/email/recipient.resolver';
-import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
-import { AppLogger } from '@/logger/app-logger.service';
-import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import { paymentInstruments, paymentRequests, tenderStatusHistory } from '@/db/schemas';
-import type { UploadResultDto, UploadChangeStatusResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
-import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { isThisSecond } from 'date-fns';
+import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
+import { reverseAuctions } from '@db/schemas/tendering/reverse-auction.schema';
+import { tenderCostingDetails } from '@db/schemas/tendering/tender-costing-details.schema';
+import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
+import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { tenderResults } from '@db/schemas/tendering/tender-result.schema';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 
 const RESULT_STATUS = {
     RESULT_AWAITED: 'Result Awaited',
@@ -332,7 +331,6 @@ export class TenderResultService {
     async getCounts(user?: ValidatedUser, teamId?: number): Promise<ResultDashboardCounts> {
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
 
-        // Subqueries copied from getDashboardData for consistency
         const latestBidSubmissionSq = this.db
             .selectDistinctOn([bidSubmissions.tenderId], {
                 tenderId: bidSubmissions.tenderId,
@@ -367,83 +365,75 @@ export class TenderResultService {
             .groupBy(tenderCostingSheets.tenderId)
             .as('latestCostingSheet');
 
-        const baseConditions = [
+        const baseWhere = and(
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             isNotNull(latestBidSubmissionSq.tenderId),
             ...roleFilterConditions,
-        ];
+        );
 
         const amountSql = sql<number>`coalesce(${latestCostingSheetSq.finalPrice}, ${tenderInfos.gstValues})`;
 
-        const getTabCounts = async (tab: ResultDashboardType) => {
-            const conditions = [...baseConditions];
+        const pendingFilter = and(
+            or(
+                isNull(latestTenderResultSq.id),
+                inArray(latestTenderResultSq.status, ['Under Evaluation', 'Result Awaited']),
+            ),
+        );
 
-            if (tab === 'result-awaited') {
-                conditions.push(
-                    or(
-                        isNull(latestTenderResultSq.id),
-                        inArray(latestTenderResultSq.status, ['Under Evaluation', 'Result Awaited'])
-                    )!
-                );
-                // conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
-            } else if (tab === 'won') {
-                conditions.push(
-                    isNotNull(latestTenderResultSq.id),
-                    inArray(latestTenderResultSq.status, ['Won', 'won'])
-                );
-                conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
-            } else if (tab === 'lost') {
-                conditions.push(
-                    isNotNull(latestTenderResultSq.id),
-                    inArray(latestTenderResultSq.status, ['lost', 'Lost', 'Lost - H1 Elimination'])
-                );
-            } else if (tab === 'disqualified') {
-                conditions.push(
-                    isNotNull(latestTenderResultSq.id),
-                    inArray(latestTenderResultSq.status, ['Disqualified', 'Cancelled', 'disqualified'])
-                );
-            }
+        const wonFilter = and(
+            isNotNull(latestTenderResultSq.id),
+            inArray(latestTenderResultSq.status, ['Won', 'won']),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+        );
 
-            const result = await this.db
-                .select({
-                    count: sql<number>`count(*)`,
-                    amount: sql<number>`sum(${amountSql})`
-                })
-                .from(tenderInfos)
-                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
-                .leftJoin(latestBidSubmissionSq, eq(latestBidSubmissionSq.tenderId, tenderInfos.id))
-                .leftJoin(latestTenderResultSq, eq(latestTenderResultSq.tenderId, tenderInfos.id))
-                .leftJoin(latestCostingSheetSq, eq(latestCostingSheetSq.tenderId, tenderInfos.id))
-                .leftJoin(items, eq(items.id, tenderInfos.item))
-                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .where(and(...conditions));
+        const lostFilter = and(
+            isNotNull(latestTenderResultSq.id),
+            inArray(latestTenderResultSq.status, ['lost', 'Lost', 'Lost - H1 Elimination']),
+        );
 
-            return {
-                count: Number(result[0]?.count || 0),
-                amount: Number(result[0]?.amount || 0)
-            };
-        };
+        const disqualifiedFilter = and(
+            isNotNull(latestTenderResultSq.id),
+            inArray(latestTenderResultSq.status, ['Disqualified', 'Cancelled', 'disqualified']),
+        );
 
-        const [pending, won, lost, disqualified] = await Promise.all([
-            getTabCounts('result-awaited'),
-            getTabCounts('won'),
-            getTabCounts('lost'),
-            getTabCounts('disqualified'),
-        ]);
+        const [counts] = await this.db
+            .select({
+                pending: sql<number>`count(*) filter (where ${pendingFilter})`,
+                won: sql<number>`count(*) filter (where ${wonFilter})`,
+                lost: sql<number>`count(*) filter (where ${lostFilter})`,
+                disqualified: sql<number>`count(*) filter (where ${disqualifiedFilter})`,
+                pendingAmount: sql<number>`coalesce(sum(${amountSql}) filter (where ${pendingFilter}), 0)`,
+                wonAmount: sql<number>`coalesce(sum(${amountSql}) filter (where ${wonFilter}), 0)`,
+                lostAmount: sql<number>`coalesce(sum(${amountSql}) filter (where ${lostFilter}), 0)`,
+                disqualifiedAmount: sql<number>`coalesce(sum(${amountSql}) filter (where ${disqualifiedFilter}), 0)`,
+            })
+            .from(tenderInfos)
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(latestBidSubmissionSq, eq(latestBidSubmissionSq.tenderId, tenderInfos.id))
+            .leftJoin(latestTenderResultSq, eq(latestTenderResultSq.tenderId, tenderInfos.id))
+            .leftJoin(latestCostingSheetSq, eq(latestCostingSheetSq.tenderId, tenderInfos.id))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(baseWhere);
+
+        const pending = Number(counts?.pending ?? 0);
+        const won = Number(counts?.won ?? 0);
+        const lost = Number(counts?.lost ?? 0);
+        const disqualified = Number(counts?.disqualified ?? 0);
 
         return {
-            pending: pending.count,
-            won: won.count,
-            lost: lost.count,
-            disqualified: disqualified.count,
-            total: pending.count + won.count + lost.count + disqualified.count,
+            pending,
+            won,
+            lost,
+            disqualified,
+            total: pending + won + lost + disqualified,
             totalAmounts: {
-                pending: pending.amount,
-                won: won.amount,
-                lost: lost.amount,
-                disqualified: disqualified.amount,
-            }
+                pending: Number(counts?.pendingAmount ?? 0),
+                won: Number(counts?.wonAmount ?? 0),
+                lost: Number(counts?.lostAmount ?? 0),
+                disqualified: Number(counts?.disqualifiedAmount ?? 0),
+            },
         };
     }
 
