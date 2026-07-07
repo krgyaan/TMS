@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PercentageSchema, PositiveIntSchema } from "./wo-details.dto";
+import { BooleanSchema, PercentageSchema, PositiveIntSchema } from "./wo-details.dto";
 // PAGE 2: COMPLIANCE OBLIGATIONS
 /**
  * Save Page 2 data (all fields optional for drafts)
@@ -28,19 +28,19 @@ export type SavePage2Dto = z.infer<typeof SavePage2Schema>;
  */
 export const SubmitPage2Schema = z
   .object({
-    ldApplicable: z.boolean(),
+    ldApplicable: BooleanSchema,
     maxLd: PercentageSchema.nullable().optional(),
     ldStartDate: z.string().date().nullable().optional(),
     maxLdDate: z.string().date().nullable().optional(),
 
-    isPbgApplicable: z.boolean(),
+    isPbgApplicable: BooleanSchema,
     filledBgFormat: z.array(z.string()).nullable().optional(),
     pbgBgId: PositiveIntSchema.nullable().optional(),
 
-    isContractAgreement: z.boolean(),
+    isContractAgreement: BooleanSchema,
     contractAgreementFormat: z.array(z.string()).nullable().optional(),
 
-    detailedPoApplicable: z.boolean(),
+    detailedPoApplicable: BooleanSchema,
     detailedPoFollowupId: PositiveIntSchema.nullable().optional(),
   })
   .superRefine((data, ctx) => {

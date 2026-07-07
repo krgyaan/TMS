@@ -9,12 +9,11 @@ import type {
   WoDetailData,
 } from "./woDetail.types";
 
-const stringToBool = (val: string | undefined | null): boolean | undefined => {
-  if (!val) return undefined;
+const stringToBool = (val: string | undefined | null): boolean => {
+  if (!val) return false;
   const lower = val.toLowerCase();
   if (lower === "true" || lower === "yes") return true;
-  if (lower === "false" || lower === "no") return false;
-  return undefined;
+  return false;
 };
 
 const boolToString = (val: boolean | undefined | null): string | undefined => {
@@ -163,16 +162,16 @@ export const apiToForm = {
 
   page2(api: ApiResponse): Partial<Page2FormValues> {
     return {
-      ldApplicable: boolToString(api.ldApplicable as boolean | undefined | null),
+      ldApplicable: boolToString(api.ldApplicable as boolean | undefined | null) ?? "false",
       maxLd: (api.maxLd as string) ?? "",
       ldStartDate: (api.ldStartDate as string) ?? "",
       maxLdDate: (api.maxLdDate as string) ?? "",
-      isPbgApplicable: boolToString(api.isPbgApplicable as boolean | undefined | null),
+      isPbgApplicable: boolToString(api.isPbgApplicable as boolean | undefined | null) ?? "false",
       filledBgFormat: (api.filledBgFormat as string[]) ?? [],
       pbgBgId: (api.pbgBgId as number | undefined) ?? undefined,
-      isContractAgreement: boolToString(api.isContractAgreement as boolean | undefined | null),
+      isContractAgreement: boolToString(api.isContractAgreement as boolean | undefined | null) ?? "false",
       contractAgreementFormat: (api.contractAgreementFormat as string[]) ?? [],
-      detailedPoApplicable: boolToString(api.detailedPoApplicable as boolean | undefined | null),
+      detailedPoApplicable: boolToString(api.detailedPoApplicable as boolean | undefined | null) ?? "false",
       detailedPoFollowupId: (api.detailedPoFollowupId as number | undefined) ?? undefined,
     };
   },

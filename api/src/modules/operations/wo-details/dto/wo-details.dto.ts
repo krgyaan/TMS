@@ -15,7 +15,7 @@ export const PercentageSchema = z
 export const PositiveIntSchema = z.number().int().positive();
 
 // Helper for boolean transformation (handles both boolean and string)
-const BooleanSchema = z
+export const BooleanSchema = z
   .union([z.boolean(), z.enum(['true', 'false'])])
   .transform((val) => (typeof val === 'boolean' ? val : val === 'true'));
 
