@@ -299,36 +299,48 @@ export class DemandDraftService {
         return { data };
     }
 
-    private async countDdByConditions(conditions: any[]) {
-        const [result] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+    async getDashboardCounts(): Promise<DemandDraftDashboardCounts> {
+        const baseWhere = and(
+            eq(paymentInstruments.instrumentType, 'DD'),
+            eq(paymentInstruments.isActive, true),
+            sql`${paymentRequests.purpose} NOT IN ('Tender Fee', 'Processing Fee')`,
+        );
+
+        const pendingFilter = or(
+            eq(paymentInstruments.action, 0),
+            eq(paymentInstruments.status, DD_STATUSES.PENDING),
+        );
+
+        const createdFilter = and(
+            inArray(paymentInstruments.action, [1, 2]),
+            inArray(paymentInstruments.status, [DD_STATUSES.ACCOUNTS_FORM_ACCEPTED, DD_STATUSES.FOLLOWUP_INITIATED]),
+        );
+
+        const rejectedFilter = and(
+            inArray(paymentInstruments.action, [1, 2]),
+            eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_REJECTED),
+        );
+
+        const returnedFilter = inArray(paymentInstruments.action, [3, 4, 5]);
+
+        const cancelledFilter = inArray(paymentInstruments.action, [6, 7]);
+
+        const [counts] = await this.db.select({
+            pending: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${pendingFilter})`,
+            created: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${createdFilter})`,
+            rejected: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${rejectedFilter})`,
+            returned: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${returnedFilter})`,
+            cancelled: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${cancelledFilter})`,
+        })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...conditions));
+            .where(baseWhere);
 
-        return Number(result?.count || 0);
-    }
-
-    async getDashboardCounts(): Promise<DemandDraftDashboardCounts> {
-        const pending = await this.countDdByConditions(
-            this.buildDdDashboardConditions('pending')
-        );
-
-        const created = await this.countDdByConditions(
-            this.buildDdDashboardConditions('created')
-        );
-
-        const rejected = await this.countDdByConditions(
-            this.buildDdDashboardConditions('rejected')
-        );
-
-        const returned = await this.countDdByConditions(
-            this.buildDdDashboardConditions('returned')
-        );
-
-        const cancelled = await this.countDdByConditions(
-            this.buildDdDashboardConditions('cancelled')
-        );
+        const pending = Number(counts?.pending ?? 0);
+        const created = Number(counts?.created ?? 0);
+        const rejected = Number(counts?.rejected ?? 0);
+        const returned = Number(counts?.returned ?? 0);
+        const cancelled = Number(counts?.cancelled ?? 0);
 
         return {
             pending,
