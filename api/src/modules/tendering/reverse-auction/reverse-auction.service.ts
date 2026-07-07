@@ -1,27 +1,25 @@
-import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, eq, lte, asc, desc, sql, inArray, isNull, isNotNull, or } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
+import { AppLogger } from '@/logger/app-logger.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import { ScheduleRaDto, UploadRaResultDto } from '@/modules/tendering/reverse-auction/dto/reverse-auction.dto';
+import type { UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
+import { TenderResultService } from '@/modules/tendering/tender-result/tender-result.service';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { DbInstance } from '@db';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { reverseAuctions } from '@db/schemas/tendering/reverse-auction.schema';
-import { tenderResults } from '@db/schemas/tendering/tender-result.schema';
-import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
+import { DRIZZLE } from '@db/database.module';
 import { users } from '@db/schemas/auth/users.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
+import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
+import { reverseAuctions } from '@db/schemas/tendering/reverse-auction.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
-import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
-import { ScheduleRaDto, UploadRaResultDto } from '@/modules/tendering/reverse-auction/dto/reverse-auction.dto';
-import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
-import { EmailService } from '@/modules/email/email.service';
-import { RecipientResolver } from '@/modules/email/recipient.resolver';
-import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
-import { AppLogger } from '@/logger/app-logger.service';
-import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { TenderResultService } from '@/modules/tendering/tender-result/tender-result.service';
-import type { UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
+import { tenderResults } from '@db/schemas/tendering/tender-result.schema';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 
 export type RaDashboardFilters = {
     type?: RaDashboardType;
@@ -363,98 +361,67 @@ export class ReverseAuctionService {
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<RaDashboardCounts> {
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
 
-        const baseConditions = [
+        const baseWhere = and(
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             inArray(tenderInformation.reverseAuctionApplicable, ['Yes', 'YES']),
             ...roleFilterConditions,
-        ];
+        );
 
-        // Under-evaluation: No RA OR (RA exists but no result AND no schedule times)
-        // Exclude records that have schedule times (they belong in scheduled tab)
-        const underEvaluationConditions = [
-            ...baseConditions,
+        const underEvaluationFilter = and(
             eq(bidSubmissions.status, 'Bid Submitted'),
             or(
                 isNull(reverseAuctions.id),
                 and(
                     isNull(reverseAuctions.raResult),
                     isNull(reverseAuctions.raStartTime),
-                    isNull(reverseAuctions.raEndTime)
-                ) as any
-            ) as any,
+                    isNull(reverseAuctions.raEndTime),
+                ),
+            ),
             TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-        ];
+        );
 
-        // Scheduled: RA exists, result is null, and has start/end times (matching getDashboardData logic)
-        const scheduledConditions = [
-            ...baseConditions,
+        const scheduledFilter = and(
             eq(bidSubmissions.status, 'Bid Submitted'),
             isNotNull(reverseAuctions.id),
             isNull(reverseAuctions.raResult),
             or(
                 isNotNull(reverseAuctions.raStartTime),
-                isNotNull(reverseAuctions.raEndTime)
-            )!,
+                isNotNull(reverseAuctions.raEndTime),
+            ),
             TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-        ];
+        );
 
-        // Completed: RA exists AND result IS NOT NULL (matching Laravel)
-        const completedConditions = [
-            ...baseConditions,
+        const completedFilter = and(
             isNotNull(reverseAuctions.id),
             isNotNull(reverseAuctions.raResult),
-            // Completed RA should show results even if tender status is 'lost' (e.g. RA was lost)
             TenderInfosService.getExcludeStatusCondition(['dnb']),
-        ];
+        );
 
-        const counts = await Promise.all([
-            // Under-evaluation count
-            this.db
-                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
-                .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-                .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
-                .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-                .leftJoin(items, eq(items.id, tenderInfos.item))
-                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .where(and(...underEvaluationConditions))
-                .then(([result]) => Number(result?.count || 0)),
-            // Scheduled count
-            this.db
-                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
-                .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-                .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
-                .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-                .leftJoin(items, eq(items.id, tenderInfos.item))
-                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .where(and(...scheduledConditions))
-                .then(([result]) => Number(result?.count || 0)),
-            // Completed count (no bid submission requirement per Laravel)
-            this.db
-                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
-                .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
-                .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
-                .leftJoin(items, eq(items.id, tenderInfos.item))
-                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .where(and(...completedConditions))
-                .then(([result]) => Number(result?.count || 0)),
-        ]);
+        const [counts] = await this.db.select({
+            underEvaluation: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${underEvaluationFilter})`,
+            scheduled: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${scheduledFilter})`,
+            completed: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${completedFilter})`,
+        })
+            .from(tenderInfos)
+            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
+            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(baseWhere);
+
+        const underEvaluation = Number(counts?.underEvaluation ?? 0);
+        const scheduled = Number(counts?.scheduled ?? 0);
+        const completed = Number(counts?.completed ?? 0);
 
         return {
-            underEvaluation: counts[0],
-            scheduled: counts[1],
-            completed: counts[2],
-            total: counts.reduce((sum, count) => sum + count, 0),
+            underEvaluation,
+            scheduled,
+            completed,
+            total: underEvaluation + scheduled + completed,
         };
     }
 
