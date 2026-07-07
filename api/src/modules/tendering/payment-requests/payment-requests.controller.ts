@@ -45,7 +45,7 @@ export class PaymentRequestsController {
         );
         // Batch-fetch timer data for all tenders
         const tenderIds = result.data.map((t: any) => t.tenderId);
-        const timerMap = await getFrontendTimersBatch(this.timersService, 'TENDER', tenderIds, 'emd_request');
+        const timerMap = await getFrontendTimersBatch(this.timersService, 'TENDER', tenderIds, 'emd_requested');
         const dataWithTimers = result.data.map((tender: any) => ({
             ...tender,
             timer: timerMap.get(tender.tenderId)

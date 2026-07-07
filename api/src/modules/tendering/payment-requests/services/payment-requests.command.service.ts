@@ -260,11 +260,11 @@ export class PaymentRequestsCommandService {
                     await this.timersService.stopTimer({
                         entityType: 'TENDER',
                         entityId: tenderId,
-                        stage: 'emd_request',
+                        stage: 'emd_requested',
                         userId: userId,
                         reason: 'EMD requested'
                     });
-                    this.logger.log(`Successfully stopped emd_request timer for tender ${tenderId}`);
+                    this.logger.log(`Successfully stopped emd_requested timer for tender ${tenderId}`);
                 } catch (error) {
                     if (error instanceof ConflictException) {
                         this.logger.warn(`Timer conflict for tender ${tenderId} after EMD requested — skipping`);

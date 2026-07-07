@@ -43,7 +43,7 @@ export class RfqsController {
         });
         // Batch-fetch timer data for all tenders
         const tenderIds = result.data.map(t => t.tenderId);
-        const timerMap = await getFrontendTimersBatch(this.timersService, 'TENDER', tenderIds, 'rfq');
+        const timerMap = await getFrontendTimersBatch(this.timersService, 'TENDER', tenderIds, 'rfq_sent');
         const dataWithTimers = result.data.map(tender => ({
             ...tender,
             timer: timerMap.get(tender.tenderId),
