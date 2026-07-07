@@ -292,36 +292,48 @@ export class BankTransferService {
         return { data };
     }
 
-    private async countBtByConditions(conditions: any[]) {
-        const [result] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+    async getDashboardCounts(): Promise<BankTransferDashboardCounts> {
+        const baseWhere = and(
+            eq(paymentInstruments.instrumentType, 'Bank Transfer'),
+            eq(paymentInstruments.isActive, true),
+            sql`${paymentRequests.purpose} NOT IN ('Tender Fee', 'Processing Fee')`,
+        );
+
+        const pendingFilter = or(
+            eq(paymentInstruments.action, 0),
+            eq(paymentInstruments.status, BT_STATUSES.PENDING),
+        );
+
+        const acceptedFilter = and(
+            inArray(paymentInstruments.action, [1, 2]),
+            inArray(paymentInstruments.status, [BT_STATUSES.ACCOUNTS_FORM_ACCEPTED, BT_STATUSES.FOLLOWUP_INITIATED]),
+        );
+
+        const rejectedFilter = and(
+            inArray(paymentInstruments.action, [1, 2]),
+            eq(paymentInstruments.status, BT_STATUSES.ACCOUNTS_FORM_REJECTED),
+        );
+
+        const returnedFilter = inArray(paymentInstruments.action, [3]);
+
+        const settledFilter = inArray(paymentInstruments.action, [4]);
+
+        const [counts] = await this.db.select({
+            pending: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${pendingFilter})`,
+            accepted: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${acceptedFilter})`,
+            rejected: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${rejectedFilter})`,
+            returned: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${returnedFilter})`,
+            settled: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${settledFilter})`,
+        })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .where(and(...conditions));
+            .where(baseWhere);
 
-        return Number(result?.count || 0);
-    }
-
-    async getDashboardCounts(): Promise<BankTransferDashboardCounts> {
-        const pending = await this.countBtByConditions(
-            this.buildBtDashboardConditions('pending')
-        );
-
-        const accepted = await this.countBtByConditions(
-            this.buildBtDashboardConditions('accepted')
-        );
-
-        const rejected = await this.countBtByConditions(
-            this.buildBtDashboardConditions('rejected')
-        );
-
-        const returned = await this.countBtByConditions(
-            this.buildBtDashboardConditions('returned')
-        );
-
-        const settled = await this.countBtByConditions(
-            this.buildBtDashboardConditions('settled')
-        );
+        const pending = Number(counts?.pending ?? 0);
+        const accepted = Number(counts?.accepted ?? 0);
+        const rejected = Number(counts?.rejected ?? 0);
+        const returned = Number(counts?.returned ?? 0);
+        const settled = Number(counts?.settled ?? 0);
 
         return {
             pending,

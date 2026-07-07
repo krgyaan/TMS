@@ -359,45 +359,61 @@ export class BankGuaranteeService {
         return { data };
     }
 
-    private async countByConditions(conditions: any[]) {
-        const [result] = await this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
+    async getDashboardCounts(): Promise<BankGuaranteeDashboardCounts> {
+        const baseWhere = and(
+            eq(paymentInstruments.instrumentType, 'BG'),
+            eq(paymentInstruments.isActive, true),
+        );
+
+        const newRequestsFilter = and(
+            inArray(paymentInstruments.action, [0, 1]),
+            inArray(paymentInstruments.status, [BG_STATUSES.PENDING, BG_STATUSES.ACCOUNTS_FORM_ACCEPTED]),
+        );
+
+        const liveYesFilter = and(
+            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
+            inArray(instrumentBgDetails.bankName, ['YESBANK_2011', 'YESBANK_0771']),
+        );
+
+        const livePnbFilter = and(
+            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
+            eq(instrumentBgDetails.bankName, 'PNB_6011'),
+        );
+
+        const liveBgLimitFilter = and(
+            inArray(paymentInstruments.action, [2, 3, 4, 5, 6, 7]),
+            eq(instrumentBgDetails.bankName, 'BGLIMIT_0771'),
+        );
+
+        const cancelledFilter = inArray(paymentInstruments.action, [8, 9]);
+
+        const rejectedFilter = and(
+            inArray(paymentInstruments.action, [1, 2]),
+            eq(paymentInstruments.status, BG_STATUSES.ACCOUNTS_FORM_REJECTED),
+        );
+
+        const [counts] = await this.db.select({
+            newRequests: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${newRequestsFilter})`,
+            liveYes: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveYesFilter})`,
+            livePnb: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${livePnbFilter})`,
+            liveBgLimit: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${liveBgLimitFilter})`,
+            cancelled: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${cancelledFilter})`,
+            rejected: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${rejectedFilter})`,
+        })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(
                 instrumentBgDetails,
-                eq(instrumentBgDetails.instrumentId, paymentInstruments.id)
+                eq(instrumentBgDetails.instrumentId, paymentInstruments.id),
             )
-            .where(and(...conditions));
+            .where(baseWhere);
 
-        return Number(result?.count || 0);
-    }
-
-    async getDashboardCounts(): Promise<BankGuaranteeDashboardCounts> {
-        const newRequests = await this.countByConditions(
-            this.buildDashboardConditions('new-requests')
-        );
-
-        const liveYes = await this.countByConditions(
-            this.buildDashboardConditions('live-yes')
-        );
-
-        const livePnb = await this.countByConditions(
-            this.buildDashboardConditions('live-pnb')
-        );
-
-        const liveBgLimit = await this.countByConditions(
-            this.buildDashboardConditions('live-bg-limit')
-        );
-
-        const cancelled = await this.countByConditions(
-            this.buildDashboardConditions('cancelled')
-        );
-
-        const rejected = await this.countByConditions(
-            this.buildDashboardConditions('rejected')
-        );
-
+        const newRequests = Number(counts?.newRequests ?? 0);
+        const liveYes = Number(counts?.liveYes ?? 0);
+        const livePnb = Number(counts?.livePnb ?? 0);
+        const liveBgLimit = Number(counts?.liveBgLimit ?? 0);
+        const cancelled = Number(counts?.cancelled ?? 0);
+        const rejected = Number(counts?.rejected ?? 0);
 
         return {
             'new-requests': newRequests,

@@ -98,20 +98,6 @@ export class FdrService {
         return { conditions, needsFdrDetails };
     }
 
-    private async countFdrByConditions(conditions: any[], needsFdrDetails: boolean) {
-        const query = this.db
-            .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
-            .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId));
-
-        if (needsFdrDetails) {
-            query.leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id));
-        }
-
-        const [result] = await query.where(and(...conditions));
-        return Number(result?.count || 0);
-    }
-
     async getDashboardData(
         tab?: string,
         options?: {
@@ -325,33 +311,80 @@ export class FdrService {
     }
 
     async getDashboardCounts(): Promise<FdrDashboardCounts> {
-        const pending = await this.countFdrByConditions(this.buildFdrDashboardConditions("pending").conditions, this.buildFdrDashboardConditions("pending").needsFdrDetails);
-
-        const rejected = await this.countFdrByConditions(this.buildFdrDashboardConditions("rejected").conditions, this.buildFdrDashboardConditions("rejected").needsFdrDetails);
-
-        const returned = await this.countFdrByConditions(this.buildFdrDashboardConditions("returned").conditions, this.buildFdrDashboardConditions("returned").needsFdrDetails);
-
-        const cancelled = await this.countFdrByConditions(this.buildFdrDashboardConditions("cancelled").conditions, this.buildFdrDashboardConditions("cancelled").needsFdrDetails);
-
-        const pnbBgLinked = await this.countFdrByConditions(
-            this.buildFdrDashboardConditions("pnb-bg-linked").conditions,
-            this.buildFdrDashboardConditions("pnb-bg-linked").needsFdrDetails
+        const baseWhere = and(
+            eq(paymentInstruments.instrumentType, "FDR"),
+            eq(paymentInstruments.isActive, true),
         );
 
-        const yblBgLinked = await this.countFdrByConditions(
-            this.buildFdrDashboardConditions("ybl-bg-linked").conditions,
-            this.buildFdrDashboardConditions("ybl-bg-linked").needsFdrDetails
+        const pendingFilter = and(
+            eq(paymentInstruments.action, 0),
+            eq(paymentInstruments.status, FDR_STATUSES.PENDING),
         );
 
-        const securityDeposit = await this.countFdrByConditions(
-            this.buildFdrDashboardConditions("security-deposit").conditions,
-            this.buildFdrDashboardConditions("security-deposit").needsFdrDetails
+        const rejectedFilter = and(
+            inArray(paymentInstruments.action, [1, 2]),
+            eq(paymentInstruments.status, FDR_STATUSES.ACCOUNTS_FORM_REJECTED),
         );
 
-        const bondLinked = await this.countFdrByConditions(
-            this.buildFdrDashboardConditions("bond-linked").conditions,
-            this.buildFdrDashboardConditions("bond-linked").needsFdrDetails
+        const returnedFilter = inArray(paymentInstruments.action, [3, 4, 5]);
+
+        const cancelledFilter = inArray(paymentInstruments.action, [6, 7]);
+
+        const pnbBgLinkedFilter = and(
+            inArray(paymentInstruments.action, [1, 2]),
+            sql`EXISTS (
+                SELECT 1 FROM instrument_bg_details bg
+                INNER JOIN payment_instruments pi_bg ON pi_bg.id = bg.instrument_id
+                WHERE bg.fdr_no = ${instrumentFdrDetails.fdrNo}
+                AND pi_bg.is_active = true
+                AND bg.bank_name = 'PNB_6011'
+            )`,
         );
+
+        const yblBgLinkedFilter = and(
+            inArray(paymentInstruments.action, [1, 2]),
+            sql`EXISTS (
+                SELECT 1 FROM instrument_bg_details bg
+                INNER JOIN payment_instruments pi_bg ON pi_bg.id = bg.instrument_id
+                WHERE bg.fdr_no = ${instrumentFdrDetails.fdrNo}
+                AND pi_bg.is_active = true
+                AND bg.bank_name IN ('YESBANK_2011', 'YESBANK_0771', 'BGLIMIT_0771')
+            )`,
+        );
+
+        const securityDepositFilter = and(
+            inArray(paymentInstruments.action, [1, 2]),
+            eq(instrumentFdrDetails.fdrPurpose, "deposit"),
+        );
+
+        const bondLinkedFilter = eq(paymentInstruments.action, 8);
+
+        const [counts] = await this.db.select({
+            pending: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${pendingFilter})`,
+            rejected: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${rejectedFilter})`,
+            returned: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${returnedFilter})`,
+            cancelled: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${cancelledFilter})`,
+            pnbBgLinked: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${pnbBgLinkedFilter})`,
+            yblBgLinked: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${yblBgLinkedFilter})`,
+            securityDeposit: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${securityDepositFilter})`,
+            bondLinked: sql<number>`count(distinct ${paymentInstruments.id}) filter (where ${bondLinkedFilter})`,
+        })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(
+                instrumentFdrDetails,
+                eq(instrumentFdrDetails.instrumentId, paymentInstruments.id),
+            )
+            .where(baseWhere);
+
+        const pending = Number(counts?.pending ?? 0);
+        const rejected = Number(counts?.rejected ?? 0);
+        const returned = Number(counts?.returned ?? 0);
+        const cancelled = Number(counts?.cancelled ?? 0);
+        const pnbBgLinked = Number(counts?.pnbBgLinked ?? 0);
+        const yblBgLinked = Number(counts?.yblBgLinked ?? 0);
+        const securityDeposit = Number(counts?.securityDeposit ?? 0);
+        const bondLinked = Number(counts?.bondLinked ?? 0);
 
         return {
             pending,

@@ -154,41 +154,28 @@ export class ContractAgreementService {
     }
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ 'uploaded': number; 'not_uploaded': number; total: number }> {
-        // Apply role-based filtering
         const baseConditions = [eq(woDetails.isContractAgreement, true), ...this.buildRoleFilterConditions(user, teamId)];
+        const baseWhere = baseConditions.length ? and(...baseConditions) : undefined;
 
-        // Count not_scheduled: kickoff IS NULL
-        const notScheduledConditions = [...baseConditions, isNull(woDetails.veSigned), isNull(woDetails.clientAndVeSigned)];
+        const notUploadedFilter = and(isNull(woDetails.veSigned), isNull(woDetails.clientAndVeSigned));
+        const uploadedFilter = and(isNotNull(woDetails.veSigned), isNotNull(woDetails.clientAndVeSigned));
 
-        // Count scheduled: kickoff IS NOT NULL
-        const scheduledConditions = [...baseConditions, isNotNull(woDetails.veSigned), isNotNull(woDetails.clientAndVeSigned)];
+        const [result] = await this.db
+            .select({
+                uploaded: sql<number>`count(distinct ${woDetails.id}) filter (where ${uploadedFilter})`,
+                notUploaded: sql<number>`count(distinct ${woDetails.id}) filter (where ${notUploadedFilter})`,
+            })
+            .from(woDetails)
+            .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
+            .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
+            .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
+            .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
+            .where(baseWhere);
 
-        const [notScheduledResult, scheduledResult] = await Promise.all([
-            this.db
-                .select({ count: sql<number>`count(distinct ${woDetails.id})` })
-                .from(woDetails)
-                .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
-                .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
-                .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
-                .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
-                .where(notScheduledConditions.length ? and(...notScheduledConditions) : undefined)
-                .then(r => Number(r[0]?.count || 0)),
-            this.db
-                .select({ count: sql<number>`count(distinct ${woDetails.id})` })
-                .from(woDetails)
-                .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
-                .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
-                .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
-                .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
-                .where(scheduledConditions.length ? and(...scheduledConditions) : undefined)
-                .then(r => Number(r[0]?.count || 0)),
-        ]);
+        const uploaded = Number(result?.uploaded ?? 0);
+        const not_uploaded = Number(result?.notUploaded ?? 0);
 
-        return {
-            uploaded: scheduledResult,
-            not_uploaded: notScheduledResult,
-            total: notScheduledResult + scheduledResult,
-        };
+        return { uploaded, not_uploaded, total: uploaded + not_uploaded };
     }
 
   async getByWoDetailId(woDetailId: number) {
