@@ -220,36 +220,24 @@ export class KickOffMeetingService {
         // Count scheduled: kickoff IS NOT NULL
         const scheduledConditions = [...baseConditions, isNotNull(sql`latest_kickoff.id`)];
 
-        const [notScheduledResult, scheduledResult] = await Promise.all([
-            this.db
-                .select({ count: sql<number>`count(distinct ${woDetails.id})` })
-                .from(woDetails)
-                .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
-                .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
-                .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
-                .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
-                .leftJoin(latestKickoff, eq(latestKickoff.woDetailId, woDetails.id))
-                .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
-                .where(notScheduledConditions.length ? and(...notScheduledConditions) : undefined)
-                .then(r => Number(r[0]?.count || 0)),
-            this.db
-                .select({ count: sql<number>`count(distinct ${woDetails.id})` })
-                .from(woDetails)
-                .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
-                .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
-                .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
-                .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
-                .leftJoin(latestKickoff, eq(latestKickoff.woDetailId, woDetails.id))
-                .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
-                .where(scheduledConditions.length ? and(...scheduledConditions) : undefined)
-                .then(r => Number(r[0]?.count || 0)),
-        ]);
+        const [result] = await this.db
+            .select({
+                scheduled: sql<number>`count(distinct ${woDetails.id}) filter (where ${isNotNull(sql`latest_kickoff.id`)})`,
+                notScheduled: sql<number>`count(distinct ${woDetails.id}) filter (where ${isNull(sql`latest_kickoff.id`)})`,
+            })
+            .from(woDetails)
+            .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
+            .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
+            .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
+            .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
+            .leftJoin(latestKickoff, eq(latestKickoff.woDetailId, woDetails.id))
+            .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
+            .where(baseConditions.length ? and(...baseConditions) : undefined);
 
-        return {
-            scheduled: scheduledResult,
-            not_scheduled: notScheduledResult,
-            total: notScheduledResult + scheduledResult,
-        };
+        const scheduled = Number(result?.scheduled ?? 0);
+        const not_scheduled = Number(result?.notScheduled ?? 0);
+
+        return { scheduled, not_scheduled, total: scheduled + not_scheduled };
     }
 
   async getByWoDetailId(woDetailId: number) {
