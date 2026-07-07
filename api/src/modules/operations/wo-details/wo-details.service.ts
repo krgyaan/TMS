@@ -1189,6 +1189,12 @@ export class WoDetailsService {
       createdAt: now,
       updatedAt: now,
       createdBy: userId ?? null,
+    }).onConflictDoUpdate({
+      target: woAcceptance.woDetailId,
+      set: {
+        updatedAt: now,
+        updatedBy: userId ?? null,
+      },
     });
 
     return {
