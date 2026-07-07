@@ -666,10 +666,14 @@ export class TenderInfoSheetsService {
                         reason: 'Tender info sheet completed',
                     });
                 } catch (error) {
-                    this.logger.warn(
-                        `Failed to stop tender_info_sheet timer for tender ${tenderId}:`,
-                        error
-                    );
+                    if (error instanceof ConflictException) {
+                        this.logger.warn(`Timer conflict for tender_info_sheet for tender ${tenderId} — skipping`);
+                    } else {
+                        this.logger.warn(
+                            `Failed to stop tender_info_sheet timer for tender ${tenderId}:`,
+                            error
+                        );
+                    }
                 }
                 try {
                     await this.timersService.startTimer({
@@ -683,10 +687,14 @@ export class TenderInfoSheetsService {
                         },
                     });
                 } catch (error) {
-                    this.logger.warn(
-                        `Failed to start tender_approval timer for tender ${tenderId}:`,
-                        error
-                    );
+                    if (error instanceof ConflictException) {
+                        this.logger.warn(`Timer already running for tender_approval for tender ${tenderId} — skipping`);
+                    } else {
+                        this.logger.warn(
+                            `Failed to start tender_approval timer for tender ${tenderId}:`,
+                            error
+                        );
+                    }
                 }
             } catch (error) {
                 this.logger.error(
