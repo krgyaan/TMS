@@ -701,38 +701,28 @@ export class WoDetailsService {
         updatedAt: now,
         createdBy: userId ?? null,
       })
-      .onConflictDoNothing()
+      .onConflictDoUpdate({
+        target: woDetails.woBasicDetailId,
+        set: { updatedAt: now },
+      })
       .returning();
 
-    if (row) {
-      await this.db
-        .update(woBasicDetails)
-        .set({ currentStage: 'wo_details', updatedAt: now })
-        .where(eq(woBasicDetails.id, woBasicDetailId));
+    await this.db
+      .update(woBasicDetails)
+      .set({ currentStage: 'wo_details', updatedAt: now })
+      .where(eq(woBasicDetails.id, woBasicDetailId));
 
-      const mapped = this.mapRowToResponse(row);
-      return {
-        id: mapped.id,
-        woBasicDetailId: mapped.woBasicDetailId,
-        status: mapped.status,
-        currentPage: mapped.currentPage,
-        completedPages: mapped.completedPages as number[],
-        skippedPages: mapped.skippedPages as number[],
-        createdAt: mapped.createdAt,
-        isExisting: false,
-      };
-    }
-
-    const existing = await this.findByWoBasicDetailId(woBasicDetailId);
+    const isExisting = row.createdAt !== row.updatedAt;
+    const mapped = this.mapRowToResponse(row);
     return {
-      id: existing!.id,
-      woBasicDetailId: existing!.woBasicDetailId,
-      status: existing!.status,
-      currentPage: existing!.currentPage,
-      completedPages: existing!.completedPages as number[],
-      skippedPages: existing!.skippedPages as number[],
-      createdAt: existing!.createdAt,
-      isExisting: true,
+      id: mapped.id,
+      woBasicDetailId: mapped.woBasicDetailId,
+      status: mapped.status,
+      currentPage: mapped.currentPage,
+      completedPages: mapped.completedPages as number[],
+      skippedPages: mapped.skippedPages as number[],
+      createdAt: mapped.createdAt,
+      isExisting,
     };
   }
 
