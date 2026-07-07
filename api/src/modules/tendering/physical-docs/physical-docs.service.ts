@@ -20,7 +20,7 @@ import { couriers } from "@db/schemas/shared/couriers.schema";
 import { physicalDocs, physicalDocsPersons, type NewPhysicalDocs } from "@db/schemas/tendering/physical-docs.schema";
 import { tenderClients, tenderInformation } from "@db/schemas/tendering/tender-info-sheet.schema";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql, SQL } from "drizzle-orm";
 
 export type PhysicalDocFilters = {
@@ -628,7 +628,11 @@ export class PhysicalDocsService {
 
             this.logger.log(`Successfully stopped physical_docs timer for tender ${data.tenderId}`);
         } catch (err) {
-            this.logger.error("Error in stopping timer", err);
+            if (err instanceof ConflictException) {
+                this.logger.warn(`Timer conflict for tender ${data.tenderId} after physical docs submitted — skipping`);
+            } else {
+                this.logger.error("Error in stopping timer", err);
+            }
         }
         return result;
     }
