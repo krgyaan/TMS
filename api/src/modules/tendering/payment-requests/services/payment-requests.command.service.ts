@@ -1,19 +1,19 @@
-import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import { eq, and, sql } from 'drizzle-orm';
-import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails, instrumentStatusHistory, paymentRequestMom } from '@db/schemas/tendering/payment-requests.schema';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
-import { users } from '@/db/schemas/auth/users.schema';
-import { userRoles } from '@/db/schemas/auth/user-roles.schema';
-import type { CreatePaymentRequestDto, UpdatePaymentRequestDto, UpdateStatusDto, PaymentPurpose } from '../dto/payment-requests.dto';
-import type { CreateMomRemarkDto } from '../dto/payment-mom.dto';
-import { extractAmountFromDetails, extractPurposeFromDetails } from './payment-requests.shared';
 import { tenderInformation } from '@/db/schemas';
-import { PaymentRequestsNotificationService } from './payment-requests-notification.service';
-import { TimersService } from '@/modules/timers/timers.service';
-import { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { userRoles } from '@/db/schemas/auth/user-roles.schema';
+import { users } from '@/db/schemas/auth/users.schema';
 import { AppLogger } from '@/logger/app-logger.service';
+import { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
+import { instrumentBgDetails, instrumentChequeDetails, instrumentDdDetails, instrumentFdrDetails, instrumentStatusHistory, instrumentTransferDetails, paymentInstruments, paymentRequestMom, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
+import { and, eq } from 'drizzle-orm';
+import type { CreateMomRemarkDto } from '../dto/payment-mom.dto';
+import type { CreatePaymentRequestDto, PaymentPurpose, UpdatePaymentRequestDto, UpdateStatusDto } from '../dto/payment-requests.dto';
+import { PaymentRequestsNotificationService } from './payment-requests-notification.service';
+import { extractAmountFromDetails, extractPurposeFromDetails } from './payment-requests.shared';
 
 @Injectable()
 export class PaymentRequestsCommandService {
@@ -266,7 +266,11 @@ export class PaymentRequestsCommandService {
                     });
                     this.logger.log(`Successfully stopped emd_request timer for tender ${tenderId}`);
                 } catch (error) {
-                    this.logger.error(`Failed to stop timer for tender ${tenderId} after EMD requested:`, error);
+                    if (error instanceof ConflictException) {
+                        this.logger.warn(`Timer conflict for tender ${tenderId} after EMD requested — skipping`);
+                    } else {
+                        this.logger.error(`Failed to stop timer for tender ${tenderId} after EMD requested:`, error);
+                    }
                 }
             }
 
