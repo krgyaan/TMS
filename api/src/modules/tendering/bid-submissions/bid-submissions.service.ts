@@ -1,26 +1,26 @@
-import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, eq, isNotNull, isNull, or, asc, desc, sql, inArray, ilike, ne, notInArray } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { statuses } from '@db/schemas/master/statuses.schema';
-import { users } from '@db/schemas/auth/users.schema';
-import { items } from '@db/schemas/master/items.schema';
-import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
-import { tenderCostingDetails } from '@db/schemas/tendering/tender-costing-details.schema';
-import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
-import { teams } from '@db/schemas/master/teams.schema';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
-import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
-import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { paymentInstruments, paymentRequests } from '@/db/schemas';
+import { AppLogger } from '@/logger/app-logger.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
-import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
-import { AppLogger } from '@/logger/app-logger.service';
-import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { TimersService } from '@/modules/timers/timers.service';
-import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { paymentInstruments, paymentRequestRelations, paymentRequests, tenderIncompleteFields } from '@/db/schemas';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
+import { users } from '@db/schemas/auth/users.schema';
+import { items } from '@db/schemas/master/items.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
+import { teams } from '@db/schemas/master/teams.schema';
+import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
+import { tenderCostingDetails } from '@db/schemas/tendering/tender-costing-details.schema';
+import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, notInArray, or, sql } from 'drizzle-orm';
 
 export type BidSubmissionDashboardRow = {
     tenderId: number;
@@ -496,8 +496,11 @@ export class BidSubmissionsService {
             });
             this.logger.log(`Successfully stopped bid_submission timer for tender ${data.tenderId}`);
         } catch (error) {
-            this.logger.error(`Failed to stop timer for tender ${data.tenderId} after bid submitted:`, error);
-            // Don't fail the entire operation if timer transition fails
+            if (error instanceof ConflictException) {
+                this.logger.warn(`Timer conflict for tender ${data.tenderId} after bid submitted — skipping`);
+            } else {
+                this.logger.error(`Failed to stop timer for tender ${data.tenderId} after bid submitted:`, error);
+            }
         }
 
         return result;
