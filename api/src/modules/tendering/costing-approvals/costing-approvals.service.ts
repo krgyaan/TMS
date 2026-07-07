@@ -270,29 +270,77 @@ export class CostingApprovalsService {
     }
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<CostingApprovalDashboardCounts> {
-        const counts = await Promise.all([
-            this.costingApprovalBaseQuery({
-                count: sql<number>`count(distinct ${tenderInfos.id})`,
-            })
-                .where(and(...this.buildDashboardConditions(user, teamId, 'pending')))
-                .then(([result]: any) => Number(result?.count || 0)),
-            this.costingApprovalBaseQuery({
-                count: sql<number>`count(distinct ${tenderInfos.id})`,
-            })
-                .where(and(...this.buildDashboardConditions(user, teamId, 'approved')))
-                .then(([result]: any) => Number(result?.count || 0)),
-            this.costingApprovalBaseQuery({
-                count: sql<number>`count(distinct ${tenderInfos.id})`,
-            })
-                .where(and(...this.buildDashboardConditions(user, teamId, 'tender-dnb')))
-                .then(([result]: any) => Number(result?.count || 0)),
-        ]);
+        const roleFilterConditions: any[] = [];
+        if (user && user.roleId) {
+            if (user.dataScope === 'all') {
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+            } else if (user.canSwitchTeams && teamId !== undefined && teamId !== null) {
+                roleFilterConditions.push(eq(tenderInfos.team, teamId));
+            } else if (user.dataScope === 'team') {
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`);
+                }
+            } else {
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`);
+                }
+            }
+        } else {
+            roleFilterConditions.push(sql`1 = 0`);
+        }
+
+        const baseWhere = and(
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            sql`EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                AND ${tenderCostingDetails.submittedFinalPrice} IS NOT NULL)`,
+            ...roleFilterConditions,
+        );
+
+        const notTenderMissed = or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status));
+
+        const pendingFilter = and(
+            TenderInfosService.getExcludeStatusCondition(['lost']),
+            sql`EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                AND ${tenderCostingDetails.status} = 'Submitted')`,
+            notTenderMissed,
+        );
+
+        const approvedFilter = and(
+            sql`NOT EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                AND ${tenderCostingDetails.status} != 'Approved')`,
+            notTenderMissed,
+        );
+
+        const dnbFilter = and(
+            eq(bidSubmissions.status, "Tender Missed"),
+        );
+
+        const [counts] = await this.costingApprovalBaseQuery({
+            pending: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${pendingFilter})`,
+            approved: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${approvedFilter})`,
+            'tender-dnb': sql<number>`count(distinct ${tenderInfos.id}) filter (where ${dnbFilter})`,
+        })
+            .where(baseWhere);
+
+        const pending = Number(counts?.pending ?? 0);
+        const approved = Number(counts?.approved ?? 0);
+        const dnb = Number(counts?.['tender-dnb'] ?? 0);
 
         return {
-            pending: counts[0],
-            approved: counts[1],
-            'tender-dnb': counts[2],
-            total: counts.reduce((sum, count) => sum + count, 0),
+            pending,
+            approved,
+            'tender-dnb': dnb,
+            total: pending + approved + dnb,
         };
     }
 
