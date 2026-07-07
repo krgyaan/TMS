@@ -1,27 +1,26 @@
-import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { and, eq, isNotNull, ne, sql, asc, desc, isNull, inArray, SQL, or, notInArray } from "drizzle-orm";
-import { DRIZZLE } from "@db/database.module";
-import type { DbInstance } from "@db";
-import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
-import { statuses } from "@db/schemas/master/statuses.schema";
-import { users } from "@db/schemas/auth/users.schema";
-import { NewRfq, rfqs, rfqItems, rfqDocuments, rfqResponses, NewRfqItem, NewRfqDocument } from "@db/schemas/tendering/rfqs.schema";
-import { items } from "@db/schemas/master/items.schema";
-import { VendorOrganization, vendorOrganizations } from "@db/schemas/vendors/vendor-organizations.schema";
-import { vendors } from "@db/schemas/vendors/vendors.schema";
-import { CreateRfqDto, UpdateRfqDto } from "./dto/rfq.dto";
-import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
-import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
-import { TenderStatusHistoryService } from "@/modules/tendering/tender-status-history/tender-status-history.service";
+import { bidSubmissions } from "@/db/schemas";
+import { AppLogger } from "@/logger/app-logger.service";
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
 import { EmailService } from "@/modules/email/email.service";
 import { RecipientResolver } from "@/modules/email/recipient.resolver";
-import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
-import { StatusCache } from "@/utils/status-cache";
-import { AppLogger } from "@/logger/app-logger.service";
-import { wrapPaginatedResponse } from "@/utils/responseWrapper";
+import { TenderStatusHistoryService } from "@/modules/tendering/tender-status-history/tender-status-history.service";
+import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
+import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
 import { TimersService } from "@/modules/timers/timers.service";
-import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
-import { bidSubmissions } from "@/db/schemas";
+import { wrapPaginatedResponse } from "@/utils/responseWrapper";
+import type { DbInstance } from "@db";
+import { DRIZZLE } from "@db/database.module";
+import { users } from "@db/schemas/auth/users.schema";
+import { items } from "@db/schemas/master/items.schema";
+import { statuses } from "@db/schemas/master/statuses.schema";
+import { NewRfq, NewRfqDocument, NewRfqItem, rfqDocuments, rfqItems, rfqResponses, rfqs } from "@db/schemas/tendering/rfqs.schema";
+import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
+import { VendorOrganization, vendorOrganizations } from "@db/schemas/vendors/vendor-organizations.schema";
+import { vendors } from "@db/schemas/vendors/vendors.schema";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, sql, SQL } from "drizzle-orm";
+import { CreateRfqDto, UpdateRfqDto } from "./dto/rfq.dto";
 
 export type RfqFilters = {
     rfqStatus?: "pending" | "sent";
@@ -864,8 +863,11 @@ export class RfqsService {
                 });
                 this.logger.log(`Successfully stopped rfq timer for tender ${tenderId}`);
             } catch (error) {
-                this.logger.error(`Failed to stop timer for tender ${tenderId} after RFQ sent:`, error);
-                // Don't fail the entire operation if timer transition fails
+                if (error instanceof ConflictException) {
+                    this.logger.warn(`Timer already completed for tender ${tenderId} after RFQ sent — skipping`);
+                } else {
+                    this.logger.error(`Failed to stop timer for tender ${tenderId} after RFQ sent:`, error);
+                }
             }
         } catch (error) {
             this.logger.error("Unexpected error in background operations:", error);
