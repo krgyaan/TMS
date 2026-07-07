@@ -1,4 +1,4 @@
-import { Inject, Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
@@ -632,7 +632,11 @@ export class TenderApprovalService {
                     await this.timersService.startTimer(timerInput);
                     this.logger.log(`Successfully started timer for stage ${item.stage} for tender ${tenderId}`);
                 } catch (error) {
-                    this.logger.error(`Failed to start timer for stage ${item.stage} for tender ${tenderId}:`, error);
+                    if (error instanceof ConflictException) {
+                        this.logger.warn(`Timer already running for stage ${item.stage} for tender ${tenderId} — skipping`);
+                    } else {
+                        this.logger.error(`Failed to start timer for stage ${item.stage} for tender ${tenderId}:`, error);
+                    }
                 }
             }
 
