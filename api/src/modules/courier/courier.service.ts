@@ -356,7 +356,6 @@ export class CourierService {
                         {
                             to: Array.isArray(toEmail) ? toEmail : [toEmail],
                             cc: Array.isArray(ccMail) ? ccMail : [ccMail],
-                            bcc: ["abhigaur.test@gmail.com"],
                             subject: "Courier Dispatch Request",
                             attachments: courierDocs.length ? { files: courierDocs, baseDir: "courier" } : undefined,
                         },
@@ -493,7 +492,6 @@ export class CourierService {
                             {
                                 to: [recipientUser.email],
                                 cc: Array.isArray(ccMail) ? ccMail : [ccMail],
-                                bcc: ["abhigaur.test@gmail.com"],
                                 subject: `Courier sent to ${updated.toOrg}`,
                                 attachments: file ? { files: file.filename, baseDir: "courier" } : undefined,
                             },
@@ -571,11 +569,6 @@ export class CourierService {
                         this.mailAudience.getAdmin(),
                     ]);
 
-                    this.logger.info("Mail recipients resolved", {
-                        to: recipientUser.email,
-                        cc: ccMail,
-                    });
-
                     const formatDate = (date: Date | string | null | undefined) => {
                         if (!date) return "N/A";
                         return format(new Date(date), "dd MMM yyyy, hh:mm a");
@@ -595,7 +588,6 @@ export class CourierService {
                             to: [recipientUser.email],
                             // [CHANGED] ccMail now comes from getAdmin() instead of getEmailsByRoleId(2)
                             cc: Array.isArray(ccMail) ? ccMail : [ccMail],
-                            bcc: ["abhigaur.test@gmail.com"],
                             subject: `Courier sent to ${courier.toOrg}`,
                             attachments: file ? { files: file.filename, baseDir: "courier" } : undefined,
                         },
