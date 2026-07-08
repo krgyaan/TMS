@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
+import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -19,8 +19,8 @@ import { WIZARD_CONFIG, YES_NO_OPTIONS } from "@/modules/operations/wo-details/h
 import { Page4FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
 import { formToApi } from "../../helpers/woDetail.mapper";
 
-import type { Address, BOQItem, Page4FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
 import NumberInput from "@/components/form/NumberInput";
+import type { Address, BOQItem, Page4FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
 
 interface Page4BillingProps extends PageFormProps {
     initialData?: Partial<Page4FormValues>;
@@ -40,9 +40,8 @@ const defaultAddress: Address = {
     gst: "",
 };
 
-const calculateAmount = (quantity: number | undefined, rate: number | undefined): number => {
+const calculateAmount = (quantity: number | undefined, r = 0): number => {
     const q = quantity ?? 0;
-    const r = rate ?? 0;
     return Number((q * r).toFixed(2));
 };
 
