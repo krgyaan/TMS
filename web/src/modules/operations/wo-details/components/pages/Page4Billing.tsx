@@ -20,6 +20,7 @@ import { Page4FormSchema } from "@/modules/operations/wo-details/helpers/woDetai
 import { formToApi } from "../../helpers/woDetail.mapper";
 
 import type { Address, BOQItem, Page4FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
+import NumberInput from "@/components/form/NumberInput";
 
 interface Page4BillingProps extends PageFormProps {
     initialData?: Partial<Page4FormValues>;
@@ -28,8 +29,8 @@ interface Page4BillingProps extends PageFormProps {
 const defaultBoqItem: BOQItem = {
     srNo: 1,
     itemDescription: "",
-    quantity: "",
-    rate: "",
+    quantity: 0,
+    rate: 0,
 };
 
 const defaultAddress: Address = {
@@ -39,9 +40,9 @@ const defaultAddress: Address = {
     gst: "",
 };
 
-const calculateAmount = (quantity: string | undefined, rate: string | undefined): number => {
-    const q = parseFloat(quantity ?? "0") || 0;
-    const r = parseFloat(rate ?? "0") || 0;
+const calculateAmount = (quantity: number | undefined, rate: number | undefined): number => {
+    const q = quantity ?? 0;
+    const r = rate ?? 0;
     return Number((q * r).toFixed(2));
 };
 
@@ -167,65 +168,24 @@ export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraft
                             return (
                                 <tr key={field.id}>
                                     <td className="p-2">
-                                        <FormField
-                                            control={form.control}
-                                            name={`${namePrefix}.${index}.srNo`}
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormControl>
-                                                        <Input
-                                                            {...field}
-                                                            type="number"
-                                                            className="h-8 text-xs w-16"
-                                                            min={1}
-                                                            onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                                                        />
-                                                    </FormControl>
-                                                </FormItem>
-                                            )}
-                                        />
+                                        <FieldWrapper control={form.control} name={`${namePrefix}.${index}.srNo`} label="">
+                                            {(field) => <NumberInput min={1} {...field} className="h-8 text-xs w-16" />}
+                                        </FieldWrapper>
                                     </td>
                                     <td className="p-2">
-                                        <FormField
-                                            control={form.control}
-                                            name={`${namePrefix}.${index}.itemDescription`}
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormControl>
-                                                        <Input {...field} placeholder="Item description" className="h-8 text-xs" />
-                                                    </FormControl>
-                                                    <FormMessage className="text-xs" />
-                                                </FormItem>
-                                            )}
-                                        />
+                                        <FieldWrapper control={form.control} name={`${namePrefix}.${index}.itemDescription`} label="">
+                                            {(field) => <Input {...field} placeholder="Item description" className="h-8 text-xs" />}
+                                        </FieldWrapper>
                                     </td>
                                     <td className="p-2">
-                                        <FormField
-                                            control={form.control}
-                                            name={`${namePrefix}.${index}.quantity`}
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormControl>
-                                                        <Input {...field} placeholder="0.00" className="h-8 text-xs" />
-                                                    </FormControl>
-                                                    <FormMessage className="text-xs" />
-                                                </FormItem>
-                                            )}
-                                        />
+                                        <FieldWrapper control={form.control} name={`${namePrefix}.${index}.quantity`} label="">
+                                            {(field) => <NumberInput className="h-8 text-xs" {...field} />}
+                                        </FieldWrapper>
                                     </td>
                                     <td className="p-2">
-                                        <FormField
-                                            control={form.control}
-                                            name={`${namePrefix}.${index}.rate`}
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormControl>
-                                                        <Input {...field} placeholder="0.00" className="h-8 text-xs" />
-                                                    </FormControl>
-                                                    <FormMessage className="text-xs" />
-                                                </FormItem>
-                                            )}
-                                        />
+                                        <FieldWrapper control={form.control} name={`${namePrefix}.${index}.rate`} label="">
+                                            {(field) => <NumberInput className="h-8 text-xs" {...field} />}
+                                        </FieldWrapper>
                                     </td>
                                     <td className="p-2">
                                         <span className="text-sm font-medium">₹{amount.toLocaleString()}</span>

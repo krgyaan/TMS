@@ -40,9 +40,9 @@ export interface BOQItem {
   id?: number;
   srNo?: number;
   itemDescription?: string;
-  quantity?: string;
-  rate?: string;
-  amount?: string;
+  quantity?: number;
+  rate?: number;
+  amount?: number;
   sortOrder?: number;
 }
 
