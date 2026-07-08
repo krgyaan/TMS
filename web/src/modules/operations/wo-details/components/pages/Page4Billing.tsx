@@ -45,15 +45,7 @@ const calculateAmount = (quantity: string | undefined, rate: string | undefined)
     return Number((q * r).toFixed(2));
 };
 
-export function Page4Billing({
-    woDetailId,
-    initialData,
-    onSaveDraft,
-    onSaveDraftOnly,
-    onSkip,
-    onBack,
-    isSaving,
-}: Page4BillingProps) {
+export function Page4Billing({ woDetailId, initialData, onSaveDraft, onSaveDraftOnly, onSkip, onBack, isSaving }: Page4BillingProps) {
     const form = useForm<Page4FormValues>({
         resolver: zodResolver(Page4FormSchema) as Resolver<Page4FormValues>,
         defaultValues: {

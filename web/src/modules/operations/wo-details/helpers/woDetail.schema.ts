@@ -70,7 +70,6 @@ export const AddressSchema = z.object({
   address: z.string().optional(),
   gst: z
     .string()
-    .regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, "Invalid GST")
     .optional()
     .or(z.literal("")),
 });
