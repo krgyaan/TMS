@@ -1,4 +1,4 @@
-import { pgTable, bigserial, bigint, varchar, text, date, timestamp, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, varchar, text, date, timestamp, jsonb, index, numeric } from "drizzle-orm/pg-core";
 
 export const purchaseOrders = pgTable(
     "purchase_orders",
@@ -33,6 +33,9 @@ export const purchaseOrders = pgTable(
         team: bigint("team", { mode: "number" }),
         tenderId: bigint("tender_id", { mode: "number" }).notNull(),
         projectId: bigint("project_id", { mode: "number" }).notNull(),
+        tdsPercentage: numeric("tds_percentage", { precision: 5, scale: 2 }),
+        tdsAmount: numeric("tds_amount", { precision: 14, scale: 2 }),
+        amountAfterTds: numeric("amount_after_tds", { precision: 14, scale: 2 }),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         generatedPdfVersions: jsonb("generated_pdf_versions").notNull().default({}),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
