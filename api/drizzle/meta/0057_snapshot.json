@@ -7478,7 +7478,9 @@
         "Security Deposit",
         "Performance BG",
         "Surety Bond",
-        "Other Payment"
+        "Other Payment",
+        "DD",
+        "FDR"
       ]
     },
     "public.payment_request_type": {
