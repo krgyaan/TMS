@@ -104,7 +104,7 @@ const MakerRequestListPage: React.FC = () => {
         { field: "requestNo", headerName: "Request No", sortable: true, filter: true, width: 260, flex: 1 },
         { field: "partyName", headerName: "Party Name", sortable: true, filter: true, flex: 1, minWidth: 150 },
         { field: "amount", headerName: "Amount", sortable: true, valueFormatter: (p: ValueFormatterParams<MakerRequestRow>) => formatINR(p.value) },
-        { field: "categoryName", headerName: "Category", sortable: true, filter: true, width: 140 },
+        { field: "category", headerName: "Category", sortable: true, filter: true, width: 140 },
         {
             field: "status",
             headerName: "Status",
@@ -184,7 +184,7 @@ const MakerRequestListPage: React.FC = () => {
                                 <Label className="text-muted-foreground text-xs">Amount</Label><p className="font-medium">{formatINR(detail.amount)}</p>
                             </div>
                             <div>
-                                <Label className="text-muted-foreground text-xs">Category</Label><p>{detail.categoryName || "—"}</p>
+                                <Label className="text-muted-foreground text-xs">Category</Label><p>{detail.category || "—"}</p>
                             </div>
                             <div>
                                 <Label className="text-muted-foreground text-xs">Account Number</Label><p className="font-mono">{detail.accountNumber}</p>

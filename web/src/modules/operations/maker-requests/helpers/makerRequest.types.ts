@@ -1,13 +1,14 @@
 export interface MakerRequestRow {
     id: number;
     requestNo: string;
-    partyName: string;
-    accountNumber: string;
+    partyName?: string;
+    accountNumber?: string;
     bankName?: string;
-    ifsc: string;
+    ifsc?: string;
     amount: number;
-    categoryId?: number;
-    categoryName?: string;
+    category?: string;
+    paymentMode: string;
+    portalLink?: string;
     billFiles: string[];
     remark?: string;
     status: string;
@@ -19,12 +20,14 @@ export interface MakerRequestRow {
 }
 
 export interface CreateMakerRequestDTO {
-    partyName: string;
-    accountNumber: string;
-    bankName?: string;
-    ifsc: string;
+    paymentMode: 'BANK_TRANSFER' | 'PORTAL';
     amount: number;
-    categoryId?: number;
+    category?: string;
+    partyName?: string;
+    accountNumber?: string;
+    bankName?: string;
+    ifsc?: string;
+    portalLink?: string;
     billFiles?: string[];
     remark?: string;
 }
