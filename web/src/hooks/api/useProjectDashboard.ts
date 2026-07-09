@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { CreatePartyDTO, CreatePurchaseOrderDTO, SetTdsDTO, UpdatePurchaseOrderDTO } from "@/modules/operations/project-dashboard/helpers/projectDashboard.types";
 import { projectDashboardApi } from "@/services/api/project-dashboard.api";
-import type { CreatePurchaseOrderDTO, CreatePartyDTO, UpdatePurchaseOrderDTO } from "@/modules/operations/project-dashboard/helpers/projectDashboard.types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const projectsDashboardKeys = {
     all: ["projects-dashboard"] as const,
@@ -89,6 +89,18 @@ export const useUpdatePurchaseOrder = () => {
     return useMutation({
         mutationFn: ({ id, data }: { id: number; data: UpdatePurchaseOrderDTO }) =>
             projectDashboardApi.updatePurchaseOrder(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: projectsDashboardKeys.all });
+        },
+    });
+};
+
+export const useSetTdsPercentage = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: SetTdsDTO }) =>
+            projectDashboardApi.setTdsPercentage(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: projectsDashboardKeys.all });
         },
