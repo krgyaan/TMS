@@ -1,0 +1,2 @@
+ALTER TABLE maker_requests ADD COLUMN payment_mode VARCHAR(50) NOT NULL DEFAULT 'BANK_TRANSFER';
+ALTER TABLE maker_requests ADD COLUMN portal_link TEXT;
