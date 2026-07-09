@@ -1,11 +1,11 @@
-import { Controller, Get, Post, Param, Body, Query, ParseIntPipe, HttpCode, HttpStatus, Put, Delete, Res, NotFoundException } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Post, Put, Query, Res } from "@nestjs/common";
+import type { Response } from "express";
 import { createReadStream, existsSync } from "fs";
 import { join } from "path";
-import type { Response } from "express";
 
-import { ProjectDashboardService } from "./project-dashboard.service";
 import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import { ProjectDashboardService } from "./project-dashboard.service";
 
 @Controller("projects")
 export class ProjectDashboardController {
@@ -113,6 +113,15 @@ export class ProjectDashboardController {
   @Get("purchase-orders/:id")
   getPurchaseOrder(@Param("id", ParseIntPipe) id: number) {
     return this.service.getPurchaseOrder(id);
+  }
+
+  @Put("purchase-orders/:id/tds")
+  @HttpCode(HttpStatus.OK)
+  setTdsPercentage(
+      @Param("id", ParseIntPipe) id: number,
+      @Body("tdsPercentage") tdsPercentage: number,
+  ) {
+      return this.service.setTdsPercentage(id, tdsPercentage);
   }
 
   @Put("purchase-orders/:id")
