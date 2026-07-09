@@ -4,14 +4,21 @@ import type { MakerRequestFormValues } from "./makerRequest.schema";
 export function mapMakerRequestFormToCreateDTO(
     values: MakerRequestFormValues,
 ): CreateMakerRequestDTO {
-    return {
-        partyName: values.partyName,
-        accountNumber: values.accountNumber,
-        bankName: values.bankName || undefined,
-        ifsc: values.ifsc,
+    const dto: CreateMakerRequestDTO = {
+        paymentMode: values.paymentMode,
         amount: values.amount!,
-        categoryId: values.categoryId ? Number(values.categoryId) : undefined,
+        category: values.categoryId || undefined,
         billFiles: values.billFiles?.length ? values.billFiles : undefined,
         remark: values.remark || undefined,
     };
+
+    if (values.paymentMode === "BANK_TRANSFER") {
+        dto.partyName = values.partyName || undefined;
+        dto.accountNumber = values.accountNumber || undefined;
+        dto.ifsc = values.ifsc || undefined;
+    } else {
+        dto.portalLink = values.portalLink || undefined;
+    }
+
+    return dto;
 }

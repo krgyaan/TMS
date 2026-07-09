@@ -3,7 +3,6 @@ import { eq, like, desc } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { makerRequests } from "@/db/schemas/operations/maker-requests.schema";
-import { imprestCategories } from "@/db/schemas/accounts/imprest-categories.schema";
 import { users } from "@/db/schemas/";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -48,10 +47,11 @@ export class MakerRequestService {
                     requestNo,
                     partyName: body.partyName,
                     accountNumber: body.accountNumber,
-                    bankName: body.bankName,
                     ifsc: body.ifsc,
                     amount: body.amount?.toString(),
-                    categoryId: body.categoryId,
+                    category: body.category,
+                    paymentMode: body.paymentMode || "BANK_TRANSFER",
+                    portalLink: body.portalLink || null,
                     billFiles: body.billFiles || [],
                     remark: body.remark,
                     requestedBy: userId,
@@ -104,10 +104,11 @@ export class MakerRequestService {
         requestNo: makerRequests.requestNo,
         partyName: makerRequests.partyName,
         accountNumber: makerRequests.accountNumber,
-        bankName: makerRequests.bankName,
         ifsc: makerRequests.ifsc,
         amount: makerRequests.amount,
-        categoryId: makerRequests.categoryId,
+        category: makerRequests.category,
+        paymentMode: makerRequests.paymentMode,
+        portalLink: makerRequests.portalLink,
         billFiles: makerRequests.billFiles,
         remark: makerRequests.remark,
         status: makerRequests.status,
@@ -123,11 +124,9 @@ export class MakerRequestService {
             .select({
                 ...this.mrFields,
                 requestedByName: users.name,
-                categoryName: imprestCategories.name,
             })
             .from(makerRequests)
             .leftJoin(users, eq(makerRequests.requestedBy, users.id))
-            .leftJoin(imprestCategories, eq(makerRequests.categoryId, imprestCategories.id))
             .where(eq(makerRequests.id, id));
 
         const mr = rows[0];
@@ -140,11 +139,9 @@ export class MakerRequestService {
             .select({
                 ...this.mrFields,
                 requestedByName: users.name,
-                categoryName: imprestCategories.name,
             })
             .from(makerRequests)
             .leftJoin(users, eq(makerRequests.requestedBy, users.id))
-            .leftJoin(imprestCategories, eq(makerRequests.categoryId, imprestCategories.id))
             .orderBy(desc(makerRequests.id));
     }
 }

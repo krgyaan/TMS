@@ -1,5 +1,4 @@
 import { pgTable, bigserial, bigint, varchar, text, numeric, timestamp, jsonb, index } from "drizzle-orm/pg-core";
-import { imprestCategories } from "@/db/schemas/accounts/imprest-categories.schema";
 
 export const makerRequests = pgTable(
     "maker_requests",
@@ -11,7 +10,9 @@ export const makerRequests = pgTable(
         bankName: varchar("bank_name", { length: 255 }),
         ifsc: varchar("ifsc", { length: 50 }),
         amount: numeric("amount", { precision: 20, scale: 2 }),
-        categoryId: bigint("category_id", { mode: "number" }).references(() => imprestCategories.id),
+        category: varchar("category", { length: 100 }),
+        paymentMode: varchar("payment_mode", { length: 50 }).notNull().default("BANK_TRANSFER"),
+        portalLink: text("portal_link"),
         billFiles: jsonb("bill_files").notNull().default([]),
         remark: text("remark"),
         status: varchar("status", { length: 50 }).notNull().default("pending"),

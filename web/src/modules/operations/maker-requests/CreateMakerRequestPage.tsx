@@ -5,14 +5,14 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SelectField } from "@/components/form/SelectField";
 import { TenderFileUploader } from "@/components/tender-file-upload";
 import { useBeneficiaries, useCreateBeneficiary } from "@/hooks/api/useProjectPaymentRequests";
-import { useImprestCategories } from "@/hooks/api/useImprestCategories";
 import { useCreateMakerRequest } from "@/hooks/api/useMakerRequests";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Landmark, Loader2, Plus, UserPlus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -21,27 +21,69 @@ import { makerRequestFormSchema, type MakerRequestFormValues } from "./helpers/m
 import { mapMakerRequestFormToCreateDTO } from "./helpers/makerRequest.mapper";
 
 const defaultFormValues: MakerRequestFormValues = {
+    selectedHeading: "",
+    categoryId: "",
+    amount: null,
+    paymentMode: "BANK_TRANSFER",
     selectedBeneficiaryId: "",
     partyName: "",
     accountNumber: "",
-    bankName: "",
     ifsc: "",
-    amount: null,
-    categoryId: "",
+    portalLink: "",
     billFiles: [],
     remark: "",
 };
+
+const headings = [
+    {label: 'fixed', value: 'Fixed'},
+    {label: 'loan_return', value: 'Loan Return'},
+    {label: 'own_bank', value: 'Own Bank'},
+    {label: 'capital_asset_purchase', value: 'Capital/Asset Purchase'},
+];
+
+const fixedCategory = [
+    {label: 'imprest', value: 'Imprest'},
+    {label: 'communication', value: 'Communication'},
+    {label: 'courier', value: 'Courier'},
+    {label: 'electricity', value: 'Electricity'},
+    {label: 'rent', value: 'Rent'},
+    {label: 'emi', value: 'EMI'},
+    {label: 'salary', value: 'Salary'},
+    {label: 'software', value: 'Software'},
+    {label: 'office_expenses', value: 'Office Expenses'},
+    {label: 'printing_stationary', value: 'Printing & Stationary'},
+    {label: 'office_maintenance', value: 'Office Maintenance'},
+];
+
+const loanReturnCategory = [
+    {label: 'related_party', value: 'Related Party'},
+    {label: 'nbfc_oc_acc', value: 'NBFC OC Account'},
+    {label: 'loan_principal_return', value: 'Loan Principal Return'},
+];
+
+const ownBankCategory = [
+    {label: 'au_1', value: 'AU-1'},
+    {label: 'au_2', value: 'AU-2'},
+    {label: 'au_3', value: 'AU-3'},
+    {label: 'au_4', value: 'AU-4'},
+    {label: 'au_5', value: 'AU-5'},
+    {label: 'au_6', value: 'AU-6'},
+];
+
+const capitalAssetPurchaseCategory = [
+    {label: 'investment', value: 'Investment'},
+    {label: 'asset_purchase', value: 'Asset Purchase'},
+];
 
 export default function CreateMakerRequestPage() {
     const navigate = useNavigate();
 
     const { data: beneficiaries } = useBeneficiaries();
-    const { data: categories } = useImprestCategories();
     const createMakerMutation = useCreateMakerRequest();
     const createBeneficiaryMutation = useCreateBeneficiary();
 
     const [isAddBeneficiaryOpen, setIsAddBeneficiaryOpen] = useState(false);
-    const [newBeneficiary, setNewBeneficiary] = useState({ name: "", accountNumber: "", ifsc: "", bankName: "" });
+    const [newBeneficiary, setNewBeneficiary] = useState({ name: "", accountNumber: "", ifsc: "" });
 
     const form = useForm<MakerRequestFormValues>({
         resolver: zodResolver(makerRequestFormSchema) as any,
@@ -49,6 +91,27 @@ export default function CreateMakerRequestPage() {
     });
 
     const selectedBeneficiaryId = form.watch("selectedBeneficiaryId");
+    const paymentMode = form.watch("paymentMode");
+    const selectedHeading = form.watch("selectedHeading");
+
+    const headingOptions = useMemo(() => headings.map(h => ({ id: h.label, name: h.value })), []);
+
+    const categoryOptions = useMemo(() => {
+        if (!selectedHeading) return [];
+        const map: Record<string, { label: string; value: string }[]> = {
+            fixed: fixedCategory,
+            loan_return: loanReturnCategory,
+            own_bank: ownBankCategory,
+            capital_asset_purchase: capitalAssetPurchaseCategory,
+        };
+        return (map[selectedHeading] || []).map(c => ({ id: c.label, name: c.value }));
+    }, [selectedHeading]);
+
+    useEffect(() => {
+        if (selectedHeading) {
+            form.setValue("categoryId", "");
+        }
+    }, [selectedHeading, form]);
 
     useEffect(() => {
         if (!selectedBeneficiaryId || !beneficiaries) return;
@@ -56,7 +119,6 @@ export default function CreateMakerRequestPage() {
         if (!ben) return;
         form.setValue("partyName", ben.name || "");
         form.setValue("accountNumber", ben.accountNumber || "");
-        form.setValue("bankName", ben.bankName || "");
         form.setValue("ifsc", ben.ifsc || "");
     }, [selectedBeneficiaryId, beneficiaries, form]);
 
@@ -65,16 +127,11 @@ export default function CreateMakerRequestPage() {
         name: `${b.name} (${b.accountNumber})`,
     }));
 
-    const categoryOptions = (categories || []).map((c: any) => ({
-        id: String(c.id),
-        name: c.name,
-    }));
-
     const handleAddBeneficiary = async () => {
         try {
             const created = await createBeneficiaryMutation.mutateAsync(newBeneficiary);
             form.setValue("selectedBeneficiaryId", String(created.id));
-            setNewBeneficiary({ name: "", accountNumber: "", ifsc: "", bankName: "" });
+            setNewBeneficiary({ name: "", accountNumber: "", ifsc: "" });
             setIsAddBeneficiaryOpen(false);
             toast.success("Beneficiary added successfully");
         } catch {
@@ -115,78 +172,23 @@ export default function CreateMakerRequestPage() {
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                         <div className="border rounded-lg border-dashed p-4 space-y-4">
-                            <h3 className="text-lg font-semibold flex items-center gap-2">
-                                <Landmark className="h-5 w-5" />
-                                Bank Details
-                            </h3>
-                            <div className="flex items-end gap-4">
+                            <h3 className="text-lg font-semibold">Payment Against</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <SelectField
                                     control={form.control}
-                                    name="selectedBeneficiaryId"
-                                    label="Beneficiary (Master)"
-                                    options={beneficiaryOptions}
-                                    placeholder="Select beneficiary..."
+                                    name="selectedHeading"
+                                    label="Category Group"
+                                    options={headingOptions}
+                                    placeholder="Select category group..."
                                 />
-                                <Dialog open={isAddBeneficiaryOpen} onOpenChange={setIsAddBeneficiaryOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button variant="outline" size="sm" type="button" className="mb-1">
-                                            <UserPlus className="mr-2 h-4 w-4" />
-                                            Add New
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>Add New Beneficiary</DialogTitle>
-                                            <DialogDescription>Save beneficiary bank details for future use</DialogDescription>
-                                        </DialogHeader>
-                                        <div className="space-y-4 py-4">
-                                            <div className="space-y-1">
-                                                <Label>Beneficiary Name <span className="text-destructive">*</span></Label>
-                                                <Input value={newBeneficiary.name} onChange={(e) => setNewBeneficiary(prev => ({ ...prev, name: e.target.value }))} placeholder="Enter beneficiary name" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label>Account Number <span className="text-destructive">*</span></Label>
-                                                <Input value={newBeneficiary.accountNumber} onChange={(e) => setNewBeneficiary(prev => ({ ...prev, accountNumber: e.target.value }))} placeholder="Enter account number" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label>IFSC Code <span className="text-destructive">*</span></Label>
-                                                <Input value={newBeneficiary.ifsc} onChange={(e) => setNewBeneficiary(prev => ({ ...prev, ifsc: e.target.value.toUpperCase() }))} placeholder="e.g. SBIN0001234" className="font-mono" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label>Bank Name</Label>
-                                                <Input value={newBeneficiary.bankName} onChange={(e) => setNewBeneficiary(prev => ({ ...prev, bankName: e.target.value }))} placeholder="e.g. State Bank of India" />
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <Button variant="outline" type="button" onClick={() => setIsAddBeneficiaryOpen(false)}>Cancel</Button>
-                                            <Button type="button" onClick={handleAddBeneficiary} disabled={!newBeneficiary.name || !newBeneficiary.accountNumber || !newBeneficiary.ifsc}>
-                                                <Plus className="mr-2 h-4 w-4" />
-                                                Add
-                                            </Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
-                                    {(field) => <Input {...field} placeholder="Enter party name" />}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="accountNumber" label={<>Account Number <span className="text-destructive">*</span></>}>
-                                    {(field) => <Input {...field} placeholder="Enter account number" />}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="bankName" label="Bank Name">
-                                    {(field) => <Input {...field} placeholder="e.g. State Bank of India" />}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="ifsc" label={<>IFSC <span className="text-destructive">*</span></>}>
-                                    {(field) => (
-                                        <Input
-                                            {...field}
-                                            placeholder="e.g. SBIN0001234"
-                                            className="font-mono"
-                                            onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                                        />
-                                    )}
-                                </FieldWrapper>
+                                <SelectField
+                                    control={form.control}
+                                    name="categoryId"
+                                    label="Category"
+                                    options={categoryOptions}
+                                    placeholder={selectedHeading ? "Select category..." : "Select a group first..."}
+                                    disabled={!selectedHeading}
+                                />
                                 <FieldWrapper control={form.control} name="amount" label={<>Amount <span className="text-destructive">*</span></>}>
                                     {(field) => (
                                         <Input
@@ -199,28 +201,117 @@ export default function CreateMakerRequestPage() {
                                     )}
                                 </FieldWrapper>
                             </div>
-                        </div>
+                            
+                            <h3 className="text-lg font-semibold">Payment Mode</h3>
+                            <RadioGroup
+                                value={paymentMode}
+                                onValueChange={(v) => form.setValue("paymentMode", v as "BANK_TRANSFER" | "PORTAL")}
+                                className="flex gap-6"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <RadioGroupItem value="BANK_TRANSFER" id="bank-transfer" />
+                                    <Label htmlFor="bank-transfer" className="cursor-pointer">Bank Transfer</Label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <RadioGroupItem value="PORTAL" id="pay-on-portal" />
+                                    <Label htmlFor="pay-on-portal" className="cursor-pointer">Pay on Portal</Label>
+                                </div>
+                            </RadioGroup>
 
-                        <div className="border rounded-lg border-dashed p-4 space-y-4">
-                            <h3 className="text-lg font-semibold">Category & Attachments</h3>
-                            <div className="max-w-md">
-                                <SelectField
-                                    control={form.control}
-                                    name="categoryId"
-                                    label="Category"
-                                    options={categoryOptions}
-                                    placeholder="Select category..."
+                            {paymentMode === "BANK_TRANSFER" && (
+                                <div className="border rounded-lg bg-muted/30 p-4 space-y-4">
+                                    <h4 className="text-md font-semibold flex items-center gap-2">
+                                        <Landmark className="h-4 w-4" />
+                                        Beneficiary Details
+                                    </h4>
+                                    <div className="flex items-end gap-4">
+                                        <SelectField
+                                            control={form.control}
+                                            name="selectedBeneficiaryId"
+                                            label="Beneficiary (Master)"
+                                            options={beneficiaryOptions}
+                                            placeholder="Select beneficiary..."
+                                        />
+                                        <Dialog open={isAddBeneficiaryOpen} onOpenChange={setIsAddBeneficiaryOpen}>
+                                            <DialogTrigger asChild>
+                                                <Button variant="outline" size="sm" type="button" className="mb-1">
+                                                    <UserPlus className="mr-2 h-4 w-4" />
+                                                    Add New
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Add New Beneficiary</DialogTitle>
+                                                    <DialogDescription>Save beneficiary bank details for future use</DialogDescription>
+                                                </DialogHeader>
+                                                <div className="space-y-4 py-4">
+                                                    <div className="space-y-1">
+                                                        <Label>Beneficiary Name <span className="text-destructive">*</span></Label>
+                                                        <Input value={newBeneficiary.name} onChange={(e) => setNewBeneficiary(prev => ({ ...prev, name: e.target.value }))} placeholder="Enter beneficiary name" />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <Label>Account Number <span className="text-destructive">*</span></Label>
+                                                        <Input value={newBeneficiary.accountNumber} onChange={(e) => setNewBeneficiary(prev => ({ ...prev, accountNumber: e.target.value }))} placeholder="Enter account number" />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <Label>IFSC Code <span className="text-destructive">*</span></Label>
+                                                        <Input value={newBeneficiary.ifsc} onChange={(e) => setNewBeneficiary(prev => ({ ...prev, ifsc: e.target.value.toUpperCase() }))} placeholder="e.g. SBIN0001234" className="font-mono" />
+                                                    </div>
+                                                </div>
+                                                <DialogFooter>
+                                                    <Button variant="outline" type="button" onClick={() => setIsAddBeneficiaryOpen(false)}>Cancel</Button>
+                                                    <Button type="button" onClick={handleAddBeneficiary} disabled={!newBeneficiary.name || !newBeneficiary.accountNumber || !newBeneficiary.ifsc}>
+                                                        <Plus className="mr-2 h-4 w-4" />
+                                                        Add
+                                                    </Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
+                                            {(field) => <Input {...field} placeholder="Enter party name" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="accountNumber" label={<>Account Number <span className="text-destructive">*</span></>}>
+                                            {(field) => <Input {...field} placeholder="Enter account number" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="ifsc" label={<>IFSC <span className="text-destructive">*</span></>}>
+                                            {(field) => (
+                                                <Input
+                                                    {...field}
+                                                    placeholder="e.g. SBIN0001234"
+                                                    className="font-mono"
+                                                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                    </div>
+                                </div>
+                            )}
+
+                            {paymentMode === "PORTAL" && (
+                                <div className="border rounded-lg bg-muted/30 p-4 space-y-4">
+                                    <h4 className="text-md font-semibold">Portal Link</h4>
+                                    <div className="max-w-md">
+                                        <FieldWrapper control={form.control} name="portalLink" label="Portal URL">
+                                            {(field) => <Input {...field} placeholder="Enter portal payment link..." />}
+                                        </FieldWrapper>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            <h3 className="text-lg font-semibold">Proof & Remark</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                                <TenderFileUploader
+                                    label="Upload Proof"
+                                    context="tender-documents"
+                                    value={form.watch("billFiles")}
+                                    onChange={(paths) => form.setValue("billFiles", paths)}
                                 />
+                                <FieldWrapper control={form.control} name="remark" label="Remark (if any)">
+                                    {(field) => <Input {...field} placeholder="Optional remarks" />}
+                                </FieldWrapper>
                             </div>
-                            <TenderFileUploader
-                                label="Upload Bill / Proof"
-                                context="tender-documents"
-                                value={form.watch("billFiles")}
-                                onChange={(paths) => form.setValue("billFiles", paths)}
-                            />
-                            <FieldWrapper control={form.control} name="remark" label="Remark">
-                                {(field) => <Input {...field} placeholder="Optional remarks" />}
-                            </FieldWrapper>
                         </div>
 
                         <div className="flex items-end justify-end">
