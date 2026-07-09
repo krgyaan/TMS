@@ -3,7 +3,6 @@ export interface MakerRequestRow {
     requestNo: string;
     partyName?: string;
     accountNumber?: string;
-    bankName?: string;
     ifsc?: string;
     amount: number;
     category?: string;
@@ -25,7 +24,6 @@ export interface CreateMakerRequestDTO {
     category?: string;
     partyName?: string;
     accountNumber?: string;
-    bankName?: string;
     ifsc?: string;
     portalLink?: string;
     billFiles?: string[];

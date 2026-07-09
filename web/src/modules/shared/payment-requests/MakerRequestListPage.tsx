@@ -190,9 +190,6 @@ const MakerRequestListPage: React.FC = () => {
                                 <Label className="text-muted-foreground text-xs">Account Number</Label><p className="font-mono">{detail.accountNumber}</p>
                             </div>
                             <div>
-                                <Label className="text-muted-foreground text-xs">Bank Name</Label><p>{detail.bankName || "—"}</p>
-                            </div>
-                            <div>
                                 <Label className="text-muted-foreground text-xs">IFSC</Label><p className="font-mono">{detail.ifsc}</p>
                             </div>
                             <div>

@@ -15,7 +15,6 @@ export function mapMakerRequestFormToCreateDTO(
     if (values.paymentMode === "BANK_TRANSFER") {
         dto.partyName = values.partyName || undefined;
         dto.accountNumber = values.accountNumber || undefined;
-        dto.bankName = values.bankName || undefined;
         dto.ifsc = values.ifsc || undefined;
     } else {
         dto.portalLink = values.portalLink || undefined;

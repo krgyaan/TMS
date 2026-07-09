@@ -28,7 +28,6 @@ const defaultFormValues: MakerRequestFormValues = {
     selectedBeneficiaryId: "",
     partyName: "",
     accountNumber: "",
-    bankName: "",
     ifsc: "",
     portalLink: "",
     billFiles: [],
@@ -84,7 +83,7 @@ export default function CreateMakerRequestPage() {
     const createBeneficiaryMutation = useCreateBeneficiary();
 
     const [isAddBeneficiaryOpen, setIsAddBeneficiaryOpen] = useState(false);
-    const [newBeneficiary, setNewBeneficiary] = useState({ name: "", accountNumber: "", ifsc: "", bankName: "" });
+    const [newBeneficiary, setNewBeneficiary] = useState({ name: "", accountNumber: "", ifsc: "" });
 
     const form = useForm<MakerRequestFormValues>({
         resolver: zodResolver(makerRequestFormSchema) as any,
@@ -120,7 +119,6 @@ export default function CreateMakerRequestPage() {
         if (!ben) return;
         form.setValue("partyName", ben.name || "");
         form.setValue("accountNumber", ben.accountNumber || "");
-        form.setValue("bankName", ben.bankName || "");
         form.setValue("ifsc", ben.ifsc || "");
     }, [selectedBeneficiaryId, beneficiaries, form]);
 
@@ -133,7 +131,7 @@ export default function CreateMakerRequestPage() {
         try {
             const created = await createBeneficiaryMutation.mutateAsync(newBeneficiary);
             form.setValue("selectedBeneficiaryId", String(created.id));
-            setNewBeneficiary({ name: "", accountNumber: "", ifsc: "", bankName: "" });
+            setNewBeneficiary({ name: "", accountNumber: "", ifsc: "" });
             setIsAddBeneficiaryOpen(false);
             toast.success("Beneficiary added successfully");
         } catch {
@@ -259,10 +257,6 @@ export default function CreateMakerRequestPage() {
                                                         <Label>IFSC Code <span className="text-destructive">*</span></Label>
                                                         <Input value={newBeneficiary.ifsc} onChange={(e) => setNewBeneficiary(prev => ({ ...prev, ifsc: e.target.value.toUpperCase() }))} placeholder="e.g. SBIN0001234" className="font-mono" />
                                                     </div>
-                                                    <div className="space-y-1">
-                                                        <Label>Bank Name</Label>
-                                                        <Input value={newBeneficiary.bankName} onChange={(e) => setNewBeneficiary(prev => ({ ...prev, bankName: e.target.value }))} placeholder="e.g. State Bank of India" />
-                                                    </div>
                                                 </div>
                                                 <DialogFooter>
                                                     <Button variant="outline" type="button" onClick={() => setIsAddBeneficiaryOpen(false)}>Cancel</Button>
@@ -280,9 +274,6 @@ export default function CreateMakerRequestPage() {
                                         </FieldWrapper>
                                         <FieldWrapper control={form.control} name="accountNumber" label={<>Account Number <span className="text-destructive">*</span></>}>
                                             {(field) => <Input {...field} placeholder="Enter account number" />}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="bankName" label="Bank Name">
-                                            {(field) => <Input {...field} placeholder="e.g. State Bank of India" />}
                                         </FieldWrapper>
                                         <FieldWrapper control={form.control} name="ifsc" label={<>IFSC <span className="text-destructive">*</span></>}>
                                             {(field) => (

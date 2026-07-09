@@ -11,7 +11,6 @@ export const makerRequestFormSchema = z.object({
     selectedBeneficiaryId: z.string().default(""),
     partyName: z.string().default(""),
     accountNumber: z.string().default(""),
-    bankName: z.string().default(""),
     ifsc: z.string().default(""),
 
     portalLink: z.string().default(""),
