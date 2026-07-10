@@ -29,7 +29,7 @@ export type SrNosDto = z.infer<typeof SrNosSchema>;
 /**
  * GST Number Schema
  */
-export const GSTSchema = z.string()
+export const GSTSchema = z.string().trim().max(15, "GST must be at most 15 characters")
 /**
  * Address Schema
  */
