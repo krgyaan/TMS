@@ -23,7 +23,7 @@ export class PaymentRequestService {
         const year = now.getFullYear();
         const month = now.getMonth() + 1;
         const from = month >= 4 ? year.toString().slice(-2) : (year - 1).toString().slice(-2);
-        const to = ((parseInt(from) + 1) % 100).toString().padStart(2, "0");
+        const to = ((Number.parseInt(from) + 1) % 100).toString().padStart(2, "0");
         const fy = `${from}${to}`;
 
         const sanitizedName = projectName ? this.sanitizeProjectName(projectName) : "PROJECT";
@@ -37,7 +37,7 @@ export class PaymentRequestService {
 
         let next = 1;
         if (last[0]?.requestNo) {
-            const match = last[0].requestNo.match(/PR(\d{4})$/);
+            const match = RegExp(/PR(\d{4})$/).exec(last[0].requestNo);
             if (match) next = parseInt(match[1]) + 1;
         }
 
