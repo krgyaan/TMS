@@ -31,7 +31,7 @@ const TDS_RATES = [
 
 function parsePercentage(rateValue: string): number {
     const parts = rateValue.split("_");
-    return Number(parts[parts.length - 1]) || 0;
+    return Number(parts.at(-1)) || 0;
 }
 
 interface SetTdsDialogProps {
