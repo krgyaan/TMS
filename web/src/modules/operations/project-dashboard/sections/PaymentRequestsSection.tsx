@@ -18,6 +18,7 @@ import { Eye, Edit, Plus } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { tenderFilesService } from "@/services/api/tender-files.service";
+import { projectDashboardApi } from "@/services/api/project-dashboard.api";
 
 const PAYMENT_AGAINST_LABELS: Record<string, string> = {
     upload_invoice: "Upload Invoice",
@@ -231,9 +232,71 @@ export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
                                 <p>{PAYMENT_AGAINST_LABELS[detail.paymentAgainst] || detail.paymentAgainst}</p>
                             </div>
                             {detail.purchaseOrderId && (
-                                <div className="col-span-2">
-                                    <Label className="text-muted-foreground text-xs">PO Reference</Label>
-                                    <p>{detail.poNumber || `#${detail.purchaseOrderId}`}</p>
+                                <div className="col-span-2 space-y-2">
+                                    <Label className="text-muted-foreground text-xs">PO Details</Label>
+                                    <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">PO Number:</span>
+                                            <span className="font-medium">{detail.poNumber || `#${detail.purchaseOrderId}`}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Total (Pre-GST):</span>
+                                            <span>{formatINR(detail.poTotalAmount || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">GST Amount:</span>
+                                            <span>{formatINR(detail.poTotalGstAmt || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-medium">
+                                            <span>Grand Total:</span>
+                                            <span>{formatINR(detail.poGrandTotal || 0)}</span>
+                                        </div>
+                                        {detail.poTdsPercentage && Number(detail.poTdsPercentage) > 0 && (
+                                            <>
+                                                <div className="border-t my-1.5" />
+                                                <div className="flex justify-between text-destructive">
+                                                    <span>TDS @ {Number(detail.poTdsPercentage)}%:</span>
+                                                    <span>-{formatINR(detail.poTdsAmount || 0)}</span>
+                                                </div>
+                                                <div className="flex justify-between font-semibold">
+                                                    <span>Amount After TDS:</span>
+                                                    <span>{formatINR(detail.poAmountAfterTds || 0)}</span>
+                                                </div>
+                                            </>
+                                        )}
+                                        <div className="border-t my-1.5" />
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Payment Requested:</span>
+                                            <span>{formatINR(detail.poTotalPaymentRequested || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between pl-2 text-muted-foreground">
+                                            <span>Maker Done:</span>
+                                            <span>{formatINR(detail.poTotalMakerDone || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between pl-2 text-muted-foreground">
+                                            <span>Payment Done:</span>
+                                            <span>{formatINR(detail.poTotalPaymentDone || 0)}</span>
+                                        </div>
+                                        {(() => {
+                                            const remaining = (detail.poAmountAfterTds ? Number(detail.poAmountAfterTds) : Number(detail.poGrandTotal || 0)) - Number(detail.poTotalPaymentRequested || 0);
+                                            return (
+                                                <div className={`flex justify-between font-medium ${remaining < 0 ? "text-destructive" : ""}`}>
+                                                    <span>Remaining:</span>
+                                                    <span>{formatINR(remaining)}</span>
+                                                </div>
+                                            );
+                                        })()}
+                                        <div className="pt-2">
+                                            <a
+                                                href={projectDashboardApi.getPurchaseOrderPdfUrl(detail.purchaseOrderId)}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-blue-600 underline text-xs"
+                                            >
+                                                View Latest PO PDF
+                                            </a>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                             {detail.paymentAgainst === "new_pi" && (
