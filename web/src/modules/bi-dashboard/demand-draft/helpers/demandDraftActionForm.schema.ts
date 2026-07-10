@@ -44,69 +44,61 @@ export const DemandDraftActionFormSchema = BaseActionFormSchema.extend({
     cancellation_date: z.string().optional(),
     cancellation_amount: z.coerce.number().optional(),
     cancellation_reference_no: z.string().optional(),
-}).refine(
-    (data) => {
-        if (data.action === 'accounts-form') {
-            return !!data.dd_req;
+}).superRefine((data, ctx) => {
+    if (data.action === 'accounts-form') {
+        if (!data.dd_req) {
+            ctx.addIssue({ code: 'custom', message: 'DD Request status is required', path: ['dd_req'] });
+            return;
         }
-        return true;
-    },
-    { message: 'DD Request status is required', path: ['dd_req'] }
-).refine(
-    (data) => {
-        if (data.action === 'accounts-form' && data.dd_req === 'Rejected') {
-            return !!data.reason_req;
+        if (data.dd_req === 'Rejected' && !data.reason_req) {
+            ctx.addIssue({ code: 'custom', message: 'Reason for rejection is required', path: ['reason_req'] });
+            return;
         }
-        return true;
-    },
-    { message: 'Reason for rejection is required', path: ['reason_req'] }
-).refine(
-    (data) => {
-        if (data.action === 'accounts-form' && data.dd_req === 'Accepted') {
-            return !!data.dd_date && !!data.dd_no &&
-                !!data.courierOrg && !!data.courierName && !!data.courierPhone &&
-                !!data.courierAddrLine1 && !!data.courierPincode &&
-                /^\d{6}$/.test(data.courierPincode || '') &&
-                !!data.empFrom && !!data.delDate && !!data.urgency;
+        if (data.dd_req === 'Accepted') {
+            if (!data.dd_date) ctx.addIssue({ code: 'custom', message: 'DD date is required', path: ['dd_date'] });
+            if (!data.dd_no) ctx.addIssue({ code: 'custom', message: 'DD number is required', path: ['dd_no'] });
+            if (!data.courierOrg) ctx.addIssue({ code: 'custom', message: 'Organization name is required', path: ['courierOrg'] });
+            if (!data.courierName) ctx.addIssue({ code: 'custom', message: 'Recipient name is required', path: ['courierName'] });
+            if (!data.courierPhone) ctx.addIssue({ code: 'custom', message: 'Phone is required', path: ['courierPhone'] });
+            if (!data.courierAddrLine1) ctx.addIssue({ code: 'custom', message: 'Address line 1 is required', path: ['courierAddrLine1'] });
+            if (!data.courierPincode) {
+                ctx.addIssue({ code: 'custom', message: 'Pin code is required', path: ['courierPincode'] });
+            } else if (!/^\d{6}$/.test(data.courierPincode)) {
+                ctx.addIssue({ code: 'custom', message: 'Pin code must be 6 digits', path: ['courierPincode'] });
+            }
+            if (!data.empFrom) ctx.addIssue({ code: 'custom', message: 'Courier from employee is required', path: ['empFrom'] });
+            if (!data.delDate) ctx.addIssue({ code: 'custom', message: 'Delivery date is required', path: ['delDate'] });
+            if (!data.urgency) ctx.addIssue({ code: 'custom', message: 'Dispatch urgency is required', path: ['urgency'] });
         }
-        return true;
-    },
-    { message: 'DD date, DD number, and courier dispatch details are required when accepted', path: ['dd_date'] }
-).refine(
-    (data) => {
-        if (data.action === 'initiate-followup') {
-            if (!data.organisation_name) return false;
-            if (!data.contacts || data.contacts.length === 0) return false;
-            if (!data.frequency) return false;
-            return data.contacts.every(contact => contact.name && contact.phone);
+    }
+
+    if (data.action === 'initiate-followup') {
+        if (!data.organisation_name) ctx.addIssue({ code: 'custom', message: 'Organisation name is required', path: ['organisation_name'] });
+        if (!data.contacts || data.contacts.length === 0) {
+            ctx.addIssue({ code: 'custom', message: 'At least one contact is required', path: ['contacts'] });
+        } else {
+            data.contacts.forEach((contact, index) => {
+                if (!contact.name) ctx.addIssue({ code: 'custom', message: 'Contact name is required', path: ['contacts', index, 'name'] });
+                if (!contact.phone) ctx.addIssue({ code: 'custom', message: 'Contact phone is required', path: ['contacts', index, 'phone'] });
+            });
         }
-        return true;
-    },
-    { message: 'Organisation name, at least one contact with name and phone, and frequency are required', path: ['organisation_name'] }
-).refine(
-    (data) => {
-        if (data.action === 'returned-courier') {
-            return !!data.docket_no;
-        }
-        return true;
-    },
-    { message: 'Docket number is required', path: ['docket_no'] }
-).refine(
-    (data) => {
-        if (data.action === 'returned-bank-transfer') {
-            return !!data.transfer_date && !!data.utr;
-        }
-        return true;
-    },
-    { message: 'Transfer date and UTR are required', path: ['transfer_date'] }
-).refine(
-    (data) => {
-        if (data.action === 'cancellation-confirmation') {
-            return !!data.cancellation_date && !!data.cancellation_amount && !!data.cancellation_reference_no;
-        }
-        return true;
-    },
-    { message: 'Cancellation date, amount, and reference number are required', path: ['cancellation_date'] }
-);
+        if (!data.frequency) ctx.addIssue({ code: 'custom', message: 'Follow-up frequency is required', path: ['frequency'] });
+    }
+
+    if (data.action === 'returned-courier' && !data.docket_no) {
+        ctx.addIssue({ code: 'custom', message: 'Docket number is required', path: ['docket_no'] });
+    }
+
+    if (data.action === 'returned-bank-transfer') {
+        if (!data.transfer_date) ctx.addIssue({ code: 'custom', message: 'Transfer date is required', path: ['transfer_date'] });
+        if (!data.utr) ctx.addIssue({ code: 'custom', message: 'UTR number is required', path: ['utr'] });
+    }
+
+    if (data.action === 'cancellation-confirmation') {
+        if (!data.cancellation_date) ctx.addIssue({ code: 'custom', message: 'Cancellation date is required', path: ['cancellation_date'] });
+        if (!data.cancellation_amount) ctx.addIssue({ code: 'custom', message: 'Cancellation amount is required', path: ['cancellation_amount'] });
+        if (!data.cancellation_reference_no) ctx.addIssue({ code: 'custom', message: 'Bank reference number is required', path: ['cancellation_reference_no'] });
+    }
+});
 
 export type DemandDraftActionFormValues = z.infer<typeof DemandDraftActionFormSchema>;
