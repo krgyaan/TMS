@@ -17,6 +17,12 @@ const VALID_PURPOSE_VALUES = [
     'BID_BOND',
     'DD',
     'FDR',
+    'EMD',
+    'TENDER_FEES',
+    'PROCESSING_FEES',
+    'SECURITY_DEPOSIT',
+    'OTHER_PAYMENT',
+    'OTHER_SECURITY',
 ] as const;
 
 const optionalString = z
