@@ -27,6 +27,15 @@ export interface PaymentRequestRow {
     piGstAmount?: string | null;
     piInvoiceDate?: string;
     piInvoiceFile?: string | null;
+    poTotalAmount?: number | string;
+    poTotalGstAmt?: number | string;
+    poGrandTotal?: number | string;
+    poTdsPercentage?: number | string;
+    poTdsAmount?: number | string;
+    poAmountAfterTds?: number | string;
+    poTotalPaymentRequested?: number | string;
+    poTotalMakerDone?: number | string;
+    poTotalPaymentDone?: number | string;
 }
 
 export interface CreatePaymentRequestDTO {
