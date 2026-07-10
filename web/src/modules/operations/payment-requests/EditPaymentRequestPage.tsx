@@ -47,15 +47,8 @@ export default function EditPaymentRequestPage() {
             amount: null,
             selectedPoId: "",
             paymentAgainst: "",
-            uploadedInvoiceFile: [],
             poFile: [],
             remark: "",
-            pi_category: "",
-            pi_partyName: "",
-            pi_valuePreGst: null,
-            pi_gstAmount: null,
-            pi_invoiceDate: "",
-            pi_invoiceFile: [],
         },
     });
 
@@ -70,15 +63,8 @@ export default function EditPaymentRequestPage() {
                 ifsc: paymentRequest.ifsc || "",
                 amount: Number(paymentRequest.amount) || null,
                 paymentAgainst: paymentRequest.paymentAgainst || "",
-                uploadedInvoiceFile: paymentRequest.uploadedInvoiceFile ? [paymentRequest.uploadedInvoiceFile] : [],
                 poFile: paymentRequest.poFile ? [paymentRequest.poFile] : [],
                 remark: paymentRequest.remark || "",
-                pi_category: "",
-                pi_partyName: "",
-                pi_valuePreGst: null,
-                pi_gstAmount: null,
-                pi_invoiceDate: "",
-                pi_invoiceFile: [],
             });
         }
     }, [paymentRequest, form]);

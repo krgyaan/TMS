@@ -198,7 +198,7 @@ export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
                         </div>
                     ) : detail ? (
                         <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-4">
-                            <div>
+                            <div className="col-span-2">
                                 <Label className="text-muted-foreground text-xs">Request No</Label>
                                 <p className="font-mono font-medium">{detail.requestNo}</p>
                             </div>
@@ -231,7 +231,7 @@ export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
                                 <p>{PAYMENT_AGAINST_LABELS[detail.paymentAgainst] || detail.paymentAgainst}</p>
                             </div>
                             {detail.purchaseOrderId && (
-                                <div>
+                                <div className="col-span-2">
                                     <Label className="text-muted-foreground text-xs">PO Reference</Label>
                                     <p>{detail.poNumber || `#${detail.purchaseOrderId}`}</p>
                                 </div>

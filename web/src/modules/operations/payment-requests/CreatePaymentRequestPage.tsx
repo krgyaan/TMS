@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBeneficiaries, useCreateBeneficiary, useCreatePaymentRequest, useNextPRNumber } from "@/hooks/api/useProjectPaymentRequests";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
-import { purchaseInvoiceApi } from "@/services/api/purchase-invoice.api";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Building2, Hash, Landmark, Loader2, Plus, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -31,15 +30,8 @@ const defaultFormValues: PaymentRequestFormValues = {
     amount: null,
     selectedPoId: "",
     paymentAgainst: "",
-    uploadedInvoiceFile: [],
     poFile: [],
     remark: "",
-    pi_category: "",
-    pi_partyName: "",
-    pi_valuePreGst: null,
-    pi_gstAmount: null,
-    pi_invoiceDate: "",
-    pi_invoiceFile: [],
 };
 
 export default function CreatePaymentRequestPage() {
@@ -95,20 +87,6 @@ export default function CreatePaymentRequestPage() {
     const handleSubmit = async (values: PaymentRequestFormValues) => {
         try {
             const prData = mapPaymentRequestFormToCreateDTO(values, projectId, projectName);
-
-            if (values.paymentAgainst === "new_pi") {
-                const pi = await purchaseInvoiceApi.create({
-                    projectId,
-                    projectName: projectName || undefined,
-                    category: values.pi_category,
-                    partyName: values.pi_partyName,
-                    valuePreGst: values.pi_valuePreGst!,
-                    gstAmount: values.pi_gstAmount!,
-                    invoiceDate: values.pi_invoiceDate,
-                    invoiceFile: values.pi_invoiceFile?.[0],
-                });
-                prData.purchaseInvoiceId = pi.id;
-            }
 
             const result = await createPRMutation.mutateAsync(prData);
             toast.success(`Payment Request #${result.requestNo} created successfully.`);
