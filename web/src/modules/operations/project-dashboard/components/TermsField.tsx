@@ -24,6 +24,7 @@ export const TERMS_FIELD_OPTIONS = [
   "Documentation",
   "PO Validity",
   "Warranty",
+  "Remarks/Note",
 ] as const;
 
 export const DEFAULT_TERMS_ROWS: { field: string; value: string }[] = [
@@ -41,6 +42,7 @@ export const DEFAULT_TERMS_ROWS: { field: string; value: string }[] = [
   { field: "Documentation", value: "" },
   { field: "PO Validity", value: "" },
   { field: "Warranty", value: "" },
+  { field: "Remarks/Note", value: "" },
 ];
 
 interface TermsFieldProps {

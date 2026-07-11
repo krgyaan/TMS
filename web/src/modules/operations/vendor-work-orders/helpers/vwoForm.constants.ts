@@ -12,6 +12,7 @@ export const VWO_TERMS_OPTIONS = [
   "Termination",
   "Dispute Resolution",
   "Scope of Work",
+  "Remarks/Note",
 ] as const;
 
 export const DEFAULT_VWO_TERMS_ROWS: { field: string; value: string }[] = [
@@ -27,4 +28,5 @@ export const DEFAULT_VWO_TERMS_ROWS: { field: string; value: string }[] = [
   { field: "Confidentiality", value: "" },
   { field: "Termination", value: "" },
   { field: "Dispute Resolution", value: "" },
+  { field: "Remarks/Note", value: "" },
 ];
