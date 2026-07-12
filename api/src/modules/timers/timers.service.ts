@@ -28,12 +28,6 @@ export class TimersService {
         // Calculate allocated time
         const allocatedTimeMs = this.calculateAllocatedTime(input);
 
-        //THE CHECK BELOW IS NOT REQUIRED, THE ALLOCATED TIME CAN BE NEGATIVE
-
-        // if (allocatedTimeMs <= 0) {
-        //     throw new BadRequestException('Allocated time must be greater than 0');
-        // }
-
         const now = new Date();
         const deadline = input.deadlineAt || new Date(now.getTime() + allocatedTimeMs);
 
@@ -461,7 +455,7 @@ export class TimersService {
 
         // Priority 2: Timer config
         if (input.timerConfig) {
-            const { type, durationHours, hoursBeforeDeadline } = input.timerConfig;
+            const { type, durationHours } = input.timerConfig;
 
             switch (type) {
                 case 'FIXED_DURATION':
@@ -474,9 +468,8 @@ export class TimersService {
                     break;
 
                 case 'NEGATIVE_COUNTDOWN':
-                    if (input.deadlineAt && hoursBeforeDeadline) {
-                        const targetTime = new Date(input.deadlineAt).getTime() + hoursToMs(hoursBeforeDeadline);
-                        return targetTime - Date.now();
+                    if (input.deadlineAt) {
+                        return new Date(input.deadlineAt).getTime() - Date.now();
                     }
                     break;
 
