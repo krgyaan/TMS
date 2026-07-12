@@ -58,8 +58,10 @@ export const SetTdsDialog: React.FC<SetTdsDialogProps> = ({ po, open, onClose })
 
     const selectedRate = watch("tdsRate");
     const tdsPercentage = selectedRate ? parsePercentage(selectedRate) : 0;
-    const tdsAmount = (po.grandTotal * tdsPercentage) / 100;
-    const amountAfterTds = po.grandTotal - tdsAmount;
+    const subtotal = Number(po.totalAmount) || 0;
+    const grandTotal = Number(po.grandTotal) || 0;
+    const tdsAmount = (subtotal * tdsPercentage) / 100;
+    const amountAfterTds = grandTotal - tdsAmount;
 
     const { mutate: saveTds, isPending } = useSetTdsPercentage();
 

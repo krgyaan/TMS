@@ -515,8 +515,8 @@ export class ProjectDashboardService {
             .from(purchaseOrderProducts)
             .where(eq(purchaseOrderProducts.purchaseOrderId, id));
 
-        const { totalWithGst: grandTotal } = this.getTotalProductValues(products);
-        const tdsAmount = (grandTotal * tdsPercentage) / 100;
+        const { total: subtotal, totalWithGst: grandTotal } = this.getTotalProductValues(products);
+        const tdsAmount = (subtotal * tdsPercentage) / 100;
         const amountAfterTds = grandTotal - tdsAmount;
 
         const [updated] = await this.db
