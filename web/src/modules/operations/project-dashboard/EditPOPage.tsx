@@ -17,7 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useCreatePoParty, usePoParties, usePurchaseOrderDetails, useUpdatePurchaseOrder } from "@/hooks/api/useProjectDashboard";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, ArrowLeft, Building2, Calendar, Hash, Info, Loader2, Mail, MapPin, Phone, Save, UserCheck, UserPlus } from "lucide-react";
+import { AlertCircle, ArrowLeft, Building2, Calendar, FileText, Hash, Info, Loader2, Mail, MapPin, Phone, Save, UserCheck, UserPlus } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
@@ -39,6 +39,8 @@ interface NewPartyForm {
 }
 
 const defaultFormValues: PurchaseOrderFormValues = {
+    poType: "new",
+    piAttachments: [],
     poDate: "",
     sellerId: "",
     sellerName: "",
@@ -187,6 +189,8 @@ export default function EditPOPage() {
     useEffect(() => {
         if (!poData) return;
         form.reset({
+            poType: poData.poType || "new",
+            piAttachments: poData.piAttachments ? (typeof poData.piAttachments === 'string' ? JSON.parse(poData.piAttachments) : poData.piAttachments) : [],
             poDate: formatDateForInput(poData.poDate),
             sellerId: "",
             sellerName: poData.sellerName || "",
@@ -302,6 +306,50 @@ export default function EditPOPage() {
                 </div>
             </CardHeader>
             <CardContent className="space-y-8">
+                {/* ── PO Type ── */}
+                <div className="rounded-lg border p-4 space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        PO Type
+                    </h3>
+                    <div className="flex gap-4">
+                        <div className={`flex-1 rounded-lg border-2 p-4 ${
+                            poData?.poType === "pi" ? "border-muted" : "border-primary bg-primary/5"
+                        }`}>
+                            <p className="font-semibold text-base">New PO</p>
+                            <p className="text-sm text-muted-foreground mt-1">Fresh purchase order</p>
+                        </div>
+                        <div className={`flex-1 rounded-lg border-2 p-4 ${
+                            poData?.poType === "pi" ? "border-primary bg-primary/5" : "border-muted"
+                        }`}>
+                            <p className="font-semibold text-base">PI Based</p>
+                            <p className="text-sm text-muted-foreground mt-1">Against proforma invoice</p>
+                        </div>
+                    </div>
+                    {poData?.poType === "pi" && poData?.piAttachments && (
+                        <div className="pt-2">
+                            <p className="text-sm font-medium mb-2">Invoice Copy</p>
+                            {(() => {
+                                const attachments = typeof poData.piAttachments === 'string'
+                                    ? JSON.parse(poData.piAttachments)
+                                    : poData.piAttachments;
+                                return Array.isArray(attachments) && attachments.length > 0 ? (
+                                    <ul className="space-y-1">
+                                        {attachments.map((path: string, i: number) => (
+                                            <li key={i} className="text-sm text-muted-foreground flex items-center gap-2">
+                                                <FileText className="h-4 w-4" />
+                                                {path.split("/").pop()}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">No invoice copy uploaded</p>
+                                );
+                            })()}
+                        </div>
+                    )}
+                </div>
+
                 {/* ── PO Details ── */}
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)}>

@@ -17,7 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useCreatePoParty, useCreatePurchaseOrder, useNextPONumber, usePoParties, useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Building2, Calendar, Eye, Hash, Info, Loader2, Mail, MapPin, Phone, UserCheck, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, Eye, FileText, Hash, Info, Loader2, Mail, MapPin, Phone, UserCheck, UserPlus } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
@@ -40,6 +40,8 @@ interface NewPartyForm {
 }
 
 const defaultFormValues: PurchaseOrderFormValues = {
+  poType: "new",
+  piAttachments: [],
   poDate: formatDateForInput(new Date()),
   sellerId: "",
   sellerName: "",
@@ -265,6 +267,53 @@ export default function RaisePoFormPage() {
         </div>
       </CardHeader>
       <CardContent className="space-y-8">
+        {/* ── PO Type Selector ── */}
+        <div className="rounded-lg border p-4 space-y-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            PO Type
+          </h3>
+          <div className="flex gap-4">
+            <button
+              type="button"
+              onClick={() => { form.setValue("poType", "new"); form.setValue("piAttachments", []); }}
+              className={`flex-1 rounded-lg border-2 p-4 text-center cursor-pointer transition-all ${
+                form.watch("poType") === "new"
+                  ? "border-primary bg-primary/5"
+                  : "border-muted hover:border-muted-foreground/30"
+              }`}
+            >
+              <p className="font-semibold text-base">New PO</p>
+              <p className="text-sm text-muted-foreground mt-1">Create a fresh purchase order</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => form.setValue("poType", "pi")}
+              className={`flex-1 rounded-lg border-2 p-4 text-center cursor-pointer transition-all ${
+                form.watch("poType") === "pi"
+                  ? "border-primary bg-primary/5"
+                  : "border-muted hover:border-muted-foreground/30"
+              }`}
+            >
+              <p className="font-semibold text-base">PI Based</p>
+              <p className="text-sm text-muted-foreground mt-1">Create PO against a proforma invoice</p>
+            </button>
+          </div>
+          {form.watch("poType") === "pi" && (
+            <div className="pt-2">
+              <TenderFileUploader
+                label="Invoice Copy *"
+                context="tender-documents"
+                value={form.watch("piAttachments")}
+                onChange={(paths) => form.setValue("piAttachments", paths)}
+              />
+              {form.formState.errors.piAttachments && (
+                <p className="text-sm text-destructive mt-1">{form.formState.errors.piAttachments.message}</p>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* ── PO Details ── */}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)}>
