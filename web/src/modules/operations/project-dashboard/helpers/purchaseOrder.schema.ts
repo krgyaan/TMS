@@ -16,6 +16,7 @@ const termRowSchema = z.object({
 export const purchaseOrderFormSchema = z.object({
     poType: z.enum(["new", "pi"]).default("new"),
     piAttachments: z.array(z.string()).default([]),
+    category: z.string().min(1, "Category is required"),
     poDate: z.string().min(1, "PO date is required"),
 
     sellerId: z.string().default(""),

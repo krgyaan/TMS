@@ -41,6 +41,7 @@ interface NewPartyForm {
 const defaultFormValues: PurchaseOrderFormValues = {
     poType: "new",
     piAttachments: [],
+    category: "",
     poDate: "",
     sellerId: "",
     sellerName: "",
@@ -191,6 +192,7 @@ export default function EditPOPage() {
         form.reset({
             poType: poData.poType || "new",
             piAttachments: poData.piAttachments ? (typeof poData.piAttachments === 'string' ? JSON.parse(poData.piAttachments) : poData.piAttachments) : [],
+            category: poData.category || "",
             poDate: formatDateForInput(poData.poDate),
             sellerId: "",
             sellerName: poData.sellerName || "",
@@ -306,7 +308,9 @@ export default function EditPOPage() {
                 </div>
             </CardHeader>
             <CardContent className="space-y-8">
-                {/* ── PO Type ── */}
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(handleSubmit)}>
+                        {/* ── PO Type ── */}
                 <div className="rounded-lg border p-4 space-y-4">
                     <h3 className="text-lg font-semibold flex items-center gap-2">
                         <FileText className="h-5 w-5" />
@@ -348,11 +352,25 @@ export default function EditPOPage() {
                             })()}
                         </div>
                     )}
+                    <div className="pt-2 max-w-md">
+                        <SelectField
+                            control={form.control}
+                            name="category"
+                            label={<><FileText className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Category <span className="text-destructive">*</span></>}
+                            options={[
+                                { id: "Supply", name: "Supply" },
+                                { id: "Service", name: "Service" },
+                                { id: "Freight", name: "Freight" },
+                                { id: "Admin/Misc.", name: "Admin/Misc." },
+                                { id: "Buyback/Sale", name: "Buyback/Sale" },
+                                { id: "GEM Charges", name: "GEM Charges" },
+                            ]}
+                            placeholder="Select category..."
+                        />
+                    </div>
                 </div>
 
                 {/* ── PO Details ── */}
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)}>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                             <div className="space-y-2">
                                 <Label className="flex items-center gap-2">

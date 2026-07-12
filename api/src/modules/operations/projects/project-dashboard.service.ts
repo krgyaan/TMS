@@ -297,6 +297,7 @@ export class ProjectDashboardService {
                 // Optional fields
                 poType: body.poType || 'new',
                 piAttachments: body.piAttachments,
+                category: body.category,
                 quotationNo: body.quotationNo,
                 quotationDate: body.quotationDate,
                 termsAndConditions: body.termsAndConditions ? (typeof body.termsAndConditions === 'string' ? JSON.parse(body.termsAndConditions) : body.termsAndConditions) : [],
@@ -714,6 +715,7 @@ export class ProjectDashboardService {
                     // Optional fields
                     poType: body.poType || existingPO.poType || 'new',
                     piAttachments: body.piAttachments,
+                    category: body.category,
                     quotationNo: body.quotationNo,
                     quotationDate: body.quotationDate,
                     termsAndConditions: body.termsAndConditions ? (typeof body.termsAndConditions === 'string' ? JSON.parse(body.termsAndConditions) : body.termsAndConditions) : [],

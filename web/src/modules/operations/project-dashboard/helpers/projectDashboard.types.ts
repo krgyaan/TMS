@@ -11,6 +11,7 @@ export interface CreatePurchaseOrderDTO {
     projectName?: string;
     poType?: string;
     piAttachments?: string;
+    category?: string;
     poDate: string;
     sellerId?: number;
     shipToPartyId?: number;
@@ -97,6 +98,7 @@ export interface SetTdsDTO {
 export interface UpdatePurchaseOrderDTO {
     poType?: string;
     piAttachments?: string;
+    category?: string;
     poDate: string;
     sellerId?: number;
     shipToPartyId?: number;
