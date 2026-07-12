@@ -87,7 +87,6 @@ import { ServeStaticModule } from "@nestjs/serve-static";
 import { SentryGlobalFilter, SentryModule } from "@sentry/nestjs/setup";
 import { join } from "path";
 import { AllExceptionsFilter } from "./logger/all-exception.filter";
-import { AccountChecklistSchedulerModule } from "./modules/accounts/account-checklist/account-checklist-scheduler.module";
 import { AccountChecklistModule } from './modules/accounts/account-checklist/account-checklist.module';
 import { LoanAdvanceModule } from "./modules/accounts/loan-advance/loan-advance.module";
 import { EmployeeOnboardingModule } from './modules/hrms/employee-onboarding/employee-onboarding.module';
@@ -235,7 +234,6 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         EmployeeProfilesModule,
         AssetsModule,
         AccountChecklistModule,
-        AccountChecklistSchedulerModule,
         SchedulerModule,
         OnboardingModule,
         EmployeeOnboardingModule,
