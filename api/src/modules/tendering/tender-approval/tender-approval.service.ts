@@ -664,36 +664,38 @@ export class TenderApprovalService {
 
         switch (payload.tlStatus) {
             case "1":
-                console.log('[buildApprovalUpdateData] Processing APPROVED status');
-                Object.assign(updateData, {
-                    rfqTo: payload.rfqTo?.join(",") || "",
-                    rfqRequired: payload.rfqRequired ?? null,
-                    quotationFiles: payload.quotationFiles ? JSON.stringify(payload.quotationFiles) : null,
-                    processingFeeMode: payload.processingFeeMode ?? null,
-                    tenderFeeMode: payload.tenderFeeMode ?? null,
-                    emdMode: payload.emdMode ?? null,
-                    approvePqrSelection: payload.approvePqrSelection ?? null,
-                    approveFinanceDocSelection: payload.approveFinanceDocSelection ?? null,
-                    tlApprovalRemarks: payload.tlApprovalRemarks ?? null,
-                    tlRejectionRemarks: null,
-                    tlIncompleteRemarks: null,
-                    oemNotAllowed: null,
-                    tlApprovalTimestamp: new Date(),
-                });
+                { 
+                    console.log('[buildApprovalUpdateData] Processing APPROVED status');
+                    Object.assign(updateData, {
+                        rfqTo: payload.rfqTo?.join(",") || "",
+                        rfqRequired: payload.rfqRequired ?? null,
+                        quotationFiles: payload.quotationFiles ? JSON.stringify(payload.quotationFiles) : null,
+                        processingFeeMode: payload.processingFeeMode ?? null,
+                        tenderFeeMode: payload.tenderFeeMode ?? null,
+                        emdMode: payload.emdMode ?? null,
+                        approvePqrSelection: payload.approvePqrSelection ?? null,
+                        approveFinanceDocSelection: payload.approveFinanceDocSelection ?? null,
+                        tlApprovalRemarks: payload.tlApprovalRemarks ?? null,
+                        tlRejectionRemarks: null,
+                        tlIncompleteRemarks: null,
+                        oemNotAllowed: null,
+                        tlApprovalTimestamp: new Date(),
+                    });
 
-                if (!isEditMode) {
-                    updateData.status = 3;
-                    newStatus = 3;
-                    statusComment = "Tender info approved";
-                }
+                    if (!isEditMode) {
+                        updateData.status = 3;
+                        newStatus = 3;
+                        statusComment = "Tender info approved";
+                    }
 
-                const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
-                if (infoSheet) {
-                    if (infoSheet.tenderValue != null) updateData.gstValues = String(infoSheet.tenderValue);
-                    if (infoSheet.tenderFeeAmount != null) updateData.tenderFees = String(infoSheet.tenderFeeAmount);
-                    if (infoSheet.emdAmount != null) updateData.emd = String(infoSheet.emdAmount);
+                    const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
+                    if (infoSheet) {
+                        if (infoSheet.tenderValue != null) updateData.gstValues = String(infoSheet.tenderValue);
+                        if (infoSheet.tenderFeeAmount != null) updateData.tenderFees = String(infoSheet.tenderFeeAmount);
+                        if (infoSheet.emdAmount != null) updateData.emd = String(infoSheet.emdAmount);
+                    }
+                    break; 
                 }
-                break;
 
             case "2":
                 console.log('[buildApprovalUpdateData] Processing REJECTED status');
@@ -848,7 +850,7 @@ export class TenderApprovalService {
      */
     private async sendApprovalEmail(tenderId: number, payload: TenderApprovalPayload, changedBy: number) {
         const tender = await this.tenderInfosService.findById(tenderId);
-        if (!tender || !tender.teamMember) return;
+        if (!tender?.teamMember) return;
 
         const assignee = await this.recipientResolver.getUserById(tender.teamMember);
         if (!assignee) return;
@@ -865,11 +867,9 @@ export class TenderApprovalService {
             }
         }
 
-        const isBidApproved = payload.tlStatus === "1";
         const isRejected = payload.tlStatus === "2";
         const isReview = payload.tlStatus === "3";
 
-        // Generate links (TODO: Update with actual frontend URLs)
         const publicAppUrl = this.configService.get<string>('app.publicAppUrl') || '';
         const emdLink = `${publicAppUrl}/tendering/emds?tenderId=${tenderId}`;
         const tenderFeesLink = `${publicAppUrl}/tendering/tender-fees?tenderId=${tenderId}`;
@@ -899,8 +899,9 @@ export class TenderApprovalService {
         // Create maps for document lookup
         const pqrMap = new Map<number, string>();
         allPqrDocs.forEach(pqr => {
-            const label = pqr.projectName ? (pqr.item ? `${pqr.projectName} - ${pqr.item}` : pqr.projectName) : `PQR ${pqr.id}`;
-            pqrMap.set(pqr.id, label);
+            const name = pqr.item ? `${pqr.projectName} - ${pqr.item}` : pqr.projectName;
+            const label = pqr.projectName ? (name) : `PQR ${pqr.id}`;
+            pqrMap.set(pqr.id, label ?? '');
         });
 
         const financeMap = new Map<number, string>();
@@ -916,14 +917,14 @@ export class TenderApprovalService {
             return docs
                 .map(doc => {
                     if (typeof doc === "string") {
-                        const docId = parseInt(doc, 10);
-                        if (!isNaN(docId) && pqrMap.has(docId)) {
+                        const docId = Number.parseInt(doc, 10);
+                        if (!Number.isNaN(docId) && pqrMap.has(docId)) {
                             return pqrMap.get(docId)!;
                         }
                         return doc; // Return as-is if not a valid ID or not found
                     }
-                    const docId = parseInt(doc.documentName, 10);
-                    if (!isNaN(docId) && pqrMap.has(docId)) {
+                    const docId = Number.parseInt(doc.documentName, 10);
+                    if (!Number.isNaN(docId) && pqrMap.has(docId)) {
                         return pqrMap.get(docId)!;
                     }
                     return doc.documentName || "";
@@ -937,14 +938,14 @@ export class TenderApprovalService {
             return docs
                 .map(doc => {
                     if (typeof doc === "string") {
-                        const docId = parseInt(doc, 10);
-                        if (!isNaN(docId) && financeMap.has(docId)) {
+                        const docId = Number.parseInt(doc, 10);
+                        if (!Number.isNaN(docId) && financeMap.has(docId)) {
                             return financeMap.get(docId)!;
                         }
                         return doc; // Return as-is if not a valid ID or not found
                     }
-                    const docId = parseInt(doc.documentName, 10);
-                    if (!isNaN(docId) && financeMap.has(docId)) {
+                    const docId = Number.parseInt(doc.documentName, 10);
+                    if (!Number.isNaN(docId) && financeMap.has(docId)) {
                         return financeMap.get(docId)!;
                     }
                     return doc.documentName || "";
@@ -957,8 +958,8 @@ export class TenderApprovalService {
             if (!ids || !Array.isArray(ids)) return [];
             return ids
                 .map(id => {
-                    const docId = parseInt(id, 10);
-                    if (!isNaN(docId) && pqrMap.has(docId)) {
+                    const docId = Number.parseInt(id, 10);
+                    if (!Number.isNaN(docId) && pqrMap.has(docId)) {
                         return pqrMap.get(docId)!;
                     }
                     return id;
@@ -970,8 +971,8 @@ export class TenderApprovalService {
             if (!ids || !Array.isArray(ids)) return [];
             return ids
                 .map(id => {
-                    const docId = parseInt(id, 10);
-                    if (!isNaN(docId) && financeMap.has(docId)) {
+                    const docId = Number.parseInt(id, 10);
+                    if (!Number.isNaN(docId) && financeMap.has(docId)) {
                         return financeMap.get(docId)!;
                     }
                     return id;
@@ -984,8 +985,8 @@ export class TenderApprovalService {
         if (techDocs && Array.isArray(techDocs)) {
             pqrDocs = techDocs
                 .map(doc => {
-                    const docId = typeof doc === "string" ? parseInt(doc, 10) : doc.id;
-                    if (!isNaN(docId) && pqrMap.has(docId)) {
+                    const docId = typeof doc === "string" ? Number.parseInt(doc, 10) : doc.id;
+                    if (!Number.isNaN(docId) && pqrMap.has(docId)) {
                         return pqrMap.get(docId)!;
                     }
                     return typeof doc === "string" ? doc : doc.projectName || "";
@@ -997,8 +998,8 @@ export class TenderApprovalService {
         if (finDocs && Array.isArray(finDocs)) {
             financeDocs = finDocs
                 .map(doc => {
-                    const docId = typeof doc === "string" ? parseInt(doc, 10) : doc.id;
-                    if (!isNaN(docId) && financeMap.has(docId)) {
+                    const docId = typeof doc === "string" ? Number.parseInt(doc, 10) : doc.id;
+                    if (!Number.isNaN(docId) && financeMap.has(docId)) {
                         return financeMap.get(docId)!;
                     }
                     return typeof doc === "string" ? doc : doc.documentName || "";
@@ -1091,7 +1092,7 @@ export class TenderApprovalService {
             }
         }
 
-        const status = parseInt(payload.tlStatus, 10);
+        const status = Number.parseInt(payload.tlStatus, 10);
 
         // Get document URLs for email
         const apiUrl = this.configService.get<string>("app.apiUrl") || "";

@@ -10,7 +10,7 @@ import { ExtendTimerInput, StartTimerInput, TimerActionInput, TimerWithComputed,
 export class TimersService {
     private readonly logger = new Logger(TimersService.name);
 
-    constructor(@Inject(DRIZZLE) private db: DbInstance) { }
+    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
 
     async startTimer(input: StartTimerInput): Promise<TimerWithComputed> {
         const { entityId, entityType, stage } = input;
@@ -462,16 +462,11 @@ export class TimersService {
                     return hoursToMs(durationHours ?? 24);
 
                 case 'DEADLINE_BASED':
-                    if (input.deadlineAt) {
-                        return new Date(input.deadlineAt).getTime() - Date.now();
-                    }
-                    break;
-
                 case 'NEGATIVE_COUNTDOWN':
                     if (input.deadlineAt) {
                         return new Date(input.deadlineAt).getTime() - Date.now();
                     }
-                    break;
+                break;
 
                 case 'NO_TIMER':
                     return 0;
