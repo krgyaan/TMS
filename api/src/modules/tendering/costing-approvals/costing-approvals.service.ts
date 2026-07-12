@@ -142,15 +142,19 @@ export class CostingApprovalsService {
         conditions.push(...roleFilterConditions);
 
         if (activeTab === 'pending') {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
-            conditions.push(sql`EXISTS (SELECT 1 FROM ${tenderCostingDetails}
-                                       WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
-                                       AND ${tenderCostingDetails.status} = 'Submitted')`);
+            conditions.push(
+                TenderInfosService.getExcludeStatusCondition(['lost']), 
+                sql`EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                AND ${tenderCostingDetails.status} = 'Submitted')`
+            );
             conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (activeTab === 'approved') {
-            conditions.push(sql`NOT EXISTS (SELECT 1 FROM ${tenderCostingDetails}
-                                           WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
-                                           AND ${tenderCostingDetails.status} != 'Approved')`);
+            conditions.push(
+                sql`NOT EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                    WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                    AND ${tenderCostingDetails.status} != 'Approved')`
+                );
             conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (activeTab === 'tender-dnb') {
             conditions.push(eq(bidSubmissions.status, "Tender Missed"));
@@ -512,6 +516,37 @@ export class CostingApprovalsService {
             }
         }
 
+        // Start bid_submission timer
+        try {
+            const timerInput: any = {
+                entityType: 'TENDER',
+                entityId: tenderId,
+                stage: 'bid_submission',
+                userId,
+            };
+            if (currentTender?.dueDate) {
+                const dueDate = new Date(currentTender.dueDate);
+                const hoursBeforeDeadline = -24;
+                timerInput.deadlineAt = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
+                timerInput.timerConfig = {
+                    type: 'NEGATIVE_COUNTDOWN',
+                    hoursBeforeDeadline,
+                };
+            } else {
+                timerInput.timerConfig = {
+                    type: 'FIXED_DURATION',
+                    durationHours: 24,
+                };
+            }
+            await this.timersService.startTimer(timerInput);
+        } catch (error) {
+            if (error instanceof ConflictException) {
+                this.logger.warn(`Timer already running for bid_submission for tender ${tenderId} — skipping`);
+            } else {
+                this.logger.error(`Failed to start timer for bid_submission for tender ${tenderId}:`, error);
+            }
+        }
+
         return updatedDetails;
     }
 
@@ -755,6 +790,37 @@ export class CostingApprovalsService {
                 this.logger.warn(`Timer conflict for costing_sheet_approval for tender ${tenderId} — skipping`);
             } else {
                 this.logger.error(`Failed to stop timer: ${error}`);
+            }
+        }
+
+        // Start bid_submission timer
+        try {
+            const timerInput: any = {
+                entityType: 'TENDER',
+                entityId: tenderId,
+                stage: 'bid_submission',
+                userId,
+            };
+            if (currentTender?.dueDate) {
+                const dueDate = new Date(currentTender.dueDate);
+                const hoursBeforeDeadline = -24;
+                timerInput.deadlineAt = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
+                timerInput.timerConfig = {
+                    type: 'NEGATIVE_COUNTDOWN',
+                    hoursBeforeDeadline,
+                };
+            } else {
+                timerInput.timerConfig = {
+                    type: 'FIXED_DURATION',
+                    durationHours: 24,
+                };
+            }
+            await this.timersService.startTimer(timerInput);
+        } catch (error) {
+            if (error instanceof ConflictException) {
+                this.logger.warn(`Timer already running for bid_submission for tender ${tenderId} — skipping`);
+            } else {
+                this.logger.error(`Failed to start timer for bid_submission for tender ${tenderId}:`, error);
             }
         }
 
