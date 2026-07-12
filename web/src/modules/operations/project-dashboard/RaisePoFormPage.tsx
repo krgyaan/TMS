@@ -270,70 +270,50 @@ export default function RaisePoFormPage() {
       <CardContent className="space-y-8">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)}>
-            {/* ── PO Type Selector ── */}
-        <div className="rounded-lg border p-4 space-y-4">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            PO Type
-          </h3>
-          <div className="flex gap-4">
-            <button
-              type="button"
-              onClick={() => { form.setValue("poType", "new"); form.setValue("piAttachments", []); }}
-              className={`flex-1 rounded-lg border-2 p-4 text-center cursor-pointer transition-all ${
-                form.watch("poType") === "new"
-                  ? "border-primary bg-primary/5"
-                  : "border-muted hover:border-muted-foreground/30"
-              }`}
-            >
-              <p className="font-semibold text-base">New PO</p>
-              <p className="text-sm text-muted-foreground mt-1">Create a fresh purchase order</p>
-            </button>
-            <button
-              type="button"
-              onClick={() => form.setValue("poType", "pi")}
-              className={`flex-1 rounded-lg border-2 p-4 text-center cursor-pointer transition-all ${
-                form.watch("poType") === "pi"
-                  ? "border-primary bg-primary/5"
-                  : "border-muted hover:border-muted-foreground/30"
-              }`}
-            >
-              <p className="font-semibold text-base">PI Based</p>
-              <p className="text-sm text-muted-foreground mt-1">Create PO against a proforma invoice</p>
-            </button>
-          </div>
-          {form.watch("poType") === "pi" && (
-            <div className="pt-2">
-              <TenderFileUploader
-                label="Invoice Copy *"
-                context="tender-documents"
-                value={form.watch("piAttachments")}
-                onChange={(paths) => form.setValue("piAttachments", paths)}
-              />
-              {form.formState.errors.piAttachments && (
-                <p className="text-sm text-destructive mt-1">{form.formState.errors.piAttachments.message}</p>
-              )}
+            {/* ── PO Type ── */}
+            <div className="rounded-lg border p-4 space-y-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                <SelectField
+                  control={form.control}
+                  name="poType"
+                  label="PO Type *"
+                  options={[
+                    { id: "new", name: "New PO" },
+                    { id: "pi", name: "PI Based" },
+                  ]}
+                  placeholder="Select PO type..."
+                />
+                <SelectField
+                  control={form.control}
+                  name="category"
+                  label={<><FileText className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Category <span className="text-destructive">*</span></>}
+                  options={[
+                    { id: "Supply", name: "Supply" },
+                    { id: "Service", name: "Service" },
+                    { id: "Freight", name: "Freight" },
+                    { id: "Admin/Misc.", name: "Admin/Misc." },
+                    { id: "Buyback/Sale", name: "Buyback/Sale" },
+                    { id: "GEM Charges", name: "GEM Charges" },
+                  ]}
+                  placeholder="Select category..."
+                />
+                {form.watch("poType") === "pi" && (
+                  <div className="space-y-1">
+                    <TenderFileUploader
+                      label="Invoice Copy *"
+                      context="tender-documents"
+                      value={form.watch("piAttachments")}
+                      onChange={(paths) => form.setValue("piAttachments", paths)}
+                    />
+                    {form.formState.errors.piAttachments && (
+                      <p className="text-sm text-destructive">{form.formState.errors.piAttachments.message}</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-          <div className="pt-2 max-w-md">
-            <SelectField
-              control={form.control}
-              name="category"
-              label={<><FileText className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Category <span className="text-destructive">*</span></>}
-              options={[
-                { id: "Supply", name: "Supply" },
-                { id: "Service", name: "Service" },
-                { id: "Freight", name: "Freight" },
-                { id: "Admin/Misc.", name: "Admin/Misc." },
-                { id: "Buyback/Sale", name: "Buyback/Sale" },
-                { id: "GEM Charges", name: "GEM Charges" },
-              ]}
-              placeholder="Select category..."
-            />
-          </div>
-        </div>
 
-        {/* ── PO Details ── */}
+            {/* ── PO Details ── */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">

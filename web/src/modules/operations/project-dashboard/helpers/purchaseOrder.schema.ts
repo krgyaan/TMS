@@ -32,8 +32,8 @@ export const purchaseOrderFormSchema = z.object({
     contactPersonEmail: z.string().default(""),
 
     partyId: z.string().default(""),
-    selectedUserId: z.string().default(""),
-    selectedCertRecipients: z.array(z.string()).default([]),
+    selectedUserId: z.string().min(1, "Team member is required"),
+    selectedCertRecipients: z.array(z.string()).min(1, "At least one certificate recipient is required").default([]),
     shipToName: z.string().min(1, "Ship to name is required"),
     shippingAddress: z.string().min(1, "Shipping address is required"),
     shipToGst: z.string().default(""),

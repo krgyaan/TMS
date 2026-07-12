@@ -311,66 +311,58 @@ export default function EditPOPage() {
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)}>
                         {/* ── PO Type ── */}
-                <div className="rounded-lg border p-4 space-y-4">
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
-                        PO Type
-                    </h3>
-                    <div className="flex gap-4">
-                        <div className={`flex-1 rounded-lg border-2 p-4 ${
-                            poData?.poType === "pi" ? "border-muted" : "border-primary bg-primary/5"
-                        }`}>
-                            <p className="font-semibold text-base">New PO</p>
-                            <p className="text-sm text-muted-foreground mt-1">Fresh purchase order</p>
+                        <div className="rounded-lg border p-4 space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <SelectField
+                                    control={form.control}
+                                    name="poType"
+                                    label="PO Type *"
+                                    options={[
+                                        { id: "new", name: "New PO" },
+                                        { id: "pi", name: "PI Based" },
+                                    ]}
+                                    placeholder="Select PO type..."
+                                />
+                                <SelectField
+                                    control={form.control}
+                                    name="category"
+                                    label={<><FileText className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Category <span className="text-destructive">*</span></>}
+                                    options={[
+                                        { id: "Supply", name: "Supply" },
+                                        { id: "Service", name: "Service" },
+                                        { id: "Freight", name: "Freight" },
+                                        { id: "Admin/Misc.", name: "Admin/Misc." },
+                                        { id: "Buyback/Sale", name: "Buyback/Sale" },
+                                        { id: "GEM Charges", name: "GEM Charges" },
+                                    ]}
+                                    placeholder="Select category..."
+                                />
+                                {poData?.poType === "pi" && poData?.piAttachments && (
+                                    <div className="space-y-1">
+                                        <p className="text-sm font-medium">Invoice Copy</p>
+                                        {(() => {
+                                            const attachments = typeof poData.piAttachments === 'string'
+                                                ? JSON.parse(poData.piAttachments)
+                                                : poData.piAttachments;
+                                            return Array.isArray(attachments) && attachments.length > 0 ? (
+                                                <ul className="space-y-1">
+                                                    {attachments.map((path: string, i: number) => (
+                                                        <li key={i} className="text-sm text-muted-foreground flex items-center gap-2">
+                                                            <FileText className="h-4 w-4" />
+                                                            {path.split("/").pop()}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground">No invoice copy uploaded</p>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                        <div className={`flex-1 rounded-lg border-2 p-4 ${
-                            poData?.poType === "pi" ? "border-primary bg-primary/5" : "border-muted"
-                        }`}>
-                            <p className="font-semibold text-base">PI Based</p>
-                            <p className="text-sm text-muted-foreground mt-1">Against proforma invoice</p>
-                        </div>
-                    </div>
-                    {poData?.poType === "pi" && poData?.piAttachments && (
-                        <div className="pt-2">
-                            <p className="text-sm font-medium mb-2">Invoice Copy</p>
-                            {(() => {
-                                const attachments = typeof poData.piAttachments === 'string'
-                                    ? JSON.parse(poData.piAttachments)
-                                    : poData.piAttachments;
-                                return Array.isArray(attachments) && attachments.length > 0 ? (
-                                    <ul className="space-y-1">
-                                        {attachments.map((path: string, i: number) => (
-                                            <li key={i} className="text-sm text-muted-foreground flex items-center gap-2">
-                                                <FileText className="h-4 w-4" />
-                                                {path.split("/").pop()}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">No invoice copy uploaded</p>
-                                );
-                            })()}
-                        </div>
-                    )}
-                    <div className="pt-2 max-w-md">
-                        <SelectField
-                            control={form.control}
-                            name="category"
-                            label={<><FileText className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Category <span className="text-destructive">*</span></>}
-                            options={[
-                                { id: "Supply", name: "Supply" },
-                                { id: "Service", name: "Service" },
-                                { id: "Freight", name: "Freight" },
-                                { id: "Admin/Misc.", name: "Admin/Misc." },
-                                { id: "Buyback/Sale", name: "Buyback/Sale" },
-                                { id: "GEM Charges", name: "GEM Charges" },
-                            ]}
-                            placeholder="Select category..."
-                        />
-                    </div>
-                </div>
 
-                {/* ── PO Details ── */}
+                        {/* ── PO Details ── */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                             <div className="space-y-2">
                                 <Label className="flex items-center gap-2">
