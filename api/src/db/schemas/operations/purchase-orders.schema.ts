@@ -21,6 +21,8 @@ export const purchaseOrders = pgTable(
         sellerMsmeNo: varchar("seller_msme_no", { length: 50 }),
         quotationNo: varchar("quotation_no", { length: 100 }),
         quotationDate: date("quotation_date"),
+        poType: varchar("po_type", { length: 20 }).notNull().default('new'),
+        piAttachments: text("pi_attachments"),
         poDate: date("po_date"),
         poNumber: varchar("po_number", { length: 255 }),
         termsAndConditions: jsonb("terms_and_conditions").notNull().default('[]'),
