@@ -636,6 +636,7 @@ export class TenderApprovalService {
                         this.logger.warn(`Timer already running for stage ${item.stage} for tender ${tenderId} — skipping`);
                     } else {
                         this.logger.error(`Failed to start timer for stage ${item.stage} for tender ${tenderId}:`, error);
+                        throw error;
                     }
                 }
             }
@@ -643,7 +644,7 @@ export class TenderApprovalService {
             this.logger.log(`Successfully transitioned timers after approval for tender ${tenderId}`);
         } catch (error) {
             this.logger.error(`Failed to transition timers after approval for tender ${tenderId}:`, error);
-            // Don't fail the entire operation if timer transition fails
+            throw error;
         }
 
         return this.getByTenderId(tenderId);        
