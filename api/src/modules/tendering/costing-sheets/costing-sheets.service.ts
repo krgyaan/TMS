@@ -522,9 +522,40 @@ export class CostingSheetsService {
             });
         } catch (error) {
             if (error instanceof ConflictException) {
-                this.logger.warn(`Timer conflict for costing_sheet for tender ${data.tenderId} — skipping`);
+                this.logger.warn(`Timer conflict for costing_sheets for tender ${data.tenderId} — skipping`);
             } else {
                 this.logger.error(`Failed to stop timer: ${error}`);
+            }
+        }
+
+        // Start costing_sheet_approval timer
+        try {
+            const timerInput: any = {
+                entityType: 'TENDER',
+                entityId: data.tenderId,
+                stage: 'costing_sheet_approval',
+                userId: data.submittedBy,
+            };
+            if (currentTender?.dueDate) {
+                const dueDate = new Date(currentTender.dueDate);
+                const hoursBeforeDeadline = -48;
+                timerInput.deadlineAt = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
+                timerInput.timerConfig = {
+                    type: 'NEGATIVE_COUNTDOWN',
+                    hoursBeforeDeadline,
+                };
+            } else {
+                timerInput.timerConfig = {
+                    type: 'FIXED_DURATION',
+                    durationHours: 24,
+                };
+            }
+            await this.timersService.startTimer(timerInput);
+        } catch (error) {
+            if (error instanceof ConflictException) {
+                this.logger.warn(`Timer already running for costing_sheet_approval for tender ${data.tenderId} — skipping`);
+            } else {
+                this.logger.error(`Failed to start timer for costing_sheet_approval for tender ${data.tenderId}:`, error);
             }
         }
 
@@ -638,6 +669,37 @@ export class CostingSheetsService {
                 this.logger.warn(`Timer conflict for costing_sheets for tender ${sheet.tenderId} — skipping`);
             } else {
                 this.logger.error(`Failed to stop timer: ${error}`);
+            }
+        }
+
+        // Start costing_sheet_approval timer
+        try {
+            const timerInput: any = {
+                entityType: 'TENDER',
+                entityId: sheet.tenderId,
+                stage: 'costing_sheet_approval',
+                userId: changedBy,
+            };
+            if (currentTender?.dueDate) {
+                const dueDate = new Date(currentTender.dueDate);
+                const hoursBeforeDeadline = -48;
+                timerInput.deadlineAt = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
+                timerInput.timerConfig = {
+                    type: 'NEGATIVE_COUNTDOWN',
+                    hoursBeforeDeadline,
+                };
+            } else {
+                timerInput.timerConfig = {
+                    type: 'FIXED_DURATION',
+                    durationHours: 24,
+                };
+            }
+            await this.timersService.startTimer(timerInput);
+        } catch (error) {
+            if (error instanceof ConflictException) {
+                this.logger.warn(`Timer already running for costing_sheet_approval for tender ${sheet.tenderId} — skipping`);
+            } else {
+                this.logger.error(`Failed to start timer for costing_sheet_approval for tender ${sheet.tenderId}:`, error);
             }
         }
 
