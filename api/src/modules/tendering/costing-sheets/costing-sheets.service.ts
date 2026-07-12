@@ -516,7 +516,7 @@ export class CostingSheetsService {
             await this.timersService.stopTimer({
                 entityType: 'TENDER',
                 entityId: data.tenderId,
-                stage: 'costing_sheet',
+                stage: 'costing_sheets',
                 userId: data.submittedBy,
                 reason: 'Costing sheet submitted'
             });
@@ -629,13 +629,13 @@ export class CostingSheetsService {
             await this.timersService.stopTimer({
                 entityType: 'TENDER',
                 entityId: sheet.tenderId,
-                stage: 'costing_sheet',
+                stage: 'costing_sheets',
                 userId: changedBy,
                 reason: 'Costing sheet resubmitted'
             });
         } catch (error) {
             if (error instanceof ConflictException) {
-                this.logger.warn(`Timer conflict for costing_sheet for tender ${sheet.tenderId} — skipping`);
+                this.logger.warn(`Timer conflict for costing_sheets for tender ${sheet.tenderId} — skipping`);
             } else {
                 this.logger.error(`Failed to stop timer: ${error}`);
             }

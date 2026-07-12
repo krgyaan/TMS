@@ -289,7 +289,36 @@ export function DemandDraftActionForm({ instrumentId, action: propAction, tender
             navigate(-1);
             form.reset();
         } catch (error: any) {
-            toast.error(error?.message || 'Failed to update action');
+            const responseData = error?.response?.data;
+            let mappedAny = false;
+
+            if (responseData?.errors && Array.isArray(responseData.errors)) {
+                for (const err of responseData.errors) {
+                    if (err.path && err.message) {
+                        const fieldPath = Array.isArray(err.path) ? err.path.join('.') : err.path;
+                        form.setError(fieldPath as any, { message: err.message });
+                        mappedAny = true;
+                    }
+                }
+            }
+
+            if (responseData?.issues && Array.isArray(responseData.issues)) {
+                for (const issue of responseData.issues) {
+                    if (issue.path && issue.message) {
+                        const fieldPath = Array.isArray(issue.path) ? issue.path.join('.') : issue.path;
+                        form.setError(fieldPath as any, { message: issue.message });
+                        mappedAny = true;
+                    }
+                }
+            }
+
+            if (!mappedAny) {
+                toast.error(
+                    typeof responseData?.message === 'string'
+                        ? responseData.message
+                        : error?.message || 'Failed to update action'
+                );
+            }
             console.error('Error updating action:', error);
         }
     };

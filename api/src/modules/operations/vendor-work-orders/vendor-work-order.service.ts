@@ -300,7 +300,24 @@ export class VendorWorkOrderService {
 
     async getByProject(projectId: number) {
         const rows = await this.db
-            .select()
+            .select({
+                id: vendorWorkOrders.id,
+                projectId: vendorWorkOrders.projectId,
+                woNumber: vendorWorkOrders.woNumber,
+                woDate: vendorWorkOrders.woDate,
+                sellerName: vendorWorkOrders.sellerName,
+                sellerEmail: vendorWorkOrders.sellerEmail,
+                sellerAddress: vendorWorkOrders.sellerAddress,
+                sellerGstNo: vendorWorkOrders.sellerGstNo,
+                sellerPanNo: vendorWorkOrders.sellerPanNo,
+                sellerMsmeNo: vendorWorkOrders.sellerMsmeNo,
+                sellerCinNo: vendorWorkOrders.sellerCinNo,
+                shipToName: vendorWorkOrders.shipToName,
+                shippingAddress: vendorWorkOrders.shippingAddress,
+                shipToGst: vendorWorkOrders.shipToGst,
+                shipToPan: vendorWorkOrders.shipToPan,
+                woRaisedBy: vendorWorkOrders.woRaisedBy,
+            })
             .from(vendorWorkOrders)
             .where(eq(vendorWorkOrders.projectId, projectId))
             .orderBy(desc(vendorWorkOrders.id));

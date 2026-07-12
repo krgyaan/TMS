@@ -5,6 +5,7 @@ import type {
     UpdatePurchaseOrderDTO,
     CreatePartyDTO,
     PurchaseOrderRow,
+    SetTdsDTO,
 } from '@/modules/operations/project-dashboard/helpers/projectDashboard.types';
 
 class ProjectDashboardApiService extends BaseApiService {
@@ -67,6 +68,10 @@ class ProjectDashboardApiService extends BaseApiService {
 
     async deletePdfVersion(id: number, version: string): Promise<void> {
         return this.delete(`/purchase-orders/${id}/pdf/versions/${encodeURIComponent(version)}`);
+    }
+
+    async setTdsPercentage(id: number, data: SetTdsDTO): Promise<any> {
+        return this.put(`/purchase-orders/${id}/tds`, data);
     }
 
     async updatePurchaseOrder(id: number, data: UpdatePurchaseOrderDTO): Promise<any> {

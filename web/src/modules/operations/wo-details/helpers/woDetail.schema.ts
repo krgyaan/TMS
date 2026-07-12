@@ -7,7 +7,7 @@ export const ContactSchema = z.object({
   name: z.string().max(255).optional(),
   designation: z.string().max(50).optional(),
   phone: z.string().max(20).optional(),
-  email: z.string().email().max(255).optional().or(z.literal("")),
+  email: z.string().max(255).optional().or(z.literal("")),
 });
 
 export const TenderChecklistSchema = z.object({
@@ -54,9 +54,9 @@ export const BOQItemSchema = z.object({
   id: z.number().optional(),
   srNo: z.number().int().positive().optional(),
   itemDescription: z.string().optional(),
-  quantity: z.string().optional(),
-  rate: z.string().optional(),
-  amount: z.string().optional(),
+  quantity: z.number().optional(),
+  rate: z.number().optional(),
+  amount: z.number().optional(),
   sortOrder: z.number().optional(),
 });
 
@@ -85,7 +85,7 @@ export const Page4FormSchema = z.object({
 export const SiteVisitPersonSchema = z.object({
   name: z.string().max(255).optional(),
   phone: z.string().max(20).optional(),
-  email: z.string().email().max(255).optional().or(z.literal("")),
+  email: z.string().max(255).optional().or(z.literal("")),
 });
 
 export const Page5FormSchema = z.object({

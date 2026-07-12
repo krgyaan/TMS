@@ -32,21 +32,13 @@ const defaultAmendment: Amendment = {
 };
 
 const defaultValues: Page7FormValues = {
-    oeWoAmendmentNeeded: "false",
+    oeWoAmendmentNeeded: undefined,
     amendments: [],
-    oeSignaturePrepared: "false",
-    courierRequestPrepared: "false",
+    oeSignaturePrepared: undefined,
+    courierRequestPrepared: undefined,
 };
 
-export function Page7Acceptance({
-    woDetailId,
-    initialData,
-    onSaveDraft,
-    onSaveDraftOnly,
-    onSkip,
-    onBack,
-    isSaving,
-}: Page7AcceptanceProps) {
+export function Page7Acceptance({ woDetailId, initialData, onSaveDraft, onSaveDraftOnly, onSkip, onBack, isSaving }: Readonly<Page7AcceptanceProps>) {
     const form = useForm<Page7FormValues>({
         resolver: zodResolver(Page7FormSchema) as Resolver<Page7FormValues>,
         defaultValues: { ...defaultValues, ...initialData },

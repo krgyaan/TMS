@@ -6,6 +6,25 @@ export * from './payment-response.dto';
 // Helper Schemas
 // ============================================================================
 
+const VALID_PURPOSE_VALUES = [
+    'PAYABLE',
+    'SECURITY',
+    'PERFORMANCE',
+    'COUNTER_GUARANTEE',
+    'FINANCIAL',
+    'ADVANCE_PAYMENT',
+    'SECURITY_BOND_DEPOSIT',
+    'BID_BOND',
+    'DD',
+    'FDR',
+    'EMD',
+    'TENDER_FEES',
+    'PROCESSING_FEES',
+    'SECURITY_DEPOSIT',
+    'OTHER_PAYMENT',
+    'OTHER_SECURITY',
+] as const;
+
 const optionalString = z
     .union([z.string(), z.undefined()])
     .transform(v => {
@@ -46,6 +65,14 @@ const ddDetails = z.object({
     ddCourierHours: optionalNumber(z.coerce.number().min(0)),
     ddDate: optionalString,
     ddRemarks: optionalString,
+}).superRefine((data, ctx) => {
+    if (data.ddPurpose && !(VALID_PURPOSE_VALUES as readonly string[]).includes(data.ddPurpose)) {
+        ctx.addIssue({
+            code: 'custom',
+            message: `ddPurpose must be one of: ${VALID_PURPOSE_VALUES.join(', ')}`,
+            path: ['ddPurpose'],
+        });
+    }
 });
 
 const fdrDetails = z.object({
@@ -64,6 +91,14 @@ const fdrDetails = z.object({
     fdrCourierPincode: optionalString,
     fdrCourierHours: optionalNumber(z.coerce.number().min(0)),
     fdrDate: optionalString,
+}).superRefine((data, ctx) => {
+    if (data.fdrPurpose && !(VALID_PURPOSE_VALUES as readonly string[]).includes(data.fdrPurpose)) {
+        ctx.addIssue({
+            code: 'custom',
+            message: `fdrPurpose must be one of: ${VALID_PURPOSE_VALUES.join(', ')}`,
+            path: ['fdrPurpose'],
+        });
+    }
 });
 
 const bgDetails = z.object({
@@ -104,6 +139,14 @@ const chequeDetails = z.object({
     chequeCourierCity: optionalString,
     chequeCourierState: optionalString,
     chequeCourierPincode: optionalString,
+}).superRefine((data, ctx) => {
+    if (data.chequePurpose && !(VALID_PURPOSE_VALUES as readonly string[]).includes(data.chequePurpose)) {
+        ctx.addIssue({
+            code: 'custom',
+            message: `chequePurpose must be one of: ${VALID_PURPOSE_VALUES.join(', ')}`,
+            path: ['chequePurpose'],
+        });
+    }
 });
 
 const bankTransferDetails = z.object({

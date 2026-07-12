@@ -9,6 +9,9 @@ export interface CreatePurchaseOrderDTO {
     tenderId: number;
     projectId?: number;
     projectName?: string;
+    poType?: string;
+    piAttachments?: string;
+    category?: string;
     poDate: string;
     sellerId?: number;
     shipToPartyId?: number;
@@ -79,10 +82,23 @@ export interface PurchaseOrderRow {
     totalAmount: number;
     totalGstAmt: number;
     grandTotal: number;
+    tdsPercentage?: number | string;
+    tdsAmount?: number | string;
+    amountAfterTds?: number | string;
+    totalPaymentRequested?: number;
+    totalMakerDone?: number;
+    totalPaymentDone?: number;
     poPdfVersions?: Record<string, { path: string; hash: string }>;
 }
 
+export interface SetTdsDTO {
+    tdsPercentage: number;
+}
+
 export interface UpdatePurchaseOrderDTO {
+    poType?: string;
+    piAttachments?: string;
+    category?: string;
     poDate: string;
     sellerId?: number;
     shipToPartyId?: number;

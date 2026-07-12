@@ -16,6 +16,9 @@ export function mapFormToCreateDTO(
         tenderId,
         projectId,
         projectName: projectName || undefined,
+        poType: values.poType,
+        piAttachments: values.piAttachments?.length ? JSON.stringify(values.piAttachments) : undefined,
+        category: values.category,
         poDate: values.poDate,
         sellerId: values.sellerId ? Number(values.sellerId) : undefined,
         shipToPartyId: values.partyId ? Number(values.partyId) : undefined,
@@ -56,6 +59,9 @@ export function mapFormToUpdateDTO(
     values: PurchaseOrderFormValues,
 ): UpdatePurchaseOrderDTO {
     return {
+        poType: values.poType,
+        piAttachments: values.piAttachments?.length ? JSON.stringify(values.piAttachments) : undefined,
+        category: values.category,
         poDate: values.poDate,
         sellerId: values.sellerId ? Number(values.sellerId) : undefined,
         shipToPartyId: values.partyId ? Number(values.partyId) : undefined,

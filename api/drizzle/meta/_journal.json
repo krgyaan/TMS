@@ -274,6 +274,27 @@
       "when": 1781940292054,
       "tag": "0071_drop_old_costing_sheet_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1764323534176,
+      "tag": "0081_add_dd_fdr_to_payment_purpose_enum",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1768000000000,
+      "tag": "0082_add_po_type_and_pi_attachments",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1768100000000,
+      "tag": "0083_add_category_to_purchase_orders",
+      "breakpoints": true
     }
   ]
 }

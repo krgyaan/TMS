@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { Eye, History, Search } from "lucide-react";
+import { Eye, History, Percent, Search } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import DataTable from "@/components/ui/data-table";
@@ -9,19 +9,24 @@ import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { useAllPurchaseOrders } from "@/hooks/api/useProjectDashboard";
 import type { PurchaseOrderRow } from "@/modules/operations/project-dashboard/helpers/projectDashboard.types";
+import { SetTdsDialog } from "./components/SetTdsDialog";
 
 const PurchaseOrderListPage: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { data } = useAllPurchaseOrders();
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
     const [search, setSearch] = useState("");
     const debouncedSearch = useDebouncedSearch(search, 300);
+    const [selectedPoForTds, setSelectedPoForTds] = useState<PurchaseOrderRow | null>(null);
+
+    const isAccountsSection = location.pathname.includes("/accounts/");
 
     const purchaseOrders = data?.purchaseOrders ?? [];
 
@@ -33,18 +38,30 @@ const PurchaseOrderListPage: React.FC = () => {
         gridApi?.setGridOption("quickFilterText", debouncedSearch || undefined);
     }, [debouncedSearch, gridApi]);
 
-    const poActions: ActionItem<PurchaseOrderRow>[] = useMemo(() => [
-        {
-            label: "View Details",
-            icon: <Eye className="h-4 w-4" />,
-            onClick: (row) => navigate(paths.operations.viewPoPage(row.id, row.projectId)),
-        },
-        {
-            label: "PDF Versions",
-            icon: <History className="h-4 w-4" />,
-            onClick: (row) => navigate(paths.operations.poPdfVersions(row.id, row.projectId)),
-        },
-    ], [navigate]);
+    const poActions: ActionItem<PurchaseOrderRow>[] = useMemo(() => {
+        const actions: ActionItem<PurchaseOrderRow>[] = [
+            {
+                label: "View Details",
+                icon: <Eye className="h-4 w-4" />,
+                onClick: (row) => navigate(paths.operations.viewPoPage(row.id, row.projectId)),
+            },
+            {
+                label: "PDF Versions",
+                icon: <History className="h-4 w-4" />,
+                onClick: (row) => navigate(paths.operations.poPdfVersions(row.id, row.projectId)),
+            },
+        ];
+
+        if (isAccountsSection) {
+            actions.unshift({
+                label: "Set TDS %",
+                icon: <Percent className="h-4 w-4" />,
+                onClick: (row) => setSelectedPoForTds(row),
+            });
+        }
+
+        return actions;
+    }, [navigate, isAccountsSection]);
 
     const poColumns = useMemo<ColDef<PurchaseOrderRow>[]>(() => [
         {
@@ -138,22 +155,71 @@ const PurchaseOrderListPage: React.FC = () => {
                 const d = params.data;
                 return `${d.grandTotal} ${d.totalAmount} ${d.totalGstAmt}`;
             },
-            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => (
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span className="truncate block">{formatINR(p.value)}</span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" align="start">
-                            <div className="space-y-1 text-xs">
-                                <p><strong>Total:</strong> {formatINR(p.data?.totalAmount || 0)}</p>
-                                <p><strong>GST:</strong> {formatINR(p.data?.totalGstAmt || 0)}</p>
-                                <p><strong>Grand Total:</strong> {formatINR(p.data?.grandTotal || 0)}</p>
-                            </div>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            ),
+            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => {
+                const d = p.data;
+                const remaining = d?.amountAfterTds
+                    ? Number(d.amountAfterTds) - Number(d.totalPaymentRequested ?? 0)
+                    : null;
+                const tdsPct = d?.tdsPercentage ? Number(d.tdsPercentage) : null;
+
+                return (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="truncate block">{formatINR(p.value)}</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start" className="max-w-xs">
+                                <div className="space-y-1 text-xs">
+                                    <p><strong>Total (Pre-GST):</strong> {formatINR(d?.totalAmount || 0)}</p>
+                                    <p><strong>GST Amount:</strong> {formatINR(d?.totalGstAmt || 0)}</p>
+                                    <p><strong>Grand Total:</strong> {formatINR(d?.grandTotal || 0)}</p>
+                                    {tdsPct !== null && (
+                                        <>
+                                            <div className="border-t my-1.5" />
+                                            <p className="text-destructive">
+                                                <strong>TDS @ {tdsPct}%:</strong> -{formatINR(d?.tdsAmount || 0)}
+                                            </p>
+                                            <p className="font-semibold">
+                                                <strong>After TDS:</strong> {formatINR(d?.amountAfterTds || 0)}
+                                            </p>
+                                            <div className="border-t my-1.5" />
+                                            <p><strong>Payment Requested:</strong> {formatINR(d?.totalPaymentRequested || 0)}</p>
+                                            <p className="pl-2 text-muted-foreground">
+                                                Maker Done: {formatINR(d?.totalMakerDone || 0)}
+                                            </p>
+                                            <p className="pl-2 text-muted-foreground">
+                                                Payment Done: {formatINR(d?.totalPaymentDone || 0)}
+                                            </p>
+                                            <p className={remaining !== null && remaining < 0 ? "text-destructive font-semibold" : "font-semibold"}>
+                                                <strong>Remaining:</strong> {formatINR(remaining ?? 0)}
+                                            </p>
+                                        </>
+                                    )}
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                );
+            },
+        },
+        {
+            field: "tdsPercentage",
+            headerName: "TDS %",
+            sortable: true,
+            filter: true,
+            width: 80,
+            valueFormatter: (p: ValueFormatterParams<PurchaseOrderRow>) => {
+                const val = p.value;
+                return val ? `${Number(val)}%` : "—";
+            },
+            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => {
+                const val = p.value;
+                return (
+                    <span className={val ? "" : "text-muted-foreground"}>
+                        {val ? `${Number(val)}%` : "Not Set"}
+                    </span>
+                );
+            },
         },
         {
             field: "poRaisedBy",
@@ -169,7 +235,7 @@ const PurchaseOrderListPage: React.FC = () => {
             width: 80,
             pinned: "right" as "right" | "left",
         },
-    ], [navigate]);
+    ], [navigate, poActions]);
 
     return (
         <Card>
@@ -207,6 +273,14 @@ const PurchaseOrderListPage: React.FC = () => {
                     }}
                 />
             </CardContent>
+
+            {selectedPoForTds && (
+                <SetTdsDialog
+                    po={selectedPoForTds}
+                    open={!!selectedPoForTds}
+                    onClose={() => setSelectedPoForTds(null)}
+                />
+            )}
         </Card>
     );
 };

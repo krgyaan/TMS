@@ -1,6 +1,6 @@
 import { useParams, useSearchParams } from "react-router-dom";
 import { WoDetailsWizard } from "./components/WoDetailsWizard";
-import { useWoDetailById } from "@/hooks/api/useWoDetails";
+import { useWoDetailWithRelations } from "@/hooks/api/useWoDetails";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -10,7 +10,7 @@ const WoDetailEditPage = () => {
     const [searchParams] = useSearchParams();
     const pageParam = searchParams.get("page");
 
-    const { data: woDetail, isLoading, error } = useWoDetailById(Number(id));
+    const { data: woDetail, isLoading, error } = useWoDetailWithRelations(Number(id));
 
     if (isLoading) {
         return (

@@ -1631,7 +1631,7 @@ export class WoDetailsService {
           srNos: addr.srNos,
           customerName: addr.customerName,
           address: addr.address,
-          gst: addr.gst || null,
+          gst: addr.gst?.trim() || null,
           createdAt: now,
           updatedAt: now,
         }));
@@ -1651,7 +1651,7 @@ export class WoDetailsService {
           srNos: addr.srNos,
           customerName: addr.customerName,
           address: addr.address,
-          gst: addr.gst || null,
+          gst: addr.gst?.trim() || null,
           createdAt: now,
           updatedAt: now,
         }));

@@ -1,4 +1,3 @@
-import { TenderInfo } from "@db/schemas/tendering/tenders.schema";
 import { TenderKpiBucket } from "../tender-executive-performance/zod/tender-buckets.type";
 
 // =======================================================
@@ -35,12 +34,12 @@ export const STAGE_BACKLOG_CONFIG = [
         isApplicable: tender => tender.tlStatus === 0,
     },
     {
-        stageKey: "rfq",
+        stageKey: "rfq_sent",
         label: "RFQ",
         autoCompleteAfter: "BID" as TenderKpiBucket,
     },
     {
-        stageKey: "emd_request",
+        stageKey: "emd_requested",
         label: "EMD Request",
         autoCompleteAfter: "BID" as TenderKpiBucket,
     },
@@ -55,7 +54,7 @@ export const STAGE_BACKLOG_CONFIG = [
         autoCompleteAfter: "BID" as TenderKpiBucket,
     },
     {
-        stageKey: "costing_sheet",
+        stageKey: "costing_sheets",
         label: "Costing Sheet",
         autoCompleteAfter: "BID" as TenderKpiBucket,
     },

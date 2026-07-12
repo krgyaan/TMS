@@ -1,13 +1,13 @@
-import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { eq, like, desc } from "drizzle-orm";
-import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
-import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
-import { beneficiaries } from "@/db/schemas/operations/beneficiaries.schema";
+import { DRIZZLE } from "@/db/database.module";
 import { users } from "@/db/schemas/";
 import { projects } from "@/db/schemas/master/projects.schema";
-import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
+import { beneficiaries } from "@/db/schemas/operations/beneficiaries.schema";
+import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
 import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
+import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { and, desc, eq, like, ne, sql } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -23,7 +23,7 @@ export class PaymentRequestService {
         const year = now.getFullYear();
         const month = now.getMonth() + 1;
         const from = month >= 4 ? year.toString().slice(-2) : (year - 1).toString().slice(-2);
-        const to = ((parseInt(from) + 1) % 100).toString().padStart(2, "0");
+        const to = ((Number.parseInt(from) + 1) % 100).toString().padStart(2, "0");
         const fy = `${from}${to}`;
 
         const sanitizedName = projectName ? this.sanitizeProjectName(projectName) : "PROJECT";
@@ -37,7 +37,7 @@ export class PaymentRequestService {
 
         let next = 1;
         if (last[0]?.requestNo) {
-            const match = last[0].requestNo.match(/PR(\d{4})$/);
+            const match = RegExp(/PR(\d{4})$/).exec(last[0].requestNo);
             if (match) next = parseInt(match[1]) + 1;
         }
 
@@ -46,6 +46,39 @@ export class PaymentRequestService {
 
     async create(body: any, userId: number) {
         const requestNo = await this.generateNumber(body.projectName);
+
+        // Validate against PO TDS cap
+        if (body.purchaseOrderId) {
+            const po = await this.db
+                .select()
+                .from(purchaseOrders)
+                .where(eq(purchaseOrders.id, body.purchaseOrderId))
+                .then(rows => rows[0]);
+
+            if (po?.amountAfterTds) {
+                const amountAfterTds = Number(po.amountAfterTds);
+                const existingSumResult = await this.db
+                    .select({
+                        total: sql<number>`COALESCE(SUM(amount::numeric), 0)`,
+                    })
+                    .from(paymentRequests)
+                    .where(
+                        and(
+                            eq(paymentRequests.purchaseOrderId, body.purchaseOrderId),
+                            ne(paymentRequests.status, 'rejected'),
+                        )
+                    );
+                const existingSum = Number(existingSumResult[0]?.total ?? 0);
+                const requestedAmount = Number(body.amount ?? 0);
+
+                if (existingSum + requestedAmount > amountAfterTds) {
+                    throw new BadRequestException(
+                        `Payment request amount (${requestedAmount}) exceeds remaining PO limit. ` +
+                        `Available: ${amountAfterTds - existingSum}, Already used: ${existingSum}`
+                    );
+                }
+            }
+        }
 
         const pr = (
             await this.db
@@ -177,6 +210,15 @@ export class PaymentRequestService {
                 requestedByName: users.name,
                 projectName: projects.projectName,
                 poNumber: purchaseOrders.poNumber,
+                poTotalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                poTotalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                poGrandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                poTdsPercentage: purchaseOrders.tdsPercentage,
+                poTdsAmount: purchaseOrders.tdsAmount,
+                poAmountAfterTds: purchaseOrders.amountAfterTds,
+                poTotalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status != 'rejected'), 0)`,
+                poTotalMakerDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'maker_done'), 0)`,
+                poTotalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done'), 0)`,
             })
             .from(paymentRequests)
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))

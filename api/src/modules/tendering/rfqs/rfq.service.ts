@@ -114,7 +114,7 @@ export class RfqsService {
     private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
         const roleFilterConditions: any[] = [];
 
-        if (user && user.roleId) {
+        if (user?.roleId) {
             if (user.dataScope === 'all') {
                 // Super User or Admin: Show all, respect teamId filter if provided
                 if (teamId !== undefined && teamId !== null) {
@@ -829,11 +829,11 @@ export class RfqsService {
                 await this.timersService.stopTimer({
                     entityType: "TENDER",
                     entityId: tenderId,
-                    stage: "rfq",
+                    stage: "rfq_sent",
                     userId: changedBy,
                     reason: "RFQ sent",
                 });
-                this.logger.log(`Successfully stopped rfq timer for tender ${tenderId}`);
+                this.logger.log(`Successfully stopped rfq_sent timer for tender ${tenderId}`);
             } catch (error) {
                 if (error instanceof ConflictException) {
                     this.logger.warn(`Timer already completed for tender ${tenderId} after RFQ sent — skipping`);

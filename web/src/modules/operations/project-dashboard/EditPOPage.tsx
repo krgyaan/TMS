@@ -17,7 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useCreatePoParty, usePoParties, usePurchaseOrderDetails, useUpdatePurchaseOrder } from "@/hooks/api/useProjectDashboard";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, ArrowLeft, Building2, Calendar, Hash, Info, Loader2, Mail, MapPin, Phone, Save, UserCheck, UserPlus } from "lucide-react";
+import { AlertCircle, ArrowLeft, Building2, Calendar, FileText, Hash, Info, Loader2, Mail, MapPin, Phone, Save, UserCheck, UserPlus } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
@@ -39,6 +39,9 @@ interface NewPartyForm {
 }
 
 const defaultFormValues: PurchaseOrderFormValues = {
+    poType: "new",
+    piAttachments: [],
+    category: "",
     poDate: "",
     sellerId: "",
     sellerName: "",
@@ -187,6 +190,9 @@ export default function EditPOPage() {
     useEffect(() => {
         if (!poData) return;
         form.reset({
+            poType: poData.poType || "new",
+            piAttachments: poData.piAttachments ? (typeof poData.piAttachments === 'string' ? JSON.parse(poData.piAttachments) : poData.piAttachments) : [],
+            category: poData.category || "",
             poDate: formatDateForInput(poData.poDate),
             sellerId: "",
             sellerName: poData.sellerName || "",
@@ -302,9 +308,61 @@ export default function EditPOPage() {
                 </div>
             </CardHeader>
             <CardContent className="space-y-8">
-                {/* ── PO Details ── */}
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)}>
+                        {/* ── PO Type ── */}
+                        <div className="rounded-lg border p-4 space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <SelectField
+                                    control={form.control}
+                                    name="poType"
+                                    label="PO Type *"
+                                    options={[
+                                        { id: "new", name: "New PO" },
+                                        { id: "pi", name: "PI Based" },
+                                    ]}
+                                    placeholder="Select PO type..."
+                                />
+                                <SelectField
+                                    control={form.control}
+                                    name="category"
+                                    label={<><FileText className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Category <span className="text-destructive">*</span></>}
+                                    options={[
+                                        { id: "Supply", name: "Supply" },
+                                        { id: "Service", name: "Service" },
+                                        { id: "Freight", name: "Freight" },
+                                        { id: "Admin/Misc.", name: "Admin/Misc." },
+                                        { id: "Buyback/Sale", name: "Buyback/Sale" },
+                                        { id: "GEM Charges", name: "GEM Charges" },
+                                    ]}
+                                    placeholder="Select category..."
+                                />
+                                {poData?.poType === "pi" && poData?.piAttachments && (
+                                    <div className="space-y-1">
+                                        <p className="text-sm font-medium">Invoice Copy</p>
+                                        {(() => {
+                                            const attachments = typeof poData.piAttachments === 'string'
+                                                ? JSON.parse(poData.piAttachments)
+                                                : poData.piAttachments;
+                                            return Array.isArray(attachments) && attachments.length > 0 ? (
+                                                <ul className="space-y-1">
+                                                    {attachments.map((path: string, i: number) => (
+                                                        <li key={i} className="text-sm text-muted-foreground flex items-center gap-2">
+                                                            <FileText className="h-4 w-4" />
+                                                            {path.split("/").pop()}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground">No invoice copy uploaded</p>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* ── PO Details ── */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                             <div className="space-y-2">
                                 <Label className="flex items-center gap-2">

@@ -1,8 +1,10 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/hooks/useFormatedDate";
 import {
   ArrowLeft,
+  FileText,
   Loader2,
   Receipt,
 } from "lucide-react";
@@ -110,6 +112,18 @@ export function POFormPreview({
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Edit
         </Button>
+      </div>
+
+      <div className="flex items-center gap-2 mb-2">
+        <Badge variant={formValues.poType === "pi" ? "default" : "secondary"}>
+          {formValues.poType === "pi" ? "PI Based" : "New PO"}
+        </Badge>
+        {formValues.poType === "pi" && formValues.piAttachments.length > 0 && (
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <FileText className="h-3 w-3" />
+            {formValues.piAttachments.length} invoice file{formValues.piAttachments.length > 1 ? "s" : ""}
+          </span>
+        )}
       </div>
 
       <Card>

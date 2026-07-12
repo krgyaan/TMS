@@ -1,23 +1,23 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, like, desc, sql, inArray } from "drizzle-orm";
+import { desc, eq, inArray, like, sql } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
+import { readFile, rename } from "node:fs/promises";
 import { join } from "node:path";
-import { rename, readFile } from "node:fs/promises";
 
-import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
+import { DRIZZLE } from "@/db/database.module";
 import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
 import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
 
+import { projectParties } from "@/db/schemas/operations/project-parties.schema";
 import { projects } from "@/db/schemas/operations/projects.schema";
-import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
+import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
+import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { woBasicDetails, woDetails } from "@/db/schemas/operations/work-order.schema";
 import { employeeImprests } from "@/db/schemas/shared/employee-imprest.schema";
-import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
-import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
-import { projectParties } from "@/db/schemas/operations/project-parties.schema";
+import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
 
-import { imprestCategories, users, tenderInformation } from "@/db/schemas";
+import { imprestCategories, tenderInformation, users } from "@/db/schemas";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -135,9 +135,15 @@ export class ProjectDashboardService {
                     poRaisedBy: users.name,
                     createdAt: purchaseOrders.createdAt,
                     poPdfVersions: purchaseOrders.generatedPdfVersions,
+                    tdsPercentage: purchaseOrders.tdsPercentage,
+                    tdsAmount: purchaseOrders.tdsAmount,
+                    amountAfterTds: purchaseOrders.amountAfterTds,
                     totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                    totalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status != 'rejected'), 0)`,
+                    totalMakerDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'maker_done'), 0)`,
+                    totalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done'), 0)`,
                 })
                 .from(purchaseOrders)
                 .innerJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
@@ -167,9 +173,15 @@ export class ProjectDashboardService {
                     poRaisedBy: users.name,
                     createdAt: purchaseOrders.createdAt,
                     poPdfVersions: purchaseOrders.generatedPdfVersions,
+                    tdsPercentage: purchaseOrders.tdsPercentage,
+                    tdsAmount: purchaseOrders.tdsAmount,
+                    amountAfterTds: purchaseOrders.amountAfterTds,
                     totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                    totalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status != 'rejected'), 0)`,
+                    totalMakerDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'maker_done'), 0)`,
+                    totalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done'), 0)`,
                 })
                 .from(purchaseOrders)
                 .innerJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
@@ -283,6 +295,9 @@ export class ProjectDashboardService {
                 shipToPan: body.shipToPan,
                 
                 // Optional fields
+                poType: body.poType || 'new',
+                piAttachments: body.piAttachments,
+                category: body.category,
                 quotationNo: body.quotationNo,
                 quotationDate: body.quotationDate,
                 termsAndConditions: body.termsAndConditions ? (typeof body.termsAndConditions === 'string' ? JSON.parse(body.termsAndConditions) : body.termsAndConditions) : [],
@@ -487,6 +502,38 @@ export class ProjectDashboardService {
         }
     }
 
+    async setTdsPercentage(id: number, tdsPercentage: number) {
+        const po = await this.db
+            .select()
+            .from(purchaseOrders)
+            .where(eq(purchaseOrders.id, id))
+            .then(rows => rows[0]);
+        if (!po) throw new NotFoundException("Purchase Order not found");
+
+        const products = await this.db
+            .select()
+            .from(purchaseOrderProducts)
+            .where(eq(purchaseOrderProducts.purchaseOrderId, id));
+
+        const { total: subtotal, totalWithGst: grandTotal } = this.getTotalProductValues(products);
+        const tdsAmount = (subtotal * tdsPercentage) / 100;
+        const amountAfterTds = grandTotal - tdsAmount;
+
+        const [updated] = await this.db
+            .update(purchaseOrders)
+            .set({
+                tdsPercentage: tdsPercentage.toString(),
+                tdsAmount: tdsAmount.toString(),
+                amountAfterTds: amountAfterTds.toString(),
+                updatedAt: new Date(),
+            })
+            .where(eq(purchaseOrders.id, id))
+            .returning();
+
+        this.logger.info(`TDS set for PO #${id}: ${tdsPercentage}%, TDS Amount: ${tdsAmount}, After TDS: ${amountAfterTds}`);
+        return updated;
+    }
+
     async getPurchaseOrder(id: number) {
         this.logger.debug("PO details called");
         const po = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
@@ -666,6 +713,9 @@ export class ProjectDashboardService {
                     shipToPan: body.shipToPan,
                     
                     // Optional fields
+                    poType: body.poType || existingPO.poType || 'new',
+                    piAttachments: body.piAttachments,
+                    category: body.category,
                     quotationNo: body.quotationNo,
                     quotationDate: body.quotationDate,
                     termsAndConditions: body.termsAndConditions ? (typeof body.termsAndConditions === 'string' ? JSON.parse(body.termsAndConditions) : body.termsAndConditions) : [],

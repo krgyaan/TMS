@@ -43,7 +43,7 @@ export class CostingSheetsController {
         }, user, parseNumber(teamId));
         // Batch-fetch timer data for all tenders
         const tenderIds = result.data.map(t => t.tenderId);
-        const timerMap = await getFrontendTimersBatch(this.timersService, 'TENDER', tenderIds, 'costing_sheet');
+        const timerMap = await getFrontendTimersBatch(this.timersService, 'TENDER', tenderIds, 'costing_sheets');
         const dataWithTimers = result.data.map(tender => ({
             ...tender,
             timer: timerMap.get(tender.tenderId)
