@@ -14,6 +14,8 @@ const termRowSchema = z.object({
 });
 
 export const purchaseOrderFormSchema = z.object({
+    poType: z.enum(["new", "pi"]).default("new"),
+    piAttachments: z.array(z.string()).default([]),
     poDate: z.string().min(1, "PO date is required"),
 
     sellerId: z.string().default(""),
@@ -44,7 +46,13 @@ export const purchaseOrderFormSchema = z.object({
     technicalSpecsAttachments: z.array(z.string()).default([]),
     accessoriesPackagingListAttachments: z.array(z.string()).default([]),
     remarks: z.string().default(""),
-});
+}).refine(
+    (data) => data.poType !== "pi" || data.piAttachments.length > 0,
+    {
+        message: "Invoice copy is required for PI-based PO",
+        path: ["piAttachments"],
+    }
+);
 
 export type PurchaseOrderFormValues = z.infer<typeof purchaseOrderFormSchema>;
 export type ProductFormItem = z.infer<typeof productItemSchema>;
