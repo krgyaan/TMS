@@ -1,6 +1,16 @@
 import type { CreatePaymentRequestDTO, UpdatePaymentRequestDTO } from "./paymentRequest.types";
 import type { PaymentRequestFormValues } from "./paymentRequest.schema";
 
+function parseRefId(refId: string): { purchaseOrderId?: number; vendorWorkOrderId?: number } {
+    if (!refId) return {};
+    const [type, idStr] = refId.split(":");
+    const id = Number(idStr);
+    if (!id) return {};
+    if (type === "po") return { purchaseOrderId: id };
+    if (type === "vwo") return { vendorWorkOrderId: id };
+    return {};
+}
+
 export function mapPaymentRequestFormToCreateDTO(
     values: PaymentRequestFormValues,
     projectId: number,
@@ -15,7 +25,7 @@ export function mapPaymentRequestFormToCreateDTO(
         ifsc: values.ifsc,
         amount: values.amount!,
         paymentAgainst: values.paymentAgainst,
-        purchaseOrderId: values.selectedPoId ? Number(values.selectedPoId) : undefined,
+        ...parseRefId(values.selectedRefId),
         poFile: values.poFile?.length ? values.poFile[0] : undefined,
         remark: values.remark || undefined,
     };
@@ -31,7 +41,7 @@ export function mapPaymentRequestFormToUpdateDTO(
         ifsc: values.ifsc,
         amount: values.amount!,
         paymentAgainst: values.paymentAgainst,
-        purchaseOrderId: values.selectedPoId ? Number(values.selectedPoId) : undefined,
+        ...parseRefId(values.selectedRefId),
         poFile: values.poFile?.length ? values.poFile[0] : undefined,
         remark: values.remark || undefined,
     };

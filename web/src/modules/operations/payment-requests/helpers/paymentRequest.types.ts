@@ -10,6 +10,7 @@ export interface PaymentRequestRow {
     paymentAgainst: string;
     purchaseInvoiceId?: number;
     purchaseOrderId?: number;
+    vendorWorkOrderId?: number;
     uploadedInvoiceFile?: string;
     poFile?: string;
     remark?: string;
@@ -20,6 +21,7 @@ export interface PaymentRequestRow {
     rejectionReason?: string;
     projectName?: string;
     poNumber?: string;
+    vwoNumber?: string;
     createdAt: string;
     piCategory?: string;
     piPartyName?: string;
@@ -49,6 +51,7 @@ export interface CreatePaymentRequestDTO {
     paymentAgainst: string;
     purchaseInvoiceId?: number;
     purchaseOrderId?: number;
+    vendorWorkOrderId?: number;
     uploadedInvoiceFile?: string;
     poFile?: string;
     remark?: string;
@@ -63,6 +66,7 @@ export interface UpdatePaymentRequestDTO {
     paymentAgainst: string;
     purchaseInvoiceId?: number;
     purchaseOrderId?: number;
+    vendorWorkOrderId?: number;
     uploadedInvoiceFile?: string;
     poFile?: string;
     remark?: string;

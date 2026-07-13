@@ -2,6 +2,7 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { Textarea } from "@/components/ui/textarea";
 import { useProjectPurchaseOrders } from "@/hooks/api/useProjectDashboard";
+import { useProjectVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
 import React from "react";
 import type { Control } from "react-hook-form";
 import { useFormContext } from "react-hook-form";
@@ -17,11 +18,25 @@ interface PaymentAgainstFieldProps {
 export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ control, projectId }) => {
     const { watch, setValue } = useFormContext();
     const paymentAgainst = watch("paymentAgainst");
+
     const { data: poData } = useProjectPurchaseOrders(projectId);
-    const poOptions = (poData?.purchaseOrders || []).map((po: any) => ({
-        id: String(po.id),
-        name: `${po.poNumber} - ${po.sellerName}`,
-    }));
+    const { data: vwoData } = useProjectVendorWorkOrders(projectId);
+
+    const mergedOptions = React.useMemo(() => {
+        const poOptions = (poData?.purchaseOrders || []).map((po: any) => ({
+            id: `po:${po.id}`,
+            name: `[PO] ${po.poNumber} - ${po.sellerName}`,
+        }));
+        const vwoOptions = (vwoData || []).map((vwo: any) => ({
+            id: `vwo:${vwo.id}`,
+            name: `[VWO] ${vwo.woNumber} - ${vwo.sellerName}`,
+        }));
+        return [...poOptions, ...vwoOptions];
+    }, [poData, vwoData]);
+
+    React.useEffect(() => {
+        setValue("selectedRefId", "");
+    }, [paymentAgainst, setValue]);
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
@@ -33,13 +48,13 @@ export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ contro
                 placeholder="Select payment type..."
             />
 
-            {paymentAgainst === "po" && (
+            {(paymentAgainst === "po" || paymentAgainst === "vwo") && (
                 <SelectField
                     control={control}
-                    name="selectedPoId"
-                    label="Select PO"
-                    options={poOptions}
-                    placeholder="Choose a PO..."
+                    name="selectedRefId"
+                    label="Select PO/VWO"
+                    options={mergedOptions}
+                    placeholder="Choose a PO or VWO..."
                 />
             )}
 

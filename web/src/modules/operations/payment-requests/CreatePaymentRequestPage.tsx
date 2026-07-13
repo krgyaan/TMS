@@ -28,7 +28,7 @@ const defaultFormValues: PaymentRequestFormValues = {
     bankName: "",
     ifsc: "",
     amount: null,
-    selectedPoId: "",
+    selectedRefId: "",
     paymentAgainst: "",
     poFile: [],
     remark: "",

@@ -15,6 +15,7 @@ export const PAYMENT_AGAINST_LABELS: Record<string, string> = {
     upload_invoice: "Upload Invoice",
     new_pi: "New PI",
     po: "PO",
+    vwo: "VWO",
     others: "Imprest",
     imprest: "Imprest",
 };
@@ -142,6 +143,17 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                                 >
                                     View Latest PO PDF
                                 </a>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {detail.vendorWorkOrderId && (
+                    <div className="col-span-2 space-y-2">
+                        <Label className="text-muted-foreground text-xs">VWO Details</Label>
+                        <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">VWO Number:</span>
+                                <span className="font-medium">{detail.vwoNumber || `#${detail.vendorWorkOrderId}`}</span>
                             </div>
                         </div>
                     </div>
