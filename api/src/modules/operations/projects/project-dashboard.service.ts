@@ -481,7 +481,13 @@ export class ProjectDashboardService {
                 const oldPath = join(process.cwd(), 'uploads', 'tendering', pdfPaths[0]);
                 const newPath = join(process.cwd(), 'uploads', 'tendering', storageDir, newFileName);
 
-                await rename(oldPath, newPath);
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    try { await rename(oldPath, newPath); break; }
+                    catch (e) {
+                        if ((e as NodeJS.ErrnoException).code !== 'ENOENT' || attempt === 2) throw e;
+                        await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
+                    }
+                }
 
                 const finalPath = `${storageDir}/${newFileName}`;
 
