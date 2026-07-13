@@ -14,6 +14,7 @@ export const paymentRequests = pgTable(
         paymentAgainst: varchar("payment_against", { length: 50 }),
         purchaseInvoiceId: bigint("purchase_invoice_id", { mode: "number" }),
         purchaseOrderId: bigint("purchase_order_id", { mode: "number" }),
+        vendorWorkOrderId: bigint("vendor_work_order_id", { mode: "number" }),
         uploadedInvoiceFile: varchar("uploaded_invoice_file", { length: 500 }),
         poFile: varchar("po_file", { length: 500 }),
         remark: text("remark"),
