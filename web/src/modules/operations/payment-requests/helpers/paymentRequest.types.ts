@@ -38,6 +38,12 @@ export interface PaymentRequestRow {
     poTotalPaymentRequested?: number | string;
     poTotalMakerDone?: number | string;
     poTotalPaymentDone?: number | string;
+    vwoTotalAmount?: number | string;
+    vwoTotalGstAmt?: number | string;
+    vwoGrandTotal?: number | string;
+    vwoTotalPaymentRequested?: number | string;
+    vwoTotalMakerDone?: number | string;
+    vwoTotalPaymentDone?: number | string;
 }
 
 export interface CreatePaymentRequestDTO {

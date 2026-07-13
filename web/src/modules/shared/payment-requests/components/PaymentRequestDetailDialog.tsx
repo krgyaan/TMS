@@ -9,6 +9,7 @@ import { formatINR } from "@/hooks/useINRFormatter";
 import { usePaymentRequestDetails } from "@/hooks/api/useProjectPaymentRequests";
 import { tenderFilesService } from "@/services/api/tender-files.service";
 import { projectDashboardApi } from "@/services/api/project-dashboard.api";
+import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
 
 export const PAYMENT_AGAINST_LABELS: Record<string, string> = {
@@ -154,6 +155,51 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">VWO Number:</span>
                                 <span className="font-medium">{detail.vwoNumber || `#${detail.vendorWorkOrderId}`}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Total (Pre-GST):</span>
+                                <span>{formatINR(detail.vwoTotalAmount || 0)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">GST Amount:</span>
+                                <span>{formatINR(detail.vwoTotalGstAmt || 0)}</span>
+                            </div>
+                            <div className="flex justify-between font-medium">
+                                <span>Grand Total:</span>
+                                <span>{formatINR(detail.vwoGrandTotal || 0)}</span>
+                            </div>
+                            <div className="border-t my-1.5" />
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Payment Requested:</span>
+                                <span>{formatINR(detail.vwoTotalPaymentRequested || 0)}</span>
+                            </div>
+                            <div className="flex justify-between pl-2 text-muted-foreground">
+                                <span>Maker Done:</span>
+                                <span>{formatINR(detail.vwoTotalMakerDone || 0)}</span>
+                            </div>
+                            <div className="flex justify-between pl-2 text-muted-foreground">
+                                <span>Payment Done:</span>
+                                <span>{formatINR(detail.vwoTotalPaymentDone || 0)}</span>
+                            </div>
+                            {(() => {
+                                const cap = Number(detail.vwoGrandTotal || 0);
+                                const remaining = cap - Number(detail.vwoTotalPaymentRequested || 0);
+                                return (
+                                    <div className={`flex justify-between font-medium ${remaining < 0 ? "text-destructive" : ""}`}>
+                                        <span>Remaining:</span>
+                                        <span>{formatINR(remaining)}</span>
+                                    </div>
+                                );
+                            })()}
+                            <div className="pt-2">
+                                <a
+                                    href={vendorWorkOrderApi.getPdfDownloadUrl(detail.vendorWorkOrderId)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 underline text-xs"
+                                >
+                                    View Latest VWO PDF
+                                </a>
                             </div>
                         </div>
                     </div>
