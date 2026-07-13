@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import * as path from 'path';
 
 const isProd = process.env.NODE_ENV === 'production';
@@ -209,18 +210,18 @@ export function getPdfMargins(templateType: string): { top: string; right: strin
 export function getOutputPath(
     templateType: string,
     templateName: string,
-    instrumentId?: number
+    instrumentId?: number,
+    suffix?: string
 ): string {
-    const timestamp = Date.now();
+    const s = suffix ?? randomUUID();
     const storagePath = getStoragePath(templateType);
 
-    // Generate filename based on Laravel pattern: {prefix}_{name}_{timestamp}.pdf
     let fileName: string;
     if (templateType === 'bg' && instrumentId) {
-        fileName = `bg_${instrumentId}_${templateName}_${timestamp}.pdf`;
+        fileName = `bg_${instrumentId}_${templateName}_${s}.pdf`;
     } else {
         const prefix = storagePath;
-        fileName = `${prefix}_${templateName}_${timestamp}.pdf`;
+        fileName = `${prefix}_${templateName}_${s}.pdf`;
     }
 
     return path.join(PDF_CONFIG.outputBasePath, storagePath, fileName);
@@ -232,18 +233,18 @@ export function getOutputPath(
 export function getRelativePath(
     templateType: string,
     templateName: string,
-    instrumentId?: number
+    instrumentId?: number,
+    suffix?: string
 ): string {
-    const timestamp = Date.now();
+    const s = suffix ?? randomUUID();
     const storagePath = getStoragePath(templateType);
 
-    // Generate filename based on Laravel pattern: {prefix}_{name}_{timestamp}.pdf
     let fileName: string;
     if (templateType === 'bg' && instrumentId) {
-        fileName = `bg_${instrumentId}_${templateName}_${timestamp}.pdf`;
+        fileName = `bg_${instrumentId}_${templateName}_${s}.pdf`;
     } else {
         const prefix = storagePath;
-        fileName = `${prefix}_${templateName}_${timestamp}.pdf`;
+        fileName = `${prefix}_${templateName}_${s}.pdf`;
     }
 
     return `payment-pdfs/${storagePath}/${fileName}`;

@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as Handlebars from 'handlebars';
@@ -169,8 +170,9 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
         const pdfBuffer = await this.htmlToPdf(html, templateType);
 
         // Save PDF to disk using template-specific paths
-        const absolutePath = getOutputPath(templateType, templateName, instrumentId);
-        const relativePath = getRelativePath(templateType, templateName, instrumentId);
+        const suffix = randomUUID();
+        const absolutePath = getOutputPath(templateType, templateName, instrumentId, suffix);
+        const relativePath = getRelativePath(templateType, templateName, instrumentId, suffix);
 
         // Ensure directory exists
         await fs.mkdir(path.dirname(absolutePath), { recursive: true });
