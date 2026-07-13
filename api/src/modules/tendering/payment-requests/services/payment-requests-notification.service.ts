@@ -1308,7 +1308,7 @@ export class PaymentRequestsNotificationService {
                     requestId: cheque.request.id,
                     tenderId: cheque.request.tenderId || undefined,
                     eventType: 'CHEQUE_DUE_DATE_REMINDER',
-                    fromUserId: 1,
+                    fromUserId: 8,
                     subject: `Cheque Due Date Reminder - ${data.chequeNo} (${data.daysLeft} days left)`,
                     template: 'cheque-due-date-reminder',
                     data,
