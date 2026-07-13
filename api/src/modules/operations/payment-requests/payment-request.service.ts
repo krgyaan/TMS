@@ -6,6 +6,7 @@ import { beneficiaries } from "@/db/schemas/operations/beneficiaries.schema";
 import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
 import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
+import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, desc, eq, like, ne, sql } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
@@ -94,6 +95,7 @@ export class PaymentRequestService {
                     paymentAgainst: body.paymentAgainst,
                     purchaseInvoiceId: body.purchaseInvoiceId,
                     purchaseOrderId: body.purchaseOrderId,
+                    vendorWorkOrderId: body.vendorWorkOrderId,
                     uploadedInvoiceFile: body.uploadedInvoiceFile,
                     poFile: body.poFile,
                     remark: body.remark,
@@ -126,6 +128,7 @@ export class PaymentRequestService {
                     paymentAgainst: body.paymentAgainst,
                     purchaseInvoiceId: body.purchaseInvoiceId,
                     purchaseOrderId: body.purchaseOrderId,
+                    vendorWorkOrderId: body.vendorWorkOrderId,
                     uploadedInvoiceFile: body.uploadedInvoiceFile,
                     poFile: body.poFile,
                     remark: body.remark,
@@ -186,6 +189,7 @@ export class PaymentRequestService {
         paymentAgainst: paymentRequests.paymentAgainst,
         purchaseInvoiceId: paymentRequests.purchaseInvoiceId,
         purchaseOrderId: paymentRequests.purchaseOrderId,
+        vendorWorkOrderId: paymentRequests.vendorWorkOrderId,
         uploadedInvoiceFile: paymentRequests.uploadedInvoiceFile,
         poFile: paymentRequests.poFile,
         remark: paymentRequests.remark,
@@ -210,6 +214,7 @@ export class PaymentRequestService {
                 requestedByName: users.name,
                 projectName: projects.projectName,
                 poNumber: purchaseOrders.poNumber,
+                vwoNumber: vendorWorkOrders.woNumber,
                 poTotalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 poTotalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 poGrandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
@@ -224,6 +229,7 @@ export class PaymentRequestService {
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
             .leftJoin(projects, eq(paymentRequests.projectId, projects.id))
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
+            .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
             .leftJoin(purchaseInvoices, eq(paymentRequests.purchaseInvoiceId, purchaseInvoices.id))
             .where(eq(paymentRequests.id, id));
 
@@ -239,11 +245,13 @@ export class PaymentRequestService {
                 requestedByName: users.name,
                 projectName: projects.projectName,
                 poNumber: purchaseOrders.poNumber,
+                vwoNumber: vendorWorkOrders.woNumber,
             })
             .from(paymentRequests)
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
             .leftJoin(projects, eq(paymentRequests.projectId, projects.id))
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
+            .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
             .leftJoin(purchaseInvoices, eq(paymentRequests.purchaseInvoiceId, purchaseInvoices.id))
             .orderBy(desc(paymentRequests.id));
     }
@@ -255,11 +263,13 @@ export class PaymentRequestService {
                 requestedByName: users.name,
                 projectName: projects.projectName,
                 poNumber: purchaseOrders.poNumber,
+                vwoNumber: vendorWorkOrders.woNumber,
             })
             .from(paymentRequests)
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
             .leftJoin(projects, eq(paymentRequests.projectId, projects.id))
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
+            .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
             .leftJoin(purchaseInvoices, eq(paymentRequests.purchaseInvoiceId, purchaseInvoices.id))
             .where(eq(paymentRequests.projectId, projectId))
             .orderBy(desc(paymentRequests.id));
