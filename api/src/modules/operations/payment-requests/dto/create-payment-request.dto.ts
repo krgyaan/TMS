@@ -10,6 +10,7 @@ export const createPaymentRequestSchema = z.object({
     paymentAgainst: z.string().min(1, "Payment against is required"),
     purchaseInvoiceId: z.number().optional(),
     purchaseOrderId: z.number().optional(),
+    vendorWorkOrderId: z.number().optional(),
     uploadedInvoiceFile: z.string().optional(),
     poFile: z.string().optional(),
     remark: z.string().optional(),
