@@ -177,8 +177,11 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
         // Ensure directory exists
         await fs.mkdir(path.dirname(absolutePath), { recursive: true });
 
-        // Write PDF file
-        await fs.writeFile(absolutePath, pdfBuffer);
+        // Write PDF file and sync to disk (ensures file exists on network filesystems like NFS/EFS before rename)
+        const fd = await fs.open(absolutePath, 'w');
+        await fd.writeFile(pdfBuffer);
+        await fd.sync();
+        await fd.close();
 
         return relativePath;
     }
