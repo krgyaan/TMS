@@ -56,10 +56,10 @@ export default function EditPaymentRequestPage() {
         if (paymentRequest) {
             form.reset({
                 selectedBeneficiaryId: "",
-                selectedRefId: paymentRequest.purchaseOrderId
-                    ? `po:${paymentRequest.purchaseOrderId}`
+                selectedPoId: paymentRequest.purchaseOrderId
+                    ? String(paymentRequest.purchaseOrderId)
                     : paymentRequest.vendorWorkOrderId
-                        ? `vwo:${paymentRequest.vendorWorkOrderId}`
+                        ? String(paymentRequest.vendorWorkOrderId)
                         : "",
                 partyName: paymentRequest.partyName || "",
                 accountNumber: paymentRequest.accountNumber || "",

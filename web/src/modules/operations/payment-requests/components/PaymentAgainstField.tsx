@@ -16,27 +16,21 @@ interface PaymentAgainstFieldProps {
 }
 
 export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ control, projectId }) => {
-    const { watch, setValue } = useFormContext();
+    const { watch } = useFormContext();
     const paymentAgainst = watch("paymentAgainst");
 
     const { data: poData } = useProjectPurchaseOrders(projectId);
     const { data: vwoData } = useProjectVendorWorkOrders(projectId);
 
-    const mergedOptions = React.useMemo(() => {
-        const poOptions = (poData?.purchaseOrders || []).map((po: any) => ({
-            id: `po:${po.id}`,
-            name: `[PO] ${po.poNumber} - ${po.sellerName}`,
-        }));
-        const vwoOptions = (vwoData || []).map((vwo: any) => ({
-            id: `vwo:${vwo.id}`,
-            name: `[VWO] ${vwo.woNumber} - ${vwo.sellerName}`,
-        }));
-        return [...poOptions, ...vwoOptions];
-    }, [poData, vwoData]);
+    const poOptions = (poData?.purchaseOrders || []).map((po: any) => ({
+        id: String(po.id),
+        name: `${po.poNumber} - ${po.sellerName}`,
+    }));
 
-    React.useEffect(() => {
-        setValue("selectedRefId", "");
-    }, [paymentAgainst, setValue]);
+    const vwoOptions = (vwoData || []).map((vwo: any) => ({
+        id: String(vwo.id),
+        name: `${vwo.woNumber} - ${vwo.sellerName}`,
+    }));
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
@@ -55,6 +49,16 @@ export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ contro
                     label="Select PO/VWO"
                     options={mergedOptions}
                     placeholder="Choose a PO or VWO..."
+                />
+            )}
+
+            {paymentAgainst === "vwo" && (
+                <SelectField
+                    control={control}
+                    name="selectedPoId"
+                    label="Select Work Order"
+                    options={vwoOptions}
+                    placeholder="Choose a Work Order..."
                 />
             )}
 
