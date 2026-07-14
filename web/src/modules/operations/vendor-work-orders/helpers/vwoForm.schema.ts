@@ -2,7 +2,6 @@ import { z } from "zod";
 
 export const productItemSchema = z.object({
     description: z.string().min(1, "Description is required"),
-    hsnSac: z.string().min(1, "HSN/SAC is required"),
     qty: z.number().nullable().refine(v => v !== null && v > 0, "Qty must be greater than 0"),
     rate: z.number().nullable().refine(v => v !== null && v >= 0, "Rate is required"),
     gstRate: z.number().default(18),
