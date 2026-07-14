@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const paymentAgainstOptions = [
     { value: "po", label: "PO" },
+    { value: "vwo", label: "Work Order" },
     { value: "imprest", label: "Imprest" },
 ] as const;
 
@@ -23,6 +24,11 @@ export const paymentRequestFormSchema = z.object({
         if (!hasPoSelection && !hasPoFile) {
             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["selectedPoId"], message: "Select a PO or upload a PO file" });
             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["poFile"], message: "Upload a PO file or select a PO" });
+        }
+    }
+    if (data.paymentAgainst === "vwo") {
+        if (!data.selectedPoId) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["selectedPoId"], message: "Select a Work Order" });
         }
     }
     if (data.paymentAgainst === "imprest") {

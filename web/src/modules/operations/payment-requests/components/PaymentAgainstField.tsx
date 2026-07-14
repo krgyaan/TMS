@@ -2,6 +2,7 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { Textarea } from "@/components/ui/textarea";
 import { useProjectPurchaseOrders } from "@/hooks/api/useProjectDashboard";
+import { useProjectVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
 import React from "react";
 import type { Control } from "react-hook-form";
 import { useFormContext } from "react-hook-form";
@@ -15,12 +16,20 @@ interface PaymentAgainstFieldProps {
 }
 
 export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ control, projectId }) => {
-    const { watch, setValue } = useFormContext();
+    const { watch } = useFormContext();
     const paymentAgainst = watch("paymentAgainst");
+
     const { data: poData } = useProjectPurchaseOrders(projectId);
+    const { data: vwoData } = useProjectVendorWorkOrders(projectId);
+
     const poOptions = (poData?.purchaseOrders || []).map((po: any) => ({
         id: String(po.id),
         name: `${po.poNumber} - ${po.sellerName}`,
+    }));
+
+    const vwoOptions = (vwoData || []).map((vwo: any) => ({
+        id: String(vwo.id),
+        name: `${vwo.woNumber} - ${vwo.sellerName}`,
     }));
 
     return (
@@ -40,6 +49,16 @@ export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ contro
                     label="Select PO"
                     options={poOptions}
                     placeholder="Choose a PO..."
+                />
+            )}
+
+            {paymentAgainst === "vwo" && (
+                <SelectField
+                    control={control}
+                    name="selectedPoId"
+                    label="Select Work Order"
+                    options={vwoOptions}
+                    placeholder="Choose a Work Order..."
                 />
             )}
 

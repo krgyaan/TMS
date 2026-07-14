@@ -15,7 +15,8 @@ export function mapPaymentRequestFormToCreateDTO(
         ifsc: values.ifsc,
         amount: values.amount!,
         paymentAgainst: values.paymentAgainst,
-        purchaseOrderId: values.selectedPoId ? Number(values.selectedPoId) : undefined,
+        purchaseOrderId: values.paymentAgainst === "po" && values.selectedPoId ? Number(values.selectedPoId) : undefined,
+        vendorWorkOrderId: values.paymentAgainst === "vwo" && values.selectedPoId ? Number(values.selectedPoId) : undefined,
         poFile: values.poFile?.length ? values.poFile[0] : undefined,
         remark: values.remark || undefined,
     };
@@ -31,7 +32,8 @@ export function mapPaymentRequestFormToUpdateDTO(
         ifsc: values.ifsc,
         amount: values.amount!,
         paymentAgainst: values.paymentAgainst,
-        purchaseOrderId: values.selectedPoId ? Number(values.selectedPoId) : undefined,
+        purchaseOrderId: values.paymentAgainst === "po" && values.selectedPoId ? Number(values.selectedPoId) : undefined,
+        vendorWorkOrderId: values.paymentAgainst === "vwo" && values.selectedPoId ? Number(values.selectedPoId) : undefined,
         poFile: values.poFile?.length ? values.poFile[0] : undefined,
         remark: values.remark || undefined,
     };
