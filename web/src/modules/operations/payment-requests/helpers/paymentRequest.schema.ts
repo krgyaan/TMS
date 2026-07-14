@@ -13,22 +13,23 @@ export const paymentRequestFormSchema = z.object({
     bankName: z.string().default(""),
     ifsc: z.string().min(1, "IFSC is required"),
     amount: z.number().nullable().refine(v => v !== null && v >= 0, "Amount must be >= 0"),
-    selectedRefId: z.string().default(""),
+    selectedPoId: z.string().default(""),
+    selectedVwoId: z.string().default(""),
     paymentAgainst: z.string().min(1, "Payment against is required"),
     poFile: z.array(z.string()).default([]),
     remark: z.string().default(""),
 }).superRefine((data, ctx) => {
-    if (data.paymentAgainst === "po" || data.paymentAgainst === "vwo") {
-        const hasSelection = !!data.selectedRefId;
+    if (data.paymentAgainst === "po") {
+        const hasPoSelection = !!data.selectedPoId;
         const hasPoFile = data.poFile && data.poFile.length > 0;
-        if (!hasSelection && !hasPoFile) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["selectedRefId"], message: "Select a PO/VWO or upload a PO file" });
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["poFile"], message: "Upload a PO file or select a PO/VWO" });
+        if (!hasPoSelection && !hasPoFile) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["selectedPoId"], message: "Select a PO or upload a PO file" });
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["poFile"], message: "Upload a PO file or select a PO" });
         }
     }
     if (data.paymentAgainst === "vwo") {
-        if (!data.selectedPoId) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["selectedPoId"], message: "Select a Work Order" });
+        if (!data.selectedVwoId) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["selectedVwoId"], message: "Select a Work Order" });
         }
     }
     if (data.paymentAgainst === "imprest") {

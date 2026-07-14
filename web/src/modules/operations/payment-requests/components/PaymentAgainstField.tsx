@@ -42,20 +42,20 @@ export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ contro
                 placeholder="Select payment type..."
             />
 
-            {(paymentAgainst === "po" || paymentAgainst === "vwo") && (
+            {paymentAgainst === "po" && (
                 <SelectField
                     control={control}
-                    name="selectedRefId"
-                    label="Select PO/VWO"
-                    options={mergedOptions}
-                    placeholder="Choose a PO or VWO..."
+                    name="selectedPoId"
+                    label="Select PO"
+                    options={poOptions}
+                    placeholder="Choose a PO..."
                 />
             )}
 
             {paymentAgainst === "vwo" && (
                 <SelectField
                     control={control}
-                    name="selectedPoId"
+                    name="selectedVwoId"
                     label="Select Work Order"
                     options={vwoOptions}
                     placeholder="Choose a Work Order..."

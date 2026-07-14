@@ -45,7 +45,8 @@ export default function EditPaymentRequestPage() {
             bankName: "",
             ifsc: "",
             amount: null,
-            selectedRefId: "",
+            selectedPoId: "",
+            selectedVwoId: "",
             paymentAgainst: "",
             poFile: [],
             remark: "",
@@ -56,11 +57,8 @@ export default function EditPaymentRequestPage() {
         if (paymentRequest) {
             form.reset({
                 selectedBeneficiaryId: "",
-                selectedPoId: paymentRequest.purchaseOrderId
-                    ? String(paymentRequest.purchaseOrderId)
-                    : paymentRequest.vendorWorkOrderId
-                        ? String(paymentRequest.vendorWorkOrderId)
-                        : "",
+                selectedPoId: paymentRequest.purchaseOrderId ? String(paymentRequest.purchaseOrderId) : "",
+                selectedVwoId: paymentRequest.vendorWorkOrderId ? String(paymentRequest.vendorWorkOrderId) : "",
                 partyName: paymentRequest.partyName || "",
                 accountNumber: paymentRequest.accountNumber || "",
                 bankName: paymentRequest.bankName || "",
