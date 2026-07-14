@@ -1,12 +1,12 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { 
-    trainingApiService, 
-    type VideoCourse,
+import {
+    trainingApiService,
+    type Comment,
     type Employee,
     type LearnerProgress,
-    type Comment,
-    type Reactions
+    type Reactions,
+    type VideoCourse
 } from "@/services/api/training.service";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 export const trainingKey = {
@@ -30,7 +30,8 @@ export const useUploadTrainingVideo = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (formData: FormData) => trainingApiService.upload(formData),
+        mutationFn: (params: { formData: FormData; onUploadProgress?: (progressEvent: any) => void }) =>
+            trainingApiService.upload(params.formData, params.onUploadProgress ? { onUploadProgress: params.onUploadProgress } : undefined),
         onSuccess: (newVideo) => {
             queryClient.invalidateQueries({ queryKey: trainingKey.lists() });
             toast.success(`Video "${newVideo.title}" uploaded and queued for processing.`);

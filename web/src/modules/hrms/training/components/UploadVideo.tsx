@@ -1,54 +1,24 @@
-import React, { useState, useRef, useCallback, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { toast } from "sonner";
-import {
-    ArrowLeft,
-    CheckCircle2,
-    Clock,
-    CloudUpload,
-    FileVideo,
-    Film,
-    GraduationCap,
-    Info,
-    Loader2,
-    Monitor,
-    Play,
-    Settings2,
-    Sparkles,
-    Upload,
-    X,
-    Trash2,
-    Eye,
-    EyeOff,
-    Users,
-    Target,
-    Zap,
-    ChevronRight,
-    HardDrive,
-    Layers,
-    Tag,
-    FileText,
-    BarChart3,
-    Shield,
-    AlertCircle
-} from "lucide-react";
+import { paths } from "@/app/routes/paths";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { useAssignTrainingVideo, useTrainingEmployees, useUploadTrainingVideo } from "@/hooks/api/useTraining";
 import { cn } from "@/lib/utils";
+import { AnimatePresence, motion } from "framer-motion";
+import { 
+    AlertCircle, ArrowLeft, BarChart3, CheckCircle2, Clock, CloudUpload, Eye, FileText, FileVideo, Film, 
+    HardDrive, Info, Layers, Loader2, Monitor, Play, Settings2, Shield, Sparkles, Tag, Upload, Users, X, Zap
+} from "lucide-react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { paths } from "@/app/routes/paths";
-import { useUploadTrainingVideo, useTrainingEmployees, useAssignTrainingVideo } from "@/hooks/api/useTraining";
-
-
+import { toast } from "sonner";
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -59,7 +29,6 @@ const staggerContainer = {
     hidden: { opacity: 0 },
     visible: { opacity: 1, transition: { staggerChildren: 0.08 } }
 };
-
 
 const CATEGORIES = [
     { value: "Tendering", label: "Tendering", icon: "📋", color: "bg-orange-500/10 text-orange-600 border-orange-500/20" },
@@ -164,7 +133,6 @@ const UploadVideo = () => {
         }
     };
 
-
     const removeFile = () => {
         setSelectedFile(null);
         setMetadata(null);
@@ -219,7 +187,7 @@ const UploadVideo = () => {
 
         try {
             setUploadPhase("uploading");
-            setUploadProgress(20);
+            setUploadProgress(0);
 
             const formData = new FormData();
             formData.append("file", fileObject);
@@ -228,10 +196,16 @@ const UploadVideo = () => {
             formData.append("category", category);
             formData.append("completionThreshold", completionThreshold);
 
-            setUploadProgress(50);
-            const newVideo = await uploadMutation.mutateAsync(formData);
+            const newVideo = await uploadMutation.mutateAsync({
+                formData,
+                onUploadProgress: (progressEvent) => {
+                    if (progressEvent.total) {
+                        const pct = Math.round((progressEvent.loaded / progressEvent.total) * 100);
+                        setUploadProgress(pct);
+                    }
+                }
+            });
 
-            setUploadProgress(85);
             setUploadPhase("processing");
             setProcessingStep("Finalizing course metadata...");
 
@@ -258,7 +232,6 @@ const UploadVideo = () => {
             toast.error(msg);
         }
     };
-
 
     const resetForm = () => {
         setSelectedFile(null);

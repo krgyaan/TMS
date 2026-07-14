@@ -79,8 +79,8 @@ export class TrainingApiService extends BaseApiService {
     }
 
 
-    async upload(formData: FormData): Promise<VideoCourse> {
-        return this.post<VideoCourse, FormData>('/upload', formData);
+    async upload(formData: FormData, extraConfig?: Record<string, any>): Promise<VideoCourse> {
+        return this.post<VideoCourse, FormData>('/upload', formData, extraConfig);
     }
 
     async remove(id: number): Promise<{ success: boolean; message: string }> {

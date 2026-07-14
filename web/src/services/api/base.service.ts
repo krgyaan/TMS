@@ -15,10 +15,16 @@ export class BaseApiService {
         return response.data
     }
 
-    protected async post<T, D = any>(endpoint: string = '', data?: D): Promise<T> {
+    protected async post<T, D = any>(endpoint: string = '', data?: D, extraConfig?: Record<string, any>): Promise<T> {
         const isFormData = data instanceof FormData;
-        const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined;
-        
+        const config: Record<string, any> = { ...extraConfig };
+
+        if (isFormData) {
+            config.headers = { ...config.headers, 'Content-Type': 'multipart/form-data' };
+            // Override the 10s global axios timeout for large uploads
+            config.timeout = config.timeout ?? 600000; // 10 minutes
+        }
+
         const response: AxiosResponse<T> = await axiosInstance.post(
             `${this.basePath}${endpoint}`,
             data,
