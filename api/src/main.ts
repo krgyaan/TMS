@@ -84,6 +84,9 @@ async function bootstrap() {
     const port = 3000;
     await app.listen(port);
 
+    // Increase server timeout for large uploads (10 minutes)
+    app.getHttpServer().timeout = 10 * 60 * 1000;
+
     winstonLogger.info(`API running at http://localhost:${port}`);
     winstonLogger.info(`Uploads served at /uploads/*`);
 }

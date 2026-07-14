@@ -1,21 +1,20 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, and, inArray } from 'drizzle-orm';
 import { Queue } from 'bullmq';
-import * as fs from 'fs';
-import * as path from 'path';
+import { and, eq, inArray } from 'drizzle-orm';
+import { unlink } from 'fs/promises';
 
-import { DRIZZLE } from '@/db/database.module';
 import type { DbInstance } from '@/db';
-import { trainingVideos } from '@/db/schemas/hrms/training-videos.schema';
+import { DRIZZLE } from '@/db/database.module';
+import { oauthAccounts } from '@/db/schemas/auth/oauth-accounts.schema';
+import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
+import { users } from '@/db/schemas/auth/users.schema';
 import { trainingAssignments } from '@/db/schemas/hrms/training-assignments.schema';
-import { trainingWatchHistory } from '@/db/schemas/hrms/training-watch-history.schema';
 import { trainingComments } from '@/db/schemas/hrms/training-comments.schema';
 import { trainingVideoReactions } from '@/db/schemas/hrms/training-video-reactions.schema';
-import { users } from '@/db/schemas/auth/users.schema';
-import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
-import { teams } from '@/db/schemas/master/teams.schema';
+import { trainingVideos } from '@/db/schemas/hrms/training-videos.schema';
+import { trainingWatchHistory } from '@/db/schemas/hrms/training-watch-history.schema';
 import { designations } from '@/db/schemas/master/designations.schema';
-import { oauthAccounts } from '@/db/schemas/auth/oauth-accounts.schema';
+import { teams } from '@/db/schemas/master/teams.schema';
 
 @Injectable()
 export class TrainingService {
@@ -34,33 +33,42 @@ export class TrainingService {
     ) {
         const videoCode = `TRN-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-        const [newVideo] = await this.db
-            .insert(trainingVideos)
-            .values({
-                videoCode,
-                title,
-                description,
-                filename: file.filename,
-                filepath: file.path,
-                filesize: file.size,
-                status: 'processing',
-                storageProvider: 'VPS',
-                storageKey: file.filename,
-                completionThreshold,
-                category,
-                uploadedBy: userId,
-            })
-            .returning();
+        let newVideo;
+        try {
+            [newVideo] = await this.db
+                .insert(trainingVideos)
+                .values({
+                    videoCode,
+                    title,
+                    description,
+                    filename: file.filename,
+                    filepath: file.path,
+                    filesize: file.size,
+                    status: 'processing',
+                    storageProvider: 'VPS',
+                    storageKey: file.filename,
+                    completionThreshold,
+                    category,
+                    uploadedBy: userId,
+                })
+                .returning();
 
-        // Add job to video processing queue
-        await this.videoQueue.add(
-            'process-video',
-            { videoId: newVideo.id, filepath: file.path },
-            {
-                attempts: 3,
-                backoff: { type: 'exponential', delay: 10000 },
-            },
-        );
+            // Add job to video processing queue
+            await this.videoQueue.add(
+                'process-video',
+                { videoId: newVideo.id, filepath: file.path },
+                {
+                    attempts: 3,
+                    backoff: { type: 'exponential', delay: 10000 },
+                },
+            );
+        } catch (error) {
+            // Clean up uploaded file if DB insert or queue add fails
+            try {
+                await unlink(file.path);
+            } catch { /* ignore if file already gone */ }
+            throw error;
+        }
 
         return newVideo;
     }
@@ -118,20 +126,22 @@ export class TrainingService {
         const video = await this.findOne(id);
 
         // Delete physical video file
-        if (fs.existsSync(video.filepath)) {
-            try {
-                fs.unlinkSync(video.filepath);
-            } catch (err) {
+        try {
+            await unlink(video.filepath);
+        } catch (err: any) {
+            if (err.code !== 'ENOENT') {
                 console.error(`Failed to delete video file at ${video.filepath}:`, err);
             }
         }
 
         // Delete thumbnail if it exists
-        if (video.thumbnailPath && fs.existsSync(video.thumbnailPath)) {
+        if (video.thumbnailPath) {
             try {
-                fs.unlinkSync(video.thumbnailPath);
-            } catch (err) {
-                console.error(`Failed to delete thumbnail file at ${video.thumbnailPath}:`, err);
+                await unlink(video.thumbnailPath);
+            } catch (err: any) {
+                if (err.code !== 'ENOENT') {
+                    console.error(`Failed to delete thumbnail file at ${video.thumbnailPath}:`, err);
+                }
             }
         }
 

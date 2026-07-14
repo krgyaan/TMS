@@ -1,25 +1,15 @@
-import {
-    Controller,
-    Post,
-    Get,
-    Delete,
-    Param,
-    Body,
-    Headers,
-    Res,
-    UseInterceptors,
-    UploadedFile,
-    ParseIntPipe,
-    NotFoundException,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, NotFoundException, Param, ParseIntPipe, Post, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import * as fs from 'fs';
+import { access, stat } from 'fs/promises';
 import { diskStorage } from 'multer';
 import { extname, resolve } from 'path';
-import * as fs from 'fs';
 
-import { Public } from '@/modules/auth/decorators/public.decorator';
 import { CurrentUser } from '@/decorators/current-user.decorator';
+import { Public } from '@/modules/auth/decorators/public.decorator';
 import { TrainingService } from './training.service';
+
+const VIDEO_MAX_SIZE = 500 * 1024 * 1024; // 500 MB
 
 const videoMulterConfig = {
     storage: diskStorage({
@@ -30,6 +20,7 @@ const videoMulterConfig = {
             callback(null, `trn-video-${uniqueSuffix}${ext}`);
         },
     }),
+    limits: { fileSize: VIDEO_MAX_SIZE },
 };
 
 @Controller('hrms/training')
@@ -75,15 +66,25 @@ export class TrainingController {
         const video = await this.service.findOne(id);
         const videoPath = resolve(video.filepath);
 
-        if (!fs.existsSync(videoPath)) {
+        try {
+            await access(videoPath);
+        } catch {
             throw new NotFoundException('Video file not found on disk');
         }
 
-        const stat = fs.statSync(videoPath);
-        const fileSize = stat.size;
+        const { size: fileSize } = await stat(videoPath);
+
+        const ext = extname(videoPath).toLowerCase();
+        const contentType: Record<string, string> = {
+            '.mp4': 'video/mp4',
+            '.mov': 'video/quicktime',
+            '.webm': 'video/webm',
+            '.avi': 'video/x-msvideo',
+            '.mkv': 'video/x-matroska',
+        };
+        const mimeType = contentType[ext] || 'video/mp4';
 
         if (rangeHeader) {
-            // Range request format: bytes=start-end
             const parts = rangeHeader.replace(/bytes=/, '').split('-');
             const start = parseInt(parts[0], 10);
             const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
@@ -99,7 +100,7 @@ export class TrainingController {
                 'Content-Range': `bytes ${start}-${end}/${fileSize}`,
                 'Accept-Ranges': 'bytes',
                 'Content-Length': chunksize,
-                'Content-Type': 'video/mp4',
+                'Content-Type': mimeType,
             };
 
             res.writeHead(206, head);
@@ -107,7 +108,7 @@ export class TrainingController {
         } else {
             const head = {
                 'Content-Length': fileSize,
-                'Content-Type': 'video/mp4',
+                'Content-Type': mimeType,
             };
             res.writeHead(200, head);
             fs.createReadStream(videoPath).pipe(res);
