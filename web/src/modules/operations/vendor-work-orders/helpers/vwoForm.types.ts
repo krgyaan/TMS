@@ -51,7 +51,6 @@ export interface CreateVendorWorkOrderDTO {
     shipToPan?: string;
     products: Array<{
         description: string;
-        hsnSac: string;
         qty: number;
         rate: number;
         gstRate: number;
@@ -86,7 +85,6 @@ export interface UpdateVendorWorkOrderDTO {
     shipToPan?: string;
     products: Array<{
         description: string;
-        hsnSac: string;
         qty: number;
         rate: number;
         gstRate: number;

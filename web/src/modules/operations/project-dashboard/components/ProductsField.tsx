@@ -28,7 +28,7 @@ export function ProductsField({ control }: ProductsFieldProps) {
     const calculations = useMemo(() => calculateTotals(products), [products]);
 
     const addProduct = () => {
-        append({ description: "", hsnSac: "", qty: null, rate: null, gstRate: 18 } as any);
+        append({ description: "", qty: null, rate: null, gstRate: 18 } as any);
     };
 
     const duplicateProduct = (index: number) => {
@@ -64,7 +64,6 @@ export function ProductsField({ control }: ProductsFieldProps) {
                         <TableRow>
                             <TableHead className="w-[5%]">#</TableHead>
                             <TableHead className="w-[50%]">Description *</TableHead>
-                            <TableHead className="w-[10%]">HSN/SAC *</TableHead>
                             <TableHead className="w-[9%]">Qty *</TableHead>
                             <TableHead className="w-[11%]">Rate (₹) *</TableHead>
                             <TableHead className="w-[9%]">GST % *</TableHead>
@@ -93,13 +92,6 @@ export function ProductsField({ control }: ProductsFieldProps) {
                                         <FieldWrapper control={control} name={`products.${index}.description` as any} label="">
                                             {(fieldProps) => (
                                                 <Textarea {...fieldProps} placeholder="Enter description" rows={2} className="min-h-[36px]" />
-                                            )}
-                                        </FieldWrapper>
-                                    </TableCell>
-                                    <TableCell className="p-1 align-top pt-2">
-                                        <FieldWrapper control={control} name={`products.${index}.hsnSac` as any} label="">
-                                            {(fieldProps) => (
-                                                <Input {...fieldProps} placeholder="HSN" className="h-9 font-mono" />
                                             )}
                                         </FieldWrapper>
                                     </TableCell>

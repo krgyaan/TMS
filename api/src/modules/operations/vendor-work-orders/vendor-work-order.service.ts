@@ -118,7 +118,6 @@ export class VendorWorkOrderService {
                 await this.db.insert(vendorWorkOrderItems).values({
                     vendorWorkOrderId: wo.id,
                     description: product.description,
-                    hsnSac: product.hsnSac,
                     qty: product.qty,
                     rate: product.rate.toString(),
                     taxableAmount: taxableAmount.toString(),
@@ -209,7 +208,6 @@ export class VendorWorkOrderService {
                 await this.db.insert(vendorWorkOrderItems).values({
                     vendorWorkOrderId: id,
                     description: product.description,
-                    hsnSac: product.hsnSac,
                     qty: product.qty,
                     rate: product.rate.toString(),
                     taxableAmount: taxableAmount.toString(),
@@ -546,7 +544,6 @@ export class VendorWorkOrderService {
             remarks: wo.remarks,
             products: (products || []).map((p: any) => ({
                 description: p.description,
-                hsnSac: p.hsnSac,
                 qty: p.qty,
                 rate: p.rate,
                 gstRate: p.gstRate,
@@ -574,7 +571,6 @@ export class VendorWorkOrderService {
             const total = amount + gstAmount;
             return {
                 description: p.description || "",
-                hsn: p.hsnSac || "",
                 quantity: qty,
                 rate,
                 amount,
@@ -588,8 +584,13 @@ export class VendorWorkOrderService {
         const totalGstAmt = items.reduce((s: number, i: any) => s + i.gst_amount, 0);
         const grandTotal = totalAmount + totalGstAmt;
 
-        // Determine signature image based on stored team
-        const team = wo.team;
+        // Determine signature image based on creator's team
+        const [creatorUser] = await this.db
+            .select({ team: users.team })
+            .from(users)
+            .where(eq(users.id, wo.woRaisedBy))
+            .limit(1);
+        const team = creatorUser?.team;
         const isProd = process.env.NODE_ENV === 'production';
         const rootDir = isProd ? 'dist' : 'src';
         const assetsPath = join(process.cwd(), rootDir, 'modules', 'pdf', 'assets');

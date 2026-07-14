@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCreatePoParty, usePoParties, useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
+import { useAuth } from "@/contexts/AuthContext";
 import { useVendorWorkOrderDetails, useUpdateVendorWorkOrder } from "@/hooks/api/useVendorWorkOrders";
 import { VWOProductsField } from "./components/VWOProductsField";
 import { VWOTermsField } from "./components/VWOTermsField";
@@ -60,7 +61,7 @@ const defaultFormValues: VendorWorkOrderFormValues = {
   shippingAddress: "",
   shipToGst: "",
   shipToPan: "",
-  products: [{ description: "", hsnSac: "", qty: null, rate: null, gstRate: 18 }],
+  products: [{ description: "", qty: null, rate: null, gstRate: 18 }],
   termsAndConditions: DEFAULT_VWO_TERMS_ROWS,
   scopeOfWork: [],
   accessoriesPackagingListAttachments: [],
@@ -127,12 +128,11 @@ function mapVwoDataToFormValues(data: any): VendorWorkOrderFormValues {
     products: data.products?.length > 0
       ? data.products.map((p: any) => ({
           description: p.description || "",
-          hsnSac: p.hsnSac || "",
           qty: p.qty ?? null,
           rate: p.rate ?? null,
           gstRate: p.gstRate ?? 18,
         }))
-      : [{ description: "", hsnSac: "", qty: null, rate: null, gstRate: 18 }],
+      : [{ description: "", qty: null, rate: null, gstRate: 18 }],
     termsAndConditions: data.termsAndConditions?.length > 0 ? data.termsAndConditions : DEFAULT_VWO_TERMS_ROWS,
     scopeOfWork: parseAttachments(data.scopeOfWork),
     accessoriesPackagingListAttachments: parseAttachments(data.accessoriesPackagingListAttachments),
@@ -145,6 +145,7 @@ export default function EditVendorWorkOrderPage() {
   const { projectId: projectIdParam, woId: vwoIdParam } = useParams<{ projectId: string; woId: string }>();
   const projectId = Number(projectIdParam);
   const vwoId = Number(vwoIdParam);
+  const { teamId } = useAuth();
 
   const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
   const { data: partiesData } = usePoParties();
@@ -284,6 +285,7 @@ export default function EditVendorWorkOrderPage() {
           onBack={() => setShowPreview(false)}
           onSubmit={form.handleSubmit(handleSubmit)}
           teamMembers={activeTeamMembers}
+          teamId={teamId}
         />
       </div>
     );

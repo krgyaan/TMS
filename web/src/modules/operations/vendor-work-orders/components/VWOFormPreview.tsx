@@ -50,9 +50,8 @@ function ProductRow({ index, product }: { index: number; product: ProductFormIte
   return (
     <tr className="border-b border-dashed last:border-0">
       <td className="py-2 px-2 text-sm text-center">{index + 1}</td>
-      <td className="py-2 px-2 text-sm">{product.description}</td>
-      <td className="py-2 px-2 text-sm font-mono">{product.hsnSac}</td>
-      <td className="py-2 px-2 text-sm text-right">{qty}</td>
+                      <td className="py-2 px-2 text-sm">{product.description}</td>
+                      <td className="py-2 px-2 text-sm text-right">{qty}</td>
       <td className="py-2 px-2 text-sm text-right">{formatINR(rate)}</td>
       <td className="py-2 px-2 text-sm text-right">{formatINR(amount)}</td>
       <td className="py-2 px-2 text-sm text-center">{product.gstRate}%</td>
@@ -70,6 +69,7 @@ interface VWOFormPreviewProps {
   onBack: () => void;
   onSubmit: () => void;
   teamMembers?: any[];
+  teamId?: number | null;
 }
 
 export function VWOFormPreview({
@@ -79,6 +79,7 @@ export function VWOFormPreview({
   isSubmitting,
   onBack,
   onSubmit,
+  teamId,
   teamMembers,
 }: VWOFormPreviewProps) {
   const certRecipientEmails = (formValues.selectedCertRecipients || [])
@@ -120,9 +121,7 @@ export function VWOFormPreview({
             <tbody>
               <tr className="border-b">
                 <td className="p-4 w-1/6 align-top">
-                  <div className="h-14 w-14 rounded bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
-                    VE
-                  </div>
+                  <img src="/ve_logo.png" alt="Volks Energie Logo" className="h-14" />
                 </td>
                 <td className="p-4 w-2/5 align-top">
                   <strong>Volks Energie Pvt. Ltd.</strong><br />
@@ -176,7 +175,6 @@ export function VWOFormPreview({
                   <tr className="border-b bg-muted/10">
                     <th className="py-2 px-2 text-left text-xs font-medium text-muted-foreground">Sr. No</th>
                     <th className="py-2 px-2 text-left text-xs font-medium text-muted-foreground">Item Description</th>
-                    <th className="py-2 px-2 text-left text-xs font-medium text-muted-foreground">HSN</th>
                     <th className="py-2 px-2 text-right text-xs font-medium text-muted-foreground">Quantity</th>
                     <th className="py-2 px-2 text-right text-xs font-medium text-muted-foreground">Rate (Rs.)</th>
                     <th className="py-2 px-2 text-right text-xs font-medium text-muted-foreground">Amount</th>
@@ -243,12 +241,15 @@ export function VWOFormPreview({
             Read understood and unconditionally accepted for and on behalf of
           </p>
           <div className="grid grid-cols-2 gap-8 px-4 py-6">
-            <div className="text-left">
-              <p className="text-sm font-medium mt-1">For M/s Volks Energie Pvt Ltd</p>
-              <div className="mt-12">
-                <p className="text-xs text-muted-foreground">Authorized Signatory</p>
+              <div className="text-left">
+                <p className="text-sm font-medium mt-1">For M/s Volks Energie Pvt Ltd</p>
+                <img
+                  src={teamId === 1 ? "/arju-boi.png" : "/sign-po.jpg"}
+                  alt="Signature"
+                  className="h-16 mt-2"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Authorized Signatory</p>
               </div>
-            </div>
             <div className="text-right">
               <p className="text-sm font-medium">For M/s {formValues.sellerName || "—"}</p>
               <div className="mt-16">
