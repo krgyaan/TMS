@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCreatePoParty, useCreatePurchaseOrder, useNextPONumber, usePoParties, useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
+import { useAuth } from "@/contexts/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Building2, Calendar, Eye, Hash, Info, Loader2, Mail, MapPin, Phone, UserCheck, UserPlus } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
@@ -59,7 +60,7 @@ const defaultFormValues: PurchaseOrderFormValues = {
   shippingAddress: "",
   shipToGst: "",
   shipToPan: "",
-  products: [{ description: "", hsnSac: "", qty: null, rate: null, gstRate: 18 }],
+  products: [{ description: "", qty: null, rate: null, gstRate: 18 }],
   quotationNo: "",
   quotationDate: "",
   technicalSpecsAttachments: [],
@@ -97,6 +98,8 @@ export default function RaisePoFormPage() {
   const navigate = useNavigate();
   const { projectId: projectIdParam } = useParams<{ projectId: string }>();
   const projectId = Number(projectIdParam);
+
+  const { teamId } = useAuth();
 
   const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
   const { data: partiesData } = usePoParties();
@@ -226,6 +229,7 @@ export default function RaisePoFormPage() {
           onBack={() => setShowPreview(false)}
           onSubmit={form.handleSubmit(handleSubmit)}
           teamMembers={activeTeamMembers}
+          teamId={teamId}
         />
       </div>
     );

@@ -38,7 +38,6 @@ export function mapFormToCreateDTO(
             .filter(p => p.description && p.qty !== null && p.rate !== null && p.qty > 0)
             .map(p => ({
                 description: p.description,
-                hsnSac: p.hsnSac,
                 qty: p.qty!,
                 rate: p.rate!,
                 gstRate: p.gstRate,
@@ -78,7 +77,6 @@ export function mapFormToUpdateDTO(
             .filter(p => p.description && p.qty !== null && p.rate !== null && p.qty > 0)
             .map(p => ({
                 description: p.description,
-                hsnSac: p.hsnSac,
                 qty: p.qty!,
                 rate: p.rate!,
                 gstRate: p.gstRate,

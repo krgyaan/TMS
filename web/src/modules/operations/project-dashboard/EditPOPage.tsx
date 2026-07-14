@@ -208,7 +208,6 @@ export default function EditPOPage() {
             shipToPan: poData.shipToPan || "",
             products: (poData.products || []).map((p: any) => ({
                 description: p.description || "",
-                hsnSac: p.hsnSac || "",
                 qty: Number(p.qty) || null,
                 rate: Number(p.rate) || null,
                 gstRate: Number(p.gstRate) || 18,

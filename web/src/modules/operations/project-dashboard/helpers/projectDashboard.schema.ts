@@ -3,7 +3,6 @@ import { z } from "zod";
 export const CreateProductSchema = z.object({
     id: z.string(),
     description: z.string().min(1, "Description is required"),
-    hsnSac: z.string().min(1, "HSN/SAC is required"),
     qty: z.number().min(1, "Quantity must be at least 1"),
     rate: z.number().min(1, "Rate must be at least 1"),
     gstRate: z.number().min(0).max(28),
