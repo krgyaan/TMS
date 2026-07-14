@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import type { ColDef, RowSelectionOptions } from "ag-grid-community";
 import { useFetchJson } from "@/hooks/usFetchJson";
 import { dateCol, currencyCol, booleanIconCol } from "@/components/data-grid";
 import DataTable from "@/components/ui/data-table";
+import { Plus } from "lucide-react";
 
 interface IRow {
   mission: string;
@@ -38,11 +40,23 @@ const index = () => {
     { field: "rocket" },
   ]);
 
+  const handleAddLead = () => {
+    console.log("Add Lead clicked");
+  };
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Leads</CardTitle>
-        <CardDescription>All leads listed</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Leads</CardTitle>
+            <CardDescription>All leads listed</CardDescription>
+          </div>
+          <Button onClick={handleAddLead} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Add Leads
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="h-screen px-0">
         <DataTable
@@ -64,4 +78,4 @@ const index = () => {
   );
 };
 
-export default index
+export default index;
