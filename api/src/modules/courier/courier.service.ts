@@ -322,10 +322,14 @@ export class CourierService {
             try {
                 let googleConnection = await this.googleService.getSanitizedGoogleConnection(data.empFrom ?? userId);
 
-                if (!googleConnection) {
-                    this.logger.warn("Google connection missing for empFrom, attempting fallback", {
+                const needsFallback = !googleConnection || !googleConnection.hasRefreshToken;
+
+                if (needsFallback) {
+                    this.logger.warn("Google connection missing or lacks offline access for empFrom, attempting fallback", {
                         empFrom: courier.empFrom,
                         courierId: courier.id,
+                        hasConnection: !!googleConnection,
+                        hasRefreshToken: googleConnection?.hasRefreshToken,
                     });
 
                     const fallbackStr = process.env.FALLBACK_MAIL_USER_ID;
@@ -334,9 +338,11 @@ export class CourierService {
                     }
                 }
 
-                if (!googleConnection) {
-                    this.logger.warn("Fallback Google connection also missing, mail skipped", {
+                if (!googleConnection || !googleConnection.hasRefreshToken) {
+                    this.logger.warn("Fallback Google connection also missing or lacks offline access, mail skipped", {
                         courierId: courier.id,
+                        hasConnection: !!googleConnection,
+                        hasRefreshToken: googleConnection?.hasRefreshToken,
                     });
                 } else {
                     const [[fromUser], [{ email: toEmail }, { email: ccMail }]] = await Promise.all([
