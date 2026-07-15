@@ -17,7 +17,7 @@ import App from "./App";
 createRoot(document.getElementById("root")!).render(
     <StrictMode>
         <QueryClientProvider client={queryClient}>
-            <ThemeProvider defaultTheme="system" storageKey="tms-theme">
+            <ThemeProvider defaultTheme="system" storageKey="tms-ui-theme">
                 <BrowserRouter>
                     <AuthProvider>
                         <App />
