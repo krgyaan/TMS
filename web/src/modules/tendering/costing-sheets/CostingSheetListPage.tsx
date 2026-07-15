@@ -386,6 +386,7 @@ const CostingSheets = () => {
                     <TenderTimerDisplay
                         remainingSeconds={timer.remainingSeconds}
                         status={timer.status}
+                        deadline={timer.deadline}
                     />
                 );
             },
