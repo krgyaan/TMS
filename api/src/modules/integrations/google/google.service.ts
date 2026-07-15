@@ -83,19 +83,15 @@ export class GoogleService {
         return this.createAuthUrlWithState(String(userId), redirectUri);
     }
 
-    createAuthUrlWithState(state: string, redirectUri?: string, forceConsent: boolean = false): { url: string } {
+    createAuthUrlWithState(state: string, redirectUri?: string): { url: string } {
         const client = this.createClient(redirectUri);
         const authOptions: any = {
             access_type: "offline",
             include_granted_scopes: true,
             scope: this.config.scopes,
             state,
+            prompt: "consent",
         };
-
-        // Only force consent for drive integration flows
-        if (forceConsent) {
-            authOptions.prompt = "consent";
-        }
 
         const url = client.generateAuthUrl(authOptions);
         return { url };

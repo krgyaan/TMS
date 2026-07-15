@@ -105,10 +105,10 @@ export class MailerService {
         }
 
         if (!connection.hasRefreshToken) {
-            this.logger.error("Google account missing refresh token", {
+            this.logger.warn("Google account missing refresh token — skipping mail send", {
                 userId: connection.userId,
             });
-            throw new BadRequestException("Google account does not have offline access");
+            return;
         }
 
         if (!connection.providerEmail) {
