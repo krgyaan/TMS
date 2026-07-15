@@ -17,6 +17,7 @@ export * from "./states.relations";
 // Industries
 export * from "./industries.schema";
 export * from "./industries.relations";
+export * from "./lead-industries.schema";
 
 // Websites
 export * from "./websites.schema";
