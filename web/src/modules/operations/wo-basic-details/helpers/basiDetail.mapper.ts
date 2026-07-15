@@ -4,6 +4,10 @@ import type { WoBasicDetail, CreateWoBasicDetailDto, UpdateWoBasicDetailDto } fr
 
 export const buildDefaultValues = (): WoBasicDetailFormValues => ({
   tenderId: null,
+  teamId: null,
+  organizationId: null,
+  itemId: null,
+  locationId: null,
   woNumber: "",
   woDate: null,
   woValuePreGst: 0,
