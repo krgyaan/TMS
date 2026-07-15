@@ -228,10 +228,10 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
             if (mode === "create") {
                 const payload = mapFormToCreatePayload(values) as Record<string, unknown>;
                 if (isNonTender) {
-                    payload.teamId = Number(values.teamId);
-                    payload.organizationId = Number(values.organizationId);
-                    payload.itemId = Number(values.itemId);
-                    payload.locationId = Number(values.locationId);
+                    if (values.teamId != null) payload.teamId = Number(values.teamId);
+                    if (values.organizationId != null) payload.organizationId = Number(values.organizationId);
+                    if (values.itemId != null) payload.itemId = Number(values.itemId);
+                    if (values.locationId != null) payload.locationId = Number(values.locationId);
                 }
                 const result = await createMutation.mutateAsync(payload as CreateWoBasicDetailDto);
 
