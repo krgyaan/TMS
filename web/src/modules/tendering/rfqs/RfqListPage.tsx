@@ -1,27 +1,26 @@
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState } from 'react';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
-import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import type { RfqDashboardRowWithTimer } from '@/modules/tendering/rfqs/helpers/rfq.types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, FileX2, Trash2, Search, RefreshCw, ClipboardList, List, XCircle } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { useRfqsDashboard, useRfqsDashboardCounts, useDeleteRfq } from '@/hooks/api/useRfqs';
 import { dateCol, tenderNameCol } from '@/components/data-grid';
-import { Input } from '@/components/ui/input';
+import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
-import { usePersistentTableState } from '@/hooks/usePersistentTableState';
+import type { ActionItem } from '@/components/ui/ActionMenu';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import DataTable from '@/components/ui/data-table';
+import { Input } from '@/components/ui/input';
 import { QuickFilter } from '@/components/ui/quick-filter';
-import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Button } from '@/components/ui/button';
+import { useDeleteRfq, useRfqsDashboard, useRfqsDashboardCounts } from '@/hooks/api/useRfqs';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
+import type { RfqDashboardRowWithTimer } from '@/modules/tendering/rfqs/helpers/rfq.types';
+import type { ColDef } from 'ag-grid-community';
+import { AlertCircle, CheckCircle, ClipboardList, Eye, FileX2, Search, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 
 const Rfqs = () => {
     const navigate = useNavigate();
@@ -288,6 +287,7 @@ const Rfqs = () => {
                     <TenderTimerDisplay
                         remainingSeconds={timer.remainingSeconds}
                         status={timer.status}
+                        deadline={timer.deadline}
                     />
                 );
             },
