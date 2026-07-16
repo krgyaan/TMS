@@ -22,18 +22,17 @@ interface TenderResultViewProps {
 // Helper function to get file URL from stored path
 const getFileUrl = (filePath: string): string => {
     if (!filePath) return '';
-    let clean = filePath.replace(/[\[\]",]/g, '').trim();
-    if (!clean.includes('/')) {
-        clean = `result-screenshots/${clean}`;
+    if (!filePath.includes('/')) {
+        return tenderFilesService.getFileUrl(`result-screenshots/${filePath}`);
     }
-    const parts = clean.split('/');
+    const parts = filePath.split('/');
     if (parts.length >= 2) {
         const context = parts[0];
         const fileName = parts.slice(1).join('/');
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
         return `${baseUrl}/tender-files/serve/${context}/${encodeURIComponent(fileName)}`;
     }
-    return tenderFilesService.getFileUrl(clean);
+    return tenderFilesService.getFileUrl(filePath);
 };
 
 export function TenderResultView({
@@ -268,56 +267,56 @@ export function TenderResultView({
                                         </TableCell>
                                     </TableRow>
                                 )}
-                                {(detail.qualifiedPartiesScreenshot || detail.finalResultScreenshot) && (
+                                {((detail.qualifiedPartiesScreenshot?.length ?? 0) > 0 || (detail.finalResultScreenshot?.length ?? 0) > 0) && (
                                     <TableRow>
                                         <TableCell colSpan={4}>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                {detail.qualifiedPartiesScreenshot && (
-                                                    <div className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
+                                                {(detail.qualifiedPartiesScreenshot ?? []).map((path, i) => (
+                                                    <div key={`qp-${i}`} className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
                                                         <div className="flex items-start gap-2 overflow-hidden">
                                                             <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
                                                             <div className="flex flex-col overflow-hidden">
-                                                                <span className="font-medium text-sm truncate" title={detail.qualifiedPartiesScreenshot.split('/').pop() || detail.qualifiedPartiesScreenshot}>
-                                                                    {detail.qualifiedPartiesScreenshot.split('/').pop() || detail.qualifiedPartiesScreenshot}
+                                                                <span className="font-medium text-sm truncate" title={path.split('/').pop() || path}>
+                                                                    {path.split('/').pop() || path}
                                                                 </span>
-                                                                <span className="text-xs text-muted-foreground truncate">Qualified Parties Screenshot</span>
+                                                                <span className="text-xs text-muted-foreground truncate">Qualified Parties Screenshot {detail.qualifiedPartiesScreenshot!.length > 1 ? `#${i + 1}` : ''}</span>
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-2 mt-auto">
                                                             <Button variant="ghost" size="sm" className="flex-1 h-8 text-xs gap-1"
-                                                                onClick={() => window.open(getFileUrl(detail.qualifiedPartiesScreenshot!), '_blank')}>
+                                                                onClick={() => window.open(getFileUrl(path), '_blank')}>
                                                                 <ExternalLink className="h-3 w-3" />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" className="flex-1 h-8 text-xs gap-1"
-                                                                onClick={() => { const a = document.createElement('a'); a.href = getFileUrl(detail.qualifiedPartiesScreenshot!); a.download = detail.qualifiedPartiesScreenshot!.split('/').pop() || detail.qualifiedPartiesScreenshot!; a.click(); }}>
+                                                                onClick={() => { const a = document.createElement('a'); a.href = getFileUrl(path); a.download = path.split('/').pop() || path; a.click(); }}>
                                                                 <Download className="h-3 w-3" />
                                                             </Button>
                                                         </div>
                                                     </div>
-                                                )}
-                                                {detail.finalResultScreenshot && (
-                                                    <div className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
+                                                ))}
+                                                {(detail.finalResultScreenshot ?? []).map((path, i) => (
+                                                    <div key={`fr-${i}`} className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
                                                         <div className="flex items-start gap-2 overflow-hidden">
                                                             <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
                                                             <div className="flex flex-col overflow-hidden">
-                                                                <span className="font-medium text-sm truncate" title={detail.finalResultScreenshot.split('/').pop() || detail.finalResultScreenshot}>
-                                                                    {detail.finalResultScreenshot.split('/').pop() || detail.finalResultScreenshot}
+                                                                <span className="font-medium text-sm truncate" title={path.split('/').pop() || path}>
+                                                                    {path.split('/').pop() || path}
                                                                 </span>
-                                                                <span className="text-xs text-muted-foreground truncate">Final Result Screenshot</span>
+                                                                <span className="text-xs text-muted-foreground truncate">Final Result Screenshot {detail.finalResultScreenshot!.length > 1 ? `#${i + 1}` : ''}</span>
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-2 mt-auto">
                                                             <Button variant="ghost" size="sm" className="flex-1 h-8 text-xs gap-1"
-                                                                onClick={() => window.open(getFileUrl(detail.finalResultScreenshot!), '_blank')}>
+                                                                onClick={() => window.open(getFileUrl(path), '_blank')}>
                                                                 <ExternalLink className="h-3 w-3" />
                                                             </Button>
                                                             <Button variant="ghost" size="sm" className="flex-1 h-8 text-xs gap-1"
-                                                                onClick={() => { const a = document.createElement('a'); a.href = getFileUrl(detail.finalResultScreenshot!); a.download = detail.finalResultScreenshot!.split('/').pop() || detail.finalResultScreenshot!; a.click(); }}>
+                                                                onClick={() => { const a = document.createElement('a'); a.href = getFileUrl(path); a.download = path.split('/').pop() || path; a.click(); }}>
                                                                 <Download className="h-3 w-3" />
                                                             </Button>
                                                         </div>
                                                     </div>
-                                                )}
+                                                ))}
                                             </div>
                                         </TableCell>
                                     </TableRow>

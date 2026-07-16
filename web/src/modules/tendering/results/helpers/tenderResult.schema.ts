@@ -6,8 +6,8 @@ export const ResultDetailSchema = z.object({
     l1Price: z.string().optional(),
     l2Price: z.string().optional(),
     ourPrice: z.string().optional(),
-    qualifiedPartiesScreenshot: z.string().optional(),
-    finalResultScreenshot: z.string().optional(),
+    qualifiedPartiesScreenshot: z.array(z.string()).optional(),
+    finalResultScreenshot: z.array(z.string()).optional(),
 });
 
 export const UploadResultSchema = z.object({

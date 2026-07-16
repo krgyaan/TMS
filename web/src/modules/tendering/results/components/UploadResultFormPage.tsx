@@ -139,8 +139,8 @@ export default function UploadResultFormPage({ tenderId, tenderDetails, isEditMo
                         l1Price: d.l1Price != null ? d.l1Price.toString() : undefined,
                         l2Price: d.l2Price != null ? d.l2Price.toString() : undefined,
                         ourPrice: d.ourPrice != null ? d.ourPrice.toString() : undefined,
-                        qualifiedPartiesScreenshot: d.qualifiedPartiesScreenshot?.[0] || undefined,
-                        finalResultScreenshot: d.finalResultScreenshot?.[0] || undefined,
+                        qualifiedPartiesScreenshot: d.qualifiedPartiesScreenshot?.length ? d.qualifiedPartiesScreenshot : undefined,
+                        finalResultScreenshot: d.finalResultScreenshot?.length ? d.finalResultScreenshot : undefined,
                     }));
                 }
             }
