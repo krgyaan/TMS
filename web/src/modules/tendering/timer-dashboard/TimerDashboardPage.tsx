@@ -7,11 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useStopTimer, useTimerDashboardSearch } from '@/hooks/api/useTimerDashboard';
-import { AlertCircle, CheckCircle, ChevronDown, ChevronRight, Clock, History, Search, Square } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { AlertCircle, CheckCircle, ChevronDown, ChevronRight, Clock, Search, Square } from 'lucide-react';
+import { Fragment, useState } from 'react';
 
 const stageNameMap: Record<string, string> = {
-    tender_info: 'Tender Info',
+    tender_info_sheet: 'Tender Info Sheet',
     tender_approval: 'Tender Approval',
     rfq_sent: 'RFQ Sent',
     rfq_dashboard: 'RFQ Dashboard',
@@ -89,35 +89,15 @@ const TimerDashboard = () => {
         );
     };
 
-    const getEventTypeBadge = (eventType: string) => {
-        const variants: Record<string, 'success' | 'destructive' | 'secondary' | 'outline'> = {
-            started: 'outline',
-            stopped: 'secondary',
-            paused: 'secondary',
-            resumed: 'outline',
-            completed: 'success',
-            cancelled: 'destructive',
-            extended: 'secondary',
-        };
-        return (
-            <Badge variant={variants[eventType] ?? 'secondary'} className="font-mono text-[10px]">
-                {eventType}
-            </Badge>
-        );
+    const getEventStatusBadge = (status: string | null) => {
+        if (!status) return <span className="text-muted-foreground">—</span>;
+        return getStatusBadge(status);
     };
 
-    const computeTimeTaken = (events: any[]) => {
-        return events.map((ev, i, arr) => {
-            if (i === 0) return { ...ev, timeTakenMs: null };
-            const prevTime = new Date(arr[i - 1].createdAt).getTime();
-            const currTime = new Date(ev.createdAt).getTime();
-            return { ...ev, timeTakenMs: currTime - prevTime };
-        });
+    const formatTimeTaken = (ms: number | null | undefined) => {
+        if (ms == null) return '—';
+        return formatDuration(ms);
     };
-
-    const parentTHeadColSpan = 8;
-    const eventColCount = 5;
-    const eventRemainingColSpan = parentTHeadColSpan - eventColCount;
 
     return (
         <div className="space-y-6">
@@ -191,7 +171,7 @@ const TimerDashboard = () => {
                 </Card>
             )}
 
-            {data && data.results.length === 0 && (
+            {data?.results.length === 0 && (
                 <Card>
                     <CardContent className="pt-6">
                         <p className="text-muted-foreground text-sm">No tenders found matching your search.</p>
@@ -241,107 +221,115 @@ const TimerDashboard = () => {
                                         <tbody>
                                             {result.timers.map((timer: any) => {
                                                 const isExpanded = expandedTimers.has(timer.id);
-                                                const events = computeTimeTaken(timer.events || []);
+                                                const events = timer.events || [];
                                                 return (
-                                                    <tr key={timer.id} className="border-b hover:bg-muted/50">
-                                                        <td className="py-2 px-3">
-                                                            {events.length > 0 && (
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    className="h-6 w-6 p-0"
-                                                                    onClick={() => toggleExpand(timer.id)}
-                                                                >
-                                                                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                                                                </Button>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2 px-3 font-medium">
-                                                            {stageNameMap[timer.stage] || timer.stage}
-                                                        </td>
-                                                        <td className="py-2 px-3">
-                                                            {getStatusBadge(timer.status)}
-                                                        </td>
-                                                        <td className="py-2 px-3 text-muted-foreground">
-                                                            {timer.timerType?.replace(/_/g, ' ')}
-                                                        </td>
-                                                        <td className="py-2 px-3">
-                                                            <TenderTimerDisplay
-                                                                remainingSeconds={Math.floor(timer.remainingTimeMs / 1000)}
-                                                                status={timer.status}
-                                                                deadline={timer.deadlineAt ? new Date(timer.deadlineAt) : null}
-                                                            />
-                                                        </td>
-                                                        <td className="py-2 px-3 text-muted-foreground">
-                                                            {formatDate(timer.deadlineAt)}
-                                                        </td>
-                                                        <td className="py-2 px-3 font-mono text-muted-foreground">
-                                                            {formatDuration(timer.allocatedTimeMs)}
-                                                        </td>
-                                                        <td className="py-2 px-3">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">
-                                                                    <div
-                                                                        className={`h-full rounded-full transition-all ${timer.isOverdue ? 'bg-destructive' : timer.isWarning ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                                                                        style={{ width: `${Math.min(timer.progressPercent, 100)}%` }}
-                                                                    />
+                                                    <Fragment key={timer.id}>
+                                                        <tr className="border-b hover:bg-muted/50">
+                                                            <td className="py-2 px-3">
+                                                                {events.length > 0 && (
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="h-6 w-6 p-0"
+                                                                        onClick={() => toggleExpand(timer.id)}
+                                                                    >
+                                                                        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                                                    </Button>
+                                                                )}
+                                                            </td>
+                                                            <td className="py-2 px-3 font-medium">
+                                                                {stageNameMap[timer.stage] || timer.stage}
+                                                            </td>
+                                                            <td className="py-2 px-3">
+                                                                {getStatusBadge(timer.status)}
+                                                            </td>
+                                                            <td className="py-2 px-3 text-muted-foreground">
+                                                                {timer.timerType?.replace(/_/g, ' ')}
+                                                            </td>
+                                                            <td className="py-2 px-3">
+                                                                <TenderTimerDisplay
+                                                                    remainingSeconds={Math.floor(timer.remainingTimeMs / 1000)}
+                                                                    status={timer.status}
+                                                                    deadline={timer.deadlineAt ? new Date(timer.deadlineAt) : null}
+                                                                />
+                                                            </td>
+                                                            <td className="py-2 px-3 text-muted-foreground">
+                                                                {formatDate(timer.deadlineAt)}
+                                                            </td>
+                                                            <td className="py-2 px-3 font-mono text-muted-foreground">
+                                                                {formatDuration(timer.allocatedTimeMs)}
+                                                            </td>
+                                                            <td className="py-2 px-3">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">
+                                                                        <div
+                                                                            className={`h-full rounded-full transition-all ${timer.isOverdue ? 'bg-destructive' : timer.isWarning ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                                                                            style={{ width: `${Math.min(timer.progressPercent, 100)}%` }}
+                                                                        />
+                                                                    </div>
+                                                                    <span className="text-xs text-muted-foreground font-mono w-10 text-right">
+                                                                        {Math.round(timer.progressPercent)}%
+                                                                    </span>
                                                                 </div>
-                                                                <span className="text-xs text-muted-foreground font-mono w-10 text-right">
-                                                                    {Math.round(timer.progressPercent)}%
-                                                                </span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-2 px-3">
-                                                            {timer.status?.toLowerCase() === 'running' && (
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => stopTimer.mutate({
-                                                                        entityType: timer.entityType,
-                                                                        entityId: timer.entityId,
-                                                                        stage: timer.stage,
-                                                                    })}
-                                                                    disabled={stopTimer.isPending}
-                                                                >
-                                                                    <Square className="w-3 h-3 mr-1" />
-                                                                    Stop
-                                                                </Button>
-                                                            )}
-                                                        </td>
-                                                    </tr>
+                                                            </td>
+                                                            <td className="py-2 px-3">
+                                                                {timer.status?.toLowerCase() === 'running' && (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() => stopTimer.mutate({
+                                                                            entityType: timer.entityType,
+                                                                            entityId: timer.entityId,
+                                                                            stage: timer.stage,
+                                                                        })}
+                                                                        disabled={stopTimer.isPending}
+                                                                    >
+                                                                        <Square className="w-3 h-3 mr-1" />
+                                                                        Stop
+                                                                    </Button>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                        {isExpanded && events.length > 0 && events.map((ev: any, evIdx: number) => {
+                                                            const startedAt = new Date(ev.createdAt).getTime();
+                                                            const endedAt = evIdx < events.length - 1
+                                                                ? new Date(events[evIdx + 1].createdAt).getTime()
+                                                                : timer.endedAt ? new Date(timer.endedAt).getTime() : null;
+                                                            const timeTakenMs = evIdx > 0
+                                                                ? startedAt - new Date(events[evIdx - 1].createdAt).getTime()
+                                                                : null;
+                                                            return (
+                                                                <tr key={`${timer.id}-event-${evIdx}`} className="bg-muted/30 border-b">
+                                                                    <td />
+                                                                    <td className="py-1.5 px-3 text-xs text-muted-foreground">
+                                                                        {stageNameMap[timer.stage] || timer.stage}
+                                                                    </td>
+                                                                    <td className="py-1.5 px-3">
+                                                                        {getEventStatusBadge(ev.eventType)}
+                                                                    </td>
+                                                                    <td className="py-1.5 px-3 text-xs font-mono text-muted-foreground">
+                                                                        {formatDuration(timer.allocatedTimeMs)}
+                                                                    </td>
+                                                                    <td className="py-1.5 px-3 text-xs text-muted-foreground whitespace-nowrap">
+                                                                        {formatDate(ev.createdAt)}
+                                                                    </td>
+                                                                    <td className="py-1.5 px-3 text-xs text-muted-foreground whitespace-nowrap">
+                                                                        {endedAt ? formatDate(new Date(endedAt)) : '—'}
+                                                                    </td>
+                                                                    <td className="py-1.5 px-3 text-xs font-mono text-muted-foreground">
+                                                                        {formatTimeTaken(timeTakenMs)}
+                                                                    </td>
+                                                                    <td className="py-1.5 px-3 text-xs text-muted-foreground truncate max-w-[120px]" title={ev.performedByName || ''}>
+                                                                        {ev.performedByName || '—'}
+                                                                    </td>
+                                                                    <td className="py-1.5 px-3 text-xs text-muted-foreground truncate max-w-[150px]" title={ev.reason || ''}>
+                                                                        {ev.reason || '—'}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </Fragment>
                                                 );
-                                            })}
-
-                                            {result.timers.map((timer: any) => {
-                                                if (!expandedTimers.has(timer.id)) return null;
-                                                const events = computeTimeTaken(timer.events || []);
-                                                if (events.length === 0) return null;
-                                                return events.map((ev: any, idx: number) => (
-                                                    <tr key={`${timer.id}-event-${idx}`} className="bg-muted/30 border-b">
-                                                        <td />
-                                                        <td colSpan={eventColCount} className="py-1.5 px-3">
-                                                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                                                <span className="flex items-center gap-1 min-w-[80px]">
-                                                                    <History className="w-3 h-3 shrink-0" />
-                                                                    {getEventTypeBadge(ev.eventType)}
-                                                                </span>
-                                                                <span className="min-w-[100px] truncate" title={ev.performedByName || 'Unknown'}>
-                                                                    {ev.performedByName || '—'}
-                                                                </span>
-                                                                <span className="min-w-[120px] truncate text-[10px]" title={ev.reason || ''}>
-                                                                    {ev.reason || '—'}
-                                                                </span>
-                                                                <span className="min-w-[130px] whitespace-nowrap text-[10px]">
-                                                                    {formatDate(ev.createdAt)}
-                                                                </span>
-                                                                <span className="min-w-[70px] font-mono text-[10px]">
-                                                                    {ev.timeTakenMs != null ? formatDuration(ev.timeTakenMs) : '—'}
-                                                                </span>
-                                                            </div>
-                                                        </td>
-                                                        <td colSpan={eventRemainingColSpan} />
-                                                    </tr>
-                                                ));
                                             })}
                                         </tbody>
                                     </table>
