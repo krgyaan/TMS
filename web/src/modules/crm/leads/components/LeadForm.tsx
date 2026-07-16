@@ -134,9 +134,9 @@ export function LeadForm({ mode }: LeadFormProps) {
             address: "",
             country: "",
             state: "",
-            type: undefined,
-            industry: undefined,
-            team: undefined,
+            type: "",
+            industry: "",
+            team: "",
             pointsDiscussed: "",
             veResponsibility: "",
         },
@@ -175,6 +175,7 @@ export function LeadForm({ mode }: LeadFormProps) {
                 pointsDiscussed: values.pointsDiscussed || null,
                 veResponsibility: values.veResponsibility || null,
             });
+            navigate(paths.crm.leads);
         } catch (error) {
             console.error("Lead form submission error:", error);
         }

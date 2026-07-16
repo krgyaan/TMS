@@ -2,7 +2,12 @@ import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { leads, type NewLead, type Lead } from '@db/schemas/crm/leads.schema';
-import { eq, sql, SQL } from 'drizzle-orm';
+import { leadIndustries } from '@db/schemas/master/lead-industries.schema';
+import { leadTypes } from '@db/schemas/crm/lead-types.schema';
+import { teams } from '@db/schemas/master/teams.schema';
+import { users } from '@db/schemas/auth/users.schema';
+import { and, asc, desc, eq, sql, type SQL } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { CreateLeadDto, UpdateLeadDto } from './dto/lead.dto';
 
 export type LeadListFilters = {
@@ -21,129 +26,135 @@ export type LeadWithNames = Lead & {
     allocatedTeName?: string | null;
 };
 
+// Alias users table for the two different joins
+// Drizzle requires aliased table references when joining the same table twice
+const bdUser = alias(users, 'bd_user');
+const teUser = alias(users, 'te_user');
+
 @Injectable()
 export class LeadsService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
     ) {}
 
-    private mapJoinedRow = (row: any): LeadWithNames => {
+    // ─── Private Helpers ──────────────────────────────────────────────────────
+
+    /**
+     * Defines the SELECT shape for the base query.
+     * Mirrors getTenderBaseSelect() in TenderInfosService.
+     */
+    private getLeadBaseSelect() {
         return {
-            id: row.id,
-            companyName: row.company_name,
-            name: row.name,
-            designation: row.designation,
-            phone: row.phone,
-            email: row.email,
-            address: row.address,
-            country: row.country,
-            state: row.state,
-            type: row.type,
-            industry: row.industry,
-            team: row.team,
-            bdPerson: row.bd_person,
-            allocatedTe: row.allocated_te,
-            pointsDiscussed: row.points_discussed,
-            veResponsibility: row.ve_responsibility,
-            mailFollowupCount: row.mail_followup_count,
-            callFollowupCount: row.call_followup_count,
-            visitFollowupCount: row.visit_followup_count,
-            letterSentCount: row.letter_sent_count,
-            whatsappFollowupCount: row.whatsapp_followup_count,
-            enquiryReceivedAt: row.enquiry_received_at,
-            lastMailSentAt: row.last_mail_sent_at,
-            lastCallAt: row.last_call_at,
-            lastVisitAt: row.last_visit_at,
-            lastLetterSentAt: row.last_letter_sent_at,
-            lastWhatsappSentAt: row.last_whatsapp_sent_at,
-            leadPriority: row.lead_priority,
-            recentFollowUp: row.recent_follow_up,
-            createdAt: row.created_at,
-            updatedAt: row.updated_at,
-            industryName: row.industry_name,
-            typeName: row.type_name,
-            teamName: row.team_name,
-            bdPersonName: row.bd_person_name,
-            allocatedTeName: row.allocated_te_name,
+            leads,
+            industryName: leadIndustries.name,
+            typeName: leadTypes.name,
+            teamName: teams.name,
+            bdPersonName: bdUser.name,
+            allocatedTeName: teUser.name,
+        };
+    }
+
+    /**
+     * Returns a pre-joined query builder ready for .where(), .orderBy(), etc.
+     * Mirrors getBaseQueryBuilder() in TenderInfosService.
+     */
+    private getBaseQueryBuilder() {
+        return this.db
+            .select(this.getLeadBaseSelect())
+            .from(leads)
+            .leftJoin(leadIndustries, eq(leadIndustries.id, sql`CAST(${leads.industry} AS BIGINT)`))
+            .leftJoin(leadTypes, eq(leadTypes.id, sql`CAST(${leads.type} AS BIGINT)`))
+            .leftJoin(teams, eq(teams.id, sql`CAST(${leads.team} AS BIGINT)`))
+            .leftJoin(bdUser, eq(bdUser.id, leads.bdPerson))
+            .leftJoin(teUser, eq(teUser.id, leads.allocatedTe));
+    }
+
+    /**
+     * Maps a joined row returned by the query builder into a typed LeadWithNames object.
+     * Mirrors mapJoinedRow() in TenderInfosService.
+     */
+    private mapJoinedRow = (row: {
+        leads: typeof leads.$inferSelect;
+        industryName: string | null;
+        typeName: string | null;
+        teamName: string | null;
+        bdPersonName: string | null;
+        allocatedTeName: string | null;
+    }): LeadWithNames => {
+        return {
+            ...row.leads,
+            industryName: row.industryName ?? null,
+            typeName: row.typeName ?? null,
+            teamName: row.teamName ?? null,
+            bdPersonName: row.bdPersonName ?? null,
+            allocatedTeName: row.allocatedTeName ?? null,
         };
     };
 
-    async findAll(filters?: LeadListFilters) {
+    // ─── Public Methods ───────────────────────────────────────────────────────
+
+    async findAll(filters?: LeadListFilters): Promise<{
+        data: LeadWithNames[];
+        meta: { total: number; page: number; limit: number; totalPages: number };
+    }> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
 
+        // 1. Build where conditions
         const conditions: SQL[] = [];
 
         if (filters?.search) {
             const searchStr = `%${filters.search}%`;
             conditions.push(
                 sql`(
-                    leads.company_name ILIKE ${searchStr} OR
-                    leads.name ILIKE ${searchStr} OR
-                    leads.email ILIKE ${searchStr} OR
-                    leads.phone ILIKE ${searchStr}
+                    ${leads.companyName} ILIKE ${searchStr} OR
+                    ${leads.name} ILIKE ${searchStr} OR
+                    ${leads.email} ILIKE ${searchStr} OR
+                    ${leads.phone} ILIKE ${searchStr}
                 )`
             );
         }
 
-        const whereClause = conditions.length > 0
-            ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
-            : sql``;
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-        const countResults = await this.db.execute(
-            sql`SELECT COUNT(*) as count FROM leads ${whereClause}`
-        );
+        // 2. Get total count
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(leads)
+            .where(whereClause);
 
-        const total = Number((countResults.rows as any[])[0]?.count || 0);
+        const total = Number(countResult?.count || 0);
 
-        let orderByClause = sql`ORDER BY leads.created_at DESC`;
+        // 3. Determine sort order
+        const sortFn = filters?.sortOrder === 'desc' ? desc : asc;
+        let orderByClause: SQL<unknown>;
 
-        if (filters?.sortBy) {
-            const direction = filters.sortOrder === 'desc' ? sql`DESC` : sql`ASC`;
-            switch (filters.sortBy) {
-                case 'companyName':
-                    orderByClause = sql`ORDER BY leads.company_name ${direction}`;
-                    break;
-                case 'name':
-                    orderByClause = sql`ORDER BY leads.name ${direction}`;
-                    break;
-                case 'email':
-                    orderByClause = sql`ORDER BY leads.email ${direction}`;
-                    break;
-                case 'createdAt':
-                    orderByClause = sql`ORDER BY leads.created_at ${direction}`;
-                    break;
-                default:
-                    orderByClause = sql`ORDER BY leads.created_at DESC`;
-            }
+        switch (filters?.sortBy) {
+            case 'companyName':
+                orderByClause = sortFn(leads.companyName);
+                break;
+            case 'name':
+                orderByClause = sortFn(leads.name);
+                break;
+            case 'email':
+                orderByClause = sortFn(leads.email);
+                break;
+            case 'createdAt':
+                orderByClause = sortFn(leads.createdAt);
+                break;
+            default:
+                orderByClause = desc(leads.createdAt);
         }
 
-        const results = await this.db.execute(sql`
-            SELECT 
-                leads.*,
-                lead_industries.name        AS industry_name,
-                lead_types.name             AS type_name,
-                teams.name                  AS team_name,
-                bd_user.name                AS bd_person_name,
-                te_user.name                AS allocated_te_name
-            FROM leads
-            LEFT JOIN lead_industries
-                ON lead_industries.id = CAST(leads.industry AS BIGINT)
-            LEFT JOIN lead_types
-                ON lead_types.id = CAST(leads.type AS BIGINT)
-            LEFT JOIN teams
-                ON teams.id = CAST(leads.team AS BIGINT)
-            LEFT JOIN users bd_user
-                ON bd_user.id = leads.bd_person
-            LEFT JOIN users te_user
-                ON te_user.id = leads.allocated_te
-            ${whereClause}
-            ${orderByClause}
-            LIMIT ${limit} OFFSET ${offset}
-        `);
+        // 4. Get paginated data
+        const rows = await this.getBaseQueryBuilder()
+            .where(whereClause)
+            .orderBy(orderByClause)
+            .limit(limit)
+            .offset(offset);
 
-        const rows = results.rows as any[];
+        // 5. Map and return
         const data = rows.map(this.mapJoinedRow);
 
         return {
@@ -158,36 +169,27 @@ export class LeadsService {
     }
 
     async findById(id: number): Promise<LeadWithNames> {
-        const results = await this.db.execute(sql`
-            SELECT 
-                leads.*,
-                lead_industries.name        AS industry_name,
-                lead_types.name             AS type_name,
-                teams.name                  AS team_name,
-                bd_user.name                AS bd_person_name,
-                te_user.name                AS allocated_te_name
-            FROM leads
-            LEFT JOIN lead_industries
-                ON lead_industries.id = CAST(leads.industry AS BIGINT)
-            LEFT JOIN lead_types
-                ON lead_types.id = CAST(leads.type AS BIGINT)
-            LEFT JOIN teams
-                ON teams.id = CAST(leads.team AS BIGINT)
-            LEFT JOIN users bd_user
-                ON bd_user.id = leads.bd_person
-            LEFT JOIN users te_user
-                ON te_user.id = leads.allocated_te
-            WHERE leads.id = ${id}
-            LIMIT 1
-        `);
+        const rows = await this.getBaseQueryBuilder()
+            .where(eq(leads.id, id))
+            .limit(1);
 
-        const rows = results.rows as any[];
+        const row = rows[0];
 
-        if (!rows[0]) {
+        if (!row) {
             throw new NotFoundException(`Lead with ID ${id} not found`);
         }
 
-        return this.mapJoinedRow(rows[0]);
+        return this.mapJoinedRow(row);
+    }
+
+    async exists(id: number): Promise<boolean> {
+        const [result] = await this.db
+            .select({ id: leads.id })
+            .from(leads)
+            .where(eq(leads.id, id))
+            .limit(1);
+
+        return !!result;
     }
 
     async create(data: CreateLeadDto, createdBy: number): Promise<Lead> {
@@ -203,11 +205,12 @@ export class LeadsService {
     }
 
     async update(id: number, data: UpdateLeadDto): Promise<Lead> {
+        // Validate existence first
         await this.findById(id);
 
         const [updated] = await this.db
             .update(leads)
-            .set({ ...data, updatedAt: new Date() } as any)
+            .set({ ...data as Partial<NewLead>, updatedAt: new Date() })
             .where(eq(leads.id, id))
             .returning();
 
@@ -219,6 +222,7 @@ export class LeadsService {
     }
 
     async delete(id: number): Promise<void> {
+        // Validate existence first
         await this.findById(id);
 
         await this.db
