@@ -1,19 +1,22 @@
 import { z } from 'zod';
 
-/**
- * Schema for uploading tender result
- */
+export const ResultDetailSchema = z.object({
+    result: z.enum(['Won', 'Lost', 'Cancelled']).optional(),
+    resultReason: z.string().optional(),
+    l1Price: z.string().optional(),
+    l2Price: z.string().optional(),
+    ourPrice: z.string().optional(),
+    qualifiedPartiesScreenshot: z.string().optional(),
+    finalResultScreenshot: z.string().optional(),
+});
+
 export const UploadResultSchema = z.object({
     technicallyQualified: z.enum(['Yes', 'No']),
     disqualificationReason: z.string().optional(),
     qualifiedPartiesCount: z.string().optional(),
     qualifiedPartiesNames: z.array(z.string()).optional(),
-    result: z.enum(['Won', 'Lost']).optional(),
-    l1Price: z.string().optional(),
-    l2Price: z.string().optional(),
-    ourPrice: z.string().optional(),
-    qualifiedPartiesScreenshot: z.array(z.string()).default([]),
-    finalResultScreenshot: z.array(z.string()).default([]),
+    tenderCancelledScreenshot: z.string().optional(),
+    details: z.array(ResultDetailSchema).optional(),
 }).refine((data) => {
     if (data.technicallyQualified === 'No' && !data.disqualificationReason) {
         return false;
@@ -29,7 +32,6 @@ export const ChangeStatusSchema = z.object({
     resultReason: z.string().min(5, { message: 'Reason must be at least 5 characters long' }),
     finalResultScreenshot: z.string().min(1, { message: 'Proof of cancellation is required' }),
 });
-
 
 export type UploadResultFormValues = z.infer<typeof UploadResultSchema>;
 export type ChangeStatusDto = z.infer<typeof ChangeStatusSchema>;

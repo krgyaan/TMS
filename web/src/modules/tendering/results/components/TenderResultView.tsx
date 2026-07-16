@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -43,7 +44,6 @@ export function TenderResultView({
 
     const isQualified = result?.technicallyQualified === 'Yes';
     const isDisqualified = result?.technicallyQualified === 'No';
-    const hasResult = !!result.result;
 
     return (
         <Card>
@@ -203,12 +203,12 @@ export function TenderResultView({
                             </>
                         )}
 
-                        {/* Result Information */}
-                        {hasResult && (
-                            <>
+                        {/* Result Information - Per Detail */}
+                        {result.details && result.details.length > 0 && result.details.map((detail, idx) => (
+                            <Fragment key={detail.id || idx}>
                                 <TableRow className="bg-muted/50">
                                     <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Result Information
+                                        Line Item Result #{idx + 1}
                                     </TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
@@ -216,36 +216,36 @@ export function TenderResultView({
                                         Result
                                     </TableCell>
                                     <TableCell>
-                                        <Badge
-                                            variant={
-                                                result.result === 'Won'
-                                                    ? 'success'
-                                                    : result.result === 'Lost'
-                                                        ? 'destructive'
-                                                        : 'secondary'
-                                            }
-                                        >
-                                            {result.result}
-                                        </Badge>
+                                        {detail.result ? (
+                                            <Badge
+                                                variant={
+                                                    detail.result === 'Won'
+                                                        ? 'success'
+                                                        : detail.result === 'Lost'
+                                                            ? 'destructive'
+                                                            : 'secondary'
+                                                }
+                                            >
+                                                {detail.result}
+                                            </Badge>
+                                        ) : '—'}
                                     </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground" colSpan={2}>
-                                        {/* Empty */}
-                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground" colSpan={2} />
                                 </TableRow>
-                                {(result.l1Price || result.l2Price || result.ourPrice) && (
+                                {detail.result !== 'Cancelled' && (detail.l1Price || detail.l2Price || detail.ourPrice) && (
                                     <>
                                         <TableRow className="hover:bg-muted/30 transition-colors">
                                             <TableCell className="text-sm font-medium text-muted-foreground">
                                                 L1 Price
                                             </TableCell>
                                             <TableCell className="text-sm font-semibold">
-                                                {result.l1Price ? formatINR(parseFloat(result.l1Price)) : '—'}
+                                                {detail.l1Price ? formatINR(parseFloat(detail.l1Price)) : '—'}
                                             </TableCell>
                                             <TableCell className="text-sm font-medium text-muted-foreground">
                                                 L2 Price
                                             </TableCell>
                                             <TableCell className="text-sm font-semibold">
-                                                {result.l2Price ? formatINR(parseFloat(result.l2Price)) : '—'}
+                                                {detail.l2Price ? formatINR(parseFloat(detail.l2Price)) : '—'}
                                             </TableCell>
                                         </TableRow>
                                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -253,107 +253,79 @@ export function TenderResultView({
                                                 Our Price
                                             </TableCell>
                                             <TableCell className="text-sm font-semibold" colSpan={3}>
-                                                {result.ourPrice ? formatINR(parseFloat(result.ourPrice)) : '—'}
+                                                {detail.ourPrice ? formatINR(parseFloat(detail.ourPrice)) : '—'}
                                             </TableCell>
                                         </TableRow>
-                                        {result.resultReason && (
-                                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                                    Reason for Win/Loss
-                                                </TableCell>
-                                                <TableCell className="text-sm break-words" colSpan={3}>
-                                                    {result.resultReason}
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
                                     </>
                                 )}
-                            </>
-                        )}
-
+                                {detail.resultReason && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Reason
+                                        </TableCell>
+                                        <TableCell className="text-sm break-words" colSpan={3}>
+                                            {detail.resultReason}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                                {(detail.qualifiedPartiesScreenshot || detail.finalResultScreenshot) && (
+                                    <TableRow>
+                                        <TableCell colSpan={4}>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {detail.qualifiedPartiesScreenshot && (
+                                                    <div className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
+                                                        <div className="flex items-start gap-2 overflow-hidden">
+                                                            <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
+                                                            <div className="flex flex-col overflow-hidden">
+                                                                <span className="font-medium text-sm truncate" title={detail.qualifiedPartiesScreenshot.split('/').pop() || detail.qualifiedPartiesScreenshot}>
+                                                                    {detail.qualifiedPartiesScreenshot.split('/').pop() || detail.qualifiedPartiesScreenshot}
+                                                                </span>
+                                                                <span className="text-xs text-muted-foreground truncate">Qualified Parties Screenshot</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-auto">
+                                                            <Button variant="ghost" size="sm" className="flex-1 h-8 text-xs gap-1"
+                                                                onClick={() => window.open(getFileUrl(detail.qualifiedPartiesScreenshot!), '_blank')}>
+                                                                <ExternalLink className="h-3 w-3" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="sm" className="flex-1 h-8 text-xs gap-1"
+                                                                onClick={() => { const a = document.createElement('a'); a.href = getFileUrl(detail.qualifiedPartiesScreenshot!); a.download = detail.qualifiedPartiesScreenshot!.split('/').pop() || detail.qualifiedPartiesScreenshot!; a.click(); }}>
+                                                                <Download className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {detail.finalResultScreenshot && (
+                                                    <div className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
+                                                        <div className="flex items-start gap-2 overflow-hidden">
+                                                            <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
+                                                            <div className="flex flex-col overflow-hidden">
+                                                                <span className="font-medium text-sm truncate" title={detail.finalResultScreenshot.split('/').pop() || detail.finalResultScreenshot}>
+                                                                    {detail.finalResultScreenshot.split('/').pop() || detail.finalResultScreenshot}
+                                                                </span>
+                                                                <span className="text-xs text-muted-foreground truncate">Final Result Screenshot</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-auto">
+                                                            <Button variant="ghost" size="sm" className="flex-1 h-8 text-xs gap-1"
+                                                                onClick={() => window.open(getFileUrl(detail.finalResultScreenshot!), '_blank')}>
+                                                                <ExternalLink className="h-3 w-3" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="sm" className="flex-1 h-8 text-xs gap-1"
+                                                                onClick={() => { const a = document.createElement('a'); a.href = getFileUrl(detail.finalResultScreenshot!); a.download = detail.finalResultScreenshot!.split('/').pop() || detail.finalResultScreenshot!; a.click(); }}>
+                                                                <Download className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </Fragment>
+                        ))}
                     </TableBody>
                 </Table>
-                {/* Screenshots */}
-                {(result.qualifiedPartiesScreenshot || result.finalResultScreenshot) && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {result.qualifiedPartiesScreenshot && (
-                            <div className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
-                                <div className="flex items-start gap-2 overflow-hidden">
-                                    <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
-                                    <div className="flex flex-col overflow-hidden">
-                                        <span className="font-medium text-sm truncate" title={result.qualifiedPartiesScreenshot.split('/').pop() || result.qualifiedPartiesScreenshot}>
-                                            {result.qualifiedPartiesScreenshot.split('/').pop() || result.qualifiedPartiesScreenshot}
-                                        </span>
-                                        <span className="text-xs text-muted-foreground truncate" title="Qualified Parties Screenshot">
-                                            Qualified Parties Screenshot
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2 mt-auto">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="flex-1 h-8 text-xs gap-1"
-                                        onClick={() => window.open(getFileUrl(result.qualifiedPartiesScreenshot!), '_blank')}
-                                    >
-                                        <ExternalLink className="h-3 w-3" />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="flex-1 h-8 text-xs gap-1"
-                                        onClick={() => {
-                                            const a = document.createElement('a');
-                                            a.href = getFileUrl(result.qualifiedPartiesScreenshot!);
-                                            a.download = result.qualifiedPartiesScreenshot!.split('/').pop() || result.qualifiedPartiesScreenshot!;
-                                            a.click();
-                                        }}
-                                    >
-                                        <Download className="h-3 w-3" />
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
-                        {result.finalResultScreenshot && (
-                            <div className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
-                                <div className="flex items-start gap-2 overflow-hidden">
-                                    <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
-                                    <div className="flex flex-col overflow-hidden">
-                                        <span className="font-medium text-sm truncate" title={result.finalResultScreenshot.split('/').pop() || result.finalResultScreenshot}>
-                                            {result.finalResultScreenshot.split('/').pop() || result.finalResultScreenshot}
-                                        </span>
-                                        <span className="text-xs text-muted-foreground truncate" title="Final Price Screenshot">
-                                            Final Price Screenshot
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2 mt-auto">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="flex-1 h-8 text-xs gap-1"
-                                        onClick={() => window.open(getFileUrl(result.finalResultScreenshot!), '_blank')}
-                                    >
-                                        <ExternalLink className="h-3 w-3" />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="flex-1 h-8 text-xs gap-1"
-                                        onClick={() => {
-                                            const a = document.createElement('a');
-                                            a.href = getFileUrl(result.finalResultScreenshot!);
-                                            a.download = result.finalResultScreenshot!.split('/').pop() || result.finalResultScreenshot!;
-                                            a.click();
-                                        }}
-                                    >
-                                        <Download className="h-3 w-3" />
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
             </CardContent>
         </Card>
     );

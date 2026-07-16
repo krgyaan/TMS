@@ -60,7 +60,7 @@ const TABS_CONFIG: Array<{ key: ResultDashboardType; name: string; icon: React.R
 
 const getStatusVariant = (status: string): string => {
     switch (status) {
-        case RESULT_STATUS.RESULT_AWAITED:
+        case RESULT_STATUS.UNDER_EVALUATION:
             return 'secondary';
         case RESULT_STATUS.WON:
             return 'success';
@@ -69,7 +69,7 @@ const getStatusVariant = (status: string): string => {
         case RESULT_STATUS.DISQUALIFIED:
             return 'destructive';
         default:
-            return 'secondary';
+            return 'outline';
     }
 };
 
@@ -108,11 +108,6 @@ const TenderResultListPage = () => {
 
     const resultActions: ActionItem<ResultDashboardRow>[] = useMemo(
         () => [
-            // {
-            //     label: 'Change Status',
-            //     icon: <RefreshCw className="h-4 w-4" />,
-            //     onClick: (row: ResultDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
-            // },
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
@@ -127,25 +122,20 @@ const TenderResultListPage = () => {
             {
                 label : 'Change Status',
                 icon : <XCircle className='h-4 w-4' />,
-                onClick: (row : ResultDashboardRow) => setChangeStatusModal({
-                    open : true,
-                    tenderId: row.tenderId,
-                    tenderNo : row.tenderNo,
-                    tenderName : row.tenderName
-                }),// this will pop the modal for us
+                onClick: (row : ResultDashboardRow) => setChangeStatusModal({ open : true, tenderId: row.tenderId }),
                 visible: () => activeTab === 'result-awaited' || activeTab == 'won',
             },
             {
                 label: 'Basic Details',
                 icon: <FileX2 className="h-4 w-4" />,
                 onClick: (row: ResultDashboardRow) => row?.woBasicDetailId ? navigate(paths.operations.woBasicDetailShowPage(row.woBasicDetailId)) : navigate(`${paths.operations.woBasicDetailCreatePage}?tenderId=${row.tenderId}`),
-                visible: (row) => row.resultStatus === 'Won' || row.resultStatus === 'won',
+                visible: (row: ResultDashboardRow) => row.resultStatus === 'Won' || row.resultStatus === 'won',
             },
             {
                 label: 'View RA Details',
                 icon: <Gavel className="h-4 w-4" />,
                 onClick: (row: ResultDashboardRow) => navigate(paths.tendering.rasShow(row.reverseAuctionId!)),
-                visible: (row) => row.raApplicable && !!row.reverseAuctionId,
+                visible: (row: ResultDashboardRow) => row.raApplicable && !!row.reverseAuctionId,
             },
         ],
         [navigate, activeTab]
@@ -202,9 +192,8 @@ const TenderResultListPage = () => {
                 colId: 'emdDetails',
                 sortable: true,
                 filter: true,
-                comparator: (valueA: number | null, valueB: number | null): number => {
+                comparator: (valueA: number | null, numB = 0): number => {
                     const numA = valueA ?? 0;
-                    const numB = valueB ?? 0;
                     return numA - numB;
                 },
                 cellRenderer: (params: any) => {
@@ -234,12 +223,12 @@ const TenderResultListPage = () => {
                                     variant='success'
                                     className="text-xs w-fit"
                                 >
-                                    {formatINR(parseFloat(emd.amount))}
+                                    {formatINR(Number.parseFloat(emd.amount))}
                                 </Badge>
                             </TooltipTrigger>
                             <TooltipContent>
                                 <div className="text-xs space-y-1">
-                                    <p>Amount: {formatINR(parseFloat(emd.amount))}</p>
+                                    <p>Amount: {formatINR(Number.parseFloat(emd.amount))}</p>
                                     <p>{emd.displayText}</p>
                                     <p>Status: {emd.instrumentStatus || '—'}</p>
                                 </div>
@@ -257,8 +246,7 @@ const TenderResultListPage = () => {
                 filter: true,
                 cellRenderer: (params: any) => {
                     const status = params.value;
-                    if (!status) return '—';
-                    return <Badge variant={getStatusVariant(status) as any}>{status}</Badge>;
+                    return <Badge variant={getStatusVariant(status) as any}>{status || 'Result Awaited'}</Badge>;
                 },
             },
             {
@@ -461,8 +449,6 @@ const TenderResultListPage = () => {
                 open={changeStatusModal.open}
                 onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
                 tenderId={changeStatusModal.tenderId}
-                tenderNo={changeStatusModal.tenderNo}
-                tenderName={changeStatusModal.tenderName}
                 activeTab={activeTab}
                 onSuccess={() => {
                     setChangeStatusModal({ open: false, tenderId: null });

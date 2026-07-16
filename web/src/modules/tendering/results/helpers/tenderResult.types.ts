@@ -24,6 +24,22 @@ export interface UploadResultFormPageProps {
         resultUploadedAt: Date | null;
     }
 }
+
+export interface TenderResultDetail {
+    id: number;
+    tenderResultId: number;
+    result: string | null;
+    l1Price: string | null;
+    l2Price: string | null;
+    ourPrice: string | null;
+    qualifiedPartiesScreenshot: string | null;
+    finalResultScreenshot: string | null;
+    resultUploadedAt: Date | null;
+    resultReason: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
 export interface EmdDetails {
     amount: string;
     instrumentType: string | null;
@@ -62,6 +78,8 @@ export type TenderResult = {
     resultReason: string | null;
     tqStatus: string | null,
     raStatus: string | null,
+    tenderCancelledScreenshot: string | null,
+    details: TenderResultDetail[];
     createdAt: Date;
     updatedAt: Date;
 };
