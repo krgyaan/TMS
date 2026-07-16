@@ -23,6 +23,7 @@ import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schem
 import { tenderResultDetails } from '@db/schemas/tendering/tender-result-details.schema';
 import { tenderResults } from '@db/schemas/tendering/tender-result.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { ConfigService } from '@nestjs/config';
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 
@@ -47,6 +48,7 @@ export class TenderResultService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly configService: ConfigService,
     ) {
         this.logger = this.appLogger.withContext(TenderResultService.name);
     }
@@ -854,9 +856,9 @@ export class TenderResultService {
             return updated;
         });
 
-        // if (hasResultDetails && dto.technicallyQualified === 'Yes') {
-        //     await this.sendTenderResultEmail(tenderId, result, changedBy, dto, details);
-        // }
+        if (hasResultDetails && dto.technicallyQualified === 'Yes') {
+            await this.sendTenderResultEmail(tenderId, changedBy, dto, details);
+        }
 
         return result;
     }
@@ -1042,10 +1044,6 @@ export class TenderResultService {
      */
     async sendTenderResultEmail(
         tenderId: number,
-        resultRecord: {
-            qualifiedPartiesScreenshot?: string[] | null;
-            finalResultScreenshot?: string[] | null;
-        },
         uploadedBy: number,
         dto: UploadResultDto,
         details: any[],
@@ -1076,6 +1074,17 @@ export class TenderResultService {
             || details.find((d: any) => d.result === 'Lost')?.result
             || 'Not specified';
 
+        const fileBaseUrl = this.configService.get<string>('app.apiUrl') || '';
+        const allScreenshotPaths = details.flatMap((d: any) => [
+            ...(this.toArray(d.qualifiedPartiesScreenshot) ?? []),
+            ...(this.toArray(d.finalResultScreenshot) ?? []),
+        ]).filter(Boolean) as string[];
+
+        const screenshotLinks = allScreenshotPaths.map(path => ({
+            name: path.split('/').pop() || path,
+            url: `${fileBaseUrl}/tender-files/serve/${path}`,
+        }));
+
         const emailData = {
             tender_no: tender.tenderNo,
             tender_name: tender.tenderName,
@@ -1086,26 +1095,11 @@ export class TenderResultService {
             result_reason: firstDetail.resultReason || 'Not specified',
             costing_receipt_formatted: formatCurrency(costingDetail[0]?.submittedReceiptPrice || null),
             costing_budget_formatted: formatCurrency(costingDetail[0]?.submittedBudgetPrice || null),
-            costing_gross_margin: costingDetail[0]?.submittedGrossMargin ? `${costingDetail[0].submittedGrossMargin}%` : '0%',
-            qualified_parties_screenshot: (resultRecord.qualifiedPartiesScreenshot?.length ?? 0) > 0,
-            final_result_screenshot: (resultRecord.finalResultScreenshot?.length ?? 0) > 0,
+            costing_gross_margin: costingDetail[0]?.submittedGrossMargin ? `${Number(costingDetail[0].submittedGrossMargin).toFixed(2)}%` : '0%',
+            screenshots: screenshotLinks,
             detail_count: details.length,
             isWon: overallResult === 'Won',
         };
-
-        const attachmentFiles = [
-            ...(resultRecord.qualifiedPartiesScreenshot ?? []),
-            ...(resultRecord.finalResultScreenshot ?? []),
-            ...details.flatMap((d: any) => [
-                ...(this.toArray(d.qualifiedPartiesScreenshot) ?? []),
-                ...(this.toArray(d.finalResultScreenshot) ?? []),
-            ]),
-        ].filter(Boolean) as string[];
-
-        const attachments = attachmentFiles.length > 0 ? {
-            files: attachmentFiles,
-            baseDir: 'result-screenshots',
-        } : undefined;
 
         await this.sendEmail(
             'tender.result',
@@ -1115,9 +1109,9 @@ export class TenderResultService {
             'tender-result',
             emailData,
             {
+                // to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }],
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
                 cc: [{ type: 'role', role: 'Admin', teamId: tender.team }],
-                attachments,
             }
         );
     }
@@ -1126,20 +1120,19 @@ export class TenderResultService {
         tender: {tenderId: number, tenderName : string, tenderLink: string, tenderNo: string, finalScreenshot: string, team : number},
         dto: any, 
         uploadedBy: number){
+        const fileBaseUrl = this.configService.get<string>('app.apiUrl') || '';
+        const cancelledUrl = tender.finalScreenshot
+            ? `${fileBaseUrl}/tender-files/serve/${tender.finalScreenshot}`
+            : null;
+
         const emailData = {
             tender_name : tender.tenderName,
             tender_link : tender.tenderLink,
             tender_no : tender.tenderNo,
-            final_screenshot : !!tender.finalScreenshot,
+            final_screenshot_url : cancelledUrl,
+            final_screenshot_name : tender.finalScreenshot?.split('/').pop() || '',
             reason: dto.resultReason
         };
-
-        const attachmentFiles = [tender.finalScreenshot].filter(Boolean) as string[];
-
-        const attachments = attachmentFiles.length > 0 ? {
-            files: attachmentFiles,
-            baseDir: 'result-screenshots',
-        } : undefined;
 
         await this.sendEmail(
             'tender-result-cancelled',
@@ -1151,7 +1144,6 @@ export class TenderResultService {
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
                 cc: [{ type: 'role', role: 'Admin', teamId: tender.team }],
-                attachments,
             }
         );
     }

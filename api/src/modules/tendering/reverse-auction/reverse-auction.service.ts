@@ -895,13 +895,12 @@ export class ReverseAuctionService {
 
             await this.tenderResultService.sendTenderResultEmail(
                 existing.tenderId,
-                {
-                    qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ? [dto.screenshotQualifiedParties] : null,
-                    finalResultScreenshot: dto.finalResultScreenshot ? [dto.finalResultScreenshot] : null,
-                },
                 changedBy,
                 mappedDto,
-                []
+                [{
+                    qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ? [dto.screenshotQualifiedParties] : null,
+                    finalResultScreenshot: dto.finalResultScreenshot ? [dto.finalResultScreenshot] : null,
+                }]
             );
         } else {
             await this.sendRaResultEmail(existing.tenderId, result, changedBy, dto);

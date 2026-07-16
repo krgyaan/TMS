@@ -25,25 +25,20 @@
         Gross Margin %:
         {{data.costing_gross_margin}}<br />
     </p>
-    <p>Attached Below:</p>
+    <p>Screenshots:</p>
+    {{#if data.screenshots.length}}
     <ul>
+        {{#each data.screenshots}}
         <li>
-            Screenshot of Qualified Parties:
-            {{#if data.qualified_parties_screenshot}}
-                Attached
-            {{else}}
-                Not Available
-            {{/if}}
+            <a href="{{this.url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">
+                {{this.name}}
+            </a>
         </li>
-        <li>
-            Screenshot of the Final result:
-            {{#if data.final_result_screenshot}}
-                Attached
-            {{else}}
-                Not Available
-            {{/if}}
-        </li>
+        {{/each}}
     </ul>
+    {{else}}
+    <p>No screenshots available.</p>
+    {{/if}}
     <p>
         {{#if data.isWon}}
             Congratulations on the win.
