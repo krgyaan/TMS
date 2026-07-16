@@ -31,7 +31,27 @@ export const CreateLeadSchema = z.object({
     whatsappFollowupCount: z.number().int().default(0),
 });
 
-export const UpdateLeadSchema = CreateLeadSchema.partial();
+export const UpdateLeadSchema = z.object({
+    companyName: z.string().min(1).optional(),
+    name: z.string().min(1).optional(),
+    designation: z.string().min(1).optional(),
+    phone: z.string().min(1).optional(),
+    email: z.string().email().optional(),
+    address: z.string().min(1).optional(),
+    country: z.string().min(1).optional(),
+    state: z.string().min(1).optional(),
+    type: z.string().optional().nullable(),
+    industry: z.string().optional().nullable(),
+    team: z.string().optional().nullable(),
+    bdPerson: z.number().int().optional().nullable(),
+    allocatedTe: z.number().int().optional().nullable(),
+    pointsDiscussed: z.string().max(2000).optional().nullable(),
+    veResponsibility: z.string().max(2000).optional().nullable(),
+    leadPriority: z.enum(['Cold', 'Warm', 'Hot']).optional().nullable(),  // ✅ ADD THIS
+    recentFollowUp: z.enum(['visit', 'whatsapp', 'letter', 'mail', 'call']).optional().nullable(),
+});
+
+
 
 export type CreateLeadDto = z.infer<typeof CreateLeadSchema>;
 export type UpdateLeadDto = z.infer<typeof UpdateLeadSchema>;

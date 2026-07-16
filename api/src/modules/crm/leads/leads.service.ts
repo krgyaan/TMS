@@ -198,12 +198,12 @@ export class LeadsService {
             .values({
                 ...data as NewLead,
                 bdPerson: createdBy,
+                leadPriority: data.leadPriority || 'Cold',  
             })
             .returning();
 
         return newLead;
     }
-
     async update(id: number, data: UpdateLeadDto): Promise<Lead> {
         // Validate existence first
         await this.findById(id);

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     Card,
@@ -11,27 +11,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
-import { 
-    Plus, 
-    Pencil, 
-    Trash2, 
-    Search, 
-    Eye, 
-    Calendar, 
-    Star, 
-    Mail, 
-    UserPlus 
+import {
+    Plus,
+    Pencil,
+    Trash2,
+    Search,
+    Eye,
+    Calendar,
+    Star,
+    Mail,
+    UserPlus
 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { useLeads, useDeleteLead } from "@/hooks/api/useLeads";
+import { useLeads, useDeleteLead, useUpdateLead } from "@/hooks/api/useLeads";
 import type { LeadWithNames } from "@/modules/crm/leads/helpers/leads.type";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
+import { LeadDeleteModal } from "./components/LeadDeleteModal";
+import { LeadPriorityModal } from "./components/LeadPriorityModal";
 
 const LeadListPage = () => {
     const navigate = useNavigate();
     const deleteLead = useDeleteLead();
+    const updateLead = useUpdateLead();
 
     const {
         search,
@@ -47,6 +50,25 @@ const LeadListPage = () => {
         defaultTab: 'all' as const,
     });
 
+    const [deleteModal, setDeleteModal] = useState<{
+        open: boolean;
+        leadId: number | null;
+        leadName?: string;
+    }>({
+        open: false,
+        leadId: null,
+    });
+
+    const [priorityModal, setPriorityModal] = useState<{
+        open: boolean;
+        leadId: number | null;
+        leadName?: string;
+        currentPriority?: string | null;
+    }>({
+        open: false,
+        leadId: null,
+    });
+
     const { data: apiResponse, isLoading } = useLeads(
         { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
@@ -59,6 +81,28 @@ const LeadListPage = () => {
         ? apiResponse.length
         : (apiResponse?.meta?.total || 0);
 
+    const handleDeleteConfirm = async (leadId: number, reason?: string) => {
+        try {
+            console.log("Deleting lead:", leadId, "Reason:", reason);
+            await deleteLead.mutateAsync(leadId);
+        } catch (error) {
+            console.error("Delete failed:", error);
+            throw error;
+        }
+    };
+
+    const handlePriorityUpdate = async (leadId: number, priority: string) => {
+        try {
+            await updateLead.mutateAsync({
+                id: leadId,
+                data: { leadPriority: priority as 'Cold' | 'Warm' | 'Hot' },
+            });
+        } catch (error) {
+            console.error("Update priority failed:", error);
+            throw error;
+        }
+    };
+
     const leadActions: ActionItem<LeadWithNames>[] = [
         {
             label: "Update Followup",
@@ -70,12 +114,18 @@ const LeadListPage = () => {
         {
             label: "Lead Priority",
             onClick: (row) => {
-                console.log("Update priority for lead:", row.id);
+                setPriorityModal({
+                    open: true,
+                    leadId: row.id,
+                    leadName: row.companyName || undefined,
+                    currentPriority: row.leadPriority,
+                });
             },
             icon: <Star className="h-4 w-4" />,
         },
         {
             label: "Enquiry Received",
+            className: "whitespace-nowrap",
             onClick: (row) => {
                 console.log("Mark enquiry received for lead:", row.id);
             },
@@ -101,14 +151,12 @@ const LeadListPage = () => {
         {
             label: "Delete",
             className: "text-red-600",
-            onClick: async (row) => {
-                if (confirm(`Are you sure you want to delete lead "${row.companyName}"?`)) {
-                    try {
-                        await deleteLead.mutateAsync(row.id);
-                    } catch (error) {
-                        console.error("Delete failed:", error);
-                    }
-                }
+            onClick: (row) => {
+                setDeleteModal({
+                    open: true,
+                    leadId: row.id,
+                    leadName: row.companyName || undefined,
+                });
             },
             icon: <Trash2 className="h-4 w-4 text-red-600" />,
         },
@@ -118,10 +166,9 @@ const LeadListPage = () => {
         {
             field: "companyName",
             headerName: "Company",
-            width: 200,
+            width: 150,
             filter: true,
             sortable: true,
-            pinned: 'left',
         },
         {
             field: "name",
@@ -202,13 +249,13 @@ const LeadListPage = () => {
             cellRenderer: (params: any) => {
                 const priority = params.value;
                 if (!priority) return "-";
-                
+
                 const colorMap: Record<string, string> = {
-                    'High': 'text-red-600 font-semibold',
-                    'Medium': 'text-yellow-600 font-semibold',
-                    'Low': 'text-green-600 font-semibold',
+                    'Hot': 'text-red-600 font-semibold',
+                    'Warm': 'text-yellow-600 font-semibold',
+                    'Cold': 'text-blue-600 font-semibold',
                 };
-                
+
                 return (
                     <span className={colorMap[priority] || ''}>
                         {priority}
@@ -294,6 +341,23 @@ const LeadListPage = () => {
                     enableSorting={true}
                 />
             </CardContent>
+
+            <LeadDeleteModal
+                open={deleteModal.open}
+                onOpenChange={(open) => setDeleteModal({ ...deleteModal, open })}
+                leadId={deleteModal.leadId}
+                leadName={deleteModal.leadName}
+                onConfirm={handleDeleteConfirm}
+            />
+
+            <LeadPriorityModal
+                open={priorityModal.open}
+                onOpenChange={(open) => setPriorityModal({ ...priorityModal, open })}
+                leadId={priorityModal.leadId}
+                leadName={priorityModal.leadName}
+                currentPriority={priorityModal.currentPriority}
+                onConfirm={handlePriorityUpdate}
+            />
         </Card>
     );
 };
