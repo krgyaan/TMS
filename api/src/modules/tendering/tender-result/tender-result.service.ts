@@ -116,7 +116,7 @@ export class TenderResultService {
             tenderId: tenderResults.tenderId,
             id: tenderResults.id,
             status: tenderResults.status,
-            result: sql<string>`(SELECT ${tenderResultDetails.result} FROM ${tenderResultDetails} WHERE ${tenderResultDetails.tenderResultId} = ${tenderResults.id} AND ${tenderResultDetails.result} IS NOT NULL LIMIT 1)`,
+            result: sql<string>`(SELECT ${tenderResultDetails.result} FROM ${tenderResultDetails} WHERE ${tenderResultDetails.tenderResultId} = ${tenderResults.id} AND ${tenderResultDetails.result} IS NOT NULL LIMIT 1)`.as('result'),
             createdAt: tenderResults.createdAt,
         })
         .from(tenderResults)
@@ -347,7 +347,7 @@ export class TenderResultService {
                 tenderId: tenderResults.tenderId,
                 id: tenderResults.id,
                 status: tenderResults.status,
-                result: sql<string>`(SELECT ${tenderResultDetails.result} FROM ${tenderResultDetails} WHERE ${tenderResultDetails.tenderResultId} = ${tenderResults.id} AND ${tenderResultDetails.result} IS NOT NULL LIMIT 1)`,
+                result: sql<string>`(SELECT ${tenderResultDetails.result} FROM ${tenderResultDetails} WHERE ${tenderResultDetails.tenderResultId} = ${tenderResults.id} AND ${tenderResultDetails.result} IS NOT NULL LIMIT 1)`.as('result'),
                 createdAt: tenderResults.createdAt,
             })
             .from(tenderResults)

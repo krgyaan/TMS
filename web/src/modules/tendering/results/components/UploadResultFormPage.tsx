@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useForm, useWatch, useFieldArray } from "react-hook-form";
+import { useForm, useWatch, useFieldArray, FormProvider } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +22,7 @@ interface UploadResultFormPageProps {
         partiesNames: string[];
     };
     isEditMode?: boolean;
+    isItemWise?: boolean;
     onSuccess?: () => void;
 }
 
@@ -56,24 +57,20 @@ const defaultDetail: DetailFormEntry = {
     finalResultScreenshot: [],
 };
 
-export default function UploadResultFormPage({
-    tenderId,
-    tenderDetails,
-    isEditMode = false,
-    onSuccess,
-}: UploadResultFormPageProps) {
+export default function UploadResultFormPage({ tenderId, tenderDetails, isEditMode = false, isItemWise = false, onSuccess }: UploadResultFormPageProps) {
     const navigate = useNavigate();
     const uploadResultMutation = useUploadResult();
     const { data: existingResult } = useTenderResultByTenderId(tenderId);
 
-    const { control, handleSubmit, reset, setValue, watch } = useForm({
+    const form = useForm({
         defaultValues: {
             technicallyQualified: 'Yes',
             disqualificationReason: '',
             qualifiedPartiesCount: '',
-            details: [] as DetailFormEntry[],
+            details: isItemWise ? ([] as DetailFormEntry[]) : [{ ...defaultDetail }],
         },
     });
+    const { control, handleSubmit, reset, setValue, watch } = form;
 
     const { fields, append, remove } = useFieldArray({ control, name: 'details' });
 
@@ -87,23 +84,23 @@ export default function UploadResultFormPage({
     useEffect(() => {
         if (existingResult) {
             reset({
-                technicallyQualified: ['Yes', 'No'].includes(existingResult.technicallyQualified)
-                    ? existingResult.technicallyQualified : 'Yes',
-                disqualificationReason: existingResult.disqualificationReason || '',
-                qualifiedPartiesCount: existingResult.qualifiedPartiesCount || '',
+                technicallyQualified: ['Yes', 'No'].includes(existingResult.technicallyQualified ?? '')
+                    ? (existingResult.technicallyQualified ?? 'Yes') : 'Yes',
+                disqualificationReason: existingResult.disqualificationReason ?? '',
+                qualifiedPartiesCount: existingResult.qualifiedPartiesCount ?? '',
                 details: isEditMode && existingResult.details
                     ? existingResult.details.map((d: any) => ({
-                        result: d.result || '',
-                        resultReason: d.resultReason || '',
+                        result: d.result ?? '',
+                        resultReason: d.resultReason ?? '',
                         l1Price: d.l1Price ? Number(d.l1Price) : null,
                         l2Price: d.l2Price ? Number(d.l2Price) : null,
                         ourPrice: d.ourPrice ? Number(d.ourPrice) : null,
                         qualifiedPartiesScreenshot: d.qualifiedPartiesScreenshot ? [d.qualifiedPartiesScreenshot] : [],
                         finalResultScreenshot: d.finalResultScreenshot ? [d.finalResultScreenshot] : [],
                     }))
-                    : [],
+                    : (isItemWise ? [] : [{ ...defaultDetail }]),
             });
-            setQualifiedPartiesNames(existingResult.qualifiedPartiesNames || []);
+            setQualifiedPartiesNames(existingResult.qualifiedPartiesNames ?? []);
         }
     }, [existingResult, isEditMode, reset]);
 
@@ -179,8 +176,9 @@ export default function UploadResultFormPage({
                 </CardAction>
             </CardHeader>
             <CardContent>
-                <div className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
+                <FormProvider {...form}>
+                    <div className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-start">
                         <SelectField
                             control={control}
                             name="technicallyQualified"
@@ -235,7 +233,7 @@ export default function UploadResultFormPage({
                                     </Button>
                                 </div>
                                 {qualifiedPartiesNames.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 md:col-span-3">
+                                    <div className="flex flex-wrap gap-2">
                                         {qualifiedPartiesNames.map((name, index) => (
                                             <Badge key={index} variant="secondary" className="gap-1">
                                                 {name}
@@ -252,11 +250,13 @@ export default function UploadResultFormPage({
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <h4 className="font-semibold text-base text-primary border-b pb-2">
-                                    Line Item Results ({fields.length})
+                                    {isItemWise ? `Line Item Results (${fields.length})` : 'Result Details'}
                                 </h4>
-                                <Button type="button" variant="outline" size="sm" onClick={addDetail}>
-                                    <Plus className="mr-2 h-4 w-4" /> Add Line Item
-                                </Button>
+                                {isItemWise && (
+                                    <Button type="button" variant="outline" size="sm" onClick={addDetail}>
+                                        <Plus className="mr-2 h-4 w-4" /> Add Line Item
+                                    </Button>
+                                )}
                             </div>
 
                             {fields.map((field, index) => {
@@ -267,17 +267,19 @@ export default function UploadResultFormPage({
                                     <div key={field.id} className="border rounded-lg p-4 space-y-4 bg-white dark:bg-gray-950">
                                         <div className="flex items-center justify-between">
                                             <h5 className="font-semibold text-sm">Line Item</h5>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => removeDetail(index)}
-                                            >
-                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                            </Button>
+                                            {isItemWise && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => removeDetail(index)}
+                                                >
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            )}
                                         </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 space-y-4">
                                             <SelectField
                                                 control={control}
                                                 name={`details.${index}.result`}
@@ -333,7 +335,7 @@ export default function UploadResultFormPage({
                                                 </>
                                             )}
 
-                                            <div className={!isCancelled ? 'md:col-span-3' : 'md:col-span-2'}>
+                                            <div>
                                                 <FieldWrapper
                                                     control={control}
                                                     name={`details.${index}.resultReason`}
@@ -348,26 +350,25 @@ export default function UploadResultFormPage({
                                                     )}
                                                 </FieldWrapper>
                                             </div>
+                                            {!isCancelled && (
+                                                <>
+                                                    <TenderFileUploader
+                                                        context="result-screenshots"
+                                                        value={detailValues?.qualifiedPartiesScreenshot || []}
+                                                        onChange={(paths) => setValue(`details.${index}.qualifiedPartiesScreenshot`, paths)}
+                                                        label="Screenshot of Qualified Parties"
+                                                        disabled={submitting}
+                                                    />
+                                                    <TenderFileUploader
+                                                        context="result-screenshots"
+                                                        value={detailValues?.finalResultScreenshot || []}
+                                                        onChange={(paths) => setValue(`details.${index}.finalResultScreenshot`, paths)}
+                                                        label="Final Result Screenshot"
+                                                        disabled={submitting}
+                                                    />
+                                                </>
+                                            )}
                                         </div>
-
-                                        {!isCancelled && (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <TenderFileUploader
-                                                    context="result-screenshots"
-                                                    value={detailValues?.qualifiedPartiesScreenshot || []}
-                                                    onChange={(paths) => setValue(`details.${index}.qualifiedPartiesScreenshot`, paths)}
-                                                    label="Screenshot of Qualified Parties"
-                                                    disabled={submitting}
-                                                />
-                                                <TenderFileUploader
-                                                    context="result-screenshots"
-                                                    value={detailValues?.finalResultScreenshot || []}
-                                                    onChange={(paths) => setValue(`details.${index}.finalResultScreenshot`, paths)}
-                                                    label="Final Result Screenshot"
-                                                    disabled={submitting}
-                                                />
-                                            </div>
-                                        )}
                                     </div>
                                 );
                             })}
@@ -389,6 +390,7 @@ export default function UploadResultFormPage({
                         </Button>
                     </div>
                 </div>
+                </FormProvider>
             </CardContent>
         </Card>
     );
