@@ -1,31 +1,17 @@
 import { useEffect, useState } from "react";
-import { z } from "zod";
+import { useForm, useWatch, useFieldArray } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
+import { NumberInput } from "@/components/form/NumberInput";
 import { SelectField } from "@/components/form/SelectField";
 import { TenderFileUploader } from "@/components/tender-file-upload";
 import { useUploadResult, useTenderResultByTenderId } from "@/hooks/api/useTenderResults";
-import { ArrowLeft, IndianRupee, Plus, Trash2, Save } from "lucide-react";
-import { UploadResultSchema } from "../helpers/tenderResult.schema";
-
-type FormValues = z.infer<typeof UploadResultSchema>;
-
-interface DetailEntry {
-    _key: string;
-    result: string;
-    resultReason: string;
-    l1Price: string;
-    l2Price: string;
-    ourPrice: string;
-    qualifiedPartiesScreenshot: string[];
-    finalResultScreenshot: string[];
-}
+import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
 
 interface UploadResultFormPageProps {
     tenderId: number;
@@ -39,6 +25,16 @@ interface UploadResultFormPageProps {
     onSuccess?: () => void;
 }
 
+interface DetailFormEntry {
+    result: string;
+    resultReason: string;
+    l1Price: number | null;
+    l2Price: number | null;
+    ourPrice: number | null;
+    qualifiedPartiesScreenshot: string[];
+    finalResultScreenshot: string[];
+}
+
 const yesNoOptions = [
     { label: "No", value: "No" },
     { label: "Yes", value: "Yes" },
@@ -50,6 +46,16 @@ const resultOptions = [
     { label: "Cancelled", value: "Cancelled" },
 ];
 
+const defaultDetail: DetailFormEntry = {
+    result: '',
+    resultReason: '',
+    l1Price: null,
+    l2Price: null,
+    ourPrice: null,
+    qualifiedPartiesScreenshot: [],
+    finalResultScreenshot: [],
+};
+
 export default function UploadResultFormPage({
     tenderId,
     tenderDetails,
@@ -60,74 +66,50 @@ export default function UploadResultFormPage({
     const uploadResultMutation = useUploadResult();
     const { data: existingResult } = useTenderResultByTenderId(tenderId);
 
-    const [technicallyQualified, setTechnicallyQualified] = useState<string>('Yes');
-    const [disqualificationReason, setDisqualificationReason] = useState('');
-    const [qualifiedPartiesCount, setQualifiedPartiesCount] = useState('');
-    const [qualifiedPartiesNames, setQualifiedPartiesNames] = useState<string[]>([]);
-    const [newPartyName, setNewPartyName] = useState('');
-
-    const [details, setDetails] = useState<DetailEntry[]>(() => {
-        if (isEditMode && existingResult?.details && existingResult.details.length > 0) {
-            return existingResult.details.map((d: any, i: number) => ({
-                _key: `existing-${d.id || i}`,
-                result: d.result || '',
-                resultReason: d.resultReason || '',
-                l1Price: d.l1Price || '',
-                l2Price: d.l2Price || '',
-                ourPrice: d.ourPrice || '',
-                qualifiedPartiesScreenshot: d.qualifiedPartiesScreenshot ? [d.qualifiedPartiesScreenshot] : [],
-                finalResultScreenshot: d.finalResultScreenshot ? [d.finalResultScreenshot] : [],
-            }));
-        }
-        return [];
+    const { control, handleSubmit, reset, setValue, watch } = useForm({
+        defaultValues: {
+            technicallyQualified: 'Yes',
+            disqualificationReason: '',
+            qualifiedPartiesCount: '',
+            details: [] as DetailFormEntry[],
+        },
     });
 
+    const { fields, append, remove } = useFieldArray({ control, name: 'details' });
+
+    const technicallyQualified = useWatch({ control, name: 'technicallyQualified' });
+    const detailsValues = useWatch({ control, name: 'details' });
+
+    const [qualifiedPartiesNames, setQualifiedPartiesNames] = useState<string[]>([]);
+    const [newPartyName, setNewPartyName] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
         if (existingResult) {
-            const tq = existingResult.technicallyQualified === 'Yes' || existingResult.technicallyQualified === 'No'
-                ? existingResult.technicallyQualified : 'Yes';
-            setTechnicallyQualified(tq);
-            setDisqualificationReason(existingResult.disqualificationReason || '');
-            setQualifiedPartiesCount(existingResult.qualifiedPartiesCount || '');
+            reset({
+                technicallyQualified: ['Yes', 'No'].includes(existingResult.technicallyQualified)
+                    ? existingResult.technicallyQualified : 'Yes',
+                disqualificationReason: existingResult.disqualificationReason || '',
+                qualifiedPartiesCount: existingResult.qualifiedPartiesCount || '',
+                details: isEditMode && existingResult.details
+                    ? existingResult.details.map((d: any) => ({
+                        result: d.result || '',
+                        resultReason: d.resultReason || '',
+                        l1Price: d.l1Price ? Number(d.l1Price) : null,
+                        l2Price: d.l2Price ? Number(d.l2Price) : null,
+                        ourPrice: d.ourPrice ? Number(d.ourPrice) : null,
+                        qualifiedPartiesScreenshot: d.qualifiedPartiesScreenshot ? [d.qualifiedPartiesScreenshot] : [],
+                        finalResultScreenshot: d.finalResultScreenshot ? [d.finalResultScreenshot] : [],
+                    }))
+                    : [],
+            });
             setQualifiedPartiesNames(existingResult.qualifiedPartiesNames || []);
-
-            if (isEditMode && existingResult.details && existingResult.details.length > 0) {
-                setDetails(existingResult.details.map((d: any, i: number) => ({
-                    _key: `existing-${d.id || i}`,
-                    result: d.result || '',
-                    resultReason: d.resultReason || '',
-                    l1Price: d.l1Price || '',
-                    l2Price: d.l2Price || '',
-                    ourPrice: d.ourPrice || '',
-                    qualifiedPartiesScreenshot: d.qualifiedPartiesScreenshot ? [d.qualifiedPartiesScreenshot] : [],
-                    finalResultScreenshot: d.finalResultScreenshot ? [d.finalResultScreenshot] : [],
-                })));
-            }
         }
-    }, [existingResult, isEditMode]);
+    }, [existingResult, isEditMode, reset]);
 
-    const addDetail = () => {
-        setDetails(prev => [...prev, {
-            _key: `new-${Date.now()}-${Math.random()}`,
-            result: '',
-            resultReason: '',
-            l1Price: '',
-            l2Price: '',
-            ourPrice: '',
-            qualifiedPartiesScreenshot: [],
-            finalResultScreenshot: [],
-        }]);
-    };
+    const addDetail = () => append({ ...defaultDetail });
 
-    const updateDetail = (key: string, field: keyof DetailEntry, value: any) => {
-        setDetails(prev => prev.map(d => d._key === key ? { ...d, [field]: value } : d));
-    };
-
-    const removeDetail = (key: string) => {
-        setDetails(prev => prev.filter(d => d._key !== key));
-    };
+    const removeDetail = (index: number) => remove(index);
 
     const addPartyName = () => {
         if (newPartyName.trim()) {
@@ -140,28 +122,28 @@ export default function UploadResultFormPage({
         setQualifiedPartiesNames(prev => prev.filter((_, i) => i !== index));
     };
 
-    const onSubmit = async () => {
+    const onSubmit = handleSubmit(async (data) => {
         setSubmitting(true);
         try {
             const submitData: any = {
-                technicallyQualified,
+                technicallyQualified: data.technicallyQualified,
             };
 
-            if (technicallyQualified === 'No') {
-                submitData.disqualificationReason = disqualificationReason;
+            if (data.technicallyQualified === 'No') {
+                submitData.disqualificationReason = data.disqualificationReason;
             } else {
-                submitData.qualifiedPartiesCount = qualifiedPartiesCount;
+                submitData.qualifiedPartiesCount = data.qualifiedPartiesCount;
                 submitData.qualifiedPartiesNames = qualifiedPartiesNames;
 
-                if (details.length > 0) {
-                    submitData.details = details.map(d => ({
+                if (data.details.length > 0) {
+                    submitData.details = data.details.map(d => ({
                         result: d.result || undefined,
                         resultReason: d.resultReason || undefined,
-                        l1Price: d.l1Price || undefined,
-                        l2Price: d.l2Price || undefined,
-                        ourPrice: d.ourPrice || undefined,
-                        qualifiedPartiesScreenshot: d.qualifiedPartiesScreenshot[0] || undefined,
-                        finalResultScreenshot: d.finalResultScreenshot[0] || undefined,
+                        l1Price: d.l1Price != null ? d.l1Price.toString() : undefined,
+                        l2Price: d.l2Price != null ? d.l2Price.toString() : undefined,
+                        ourPrice: d.ourPrice != null ? d.ourPrice.toString() : undefined,
+                        qualifiedPartiesScreenshot: d.qualifiedPartiesScreenshot?.[0] || undefined,
+                        finalResultScreenshot: d.finalResultScreenshot?.[0] || undefined,
                     }));
                 }
             }
@@ -180,7 +162,7 @@ export default function UploadResultFormPage({
         } finally {
             setSubmitting(false);
         }
-    };
+    });
 
     return (
         <Card>
@@ -200,22 +182,28 @@ export default function UploadResultFormPage({
                 <div className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
                         <SelectField
+                            control={control}
+                            name="technicallyQualified"
                             label="Technically Qualified"
                             options={yesNoOptions}
                             placeholder="Select qualification status"
-                            value={technicallyQualified}
-                            onChange={(v) => setTechnicallyQualified(v)}
                         />
 
                         {technicallyQualified === 'No' && (
                             <div className="md:col-span-2">
-                                <label className="text-sm font-medium mb-1 block">Reason for Disqualification</label>
-                                <Textarea
-                                    value={disqualificationReason}
-                                    onChange={(e) => setDisqualificationReason(e.target.value)}
-                                    placeholder="Enter reason for disqualification"
-                                    rows={3}
-                                />
+                                <FieldWrapper
+                                    control={control}
+                                    name="disqualificationReason"
+                                    label="Reason for Disqualification"
+                                >
+                                    {field => (
+                                        <textarea
+                                            className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                            placeholder="Enter reason for disqualification"
+                                            {...field}
+                                        />
+                                    )}
+                                </FieldWrapper>
                             </div>
                         )}
 
@@ -224,8 +212,8 @@ export default function UploadResultFormPage({
                                 <div>
                                     <label className="text-sm font-medium mb-1 block">No. of Qualified Parties</label>
                                     <Input
-                                        value={qualifiedPartiesCount}
-                                        onChange={(e) => setQualifiedPartiesCount(e.target.value)}
+                                        value={watch('qualifiedPartiesCount')}
+                                        onChange={(e) => setValue('qualifiedPartiesCount', e.target.value)}
                                         placeholder="e.g., 5 or 'not known'"
                                     />
                                 </div>
@@ -264,104 +252,125 @@ export default function UploadResultFormPage({
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <h4 className="font-semibold text-base text-primary border-b pb-2">
-                                    Line Item Results ({details.length})
+                                    Line Item Results ({fields.length})
                                 </h4>
                                 <Button type="button" variant="outline" size="sm" onClick={addDetail}>
                                     <Plus className="mr-2 h-4 w-4" /> Add Line Item
                                 </Button>
                             </div>
 
-                            {details.map((detail) => (
-                                <div key={detail._key} className="border rounded-lg p-4 space-y-4 bg-white dark:bg-gray-950">
-                                    <div className="flex items-center justify-between">
-                                        <h5 className="font-semibold text-sm">Line Item</h5>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => removeDetail(detail._key)}
-                                        >
-                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                        </Button>
-                                    </div>
+                            {fields.map((field, index) => {
+                                const detailValues = detailsValues?.[index];
+                                const isCancelled = detailValues?.result === 'Cancelled';
 
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                        <SelectField
-                                            label="Result"
-                                            options={resultOptions}
-                                            placeholder="Select result"
-                                            value={detail.result}
-                                            onChange={(v) => updateDetail(detail._key, 'result', v)}
-                                        />
+                                return (
+                                    <div key={field.id} className="border rounded-lg p-4 space-y-4 bg-white dark:bg-gray-950">
+                                        <div className="flex items-center justify-between">
+                                            <h5 className="font-semibold text-sm">Line Item</h5>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => removeDetail(index)}
+                                            >
+                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                            </Button>
+                                        </div>
 
-                                        {detail.result !== 'Cancelled' && (
-                                            <>
-                                                <div className="relative">
-                                                    <IndianRupee className="absolute left-3 top-9 h-4 w-4 text-muted-foreground" />
-                                                    <Input
-                                                        value={detail.l1Price}
-                                                        onChange={(e) => updateDetail(detail._key, 'l1Price', e.target.value)}
-                                                        type="number"
-                                                        step="0.01"
-                                                        className="pl-10"
-                                                        placeholder="L1 Price"
-                                                    />
-                                                </div>
-                                                <div className="relative">
-                                                    <IndianRupee className="absolute left-3 top-9 h-4 w-4 text-muted-foreground" />
-                                                    <Input
-                                                        value={detail.l2Price}
-                                                        onChange={(e) => updateDetail(detail._key, 'l2Price', e.target.value)}
-                                                        type="number"
-                                                        step="0.01"
-                                                        className="pl-10"
-                                                        placeholder="L2 Price"
-                                                    />
-                                                </div>
-                                                <div className="relative">
-                                                    <IndianRupee className="absolute left-3 top-9 h-4 w-4 text-muted-foreground" />
-                                                    <Input
-                                                        value={detail.ourPrice}
-                                                        onChange={(e) => updateDetail(detail._key, 'ourPrice', e.target.value)}
-                                                        type="number"
-                                                        step="0.01"
-                                                        className="pl-10"
-                                                        placeholder="Our Price"
-                                                    />
-                                                </div>
-                                            </>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                            <SelectField
+                                                control={control}
+                                                name={`details.${index}.result`}
+                                                label="Result"
+                                                options={resultOptions}
+                                                placeholder="Select result"
+                                            />
+
+                                            {!isCancelled && (
+                                                <>
+                                                    <FieldWrapper
+                                                        control={control}
+                                                        name={`details.${index}.l1Price`}
+                                                        label="L1 Price"
+                                                    >
+                                                        {field => (
+                                                            <NumberInput
+                                                                step={0.01}
+                                                                placeholder="L1 Price"
+                                                                value={field.value}
+                                                                onChange={field.onChange}
+                                                            />
+                                                        )}
+                                                    </FieldWrapper>
+                                                    <FieldWrapper
+                                                        control={control}
+                                                        name={`details.${index}.l2Price`}
+                                                        label="L2 Price"
+                                                    >
+                                                        {field => (
+                                                            <NumberInput
+                                                                step={0.01}
+                                                                placeholder="L2 Price"
+                                                                value={field.value}
+                                                                onChange={field.onChange}
+                                                            />
+                                                        )}
+                                                    </FieldWrapper>
+                                                    <FieldWrapper
+                                                        control={control}
+                                                        name={`details.${index}.ourPrice`}
+                                                        label="Our Price"
+                                                    >
+                                                        {field => (
+                                                            <NumberInput
+                                                                step={0.01}
+                                                                placeholder="Our Price"
+                                                                value={field.value}
+                                                                onChange={field.onChange}
+                                                            />
+                                                        )}
+                                                    </FieldWrapper>
+                                                </>
+                                            )}
+
+                                            <div className={!isCancelled ? 'md:col-span-3' : 'md:col-span-2'}>
+                                                <FieldWrapper
+                                                    control={control}
+                                                    name={`details.${index}.resultReason`}
+                                                    label="Result Reason"
+                                                >
+                                                    {field => (
+                                                        <textarea
+                                                            className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                            placeholder={isCancelled ? "Reason for cancellation" : "Reason for Win/Loss"}
+                                                            {...field}
+                                                        />
+                                                    )}
+                                                </FieldWrapper>
+                                            </div>
+                                        </div>
+
+                                        {!isCancelled && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <TenderFileUploader
+                                                    context="result-screenshots"
+                                                    value={detailValues?.qualifiedPartiesScreenshot || []}
+                                                    onChange={(paths) => setValue(`details.${index}.qualifiedPartiesScreenshot`, paths)}
+                                                    label="Screenshot of Qualified Parties"
+                                                    disabled={submitting}
+                                                />
+                                                <TenderFileUploader
+                                                    context="result-screenshots"
+                                                    value={detailValues?.finalResultScreenshot || []}
+                                                    onChange={(paths) => setValue(`details.${index}.finalResultScreenshot`, paths)}
+                                                    label="Final Result Screenshot"
+                                                    disabled={submitting}
+                                                />
+                                            </div>
                                         )}
-
-                                        <div className={detail.result !== 'Cancelled' ? 'md:col-span-3' : 'md:col-span-2'}>
-                                            <Textarea
-                                                value={detail.resultReason}
-                                                onChange={(e) => updateDetail(detail._key, 'resultReason', e.target.value)}
-                                                placeholder={detail.result === 'Cancelled' ? "Reason for cancellation" : "Reason for Win/Loss"}
-                                                rows={2}
-                                            />
-                                        </div>
                                     </div>
-
-                                    {detail.result !== 'Cancelled' && (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <TenderFileUploader
-                                                context="result-screenshots"
-                                                value={detail.qualifiedPartiesScreenshot}
-                                                onChange={(paths) => updateDetail(detail._key, 'qualifiedPartiesScreenshot', paths)}
-                                                label="Screenshot of Qualified Parties"
-                                                disabled={submitting}
-                                            />
-                                            <TenderFileUploader
-                                                context="result-screenshots"
-                                                value={detail.finalResultScreenshot}
-                                                onChange={(paths) => updateDetail(detail._key, 'finalResultScreenshot', paths)}
-                                                label="Final Result Screenshot"
-                                                disabled={submitting}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
 
