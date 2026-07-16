@@ -20,6 +20,7 @@ import { reverseAuctions } from '@db/schemas/tendering/reverse-auction.schema';
 import { tenderCostingDetails } from '@db/schemas/tendering/tender-costing-details.schema';
 import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { tenderResultDetails } from '@db/schemas/tendering/tender-result-details.schema';
 import { tenderResults } from '@db/schemas/tendering/tender-result.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
@@ -115,7 +116,7 @@ export class TenderResultService {
             tenderId: tenderResults.tenderId,
             id: tenderResults.id,
             status: tenderResults.status,
-            result: tenderResults.result,
+            result: sql<string>`(SELECT ${tenderResultDetails.result} FROM ${tenderResultDetails} WHERE ${tenderResultDetails.tenderResultId} = ${tenderResults.id} AND ${tenderResultDetails.result} IS NOT NULL LIMIT 1)`,
             createdAt: tenderResults.createdAt,
         })
         .from(tenderResults)
@@ -158,8 +159,7 @@ export class TenderResultService {
         conditions.push(
             isNotNull(latestTenderResultSq.id),
             inArray(latestTenderResultSq.status, ['Won', 'won'])
-        );
-        conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+        , TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
     } else if (activeTab === 'lost') {
         conditions.push(
             isNotNull(latestTenderResultSq.id),
@@ -347,7 +347,7 @@ export class TenderResultService {
                 tenderId: tenderResults.tenderId,
                 id: tenderResults.id,
                 status: tenderResults.status,
-                result: tenderResults.result,
+                result: sql<string>`(SELECT ${tenderResultDetails.result} FROM ${tenderResultDetails} WHERE ${tenderResultDetails.tenderResultId} = ${tenderResults.id} AND ${tenderResultDetails.result} IS NOT NULL LIMIT 1)`,
                 createdAt: tenderResults.createdAt,
             })
             .from(tenderResults)
@@ -554,7 +554,6 @@ export class TenderResultService {
                 tenderStatus: statuses.name,
                 reverseAuctionApplicable: tenderInformation.reverseAuctionApplicable,
                 bidSubmissionDate: latestBidSubmissionSq.submissionDatetime,
-                resultReason: tenderResults.resultReason,
                 woBasicDetailId: woBasicDetails.id,
             })
             .from(tenderResults)
@@ -575,6 +574,12 @@ export class TenderResultService {
         const emdDetailsMap = await this.getEmdDetailsForTenders([result.result.tenderId]);
         const emdDetails = this.formatEmdDetails(result.emdAmount, emdDetailsMap.get(result.result.tenderId));
 
+        const detailRows = await this.db
+            .select()
+            .from(tenderResultDetails)
+            .where(eq(tenderResultDetails.tenderResultId, result.result.id))
+            .orderBy(tenderResultDetails.id);
+
         return {
             ...result.result,
             tenderNo: result.tenderNo,
@@ -588,7 +593,8 @@ export class TenderResultService {
             raApplicable: result.reverseAuctionApplicable === 'Yes',
             bidSubmissionDate: result.bidSubmissionDate,
             woBasicDetailId: result.woBasicDetailId,
-            resultReason: result.resultReason,
+            resultReason: detailRows[0]?.resultReason ?? null,
+            details: detailRows,
             emdDetails,
         };
     }
@@ -622,7 +628,6 @@ export class TenderResultService {
                 reverseAuctionApplicable: tenderInformation.reverseAuctionApplicable,
                 bidSubmissionDate: latestBidSubmissionSq.submissionDatetime,
                 woBasicDetailId: woBasicDetails.id,
-                resultReason: tenderResults.resultReason,
             })
             .from(tenderResults)
             .innerJoin(tenderInfos, eq(tenderResults.tenderId, tenderInfos.id))
@@ -642,6 +647,12 @@ export class TenderResultService {
         const emdDetailsMap = await this.getEmdDetailsForTenders([tenderId]);
         const emdDetails = this.formatEmdDetails(result.emdAmount, emdDetailsMap.get(tenderId));
 
+        const detailRows = await this.db
+            .select()
+            .from(tenderResultDetails)
+            .where(eq(tenderResultDetails.tenderResultId, result.result.id))
+            .orderBy(tenderResultDetails.id);
+
         return {
             ...result.result,
             tenderNo: result.tenderNo,
@@ -655,7 +666,8 @@ export class TenderResultService {
             raApplicable: result.reverseAuctionApplicable === 'Yes',
             bidSubmissionDate: result.bidSubmissionDate,
             woBasicDetailId: result.woBasicDetailId,
-            resultReason: result.resultReason,
+            resultReason: detailRows[0]?.resultReason ?? null,
+            details: detailRows,
             emdDetails,
         };
     }
@@ -694,6 +706,32 @@ export class TenderResultService {
         return result;
     }
 
+    private normalizeDetails(dto: UploadResultDto): any[] {
+        if (dto.details && Array.isArray(dto.details) && dto.details.length > 0) {
+            return dto.details.map(d => ({
+                result: d.result ?? null,
+                l1Price: d.l1Price?.toString() ?? null,
+                l2Price: d.l2Price?.toString() ?? null,
+                ourPrice: d.ourPrice?.toString() ?? null,
+                qualifiedPartiesScreenshot: d.qualifiedPartiesScreenshot ?? null,
+                finalResultScreenshot: d.finalResultScreenshot ?? null,
+                resultReason: d.resultReason ?? null,
+            }));
+        }
+        if (dto.result) {
+            return [{
+                result: dto.result,
+                l1Price: dto.l1Price?.toString() ?? null,
+                l2Price: dto.l2Price?.toString() ?? null,
+                ourPrice: dto.ourPrice?.toString() ?? null,
+                qualifiedPartiesScreenshot: null,
+                finalResultScreenshot: dto.finalResultScreenshot ?? null,
+                resultReason: dto.resultReason ?? null,
+            }];
+        }
+        return [];
+    }
+
     async uploadResult(id: number | null, tenderId: number, dto: UploadResultDto, changedBy: number) {
         let resultId = id;
 
@@ -710,7 +748,9 @@ export class TenderResultService {
             );
         }
 
-        const isCompleteResult = dto.technicallyQualified === 'No' || !!dto.result;
+        const details = this.normalizeDetails(dto);
+        const hasResultDetails = details.some(d => !!d.result);
+        const isCompleteResult = dto.technicallyQualified === 'No' || hasResultDetails;
         if (isCompleteResult) {
             if (existing.raStatus === 'pending' || existing.tqStatus === 'pending') {
                 throw new BadRequestException(
@@ -722,6 +762,12 @@ export class TenderResultService {
         const currentTender = await this.tenderInfosService.findById(tenderId);
         const prevStatus = currentTender?.status ?? null;
 
+        // Determine overall result from details
+        const overallResult = details.find(d => d.result === 'Won')?.result
+            || details.find(d => d.result === 'Cancelled')?.result
+            || details.find(d => d.result === 'Lost')?.result
+            || null;
+
         let updateData: any = {
             technicallyQualified: dto.technicallyQualified,
             updatedAt: new Date(),
@@ -731,43 +777,25 @@ export class TenderResultService {
         let statusComment: string = '';
 
         if (dto.technicallyQualified === 'No') {
-            // Disqualified: Update tender status to 22
             updateData.status = RESULT_STATUS.DISQUALIFIED;
             updateData.disqualificationReason = dto.disqualificationReason;
-            newStatus = 22; // Status ID for "Disqualified (reason)"
+            newStatus = 22;
             statusComment = 'Disqualified';
         } else {
-            // Qualified: Save qualified parties data
             updateData.qualifiedPartiesCount = dto.qualifiedPartiesCount;
             updateData.qualifiedPartiesNames = dto.qualifiedPartiesNames;
-            updateData.qualifiedPartiesScreenshot = dto.qualifiedPartiesScreenshot;
+            updateData.tenderCancelledScreenshot = dto.tenderCancelledScreenshot;
 
-            // Only update tender status if result details are provided
-            if (dto.result === 'Won' || dto.result === 'Lost') {
-                updateData.status = dto.result === 'Won' ? RESULT_STATUS.WON : RESULT_STATUS.LOST;
-                updateData.result = dto.result;
-                updateData.resultReason = dto.resultReason;
-                updateData.l1Price = dto.l1Price;
-                updateData.l2Price = dto.l2Price;
-                updateData.ourPrice = dto.ourPrice;
-                updateData.finalResultScreenshot = dto.finalResultScreenshot;
-                updateData.resultUploadedAt = new Date();
-
-                // Update tender status based on result
-                newStatus = dto.result === 'Won' ? 25 : 24; // 25 for Won, 24 for Lost
-                statusComment = dto.result === 'Won' ? 'Won (PO awaited)' : 'Lost';
-            } else if(dto.result === 'Cancelled'){
-                updateData.status = RESULT_STATUS.CANCELLED,
-                updateData.resultUploadedAt = new Date();
-                updateData.resultReason = dto.resultReason;
-
-                // Update tender status based on result
+            if (overallResult === 'Won' || overallResult === 'Lost') {
+                updateData.status = overallResult === 'Won' ? RESULT_STATUS.WON : RESULT_STATUS.LOST;
+                newStatus = overallResult === 'Won' ? 25 : 24;
+                statusComment = overallResult === 'Won' ? 'Won (PO awaited)' : 'Lost';
+            } else if (overallResult === 'Cancelled') {
+                updateData.status = RESULT_STATUS.CANCELLED;
                 newStatus = 18;
                 statusComment = "Tender Cancelled";
             } else {
-                // No result details: Only update result status, not tender status
                 updateData.status = RESULT_STATUS.UNDER_EVALUATION;
-                // newStatus remains null, so tender status won't be updated
             }
         }
 
@@ -778,14 +806,35 @@ export class TenderResultService {
                 .where(eq(tenderResults.id, resultId))
                 .returning();
 
-            // Update tender status if status change is needed
+            // Delete existing details and re-insert
+            if (details.length > 0) {
+                await tx
+                    .delete(tenderResultDetails)
+                    .where(eq(tenderResultDetails.tenderResultId, resultId));
+
+                for (const detail of details) {
+                    await tx
+                        .insert(tenderResultDetails)
+                        .values({
+                            tenderResultId: resultId,
+                            result: detail.result,
+                            l1Price: detail.l1Price,
+                            l2Price: detail.l2Price,
+                            ourPrice: detail.ourPrice,
+                            qualifiedPartiesScreenshot: detail.qualifiedPartiesScreenshot,
+                            finalResultScreenshot: detail.finalResultScreenshot,
+                            resultUploadedAt: detail.result ? new Date() : null,
+                            resultReason: detail.resultReason,
+                        });
+                }
+            }
+
             if (newStatus !== null) {
                 await tx
                     .update(tenderInfos)
                     .set({ status: newStatus, updatedAt: new Date() })
                     .where(eq(tenderInfos.id, tenderId));
 
-                // Track status change
                 await this.tenderStatusHistoryService.trackStatusChange(
                     tenderId,
                     newStatus,
@@ -799,9 +848,8 @@ export class TenderResultService {
             return updated;
         });
 
-        // Send email notification if result details are provided
-        if (dto.result && dto.technicallyQualified === 'Yes') {
-            await this.sendTenderResultEmail(tenderId, result, changedBy, dto);
+        if (hasResultDetails && dto.technicallyQualified === 'Yes') {
+            await this.sendTenderResultEmail(tenderId, result, changedBy, dto, details);
         }
 
         return result;
@@ -887,13 +935,21 @@ export class TenderResultService {
             .update(tenderResults)
             .set({
                 status: newResultStatus,
-                result: result,
-                resultReason: dto.resultReason,
                 tenderCancelledScreenshot: dto.finalResultScreenshot,
-                resultUploadedAt: new Date(),
                 updatedAt: new Date(),
             })
             .where(eq(tenderResults.id, resultId));
+
+        // Insert into tender_result_details
+        await this.db
+            .insert(tenderResultDetails)
+            .values({
+                tenderResultId: resultId,
+                result: result,
+                resultReason: dto.resultReason,
+                finalResultScreenshot: dto.finalResultScreenshot,
+                resultUploadedAt: new Date(),
+            });
 
         //create tenderstatushistory log 
         await this.tenderStatusHistoryService.trackStatusChange(
@@ -981,16 +1037,16 @@ export class TenderResultService {
     async sendTenderResultEmail(
         tenderId: number,
         resultRecord: {
-            qualifiedPartiesScreenshot: string | null;
-            finalResultScreenshot: string | null;
+            qualifiedPartiesScreenshot?: string | null;
+            finalResultScreenshot?: string | null;
         },
         uploadedBy: number,
-        dto: UploadResultDto
+        dto: UploadResultDto,
+        details: any[],
     ) {
         const tender = await this.tenderInfosService.findById(tenderId);
         if (!tender || !tender.teamMember) return;
 
-        // Get costing detail data (combined from first detail)
         const costingDetail = await this.db
             .select({
                 submittedReceiptPrice: sql<string>`SUM(${tenderCostingDetails.submittedReceiptPrice})`,
@@ -1002,33 +1058,39 @@ export class TenderResultService {
             .where(eq(tenderCostingSheets.tenderId, tenderId))
             .limit(1);
 
-        // Format currency values
         const formatCurrency = (value: string | null) => {
             if (!value) return '₹0';
             const num = Number(value);
             return isNaN(num) ? value : `₹${num.toLocaleString('en-IN')}`;
         };
 
+        const firstDetail = details[0] || {};
+        const overallResult = details.find((d: any) => d.result === 'Won')?.result
+            || details.find((d: any) => d.result === 'Cancelled')?.result
+            || details.find((d: any) => d.result === 'Lost')?.result
+            || 'Not specified';
+
         const emailData = {
             tender_no: tender.tenderNo,
             tender_name: tender.tenderName,
-            result: dto.result || 'Not specified',
-            l1_price_formatted: formatCurrency(dto.l1Price?.toString() ?? null),
-            l2_price_formatted: formatCurrency(dto.l2Price?.toString() ?? null),
-            our_price_formatted: formatCurrency(dto.ourPrice?.toString() ?? null),
-            result_reason: dto.resultReason || 'Not specified',
+            result: overallResult,
+            l1_price_formatted: formatCurrency(firstDetail.l1Price ?? null),
+            l2_price_formatted: formatCurrency(firstDetail.l2Price ?? null),
+            our_price_formatted: formatCurrency(firstDetail.ourPrice ?? null),
+            result_reason: firstDetail.resultReason || 'Not specified',
             costing_receipt_formatted: formatCurrency(costingDetail[0]?.submittedReceiptPrice || null),
             costing_budget_formatted: formatCurrency(costingDetail[0]?.submittedBudgetPrice || null),
             costing_gross_margin: costingDetail[0]?.submittedGrossMargin ? `${costingDetail[0].submittedGrossMargin}%` : '0%',
             qualified_parties_screenshot: !!resultRecord.qualifiedPartiesScreenshot,
             final_result_screenshot: !!resultRecord.finalResultScreenshot,
-            isWon: dto.result === 'Won',
+            detail_count: details.length,
+            isWon: overallResult === 'Won',
         };
 
-        // Collect valid attachments
         const attachmentFiles = [
             resultRecord.qualifiedPartiesScreenshot,
             resultRecord.finalResultScreenshot,
+            ...details.flatMap((d: any) => [d.qualifiedPartiesScreenshot, d.finalResultScreenshot]),
         ].filter(Boolean) as string[];
 
         const attachments = attachmentFiles.length > 0 ? {

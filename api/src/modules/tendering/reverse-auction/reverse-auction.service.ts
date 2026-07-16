@@ -882,6 +882,7 @@ export class ReverseAuctionService {
                 disqualificationReason: null,
                 qualifiedPartiesCount: existing.qualifiedPartiesCount ?? null,
                 qualifiedPartiesNames: existing.qualifiedPartiesNames ?? [],
+                tenderCancelledScreenshot: null,
                 result: dto.raResult as 'Won' | 'Lost',
                 resultReason: dto.resultReason ?? null,
                 l1Price: dto.raClosePrice ?? null,
@@ -898,7 +899,8 @@ export class ReverseAuctionService {
                     finalResultScreenshot: dto.finalResultScreenshot ?? null,
                 },
                 changedBy,
-                mappedDto
+                mappedDto,
+                []
             );
         } else {
             await this.sendRaResultEmail(existing.tenderId, result, changedBy, dto);

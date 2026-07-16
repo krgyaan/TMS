@@ -1,18 +1,8 @@
+import { optionalNumber, optionalString, optionalTextField, requiredEnumField } from '@/utils/zod-schema-generator';
 import { z } from 'zod';
-import {
-    optionalString,
-    optionalTextField,
-    optionalNumber,
-    decimalField,
-    requiredEnumField,
-} from '@/utils/zod-schema-generator';
 
-export const UploadResultSchema = z.object({
-    technicallyQualified: requiredEnumField(['Yes', 'No']),
-    disqualificationReason: optionalString,
-    qualifiedPartiesCount: optionalTextField(50),
-    qualifiedPartiesNames: z.array(z.string()).optional(),
-    result: z.enum(['Won', 'Lost']).optional(),
+const ResultDetailSchema = z.object({
+    result: z.enum(['Won', 'Lost', 'Cancelled']).optional(),
     resultReason: optionalString,
     l1Price: optionalNumber(z.coerce.number().min(0, 'L1 price must be non-negative')),
     l2Price: optionalNumber(z.coerce.number().min(0, 'L2 price must be non-negative')),
@@ -21,9 +11,18 @@ export const UploadResultSchema = z.object({
     finalResultScreenshot: optionalString,
 });
 
+export const UploadResultSchema = z.object({
+    technicallyQualified: requiredEnumField(['Yes', 'No']),
+    disqualificationReason: optionalString,
+    qualifiedPartiesCount: optionalTextField(50),
+    qualifiedPartiesNames: z.array(z.string()).optional(),
+    tenderCancelledScreenshot: optionalString,
+    details: z.array(ResultDetailSchema).optional(),
+}).passthrough();
+
 export const UploadChangeStatusResultSchema = z.object({
     statusId: z.number({ required_error: "Status ID is required" }),
-    finalResultScreenshot : z.string({ required_error: "No screenshot uploaded" }),
+    finalResultScreenshot: z.string({ required_error: "No screenshot uploaded" }),
     resultReason: z.string({ required_error: "Reason for Cancellation is required" }),
 });
 
