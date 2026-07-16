@@ -102,6 +102,7 @@ export const paths = {
         submitQueryCreate: (tenderId: number) => `/tendering/submit-queries/${tenderId}/create`,
         submitQueryEdit: (tenderId: number, id: number) => `/tendering/submit-queries/${tenderId}/edit/${id}`,
         submitQueryView: (tenderId: number, id: number) => `/tendering/submit-queries/${tenderId}/view/${id}`,
+        timerDashboard: "/tendering/timer-dashboard",
     },
 
     // ==================== OPERATIONS ====================

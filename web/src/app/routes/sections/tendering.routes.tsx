@@ -58,6 +58,7 @@ const TqEditRepliedPage = lazy(() => import('@/modules/tendering/tq-management/T
 const TqMissedPage = lazy(() => import('@/modules/tendering/tq-management/TqMissedPage'));
 const TqEditMissedPage = lazy(() => import('@/modules/tendering/tq-management/TqEditMissedPage'));
 const TqViewPage = lazy(() => import('@/modules/tendering/tq-management/TqViewPage'));
+const TimerDashboard = lazy(() => import('@/modules/tendering/timer-dashboard/TimerDashboardPage'));
 const Tendering_RAs = lazy(() => import('@/modules/tendering/ras/RaListPage'));
 const Tendering_RA_Show = lazy(() => import('@/modules/tendering/ras/RaShowPage'));
 const Tendering_RA_Edit = lazy(() => import('@/modules/tendering/ras/RaEditPage'));
@@ -151,6 +152,7 @@ export default function TenderingRoutes() {
             <Route path="submit-queries/:tenderId/create" element={<RouteWrapper><SubmitQueryCreatePage /></RouteWrapper>} />
             <Route path="submit-queries/:tenderId/edit/:id" element={<RouteWrapper><SubmitQueryEditPage /></RouteWrapper>} />
             <Route path="submit-queries/:tenderId/view/:id" element={<RouteWrapper><SubmitQueryShowPage /></RouteWrapper>} />
+            <Route path="timer-dashboard" element={<RouteWrapper><TimerDashboard /></RouteWrapper>} />
         </Routes>
     );
 }
