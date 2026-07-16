@@ -6,7 +6,7 @@ class TimerDashboardService extends BaseApiService {
     }
 
     async search(by: string, value: string) {
-        return this.get<{ tender: any; timers: any[]; }>(`/search?by=${encodeURIComponent(by)}&value=${encodeURIComponent(value)}`);
+        return this.get<{ results: Array<{ tender: any; timers: any[] }> }>(`/search?by=${encodeURIComponent(by)}&value=${encodeURIComponent(value)}`);
     }
 
     async stopTimer(data: { entityType: string; entityId: number; stage: string }) {
