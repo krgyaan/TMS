@@ -1,17 +1,16 @@
-import { useFieldArray, useWatch, type Control } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { NumberInput } from "@/components/form/NumberInput";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Copy, Trash2, AlertCircle, Calculator } from "lucide-react";
+import { AlertCircle, Calculator, Copy, Plus, Trash2 } from "lucide-react";
+import { useMemo } from "react";
+import { useFieldArray, useWatch, type Control } from "react-hook-form";
 import { calculateTotals, formatCurrency } from "../helpers/projectDashboard.mapper";
 import type { PurchaseOrderFormValues } from "../helpers/purchaseOrder.schema";
-import { useMemo } from "react";
 
 interface ProductsFieldProps {
     control: Control<PurchaseOrderFormValues>;
@@ -101,7 +100,8 @@ export function ProductsField({ control }: ProductsFieldProps) {
                                                 <NumberInput
                                                     value={fieldProps.value}
                                                     onChange={fieldProps.onChange}
-                                                    min={0}
+                                                    min={0.00}
+                                                    step={0.00}
                                                     placeholder="0"
                                                     className="h-9 text-right"
                                                 />
