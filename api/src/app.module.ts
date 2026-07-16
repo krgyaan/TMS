@@ -39,6 +39,8 @@ import { IndustriesModule } from "@/modules/master/industries/industries.module"
 import { ItemHeadingsModule } from "@/modules/master/item-headings/item-headings.module";
 import { ItemsModule } from "@/modules/master/items/items.module";
 import { LeadTypesModule } from "@/modules/master/lead-types/lead-types.module";
+import { LeadsModule } from "@/modules/crm/leads/leads.module";
+import { LeadIndustriesModule } from "@/modules/master/lead-industries/lead-industries.module";
 import { LoanPartiesModule } from "@/modules/master/loan-parties/loan-parties.module";
 import { LocationsModule } from "@/modules/master/locations/locations.module";
 import { OauthAccountsModule } from "@/modules/master/oauth-accounts/oauth-accounts.module";
@@ -79,6 +81,7 @@ import { TenderFilesModule } from "@/modules/tendering/tender-files/tender-files
 import { TenderResultModule } from "@/modules/tendering/tender-result/tender-result.module";
 import { TendersModule } from "@/modules/tendering/tenders/tenders.module";
 import { TqManagementModule } from "@/modules/tendering/tq-management/tq-management.module";
+import { TimerDashboardModule } from "@/modules/timer-dashboard/timer-dashboard.module";
 import { TimersModule } from "@/modules/timers/timers.module";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
@@ -172,6 +175,8 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         WebsitesModule,
         StatesModule,
         LeadTypesModule,
+        LeadIndustriesModule,
+        LeadsModule,
         TendersModule,
         EmployeeImprestModule,
         TenderInfoSheetsModule,
@@ -207,6 +212,7 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         ChequeModule,
         TenderFeeModule,
         TimersModule,
+        TimerDashboardModule,
         WoBasicDetailsModule,
         WoDetailsModule,
         WoContactsModule,

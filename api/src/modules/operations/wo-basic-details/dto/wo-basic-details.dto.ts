@@ -9,15 +9,15 @@ import { z } from "zod";
  * Used by TE (Tendering Executive) within 12 hours of PO receipt
  */
 export const CreateWoBasicDetailSchema = z.object({
-  teamId: z.number().int().positive().optional(),
+  teamId: z.number().int().positive().nullish(),
   // Source reference - one of these should be provided
   tenderId: z.number().int().positive().optional(),
   enquiryId: z.number().int().positive().optional(),
 
   // Non-tender source identifiers (for project creation without a tender)
-  organizationId: z.number().int().positive().optional(),
-  itemId: z.number().int().positive().optional(),
-  locationId: z.number().int().positive().optional(),
+  organizationId: z.number().int().positive().nullish(),
+  itemId: z.number().int().positive().nullish(),
+  locationId: z.number().int().positive().nullish(),
 
   // Core WO information
   woNumber: z.string().max(255).optional(),

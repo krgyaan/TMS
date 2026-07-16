@@ -51,6 +51,7 @@ const navMain: NavGroup[] = [
             { title: "TQ Management", url: paths.tendering.tqManagement, permission: "tq-management" },
             { title: "RA Management", url: paths.tendering.ras, permission: "reverse-auction" },
             { title: "Results", url: paths.tendering.results, permission: "tender-result" },
+            // { title: "Timer Dashboard", url: paths.tendering.timerDashboard, permission: "tenders" },
         ],
     },
     {

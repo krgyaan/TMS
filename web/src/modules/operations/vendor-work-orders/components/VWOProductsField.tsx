@@ -102,6 +102,7 @@ export function VWOProductsField({ control }: VWOProductsFieldProps) {
                                                     value={fieldProps.value}
                                                     onChange={fieldProps.onChange}
                                                     min={0}
+                                                    step={0.01}
                                                     placeholder="0"
                                                     className="h-9 text-right"
                                                 />
