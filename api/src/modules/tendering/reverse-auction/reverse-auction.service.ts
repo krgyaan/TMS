@@ -889,15 +889,15 @@ export class ReverseAuctionService {
                 l1Price: dto.raClosePrice ?? null,
                 l2Price: dto.raClosePriceL2 ?? null,
                 ourPrice: dto.raOurPrice ?? null,
-                qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ?? null,
-                finalResultScreenshot: dto.finalResultScreenshot ?? null,
+                qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ? [dto.screenshotQualifiedParties] : null,
+                finalResultScreenshot: dto.finalResultScreenshot ? [dto.finalResultScreenshot] : null,
             };
 
             await this.tenderResultService.sendTenderResultEmail(
                 existing.tenderId,
                 {
-                    qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ?? null,
-                    finalResultScreenshot: dto.finalResultScreenshot ?? null,
+                    qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ? [dto.screenshotQualifiedParties] : null,
+                    finalResultScreenshot: dto.finalResultScreenshot ? [dto.finalResultScreenshot] : null,
                 },
                 changedBy,
                 mappedDto,
@@ -1032,8 +1032,8 @@ export class ReverseAuctionService {
             if (raRecord.raClosePrice) detailPayload.l1Price = raRecord.raClosePrice;
             if (raRecord.raClosePriceL2) detailPayload.l2Price = raRecord.raClosePriceL2;
             if (raRecord.raOurPrice) detailPayload.ourPrice = raRecord.raOurPrice;
-            if (raRecord.screenshotQualifiedParties) detailPayload.qualifiedPartiesScreenshot = raRecord.screenshotQualifiedParties;
-            if (raRecord.finalResultScreenshot) detailPayload.finalResultScreenshot = raRecord.finalResultScreenshot;
+            if (raRecord.screenshotQualifiedParties) detailPayload.qualifiedPartiesScreenshot = [raRecord.screenshotQualifiedParties];
+            if (raRecord.finalResultScreenshot) detailPayload.finalResultScreenshot = [raRecord.finalResultScreenshot];
             if (raRecord.resultReason) detailPayload.resultReason = raRecord.resultReason;
             if (raRecord.raResult) detailPayload.resultUploadedAt = new Date();
 

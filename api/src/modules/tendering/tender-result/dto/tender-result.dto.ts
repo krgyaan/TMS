@@ -7,8 +7,8 @@ const ResultDetailSchema = z.object({
     l1Price: optionalNumber(z.coerce.number().min(0, 'L1 price must be non-negative')),
     l2Price: optionalNumber(z.coerce.number().min(0, 'L2 price must be non-negative')),
     ourPrice: optionalNumber(z.coerce.number().min(0, 'Our price must be non-negative')),
-    qualifiedPartiesScreenshot: optionalString,
-    finalResultScreenshot: optionalString,
+    qualifiedPartiesScreenshot: z.array(z.string()).optional(),
+    finalResultScreenshot: z.array(z.string()).optional(),
 });
 
 export const UploadResultSchema = z.object({

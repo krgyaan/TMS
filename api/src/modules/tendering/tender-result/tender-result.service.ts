@@ -706,6 +706,12 @@ export class TenderResultService {
         return result;
     }
 
+    private toArray(v: any): string[] | null {
+        if (Array.isArray(v)) return v.length > 0 ? v : null;
+        if (v != null && v !== '') return [String(v)];
+        return null;
+    }
+
     private normalizeDetails(dto: UploadResultDto): any[] {
         if (dto.details && Array.isArray(dto.details) && dto.details.length > 0) {
             return dto.details.map(d => ({
@@ -713,8 +719,8 @@ export class TenderResultService {
                 l1Price: d.l1Price?.toString() ?? null,
                 l2Price: d.l2Price?.toString() ?? null,
                 ourPrice: d.ourPrice?.toString() ?? null,
-                qualifiedPartiesScreenshot: d.qualifiedPartiesScreenshot ?? null,
-                finalResultScreenshot: d.finalResultScreenshot ?? null,
+                qualifiedPartiesScreenshot: this.toArray(d.qualifiedPartiesScreenshot),
+                finalResultScreenshot: this.toArray(d.finalResultScreenshot),
                 resultReason: d.resultReason ?? null,
             }));
         }
@@ -725,7 +731,7 @@ export class TenderResultService {
                 l2Price: dto.l2Price?.toString() ?? null,
                 ourPrice: dto.ourPrice?.toString() ?? null,
                 qualifiedPartiesScreenshot: null,
-                finalResultScreenshot: dto.finalResultScreenshot ?? null,
+                finalResultScreenshot: this.toArray(dto.finalResultScreenshot),
                 resultReason: dto.resultReason ?? null,
             }];
         }
@@ -947,7 +953,7 @@ export class TenderResultService {
                 tenderResultId: resultId,
                 result: result,
                 resultReason: dto.resultReason,
-                finalResultScreenshot: dto.finalResultScreenshot,
+                finalResultScreenshot: dto.finalResultScreenshot ? [dto.finalResultScreenshot] : null,
                 resultUploadedAt: new Date(),
             });
 
@@ -1037,8 +1043,8 @@ export class TenderResultService {
     async sendTenderResultEmail(
         tenderId: number,
         resultRecord: {
-            qualifiedPartiesScreenshot?: string | null;
-            finalResultScreenshot?: string | null;
+            qualifiedPartiesScreenshot?: string[] | null;
+            finalResultScreenshot?: string[] | null;
         },
         uploadedBy: number,
         dto: UploadResultDto,
@@ -1081,16 +1087,19 @@ export class TenderResultService {
             costing_receipt_formatted: formatCurrency(costingDetail[0]?.submittedReceiptPrice || null),
             costing_budget_formatted: formatCurrency(costingDetail[0]?.submittedBudgetPrice || null),
             costing_gross_margin: costingDetail[0]?.submittedGrossMargin ? `${costingDetail[0].submittedGrossMargin}%` : '0%',
-            qualified_parties_screenshot: !!resultRecord.qualifiedPartiesScreenshot,
-            final_result_screenshot: !!resultRecord.finalResultScreenshot,
+            qualified_parties_screenshot: (resultRecord.qualifiedPartiesScreenshot?.length ?? 0) > 0,
+            final_result_screenshot: (resultRecord.finalResultScreenshot?.length ?? 0) > 0,
             detail_count: details.length,
             isWon: overallResult === 'Won',
         };
 
         const attachmentFiles = [
-            resultRecord.qualifiedPartiesScreenshot,
-            resultRecord.finalResultScreenshot,
-            ...details.flatMap((d: any) => [d.qualifiedPartiesScreenshot, d.finalResultScreenshot]),
+            ...(resultRecord.qualifiedPartiesScreenshot ?? []),
+            ...(resultRecord.finalResultScreenshot ?? []),
+            ...details.flatMap((d: any) => [
+                ...(this.toArray(d.qualifiedPartiesScreenshot) ?? []),
+                ...(this.toArray(d.finalResultScreenshot) ?? []),
+            ]),
         ].filter(Boolean) as string[];
 
         const attachments = attachmentFiles.length > 0 ? {
