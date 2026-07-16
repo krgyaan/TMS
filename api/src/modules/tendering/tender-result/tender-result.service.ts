@@ -55,7 +55,7 @@ export class TenderResultService {
     private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
         const roleFilterConditions: any[] = [];
 
-        if (user && user.roleId) {
+        if (user?.roleId) {
             if (user.dataScope === 'all') {
                 // Super User or Admin: Show all, respect teamId filter if provided
                 if (teamId !== undefined && teamId !== null) {
@@ -848,9 +848,9 @@ export class TenderResultService {
             return updated;
         });
 
-        if (hasResultDetails && dto.technicallyQualified === 'Yes') {
-            await this.sendTenderResultEmail(tenderId, result, changedBy, dto, details);
-        }
+        // if (hasResultDetails && dto.technicallyQualified === 'Yes') {
+        //     await this.sendTenderResultEmail(tenderId, result, changedBy, dto, details);
+        // }
 
         return result;
     }
@@ -1045,7 +1045,7 @@ export class TenderResultService {
         details: any[],
     ) {
         const tender = await this.tenderInfosService.findById(tenderId);
-        if (!tender || !tender.teamMember) return;
+        if (!tender?.teamMember) return;
 
         const costingDetail = await this.db
             .select({
@@ -1061,7 +1061,7 @@ export class TenderResultService {
         const formatCurrency = (value: string | null) => {
             if (!value) return '₹0';
             const num = Number(value);
-            return isNaN(num) ? value : `₹${num.toLocaleString('en-IN')}`;
+            return Number.isNaN(num) ? value : `₹${num.toLocaleString('en-IN')}`;
         };
 
         const firstDetail = details[0] || {};
