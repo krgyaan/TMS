@@ -340,7 +340,7 @@ const ImprestAdminUserView: React.FC = () => {
 
                     return (
                         <div className="flex items-center gap-1">
-                            <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />
+                            {canUpdate("imprests.shared") &&  <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />}
                             <IconAction icon={ImagePlus} label="Add Proof" onClick={() => openAddProof(row.id)} />
                             {canUpdate("imprests.shared") && <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />}
                         </div>
