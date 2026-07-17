@@ -9,6 +9,8 @@ export interface PurchaseInvoiceRow {
     invoiceDate: string;
     uploadedBy: string;
     invoiceFile?: string;
+    purchaseOrderId?: number;
+    poNumber?: string;
     createdAt: string;
 }
 
@@ -21,6 +23,7 @@ export interface CreatePurchaseInvoiceDTO {
     gstAmount: number;
     invoiceDate: string;
     invoiceFile?: string;
+    purchaseOrderId?: number;
 }
 
 export interface UpdatePurchaseInvoiceDTO {
@@ -30,4 +33,5 @@ export interface UpdatePurchaseInvoiceDTO {
     gstAmount: number;
     invoiceDate: string;
     invoiceFile?: string;
+    purchaseOrderId?: number;
 }

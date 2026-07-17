@@ -7,6 +7,7 @@ export const purchaseInvoiceFormSchema = z.object({
     gstAmount: z.number().nullable().refine(v => v !== null && v >= 0, "GST amount must be >= 0"),
     invoiceDate: z.string().min(1, "Invoice date is required"),
     invoiceFile: z.array(z.string()).default([]),
+    selectedPoId: z.string().default(""),
 });
 
 export type PurchaseInvoiceFormValues = z.infer<typeof purchaseInvoiceFormSchema>;
