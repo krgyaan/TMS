@@ -49,6 +49,17 @@ export const PurchaseInvoicesSection: React.FC<PurchaseInvoicesSectionProps> = (
             ),
         },
         {
+            field: "poNumber",
+            headerName: "PO Number",
+            sortable: true,
+            filter: true,
+            width: 200,
+            flex: 1,
+            cellRenderer: (p: CustomCellRendererProps<PurchaseInvoiceRow>) => (
+                <span className="text-sm">{p.value || "-"}</span>
+            ),
+        },
+        {
             field: "category",
             headerName: "Category",
             sortable: true,
