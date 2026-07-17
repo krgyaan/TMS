@@ -14,6 +14,7 @@ export const CreateLeadSchema = z.object({
     team: z.string().optional().nullable(),
     bdPerson: z.number().int().optional().nullable(),
     allocatedTe: z.number().int().optional().nullable(),
+    allocationNotes: z.string().max(2000).optional().nullable(),      // ← NEW
     pointsDiscussed: z.string().max(2000).optional().nullable(),
     veResponsibility: z.string().max(2000).optional().nullable(),
     leadPriority: z.string().optional().nullable(),
@@ -45,13 +46,22 @@ export const UpdateLeadSchema = z.object({
     team: z.string().optional().nullable(),
     bdPerson: z.number().int().optional().nullable(),
     allocatedTe: z.number().int().optional().nullable(),
+    allocationNotes: z.string().max(2000).optional().nullable(),      // ← NEW
     pointsDiscussed: z.string().max(2000).optional().nullable(),
     veResponsibility: z.string().max(2000).optional().nullable(),
-    leadPriority: z.enum(['Cold', 'Warm', 'Hot']).optional().nullable(),  // ✅ ADD THIS
+    leadPriority: z.enum(['Cold', 'Warm', 'Hot']).optional().nullable(),
     recentFollowUp: z.enum(['visit', 'whatsapp', 'letter', 'mail', 'call']).optional().nullable(),
 });
 
-
+// ← NEW
+export const AllocateLeadSchema = z.object({
+    allocatedTe: z.number({
+        required_error: 'Technical Executive is required',
+        invalid_type_error: 'Technical Executive must be a number',
+    }).int().positive({ message: 'Please select a valid Technical Executive' }),
+    allocationNotes: z.string().max(2000).optional().nullable(),
+});
 
 export type CreateLeadDto = z.infer<typeof CreateLeadSchema>;
 export type UpdateLeadDto = z.infer<typeof UpdateLeadSchema>;
+export type AllocateLeadDto = z.infer<typeof AllocateLeadSchema>;   

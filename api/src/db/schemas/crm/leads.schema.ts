@@ -25,6 +25,7 @@ export const leads = pgTable("leads", {
     team: varchar("team", { length: 255 }),
     bdPerson: integer("bd_person"),
     allocatedTe: bigint("allocated_te", { mode: "number" }),
+    allocationNotes: text("allocation_notes"),          // ← NEW
     pointsDiscussed: text("points_discussed"),
     veResponsibility: text("ve_responsibility"),
     mailFollowupCount: integer("mail_followup_count").default(0),

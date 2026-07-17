@@ -13,6 +13,7 @@ export interface Lead {
     team: string | null;
     bdPerson: number | null;
     allocatedTe: number | null;
+    allocationNotes: string | null;        // ← NEW
     pointsDiscussed: string | null;
     veResponsibility: string | null;
     mailFollowupCount: number | null;
@@ -54,6 +55,7 @@ export interface CreateLeadRequest {
     team?: string | null;
     bdPerson?: number | null;
     allocatedTe?: number | null;
+    allocationNotes?: string | null;       // ← NEW
     pointsDiscussed?: string | null;
     veResponsibility?: string | null;
     leadPriority?: string | null;
@@ -61,6 +63,12 @@ export interface CreateLeadRequest {
 }
 
 export interface UpdateLeadRequest extends Partial<CreateLeadRequest> {}
+
+// ← NEW: dedicated allocation request type
+export interface AllocateLeadRequest {
+    allocatedTe: number;
+    allocationNotes?: string | null;
+}
 
 export interface LeadListParams {
     page?: number;

@@ -143,9 +143,7 @@ const LeadListPage = () => {
         },
         {
             label: "Allocate to TE",
-            onClick: (row) => {
-                console.log("Allocate to TE for lead:", row.id);
-            },
+            onClick: (row) => navigate(paths.crm.leadAllocate(row.id)),  
             icon: <UserPlus className="h-4 w-4" />,
         },
         {

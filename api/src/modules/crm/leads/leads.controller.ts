@@ -12,9 +12,17 @@ import {
     HttpStatus,
 } from '@nestjs/common';
 import { LeadsService } from './leads.service';
-import { CreateLeadSchema, UpdateLeadSchema } from './dto/lead.dto';
+import {
+    CreateLeadSchema,
+    UpdateLeadSchema,
+    AllocateLeadSchema,            // ← NEW
+} from './dto/lead.dto';
 import { ValidatedBody } from '@/decorators/validated-body.decorator';
-import type { CreateLeadDto, UpdateLeadDto } from './dto/lead.dto';
+import type {
+    CreateLeadDto,
+    UpdateLeadDto,
+    AllocateLeadDto,               // ← NEW
+} from './dto/lead.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
@@ -54,18 +62,26 @@ export class LeadsController {
     @HttpCode(HttpStatus.CREATED)
     async create(
         @ValidatedBody(CreateLeadSchema) body: CreateLeadDto,
-        @CurrentUser() user: ValidatedUser, // ← GET LOGGED IN USER
+        @CurrentUser() user: ValidatedUser,
     ) {
-        return this.leadsService.create(body, user.sub); // ← PASS USER ID
+        return this.leadsService.create(body, user.sub);
     }
 
     @Patch(':id')
     async update(
         @Param('id', ParseIntPipe) id: number,
-        @Body() body: unknown,
+        @ValidatedBody(UpdateLeadSchema) body: UpdateLeadDto,  // ← consistent with create
     ) {
-        const parsed = UpdateLeadSchema.parse(body);
-        return this.leadsService.update(id, parsed);
+        return this.leadsService.update(id, body);
+    }
+
+    // ← NEW
+    @Patch(':id/allocate')
+    async allocate(
+        @Param('id', ParseIntPipe) id: number,
+        @ValidatedBody(AllocateLeadSchema) body: AllocateLeadDto,
+    ) {
+        return this.leadsService.allocate(id, body);
     }
 
     @Delete(':id')

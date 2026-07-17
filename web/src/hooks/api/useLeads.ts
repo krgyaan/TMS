@@ -4,7 +4,8 @@ import { toast } from 'sonner';
 import { showErrorToast } from '@/utils/errorToast';
 import type { 
     CreateLeadRequest, 
-    UpdateLeadRequest, 
+    UpdateLeadRequest,
+    AllocateLeadRequest,
     LeadListParams,
     LeadWithNames
 } from '@/modules/crm/leads/helpers/leads.type';
@@ -26,17 +27,15 @@ export const useLeads = (
         page: pagination.page,
         limit: pagination.limit,
         search: pagination.search,
-        ...(sort?.sortBy && { sortBy: sort.sortBy }),
+        ...(sort?.sortBy    && { sortBy: sort.sortBy }),
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
     };
 
     return useQuery<PaginatedResult<LeadWithNames>>({
         queryKey: leadsKey.list({ ...pagination, ...sort }),
         queryFn: () => leadsService.getAll(filters),
-        placeholderData: (previousData) => {
-            if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
-                return previousData;
-            }
+        placeholderData: (prev) => {
+            if (prev && typeof prev === 'object' && 'data' in prev && 'meta' in prev) return prev;
             return undefined;
         },
     });
@@ -52,7 +51,6 @@ export const useLead = (id: number | null) => {
 
 export const useCreateLead = () => {
     const queryClient = useQueryClient();
-
     return useMutation({
         mutationFn: (data: CreateLeadRequest) => leadsService.create(data),
         onSuccess: () => {
@@ -65,7 +63,6 @@ export const useCreateLead = () => {
 
 export const useUpdateLead = () => {
     const queryClient = useQueryClient();
-
     return useMutation({
         mutationFn: ({ id, data }: { id: number; data: UpdateLeadRequest }) =>
             leadsService.update(id, data),
@@ -78,9 +75,23 @@ export const useUpdateLead = () => {
     });
 };
 
+// ← NEW
+export const useAllocateLead = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: AllocateLeadRequest }) =>
+            leadsService.allocate(id, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: leadsKey.lists() });
+            queryClient.invalidateQueries({ queryKey: leadsKey.detail(variables.id) });
+            toast.success('Lead allocated successfully');
+        },
+        onError: showErrorToast,
+    });
+};
+
 export const useDeleteLead = () => {
     const queryClient = useQueryClient();
-
     return useMutation({
         mutationFn: (id: number) => leadsService.remove(id),
         onSuccess: () => {
