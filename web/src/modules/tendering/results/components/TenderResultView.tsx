@@ -35,6 +35,12 @@ const getFileUrl = (filePath: string): string => {
     return tenderFilesService.getFileUrl(filePath);
 };
 
+const toScreenshotArray = (v: string | string[] | null | undefined): string[] => {
+    if (Array.isArray(v)) return v;
+    if (v) return [v];
+    return [];
+};
+
 export function TenderResultView({
     result,
     onViewRa,
@@ -267,11 +273,15 @@ export function TenderResultView({
                                         </TableCell>
                                     </TableRow>
                                 )}
-                                {((detail.qualifiedPartiesScreenshot?.length ?? 0) > 0 || (detail.finalResultScreenshot?.length ?? 0) > 0) && (
+                                {(() => {
+                                    const qp = toScreenshotArray(detail.qualifiedPartiesScreenshot);
+                                    const fr = toScreenshotArray(detail.finalResultScreenshot);
+                                    return qp.length > 0 || fr.length > 0;
+                                })() && (
                                     <TableRow>
                                         <TableCell colSpan={4}>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                {(detail.qualifiedPartiesScreenshot ?? []).map((path, i) => (
+                                                {toScreenshotArray(detail.qualifiedPartiesScreenshot).map((path, i) => (
                                                     <div key={`qp-${i}`} className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
                                                         <div className="flex items-start gap-2 overflow-hidden">
                                                             <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
@@ -279,7 +289,7 @@ export function TenderResultView({
                                                                 <span className="font-medium text-sm truncate" title={path.split('/').pop() || path}>
                                                                     {path.split('/').pop() || path}
                                                                 </span>
-                                                                <span className="text-xs text-muted-foreground truncate">Qualified Parties Screenshot {detail.qualifiedPartiesScreenshot!.length > 1 ? `#${i + 1}` : ''}</span>
+                                                                <span className="text-xs text-muted-foreground truncate">Qualified Parties Screenshot {toScreenshotArray(detail.qualifiedPartiesScreenshot).length > 1 ? `#${i + 1}` : ''}</span>
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-2 mt-auto">
@@ -294,7 +304,7 @@ export function TenderResultView({
                                                         </div>
                                                     </div>
                                                 ))}
-                                                {(detail.finalResultScreenshot ?? []).map((path, i) => (
+                                                {toScreenshotArray(detail.finalResultScreenshot).map((path, i) => (
                                                     <div key={`fr-${i}`} className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
                                                         <div className="flex items-start gap-2 overflow-hidden">
                                                             <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
@@ -302,7 +312,7 @@ export function TenderResultView({
                                                                 <span className="font-medium text-sm truncate" title={path.split('/').pop() || path}>
                                                                     {path.split('/').pop() || path}
                                                                 </span>
-                                                                <span className="text-xs text-muted-foreground truncate">Final Result Screenshot {detail.finalResultScreenshot!.length > 1 ? `#${i + 1}` : ''}</span>
+                                                                <span className="text-xs text-muted-foreground truncate">Final Result Screenshot {toScreenshotArray(detail.finalResultScreenshot).length > 1 ? `#${i + 1}` : ''}</span>
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-2 mt-auto">

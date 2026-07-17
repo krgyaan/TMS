@@ -596,7 +596,11 @@ export class TenderResultService {
             bidSubmissionDate: result.bidSubmissionDate,
             woBasicDetailId: result.woBasicDetailId,
             resultReason: detailRows[0]?.resultReason ?? null,
-            details: detailRows,
+            details: detailRows.map(d => ({
+                ...d,
+                qualifiedPartiesScreenshot: this.normalizeScreenshotArray(d.qualifiedPartiesScreenshot),
+                finalResultScreenshot: this.normalizeScreenshotArray(d.finalResultScreenshot),
+            })),
             emdDetails,
         };
     }
@@ -669,7 +673,11 @@ export class TenderResultService {
             bidSubmissionDate: result.bidSubmissionDate,
             woBasicDetailId: result.woBasicDetailId,
             resultReason: detailRows[0]?.resultReason ?? null,
-            details: detailRows,
+            details: detailRows.map(d => ({
+                ...d,
+                qualifiedPartiesScreenshot: this.normalizeScreenshotArray(d.qualifiedPartiesScreenshot),
+                finalResultScreenshot: this.normalizeScreenshotArray(d.finalResultScreenshot),
+            })),
             emdDetails,
         };
     }
@@ -712,6 +720,12 @@ export class TenderResultService {
         if (Array.isArray(v)) return v.length > 0 ? v : null;
         if (v != null && v !== '') return [String(v)];
         return null;
+    }
+
+    private normalizeScreenshotArray(v: unknown): string[] {
+        if (Array.isArray(v)) return v;
+        if (v && typeof v === 'string') return [v];
+        return [];
     }
 
     private normalizeDetails(dto: UploadResultDto): any[] {

@@ -95,8 +95,8 @@ export default function UploadResultFormPage({ tenderId, tenderDetails, isEditMo
                         l1Price: d.l1Price ? Number(d.l1Price) : null,
                         l2Price: d.l2Price ? Number(d.l2Price) : null,
                         ourPrice: d.ourPrice ? Number(d.ourPrice) : null,
-                        qualifiedPartiesScreenshot: d.qualifiedPartiesScreenshot ? [d.qualifiedPartiesScreenshot] : [],
-                        finalResultScreenshot: d.finalResultScreenshot ? [d.finalResultScreenshot] : [],
+                        qualifiedPartiesScreenshot: Array.isArray(d.qualifiedPartiesScreenshot) ? d.qualifiedPartiesScreenshot : d.qualifiedPartiesScreenshot ? [d.qualifiedPartiesScreenshot] : [],
+                        finalResultScreenshot: Array.isArray(d.finalResultScreenshot) ? d.finalResultScreenshot : d.finalResultScreenshot ? [d.finalResultScreenshot] : [],
                     }))
                     : (isItemWise ? [] : [{ ...defaultDetail }]),
             });
@@ -139,8 +139,8 @@ export default function UploadResultFormPage({ tenderId, tenderDetails, isEditMo
                         l1Price: d.l1Price != null ? d.l1Price.toString() : undefined,
                         l2Price: d.l2Price != null ? d.l2Price.toString() : undefined,
                         ourPrice: d.ourPrice != null ? d.ourPrice.toString() : undefined,
-                        qualifiedPartiesScreenshot: d.qualifiedPartiesScreenshot?.length ? d.qualifiedPartiesScreenshot : undefined,
-                        finalResultScreenshot: d.finalResultScreenshot?.length ? d.finalResultScreenshot : undefined,
+                        qualifiedPartiesScreenshot: Array.isArray(d.qualifiedPartiesScreenshot) && d.qualifiedPartiesScreenshot.length > 0 ? d.qualifiedPartiesScreenshot : d.qualifiedPartiesScreenshot ? [d.qualifiedPartiesScreenshot] : undefined,
+                        finalResultScreenshot: Array.isArray(d.finalResultScreenshot) && d.finalResultScreenshot.length > 0 ? d.finalResultScreenshot : d.finalResultScreenshot ? [d.finalResultScreenshot] : undefined,
                     }));
                 }
             }
