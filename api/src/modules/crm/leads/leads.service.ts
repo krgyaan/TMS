@@ -24,10 +24,12 @@ export type LeadWithNames = Lead & {
     teamName?: string | null;
     bdPersonName?: string | null;
     allocatedTeName?: string | null;
+    allocatedByName?: string | null;    // ← NEW
 };
 
 const bdUser = alias(users, 'bd_user');
 const teUser = alias(users, 'te_user');
+const allocatedByUser = alias(users, 'allocated_by_user');   // ← NEW
 
 @Injectable()
 export class LeadsService {
@@ -45,6 +47,7 @@ export class LeadsService {
             teamName: teams.name,
             bdPersonName: bdUser.name,
             allocatedTeName: teUser.name,
+            allocatedByName: allocatedByUser.name,              // ← NEW
         };
     }
 
@@ -56,7 +59,8 @@ export class LeadsService {
             .leftJoin(leadTypes, eq(leadTypes.id, sql`CAST(${leads.type} AS BIGINT)`))
             .leftJoin(teams, eq(teams.id, sql`CAST(${leads.team} AS BIGINT)`))
             .leftJoin(bdUser, eq(bdUser.id, leads.bdPerson))
-            .leftJoin(teUser, eq(teUser.id, leads.allocatedTe));
+            .leftJoin(teUser, eq(teUser.id, leads.allocatedTe))
+            .leftJoin(allocatedByUser, eq(allocatedByUser.id, leads.allocatedBy)); // ← NEW
     }
 
     private mapJoinedRow = (row: {
@@ -66,6 +70,7 @@ export class LeadsService {
         teamName: string | null;
         bdPersonName: string | null;
         allocatedTeName: string | null;
+        allocatedByName: string | null;                         // ← NEW
     }): LeadWithNames => ({
         ...row.leads,
         industryName: row.industryName ?? null,
@@ -73,6 +78,7 @@ export class LeadsService {
         teamName: row.teamName ?? null,
         bdPersonName: row.bdPersonName ?? null,
         allocatedTeName: row.allocatedTeName ?? null,
+        allocatedByName: row.allocatedByName ?? null,           // ← NEW
     });
 
     // ─── Public Methods ───────────────────────────────────────────────
@@ -174,9 +180,9 @@ export class LeadsService {
         return updated;
     }
 
-    // ─── NEW: Allocate TE ─────────────────────────────────────────────
+    // ─── Allocate TE ──────────────────────────────────────────────────
 
-    async allocate(id: number, data: AllocateLeadDto): Promise<Lead> {
+    async allocate(id: number, data: AllocateLeadDto, allocatedBy: number): Promise<Lead> {
         await this.findById(id);
 
         const [updated] = await this.db
@@ -184,6 +190,8 @@ export class LeadsService {
             .set({
                 allocatedTe: data.allocatedTe,
                 allocationNotes: data.allocationNotes ?? null,
+                allocatedBy: allocatedBy,                     
+                allocatedAt: new Date(),                       
                 updatedAt: new Date(),
             })
             .where(eq(leads.id, id))

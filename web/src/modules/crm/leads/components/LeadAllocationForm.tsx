@@ -2,7 +2,6 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import {
     Card,
     CardAction,
@@ -18,35 +17,19 @@ import { paths } from "@/app/routes/paths";
 import { SelectField } from "@/components/form/SelectField";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { useAllocateLead, useLead } from "@/hooks/api/useLeads";
+import { useUsers } from "@/hooks/api/useUsers";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-import axiosInstance from "@/lib/axios";
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 const AllocationSchema = z.object({
-    te_id: z.string().min(1, { message: "Please select a Technical Executive" }),
+    te_id: z.string().min(1, { message: "Please select a Tender Executive" }),
     allocation_notes: z.string().max(2000).optional(),
 });
 
 type AllocationFormValues = z.infer<typeof AllocationSchema>;
-
-// ─── API Fetchers ─────────────────────────────────────────────────────────────
-
-interface TEOption {
-    value: string;
-    label: string;
-}
-
-const fetchTechnicalExecutives = async (): Promise<TEOption[]> => {
-    // Adjust the endpoint to whatever your backend exposes for TE users
-    const res = await axiosInstance.get('/users?role=te');
-    return res.data.map((u: { id: number; name: string; teamName?: string }) => ({
-        value: u.id.toString(),
-        label: u.teamName ? `${u.name} (${u.teamName})` : u.name,
-    }));
-};
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -60,15 +43,22 @@ export function LeadAllocationForm({ leadId }: LeadAllocationFormProps) {
     const navigate = useNavigate();
     const allocateLead = useAllocateLead();
 
-    // Fetch the lead so we can show company name in the header
+    // ── Fetch lead data ───────────────────────────────────────────────
     const { data: lead, isLoading: leadLoading } = useLead(leadId);
 
-    // Fetch list of TEs for the dropdown
-    const { data: teOptions = [], isLoading: teLoading } = useQuery({
-        queryKey: ['technical-executives'],
-        queryFn: fetchTechnicalExecutives,
-    });
+    // ── Fetch all users via existing hook ─────────────────────────────
+    // useUsers → usersService.getAll() → findAllWithRelations()
+    // which already joins teams table and resolves team: { id, name }
+    const { data: allUsers = [], isLoading: teLoading } = useUsers();
 
+    // ── Build dropdown options ────────────────────────────────────────
+    // UserWithRelations already has team: { id: number, name: string | null }
+    const teOptions = allUsers.map((u) => ({
+        value: u.id.toString(),
+        label: u.team?.name ? `${u.name} (${u.team.name})` : (u.name ?? ""),
+    }));
+
+    // ── Form setup ───────────────────────────────────────────────────
     const form = useForm<AllocationFormValues>({
         resolver: zodResolver(AllocationSchema),
         defaultValues: {
@@ -77,6 +67,7 @@ export function LeadAllocationForm({ leadId }: LeadAllocationFormProps) {
         },
     });
 
+    // ── Submit ───────────────────────────────────────────────────────
     const handleSubmit: SubmitHandler<AllocationFormValues> = async (values) => {
         try {
             await allocateLead.mutateAsync({
@@ -92,6 +83,7 @@ export function LeadAllocationForm({ leadId }: LeadAllocationFormProps) {
         }
     };
 
+    // ── Loading state ────────────────────────────────────────────────
     if (leadLoading) {
         return (
             <div className="space-y-4">
@@ -101,6 +93,7 @@ export function LeadAllocationForm({ leadId }: LeadAllocationFormProps) {
         );
     }
 
+    // ── Error state ──────────────────────────────────────────────────
     if (!lead) {
         return (
             <Alert variant="destructive">
@@ -123,12 +116,12 @@ export function LeadAllocationForm({ leadId }: LeadAllocationFormProps) {
     const saving = allocateLead.isPending;
 
     return (
-        <Card>  {/* ← REMOVED max-w-2xl mx-auto */}
+        <Card>
             <CardHeader>
                 <div className="flex flex-col gap-1">
                     <CardTitle className="flex items-center gap-2">
                         <UserPlus className="h-5 w-5" />
-                        Allocate to Technical Executive
+                        Allocate to Tender Executive
                     </CardTitle>
                     <CardDescription>
                         Allocating lead:{" "}
@@ -154,23 +147,23 @@ export function LeadAllocationForm({ leadId }: LeadAllocationFormProps) {
                         onSubmit={form.handleSubmit(handleSubmit)}
                         className="space-y-6"
                     >
-                        {/* ── Form fields in a grid layout (like LeadForm) ── */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* ── TE Selector ─────────────────────────────── */}
+
+                            {/* ── TE Selector ─────────────────────────── */}
                             <SelectField<AllocationFormValues, "te_id">
                                 control={form.control}
                                 name="te_id"
-                                label="Select Technical Executive"
+                                label="Select Tender Executive"
                                 options={teOptions}
                                 placeholder={
                                     teLoading
                                         ? "Loading executives..."
                                         : "-- Select TE --"
                                 }
-                                disabled={teLoading}
+                                disabled={teLoading || saving}
                             />
 
-                            {/* ── Notes (full width on second row) ────────── */}
+                            {/* ── Allocation Notes (full width) ────────── */}
                             <div className="col-span-full">
                                 <FieldWrapper<AllocationFormValues, "allocation_notes">
                                     control={form.control}
@@ -188,11 +181,12 @@ export function LeadAllocationForm({ leadId }: LeadAllocationFormProps) {
                                     )}
                                 </FieldWrapper>
                             </div>
+
                         </div>
 
                         {/* ── Actions ─────────────────────────────────── */}
                         <div className="w-full flex items-center justify-center gap-2 pt-2">
-                            <Button type="submit" disabled={saving}>
+                            <Button type="submit" disabled={saving || teLoading}>
                                 {saving ? (
                                     <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -222,14 +222,13 @@ export const paths = {
         makerRequestCreate: "/accounts/maker-requests/create",
     },
 
-    // ==================== CRM ====================
-        // ==================== CRM ====================
+    
     crm: {
         leads: "/crm/leads",
         leadCreate: "/crm/leads/create",
         leadEdit: (id: number | string) => `/crm/leads/${id}/edit`,
         leadView: (id: number | string) => `/crm/leads/${id}`,
-        leadAllocate: (id: number | string) => `/crm/leads/${id}/allocate`, 
+        leadAllocate: (id: number | string) => `/crm/leads/allocate/${id}`,  
 
         enquiries: "/crm/enquiries",
         costings: "/crm/costings",

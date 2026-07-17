@@ -13,7 +13,9 @@ export interface Lead {
     team: string | null;
     bdPerson: number | null;
     allocatedTe: number | null;
-    allocationNotes: string | null;        // ← NEW
+    allocatedBy: number | null;         
+    allocationNotes: string | null;
+    allocatedAt: string | null;       
     pointsDiscussed: string | null;
     veResponsibility: string | null;
     mailFollowupCount: number | null;
@@ -39,6 +41,7 @@ export interface LeadWithNames extends Lead {
     teamName?: string | null;
     bdPersonName?: string | null;
     allocatedTeName?: string | null;
+    allocatedByName?: string | null;    // ← NEW
 }
 
 export interface CreateLeadRequest {
@@ -55,7 +58,7 @@ export interface CreateLeadRequest {
     team?: string | null;
     bdPerson?: number | null;
     allocatedTe?: number | null;
-    allocationNotes?: string | null;       // ← NEW
+    allocationNotes?: string | null;
     pointsDiscussed?: string | null;
     veResponsibility?: string | null;
     leadPriority?: string | null;
@@ -64,10 +67,10 @@ export interface CreateLeadRequest {
 
 export interface UpdateLeadRequest extends Partial<CreateLeadRequest> {}
 
-// ← NEW: dedicated allocation request type
 export interface AllocateLeadRequest {
     allocatedTe: number;
     allocationNotes?: string | null;
+    // allocatedBy is NOT here — backend gets it from JWT
 }
 
 export interface LeadListParams {

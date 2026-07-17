@@ -15,13 +15,13 @@ import { LeadsService } from './leads.service';
 import {
     CreateLeadSchema,
     UpdateLeadSchema,
-    AllocateLeadSchema,            // ← NEW
+    AllocateLeadSchema,
 } from './dto/lead.dto';
 import { ValidatedBody } from '@/decorators/validated-body.decorator';
 import type {
     CreateLeadDto,
     UpdateLeadDto,
-    AllocateLeadDto,               // ← NEW
+    AllocateLeadDto,
 } from './dto/lead.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -70,18 +70,19 @@ export class LeadsController {
     @Patch(':id')
     async update(
         @Param('id', ParseIntPipe) id: number,
-        @ValidatedBody(UpdateLeadSchema) body: UpdateLeadDto,  // ← consistent with create
+        @ValidatedBody(UpdateLeadSchema) body: UpdateLeadDto,
     ) {
         return this.leadsService.update(id, body);
     }
 
-    // ← NEW
+    // ← UPDATED: pass user.sub as allocatedBy
     @Patch(':id/allocate')
     async allocate(
         @Param('id', ParseIntPipe) id: number,
         @ValidatedBody(AllocateLeadSchema) body: AllocateLeadDto,
+        @CurrentUser() user: ValidatedUser,                     // ← NEW
     ) {
-        return this.leadsService.allocate(id, body);
+        return this.leadsService.allocate(id, body, user.sub);  // ← PASS USER ID
     }
 
     @Delete(':id')

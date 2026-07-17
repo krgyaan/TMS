@@ -17,8 +17,8 @@ export default function CRMRoutes() {
         <Routes>
             <Route path="leads"               element={<RouteWrapper><CRM_Leads /></RouteWrapper>} />
             <Route path="leads/create"        element={<RouteWrapper><CRM_LeadCreate /></RouteWrapper>} />
+            <Route path="leads/allocate/:id"  element={<RouteWrapper><CRM_LeadAllocate /></RouteWrapper>} />  {/* ← CHANGED ORDER & PATH */}
             <Route path="leads/:id/edit"      element={<RouteWrapper><CRM_LeadEdit /></RouteWrapper>} />
-            <Route path="leads/:id/allocate"  element={<RouteWrapper><CRM_LeadAllocate /></RouteWrapper>} />  {/* ← NEW */}
             <Route path="leads/:id"           element={<RouteWrapper><CRM_LeadShow /></RouteWrapper>} />
 
             <Route path="enquiries"  element={<RouteWrapper><CRM_Enquiries /></RouteWrapper>} />

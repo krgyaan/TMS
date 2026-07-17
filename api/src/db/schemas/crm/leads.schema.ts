@@ -25,7 +25,9 @@ export const leads = pgTable("leads", {
     team: varchar("team", { length: 255 }),
     bdPerson: integer("bd_person"),
     allocatedTe: bigint("allocated_te", { mode: "number" }),
-    allocationNotes: text("allocation_notes"),          // ← NEW
+    allocatedBy: bigint("allocated_by", { mode: "number" }),          
+    allocationNotes: text("allocation_notes"),
+    allocatedAt: timestamp("allocated_at", { withTimezone: true }),
     pointsDiscussed: text("points_discussed"),
     veResponsibility: text("ve_responsibility"),
     mailFollowupCount: integer("mail_followup_count").default(0),
@@ -42,9 +44,7 @@ export const leads = pgTable("leads", {
     leadPriority: varchar("lead_priority", { length: 50 }),
     recentFollowUp: recentFollowUpEnum("recent_follow_up"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-        .defaultNow()
-        .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type Lead = typeof leads.$inferSelect;
