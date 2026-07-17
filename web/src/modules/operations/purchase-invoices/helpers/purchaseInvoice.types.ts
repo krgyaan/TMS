@@ -11,6 +11,7 @@ export interface PurchaseInvoiceRow {
     invoiceFile?: string;
     purchaseOrderId?: number;
     poNumber?: string;
+    total: number;
     createdAt: string;
 }
 

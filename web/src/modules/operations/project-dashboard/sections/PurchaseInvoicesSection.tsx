@@ -103,6 +103,17 @@ export const PurchaseInvoicesSection: React.FC<PurchaseInvoicesSectionProps> = (
             valueFormatter: (p: ValueFormatterParams<PurchaseInvoiceRow>) => formatINR(p.value),
         },
         {
+            field: "total",
+            headerName: "Amount",
+            sortable: true,
+            cellRenderer: (p: ValueFormatterParams<PurchaseInvoiceRow>) => {
+                console.log(Number(p?.data?.valuePreGst || 0) + Number(p?.data?.gstAmount || 0));
+                
+                const total = Number(p?.data?.valuePreGst || 0) + Number(p?.data?.gstAmount || 0);
+                return <span>{formatINR(total)}</span>;
+            }
+        },
+        {
             field: "invoiceDate",
             headerName: "Invoice Date",
             sortable: true,
