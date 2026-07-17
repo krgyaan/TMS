@@ -10,12 +10,13 @@ import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
+import { useProjectOverview, useProjectPurchaseOrders } from "@/hooks/api/useProjectDashboard";
 import { useCreatePurchaseInvoice, useNextPINumber } from "@/hooks/api/usePurchaseInvoices";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Calendar, Hash, Loader2 } from "lucide-react";
+import { PoDetailsCard } from "@/modules/operations/payment-requests/components/PoDetailsCard";
+import { ArrowLeft, Calendar, Hash, Loader2, ShoppingCart } from "lucide-react";
 import { useForm } from "react-hook-form";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { formatDateForInput, mapPurchaseInvoiceFormToCreateDTO } from "./helpers/purchaseInvoice.mapper";
 import { purchaseInvoiceFormSchema, type PurchaseInvoiceFormValues } from "./helpers/purchaseInvoice.schema";
@@ -30,6 +31,7 @@ const BUDGET_CATEGORIES = [
 ];
 
 const defaultFormValues: PurchaseInvoiceFormValues = {
+    selectedPoId: '',
     category: "",
     partyName: "",
     valuePreGst: null,
@@ -42,15 +44,29 @@ export default function CreatePurchaseInvoicePage() {
     const navigate = useNavigate();
     const { projectId: projectIdParam } = useParams<{ projectId: string }>();
     const projectId = Number(projectIdParam);
+    const [searchParams] = useSearchParams();
+    const poIdParam = searchParams.get("poId");
 
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
     const projectName = overview?.project?.projectName;
     const { data: nextPINumber, isLoading: isLoadingPINumber } = useNextPINumber(projectName);
+    const { data: poData } = useProjectPurchaseOrders(projectId);
+
+    const poOptions = (poData?.purchaseOrders || []).map((po: any) => ({
+        id: String(po.id),
+        name: `${po.poNumber} - ${po.sellerName}`,
+    }));
 
     const form = useForm<PurchaseInvoiceFormValues>({
         resolver: zodResolver(purchaseInvoiceFormSchema) as any,
-        defaultValues: defaultFormValues,
+        defaultValues: {
+            ...defaultFormValues,
+            selectedPoId: poIdParam || "",
+        },
     });
+
+    const selectedPoId = form.watch("selectedPoId");
+    const selectedPo = (poData?.purchaseOrders || []).find((po: any) => String(po.id) === selectedPoId);
 
     const createPIMutation = useCreatePurchaseInvoice();
 
@@ -133,6 +149,24 @@ export default function CreatePurchaseInvoicePage() {
                             />
                         </div>
 
+                        <div className="border rounded-lg border-dashed p-4 space-y-4">
+                            <h3 className="text-sm font-semibold flex items-center gap-2">
+                                <ShoppingCart className="h-4 w-4" />
+                                Link to Purchase Order (Optional)
+                            </h3>
+                            <div className="max-w-md">
+                                <SelectField
+                                    control={form.control}
+                                    name="selectedPoId"
+                                    label="Select PO"
+                                    options={poOptions}
+                                    placeholder="Choose a PO..."
+                                />
+                            </div>
+                            {selectedPo && (
+                                <PoDetailsCard po={selectedPo} />
+                            )}
+                        </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>

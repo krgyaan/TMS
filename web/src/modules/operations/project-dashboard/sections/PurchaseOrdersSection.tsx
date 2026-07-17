@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Edit, Eye, History, Plus } from "lucide-react";
+import { Edit, Eye, FileText, History, Plus } from "lucide-react";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import DataTable from "@/components/ui/data-table";
@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { getShortId } from "@/lib/id-utils";
 import { useProjectPurchaseOrders } from "@/hooks/api/useProjectDashboard";
 import { Button } from "@/components/ui/button";
 import type { PurchaseOrderRow } from "../helpers/projectDashboard.types";
@@ -32,7 +33,12 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
     const poActions: ActionItem<PurchaseOrderRow>[] = useMemo(() => [
         {
             label: "Raise Payment",
-            onClick: (row) => console.log("Raise payment for", row.id),
+            onClick: (row) => navigate(paths.operations.raiseProjectPaymentRequestForm(projectId!, row.id)),
+        },
+        {
+            label: "Upload Invoice",
+            icon: <FileText className="h-4 w-4" />,
+            onClick: (row) => navigate(paths.operations.raiseProjectPurchaseInvoiceForm(projectId!, row.id)),
         },
         {
             label: "View Details",
@@ -63,7 +69,7 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <span>{p.value || "-"}</span>
+                            <span>{getShortId(p.value)}</span>
                         </TooltipTrigger>
                         <TooltipContent>{p.value}</TooltipContent>
                     </Tooltip>
@@ -149,6 +155,35 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
             ),
         },
         {
+            field: "totalPiAmount",
+            headerName: "Invoiced",
+            sortable: true,
+            valueFormatter: (p: ValueFormatterParams<PurchaseOrderRow>) => formatINR(p.value || 0),
+            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => (
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span className="truncate block">{formatINR(p.value || 0)}</span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="start">
+                            <p className="text-xs">{p.data?.totalPiCount || 0} invoice(s)</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            ),
+        },
+        {
+            headerName: "Bal to Inv",
+            sortable: false,
+            valueGetter: (p: any) => {
+                const po = p.data as PurchaseOrderRow;
+                const cap = po.amountAfterTds ? Number(po.amountAfterTds) : Number(po.grandTotal || 0);
+                return cap - Number(po.totalPiAmount || 0);
+            },
+            valueFormatter: (p: ValueFormatterParams) => formatINR(p.value),
+            cellStyle: (p: any) => p.value <= 0 ? { color: "var(--color-destructive)" } : undefined,
+        },
+        {
             field: "poRaisedBy",
             headerName: "PO Raised By",
             sortable: true,
@@ -207,7 +242,7 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
                     onGridReady={(params) => setPoGridApi(params.api)}
                     gridOptions={{
                         pagination: true,
-                        paginationPageSize: 5,
+                        paginationPageSize: 10,
                         domLayout: 'autoHeight',
                     }}
                 />

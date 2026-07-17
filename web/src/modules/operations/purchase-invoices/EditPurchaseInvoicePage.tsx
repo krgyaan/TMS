@@ -10,10 +10,11 @@ import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
+import { useProjectOverview, useProjectPurchaseOrders } from "@/hooks/api/useProjectDashboard";
 import { usePurchaseInvoiceDetails, useUpdatePurchaseInvoice } from "@/hooks/api/usePurchaseInvoices";
+import { PoDetailsCard } from "@/modules/operations/payment-requests/components/PoDetailsCard";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Calendar, Info, Loader2 } from "lucide-react";
+import { ArrowLeft, Calendar, Info, Loader2, ShoppingCart } from "lucide-react";
 import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
@@ -38,7 +39,16 @@ export default function EditPurchaseInvoicePage() {
 
     const { data: overview } = useProjectOverview(projectId);
     const { data: invoice, isLoading } = usePurchaseInvoiceDetails(piId);
+    const { data: poData } = useProjectPurchaseOrders(projectId);
     const updateMutation = useUpdatePurchaseInvoice();
+
+    const poOptions = (poData?.purchaseOrders || []).map((po: any) => ({
+        id: String(po.id),
+        name: `${po.poNumber} - ${po.sellerName}`,
+    }));
+
+    const selectedPoId = form.watch("selectedPoId");
+    const selectedPo = (poData?.purchaseOrders || []).find((po: any) => String(po.id) === selectedPoId);
 
     const form = useForm<PurchaseInvoiceFormValues>({
         resolver: zodResolver(purchaseInvoiceFormSchema) as any,
@@ -49,6 +59,7 @@ export default function EditPurchaseInvoicePage() {
             gstAmount: null,
             invoiceDate: "",
             invoiceFile: [],
+            selectedPoId: "",
         },
     });
 
@@ -61,6 +72,7 @@ export default function EditPurchaseInvoicePage() {
                 gstAmount: Number(invoice.gstAmount) || null,
                 invoiceDate: invoice.invoiceDate || "",
                 invoiceFile: invoice.invoiceFile ? [invoice.invoiceFile] : [],
+                selectedPoId: invoice.purchaseOrderId ? String(invoice.purchaseOrderId) : "",
             });
         }
     }, [invoice, form]);
@@ -119,6 +131,25 @@ export default function EditPurchaseInvoicePage() {
                                 options={BUDGET_CATEGORIES}
                                 placeholder="Select category..."
                             />
+                        </div>
+
+                        <div className="border rounded-lg border-dashed p-4 space-y-4">
+                            <h3 className="text-sm font-semibold flex items-center gap-2">
+                                <ShoppingCart className="h-4 w-4" />
+                                Link to Purchase Order (Optional)
+                            </h3>
+                            <div className="max-w-md">
+                                <SelectField
+                                    control={form.control}
+                                    name="selectedPoId"
+                                    label="Select PO"
+                                    options={poOptions}
+                                    placeholder="Choose a PO..."
+                                />
+                            </div>
+                            {selectedPo && (
+                                <PoDetailsCard po={selectedPo} />
+                            )}
                         </div>
 
                         <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>

@@ -3,10 +3,12 @@ import { createActionColumnRenderer } from "@/components/data-grid/renderers/Act
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectPaymentRequests } from "@/hooks/api/useProjectPaymentRequests";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { getShortId } from "@/lib/id-utils";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
 import { PAYMENT_AGAINST_LABELS, PaymentRequestDetailDialog } from "@/modules/shared/payment-requests/components/PaymentRequestDetailDialog";
 import type { ColDef, GridApi, ValueFormatterParams } from "ag-grid-community";
@@ -54,7 +56,14 @@ export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
             width: 250,
             flex: 1,
             cellRenderer: (p: CustomCellRendererProps<PaymentRequestRow>) => (
-                <span className="font-mono text-sm font-medium">{p.value || "-"}</span>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span className="font-mono text-sm font-medium">{getShortId(p.value)}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>{p.value}</TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
             ),
         },
         {
@@ -154,7 +163,7 @@ export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
                         onGridReady={(params) => setPrGridApi(params.api)}
                         gridOptions={{
                             pagination: true,
-                            paginationPageSize: 5,
+                            paginationPageSize: 10,
                             domLayout: 'autoHeight',
                         }}
                     />

@@ -15,6 +15,7 @@ import { useAllPaymentRequests, useUpdatePaymentRequestStatus } from "@/hooks/ap
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { getShortId } from "@/lib/id-utils";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
@@ -155,7 +156,7 @@ const PaymentRequestListPage: React.FC = () => {
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <span className="font-mono text-sm font-medium">{p.value || "-"}</span>
+                            <span className="font-mono text-sm font-medium">{getShortId(p.value)}</span>
                         </TooltipTrigger>
                         <TooltipContent>{p.value}</TooltipContent>
                     </Tooltip>

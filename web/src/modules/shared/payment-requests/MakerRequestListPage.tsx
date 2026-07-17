@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
@@ -18,6 +19,7 @@ import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-g
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { getShortId } from "@/lib/id-utils";
 import { useMakerRequests, useMakerRequestDetails, useUpdateMakerRequestStatus } from "@/hooks/api/useMakerRequests";
 import { tenderFilesService } from "@/services/api/tender-files.service";
 import type { MakerRequestRow } from "@/modules/operations/maker-requests/helpers/makerRequest.types";
@@ -101,7 +103,16 @@ const MakerRequestListPage: React.FC = () => {
     ], [handleView, handleMakerDone, handlePaymentDone, handleReject]);
 
     const mrColumns = useMemo<ColDef<MakerRequestRow>[]>(() => [
-        { field: "requestNo", headerName: "Request No", sortable: true, filter: true, width: 260, flex: 1 },
+        { field: "requestNo", headerName: "Request No", sortable: true, filter: true, width: 260, flex: 1, cellRenderer: (p: CustomCellRendererProps<MakerRequestRow>) => (
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <span className="font-mono text-sm font-medium">{getShortId(p.value)}</span>
+                    </TooltipTrigger>
+                    <TooltipContent>{p.value}</TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        ) },
         { field: "partyName", headerName: "Party Name", sortable: true, filter: true, flex: 1, minWidth: 150 },
         { field: "amount", headerName: "Amount", sortable: true, valueFormatter: (p: ValueFormatterParams<MakerRequestRow>) => formatINR(p.value) },
         { field: "category", headerName: "Category", sortable: true, filter: true, width: 140 },

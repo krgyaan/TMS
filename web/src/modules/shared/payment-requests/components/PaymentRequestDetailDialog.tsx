@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getShortId } from "@/lib/id-utils";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { usePaymentRequestDetails } from "@/hooks/api/useProjectPaymentRequests";
@@ -49,7 +51,14 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
             <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-4">
                 <div className="col-span-2">
                     <Label className="text-muted-foreground text-xs">Request No</Label>
-                    <p className="font-mono font-medium">{detail.requestNo}</p>
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <p className="font-mono font-medium">{getShortId(detail.requestNo)}</p>
+                            </TooltipTrigger>
+                            <TooltipContent>{detail.requestNo}</TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                 </div>
                 <div>
                     <Label className="text-muted-foreground text-xs">Project</Label>
@@ -85,7 +94,14 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                         <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">PO Number:</span>
-                                <span className="font-medium">{detail.poNumber || `#${detail.purchaseOrderId}`}</span>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="font-medium">{getShortId(detail.poNumber) || `#${detail.purchaseOrderId}`}</span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>{detail.poNumber}</TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Total (Pre-GST):</span>
@@ -154,7 +170,14 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                         <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">VWO Number:</span>
-                                <span className="font-medium">{detail.vwoNumber || `#${detail.vendorWorkOrderId}`}</span>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="font-medium">{getShortId(detail.vwoNumber) || `#${detail.vendorWorkOrderId}`}</span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>{detail.vwoNumber}</TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Total (Pre-GST):</span>
