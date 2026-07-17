@@ -9,6 +9,7 @@ import { DRIZZLE } from "@/db/database.module";
 import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
 import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
 
+import { paymentRequests, purchaseInvoices } from "@/db/schemas/operations";
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
 import { projects } from "@/db/schemas/operations/projects.schema";
 import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
@@ -587,7 +588,53 @@ export class ProjectDashboardService {
             }
         })
 
-        return { ...po, products: enrichedProducts, total };
+        let raisedByName: string | null = null;
+        if (po.poRaisedBy) {
+            const [raisedByUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.id, po.poRaisedBy));
+            raisedByName = raisedByUser?.name ?? null;
+        }
+
+        const paymentRequestsData = await this.db
+            .select({
+                id: paymentRequests.id,
+                requestNo: paymentRequests.requestNo,
+                partyName: paymentRequests.partyName,
+                amount: paymentRequests.amount,
+                status: paymentRequests.status,
+                requestedByName: users.name,
+                createdAt: paymentRequests.createdAt,
+            })
+            .from(paymentRequests)
+            .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
+            .where(eq(paymentRequests.purchaseOrderId, id))
+            .orderBy(desc(paymentRequests.createdAt));
+
+        const purchaseInvoicesData = await this.db
+            .select({
+                id: purchaseInvoices.id,
+                invoiceNo: purchaseInvoices.invoiceNo,
+                valuePreGst: purchaseInvoices.valuePreGst,
+                gstAmount: purchaseInvoices.gstAmount,
+                invoiceDate: purchaseInvoices.invoiceDate,
+                invoiceFile: purchaseInvoices.invoiceFile,
+                uploadedByName: users.name,
+            })
+            .from(purchaseInvoices)
+            .leftJoin(users, eq(purchaseInvoices.uploadedBy, users.id))
+            .where(eq(purchaseInvoices.purchaseOrderId, id))
+            .orderBy(desc(purchaseInvoices.createdAt));
+
+        return {
+            ...po,
+            products: enrichedProducts,
+            total,
+            raisedByName,
+            paymentRequests: paymentRequestsData,
+            purchaseInvoices: purchaseInvoicesData,
+        };
     }
 
     async getPurchaseOrderPdf(id: number, version?: string): Promise<{ path: string; filename: string }> {
