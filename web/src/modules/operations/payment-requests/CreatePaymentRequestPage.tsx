@@ -12,8 +12,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useBeneficiaries, useCreateBeneficiary, useCreatePaymentRequest, useNextPRNumber } from "@/hooks/api/useProjectPaymentRequests";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { formatINR } from "@/hooks/useINRFormatter";
 import { ArrowLeft, Building2, Hash, Landmark, Loader2, Plus, UserPlus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -52,6 +53,11 @@ export default function CreatePaymentRequestPage() {
     const [newBeneficiary, setNewBeneficiary] = useState({ name: "", accountNumber: "", ifsc: "", bankName: "" });
 
     const preSelectedPoId = poIdParam ? Number(poIdParam) : undefined;
+    const [remainingAmount, setRemainingAmount] = useState(0);
+
+    const onRemainingChange = useCallback((remaining: number) => {
+        setRemainingAmount(remaining);
+    }, []);
 
     const form = useForm<PaymentRequestFormValues>({
         resolver: zodResolver(paymentRequestFormSchema) as any,
@@ -95,6 +101,11 @@ export default function CreatePaymentRequestPage() {
 
     const handleSubmit = async (values: PaymentRequestFormValues) => {
         try {
+            if (values.paymentAgainst === "po" && values.amount != null && remainingAmount > 0 && values.amount > remainingAmount) {
+                form.setError("amount", { message: `Amount exceeds remaining PO balance (${formatINR(remainingAmount)})` });
+                return;
+            }
+
             const prData = mapPaymentRequestFormToCreateDTO(values, projectId, projectName);
 
             const result = await createPRMutation.mutateAsync(prData);
@@ -269,15 +280,22 @@ export default function CreatePaymentRequestPage() {
                         </div>
 
                         <div className="border rounded-lg border-dashed p-4 space-y-4">
-                            <PaymentAgainstField control={form.control} projectId={projectId} preSelectedPoId={preSelectedPoId} />
+                            <PaymentAgainstField control={form.control} projectId={projectId} preSelectedPoId={preSelectedPoId} onRemainingChange={onRemainingChange} />
                         </div>
 
-                        <div className="flex items-end justify-end">
+                        <div className="flex items-end justify-between">
+                            <div>
+                                {remainingAmount <= 0 && poIdParam && (
+                                    <p className="text-destructive text-sm font-medium">
+                                        This PO has no remaining balance. Payment request cannot be created.
+                                    </p>
+                                )}
+                            </div>
                             <div className="flex items-center gap-4">
                                 <Button type="button" variant="outline" onClick={() => navigate(-1)}>
                                     Cancel
                                 </Button>
-                                <Button type="submit" className="min-w-[160px]" disabled={createPRMutation.isPending}>
+                                <Button type="submit" className="min-w-[160px]" disabled={createPRMutation.isPending || (remainingAmount <= 0 && !!poIdParam)}>
                                     {createPRMutation.isPending ? (
                                         <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating...</>
                                     ) : (
