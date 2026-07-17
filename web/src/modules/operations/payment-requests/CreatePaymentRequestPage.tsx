@@ -15,7 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Building2, Hash, Landmark, Loader2, Plus, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { PaymentAgainstField } from "./components/PaymentAgainstField";
 import { mapPaymentRequestFormToCreateDTO } from "./helpers/paymentRequest.mapper";
@@ -39,6 +39,8 @@ export default function CreatePaymentRequestPage() {
     const navigate = useNavigate();
     const { projectId: projectIdParam } = useParams<{ projectId: string }>();
     const projectId = Number(projectIdParam);
+    const [searchParams] = useSearchParams();
+    const poIdParam = searchParams.get("poId");
 
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
     const projectName = overview?.project?.projectName;
@@ -49,9 +51,15 @@ export default function CreatePaymentRequestPage() {
     const [isAddBeneficiaryOpen, setIsAddBeneficiaryOpen] = useState(false);
     const [newBeneficiary, setNewBeneficiary] = useState({ name: "", accountNumber: "", ifsc: "", bankName: "" });
 
+    const preSelectedPoId = poIdParam ? Number(poIdParam) : undefined;
+
     const form = useForm<PaymentRequestFormValues>({
         resolver: zodResolver(paymentRequestFormSchema) as any,
-        defaultValues: defaultFormValues,
+        defaultValues: {
+            ...defaultFormValues,
+            paymentAgainst: poIdParam ? "po" : "",
+            selectedPoId: poIdParam || "",
+        },
     });
 
     const selectedBeneficiaryId = form.watch("selectedBeneficiaryId");
@@ -261,7 +269,7 @@ export default function CreatePaymentRequestPage() {
                         </div>
 
                         <div className="border rounded-lg border-dashed p-4 space-y-4">
-                            <PaymentAgainstField control={form.control} projectId={projectId} />
+                            <PaymentAgainstField control={form.control} projectId={projectId} preSelectedPoId={preSelectedPoId} />
                         </div>
 
                         <div className="flex items-end justify-end">

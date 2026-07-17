@@ -13,24 +13,36 @@ const PAYMENT_AGAINST_OPTIONS = paymentAgainstOptions.map(o => ({ id: o.value, n
 interface PaymentAgainstFieldProps {
     control: Control<any>;
     projectId: number;
+    preSelectedPoId?: number;
 }
 
-export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ control, projectId }) => {
-    const { watch } = useFormContext();
+export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ control, projectId, preSelectedPoId }) => {
+    const { watch, setValue } = useFormContext();
     const paymentAgainst = watch("paymentAgainst");
 
     const { data: poData } = useProjectPurchaseOrders(projectId);
     const { data: vwoData } = useProjectVendorWorkOrders(projectId);
 
-    const poOptions = (poData?.purchaseOrders || []).map((po: any) => ({
-        id: String(po.id),
-        name: `${po.poNumber} - ${po.sellerName}`,
-    }));
+    React.useEffect(() => {
+        if (preSelectedPoId) {
+            setValue("paymentAgainst", "po");
+            setValue("selectedPoId", String(preSelectedPoId));
+        }
+    }, [preSelectedPoId, setValue]);
+
+    const poOptions = (poData?.purchaseOrders || [])
+        .filter((po: any) => !preSelectedPoId || String(po.id) === String(preSelectedPoId))
+        .map((po: any) => ({
+            id: String(po.id),
+            name: `${po.poNumber} - ${po.sellerName}`,
+        }));
 
     const vwoOptions = (vwoData || []).map((vwo: any) => ({
         id: String(vwo.id),
         name: `${vwo.woNumber} - ${vwo.sellerName}`,
     }));
+
+    const isPoPreSelected = !!preSelectedPoId;
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
@@ -40,6 +52,7 @@ export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ contro
                 label="Payment Against"
                 options={PAYMENT_AGAINST_OPTIONS}
                 placeholder="Select payment type..."
+                disabled={isPoPreSelected}
             />
 
             {paymentAgainst === "po" && (
@@ -49,6 +62,7 @@ export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ contro
                     label="Select PO"
                     options={poOptions}
                     placeholder="Choose a PO..."
+                    disabled={isPoPreSelected}
                 />
             )}
 

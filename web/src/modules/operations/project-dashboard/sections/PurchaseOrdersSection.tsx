@@ -32,7 +32,7 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
     const poActions: ActionItem<PurchaseOrderRow>[] = useMemo(() => [
         {
             label: "Raise Payment",
-            onClick: (row) => console.log("Raise payment for", row.id),
+            onClick: (row) => navigate(paths.operations.raiseProjectPaymentRequestForm(projectId!, row.id)),
         },
         {
             label: "View Details",
