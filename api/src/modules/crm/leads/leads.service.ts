@@ -8,13 +8,14 @@ import { teams } from '@db/schemas/master/teams.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { and, asc, desc, eq, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import type { CreateLeadDto, UpdateLeadDto, AllocateLeadDto } from './dto/lead.dto';
+import type { CreateLeadDto, UpdateLeadDto, AllocateLeadDto, DeleteLeadDto } from './dto/lead.dto';
 
 export type LeadListFilters = {
     page?: number;
     limit?: number;
     search?: string;
     priority?: string;
+    status?: string;        // ← NEW: for 'disqualified' tab
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 };
@@ -25,12 +26,12 @@ export type LeadWithNames = Lead & {
     teamName?: string | null;
     bdPersonName?: string | null;
     allocatedTeName?: string | null;
-    allocatedByName?: string | null;    // ← NEW
+    allocatedByName?: string | null;
 };
 
 const bdUser = alias(users, 'bd_user');
 const teUser = alias(users, 'te_user');
-const allocatedByUser = alias(users, 'allocated_by_user');   // ← NEW
+const allocatedByUser = alias(users, 'allocated_by_user');
 
 @Injectable()
 export class LeadsService {
@@ -48,7 +49,7 @@ export class LeadsService {
             teamName: teams.name,
             bdPersonName: bdUser.name,
             allocatedTeName: teUser.name,
-            allocatedByName: allocatedByUser.name,              // ← NEW
+            allocatedByName: allocatedByUser.name,
         };
     }
 
@@ -61,7 +62,7 @@ export class LeadsService {
             .leftJoin(teams, eq(teams.id, sql`CAST(${leads.team} AS BIGINT)`))
             .leftJoin(bdUser, eq(bdUser.id, leads.bdPerson))
             .leftJoin(teUser, eq(teUser.id, leads.allocatedTe))
-            .leftJoin(allocatedByUser, eq(allocatedByUser.id, leads.allocatedBy)); // ← NEW
+            .leftJoin(allocatedByUser, eq(allocatedByUser.id, leads.allocatedBy));
     }
 
     private mapJoinedRow = (row: {
@@ -71,7 +72,7 @@ export class LeadsService {
         teamName: string | null;
         bdPersonName: string | null;
         allocatedTeName: string | null;
-        allocatedByName: string | null;                         // ← NEW
+        allocatedByName: string | null;
     }): LeadWithNames => ({
         ...row.leads,
         industryName: row.industryName ?? null,
@@ -79,7 +80,7 @@ export class LeadsService {
         teamName: row.teamName ?? null,
         bdPersonName: row.bdPersonName ?? null,
         allocatedTeName: row.allocatedTeName ?? null,
-        allocatedByName: row.allocatedByName ?? null,           // ← NEW
+        allocatedByName: row.allocatedByName ?? null,
     });
 
     // ─── Public Methods ───────────────────────────────────────────────
@@ -94,6 +95,16 @@ export class LeadsService {
 
         const conditions: SQL[] = [];
 
+        // ── Status filter (disqualified tab) ──────────────────────────
+        if (filters?.status === 'disqualified') {
+            // Show only soft-deleted leads
+            conditions.push(eq(leads.isDeleted, true));
+        } else {
+            // All other tabs: only show non-deleted leads
+            conditions.push(eq(leads.isDeleted, false));
+        }
+
+        // ── Search filter ─────────────────────────────────────────────
         if (filters?.search) {
             const searchStr = `%${filters.search}%`;
             conditions.push(
@@ -105,7 +116,8 @@ export class LeadsService {
                 )`
             );
         }
-        
+
+        // ── Priority filter ───────────────────────────────────────────
         if (filters?.priority) {
             conditions.push(eq(leads.leadPriority, filters.priority));
         }
@@ -195,8 +207,8 @@ export class LeadsService {
             .set({
                 allocatedTe: data.allocatedTe,
                 allocationNotes: data.allocationNotes ?? null,
-                allocatedBy: allocatedBy,                     
-                allocatedAt: new Date(),                       
+                allocatedBy: allocatedBy,
+                allocatedAt: new Date(),
                 updatedAt: new Date(),
             })
             .where(eq(leads.id, id))
@@ -206,8 +218,19 @@ export class LeadsService {
         return updated;
     }
 
-    async delete(id: number): Promise<void> {
+    // ─── Soft Delete with reason ──────────────────────────────────────
+
+    async delete(id: number, data?: DeleteLeadDto): Promise<void> {
         await this.findById(id);
-        await this.db.delete(leads).where(eq(leads.id, id));
+
+        await this.db
+            .update(leads)
+            .set({
+                isDeleted: true,
+                deleteReason: data?.reason ?? null,
+                deletedAt: new Date(),
+                updatedAt: new Date(),
+            })
+            .where(eq(leads.id, id));
     }
 }

@@ -19,13 +19,12 @@ export const leadsKey = {
     detail: (id: number) => [...leadsKey.details(), id] as const,
 };
 
-// ─── Pagination param type now includes priority ───────────────────────────
-
 type LeadsPaginationParams = {
     page: number;
     limit: number;
     search?: string;
-    priority?: string;   // ← ADD THIS
+    priority?: string;
+    status?: string;    // ← NEW
 };
 
 export const useLeads = (
@@ -36,7 +35,8 @@ export const useLeads = (
         page: pagination.page,
         limit: pagination.limit,
         search: pagination.search,
-        priority: pagination.priority,   // ← ADD THIS
+        priority: pagination.priority,
+        status: pagination.status,      // ← NEW
         ...(sort?.sortBy    && { sortBy: sort.sortBy }),
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
     };
@@ -102,10 +102,12 @@ export const useAllocateLead = () => {
 export const useDeleteLead = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (id: number) => leadsService.remove(id),
+        // ← UPDATED: accepts reason
+        mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
+            leadsService.remove(id, reason),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: leadsKey.lists() });
-            toast.success('Lead deleted successfully');
+            toast.success('Lead disqualified successfully');
         },
         onError: showErrorToast,
     });

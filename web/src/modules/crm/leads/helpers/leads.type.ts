@@ -13,9 +13,9 @@ export interface Lead {
     team: string | null;
     bdPerson: number | null;
     allocatedTe: number | null;
-    allocatedBy: number | null;         
+    allocatedBy: number | null;
     allocationNotes: string | null;
-    allocatedAt: string | null;       
+    allocatedAt: string | null;
     pointsDiscussed: string | null;
     veResponsibility: string | null;
     mailFollowupCount: number | null;
@@ -31,6 +31,9 @@ export interface Lead {
     lastWhatsappSentAt: string | null;
     leadPriority: string | null;
     recentFollowUp: 'visit' | 'whatsapp' | 'letter' | 'mail' | 'call' | null;
+    isDeleted: boolean;                 // ← NEW
+    deleteReason: string | null;        // ← NEW
+    deletedAt: string | null;           // ← NEW
     createdAt: string;
     updatedAt: string;
 }
@@ -41,7 +44,7 @@ export interface LeadWithNames extends Lead {
     teamName?: string | null;
     bdPersonName?: string | null;
     allocatedTeName?: string | null;
-    allocatedByName?: string | null;    // ← NEW
+    allocatedByName?: string | null;
 }
 
 export interface CreateLeadRequest {
@@ -70,7 +73,6 @@ export interface UpdateLeadRequest extends Partial<CreateLeadRequest> {}
 export interface AllocateLeadRequest {
     allocatedTe: number;
     allocationNotes?: string | null;
-    // allocatedBy is NOT here — backend gets it from JWT
 }
 
 export interface LeadListParams {
@@ -78,6 +80,7 @@ export interface LeadListParams {
     limit?: number;
     search?: string;
     priority?: string;
+    status?: string;            // ← NEW
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 }

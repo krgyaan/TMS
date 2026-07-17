@@ -33,10 +33,10 @@ export function LeadDeleteModal({
 
     const handleConfirm = async () => {
         if (!leadId) return;
-
         setIsDeleting(true);
         try {
-            await onConfirm(leadId, reason);
+            // ← reason is now properly passed and saved
+            await onConfirm(leadId, reason || undefined);
             handleClose();
         } catch (error) {
             console.error("Delete failed:", error);
@@ -56,10 +56,10 @@ export function LeadDeleteModal({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-red-600">
                         <AlertTriangle className="h-5 w-5" />
-                        Delete Lead
+                        Disqualify Lead
                     </DialogTitle>
                     <DialogDescription>
-                        This action cannot be undone. The lead will be permanently deleted from the system.
+                        This lead will be marked as disqualified and moved to the Disqualified tab.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -67,17 +67,19 @@ export function LeadDeleteModal({
                     <Alert variant="destructive">
                         <AlertTriangle className="h-4 w-4" />
                         <AlertDescription>
-                            You are about to delete the lead: <strong>{leadName || "this lead"}</strong>
+                            You are about to disqualify:{" "}
+                            <strong>{leadName || "this lead"}</strong>
                         </AlertDescription>
                     </Alert>
 
                     <div className="space-y-2">
                         <Label htmlFor="reason">
-                            Reason for deletion <span className="text-muted-foreground">(Optional)</span>
+                            Reason for disqualification{" "}
+                            <span className="text-muted-foreground">(Optional)</span>
                         </Label>
                         <Textarea
                             id="reason"
-                            placeholder="Enter the reason for deleting this lead..."
+                            placeholder="Enter the reason for disqualifying this lead..."
                             value={reason}
                             onChange={(e) => setReason(e.target.value)}
                             className="min-h-[100px]"
@@ -104,10 +106,10 @@ export function LeadDeleteModal({
                         {isDeleting ? (
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Deleting...
+                                Processing...
                             </>
                         ) : (
-                            "Delete Lead"
+                            "Disqualify Lead"
                         )}
                     </Button>
                 </DialogFooter>

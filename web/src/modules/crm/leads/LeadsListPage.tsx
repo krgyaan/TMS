@@ -67,29 +67,20 @@ const LeadListPage = () => {
         open: boolean;
         leadId: number | null;
         leadName?: string;
-    }>({
-        open: false,
-        leadId: null,
-    });
+    }>({ open: false, leadId: null });
 
     const [priorityModal, setPriorityModal] = useState<{
         open: boolean;
         leadId: number | null;
         leadName?: string;
         currentPriority?: string | null;
-    }>({
-        open: false,
-        leadId: null,
-    });
+    }>({ open: false, leadId: null });
 
     const [allocationModal, setAllocationModal] = useState<{
         open: boolean;
         leadId: number | null;
         leadName?: string;
-    }>({
-        open: false,
-        leadId: null,
-    });
+    }>({ open: false, leadId: null });
 
     // ── Priority Filter ───────────────────────────────────────────────
 
@@ -97,18 +88,17 @@ const LeadListPage = () => {
         return tab.charAt(0).toUpperCase() + tab.slice(1);
     };
 
-    // ── Fetch each tab count ──────────────────────────────────────────
-    // We fetch all three priorities to get counts for badges
+    // ── Fetch counts for badges ───────────────────────────────────────
 
     const { data: coldResponse } = useLeads({ page: 1, limit: 1, priority: 'Cold' });
     const { data: warmResponse } = useLeads({ page: 1, limit: 1, priority: 'Warm' });
-    const { data: hotResponse  } = useLeads({ page: 1, limit: 1, priority: 'Hot'  });
+    const { data: hotResponse }  = useLeads({ page: 1, limit: 1, priority: 'Hot'  });
 
     const coldCount = Array.isArray(coldResponse) ? coldResponse.length : (coldResponse?.meta?.total ?? 0);
     const warmCount = Array.isArray(warmResponse) ? warmResponse.length : (warmResponse?.meta?.total ?? 0);
     const hotCount  = Array.isArray(hotResponse)  ? hotResponse.length  : (hotResponse?.meta?.total  ?? 0);
 
-    // ── Tabs Config with counts ───────────────────────────────────────
+    // ── Tabs Config ───────────────────────────────────────────────────
 
     const tabsConfig = useMemo(() => [
         { key: 'cold' as LeadPriorityTab, name: 'Cold', count: coldCount },
@@ -116,7 +106,7 @@ const LeadListPage = () => {
         { key: 'hot'  as LeadPriorityTab, name: 'Hot',  count: hotCount  },
     ], [coldCount, warmCount, hotCount]);
 
-    // ── Data Fetching ─────────────────────────────────────────────────
+    // ── Main Data Fetch ───────────────────────────────────────────────
 
     const { data: apiResponse, isLoading } = useLeads(
         {
@@ -140,7 +130,7 @@ const LeadListPage = () => {
 
     const handleDeleteConfirm = async (leadId: number, reason?: string) => {
         try {
-            await deleteLead.mutateAsync(leadId);
+            await deleteLead.mutateAsync({ id: leadId, reason });
         } catch (error) {
             console.error("Delete failed:", error);
             throw error;
@@ -164,9 +154,7 @@ const LeadListPage = () => {
     const leadActions: ActionItem<LeadWithNames>[] = [
         {
             label: "Update Followup",
-            onClick: (row) => {
-                console.log("Update followup for lead:", row.id);
-            },
+            onClick: (row) => console.log("Update followup for lead:", row.id),
             icon: <Calendar className="h-4 w-4" />,
         },
         {
@@ -184,9 +172,7 @@ const LeadListPage = () => {
         {
             label: "Enquiry Received",
             className: "whitespace-nowrap",
-            onClick: (row) => {
-                console.log("Mark enquiry received for lead:", row.id);
-            },
+            onClick: (row) => console.log("Mark enquiry received for lead:", row.id),
             icon: <Mail className="h-4 w-4" />,
         },
         {
@@ -211,7 +197,7 @@ const LeadListPage = () => {
             icon: <UserPlus className="h-4 w-4" />,
         },
         {
-            label: "Delete",
+            label: "Disqualify",
             className: "text-red-600",
             onClick: (row) => {
                 setDeleteModal({
@@ -318,11 +304,7 @@ const LeadListPage = () => {
                     'Warm': 'text-yellow-600 font-semibold',
                     'Cold': 'text-blue-600 font-semibold',
                 };
-                return (
-                    <span className={colorMap[priority] || ''}>
-                        {priority}
-                    </span>
-                );
+                return <span className={colorMap[priority] || ''}>{priority}</span>;
             },
         },
         {
@@ -332,9 +314,9 @@ const LeadListPage = () => {
             filter: true,
             cellRenderer: (params: any) => {
                 const status = params.value;
-                return status ? (
-                    <span className="capitalize">{status}</span>
-                ) : "-";
+                return status
+                    ? <span className="capitalize">{status}</span>
+                    : "-";
             },
         },
         {
@@ -342,7 +324,7 @@ const LeadListPage = () => {
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer(leadActions),
-            pinned: "right",
+            pinned: "right" as const,
             width: 80,
         },
     ], []);
@@ -373,10 +355,10 @@ const LeadListPage = () => {
                     onValueChange={(value) => setActiveTab(value as LeadPriorityTab)}
                     className="flex flex-col w-full"
                 >
-                    {/* ── Single Row: Tabs (left) + Search (right) ──── */}
+                    {/* ── Single Row: Tabs (left) + Search (right) ── */}
                     <div className="flex items-center gap-4 px-6 pb-4">
 
-                        {/* Priority Tabs with Badge counts (Left) */}
+                        {/* Tabs with Badge counts */}
                         <TabsList>
                             {tabsConfig.map(tab => (
                                 <TabsTrigger
@@ -387,10 +369,7 @@ const LeadListPage = () => {
                                     <span className="font-semibold text-sm">
                                         {tab.name}
                                     </span>
-                                    <Badge
-                                        variant="secondary"
-                                        className="text-xs"
-                                    >
+                                    <Badge variant="secondary" className="text-xs">
                                         {tab.count}
                                     </Badge>
                                 </TabsTrigger>
@@ -412,7 +391,7 @@ const LeadListPage = () => {
                         </div>
                     </div>
 
-                    {/* ── Data Table per Tab ─────────────────────────── */}
+                    {/* ── Data Table per Tab ─────────────────────── */}
                     <div className="flex-1 min-h-0">
                         {tabsConfig.map(tab => (
                             <TabsContent
@@ -449,7 +428,7 @@ const LeadListPage = () => {
                 </Tabs>
             </CardContent>
 
-            {/* ── Modals ────────────────────────────────────────────── */}
+            {/* ── Modals ───────────────────────────────────────── */}
 
             <LeadDeleteModal
                 open={deleteModal.open}

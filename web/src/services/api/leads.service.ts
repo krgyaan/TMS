@@ -20,7 +20,8 @@ class LeadsService extends BaseApiService {
             if (params.page)      search.set('page', String(params.page));
             if (params.limit)     search.set('limit', String(params.limit));
             if (params.search)    search.set('search', params.search);
-             if (params.priority)  search.set('priority', params.priority);
+            if (params.priority)  search.set('priority', params.priority);
+            if (params.status)    search.set('status', params.status);
             if (params.sortBy)    search.set('sortBy', params.sortBy);
             if (params.sortOrder) search.set('sortOrder', params.sortOrder);
         }
@@ -40,13 +41,13 @@ class LeadsService extends BaseApiService {
         return this.patch<Lead>(`/${id}`, data);
     }
 
-    // ← NEW
     async allocate(id: number, data: AllocateLeadRequest): Promise<Lead> {
         return this.patch<Lead>(`/${id}/allocate`, data);
     }
 
-    async remove(id: number): Promise<void> {
-        return super.delete<void>(`/${id}`);
+    // ← UPDATED: use PATCH to /id/disqualify instead of DELETE with body
+    async remove(id: number, reason?: string): Promise<void> {
+        return this.patch<void>(`/${id}/disqualify`, { reason: reason ?? null });
     }
 }
 

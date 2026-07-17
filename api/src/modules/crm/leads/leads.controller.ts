@@ -1,5 +1,4 @@
 import {
-    Body,
     Controller,
     Delete,
     Get,
@@ -16,12 +15,14 @@ import {
     CreateLeadSchema,
     UpdateLeadSchema,
     AllocateLeadSchema,
+    DeleteLeadSchema,
 } from './dto/lead.dto';
 import { ValidatedBody } from '@/decorators/validated-body.decorator';
 import type {
     CreateLeadDto,
     UpdateLeadDto,
     AllocateLeadDto,
+    DeleteLeadDto,
 } from './dto/lead.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -35,7 +36,8 @@ export class LeadsController {
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('search') search?: string,
-        @Query('priority') priority?: string,  // ← ADD THIS
+        @Query('priority') priority?: string,
+        @Query('status') status?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: string,
     ) {
@@ -49,7 +51,8 @@ export class LeadsController {
             page: parseNumber(page),
             limit: parseNumber(limit),
             search,
-            priority,  // ← ADD THIS
+            priority,
+            status,
             sortBy,
             sortOrder: sortOrder as 'asc' | 'desc' | undefined,
         });
@@ -77,16 +80,26 @@ export class LeadsController {
         return this.leadsService.update(id, body);
     }
 
-    // ← UPDATED: pass user.sub as allocatedBy
     @Patch(':id/allocate')
     async allocate(
         @Param('id', ParseIntPipe) id: number,
         @ValidatedBody(AllocateLeadSchema) body: AllocateLeadDto,
-        @CurrentUser() user: ValidatedUser,                     // ← NEW
+        @CurrentUser() user: ValidatedUser,
     ) {
-        return this.leadsService.allocate(id, body, user.sub);  // ← PASS USER ID
+        return this.leadsService.allocate(id, body, user.sub);
     }
 
+    // ← CHANGED: from DELETE to PATCH /id/disqualify
+    @Patch(':id/disqualify')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    async disqualify(
+        @Param('id', ParseIntPipe) id: number,
+        @ValidatedBody(DeleteLeadSchema) body: DeleteLeadDto,
+    ) {
+        await this.leadsService.delete(id, body);
+    }
+
+    // ← Keep DELETE for actual hard delete if needed in future
     @Delete(':id')
     @HttpCode(HttpStatus.NO_CONTENT)
     async delete(@Param('id', ParseIntPipe) id: number) {

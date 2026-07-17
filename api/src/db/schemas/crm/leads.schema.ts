@@ -5,6 +5,7 @@ import {
     text, 
     integer, 
     timestamp,
+    boolean,
     pgEnum
 } from "drizzle-orm/pg-core";
 
@@ -25,7 +26,7 @@ export const leads = pgTable("leads", {
     team: varchar("team", { length: 255 }),
     bdPerson: integer("bd_person"),
     allocatedTe: bigint("allocated_te", { mode: "number" }),
-    allocatedBy: bigint("allocated_by", { mode: "number" }),          
+    allocatedBy: bigint("allocated_by", { mode: "number" }),
     allocationNotes: text("allocation_notes"),
     allocatedAt: timestamp("allocated_at", { withTimezone: true }),
     pointsDiscussed: text("points_discussed"),
@@ -43,6 +44,9 @@ export const leads = pgTable("leads", {
     lastWhatsappSentAt: timestamp("last_whatsapp_sent_at", { withTimezone: true }),
     leadPriority: varchar("lead_priority", { length: 50 }),
     recentFollowUp: recentFollowUpEnum("recent_follow_up"),
+    isDeleted: boolean("is_deleted").default(false).notNull(),   // ← NEW
+    deleteReason: text("delete_reason"),                          // ← NEW
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),   // ← NEW
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
