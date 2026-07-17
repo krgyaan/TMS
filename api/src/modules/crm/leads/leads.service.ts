@@ -14,6 +14,7 @@ export type LeadListFilters = {
     page?: number;
     limit?: number;
     search?: string;
+    priority?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 };
@@ -103,6 +104,10 @@ export class LeadsService {
                     ${leads.phone} ILIKE ${searchStr}
                 )`
             );
+        }
+        
+        if (filters?.priority) {
+            conditions.push(eq(leads.leadPriority, filters.priority));
         }
 
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

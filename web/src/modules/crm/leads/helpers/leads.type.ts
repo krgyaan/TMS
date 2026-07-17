@@ -77,6 +77,7 @@ export interface LeadListParams {
     page?: number;
     limit?: number;
     search?: string;
+    priority?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 }

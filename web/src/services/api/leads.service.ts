@@ -20,6 +20,7 @@ class LeadsService extends BaseApiService {
             if (params.page)      search.set('page', String(params.page));
             if (params.limit)     search.set('limit', String(params.limit));
             if (params.search)    search.set('search', params.search);
+             if (params.priority)  search.set('priority', params.priority);
             if (params.sortBy)    search.set('sortBy', params.sortBy);
             if (params.sortOrder) search.set('sortOrder', params.sortOrder);
         }

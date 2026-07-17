@@ -19,14 +19,24 @@ export const leadsKey = {
     detail: (id: number) => [...leadsKey.details(), id] as const,
 };
 
+// ─── Pagination param type now includes priority ───────────────────────────
+
+type LeadsPaginationParams = {
+    page: number;
+    limit: number;
+    search?: string;
+    priority?: string;   // ← ADD THIS
+};
+
 export const useLeads = (
-    pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
+    pagination: LeadsPaginationParams = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
     const filters: LeadListParams = {
         page: pagination.page,
         limit: pagination.limit,
         search: pagination.search,
+        priority: pagination.priority,   // ← ADD THIS
         ...(sort?.sortBy    && { sortBy: sort.sortBy }),
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
     };
@@ -75,7 +85,6 @@ export const useUpdateLead = () => {
     });
 };
 
-// ← NEW
 export const useAllocateLead = () => {
     const queryClient = useQueryClient();
     return useMutation({

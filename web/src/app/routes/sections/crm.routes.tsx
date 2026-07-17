@@ -6,7 +6,7 @@ const CRM_Leads        = lazy(() => import('@/modules/crm/leads/LeadsListPage'))
 const CRM_LeadCreate   = lazy(() => import('@/modules/crm/leads/LeadCreatePage'));
 const CRM_LeadEdit     = lazy(() => import('@/modules/crm/leads/LeadEditPage'));
 const CRM_LeadShow     = lazy(() => import('@/modules/crm/leads/LeadShowPage'));
-const CRM_LeadAllocate = lazy(() => import('@/modules/crm/leads/LeadAllocationPage'));
+
 
 const CRM_Enquiries  = lazy(() => import('@/modules/crm/enquiries'));
 const CRM_Costings   = lazy(() => import('@/modules/crm/costings'));
@@ -17,7 +17,6 @@ export default function CRMRoutes() {
         <Routes>
             <Route path="leads"               element={<RouteWrapper><CRM_Leads /></RouteWrapper>} />
             <Route path="leads/create"        element={<RouteWrapper><CRM_LeadCreate /></RouteWrapper>} />
-            <Route path="leads/allocate/:id"  element={<RouteWrapper><CRM_LeadAllocate /></RouteWrapper>} />  {/* ← CHANGED ORDER & PATH */}
             <Route path="leads/:id/edit"      element={<RouteWrapper><CRM_LeadEdit /></RouteWrapper>} />
             <Route path="leads/:id"           element={<RouteWrapper><CRM_LeadShow /></RouteWrapper>} />
 

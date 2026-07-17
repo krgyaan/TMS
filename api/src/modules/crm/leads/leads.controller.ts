@@ -35,6 +35,7 @@ export class LeadsController {
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('search') search?: string,
+        @Query('priority') priority?: string,  // ← ADD THIS
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: string,
     ) {
@@ -48,6 +49,7 @@ export class LeadsController {
             page: parseNumber(page),
             limit: parseNumber(limit),
             search,
+            priority,  // ← ADD THIS
             sortBy,
             sortOrder: sortOrder as 'asc' | 'desc' | undefined,
         });
