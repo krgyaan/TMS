@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { desc, eq, inArray, like, sql } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rename } from "node:fs/promises";
@@ -510,7 +510,7 @@ export class ProjectDashboardService {
         }
     }
 
-    async setTdsPercentage(id: number, tdsPercentage: number) {
+    async setTdsPercentage(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }) {
         const po = await this.db
             .select()
             .from(purchaseOrders)
@@ -518,28 +518,49 @@ export class ProjectDashboardService {
             .then(rows => rows[0]);
         if (!po) throw new NotFoundException("Purchase Order not found");
 
-        const products = await this.db
-            .select()
-            .from(purchaseOrderProducts)
-            .where(eq(purchaseOrderProducts.purchaseOrderId, id));
+        if (approve) {
+            if (!tdsPercentage || tdsPercentage <= 0) {
+                throw new BadRequestException("TDS percentage is required when approving");
+            }
 
-        const { total: subtotal, totalWithGst: grandTotal } = this.getTotalProductValues(products);
-        const tdsAmount = (subtotal * tdsPercentage) / 100;
-        const amountAfterTds = grandTotal - tdsAmount;
+            const products = await this.db
+                .select()
+                .from(purchaseOrderProducts)
+                .where(eq(purchaseOrderProducts.purchaseOrderId, id));
 
-        const [updated] = await this.db
-            .update(purchaseOrders)
-            .set({
-                tdsPercentage: tdsPercentage.toString(),
-                tdsAmount: tdsAmount.toString(),
-                amountAfterTds: amountAfterTds.toString(),
-                updatedAt: new Date(),
-            })
-            .where(eq(purchaseOrders.id, id))
-            .returning();
+            const { total: subtotal, totalWithGst: grandTotal } = this.getTotalProductValues(products);
+            const tdsAmt = (subtotal * tdsPercentage) / 100;
+            const amountAfterTds = grandTotal - tdsAmt;
 
-        this.logger.info(`TDS set for PO #${id}: ${tdsPercentage}%, TDS Amount: ${tdsAmount}, After TDS: ${amountAfterTds}`);
-        return updated;
+            const [updated] = await this.db
+                .update(purchaseOrders)
+                .set({
+                    tdsPercentage: tdsPercentage.toString(),
+                    tdsAmount: tdsAmt.toString(),
+                    amountAfterTds: amountAfterTds.toString(),
+                    poApproved: true,
+                    poApprovalRemark: remark || null,
+                    updatedAt: new Date(),
+                })
+                .where(eq(purchaseOrders.id, id))
+                .returning();
+
+            this.logger.info(`TDS approved for PO #${id}: ${tdsPercentage}%, TDS Amount: ${tdsAmt}, After TDS: ${amountAfterTds}`);
+            return updated;
+        } else {
+            const [updated] = await this.db
+                .update(purchaseOrders)
+                .set({
+                    poApproved: false,
+                    poApprovalRemark: remark || null,
+                    updatedAt: new Date(),
+                })
+                .where(eq(purchaseOrders.id, id))
+                .returning();
+
+            this.logger.info(`TDS rejected for PO #${id}: ${remark || 'no remark'}`);
+            return updated;
+        }
     }
 
     async getPurchaseOrder(id: number) {

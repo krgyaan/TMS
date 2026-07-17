@@ -119,9 +119,9 @@ export class ProjectDashboardController {
   @HttpCode(HttpStatus.OK)
   setTdsPercentage(
       @Param("id", ParseIntPipe) id: number,
-      @Body("tdsPercentage") tdsPercentage: number,
+      @Body() body: { approve: boolean; tdsPercentage?: number; remark?: string },
   ) {
-      return this.service.setTdsPercentage(id, tdsPercentage);
+      return this.service.setTdsPercentage(id, body);
   }
 
   @Put("purchase-orders/:id")

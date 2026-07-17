@@ -84,6 +84,8 @@ export interface PurchaseOrderRow {
     tdsPercentage?: number | string;
     tdsAmount?: number | string;
     amountAfterTds?: number | string;
+    poApproved?: boolean;
+    poApprovalRemark?: string;
     totalPaymentRequested?: number;
     totalMakerDone?: number;
     totalPaymentDone?: number;
@@ -91,7 +93,9 @@ export interface PurchaseOrderRow {
 }
 
 export interface SetTdsDTO {
-    tdsPercentage: number;
+    approve: boolean;
+    tdsPercentage?: number;
+    remark?: string;
 }
 
 export interface UpdatePurchaseOrderDTO {
