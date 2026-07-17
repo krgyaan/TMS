@@ -13,6 +13,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { getShortId } from "@/lib/id-utils";
 import { useAllPurchaseOrders } from "@/hooks/api/useProjectDashboard";
 import type { PurchaseOrderRow } from "@/modules/operations/project-dashboard/helpers/projectDashboard.types";
 import { SetTdsDialog } from "./components/SetTdsDialog";
@@ -75,7 +76,7 @@ const PurchaseOrderListPage: React.FC = () => {
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <span>{p.value || "-"}</span>
+                            <span>{getShortId(p.value)}</span>
                         </TooltipTrigger>
                         <TooltipContent>{p.value}</TooltipContent>
                     </Tooltip>
