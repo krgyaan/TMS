@@ -135,7 +135,7 @@ export const PurchaseInvoicesSection: React.FC<PurchaseInvoicesSectionProps> = (
                     onGridReady={(params) => setPiGridApi(params.api)}
                     gridOptions={{
                         pagination: true,
-                        paginationPageSize: 5,
+                        paginationPageSize: 10,
                         domLayout: 'autoHeight',
                     }}
                 />

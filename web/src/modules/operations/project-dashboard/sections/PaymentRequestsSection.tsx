@@ -154,7 +154,7 @@ export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
                         onGridReady={(params) => setPrGridApi(params.api)}
                         gridOptions={{
                             pagination: true,
-                            paginationPageSize: 5,
+                            paginationPageSize: 10,
                             domLayout: 'autoHeight',
                         }}
                     />

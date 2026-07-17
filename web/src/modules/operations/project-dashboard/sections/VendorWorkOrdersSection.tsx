@@ -196,7 +196,7 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
                     onGridReady={(params) => setVwoGridApi(params.api)}
                     gridOptions={{
                         pagination: true,
-                        paginationPageSize: 5,
+                        paginationPageSize: 10,
                         domLayout: 'autoHeight',
                     }}
                 />

@@ -207,7 +207,7 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
                     onGridReady={(params) => setPoGridApi(params.api)}
                     gridOptions={{
                         pagination: true,
-                        paginationPageSize: 5,
+                        paginationPageSize: 10,
                         domLayout: 'autoHeight',
                     }}
                 />
