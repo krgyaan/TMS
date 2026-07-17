@@ -13,6 +13,7 @@ export const purchaseInvoices = pgTable(
         invoiceDate: date("invoice_date"),
         uploadedBy: bigint("uploaded_by", { mode: "number" }),
         invoiceFile: varchar("invoice_file", { length: 500 }),
+        purchaseOrderId: bigint("purchase_order_id", { mode: "number" }),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     },
@@ -20,6 +21,7 @@ export const purchaseInvoices = pgTable(
         index("idx_pi_invoice_no").on(table.invoiceNo),
         index("idx_pi_project_id").on(table.projectId),
         index("idx_pi_category").on(table.category),
+        index("idx_pi_purchase_order_id").on(table.purchaseOrderId),
     ])
 );
 
