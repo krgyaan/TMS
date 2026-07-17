@@ -1,8 +1,9 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, like, desc } from "drizzle-orm";
+import { eq, like, desc, sql } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
+import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -55,6 +56,7 @@ export class PurchaseInvoiceService {
                     invoiceDate: body.invoiceDate,
                     uploadedBy: userId,
                     invoiceFile: body.invoiceFile,
+                    purchaseOrderId: body.purchaseOrderId || null,
                 })
                 .returning()
         )[0];
@@ -81,6 +83,7 @@ export class PurchaseInvoiceService {
                     gstAmount: body.gstAmount?.toString(),
                     invoiceDate: body.invoiceDate,
                     invoiceFile: body.invoiceFile,
+                    purchaseOrderId: body.purchaseOrderId || null,
                     updatedAt: new Date(),
                 })
                 .where(eq(purchaseInvoices.id, id))
@@ -102,14 +105,44 @@ export class PurchaseInvoiceService {
 
     async getAll() {
         return this.db
-            .select()
+            .select({
+                id: purchaseInvoices.id,
+                projectId: purchaseInvoices.projectId,
+                invoiceNo: purchaseInvoices.invoiceNo,
+                category: purchaseInvoices.category,
+                partyName: purchaseInvoices.partyName,
+                valuePreGst: purchaseInvoices.valuePreGst,
+                gstAmount: purchaseInvoices.gstAmount,
+                invoiceDate: purchaseInvoices.invoiceDate,
+                uploadedBy: purchaseInvoices.uploadedBy,
+                invoiceFile: purchaseInvoices.invoiceFile,
+                purchaseOrderId: purchaseInvoices.purchaseOrderId,
+                poNumber: sql<string>`COALESCE((SELECT po_number FROM purchase_orders WHERE id = ${purchaseInvoices.purchaseOrderId}), '')`,
+                createdAt: purchaseInvoices.createdAt,
+                updatedAt: purchaseInvoices.updatedAt,
+            })
             .from(purchaseInvoices)
             .orderBy(desc(purchaseInvoices.id));
     }
 
     async getByProject(projectId: number) {
         return this.db
-            .select()
+            .select({
+                id: purchaseInvoices.id,
+                projectId: purchaseInvoices.projectId,
+                invoiceNo: purchaseInvoices.invoiceNo,
+                category: purchaseInvoices.category,
+                partyName: purchaseInvoices.partyName,
+                valuePreGst: purchaseInvoices.valuePreGst,
+                gstAmount: purchaseInvoices.gstAmount,
+                invoiceDate: purchaseInvoices.invoiceDate,
+                uploadedBy: purchaseInvoices.uploadedBy,
+                invoiceFile: purchaseInvoices.invoiceFile,
+                purchaseOrderId: purchaseInvoices.purchaseOrderId,
+                poNumber: sql<string>`COALESCE((SELECT po_number FROM purchase_orders WHERE id = ${purchaseInvoices.purchaseOrderId}), '')`,
+                createdAt: purchaseInvoices.createdAt,
+                updatedAt: purchaseInvoices.updatedAt,
+            })
             .from(purchaseInvoices)
             .where(eq(purchaseInvoices.projectId, projectId))
             .orderBy(desc(purchaseInvoices.id));
