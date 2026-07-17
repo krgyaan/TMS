@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { getShortId } from "@/lib/id-utils";
 import { useProjectPurchaseOrders } from "@/hooks/api/useProjectDashboard";
 import { Button } from "@/components/ui/button";
 import type { PurchaseOrderRow } from "../helpers/projectDashboard.types";
@@ -68,7 +69,7 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <span>{p.value || "-"}</span>
+                            <span>{getShortId(p.value)}</span>
                         </TooltipTrigger>
                         <TooltipContent>{p.value}</TooltipContent>
                     </Tooltip>

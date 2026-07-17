@@ -1,4 +1,6 @@
 import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getShortId } from "@/lib/id-utils";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { projectDashboardApi } from "@/services/api/project-dashboard.api";
 import type { PurchaseOrderRow } from "../../project-dashboard/helpers/projectDashboard.types";
@@ -20,7 +22,14 @@ export const PoDetailsCard: React.FC<PoDetailsCardProps> = ({ po, requestAmount 
             <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
                 <div className="flex justify-between">
                     <span className="text-muted-foreground">PO Number:</span>
-                    <span className="font-medium">{po.poNumber || `#${po.id}`}</span>
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="font-medium">{getShortId(po.poNumber) || `#${po.id}`}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>{po.poNumber}</TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                 </div>
                 <div className="flex justify-between">
                     <span className="text-muted-foreground">Total (Pre-GST):</span>

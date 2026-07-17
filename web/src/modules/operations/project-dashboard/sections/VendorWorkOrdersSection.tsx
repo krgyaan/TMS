@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { getShortId } from "@/lib/id-utils";
 import { useProjectVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
 import { Button } from "@/components/ui/button";
 import type { VendorWorkOrderRow } from "@/modules/operations/vendor-work-orders/helpers/vwoForm.types";
@@ -56,7 +57,14 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
             width: 250,
             flex: 1,
             cellRenderer: (p: CustomCellRendererProps<VendorWorkOrderRow>) => (
-                <span className="font-mono text-sm font-medium">{p.value || "-"}</span>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span className="font-mono text-sm font-medium">{getShortId(p.value)}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>{p.value}</TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
             ),
         },
         {
