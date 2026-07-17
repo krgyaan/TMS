@@ -45,6 +45,8 @@ export * from './reverse-auction.schema';
 
 // Tender Results
 export * from './tender-result.schema';
+export * from './tender-result-details.schema';
+export * from './tender-result-details.relations';
 
 // TQ Types
 export * from './tq-types.schema';

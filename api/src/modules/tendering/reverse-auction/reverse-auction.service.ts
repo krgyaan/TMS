@@ -16,6 +16,7 @@ import { statuses } from '@db/schemas/master/statuses.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
 import { reverseAuctions } from '@db/schemas/tendering/reverse-auction.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { tenderResultDetails } from '@db/schemas/tendering/tender-result-details.schema';
 import { tenderResults } from '@db/schemas/tendering/tender-result.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
@@ -882,23 +883,24 @@ export class ReverseAuctionService {
                 disqualificationReason: null,
                 qualifiedPartiesCount: existing.qualifiedPartiesCount ?? null,
                 qualifiedPartiesNames: existing.qualifiedPartiesNames ?? [],
+                tenderCancelledScreenshot: null,
                 result: dto.raResult as 'Won' | 'Lost',
                 resultReason: dto.resultReason ?? null,
                 l1Price: dto.raClosePrice ?? null,
                 l2Price: dto.raClosePriceL2 ?? null,
                 ourPrice: dto.raOurPrice ?? null,
-                qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ?? null,
-                finalResultScreenshot: dto.finalResultScreenshot ?? null,
+                qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ? [dto.screenshotQualifiedParties] : null,
+                finalResultScreenshot: dto.finalResultScreenshot ? [dto.finalResultScreenshot] : null,
             };
 
             await this.tenderResultService.sendTenderResultEmail(
                 existing.tenderId,
-                {
-                    qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ?? null,
-                    finalResultScreenshot: dto.finalResultScreenshot ?? null,
-                },
                 changedBy,
-                mappedDto
+                mappedDto,
+                [{
+                    qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ? [dto.screenshotQualifiedParties] : null,
+                    finalResultScreenshot: dto.finalResultScreenshot ? [dto.finalResultScreenshot] : null,
+                }]
             );
         } else {
             await this.sendRaResultEmail(existing.tenderId, result, changedBy, dto);
@@ -989,13 +991,6 @@ export class ReverseAuctionService {
         };
 
         if (raRecord) {
-            updatePayload.l1Price = raRecord.raClosePrice;
-            updatePayload.l2Price = raRecord.raClosePriceL2;
-            updatePayload.ourPrice = raRecord.raOurPrice;
-            updatePayload.resultReason = raRecord.resultReason;
-            updatePayload.result = raRecord.raResult;
-            updatePayload.qualifiedPartiesScreenshot = raRecord.screenshotQualifiedParties;
-            updatePayload.finalResultScreenshot = raRecord.finalResultScreenshot;
             updatePayload.qualifiedPartiesCount = raRecord.qualifiedPartiesCount;
             updatePayload.qualifiedPartiesNames = raRecord.qualifiedPartiesNames;
             updatePayload.technicallyQualified = raRecord.technicallyQualified;
@@ -1011,18 +1006,43 @@ export class ReverseAuctionService {
             .where(eq(tenderResults.tenderId, tenderId))
             .limit(1);
 
+        let resultId: number;
         if (existing) {
             await dbClient
                 .update(tenderResults)
                 .set(updatePayload)
                 .where(eq(tenderResults.id, existing.id));
+            resultId = existing.id;
         } else {
-            await dbClient
+            const [inserted] = await dbClient
                 .insert(tenderResults)
                 .values({
                     tenderId,
                     ...updatePayload,
-                });
+                })
+                .returning();
+            resultId = inserted.id;
+        }
+
+        // Sync per-detail fields to tender_result_details
+        if (raRecord && (raRecord.raResult || raRecord.raClosePrice || raRecord.raOurPrice)) {
+            const detailPayload: any = { tenderResultId: resultId };
+            if (raRecord.raResult) detailPayload.result = raRecord.raResult;
+            if (raRecord.raClosePrice) detailPayload.l1Price = raRecord.raClosePrice;
+            if (raRecord.raClosePriceL2) detailPayload.l2Price = raRecord.raClosePriceL2;
+            if (raRecord.raOurPrice) detailPayload.ourPrice = raRecord.raOurPrice;
+            if (raRecord.screenshotQualifiedParties) detailPayload.qualifiedPartiesScreenshot = [raRecord.screenshotQualifiedParties];
+            if (raRecord.finalResultScreenshot) detailPayload.finalResultScreenshot = [raRecord.finalResultScreenshot];
+            if (raRecord.resultReason) detailPayload.resultReason = raRecord.resultReason;
+            if (raRecord.raResult) detailPayload.resultUploadedAt = new Date();
+
+            await dbClient
+                .delete(tenderResultDetails)
+                .where(eq(tenderResultDetails.tenderResultId, resultId));
+
+            await dbClient
+                .insert(tenderResultDetails)
+                .values(detailPayload);
         }
     }
 

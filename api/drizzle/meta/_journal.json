@@ -316,6 +316,27 @@
       "when": 1768400000000,
       "tag": "0086_add_po_approval_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1784948800001,
+      "tag": "0074_drop_old_result_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1785948800000,
+      "tag": "0075_change_screenshots_to_jsonb",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1784948800000,
+      "tag": "0073_add_tender_result_details",
+      "breakpoints": true
     }
   ]
 }

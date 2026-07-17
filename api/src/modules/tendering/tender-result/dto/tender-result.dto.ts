@@ -1,29 +1,28 @@
+import { optionalNumber, optionalString, optionalTextField, requiredEnumField } from '@/utils/zod-schema-generator';
 import { z } from 'zod';
-import {
-    optionalString,
-    optionalTextField,
-    optionalNumber,
-    decimalField,
-    requiredEnumField,
-} from '@/utils/zod-schema-generator';
+
+const ResultDetailSchema = z.object({
+    result: z.enum(['Won', 'Lost', 'Cancelled']).optional(),
+    resultReason: optionalString,
+    l1Price: optionalNumber(z.coerce.number().min(0, 'L1 price must be non-negative')),
+    l2Price: optionalNumber(z.coerce.number().min(0, 'L2 price must be non-negative')),
+    ourPrice: optionalNumber(z.coerce.number().min(0, 'Our price must be non-negative')),
+    qualifiedPartiesScreenshot: z.array(z.string()).optional(),
+    finalResultScreenshot: z.array(z.string()).optional(),
+});
 
 export const UploadResultSchema = z.object({
     technicallyQualified: requiredEnumField(['Yes', 'No']),
     disqualificationReason: optionalString,
     qualifiedPartiesCount: optionalTextField(50),
     qualifiedPartiesNames: z.array(z.string()).optional(),
-    result: z.enum(['Won', 'Lost']).optional(),
-    resultReason: optionalString,
-    l1Price: optionalNumber(z.coerce.number().min(0, 'L1 price must be non-negative')),
-    l2Price: optionalNumber(z.coerce.number().min(0, 'L2 price must be non-negative')),
-    ourPrice: optionalNumber(z.coerce.number().min(0, 'Our price must be non-negative')),
-    qualifiedPartiesScreenshot: optionalString,
-    finalResultScreenshot: optionalString,
-});
+    tenderCancelledScreenshot: optionalString,
+    details: z.array(ResultDetailSchema).optional(),
+}).passthrough();
 
 export const UploadChangeStatusResultSchema = z.object({
     statusId: z.number({ required_error: "Status ID is required" }),
-    finalResultScreenshot : z.string({ required_error: "No screenshot uploaded" }),
+    finalResultScreenshot: z.string({ required_error: "No screenshot uploaded" }),
     resultReason: z.string({ required_error: "Reason for Cancellation is required" }),
 });
 
