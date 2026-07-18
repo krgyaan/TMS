@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, Table
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Copy, Trash2, AlertCircle, Calculator } from "lucide-react";
-import { calculateTotals, formatCurrency } from "@/modules/operations/project-dashboard/helpers/projectDashboard.mapper";
+import { calculateTotals, formatCurrency } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.mapper";
 import type { VendorWorkOrderFormValues } from "../helpers/vwoForm.schema";
 import { useMemo } from "react";
 

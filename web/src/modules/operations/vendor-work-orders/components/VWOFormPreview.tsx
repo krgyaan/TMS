@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { ArrowLeft, Loader2, Receipt } from "lucide-react";
-import { calculateTotals, formatINR } from "@/modules/operations/project-dashboard/helpers/projectDashboard.mapper";
+import { calculateTotals, formatINR } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.mapper";
 import type { VendorWorkOrderFormValues, ProductFormItem } from "../helpers/vwoForm.schema";
 
 function numberToWords(num: number): string {
