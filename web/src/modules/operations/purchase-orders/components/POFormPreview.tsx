@@ -8,7 +8,7 @@ import {
   Loader2,
   Receipt,
 } from "lucide-react";
-import { calculateTotals, formatINR } from "../helpers/projectDashboard.mapper";
+import { calculateTotals, formatINR } from "../helpers/purchaseOrder.mapper";
 import type { ProductFormItem, PurchaseOrderFormValues } from "../helpers/purchaseOrder.schema";
 
 function numberToWords(num: number): string {
@@ -134,7 +134,6 @@ export function POFormPreview({
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {/* Company Header Table */}
           <table className="w-full text-sm">
             <tbody>
               <tr className="border-b">
@@ -179,13 +178,11 @@ export function POFormPreview({
             </tbody>
           </table>
 
-          {/* Intro */}
           <p className="text-sm text-muted-foreground italic px-4 py-3">
             This is in reference to your offer and subsequent discussion with you.
             We are pleased to place this PO to your company {formValues.shipToName || "—"}
           </p>
 
-          {/* Items Table */}
           <div className="border-t">
             <div className="p-0 overflow-x-auto">
               <table className="w-full text-sm">
@@ -219,18 +216,15 @@ export function POFormPreview({
             </div>
           </div>
 
-          {/* Total Amount in Words */}
           <p className="text-sm px-4 py-3 border-t">
             <strong>Total Amount (In Words):</strong>{" "}
             {numberToWords(grandTotal)}
           </p>
 
-          {/* Test Certificate Email */}
           <p className="text-sm px-4 py-3 border-t">
             Test certificate and invoice with machine serial no. need to be shared on {certRecipientEmails}
           </p>
 
-          {/* Terms & Conditions */}
           <div className="px-4 py-3 border-t">
             <strong>Terms and conditions:</strong><br />
             {formValues.termsAndConditions?.map((term, i) =>
@@ -242,7 +236,6 @@ export function POFormPreview({
             )}
           </div>
 
-          {/* Additional Details inline */}
           {(formValues.quotationNo || formValues.quotationDate || formValues.remarks) && (
             <div className="px-4 py-3 border-t text-sm text-muted-foreground">
               {formValues.quotationNo && <span><strong>Quotation No:</strong> {formValues.quotationNo}<br /></span>}
@@ -251,12 +244,10 @@ export function POFormPreview({
             </div>
           )}
 
-          {/* Footer disclaimer */}
           <p className="text-xs text-center text-muted-foreground px-4 py-3 border-t">
             *** This is electronically generated document. It does not require any signature from M/s. Volks Energie Pvt. Ltd. ***
           </p>
 
-          {/* Signature Area */}
           <p className="text-center text-sm">
             Read understood and unconditionally accepted for and on behalf of
           </p>
@@ -280,7 +271,6 @@ export function POFormPreview({
         </CardContent>
       </Card>
 
-      {/* Action Buttons */}
       <div className="flex justify-between pt-4 border-t">
         <Button variant="outline" onClick={onBack} disabled={isSubmitting}>
           <ArrowLeft className="mr-2 h-4 w-4" />

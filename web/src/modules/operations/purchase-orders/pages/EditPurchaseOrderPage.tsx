@@ -14,7 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCreatePoParty, usePoParties, usePurchaseOrderDetails, useUpdatePurchaseOrder } from "@/hooks/api/useProjectDashboard";
+import { usePurchaseOrderDetails, useUpdatePurchaseOrder } from "@/hooks/api/usePurchaseOrders";
+import { useCreatePoParty, usePoParties } from "@/hooks/api/usePurchaseOrders";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, ArrowLeft, Building2, Calendar, FileText, Hash, Info, Loader2, Mail, MapPin, Phone, Save, UserCheck, UserPlus } from "lucide-react";
@@ -22,11 +23,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { ProductsField } from "./components/ProductsField";
-import { TermsField } from "./components/TermsField";
-import { formatDateForInput, mapFormToUpdateDTO } from "./helpers/projectDashboard.mapper";
-import type { CreatePartyDTO } from "./helpers/projectDashboard.types";
-import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "./helpers/purchaseOrder.schema";
+import { ProductsField } from "../components/ProductsField";
+import { TermsField } from "../components/TermsField";
+import { formatDateForInput, mapFormToUpdateDTO } from "../helpers/purchaseOrder.mapper";
+import type { CreatePartyDTO } from "../helpers/purchaseOrder.types";
+import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "../helpers/purchaseOrder.schema";
 
 interface NewPartyForm {
     name: string;
@@ -111,7 +112,7 @@ const NotFound = ({ message, onBack }: { message: string; onBack: () => void }) 
     </div>
 );
 
-export default function EditPOPage() {
+export default function EditPurchaseOrderPage() {
     const navigate = useNavigate();
     const { projectId: projectIdParam, poId } = useParams<{ projectId: string; poId: string }>();
     const purchaseOrderId = Number(poId);

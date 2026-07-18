@@ -9,9 +9,9 @@ import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { ArrowLeft, ExternalLink, FileText, AlertCircle } from "lucide-react";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDate } from "@/hooks/useFormatedDate";
-import { usePurchaseOrderDetails } from "@/hooks/api/useProjectDashboard";
-import { projectDashboardApi } from "@/services/api/project-dashboard.api";
-import type { PurchaseOrderView } from "./helpers/purchaseOrderView.types";
+import { usePurchaseOrderDetails } from "@/hooks/api/usePurchaseOrders";
+import { purchaseOrderApi } from "@/services/api/purchase-order.api";
+import type { PurchaseOrderView, PoProduct, PoPaymentRequest, PoPurchaseInvoice } from "../helpers/purchaseOrderView.types";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "default" | "outline" | "success" | "destructive" }> = {
     pending: { label: "Pending", variant: "outline" },
@@ -36,7 +36,7 @@ function PdfVersionsInline({ versions, poId }: Readonly<{ versions: Record<strin
         <div className="flex flex-wrap gap-2">
             {labels.map(label => (
                 <Button key={label} variant="outline" size="sm" className="h-7 text-xs gap-1" asChild>
-                    <a href={projectDashboardApi.getPurchaseOrderPdfUrl(poId, label)} target="_blank" rel="noopener noreferrer">
+                    <a href={purchaseOrderApi.getPurchaseOrderPdfUrl(poId, label)} target="_blank" rel="noopener noreferrer">
                         <FileText className="h-3 w-3" />
                         {label}
                     </a>
@@ -46,7 +46,7 @@ function PdfVersionsInline({ versions, poId }: Readonly<{ versions: Record<strin
     );
 }
 
-const ViewPOPage = () => {
+const ViewPurchaseOrderPage = () => {
     const { projectId: projectIdParam, poId: poIdParam } = useParams<{ projectId: string; poId: string }>();
     const navigate = useNavigate();
     const projectId = Number(projectIdParam);
@@ -247,4 +247,4 @@ const ViewPOPage = () => {
     );
 };
 
-export default ViewPOPage;
+export default ViewPurchaseOrderPage;

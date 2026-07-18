@@ -1,4 +1,4 @@
-import type { CreatePurchaseOrderDTO, UpdatePurchaseOrderDTO } from "./projectDashboard.types";
+import type { CreatePurchaseOrderDTO, UpdatePurchaseOrderDTO } from "./purchaseOrder.types";
 import type { PurchaseOrderFormValues } from "./purchaseOrder.schema";
 
 export function formatDateForInput(date: Date | string): string {

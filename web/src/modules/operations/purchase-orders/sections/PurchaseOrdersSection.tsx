@@ -13,9 +13,9 @@ import { paths } from "@/app/routes/paths";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
-import { useProjectPurchaseOrders } from "@/hooks/api/useProjectDashboard";
+import { useProjectPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
 import { Button } from "@/components/ui/button";
-import type { PurchaseOrderRow } from "../helpers/projectDashboard.types";
+import type { PurchaseOrderRow } from "../helpers/purchaseOrder.types";
 
 interface PurchaseOrdersSectionProps {
     projectId: number | null;

@@ -1,10 +1,8 @@
-// ===================== TERMS ROW =====================
 export interface TermRow {
     field: string;
     value: string;
 }
 
-// ===================== DTO TYPES =====================
 export interface CreatePurchaseOrderDTO {
     tenderId: number;
     projectId?: number;

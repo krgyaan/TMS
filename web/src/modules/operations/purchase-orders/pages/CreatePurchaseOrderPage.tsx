@@ -14,7 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCreatePoParty, useCreatePurchaseOrder, useNextPONumber, usePoParties, useProjectOverview } from "@/hooks/api/useProjectDashboard";
+import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
+import { useCreatePoParty, useCreatePurchaseOrder, useNextPONumber, usePoParties } from "@/hooks/api/usePurchaseOrders";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,12 +24,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { POFormPreview } from "./components/POFormPreview";
-import { ProductsField } from "./components/ProductsField";
-import { DEFAULT_TERMS_ROWS, TermsField } from "./components/TermsField";
-import { formatDateForInput, mapFormToCreateDTO } from "./helpers/projectDashboard.mapper";
-import type { CreatePartyDTO } from "./helpers/projectDashboard.types";
-import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "./helpers/purchaseOrder.schema";
+import { POFormPreview } from "../components/POFormPreview";
+import { ProductsField } from "../components/ProductsField";
+import { DEFAULT_TERMS_ROWS, TermsField } from "../components/TermsField";
+import { formatDateForInput, mapFormToCreateDTO } from "../helpers/purchaseOrder.mapper";
+import type { CreatePartyDTO } from "../helpers/purchaseOrder.types";
+import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "../helpers/purchaseOrder.schema";
 
 interface NewPartyForm {
   name: string;
@@ -97,7 +98,7 @@ const FormSkeleton = () => (
   </div>
 );
 
-export default function RaisePoFormPage() {
+export default function CreatePurchaseOrderPage() {
   const navigate = useNavigate();
   const { projectId: projectIdParam } = useParams<{ projectId: string }>();
   const projectId = Number(projectIdParam);

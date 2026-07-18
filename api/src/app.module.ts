@@ -18,6 +18,7 @@ import { FdrModule } from "@/modules/bi-dashboard/fdr/fdr.module";
 import { PayOnPortalModule } from "@/modules/bi-dashboard/pay-on-portal/pay-on-portal.module";
 import { TenderFeeModule } from "@/modules/bi-dashboard/tender-fee/tender-fee.module";
 import { CourierModule } from "@/modules/courier/courier.module";
+import { LeadsModule } from "@/modules/crm/leads/leads.module";
 import { EmailModule } from "@/modules/email/email.module";
 import { EmployeeImprestModule } from "@/modules/employee-imprest/employee-imprest.module";
 import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
@@ -38,9 +39,8 @@ import { ImprestCategoriesModule } from "@/modules/master/imprest-categories/imp
 import { IndustriesModule } from "@/modules/master/industries/industries.module";
 import { ItemHeadingsModule } from "@/modules/master/item-headings/item-headings.module";
 import { ItemsModule } from "@/modules/master/items/items.module";
-import { LeadTypesModule } from "@/modules/master/lead-types/lead-types.module";
-import { LeadsModule } from "@/modules/crm/leads/leads.module";
 import { LeadIndustriesModule } from "@/modules/master/lead-industries/lead-industries.module";
+import { LeadTypesModule } from "@/modules/master/lead-types/lead-types.module";
 import { LoanPartiesModule } from "@/modules/master/loan-parties/loan-parties.module";
 import { LocationsModule } from "@/modules/master/locations/locations.module";
 import { OauthAccountsModule } from "@/modules/master/oauth-accounts/oauth-accounts.module";
@@ -103,8 +103,9 @@ import { MakerRequestModule } from "./modules/operations/maker-requests/maker-re
 import { PaymentRequestModule } from "./modules/operations/payment-requests/payment-request.module";
 import { ProjectDashboardModule } from "./modules/operations/projects/project-dashboard.module";
 import { PurchaseInvoiceModule } from "./modules/operations/purchase-invoices/purchase-invoice.module";
-import { VendorWorkOrderModule } from "./modules/operations/vendor-work-orders/vendor-work-order.module";
+import { PurchaseOrderModule } from "./modules/operations/purchase-orders/purchase-order.module";
 import { SaleInvoiceModule } from "./modules/operations/sale-invoices/sale-invoice.module";
+import { VendorWorkOrderModule } from "./modules/operations/vendor-work-orders/vendor-work-order.module";
 import { WoAmendmentsModule } from "./modules/operations/wo-amendments/wo-amendments.module";
 import { WoContactsModule } from "./modules/operations/wo-contacts/wo-contacts.module";
 import { WoDetailsModule } from "./modules/operations/wo-details/wo-details.module";
@@ -236,6 +237,7 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         ContractAgreementModule,
         VendorWorkOrderModule,
         SaleInvoiceModule,
+        PurchaseOrderModule,
         PurchaseInvoiceModule,
         PaymentRequestModule,
         MakerRequestModule,

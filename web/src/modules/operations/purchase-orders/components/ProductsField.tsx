@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { AlertCircle, Calculator, Copy, Plus, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { useFieldArray, useWatch, type Control } from "react-hook-form";
-import { calculateTotals, formatCurrency } from "../helpers/projectDashboard.mapper";
+import { calculateTotals, formatCurrency } from "../helpers/purchaseOrder.mapper";
 import type { PurchaseOrderFormValues } from "../helpers/purchaseOrder.schema";
 
 interface ProductsFieldProps {

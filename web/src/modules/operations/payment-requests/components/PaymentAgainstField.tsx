@@ -1,7 +1,7 @@
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { Textarea } from "@/components/ui/textarea";
-import { useProjectPurchaseOrders } from "@/hooks/api/useProjectDashboard";
+import { useProjectPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
 import { useProjectVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
 import { formatINR } from "@/hooks/useINRFormatter";
 import React from "react";
@@ -9,7 +9,7 @@ import type { Control } from "react-hook-form";
 import { useFormContext } from "react-hook-form";
 import { paymentAgainstOptions } from "../helpers/paymentRequest.schema";
 import { PoDetailsCard } from "./PoDetailsCard";
-import type { PurchaseOrderRow } from "../../project-dashboard/helpers/projectDashboard.types";
+import type { PurchaseOrderRow } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
 
 const PAYMENT_AGAINST_OPTIONS = paymentAgainstOptions.map(o => ({ id: o.value, name: o.label }));
 

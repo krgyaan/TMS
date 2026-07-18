@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Download, FileText, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { projectDashboardApi } from "@/services/api/project-dashboard.api";
+import { purchaseOrderApi } from "@/services/api/purchase-order.api";
 import { Button } from "@/components/ui/button";
 import { paths } from "@/app/routes/paths";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,13 +46,13 @@ const PoPdfVersionsPage: React.FC = () => {
 
     const { data: poData } = useQuery({
         queryKey: ["purchase-order", poNum],
-        queryFn: () => projectDashboardApi.getPurchaseOrder(poNum),
+        queryFn: () => purchaseOrderApi.getPurchaseOrder(poNum),
         enabled: !!poNum,
     });
 
     const { data: versionsData } = useQuery({
         queryKey: ["purchase-order", poNum, "pdf-versions"],
-        queryFn: () => projectDashboardApi.getPurchaseOrderPdfVersions(poNum),
+        queryFn: () => purchaseOrderApi.getPurchaseOrderPdfVersions(poNum),
         enabled: !!poNum,
     });
 
@@ -64,7 +64,7 @@ const PoPdfVersionsPage: React.FC = () => {
     }, [versionsData]);
 
     const versionPdfUrl = useCallback(
-        (label: string) => projectDashboardApi.getPurchaseOrderPdfUrl(poNum, label),
+        (label: string) => purchaseOrderApi.getPurchaseOrderPdfUrl(poNum, label),
         [poNum],
     );
 
@@ -78,7 +78,7 @@ const PoPdfVersionsPage: React.FC = () => {
 
     const handleDelete = useCallback(
         async (label: string) => {
-            await projectDashboardApi.deletePdfVersion(poNum, label);
+            await purchaseOrderApi.deletePdfVersion(poNum, label);
             queryClient.invalidateQueries({ queryKey: ["purchase-order", poNum, "pdf-versions"] });
             if (previewLabel === label) {
                 setPreviewUrl(null);

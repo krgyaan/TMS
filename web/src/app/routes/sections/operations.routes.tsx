@@ -28,10 +28,10 @@ const Operations_ContractAgreementShow = lazy(() => import("@/modules/operations
 
 const Operations_ProjectDashboard = lazy(() => import("@/modules/operations/project-dashboard/ProjectDashboardPage"));
 const Operations_ProjectShowPage = lazy(() => import("@/modules/operations/project-dashboard/ProjectShowPage"));
-const Operations_RaisePoFormPage = lazy(() => import("@/modules/operations/project-dashboard/RaisePoFormPage"));
-const Operations_ViewPoPage = lazy(() => import("@/modules/operations/project-dashboard/ViewPOPage"));
-const Operations_EditPOPage = lazy(() => import("@/modules/operations/project-dashboard/EditPOPage"));
-const Operations_PoPdfVersions = lazy(() => import("@/modules/operations/project-dashboard/PoPdfVersionsPage"));
+const Operations_RaisePoFormPage = lazy(() => import("@/modules/operations/purchase-orders/pages/CreatePurchaseOrderPage"));
+const Operations_ViewPoPage = lazy(() => import("@/modules/operations/purchase-orders/pages/ViewPurchaseOrderPage"));
+const Operations_EditPOPage = lazy(() => import("@/modules/operations/purchase-orders/pages/EditPurchaseOrderPage"));
+const Operations_PoPdfVersions = lazy(() => import("@/modules/operations/purchase-orders/pages/PoPdfVersionsPage"));
 const Operations_PurchaseOrderTabs = lazy(() => import("@/modules/shared/purchase-orders/PurchaseOrderTabsPage"));
 const Operations_RaiseSaleInvoiceFormPage = lazy(() => import("@/modules/operations/sale-invoices/CreateSaleInvoicePage"));
 

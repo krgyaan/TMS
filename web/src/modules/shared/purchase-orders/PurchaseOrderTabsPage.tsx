@@ -2,7 +2,7 @@ import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
-import { useAllPurchaseOrders } from "@/hooks/api/useProjectDashboard";
+import { useAllPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
 import { useAllVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
 import PurchaseOrderListPage from "./PurchaseOrderListPage";
 import VendorWorkOrderListPage from "@/modules/operations/vendor-work-orders/VendorWorkOrderListPage";

@@ -13,7 +13,7 @@ import { EmployeeImprestsSection } from "./sections/EmployeeImprestsSection";
 import { PaymentRequestsSection } from "./sections/PaymentRequestsSection";
 import { ProjectOverviewSection } from "./sections/ProjectOverviewSection";
 import { PurchaseInvoicesSection } from "./sections/PurchaseInvoicesSection";
-import { PurchaseOrdersSection } from "./sections/PurchaseOrdersSection";
+import { PurchaseOrdersSection } from "@/modules/operations/purchase-orders/sections/PurchaseOrdersSection";
 import { SaleInvoicesSection } from "./sections/SaleInvoicesSection";
 import { VendorWorkOrdersSection } from "./sections/VendorWorkOrdersSection";
 
