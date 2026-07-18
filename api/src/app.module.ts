@@ -104,6 +104,7 @@ import { PaymentRequestModule } from "./modules/operations/payment-requests/paym
 import { ProjectDashboardModule } from "./modules/operations/projects/project-dashboard.module";
 import { PurchaseInvoiceModule } from "./modules/operations/purchase-invoices/purchase-invoice.module";
 import { VendorWorkOrderModule } from "./modules/operations/vendor-work-orders/vendor-work-order.module";
+import { SaleInvoiceModule } from "./modules/operations/sale-invoices/sale-invoice.module";
 import { WoAmendmentsModule } from "./modules/operations/wo-amendments/wo-amendments.module";
 import { WoContactsModule } from "./modules/operations/wo-contacts/wo-contacts.module";
 import { WoDetailsModule } from "./modules/operations/wo-details/wo-details.module";
@@ -234,6 +235,7 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         LocationPerformanceModule,
         ContractAgreementModule,
         VendorWorkOrderModule,
+        SaleInvoiceModule,
         PurchaseInvoiceModule,
         PaymentRequestModule,
         MakerRequestModule,
