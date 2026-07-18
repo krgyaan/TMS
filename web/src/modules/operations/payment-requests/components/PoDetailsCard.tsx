@@ -2,8 +2,8 @@ import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getShortId } from "@/lib/id-utils";
 import { formatINR } from "@/hooks/useINRFormatter";
-import { projectDashboardApi } from "@/services/api/project-dashboard.api";
-import type { PurchaseOrderRow } from "../../project-dashboard/helpers/projectDashboard.types";
+import { purchaseOrderApi } from "@/services/api/purchase-order.api";
+import type { PurchaseOrderRow } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
 
 interface PoDetailsCardProps {
     po: PurchaseOrderRow;
@@ -85,7 +85,7 @@ export const PoDetailsCard: React.FC<PoDetailsCardProps> = ({ po, requestAmount 
                 )}
                 <div className="pt-2">
                     <a
-                        href={projectDashboardApi.getPurchaseOrderPdfUrl(po.id)}
+                        href={purchaseOrderApi.getPurchaseOrderPdfUrl(po.id)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-600 underline text-xs"
