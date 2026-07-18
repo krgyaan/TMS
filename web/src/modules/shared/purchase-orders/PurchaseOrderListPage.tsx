@@ -14,8 +14,8 @@ import { paths } from "@/app/routes/paths";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
-import { useAllPurchaseOrders } from "@/hooks/api/useProjectDashboard";
-import type { PurchaseOrderRow } from "@/modules/operations/project-dashboard/helpers/projectDashboard.types";
+import { useAllPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
+import type { PurchaseOrderRow } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
 import { SetTdsDialog } from "./components/SetTdsDialog";
 
 const PurchaseOrderListPage: React.FC = () => {
