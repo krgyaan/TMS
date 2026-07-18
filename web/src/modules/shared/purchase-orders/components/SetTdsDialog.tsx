@@ -11,9 +11,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { formatINR } from "@/hooks/useINRFormatter";
-import { useSetTdsPercentage } from "@/hooks/api/useProjectDashboard";
+import { useSetTdsPercentage } from "@/hooks/api/usePurchaseOrders";
 import { Loader2 } from "lucide-react";
-import type { PurchaseOrderRow } from "@/modules/operations/project-dashboard/helpers/projectDashboard.types";
+import type { PurchaseOrderRow } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
 import SelectField from "@/components/form/SelectField";
 import { Form } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";

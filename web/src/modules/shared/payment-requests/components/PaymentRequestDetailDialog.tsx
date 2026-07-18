@@ -10,7 +10,7 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { usePaymentRequestDetails } from "@/hooks/api/useProjectPaymentRequests";
 import { tenderFilesService } from "@/services/api/tender-files.service";
-import { projectDashboardApi } from "@/services/api/project-dashboard.api";
+import { purchaseOrderApi } from "@/services/api/purchase-order.api";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
 
@@ -153,7 +153,7 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                             })()}
                             <div className="pt-2">
                                 <a
-                                    href={projectDashboardApi.getPurchaseOrderPdfUrl(detail.purchaseOrderId)}
+                                    href={purchaseOrderApi.getPurchaseOrderPdfUrl(detail.purchaseOrderId)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-blue-600 underline text-xs"
