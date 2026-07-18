@@ -36,7 +36,7 @@ const defaultFormValues: MakerRequestFormValues = {
 
 const headings = [
     {label: 'fixed', value: 'Fixed'},
-    {label: 'loan_repayment', value: 'Loan Repayment/Return'},
+    {label: 'loan_return', value: 'Loan Repayment/Return'},
     {label: 'own_bank', value: 'Own Bank'},
     {label: 'capital_asset_purchase', value: 'Capital/Asset Purchase'},
 ];

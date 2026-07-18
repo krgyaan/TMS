@@ -1,5 +1,11 @@
-import type { AcceptanceStatus, CreateWoDetailDto, PaginatedResult, RequestAmendmentDto, SlaComplianceReport, UpdateWoDetailDto, WoAcceptanceDecisionDto, WoDetail, WoDetailsDashboardSummary, WoDetailsFilters, WoDetailWithRelations, WoTimeline } from '@/modules/operations/types/wo.types';
-import type { Contact, Page1FormValues, Page2FormValues, Page3FormValues, Page4FormValues, Page5FormValues, Page6FormValues, Page7FormValues, WizardProgress, WizardValidationResult } from '@/modules/operations/wo-details/helpers/woDetail.types';
+import type {
+  AcceptanceStatus, CreateWoDetailDto, PaginatedResult, RequestAmendmentDto, SlaComplianceReport, UpdateWoDetailDto,
+  WoAcceptanceDecisionDto, WoDetail, WoDetailsDashboardSummary, WoDetailsFilters, WoDetailWithRelations, WoTimeline
+} from '@/modules/operations/types/wo.types';
+import type {
+  Contact, Page1FormValues, Page2FormValues, Page3FormValues, Page4FormValues, Page5FormValues,
+  Page6FormValues, Page7FormValues, WizardProgress, WizardValidationResult
+} from '@/modules/operations/wo-details/helpers/woDetail.types';
 import { BaseApiService } from './base.service';
 
 // TYPES
@@ -16,14 +22,6 @@ interface WizardProgressResponse extends WizardProgress {
   percentComplete: number;
   canSubmitForReview: boolean;
   blockers: string[];
-}
-
-interface WizardInitResponse {
-  id: number;
-  woBasicDetailId: number;
-  status: string;
-  currentPage: number;
-  createdAt: string;
 }
 
 interface PageSubmitResponse extends WoDetail {
@@ -107,10 +105,6 @@ class WoDetailsService extends BaseApiService {
   }
 
   // WIZARD OPERATIONS (ESSENTIAL FOR FORMS)
-  async initializeWizard(woBasicDetailId: number): Promise<WizardInitResponse> {
-    return this.post<WizardInitResponse>('/initialize', { woBasicDetailId });
-  }
-
   async getWizardProgress(id: number): Promise<WizardProgressResponse> {
     return this.get<WizardProgressResponse>(`/${id}/wizard/progress`);
   }
