@@ -2,13 +2,12 @@ import { paths } from "@/app/routes/paths";
 import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { NumberInput } from "@/components/form/NumberInput";
+import { SelectField } from "@/components/form/SelectField";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,7 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useWoBillingData, useCreateSaleInvoice } from "@/hooks/api/useSaleInvoices";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, ArrowLeft, Building2, Calendar, Copy, Eye, FileText, Loader2, MapPin, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, Building2, Calendar, Copy, Eye, FileText, MapPin, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
@@ -35,6 +34,8 @@ const defaultFormValues: SaleInvoiceFormValues = {
     shippingCustomerName: "",
     shippingAddress: "",
     shippingGst: "",
+    selectedBillingAddressId: "",
+    selectedShippingAddressId: "",
     items: [],
     remarks: "",
 };
@@ -148,23 +149,32 @@ export default function CreateSaleInvoicePage() {
         }));
     }, [woBillingData]);
 
-    const handleBillingSelect = (value: string) => {
-        const addr = (woBillingData?.billingAddresses || []).find((a: WoBillingAddress) => String(a.id) === value);
+    const selectedBillingId = form.watch("selectedBillingAddressId");
+    const selectedShippingId = form.watch("selectedShippingAddressId");
+
+    useEffect(() => {
+        if (!selectedBillingId) return;
+        const addr = (woBillingData?.billingAddresses || []).find(
+            (a: WoBillingAddress) => String(a.id) === selectedBillingId
+        );
         if (addr) {
             form.setValue("billingCustomerName", addr.customerName);
             form.setValue("billingAddress", addr.address);
             form.setValue("billingGst", addr.gst || "");
         }
-    };
+    }, [selectedBillingId, woBillingData, form]);
 
-    const handleShippingSelect = (value: string) => {
-        const addr = (woBillingData?.shippingAddresses || []).find((a: WoShippingAddress) => String(a.id) === value);
+    useEffect(() => {
+        if (!selectedShippingId) return;
+        const addr = (woBillingData?.shippingAddresses || []).find(
+            (a: WoShippingAddress) => String(a.id) === selectedShippingId
+        );
         if (addr) {
             form.setValue("shippingCustomerName", addr.customerName);
             form.setValue("shippingAddress", addr.address);
             form.setValue("shippingGst", addr.gst || "");
         }
-    };
+    }, [selectedShippingId, woBillingData, form]);
 
     const handleAddBillingAddress = () => {
         if (!newBillingAddr.customerName.trim() || !newBillingAddr.address.trim()) {
@@ -264,11 +274,9 @@ export default function CreateSaleInvoicePage() {
             <CardContent className="space-y-8">
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)}>
-                        <div className="rounded-lg border p-4 mb-4 max-w-xs">
-                            <FieldWrapper control={form.control} name="invoiceDate" label={<><Calendar className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Invoice Date <span className="text-destructive">*</span></>}>
-                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                            </FieldWrapper>
-                        </div>
+                        <FieldWrapper control={form.control} name="invoiceDate" label={<>Invoice Date <span className="text-destructive">*</span></>}>
+                            {(field) => <DateInput value={field.value} onChange={field.onChange} />}
+                        </FieldWrapper>
 
                         <div className="space-y-4">
                             <div className="flex items-center justify-between flex-wrap gap-4">
@@ -317,7 +325,7 @@ export default function CreateSaleInvoicePage() {
                                                     <TableCell className="p-1 align-top pt-2">
                                                         <FieldWrapper control={form.control} name={`items.${index}.itemDescription` as any} label="">
                                                             {(fieldProps) => (
-                                                                <Textarea {...fieldProps} placeholder="Enter description" rows={2} className="min-h-[36px]" />
+                                                                <Textarea readOnly {...fieldProps} placeholder="Enter description" rows={2} className="min-h-[36px]" />
                                                             )}
                                                         </FieldWrapper>
                                                     </TableCell>
@@ -350,25 +358,19 @@ export default function CreateSaleInvoicePage() {
                                                         </FieldWrapper>
                                                     </TableCell>
                                                     <TableCell className="p-1 align-top pt-2">
-                                                        <FieldWrapper control={form.control} name={`items.${index}.gstRate` as any} label="">
-                                                            {(fieldProps) => (
-                                                                <Select
-                                                                    value={String(fieldProps.value ?? 18)}
-                                                                    onValueChange={(v) => fieldProps.onChange(Number(v))}
-                                                                >
-                                                                    <SelectTrigger className="h-9">
-                                                                        <SelectValue />
-                                                                    </SelectTrigger>
-                                                                    <SelectContent>
-                                                                        <SelectItem value="0">0%</SelectItem>
-                                                                        <SelectItem value="5">5%</SelectItem>
-                                                                        <SelectItem value="12">12%</SelectItem>
-                                                                        <SelectItem value="18">18%</SelectItem>
-                                                                        <SelectItem value="28">28%</SelectItem>
-                                                                    </SelectContent>
-                                                                </Select>
-                                                            )}
-                                                        </FieldWrapper>
+                                                        <SelectField
+                                                            control={form.control}
+                                                            name={`items.${index}.gstRate` as any}
+                                                            label=""
+                                                            options={[
+                                                                { value: "0", label: "0%" },
+                                                                { value: "5", label: "5%" },
+                                                                { value: "12", label: "12%" },
+                                                                { value: "18", label: "18%" },
+                                                                { value: "28", label: "28%" },
+                                                            ]}
+                                                            placeholder="GST"
+                                                        />
                                                     </TableCell>
                                                     <TableCell className="p-1 text-right align-top pt-4 font-medium tabular-nums">
                                                         {qty > 0 && rate > 0 ? formatCurrency(amount) : "-"}
@@ -466,19 +468,13 @@ export default function CreateSaleInvoicePage() {
                                 </div>
                                 <p className="text-sm text-muted-foreground mb-4">Billing address from work order</p>
                                 <div className="mb-4">
-                                    <Label>Select Existing Billing Address</Label>
-                                    <Select onValueChange={handleBillingSelect}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Choose billing address..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {billingAddressOptions.map((opt) => (
-                                                <SelectItem key={opt.value} value={opt.value}>
-                                                    {opt.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <SelectField
+                                        control={form.control}
+                                        name="selectedBillingAddressId"
+                                        label="Select Existing Billing Address"
+                                        options={billingAddressOptions}
+                                        placeholder="Choose billing address..."
+                                    />
                                 </div>
                                 <div className="space-y-4">
                                     <FieldWrapper control={form.control} name="billingCustomerName" label={<><Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Customer Name <span className="text-destructive">*</span></>}>
@@ -522,19 +518,13 @@ export default function CreateSaleInvoicePage() {
                                 </div>
                                 <p className="text-sm text-muted-foreground mb-4">Shipping address from work order</p>
                                 <div className="mb-4">
-                                    <Label>Select Existing Shipping Address</Label>
-                                    <Select onValueChange={handleShippingSelect}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Choose shipping address..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {shippingAddressOptions.map((opt) => (
-                                                <SelectItem key={opt.value} value={opt.value}>
-                                                    {opt.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <SelectField
+                                        control={form.control}
+                                        name="selectedShippingAddressId"
+                                        label="Select Existing Shipping Address"
+                                        options={shippingAddressOptions}
+                                        placeholder="Choose shipping address..."
+                                    />
                                 </div>
                                 <div className="space-y-4">
                                     <FieldWrapper control={form.control} name="shippingCustomerName" label={<><Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Customer Name <span className="text-destructive">*</span></>}>

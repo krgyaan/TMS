@@ -63,9 +63,9 @@ export class SaleInvoiceService {
 
     async generateInvoiceNumber(projectName?: string): Promise<string> {
         const sanitizedName = (projectName || "PROJ")
-            .replace(/[^a-zA-Z0-9]/g, "")
-            .toUpperCase()
-            .slice(0, 10);
+            .replace(/\s+/g, "_")
+            .replace(/[^a-zA-Z0-9_]/g, "")
+            .toUpperCase();
 
         const now = new Date();
         const year = now.getFullYear();
@@ -85,11 +85,11 @@ export class SaleInvoiceService {
         let seq = 1;
         if (last?.num) {
             const parts = last.num.split("/");
-            const lastSeq = parseInt(parts[parts.length - 1]?.replace("SI", "") || "0", 10);
+            const lastSeq = Number.parseInt(parts.at(-1)?.replace("SI", "") || "0", 10);
             seq = lastSeq + 1;
         }
 
-        return `SI/${sanitizedName}/${fyString}/SI${seq}`;
+        return `SI/${sanitizedName}/${fyString}/SI${String(seq).padStart(4, "0")}`;
     }
 
     async create(body: any, userId: number) {
