@@ -1,6 +1,11 @@
 import { handleQueryError } from '@/lib/react-query';
-import type { CreateWoDetailDto, RequestAmendmentDto, UpdateWoDetailDto, WoAcceptanceDecisionDto, WoDetailsFilters } from '@/modules/operations/types/wo.types';
-import type { Page1FormValues, Page2FormValues, Page3FormValues, Page4FormValues, Page5FormValues, Page6FormValues, Page7FormValues, PageData, WizardValidationResult } from '@/modules/operations/wo-details/helpers/woDetail.types';
+import type { 
+  CreateWoDetailDto, RequestAmendmentDto, UpdateWoDetailDto, WoAcceptanceDecisionDto, WoDetailsFilters 
+} from '@/modules/operations/types/wo.types';
+import type { 
+  Page1FormValues, Page2FormValues, Page3FormValues, Page4FormValues, Page5FormValues, 
+  Page6FormValues, Page7FormValues, PageData, WizardValidationResult 
+} from '@/modules/operations/wo-details/helpers/woDetail.types';
 import { woDetailsService } from '@/services/api/wo-details.api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
@@ -106,22 +111,6 @@ export const usePage7Data = (woDetailId: number | null) => {
 };
 
 // WIZARD MUTATION HOOKS (ESSENTIAL - USED BY FORMS)
-// Initialize wizard (create empty WoDetail)
-export const useInitializeWizard = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (woBasicDetailId: number) => woDetailsService.initializeWizard(woBasicDetailId),
-    onSuccess: (result, woBasicDetailId) => {
-      queryClient.invalidateQueries({ queryKey: woDetailsKeys.byBasicDetail(woBasicDetailId) });
-      return result;
-    },
-    onError: (error: any) => {
-      toast.error(handleQueryError(error));
-    },
-  });
-};
-
 export const useTenderConsolidatedData = (tenderId: number | null) => {
   return useQuery({
     queryKey: woDetailsKeys.tenderConsolidatedData(tenderId ?? 0),

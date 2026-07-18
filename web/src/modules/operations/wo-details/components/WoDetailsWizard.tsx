@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -10,7 +10,8 @@ import { apiToForm, formToApi } from "../helpers/woDetail.mapper";
 import { WizardStepper } from "./WizardStepper";
 
 import { useWoBasicDetailById } from "@/hooks/api/useWoBasicDetails";
-import { useInitializeWizard, useSavePageDraft, useSkipPage, useSubmitAllPages, useSubmitPage, useWoDetailByBasicDetail } from "@/hooks/api/useWoDetails";
+import { useSavePageDraft, useSkipPage, useSubmitAllPages, useSubmitPage } from "@/hooks/api/useWoDetails";
+import { woDetailsService } from "@/services/api/wo-details.api";
 import type { WizardState } from "../helpers/woDetail.types";
 
 const Page1Handover = lazy(() => import("./pages/Page1Handover").then((m) => ({ default: m.Page1Handover })));
@@ -67,15 +68,10 @@ export function WoDetailsWizard({
     const navigate = useNavigate();
 
     const [woDetailId, setWoDetailId] = useState<number | null>(existingWoDetailId || null);
-    const hasAttemptedInit = useRef(false);
-    const { data: existingDetail, isLoading: isLoadingExisting, isFetching: isFetchingExisting } = useWoDetailByBasicDetail(
-        woBasicDetailId
-    );
     const { data: basicDetail } = useWoBasicDetailById(woBasicDetailId);
     const tenderId = basicDetail?.tenderId;
     const [isSavingDraft, setIsSavingDraft] = useState(false);
 
-    const initializeWizard = useInitializeWizard();
     const savePageDraft = useSavePageDraft();
     const submitPage = useSubmitPage();
     const skipPage = useSkipPage();
@@ -88,33 +84,16 @@ export function WoDetailsWizard({
         status: existingData?.status || "draft",
     });
 
-    useEffect(() => {
-        if (mode === 'create' && !woDetailId && !isLoadingExisting && !isFetchingExisting && !hasAttemptedInit.current) {
-            hasAttemptedInit.current = true;
-            if (existingDetail?.id) {
-                setWoDetailId(existingDetail.id);
-                setWizardState((prev) => ({
-                    ...prev,
-                    woDetailId: existingDetail.id,
-                    currentPage: existingDetail.currentPage || 1,
-                    status: existingDetail.status || 'draft',
-                }));
-            } else {
-                initializeWizard.mutate(woBasicDetailId, {
-                    onSuccess: (result) => {
-                        setWoDetailId(result.id);
-                        setWizardState((prev) => ({
-                            ...prev,
-                            woDetailId: result.id,
-                        }));
-                    },
-                    onError: () => {
-                        toast.error("Failed to initialize wizard");
-                    },
-                });
-            }
-        }
-    }, [mode, woDetailId, existingDetail, isLoadingExisting, isFetchingExisting, woBasicDetailId, initializeWizard]);
+    const ensureWoDetailCreated = async (): Promise<number> => {
+        if (woDetailId) return woDetailId;
+        const result = await woDetailsService.create({ woBasicDetailId });
+        setWoDetailId(result.id);
+        setWizardState((prev) => ({
+            ...prev,
+            woDetailId: result.id,
+        }));
+        return result.id;
+    };
 
     const pageInitialData = useMemo(() => {
         if (!existingData) return undefined;
@@ -131,11 +110,11 @@ export function WoDetailsWizard({
     }, [existingData, wizardState.currentPage]);
 
     const handleSaveAndContinue = async (data: Record<string, unknown>) => {
-        if (!woDetailId) return;
+        const id = await ensureWoDetailCreated();
         setIsSavingDraft(true);
         try {
             const mappedData = applyMapper(data, wizardState.currentPage);
-            await submitPage.mutateAsync({ woDetailId, pageNum: wizardState.currentPage, data: mappedData });
+            await submitPage.mutateAsync({ woDetailId: id, pageNum: wizardState.currentPage, data: mappedData });
             // After successful save, advance to next page
             if (wizardState.currentPage < WIZARD_CONFIG.TOTAL_PAGES) {
                 setWizardState((prev) => ({
@@ -156,11 +135,11 @@ export function WoDetailsWizard({
     };
 
     const handleSaveDraftOnly = async (data: Record<string, unknown>) => {
-        if (!woDetailId) return;
+        const id = await ensureWoDetailCreated();
         setIsSavingDraft(true);
         try {
             const mappedData = applyMapper(data, wizardState.currentPage);
-            await savePageDraft.mutateAsync({ woDetailId, pageNum: wizardState.currentPage, data: mappedData });
+            await savePageDraft.mutateAsync({ woDetailId: id, pageNum: wizardState.currentPage, data: mappedData });
             toast.success("Draft saved");
             return [];
         } catch (error: any) {
@@ -175,9 +154,9 @@ export function WoDetailsWizard({
     };
 
     const handleSkipPage = async () => {
-        if (!woDetailId) return;
+        const id = await ensureWoDetailCreated();
         try {
-            await skipPage.mutateAsync({ woDetailId, pageNum: wizardState.currentPage });
+            await skipPage.mutateAsync({ woDetailId: id, pageNum: wizardState.currentPage });
             if (wizardState.currentPage < WIZARD_CONFIG.TOTAL_PAGES) {
                 setWizardState((prev) => ({
                     ...prev,
@@ -191,8 +170,8 @@ export function WoDetailsWizard({
     };
 
     const handleSubmitForReview = async () => {
-        if (!woDetailId) return;
-        await submitAllPages.mutateAsync(woDetailId);
+        const id = await ensureWoDetailCreated();
+        await submitAllPages.mutateAsync(id);
         navigate(-1);
     };
 
