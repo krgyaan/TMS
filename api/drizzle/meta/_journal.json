@@ -337,6 +337,13 @@
       "when": 1784948800000,
       "tag": "0073_add_tender_result_details",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1786140800000,
+      "tag": "0087_create_sale_invoices_tables",
+      "breakpoints": true
     }
   ]
 }
