@@ -51,6 +51,15 @@ function getPermissionModule(title: string, parentMenuTitle?: string): string | 
         }
     }
 
+    if (title === 'Sale Invoices') {
+        if (parentMenuTitle === 'Operations') {
+            return 'ops.sale-invoices';
+        }
+        if (parentMenuTitle === 'Accounts') {
+            return 'accounts.sale-invoices';
+        }
+    }
+
     // Standard mapping for unique titles
     const MENU_PERMISSION_MAP: Record<string, string> = {
         // Tendering sub-items
