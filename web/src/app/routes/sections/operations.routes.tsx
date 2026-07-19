@@ -34,6 +34,8 @@ const Operations_EditPOPage = lazy(() => import("@/modules/operations/purchase-o
 const Operations_PoPdfVersions = lazy(() => import("@/modules/operations/purchase-orders/pages/PoPdfVersionsPage"));
 const Operations_PurchaseOrderTabs = lazy(() => import("@/modules/shared/purchase-orders/PurchaseOrderTabsPage"));
 const Operations_RaiseSaleInvoiceFormPage = lazy(() => import("@/modules/operations/sale-invoices/CreateSaleInvoicePage"));
+const Operations_SaleInvoiceTabs = lazy(() => import("@/modules/shared/sale-invoices/SaleInvoiceTabsPage"));
+const Operations_ViewSaleInvoice = lazy(() => import("@/modules/shared/sale-invoices/ViewSaleInvoicePage"));
 
 const Operations_RaiseVendorWoFormPage = lazy(() => import("@/modules/operations/vendor-work-orders/CreateVendorWorkOrderPage"));
 const Operations_EditVendorWoPage = lazy(() => import("@/modules/operations/vendor-work-orders/EditVendorWorkOrderPage"));
@@ -86,6 +88,8 @@ export default function OperationsRoutes() {
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId/edit" element={<RouteWrapper><Operations_EditVendorWoPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId/pdf-versions" element={<RouteWrapper><Operations_VendorWoPdfVersions /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/sale-invoice/create" element={<RouteWrapper><Operations_RaiseSaleInvoiceFormPage /></RouteWrapper>} />
+            <Route path="sale-invoices" element={<RouteWrapper><Operations_SaleInvoiceTabs /></RouteWrapper>} />
+            <Route path="sale-invoices/:siId" element={<RouteWrapper><Operations_ViewSaleInvoice /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/project-purchase-invoice/create" element={<RouteWrapper><Operations_CreatePurchaseInvoice /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/project-purchase-invoice/:piId/edit" element={<RouteWrapper><Operations_EditPurchaseInvoice /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/project-payment-request/create" element={<RouteWrapper><Operations_CreatePaymentRequest /></RouteWrapper>} />

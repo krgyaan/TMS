@@ -29,6 +29,7 @@ const TaskStatusUpdate = lazy(() => import("@/modules/accounts/delegation/TaskSt
 
 const Accounts_PurchaseOrderTabs = lazy(() => import("@/modules/shared/purchase-orders/PurchaseOrderTabsPage"));
 const Accounts_PaymentRequestTabs = lazy(() => import("@/modules/shared/payment-requests/PaymentRequestTabsPage"));
+const Accounts_SaleInvoiceTabs = lazy(() => import("@/modules/shared/sale-invoices/SaleInvoiceTabsPage"));
 const Accounts_CreateMakerRequest = lazy(() => import("@/modules/operations/maker-requests/CreateMakerRequestPage"));
 
 export default function AccountsRoutes() {
@@ -58,6 +59,7 @@ export default function AccountsRoutes() {
 
             <Route path="delegation" element={<RouteWrapper><TaskDashboard /></RouteWrapper>} />
             <Route path="purchase-orders" element={<RouteWrapper><Accounts_PurchaseOrderTabs /></RouteWrapper>} />
+            <Route path="sale-invoices" element={<RouteWrapper><Accounts_SaleInvoiceTabs /></RouteWrapper>} />
             <Route path="payment-requests" element={<RouteWrapper><Accounts_PaymentRequestTabs /></RouteWrapper>} />
             <Route path="maker-requests/create" element={<RouteWrapper><Accounts_CreateMakerRequest /></RouteWrapper>} />
             <Route path="delegation/add" element={<RouteWrapper><AddTask /></RouteWrapper>} />

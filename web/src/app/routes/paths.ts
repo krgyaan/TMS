@@ -147,6 +147,8 @@ export const paths = {
         editProjectPurchaseInvoicePage: (piId: number, projectId: number) => `/operations/project-dashboard/${projectId}/project-purchase-invoice/${piId}/edit`,
         raiseSaleInvoiceForm: (projectId: number) =>
             `/operations/project-dashboard/${projectId}/sale-invoice/create`,
+        saleInvoices: "/operations/sale-invoices",
+        viewSaleInvoice: (siId: number) => `/operations/sale-invoices/${siId}`,
         raiseProjectPaymentRequestForm: (projectId: number, poId?: number) =>
             `/operations/project-dashboard/${projectId}/project-payment-request/create${poId ? `?poId=${poId}` : ''}`,
         editProjectPaymentRequestPage: (prId: number, projectId: number) => `/operations/project-dashboard/${projectId}/project-payment-request/${prId}/edit`,
@@ -223,6 +225,7 @@ export const paths = {
         delegationView: (id: string) => `/accounts/delegation/${id}`,
         delegationUpdate: (id: string) => `/accounts/delegation/${id}/update`,
         purchaseOrders: "/accounts/purchase-orders",
+        saleInvoices: "/accounts/sale-invoices",
         paymentRequests: "/accounts/payment-requests",
         makerRequestCreate: "/accounts/maker-requests/create",
     },
