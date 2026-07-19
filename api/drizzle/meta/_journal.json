@@ -344,6 +344,13 @@
       "when": 1786140800000,
       "tag": "0087_create_sale_invoices_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1786140800001,
+      "tag": "0088_add_missing_purchase_order_id_columns",
+      "breakpoints": true
     }
   ]
 }
