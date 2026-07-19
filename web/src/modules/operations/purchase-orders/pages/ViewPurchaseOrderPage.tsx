@@ -8,7 +8,7 @@ import { usePurchaseOrderDetails } from "@/hooks/api/usePurchaseOrders";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
-import { AlertCircle, ArrowLeft, ExternalLink, FileText } from "lucide-react";
+import { AlertCircle, ArrowLeft, Calculator, ExternalLink, FileText } from "lucide-react";
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { PurchaseOrderView } from "../helpers/purchaseOrderView.types";
@@ -19,15 +19,6 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "def
     payment_done: { label: "Payment Done", variant: "success" },
     rejected: { label: "Rejected", variant: "destructive" },
 };
-
-function Field({ label, value }: Readonly<{ label: string; value: React.ReactNode }>) {
-    return (
-        <div>
-            <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
-            <p className="text-sm break-words">{value ?? "—"}</p>
-        </div>
-    );
-}
 
 function PdfVersionsInline({ versions, poId }: Readonly<{ versions: Record<string, { path: string; hash: string }> | null; poId: number; projectId: number }>) {
     if (!versions || Object.keys(versions).length === 0) return <span className="text-muted-foreground">—</span>;
@@ -43,6 +34,14 @@ function PdfVersionsInline({ versions, poId }: Readonly<{ versions: Record<strin
                 </Button>
             ))}
         </div>
+    );
+}
+
+function SectionHeader({ title }: Readonly<{ title: string }>) {
+    return (
+        <TableRow className="bg-muted/50">
+            <TableCell colSpan={4} className="font-semibold text-sm">{title}</TableCell>
+        </TableRow>
     );
 }
 
@@ -103,7 +102,6 @@ const ViewPurchaseOrderPage = () => {
 
     return (
         <Card>
-            {/* Header */}
             <CardHeader>
                 <div className="flex items-center gap-4">
                     <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
@@ -119,19 +117,43 @@ const ViewPurchaseOrderPage = () => {
             <CardContent className="space-y-2">
                 {/* PO Details */}
                 <Card>
-                    <CardHeader><CardTitle className="text-base">PO Details</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="flex items-center gap-2 text-base"><FileText className="h-5 w-5" />PO Details</CardTitle></CardHeader>
                     <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
-                            <Field label="Date" value={po.poDate ? formatDate(po.poDate) : null} />
-                            <Field label="Pre-GST" value={formatINR(po.total?.total ?? 0)} />
-                            <Field label="GST" value={formatINR(po.total?.totalGst ?? 0)} />
-                            <Field label="Total" value={<span className="font-semibold">{formatINR(po.total?.totalWithGst ?? 0)}</span>} />
-                            <Field label="Raised By" value={po.raisedByName} />
-                            <Field label="TDS %" value={po.tdsPercentage != null ? `${po.tdsPercentage}%` : null} />
-                            <Field label="TDS Amount" value={po.tdsAmount != null ? formatINR(Number(po.tdsAmount)) : null} />
-                            <Field label="Amount After TDS" value={po.amountAfterTds != null ? <span className="font-semibold">{formatINR(Number(po.amountAfterTds))}</span> : null} />
-                            <div className="col-span-2"><Field label="PDFs" value={<PdfVersionsInline versions={po.generatedPdfVersions} poId={po.id} projectId={projectId} />} /></div>
-                        </div>
+                        <Table>
+                            <TableBody>
+                                <SectionHeader title="Basic Information" />
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Date</TableCell>
+                                    <TableCell className="text-sm w-1/4">{po.poDate ? formatDate(po.poDate) : '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Raised By</TableCell>
+                                    <TableCell className="text-sm w-1/4">{po.raisedByName || '—'}</TableCell>
+                                </TableRow>
+                                <SectionHeader title="Financial Information" />
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Pre-GST</TableCell>
+                                    <TableCell className="text-sm">{formatINR(po.total?.total ?? 0)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">GST</TableCell>
+                                    <TableCell className="text-sm">{formatINR(po.total?.totalGst ?? 0)}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Total</TableCell>
+                                    <TableCell className="text-sm font-semibold">{formatINR(po.total?.totalWithGst ?? 0)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">TDS %</TableCell>
+                                    <TableCell className="text-sm">{po.tdsPercentage != null ? `${po.tdsPercentage}%` : '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">TDS Amount</TableCell>
+                                    <TableCell className="text-sm">{po.tdsAmount != null ? formatINR(Number(po.tdsAmount)) : '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Amount After TDS</TableCell>
+                                    <TableCell className="text-sm font-semibold">{po.amountAfterTds != null ? formatINR(Number(po.amountAfterTds)) : '—'}</TableCell>
+                                </TableRow>
+                                <SectionHeader title="Documents" />
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">PDFs</TableCell>
+                                    <TableCell className="text-sm" colSpan={3}><PdfVersionsInline versions={po.generatedPdfVersions} poId={po.id} projectId={projectId} /></TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
                     </CardContent>
                 </Card>
 
@@ -227,19 +249,41 @@ const ViewPurchaseOrderPage = () => {
 
                 {/* Summary */}
                 <Card>
-                    <CardHeader><CardTitle className="text-base">Summary</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Calculator className="h-5 w-5" />Summary</CardTitle></CardHeader>
                     <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
-                            <Field label="Total PO Amount" value={<span className="font-semibold">{formatINR(po.total?.totalWithGst ?? 0)}</span>} />
-                            <Field label="TDS Amount" value={po.tdsAmount != null ? formatINR(Number(po.tdsAmount)) : null} />
-                            <Field label="Amount After TDS" value={<span className="font-semibold">{formatINR(amountAfterTds)}</span>} />
-                            <Field label="Payment Requested" value={formatINR(totalPaymentRequested)} />
-                            <Field label="Maker Done" value={formatINR(totalMakerDone)} />
-                            <Field label="Payment Done" value={<span className="font-semibold text-green-600">{formatINR(totalPaymentDone)}</span>} />
-                            <Field label="Remaining (To be Requested)" value={<span className="font-semibold">{formatINR(Math.max(0, amountAfterTds - totalPaymentRequested))}</span>} />
-                            <Field label="PI Amount Received" value={formatINR(totalPiAmount)} />
-                            <Field label="Remaining PI of Payment Done" value={<span className="font-semibold">{formatINR(Math.max(0, totalPiAmount - totalPaymentDone))}</span>} />
-                        </div>
+                        <Table>
+                            <TableBody>
+                                <SectionHeader title="Summary" />
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Total PO Amount</TableCell>
+                                    <TableCell className="text-sm font-semibold w-1/4">{formatINR(po.total?.totalWithGst ?? 0)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">TDS Amount</TableCell>
+                                    <TableCell className="text-sm w-1/4">{po.tdsAmount != null ? formatINR(Number(po.tdsAmount)) : '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Amount After TDS</TableCell>
+                                    <TableCell className="text-sm font-semibold">{formatINR(amountAfterTds)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Payment Requested</TableCell>
+                                    <TableCell className="text-sm">{formatINR(totalPaymentRequested)}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Maker Done</TableCell>
+                                    <TableCell className="text-sm">{formatINR(totalMakerDone)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Payment Done</TableCell>
+                                    <TableCell className="text-sm font-semibold text-green-600">{formatINR(totalPaymentDone)}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Remaining (To be Requested)</TableCell>
+                                    <TableCell className="text-sm font-semibold" colSpan={3}>{formatINR(Math.max(0, amountAfterTds - totalPaymentRequested))}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">PI Amount Received</TableCell>
+                                    <TableCell className="text-sm">{formatINR(totalPiAmount)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Remaining PI of Payment Done</TableCell>
+                                    <TableCell className="text-sm font-semibold">{formatINR(Math.max(0, totalPiAmount - totalPaymentDone))}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
                     </CardContent>
                 </Card>
             </CardContent>

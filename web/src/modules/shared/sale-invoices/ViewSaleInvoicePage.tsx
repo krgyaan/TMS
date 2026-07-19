@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useSaleInvoice } from "@/hooks/api/useSaleInvoices";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
-import { AlertCircle, ArrowLeft, ExternalLink } from "lucide-react";
+import { AlertCircle, ArrowLeft, Banknote, Calculator, ExternalLink, FileText, History, IndianRupee, Lock, Package } from "lucide-react";
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -18,15 +18,6 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "def
     payment_received: { label: "Payment Received", variant: "success" },
     completed: { label: "Completed", variant: "success" },
 };
-
-function Field({ label, value }: Readonly<{ label: string; value: React.ReactNode }>) {
-    return (
-        <div>
-            <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
-            <p className="text-sm break-words">{value ?? "—"}</p>
-        </div>
-    );
-}
 
 function DocLinks({ paths }: Readonly<{ paths: string[] }>) {
     if (!paths || paths.length === 0) return <span className="text-muted-foreground">—</span>;
@@ -41,6 +32,14 @@ function DocLinks({ paths }: Readonly<{ paths: string[] }>) {
                 </Button>
             ))}
         </div>
+    );
+}
+
+function SectionHeader({ title }: Readonly<{ title: string }>) {
+    return (
+        <TableRow className="bg-muted/50">
+            <TableCell colSpan={4} className="font-semibold text-sm">{title}</TableCell>
+        </TableRow>
     );
 }
 
@@ -105,7 +104,6 @@ const ViewSaleInvoicePage = () => {
 
     return (
         <Card>
-            {/* Header */}
             <CardHeader className="flex items-center gap-4">
                 <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
                     <ArrowLeft className="h-5 w-5" />
@@ -115,106 +113,211 @@ const ViewSaleInvoicePage = () => {
                     <Badge variant={statusCfg.variant}>{statusCfg.label}</Badge>
                 </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-2">
                 {/* Invoice Details */}
                 <Card>
-                    <CardHeader><CardTitle className="text-base">Invoice Details</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="flex items-center gap-2 text-base"><FileText className="h-5 w-5" />Invoice Details</CardTitle></CardHeader>
                     <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
-                            <Field label="Date" value={si.invoiceDate ? formatDate(si.invoiceDate) : null} />
-                            <Field label="Billing Customer" value={si.billingCustomerName} />
-                            <Field label="Billing Address" value={si.billingAddress} />
-                            <Field label="Billing GST" value={si.billingGst} />
-                            <Field label="Shipping Customer" value={si.shippingCustomerName} />
-                            <Field label="Shipping Address" value={si.shippingAddress} />
-                            <Field label="Shipping GST" value={si.shippingGst} />
-                            <Field label="Total Pre-GST" value={formatINR(Number(si.totalPreGst || 0))} />
-                            <Field label="Total GST" value={formatINR(Number(si.totalGst || 0))} />
-                            <Field label="Grand Total" value={<span className="font-semibold">{formatINR(Number(si.grandTotal || 0))}</span>} />
-                            <Field label="Status" value={<Badge variant={statusCfg.variant}>{statusCfg.label}</Badge>} />
-                            <Field label="Raised By" value={si.raisedByName || si.raisedBy} />
-                            <Field label="Remarks" value={si.remarks} />
-                        </div>
+                        <Table>
+                            <TableBody>
+                                <SectionHeader title="Basic Information" />
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Date</TableCell>
+                                    <TableCell className="text-sm w-1/4">{si.invoiceDate ? formatDate(si.invoiceDate) : '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Status</TableCell>
+                                    <TableCell className="w-1/4"><Badge variant={statusCfg.variant}>{statusCfg.label}</Badge></TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Billing Customer</TableCell>
+                                    <TableCell className="text-sm">{si.billingCustomerName || '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Billing GST</TableCell>
+                                    <TableCell className="text-sm">{si.billingGst || '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Billing Address</TableCell>
+                                    <TableCell className="text-sm" colSpan={3}>{si.billingAddress || '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Shipping Customer</TableCell>
+                                    <TableCell className="text-sm">{si.shippingCustomerName || '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Shipping GST</TableCell>
+                                    <TableCell className="text-sm">{si.shippingGst || '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Shipping Address</TableCell>
+                                    <TableCell className="text-sm" colSpan={3}>{si.shippingAddress || '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Raised By</TableCell>
+                                    <TableCell className="text-sm" colSpan={3}>{si.raisedByName || si.raisedBy || '—'}</TableCell>
+                                </TableRow>
+                                {si.remarks && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Remarks</TableCell>
+                                        <TableCell className="text-sm break-words" colSpan={3}>{si.remarks}</TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
                     </CardContent>
                 </Card>
                 {/* Invoice-level GSTs (shown when invoiced+) */}
                 {Number(si.invoiceTaxableAmount) > 0 && (
                     <Card>
-                        <CardHeader><CardTitle className="text-base">Invoice Financials</CardTitle></CardHeader>
+                        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><IndianRupee className="h-5 w-5" />Invoice Financials</CardTitle></CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
-                                <Field label="Taxable Amount" value={formatINR(Number(si.invoiceTaxableAmount || 0))} />
-                                <Field label="IGST" value={formatINR(Number(si.invoiceIgst || 0))} />
-                                <Field label="CGST" value={formatINR(Number(si.invoiceCgst || 0))} />
-                                <Field label="SGST" value={formatINR(Number(si.invoiceSgst || 0))} />
-                                <Field label="Invoice Total" value={<span className="font-semibold">{formatINR(Number(si.invoiceTotal || 0))}</span>} />
-                                <Field label="Documents" value={<DocLinks paths={invoiceDocs} />} />
-                            </div>
+                            <Table>
+                                <TableBody>
+                                    <SectionHeader title="Financials" />
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Taxable Amount</TableCell>
+                                        <TableCell className="text-sm w-1/4">{formatINR(Number(si.invoiceTaxableAmount || 0))}</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">IGST</TableCell>
+                                        <TableCell className="text-sm w-1/4">{formatINR(Number(si.invoiceIgst || 0))}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">CGST</TableCell>
+                                        <TableCell className="text-sm">{formatINR(Number(si.invoiceCgst || 0))}</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">SGST</TableCell>
+                                        <TableCell className="text-sm">{formatINR(Number(si.invoiceSgst || 0))}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Invoice Total</TableCell>
+                                        <TableCell className="text-sm font-semibold" colSpan={3}>{formatINR(Number(si.invoiceTotal || 0))}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Documents</TableCell>
+                                        <TableCell className="text-sm" colSpan={3}><DocLinks paths={invoiceDocs} /></TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
                         </CardContent>
                     </Card>
                 )}
                 {/* Credit Note */}
                 {Number(si.cnTaxable) > 0 && (
                     <Card>
-                        <CardHeader><CardTitle className="text-base">Credit Note</CardTitle></CardHeader>
+                        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><FileText className="h-5 w-5" />Credit Note</CardTitle></CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
-                                <Field label="CN Taxable" value={formatINR(Number(si.cnTaxable || 0))} />
-                                <Field label="CN IGST" value={formatINR(Number(si.cnIgst || 0))} />
-                                <Field label="CN CGST" value={formatINR(Number(si.cnCgst || 0))} />
-                                <Field label="CN SGST" value={formatINR(Number(si.cnSgst || 0))} />
-                                <Field label="CN Total" value={<span className="font-semibold">{formatINR(Number(si.cnTotal || 0))}</span>} />
-                                <Field label="Documents" value={<DocLinks paths={creditNoteDocs} />} />
-                            </div>
+                            <Table>
+                                <TableBody>
+                                    <SectionHeader title="Credit Note" />
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">CN Taxable</TableCell>
+                                        <TableCell className="text-sm w-1/4">{formatINR(Number(si.cnTaxable || 0))}</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">CN IGST</TableCell>
+                                        <TableCell className="text-sm w-1/4">{formatINR(Number(si.cnIgst || 0))}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">CN CGST</TableCell>
+                                        <TableCell className="text-sm">{formatINR(Number(si.cnCgst || 0))}</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">CN SGST</TableCell>
+                                        <TableCell className="text-sm">{formatINR(Number(si.cnSgst || 0))}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">CN Total</TableCell>
+                                        <TableCell className="text-sm font-semibold" colSpan={3}>{formatINR(Number(si.cnTotal || 0))}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Documents</TableCell>
+                                        <TableCell className="text-sm" colSpan={3}><DocLinks paths={creditNoteDocs} /></TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
                         </CardContent>
                     </Card>
                 )}
                 {/* Payment Received */}
                 {si.status === "payment_received" || si.status === "completed" || Number(si.gstTds) > 0 ? (
                     <Card>
-                        <CardHeader><CardTitle className="text-base">Payment Details</CardTitle></CardHeader>
+                        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Banknote className="h-5 w-5" />Payment Details</CardTitle></CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
-                                <Field label="Payment Advice Docs" value={<DocLinks paths={paymentAdviceDocs} />} />
-                                <Field label="Buyback Docs" value={<DocLinks paths={buybackDocs} />} />
-                                <Field label="GST TDS" value={formatINR(Number(si.gstTds || 0))} />
-                                <Field label="IT TDS" value={formatINR(Number(si.itTds || 0))} />
-                                <Field label="LD Deduction" value={formatINR(Number(si.ldDeduction || 0))} />
-                                <Field label="Other Deduction" value={formatINR(Number(si.otherDeduction || 0))} />
-                                <Field label="Payment Advice Requested" value={si.paymentAdviceRequestedAt ? formatDate(si.paymentAdviceRequestedAt) : null} />
-                                <Field label="Payment Advice Received" value={si.paymentAdviceReceivedAt ? formatDate(si.paymentAdviceReceivedAt) : null} />
-                                <Field label="Net Received" value={<span className="font-semibold text-green-600">{formatINR(values.netReceived)}</span>} />
-                            </div>
+                            <Table>
+                                <TableBody>
+                                    <SectionHeader title="Payment Details" />
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">GST TDS</TableCell>
+                                        <TableCell className="text-sm w-1/4">{formatINR(Number(si.gstTds || 0))}</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">IT TDS</TableCell>
+                                        <TableCell className="text-sm w-1/4">{formatINR(Number(si.itTds || 0))}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">LD Deduction</TableCell>
+                                        <TableCell className="text-sm">{formatINR(Number(si.ldDeduction || 0))}</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Other Deduction</TableCell>
+                                        <TableCell className="text-sm">{formatINR(Number(si.otherDeduction || 0))}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Payment Advice Requested</TableCell>
+                                        <TableCell className="text-sm">{si.paymentAdviceRequestedAt ? formatDate(si.paymentAdviceRequestedAt) : '—'}</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Payment Advice Received</TableCell>
+                                        <TableCell className="text-sm">{si.paymentAdviceReceivedAt ? formatDate(si.paymentAdviceReceivedAt) : '—'}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Payment Advice Docs</TableCell>
+                                        <TableCell className="text-sm" colSpan={3}><DocLinks paths={paymentAdviceDocs} /></TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Buyback Docs</TableCell>
+                                        <TableCell className="text-sm" colSpan={3}><DocLinks paths={buybackDocs} /></TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Net Received</TableCell>
+                                        <TableCell className="text-sm font-semibold text-green-600" colSpan={3}>{formatINR(values.netReceived)}</TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
                         </CardContent>
                     </Card>
                 ) : null}
                 {/* Hold Amounts */}
                 {(Number(si.totalHoldAmount) > 0 || Number(si.holdGstIgst) > 0) && (
                     <Card>
-                        <CardHeader><CardTitle className="text-base">Hold Amounts</CardTitle></CardHeader>
+                        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Lock className="h-5 w-5" />Hold Amounts</CardTitle></CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
-                                <Field label="GST IGST" value={formatINR(Number(si.holdGstIgst || 0))} />
-                                <Field label="GST CGST" value={formatINR(Number(si.holdGstCgst || 0))} />
-                                <Field label="GST SGST" value={formatINR(Number(si.holdGstSgst || 0))} />
-                                <Field label="ITC" value={formatINR(Number(si.holdItc || 0))} />
-                                <Field label="Retention" value={formatINR(Number(si.holdRetention || 0))} />
-                                <Field label="Buyback" value={formatINR(Number(si.holdBuyback || 0))} />
-                                <Field label="Other Hold" value={formatINR(Number(si.holdOther || 0))} />
-                                <Field label="Total Hold" value={<span className="font-semibold">{formatINR(Number(si.totalHoldAmount || 0))}</span>} />
-                                {Number(si.holdReleasedAmount) > 0 && (
-                                    <>
-                                        <Field label="Released Amount" value={formatINR(Number(si.holdReleasedAmount || 0))} />
-                                        <Field label="Released At" value={si.holdReleasedAt ? formatDate(si.holdReleasedAt) : null} />
-                                    </>
-                                )}
-                            </div>
+                            <Table>
+                                <TableBody>
+                                    <SectionHeader title="Hold Amounts" />
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">GST IGST</TableCell>
+                                        <TableCell className="text-sm w-1/4">{formatINR(Number(si.holdGstIgst || 0))}</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">GST CGST</TableCell>
+                                        <TableCell className="text-sm w-1/4">{formatINR(Number(si.holdGstCgst || 0))}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">GST SGST</TableCell>
+                                        <TableCell className="text-sm">{formatINR(Number(si.holdGstSgst || 0))}</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">ITC</TableCell>
+                                        <TableCell className="text-sm">{formatINR(Number(si.holdItc || 0))}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Retention</TableCell>
+                                        <TableCell className="text-sm">{formatINR(Number(si.holdRetention || 0))}</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Buyback</TableCell>
+                                        <TableCell className="text-sm">{formatINR(Number(si.holdBuyback || 0))}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Other Hold</TableCell>
+                                        <TableCell className="text-sm">{formatINR(Number(si.holdOther || 0))}</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Total Hold</TableCell>
+                                        <TableCell className="text-sm font-semibold">{formatINR(Number(si.totalHoldAmount || 0))}</TableCell>
+                                    </TableRow>
+                                    {Number(si.holdReleasedAmount) > 0 && (
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">Released Amount</TableCell>
+                                            <TableCell className="text-sm">{formatINR(Number(si.holdReleasedAmount || 0))}</TableCell>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">Released At</TableCell>
+                                            <TableCell className="text-sm">{si.holdReleasedAt ? formatDate(si.holdReleasedAt) : '—'}</TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
                         </CardContent>
                     </Card>
                 )}
                 {/* Items Table */}
                 <Card>
-                    <CardHeader><CardTitle className="text-base">Invoice Items</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Package className="h-5 w-5" />Invoice Items</CardTitle></CardHeader>
                     <CardContent>
                         {items.length === 0 ? (
                             <p className="text-sm text-muted-foreground italic">No items.</p>
@@ -252,30 +355,50 @@ const ViewSaleInvoicePage = () => {
                         )}
                     </CardContent>
                 </Card>
-                {/* Summary — Reconciliation */}
+                {/* Summary — Totals */}
                 <Card>
-                    <CardHeader><CardTitle className="text-base">Summary</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Calculator className="h-5 w-5" />Summary</CardTitle></CardHeader>
                     <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
-                            <Field label="Total Pre-GST" value={formatINR(Number(si.totalPreGst || 0))} />
-                            <Field label="Total GST" value={formatINR(Number(si.totalGst || 0))} />
-                            <Field label="Payment Received (Net)" value={<span className="font-semibold text-green-600">{formatINR(values.netReceived)}</span>} />
-                            <Field label="Amount Hold (Remaining)" value={formatINR(values.holdRemaining)} />
-                            <Field label="Amount Released" value={formatINR(values.holdReleased)} />
-                            {values.cnTotal > 0 && (
-                                <Field label="Less: Credit Note" value={<span className="text-destructive">- {formatINR(values.cnTotal)}</span>} />
-                            )}
-                            <Field
-                                label="Grand Total"
-                                value={<span className="font-semibold text-lg">{formatINR(values.grandTotal)}</span>}
-                            />
-                        </div>
+                        <Table>
+                            <TableBody>
+                                <SectionHeader title="Reconciliation" />
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Total Pre-GST</TableCell>
+                                    <TableCell className="text-sm w-1/4">{formatINR(Number(si.totalPreGst || 0))}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Total GST</TableCell>
+                                    <TableCell className="text-sm w-1/4">{formatINR(Number(si.totalGst || 0))}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Payment Received (Net)</TableCell>
+                                    <TableCell className="text-sm font-semibold text-green-600">{formatINR(values.netReceived)}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Amount Hold (Remaining)</TableCell>
+                                    <TableCell className="text-sm">{formatINR(values.holdRemaining)}</TableCell>
+                                </TableRow>
+                                {values.cnTotal > 0 ? (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Amount Released</TableCell>
+                                        <TableCell className="text-sm">{formatINR(values.holdReleased)}</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Less: Credit Note</TableCell>
+                                        <TableCell className="text-sm text-destructive">- {formatINR(values.cnTotal)}</TableCell>
+                                    </TableRow>
+                                ) : (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Amount Released</TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>{formatINR(values.holdReleased)}</TableCell>
+                                    </TableRow>
+                                )}
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Grand Total</TableCell>
+                                    <TableCell className="text-sm font-semibold" colSpan={3}>{formatINR(values.grandTotal)}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
                     </CardContent>
                 </Card>
                 {/* Action Log */}
                 {actionLogs.length > 0 && (
                     <Card>
-                        <CardHeader><CardTitle className="text-base">Activity Log</CardTitle></CardHeader>
+                        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><History className="h-5 w-5" />Activity Log</CardTitle></CardHeader>
                         <CardContent>
                             <div className="space-y-2">
                                 {actionLogs.map((entry: any, idx: number) => (
