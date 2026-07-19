@@ -64,6 +64,8 @@ export const saleInvoices = pgTable("sale_invoices", {
     team: bigint("team", { mode: "number" }),
     remarks: text("remarks"),
 
+    actionLogs: jsonb("action_logs").$type<ActionLogEntry[]>().default([]),
+
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -90,3 +92,10 @@ export type SaleInvoice = typeof saleInvoices.$inferSelect;
 export type NewSaleInvoice = typeof saleInvoices.$inferInsert;
 export type SaleInvoiceItem = typeof saleInvoiceItems.$inferSelect;
 export type NewSaleInvoiceItem = typeof saleInvoiceItems.$inferInsert;
+
+export interface ActionLogEntry {
+    action: string;
+    data: Record<string, unknown>;
+    updatedBy: number;
+    updatedAt: string;
+}

@@ -351,6 +351,13 @@
       "when": 1786140800001,
       "tag": "0088_add_missing_purchase_order_id_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1784453857516,
+      "tag": "0089_add_action_logs_to_sale_invoices",
+      "breakpoints": true
     }
   ]
 }
