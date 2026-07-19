@@ -1,16 +1,13 @@
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { TenderFileUploader } from "@/components/tender-file-upload";
-import { useAllSaleInvoices, useUpdateSaleInvoiceStatus } from "@/hooks/api/useSaleInvoices";
+import { useAllSaleInvoices } from "@/hooks/api/useSaleInvoices";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
@@ -19,10 +16,15 @@ import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import type { SaleInvoiceListRow } from "@/modules/operations/sale-invoices/helpers/saleInvoice.types";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { Eye, Search, Upload } from "lucide-react";
+import { Banknote, Eye, HandCoins, LampCeiling, Lock, Search, Upload } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
+import CreditNoteDialog from "./components/CreditNoteDialog";
+import HoldAmountDialog from "./components/HoldAmountDialog";
+import HoldReleasedDialog from "./components/HoldReleasedDialog";
+import PaymentReceivedDialog from "./components/PaymentReceivedDialog";
+import UploadInvoiceDialog from "./components/UploadInvoiceDialog";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "default" | "outline" | "success" | "destructive" }> = {
     oe_request: { label: "OE Request", variant: "outline" },
@@ -46,16 +48,18 @@ const SaleInvoiceListPage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { data, isLoading } = useAllSaleInvoices();
-    const updateStatusMutation = useUpdateSaleInvoiceStatus();
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
     const [search, setSearch] = useState("");
     const debouncedSearch = useDebouncedSearch(search, 300);
 
     const isAccountsSection = location.pathname.includes("/accounts/");
 
-    // Upload dialog state
+    // Dialog states
     const [uploadRow, setUploadRow] = useState<SaleInvoiceListRow | null>(null);
-    const [uploadedPaths, setUploadedPaths] = useState<string[]>([]);
+    const [creditNoteRow, setCreditNoteRow] = useState<SaleInvoiceListRow | null>(null);
+    const [paymentReceivedRow, setPaymentReceivedRow] = useState<SaleInvoiceListRow | null>(null);
+    const [holdAmountRow, setHoldAmountRow] = useState<SaleInvoiceListRow | null>(null);
+    const [holdReleasedRow, setHoldReleasedRow] = useState<SaleInvoiceListRow | null>(null);
 
     const saleInvoices = useMemo(() => (data?.saleInvoices ?? []) as SaleInvoiceListRow[], [data]);
 
@@ -89,40 +93,59 @@ const SaleInvoiceListPage: React.FC = () => {
         navigate(paths.operations.viewSaleInvoice(row.id));
     }, [navigate]);
 
-    const handleUpload = useCallback((row: SaleInvoiceListRow) => {
-        setUploadRow(row);
-        setUploadedPaths(row.invoiceDocPaths ?? []);
+    const closeAll = useCallback(() => {
+        setUploadRow(null);
+        setCreditNoteRow(null);
+        setPaymentReceivedRow(null);
+        setHoldAmountRow(null);
+        setHoldReleasedRow(null);
     }, []);
 
-    const confirmUpload = useCallback(async () => {
-        if (!uploadRow) return;
-        await updateStatusMutation.mutateAsync({
-            id: uploadRow.id,
-            status: "invoiced",
-            invoiceDocPaths: uploadedPaths,
-        });
-        setUploadRow(null);
-        setUploadedPaths([]);
-    }, [uploadRow, uploadedPaths, updateStatusMutation]);
-
     const siActions: ActionItem<SaleInvoiceListRow>[] = useMemo(() => {
-        if (isAccountsSection) {
-            return [
-                {
-                    label: "Upload Invoice",
-                    icon: <Upload className="h-4 w-4" />,
-                    onClick: (row) => handleUpload(row),
-                },
-            ];
-        }
-        return [
+        const base: ActionItem<SaleInvoiceListRow>[] = [
             {
                 label: "View Details",
                 icon: <Eye className="h-4 w-4" />,
                 onClick: (row) => handleView(row),
             },
         ];
-    }, [isAccountsSection, handleUpload, handleView]);
+
+        if (isAccountsSection) {
+            return [
+                {
+                    label: "Upload Invoice",
+                    icon: <Upload className="h-4 w-4" />,
+                    onClick: (row) => setUploadRow(row),
+                    visible: (row) => row.status === "oe_request",
+                },
+                {
+                    label: "Credit Note",
+                    icon: <LampCeiling className="h-4 w-4" />,
+                    onClick: (row) => setCreditNoteRow(row),
+                    visible: (row) => row.status === "invoiced",
+                },
+                {
+                    label: "Payment Received",
+                    icon: <Banknote className="h-4 w-4" />,
+                    onClick: (row) => setPaymentReceivedRow(row),
+                    visible: (row) => row.status === "invoiced" || row.status === "credit_note",
+                },
+                {
+                    label: "Hold Amount",
+                    icon: <Lock className="h-4 w-4" />,
+                    onClick: (row) => setHoldAmountRow(row),
+                },
+                {
+                    label: "Release Hold",
+                    icon: <HandCoins className="h-4 w-4" />,
+                    onClick: (row) => setHoldReleasedRow(row),
+                },
+                ...base,
+            ];
+        }
+
+        return base;
+    }, [isAccountsSection, handleView]);
 
     const statusBadge = (status: string) => {
         const cfg = STATUS_CONFIG[status] || { label: status, variant: "outline" as const };
@@ -258,40 +281,11 @@ const SaleInvoiceListPage: React.FC = () => {
                 </CardContent>
             </Card>
 
-            {/* Upload Invoice Dialog */}
-            <Dialog open={uploadRow !== null} onOpenChange={(open) => { if (!open) { setUploadRow(null); setUploadedPaths([]); } }}>
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>Upload Invoice</DialogTitle>
-                        <DialogDescription>
-                            Upload the invoice document and mark as Invoiced
-                        </DialogDescription>
-                    </DialogHeader>
-                    {uploadRow && (
-                        <div className="space-y-4 py-2">
-                            <div className="space-y-1">
-                                <p className="text-sm"><strong>Invoice:</strong> {uploadRow.invoiceNumber}</p>
-                                <p className="text-sm"><strong>Customer:</strong> {uploadRow.billingCustomerName}</p>
-                                <p className="text-sm"><strong>Current Status:</strong> {statusBadge(uploadRow.status)}</p>
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium mb-2">Invoice Documents</p>
-                                <TenderFileUploader
-                                    context="tender-documents"
-                                    value={uploadedPaths}
-                                    onChange={setUploadedPaths}
-                                />
-                            </div>
-                        </div>
-                    )}
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => { setUploadRow(null); setUploadedPaths([]); }}>Cancel</Button>
-                        <Button onClick={confirmUpload} disabled={uploadedPaths.length === 0 || updateStatusMutation.isPending}>
-                            {updateStatusMutation.isPending ? "Uploading..." : "Mark as Invoiced"}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <UploadInvoiceDialog row={uploadRow} open={uploadRow !== null} onClose={closeAll} />
+            <CreditNoteDialog row={creditNoteRow} open={creditNoteRow !== null} onClose={closeAll} />
+            <PaymentReceivedDialog row={paymentReceivedRow} open={paymentReceivedRow !== null} onClose={closeAll} />
+            <HoldAmountDialog row={holdAmountRow} open={holdAmountRow !== null} onClose={closeAll} />
+            <HoldReleasedDialog row={holdReleasedRow} open={holdReleasedRow !== null} onClose={closeAll} />
         </>
     );
 };

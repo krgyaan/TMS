@@ -8,6 +8,7 @@ import { useSaleInvoice } from "@/hooks/api/useSaleInvoices";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { AlertCircle, ArrowLeft, ExternalLink } from "lucide-react";
+import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "default" | "outline" | "success" | "destructive" }> = {
@@ -27,12 +28,38 @@ function Field({ label, value }: Readonly<{ label: string; value: React.ReactNod
     );
 }
 
+function DocLinks({ paths }: Readonly<{ paths: string[] }>) {
+    if (!paths || paths.length === 0) return <span className="text-muted-foreground">—</span>;
+    return (
+        <div className="flex flex-wrap gap-2">
+            {paths.map((path, idx) => (
+                <Button key={idx} variant="outline" size="sm" className="h-7 text-xs gap-1" asChild>
+                    <a href={path} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-3 w-3" />
+                        Doc {idx + 1}
+                    </a>
+                </Button>
+            ))}
+        </div>
+    );
+}
+
 const ViewSaleInvoicePage = () => {
     const { siId: siIdParam } = useParams<{ siId: string }>();
     const navigate = useNavigate();
     const siId = Number(siIdParam);
 
     const { data: si, isLoading, isError, error } = useSaleInvoice(siId);
+
+    const netReceived = useMemo(() => {
+        if (!si) return 0;
+        return Number(si.grandTotal || 0)
+            - Number(si.gstTds || 0)
+            - Number(si.itTds || 0)
+            - Number(si.ldDeduction || 0)
+            - Number(si.otherDeduction || 0)
+            - Number(si.totalHoldAmount || 0);
+    }, [si]);
 
     if (isLoading) {
         return (
@@ -63,18 +90,12 @@ const ViewSaleInvoicePage = () => {
     }
 
     const statusCfg = STATUS_CONFIG[si.status] || { label: si.status, variant: "outline" as const };
-    const items: Array<{
-        srNo: number | null;
-        itemDescription: string;
-        quantity: string;
-        rate: string;
-        amount: string;
-        gstRate: string;
-        gstAmount: string;
-        totalAmount: string;
-    }> = si.items ?? [];
-
+    const items: Array<any> = si.items ?? [];
     const invoiceDocs: string[] = Array.isArray(si.invoiceDocPaths) ? si.invoiceDocPaths : [];
+    const creditNoteDocs: string[] = Array.isArray(si.creditNoteDocPaths) ? si.creditNoteDocPaths : [];
+    const paymentAdviceDocs: string[] = Array.isArray(si.paymentAdviceDocPaths) ? si.paymentAdviceDocPaths : [];
+    const buybackDocs: string[] = Array.isArray(si.buybackInvoiceDocPaths) ? si.buybackInvoiceDocPaths : [];
+    const actionLogs: Array<any> = Array.isArray(si.actionLogs) ? si.actionLogs : [];
 
     return (
         <div className="p-6 space-y-6">
@@ -107,24 +128,88 @@ const ViewSaleInvoicePage = () => {
                         <Field label="Status" value={<Badge variant={statusCfg.variant}>{statusCfg.label}</Badge>} />
                         <Field label="Raised By" value={si.raisedByName || si.raisedBy} />
                         <Field label="Remarks" value={si.remarks} />
-                        {invoiceDocs.length > 0 && (
-                            <div className="col-span-2">
-                                <Field
-                                    label="Invoice Documents"
-                                    value={invoiceDocs.map((path, idx) => (
-                                        <Button key={idx} variant="outline" size="sm" className="h-7 text-xs gap-1 mr-2" asChild>
-                                            <a href={path} target="_blank" rel="noopener noreferrer">
-                                                <ExternalLink className="h-3 w-3" />
-                                                Document {idx + 1}
-                                            </a>
-                                        </Button>
-                                    ))}
-                                />
-                            </div>
-                        )}
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Invoice-level GSTs (shown when invoiced+) */}
+            {Number(si.invoiceTaxableAmount) > 0 && (
+                <Card>
+                    <CardHeader><CardTitle className="text-base">Invoice Financials</CardTitle></CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+                            <Field label="Taxable Amount" value={formatINR(Number(si.invoiceTaxableAmount || 0))} />
+                            <Field label="IGST" value={formatINR(Number(si.invoiceIgst || 0))} />
+                            <Field label="CGST" value={formatINR(Number(si.invoiceCgst || 0))} />
+                            <Field label="SGST" value={formatINR(Number(si.invoiceSgst || 0))} />
+                            <Field label="Invoice Total" value={<span className="font-semibold">{formatINR(Number(si.invoiceTotal || 0))}</span>} />
+                            <Field label="Documents" value={<DocLinks paths={invoiceDocs} />} />
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Credit Note */}
+            {Number(si.cnTaxable) > 0 && (
+                <Card>
+                    <CardHeader><CardTitle className="text-base">Credit Note</CardTitle></CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+                            <Field label="CN Taxable" value={formatINR(Number(si.cnTaxable || 0))} />
+                            <Field label="CN IGST" value={formatINR(Number(si.cnIgst || 0))} />
+                            <Field label="CN CGST" value={formatINR(Number(si.cnCgst || 0))} />
+                            <Field label="CN SGST" value={formatINR(Number(si.cnSgst || 0))} />
+                            <Field label="CN Total" value={<span className="font-semibold">{formatINR(Number(si.cnTotal || 0))}</span>} />
+                            <Field label="Documents" value={<DocLinks paths={creditNoteDocs} />} />
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Payment Received */}
+            {si.status === "payment_received" || si.status === "completed" || Number(si.gstTds) > 0 ? (
+                <Card>
+                    <CardHeader><CardTitle className="text-base">Payment Details</CardTitle></CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+                            <Field label="Payment Advice Docs" value={<DocLinks paths={paymentAdviceDocs} />} />
+                            <Field label="Buyback Docs" value={<DocLinks paths={buybackDocs} />} />
+                            <Field label="GST TDS" value={formatINR(Number(si.gstTds || 0))} />
+                            <Field label="IT TDS" value={formatINR(Number(si.itTds || 0))} />
+                            <Field label="LD Deduction" value={formatINR(Number(si.ldDeduction || 0))} />
+                            <Field label="Other Deduction" value={formatINR(Number(si.otherDeduction || 0))} />
+                            <Field label="Payment Advice Requested" value={si.paymentAdviceRequestedAt ? formatDate(si.paymentAdviceRequestedAt) : null} />
+                            <Field label="Payment Advice Received" value={si.paymentAdviceReceivedAt ? formatDate(si.paymentAdviceReceivedAt) : null} />
+                            <Field label="Net Received" value={<span className="font-semibold text-green-600">{formatINR(netReceived)}</span>} />
+                        </div>
+                    </CardContent>
+                </Card>
+            ) : null}
+
+            {/* Hold Amounts */}
+            {(Number(si.totalHoldAmount) > 0 || Number(si.holdGstIgst) > 0) && (
+                <Card>
+                    <CardHeader><CardTitle className="text-base">Hold Amounts</CardTitle></CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
+                            <Field label="GST IGST" value={formatINR(Number(si.holdGstIgst || 0))} />
+                            <Field label="GST CGST" value={formatINR(Number(si.holdGstCgst || 0))} />
+                            <Field label="GST SGST" value={formatINR(Number(si.holdGstSgst || 0))} />
+                            <Field label="ITC" value={formatINR(Number(si.holdItc || 0))} />
+                            <Field label="Retention" value={formatINR(Number(si.holdRetention || 0))} />
+                            <Field label="Buyback" value={formatINR(Number(si.holdBuyback || 0))} />
+                            <Field label="Other Hold" value={formatINR(Number(si.holdOther || 0))} />
+                            <Field label="Total Hold" value={<span className="font-semibold">{formatINR(Number(si.totalHoldAmount || 0))}</span>} />
+                            {Number(si.holdReleasedAmount) > 0 && (
+                                <>
+                                    <Field label="Released Amount" value={formatINR(Number(si.holdReleasedAmount || 0))} />
+                                    <Field label="Released At" value={si.holdReleasedAt ? formatDate(si.holdReleasedAt) : null} />
+                                </>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Items Table */}
             <Card>
@@ -148,7 +233,7 @@ const ViewSaleInvoicePage = () => {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {items.map((item, idx) => (
+                                    {items.map((item: any, idx: number) => (
                                         <TableRow key={idx} className="hover:bg-muted/30">
                                             <TableCell className="text-sm">{item.srNo ?? idx + 1}</TableCell>
                                             <TableCell className="text-sm">{item.itemDescription}</TableCell>
@@ -178,6 +263,25 @@ const ViewSaleInvoicePage = () => {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Action Log */}
+            {actionLogs.length > 0 && (
+                <Card>
+                    <CardHeader><CardTitle className="text-base">Activity Log</CardTitle></CardHeader>
+                    <CardContent>
+                        <div className="space-y-2">
+                            {actionLogs.map((entry: any, idx: number) => (
+                                <div key={idx} className="flex items-start gap-3 text-sm py-1 border-b border-border/40 last:border-0">
+                                    <Badge variant="outline" className="shrink-0 text-xs">{entry.action?.replace(/_/g, " ")}</Badge>
+                                    <span className="text-muted-foreground text-xs">
+                                        {entry.updatedAt ? formatDate(entry.updatedAt) : ""}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 };

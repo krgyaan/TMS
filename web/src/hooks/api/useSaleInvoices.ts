@@ -62,3 +62,15 @@ export const useUpdateSaleInvoiceStatus = () => {
         },
     });
 };
+
+export const useUpdateSaleInvoice = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, ...data }: { id: number } & Record<string, any>) =>
+            saleInvoiceApi.updateSaleInvoice(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: saleInvoiceKeys.all });
+        },
+    });
+};

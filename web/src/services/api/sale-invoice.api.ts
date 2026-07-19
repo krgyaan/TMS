@@ -29,6 +29,10 @@ class SaleInvoiceApiService extends BaseApiService {
     async updateSaleInvoiceStatus(id: number, data: { status: string; invoiceDocPaths?: string[] }): Promise<any> {
         return this.patch(`/${id}/status`, data);
     }
+
+    async updateSaleInvoice(id: number, data: Record<string, any>): Promise<any> {
+        return this.patch(`/${id}`, data);
+    }
 }
 
 export const saleInvoiceApi = new SaleInvoiceApiService();
