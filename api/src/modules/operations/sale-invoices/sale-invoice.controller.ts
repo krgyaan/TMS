@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post } from "@nestjs/common";
 import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 import { SaleInvoiceService } from "./sale-invoice.service";
@@ -21,6 +21,19 @@ export class SaleInvoiceController {
     @Get("project/:projectId")
     getByProject(@Param("projectId", ParseIntPipe) projectId: number) {
         return this.service.getByProject(projectId);
+    }
+
+    @Get()
+    getAll() {
+        return this.service.getAll();
+    }
+
+    @Patch(":id/status")
+    updateStatus(
+        @Param("id", ParseIntPipe) id: number,
+        @Body() body: { status: string; invoiceDocPaths?: string[] },
+    ) {
+        return this.service.updateStatus(id, body);
     }
 
     @Get(":id")

@@ -1,10 +1,11 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
 import { eq, desc, sql } from "drizzle-orm";
 
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 
 import { projects } from "@/db/schemas/operations/projects.schema";
+import { users } from "@/db/schemas/auth/users.schema";
 import { woBasicDetails, woDetails, woBillingBoq, woBuybackBoq, woBillingAddresses, woShippingAddresses } from "@/db/schemas/operations/work-order.schema";
 import { saleInvoices, saleInvoiceItems } from "@/db/schemas/operations/sale-invoices.schema";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
@@ -182,6 +183,72 @@ export class SaleInvoiceService {
         return this.getById(si.id);
     }
 
+    async getAll() {
+        const rows = await this.db
+            .select({
+                id: saleInvoices.id,
+                projectId: saleInvoices.projectId,
+                invoiceNumber: saleInvoices.invoiceNumber,
+                invoiceDate: saleInvoices.invoiceDate,
+                billingCustomerName: saleInvoices.billingCustomerName,
+                totalPreGst: saleInvoices.totalPreGst,
+                totalGst: saleInvoices.totalGst,
+                grandTotal: saleInvoices.grandTotal,
+                status: saleInvoices.status,
+                invoiceDocPaths: saleInvoices.invoiceDocPaths,
+                projectName: projects.projectName,
+                raisedByName: users.name,
+                createdAt: saleInvoices.createdAt,
+            })
+            .from(saleInvoices)
+            .leftJoin(projects, eq(saleInvoices.projectId, projects.id))
+            .leftJoin(users, eq(saleInvoices.raisedBy, users.id))
+            .orderBy(desc(saleInvoices.createdAt));
+        return { saleInvoices: rows };
+    }
+
+    async updateStatus(id: number, body: { status: string; invoiceDocPaths?: string[] }) {
+        const [existing] = await this.db
+            .select()
+            .from(saleInvoices)
+            .where(eq(saleInvoices.id, id));
+        if (!existing) throw new NotFoundException("Sale invoice not found");
+
+        const validTransitions: Record<string, string[]> = {
+            oe_request: ["invoiced"],
+            invoiced: ["credit_note", "payment_received"],
+            credit_note: ["payment_received"],
+            payment_received: ["completed"],
+        };
+
+        const currentStatus = existing.status ?? "oe_request";
+        if (body.status !== currentStatus) {
+            if (!validTransitions[currentStatus]?.includes(body.status)) {
+                throw new BadRequestException(
+                    `Cannot transition from "${currentStatus}" to "${body.status}"`
+                );
+            }
+        }
+
+        const updateData: Record<string, any> = {
+            status: body.status,
+            updatedAt: new Date(),
+        };
+
+        if (body.invoiceDocPaths !== undefined) {
+            updateData.invoiceDocPaths = body.invoiceDocPaths;
+        }
+
+        const [updated] = await this.db
+            .update(saleInvoices)
+            .set(updateData)
+            .where(eq(saleInvoices.id, id))
+            .returning();
+
+        this.logger.info(`Sale Invoice #${id} status updated to "${body.status}"`);
+        return updated;
+    }
+
     async getByProject(projectId: number) {
         const rows = await this.db
             .select()
@@ -192,11 +259,66 @@ export class SaleInvoiceService {
     }
 
     async getById(id: number) {
-        const [si] = await this.db
-            .select()
+        const [row] = await this.db
+            .select({
+                id: saleInvoices.id,
+                projectId: saleInvoices.projectId,
+                tenderId: saleInvoices.tenderId,
+                woDetailId: saleInvoices.woDetailId,
+                invoiceNumber: saleInvoices.invoiceNumber,
+                invoiceDate: saleInvoices.invoiceDate,
+                billingCustomerName: saleInvoices.billingCustomerName,
+                billingAddress: saleInvoices.billingAddress,
+                billingGst: saleInvoices.billingGst,
+                shippingCustomerName: saleInvoices.shippingCustomerName,
+                shippingAddress: saleInvoices.shippingAddress,
+                shippingGst: saleInvoices.shippingGst,
+                totalPreGst: saleInvoices.totalPreGst,
+                totalGst: saleInvoices.totalGst,
+                grandTotal: saleInvoices.grandTotal,
+                invoiceTaxableAmount: saleInvoices.invoiceTaxableAmount,
+                invoiceIgst: saleInvoices.invoiceIgst,
+                invoiceCgst: saleInvoices.invoiceCgst,
+                invoiceSgst: saleInvoices.invoiceSgst,
+                invoiceTotal: saleInvoices.invoiceTotal,
+                invoiceDocPaths: saleInvoices.invoiceDocPaths,
+                cnTaxable: saleInvoices.cnTaxable,
+                cnIgst: saleInvoices.cnIgst,
+                cnCgst: saleInvoices.cnCgst,
+                cnSgst: saleInvoices.cnSgst,
+                cnTotal: saleInvoices.cnTotal,
+                creditNoteDocPaths: saleInvoices.creditNoteDocPaths,
+                paymentAdviceDocPaths: saleInvoices.paymentAdviceDocPaths,
+                paymentAdviceRequestedAt: saleInvoices.paymentAdviceRequestedAt,
+                paymentAdviceReceivedAt: saleInvoices.paymentAdviceReceivedAt,
+                buybackInvoiceDocPaths: saleInvoices.buybackInvoiceDocPaths,
+                gstTds: saleInvoices.gstTds,
+                itTds: saleInvoices.itTds,
+                ldDeduction: saleInvoices.ldDeduction,
+                otherDeduction: saleInvoices.otherDeduction,
+                netReceived: saleInvoices.netReceived,
+                holdGstIgst: saleInvoices.holdGstIgst,
+                holdGstCgst: saleInvoices.holdGstCgst,
+                holdGstSgst: saleInvoices.holdGstSgst,
+                holdItc: saleInvoices.holdItc,
+                holdRetention: saleInvoices.holdRetention,
+                holdBuyback: saleInvoices.holdBuyback,
+                holdOther: saleInvoices.holdOther,
+                totalHoldAmount: saleInvoices.totalHoldAmount,
+                holdReleasedAmount: saleInvoices.holdReleasedAmount,
+                holdReleasedAt: saleInvoices.holdReleasedAt,
+                status: saleInvoices.status,
+                raisedBy: saleInvoices.raisedBy,
+                raisedByName: users.name,
+                team: saleInvoices.team,
+                remarks: saleInvoices.remarks,
+                createdAt: saleInvoices.createdAt,
+                updatedAt: saleInvoices.updatedAt,
+            })
             .from(saleInvoices)
+            .leftJoin(users, eq(saleInvoices.raisedBy, users.id))
             .where(eq(saleInvoices.id, id));
-        if (!si) throw new NotFoundException("Sale invoice not found");
+        if (!row) throw new NotFoundException("Sale invoice not found");
 
         const items = await this.db
             .select()
@@ -204,6 +326,6 @@ export class SaleInvoiceService {
             .where(eq(saleInvoiceItems.saleInvoiceId, id))
             .orderBy(saleInvoiceItems.srNo);
 
-        return { ...si, items };
+        return { ...row, items };
     }
 }
