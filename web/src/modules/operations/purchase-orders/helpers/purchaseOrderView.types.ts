@@ -35,6 +35,7 @@ export interface PurchaseOrderView {
     poApproved?: boolean;
     poApprovalRemark?: string;
     category?: string;
+    generatedPdfVersions: Record<string, { path: string; hash: string }> | null;
 }
 
 export interface PoProduct {

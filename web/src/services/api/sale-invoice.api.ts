@@ -17,6 +17,18 @@ class SaleInvoiceApiService extends BaseApiService {
     async getProjectSaleInvoices(projectId: number): Promise<{ saleInvoices: any[] }> {
         return this.get(`/project/${projectId}`);
     }
+
+    async getAllSaleInvoices(): Promise<{ saleInvoices: any[] }> {
+        return this.get('/');
+    }
+
+    async getSaleInvoiceById(id: number): Promise<any> {
+        return this.get(`/${id}`);
+    }
+
+    async updateSaleInvoiceStatus(id: number, data: { status: string; invoiceDocPaths?: string[] }): Promise<any> {
+        return this.patch(`/${id}/status`, data);
+    }
 }
 
 export const saleInvoiceApi = new SaleInvoiceApiService();

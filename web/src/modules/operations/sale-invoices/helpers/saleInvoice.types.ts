@@ -40,6 +40,22 @@ export interface SaleInvoiceRow {
     remarks?: string;
 }
 
+export interface SaleInvoiceListRow {
+    id: number;
+    projectId: number;
+    invoiceNumber: string;
+    invoiceDate: string;
+    billingCustomerName: string;
+    totalPreGst: string;
+    totalGst: string;
+    grandTotal: string;
+    status: string;
+    invoiceDocPaths?: string[];
+    projectName: string;
+    raisedByName: string;
+    createdAt: string;
+}
+
 export interface WoBillingAddress {
     id: number;
     woDetailId: number;
