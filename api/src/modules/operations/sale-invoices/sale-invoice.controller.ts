@@ -36,6 +36,15 @@ export class SaleInvoiceController {
         return this.service.updateStatus(id, body);
     }
 
+    @Patch(":id")
+    update(
+        @Param("id", ParseIntPipe) id: number,
+        @Body() body: Record<string, any>,
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        return this.service.update(id, body, user.id);
+    }
+
     @Get(":id")
     getById(@Param("id", ParseIntPipe) id: number) {
         return this.service.getById(id);

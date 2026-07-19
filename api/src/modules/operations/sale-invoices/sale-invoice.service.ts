@@ -249,6 +249,122 @@ export class SaleInvoiceService {
         return updated;
     }
 
+    async update(id: number, body: Record<string, any>, userId: number) {
+        const [existing] = await this.db
+            .select()
+            .from(saleInvoices)
+            .where(eq(saleInvoices.id, id));
+        if (!existing) throw new NotFoundException("Sale invoice not found");
+
+        const currentStatus = existing.status ?? "oe_request";
+        let newStatus = currentStatus;
+
+        if (body.status && body.status !== currentStatus) {
+            const validTransitions: Record<string, string[]> = {
+                oe_request: ["invoiced"],
+                invoiced: ["credit_note", "payment_received"],
+                credit_note: ["payment_received"],
+                payment_received: ["completed"],
+            };
+            if (!validTransitions[currentStatus]?.includes(body.status)) {
+                throw new BadRequestException(
+                    `Cannot transition from "${currentStatus}" to "${body.status}"`
+                );
+            }
+            newStatus = body.status;
+        }
+
+        const updateData: Record<string, any> = {
+            updatedAt: new Date(),
+        };
+
+        if (body.status) updateData.status = body.status;
+
+        if (body.invoiceTaxableAmount !== undefined) updateData.invoiceTaxableAmount = body.invoiceTaxableAmount.toString();
+        if (body.invoiceIgst !== undefined) updateData.invoiceIgst = body.invoiceIgst.toString();
+        if (body.invoiceCgst !== undefined) updateData.invoiceCgst = body.invoiceCgst.toString();
+        if (body.invoiceSgst !== undefined) updateData.invoiceSgst = body.invoiceSgst.toString();
+        if (body.invoiceDocPaths !== undefined) updateData.invoiceDocPaths = body.invoiceDocPaths;
+
+        if (body.invoiceTaxableAmount !== undefined || body.invoiceIgst !== undefined || body.invoiceCgst !== undefined || body.invoiceSgst !== undefined) {
+            updateData.invoiceTotal = (
+                Number(body.invoiceTaxableAmount ?? existing.invoiceTaxableAmount ?? 0) +
+                Number(body.invoiceIgst ?? existing.invoiceIgst ?? 0) +
+                Number(body.invoiceCgst ?? existing.invoiceCgst ?? 0) +
+                Number(body.invoiceSgst ?? existing.invoiceSgst ?? 0)
+            ).toFixed(2);
+        }
+
+        if (body.cnTaxable !== undefined) updateData.cnTaxable = body.cnTaxable.toString();
+        if (body.cnIgst !== undefined) updateData.cnIgst = body.cnIgst.toString();
+        if (body.cnCgst !== undefined) updateData.cnCgst = body.cnCgst.toString();
+        if (body.cnSgst !== undefined) updateData.cnSgst = body.cnSgst.toString();
+        if (body.creditNoteDocPaths !== undefined) updateData.creditNoteDocPaths = body.creditNoteDocPaths;
+
+        if (body.cnTaxable !== undefined || body.cnIgst !== undefined || body.cnCgst !== undefined || body.cnSgst !== undefined) {
+            updateData.cnTotal = (
+                Number(body.cnTaxable ?? existing.cnTaxable ?? 0) +
+                Number(body.cnIgst ?? existing.cnIgst ?? 0) +
+                Number(body.cnCgst ?? existing.cnCgst ?? 0) +
+                Number(body.cnSgst ?? existing.cnSgst ?? 0)
+            ).toFixed(2);
+        }
+
+        if (body.paymentAdviceDocPaths !== undefined) updateData.paymentAdviceDocPaths = body.paymentAdviceDocPaths;
+        if (body.buybackInvoiceDocPaths !== undefined) updateData.buybackInvoiceDocPaths = body.buybackInvoiceDocPaths;
+        if (body.gstTds !== undefined) updateData.gstTds = body.gstTds.toString();
+        if (body.itTds !== undefined) updateData.itTds = body.itTds.toString();
+        if (body.ldDeduction !== undefined) updateData.ldDeduction = body.ldDeduction.toString();
+        if (body.otherDeduction !== undefined) updateData.otherDeduction = body.otherDeduction.toString();
+
+        if (body.holdGstIgst !== undefined) updateData.holdGstIgst = body.holdGstIgst.toString();
+        if (body.holdGstCgst !== undefined) updateData.holdGstCgst = body.holdGstCgst.toString();
+        if (body.holdGstSgst !== undefined) updateData.holdGstSgst = body.holdGstSgst.toString();
+        if (body.holdItc !== undefined) updateData.holdItc = body.holdItc.toString();
+        if (body.holdRetention !== undefined) updateData.holdRetention = body.holdRetention.toString();
+        if (body.holdBuyback !== undefined) updateData.holdBuyback = body.holdBuyback.toString();
+        if (body.holdOther !== undefined) updateData.holdOther = body.holdOther.toString();
+
+        if (body.holdGstIgst !== undefined || body.holdGstCgst !== undefined || body.holdGstSgst !== undefined ||
+            body.holdItc !== undefined || body.holdRetention !== undefined || body.holdBuyback !== undefined || body.holdOther !== undefined) {
+            updateData.totalHoldAmount = (
+                Number(body.holdGstIgst ?? existing.holdGstIgst ?? 0) +
+                Number(body.holdGstCgst ?? existing.holdGstCgst ?? 0) +
+                Number(body.holdGstSgst ?? existing.holdGstSgst ?? 0) +
+                Number(body.holdItc ?? existing.holdItc ?? 0) +
+                Number(body.holdRetention ?? existing.holdRetention ?? 0) +
+                Number(body.holdBuyback ?? existing.holdBuyback ?? 0) +
+                Number(body.holdOther ?? existing.holdOther ?? 0)
+            ).toFixed(2);
+        }
+
+        if (body.holdReleasedAmount !== undefined) {
+            const existingReleased = Number(existing.holdReleasedAmount ?? 0);
+            updateData.holdReleasedAmount = (existingReleased + Number(body.holdReleasedAmount)).toFixed(2);
+        }
+        if (body.holdReleasedAt !== undefined) {
+            updateData.holdReleasedAt = body.holdReleasedAt;
+        }
+
+        const actionLog = existing.actionLogs ?? [];
+        const actionEntry = {
+            action: newStatus !== currentStatus ? `status_changed_to_${newStatus}` : `${Object.keys(body).filter(k => k !== 'status').join('_')}_updated`,
+            data: body,
+            updatedBy: userId,
+            updatedAt: new Date().toISOString(),
+        };
+        updateData.actionLogs = [...actionLog, actionEntry];
+
+        const [updated] = await this.db
+            .update(saleInvoices)
+            .set(updateData)
+            .where(eq(saleInvoices.id, id))
+            .returning();
+
+        this.logger.info(`Sale Invoice #${id} updated`);
+        return updated;
+    }
+
     async getByProject(projectId: number) {
         const rows = await this.db
             .select()
@@ -312,6 +428,7 @@ export class SaleInvoiceService {
                 raisedByName: users.name,
                 team: saleInvoices.team,
                 remarks: saleInvoices.remarks,
+                actionLogs: saleInvoices.actionLogs,
                 createdAt: saleInvoices.createdAt,
                 updatedAt: saleInvoices.updatedAt,
             })
