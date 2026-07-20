@@ -1,10 +1,9 @@
-// src/modules/hrms/assets/assets.service.ts
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { eq, count, desc } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { employeeAssets, type NewEmployeeAsset, type EmployeeAsset } from "@/db/schemas/hrms/employee-assets.schema";
-import { assetTrackingHistory, type NewAssetTrackingHistory, type AssetTrackingHistory } from "@/db/schemas/hrms/asset-tracking-history.schema";
+import { assetTrackingHistory, type NewAssetTrackingHistory } from "@/db/schemas/hrms/asset-tracking-history.schema";
 import { users } from "@/db/schemas/auth/users.schema";
 
 // ─── Label Maps ───────────────────────────────────────────────────────────────
@@ -29,7 +28,7 @@ const ASSET_LOCATION_LABELS: Record<string, string> = {
 
 const ASSET_STATUS_LABELS: Record<string, string> = {
   "1": "Assigned", "2": "Available", "3": "Under Repair",
-  "4": "Damaged", "5": "Lost", "6": "Returned",
+  "4": "Damaged", "5": "Lost", "6": "Returned", "7": "Disposed",
 };
 
 const ASSET_TYPE_PREFIXES: Record<string, string> = {
@@ -40,7 +39,7 @@ const ASSET_TYPE_PREFIXES: Record<string, string> = {
 
 const ACTION_TYPE_MAP: Record<string, string> = {
   "1": "ASSIGN", "2": "AVAILABLE", "3": "REPAIR",
-  "4": "DAMAGE", "5": "LOSS", "6": "RETURN",
+  "4": "DAMAGE", "5": "LOSS", "6": "RETURN", "7": "DISPOSAL",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -93,6 +92,13 @@ export interface StatusUpdateDto {
   deductionAmount?: string | null;
   deductionReason?: string | null;
   
+  // Disposal fields
+  disposalDate?: string | null;
+  disposalType?: string | null;
+  disposalReason?: string | null;
+  disposalAmount?: string | null;
+  disposalApprovedBy?: string | null;
+
   // General
   remarks?: string | null;
   changedByUserId?: number | null;
@@ -285,6 +291,16 @@ export class AssetsService {
         assetUpdate.assetCondition = data.assetCondition || null;
         assetUpdate.deductionAmount = data.deductionAmount || null;
         break;
+
+      case "7": // Disposed
+        assetUpdate.userId = null;
+        assetUpdate.assetLocation = null;
+        assetUpdate.disposalDate = data.disposalDate || null;
+        assetUpdate.disposalType = data.disposalType || null;
+        assetUpdate.disposalReason = data.disposalReason || null;
+        assetUpdate.disposalAmount = data.disposalAmount || null;
+        assetUpdate.disposalApprovedBy = data.disposalApprovedBy || null;
+        break;
     }
 
     // Update asset
@@ -354,6 +370,13 @@ export class AssetsService {
       deductionAmount: data.deductionAmount ?? null,
       deductionReason: data.deductionReason ?? null,
       assetConditionAfter: data.assetCondition ?? null,
+      
+      // Disposal
+      disposalDate: data.disposalDate ?? null,
+      disposalType: data.disposalType ?? null,
+      disposalReason: data.disposalReason ?? null,
+      disposalAmount: data.disposalAmount ?? null,
+      disposalApprovedBy: data.disposalApprovedBy ?? null,
       
       // General
       remarks: data.remarks ?? null,

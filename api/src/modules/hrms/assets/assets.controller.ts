@@ -59,32 +59,32 @@ const UpdateAssetSchema = BaseAssetSchema.partial();
 // Schema for status updates
 const StatusUpdateSchema = z.object({
   assetStatus: z.string(),
-  
+
   // Assignment
   userId: z.coerce.number().optional().nullable(),
   assignedDate: z.string().optional().nullable().transform(emptyToNull),
   expectedReturnDate: z.string().optional().nullable(),
   purpose: z.string().optional().nullable(),
   assetLocation: z.string().optional().nullable(),
-  
+
   // Return
   returnDate: z.string().optional().nullable().transform(emptyToNull),
   returnCondition: z.string().optional().nullable(),
-  
+
   // Damage
   damageDate: z.string().optional().nullable(),
   damageType: z.string().optional().nullable(),
   damageDescription: z.string().optional().nullable(),
   isRepairable: z.string().optional().nullable(),
   assetCondition: z.string().optional().nullable(),
-  
+
   // Loss
   lostDate: z.string().optional().nullable(),
   lostLocation: z.string().optional().nullable(),
   lostCircumstances: z.string().optional().nullable(),
   policeReportNumber: z.string().optional().nullable(),
   policeReportDate: z.string().optional().nullable(),
-  
+
   // Repair
   repairStartDate: z.string().optional().nullable(),
   repairEndDate: z.string().optional().nullable().transform(emptyToNull),
@@ -92,11 +92,18 @@ const StatusUpdateSchema = z.object({
   repairActualCost: z.string().optional().nullable(),
   repairVendor: z.string().optional().nullable(),
   repairDescription: z.string().optional().nullable(),
-  
+
   // Financial
   deductionAmount: z.string().optional().nullable(),
   deductionReason: z.string().optional().nullable(),
-  
+
+  // Disposal
+  disposalDate: z.string().optional().nullable(),
+  disposalType: z.string().optional().nullable(),
+  disposalReason: z.string().optional().nullable(),
+  disposalAmount: z.string().optional().nullable(),
+  disposalApprovedBy: z.string().optional().nullable(),
+
   // General
   remarks: z.string().optional().nullable(),
 });
@@ -119,7 +126,7 @@ const multerConfig = {
 
 @Controller("assets")
 export class AssetsController {
-  constructor(private readonly assetsService: AssetsService) {}
+  constructor(private readonly assetsService: AssetsService) { }
 
   @Get()
   async listAll() {
