@@ -1,4 +1,3 @@
-// src/pages/hrms/assets/constants.ts
 export const ASSET_STATUS_KEYS = {
   ASSIGNED: "1",
   AVAILABLE: "2",
