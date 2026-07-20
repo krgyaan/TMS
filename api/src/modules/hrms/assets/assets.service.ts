@@ -276,12 +276,12 @@ export class AssetsService {
       case "damaged":
         assetUpdate.assetCondition = data.assetCondition || "damaged";
         assetUpdate.damageRemarks = data.damageDescription || null;
-        assetUpdate.deductionAmount = data.deductionAmount || null;
+        assetUpdate.deductionAmount = data.deductionAmount ? String(data.deductionAmount) : null;
         break;
 
       case "lost":
         assetUpdate.damageRemarks = data.lostCircumstances || null;
-        assetUpdate.deductionAmount = data.deductionAmount || null;
+        assetUpdate.deductionAmount = data.deductionAmount ? String(data.deductionAmount) : null;
         break;
 
       case "returned":
@@ -289,7 +289,7 @@ export class AssetsService {
         assetUpdate.returnDate = data.returnDate;
         assetUpdate.returnCondition = data.returnCondition || null;
         assetUpdate.assetCondition = data.assetCondition || null;
-        assetUpdate.deductionAmount = data.deductionAmount || null;
+        assetUpdate.deductionAmount = data.deductionAmount ? String(data.deductionAmount) : null;
         break;
 
       case "disposed":
@@ -367,7 +367,7 @@ export class AssetsService {
       repairDescription: data.repairDescription ?? null,
       
       // Financial
-      deductionAmount: data.deductionAmount ?? null,
+      deductionAmount: data.deductionAmount != null ? String(data.deductionAmount) : null,
       deductionReason: data.deductionReason ?? null,
       assetConditionAfter: data.assetCondition ?? null,
       

@@ -166,7 +166,7 @@ export class AssetsController {
     const warrantyCard = files.find(f => f.fieldname === 'warrantyCard' || f.fieldname === 'warrantyCard[]')?.filename || null;
     const assignmentForm = files.find(f => f.fieldname === 'assignmentForm' || f.fieldname === 'assignmentForm[]')?.filename || null;
 
-    if (typeof body.userId === "string") body.userId = parseInt(body.userId, 10);
+    if (typeof body.userId === "string") body.userId = Number.parseInt(body.userId, 10);
     if (typeof body.accessories === "string") {
       try {
         body.accessories = JSON.parse(body.accessories);
