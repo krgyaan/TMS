@@ -61,7 +61,7 @@ const LeadListPage = () => {
         defaultTab: 'cold' as LeadPriorityTab,
     });
 
-    // ── Modal States ─────────────────────────────────────────────────
+    // ── Modal States ──────────────────────────────────────────────────
 
     const [deleteModal, setDeleteModal] = useState<{
         open: boolean;
@@ -154,7 +154,7 @@ const LeadListPage = () => {
     const leadActions: ActionItem<LeadWithNames>[] = [
         {
             label: "Update Followup",
-            onClick: (row) => navigate(paths.crm.leadFollowup(row.id)),  
+            onClick: (row) => navigate(paths.crm.leadFollowup(row.id)),
             icon: <Calendar className="h-4 w-4" />,
         },
         {
@@ -276,19 +276,55 @@ const LeadListPage = () => {
                 });
             },
         },
+        // ✅ UPDATED - Now shows latest nextFollowupDate from lead_followups table
         {
-            field: "enquiryReceivedAt",
+            field: "nextFollowupDate",
             headerName: "Next Follow Up",
             width: 150,
             filter: true,
-            sortable: true,
-            valueFormatter: (params) => {
-                if (!params.value) return "-";
-                return new Date(params.value).toLocaleDateString('en-IN', {
+            sortable: false,
+            cellRenderer: (params: any) => {
+                if (!params.value) return <span className="text-muted-foreground">-</span>;
+
+                const date = new Date(params.value);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const tomorrow = new Date(today);
+                tomorrow.setDate(today.getDate() + 1);
+
+                const isPast     = date < today;
+                const isToday    = date >= today && date < tomorrow;
+                const isUpcoming = date >= tomorrow;
+
+                const formatted = date.toLocaleDateString('en-IN', {
                     year: 'numeric',
                     month: 'short',
                     day: 'numeric',
                 });
+
+                if (isPast) {
+                    return (
+                        <span className="text-red-500 font-medium">
+                            {formatted}
+                        </span>
+                    );
+                }
+                if (isToday) {
+                    return (
+                        <span className="text-green-600 font-semibold">
+                            Today
+                        </span>
+                    );
+                }
+                if (isUpcoming) {
+                    return (
+                        <span className="text-blue-500">
+                            {formatted}
+                        </span>
+                    );
+                }
+
+                return <span>{formatted}</span>;
             },
         },
         {
@@ -357,8 +393,6 @@ const LeadListPage = () => {
                 >
                     {/* ── Single Row: Tabs (left) + Search (right) ── */}
                     <div className="flex items-center gap-4 px-6 pb-4">
-
-                        {/* Tabs with Badge counts */}
                         <TabsList>
                             {tabsConfig.map(tab => (
                                 <TabsTrigger
@@ -376,7 +410,6 @@ const LeadListPage = () => {
                             ))}
                         </TabsList>
 
-                        {/* Search Bar (Right) */}
                         <div className="flex-1 flex justify-end">
                             <div className="relative">
                                 <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />

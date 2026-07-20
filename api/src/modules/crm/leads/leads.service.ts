@@ -2,11 +2,12 @@ import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { leads, type NewLead, type Lead } from '@db/schemas/crm/leads.schema';
+import { leadFollowups } from '@db/schemas/crm/lead-followups.schema';
 import { leadIndustries } from '@db/schemas/master/lead-industries.schema';
 import { leadTypes } from '@db/schemas/crm/lead-types.schema';
 import { teams } from '@db/schemas/master/teams.schema';
 import { users } from '@db/schemas/auth/users.schema';
-import { and, asc, desc, eq, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { CreateLeadDto, UpdateLeadDto, AllocateLeadDto, DeleteLeadDto } from './dto/lead.dto';
 
@@ -15,7 +16,7 @@ export type LeadListFilters = {
     limit?: number;
     search?: string;
     priority?: string;
-    status?: string;        // ← NEW: for 'disqualified' tab
+    status?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 };
@@ -27,11 +28,13 @@ export type LeadWithNames = Lead & {
     bdPersonName?: string | null;
     allocatedTeName?: string | null;
     allocatedByName?: string | null;
+    nextFollowupDate?: string | null;
 };
 
 const bdUser = alias(users, 'bd_user');
 const teUser = alias(users, 'te_user');
 const allocatedByUser = alias(users, 'allocated_by_user');
+const latestFollowup = alias(leadFollowups, 'latest_followup');
 
 @Injectable()
 export class LeadsService {
@@ -50,10 +53,26 @@ export class LeadsService {
             bdPersonName: bdUser.name,
             allocatedTeName: teUser.name,
             allocatedByName: allocatedByUser.name,
+            nextFollowupDate: latestFollowup.nextFollowupDate,
         };
     }
 
     private getBaseQueryBuilder() {
+        // ── Subquery: latest followup per lead that has nextFollowupDate ──
+        const latestFollowupSubquery = this.db
+            .selectDistinctOn([leadFollowups.leadId], {
+                leadId: leadFollowups.leadId,
+                nextFollowupDate: leadFollowups.nextFollowupDate,
+            })
+            .from(leadFollowups)
+            .where(isNotNull(leadFollowups.nextFollowupDate))
+            .orderBy(
+                leadFollowups.leadId,
+                desc(leadFollowups.createdAt),
+                desc(leadFollowups.id),
+            )
+            .as('latest_followup');
+
         return this.db
             .select(this.getLeadBaseSelect())
             .from(leads)
@@ -62,7 +81,8 @@ export class LeadsService {
             .leftJoin(teams, eq(teams.id, sql`CAST(${leads.team} AS BIGINT)`))
             .leftJoin(bdUser, eq(bdUser.id, leads.bdPerson))
             .leftJoin(teUser, eq(teUser.id, leads.allocatedTe))
-            .leftJoin(allocatedByUser, eq(allocatedByUser.id, leads.allocatedBy));
+            .leftJoin(allocatedByUser, eq(allocatedByUser.id, leads.allocatedBy))
+            .leftJoin(latestFollowupSubquery, eq(latestFollowupSubquery.leadId, leads.id));
     }
 
     private mapJoinedRow = (row: {
@@ -73,6 +93,7 @@ export class LeadsService {
         bdPersonName: string | null;
         allocatedTeName: string | null;
         allocatedByName: string | null;
+        nextFollowupDate: Date | null;
     }): LeadWithNames => ({
         ...row.leads,
         industryName: row.industryName ?? null,
@@ -81,6 +102,9 @@ export class LeadsService {
         bdPersonName: row.bdPersonName ?? null,
         allocatedTeName: row.allocatedTeName ?? null,
         allocatedByName: row.allocatedByName ?? null,
+        nextFollowupDate: row.nextFollowupDate
+            ? row.nextFollowupDate.toISOString()
+            : null,
     });
 
     // ─── Public Methods ───────────────────────────────────────────────
@@ -97,10 +121,8 @@ export class LeadsService {
 
         // ── Status filter (disqualified tab) ──────────────────────────
         if (filters?.status === 'disqualified') {
-            // Show only soft-deleted leads
             conditions.push(eq(leads.isDeleted, true));
         } else {
-            // All other tabs: only show non-deleted leads
             conditions.push(eq(leads.isDeleted, false));
         }
 

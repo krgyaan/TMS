@@ -31,9 +31,9 @@ export interface Lead {
     lastWhatsappSentAt: string | null;
     leadPriority: string | null;
     recentFollowUp: 'visit' | 'whatsapp' | 'letter' | 'mail' | 'call' | null;
-    isDeleted: boolean;                 // ← NEW
-    deleteReason: string | null;        // ← NEW
-    deletedAt: string | null;           // ← NEW
+    isDeleted: boolean;
+    deleteReason: string | null;
+    deletedAt: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -45,6 +45,7 @@ export interface LeadWithNames extends Lead {
     bdPersonName?: string | null;
     allocatedTeName?: string | null;
     allocatedByName?: string | null;
+    nextFollowupDate?: string | null; // ✅ Latest next followup date from lead_followups
 }
 
 export interface CreateLeadRequest {
@@ -80,7 +81,7 @@ export interface LeadListParams {
     limit?: number;
     search?: string;
     priority?: string;
-    status?: string;            // ← NEW
+    status?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 }
