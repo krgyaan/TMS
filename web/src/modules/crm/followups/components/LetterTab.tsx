@@ -1,142 +1,97 @@
-import { useState } from "react";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Loader2, FileText } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Loader2, FileText, Edit, Save, X, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
-import { TenderFileUploader } from "@/components/tender-file-upload"; // ✅ Changed
-import { useCreateFollowup } from "@/hooks/api/useFollowups";
+import { TenderFileUploader } from "@/components/tender-file-upload";
 import { useUsers } from "@/hooks/api/useUsers";
-import type { LetterFollowupRequest } from "../helpers/followup.types";
-
-// ─── Schema ───────────────────────────────────────────────────────────────────
-
-const LetterSchema = z.object({
-    toOrg:           z.string().min(1, { message: "Organization name is required" }),
-    toName:          z.string().min(1, { message: "Recipient name is required" }),
-    toAddr:          z.string().min(1, { message: "Address is required" }),
-    toPin:           z.string().min(1, { message: "Pin code is required" }),
-    toMobile:        z.string().min(1, { message: "Mobile number is required" }),
-    empFrom:         z.string().min(1, { message: "Please select an employee" }),
-    delDate:         z.string().min(1, { message: "Expected delivery date is required" }),
-    urgency:         z.string().min(1, { message: "Please select urgency" }),
-    nextFollowupDate: z.string().optional().nullable(),
-});
-
-type LetterFormValues = z.infer<typeof LetterSchema>;
+import { tenderFilesService } from "@/services/api/tender-files.service";
+import { format } from "date-fns";
+import { paths } from "@/app/routes/paths";
+import {
+    useFollowups,
+    useLetterForm,
+    isToday,
+    type LetterFormValues
+} from "@/hooks/api/useFollowups";
+import type { BaseFollowup } from "../helpers/followup.types";
 
 const URGENCY_OPTIONS = [
     { value: '1', label: 'Very Low' },
-    { value: '2', label: 'Low'      },
-    { value: '3', label: 'Normal'   },
-    { value: '4', label: 'High'     },
-    { value: '5', label: 'Urgent'   },
+    { value: '2', label: 'Low' },
+    { value: '3', label: 'Normal' },
+    { value: '4', label: 'High' },
+    { value: '5', label: 'Urgent' },
 ];
-
-// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface LetterTabProps {
     leadId: number;
+    mode?: 'create' | 'view';
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+export function LetterTab({ leadId, mode = 'create' }: LetterTabProps) {
+    if (mode === 'view') {
+        return <LetterFollowupList leadId={leadId} />;
+    }
+    return <LetterCreateForm leadId={leadId} />;
+}
 
-export function LetterTab({ leadId }: LetterTabProps) {
-    const createFollowup = useCreateFollowup(leadId);
-    const [attachmentPaths, setAttachmentPaths] = useState<string[]>([]); // ✅ Changed
+// ─── Create / Edit Form ───────────────────────────────────────────────────────
+
+function LetterCreateForm({ leadId }: { leadId: number }) {
+    const {
+        form,
+        attachmentPaths,
+        setAttachmentPaths,
+        isEditMode,
+        saving,
+        handleSubmit,
+        handleCancelEdit,
+    } = useLetterForm(leadId);
+
     const { data: allUsers = [] } = useUsers();
-
     const employeeOptions = allUsers.map(u => ({
         value: u.id.toString(),
         label: u.team?.name ? `${u.name} (${u.team.name})` : (u.name ?? ""),
     }));
 
-    const form = useForm<LetterFormValues>({
-        resolver: zodResolver(LetterSchema),
-        defaultValues: {
-            toOrg:            "",
-            toName:           "",
-            toAddr:           "",
-            toPin:            "",
-            toMobile:         "",
-            empFrom:          "",
-            delDate:          "",
-            urgency:          "",
-            nextFollowupDate: "",
-        },
-    });
-
-    const handleSubmit = async (values: LetterFormValues) => {
-        const payload: LetterFollowupRequest = {
-            type:             'letter',
-            toOrg:            values.toOrg,
-            toName:           values.toName,
-            toAddr:           values.toAddr,
-            toPin:            values.toPin,
-            toMobile:         values.toMobile,
-            empFrom:          Number(values.empFrom),
-            delDate:          values.delDate,
-            urgency:          Number(values.urgency),
-            attachments:      attachmentPaths, // ✅ Changed
-            nextFollowupDate: values.nextFollowupDate || null,
-        };
-        try {
-            await createFollowup.mutateAsync(payload);
-            form.reset();
-            setAttachmentPaths([]); // ✅ Changed
-        } catch {
-            // handled by hook
-        }
-    };
-
-    const saving = createFollowup.isPending;
-
     return (
         <Form {...form}>
+            {isEditMode && (
+                <div className="flex items-center justify-between p-3 mb-6 bg-amber-50 border border-amber-200 rounded-lg dark:bg-amber-950/30 dark:border-amber-800">
+                    <p className="text-sm text-amber-800 font-medium dark:text-amber-400">
+                        ✏️ Editing existing letter follow-up
+                    </p>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleCancelEdit}
+                        disabled={saving}
+                    >
+                        <X className="h-3 w-3 mr-1" />
+                        Cancel Edit
+                    </Button>
+                </div>
+            )}
+
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                    {/* Organization Name */}
-                    <FieldWrapper<LetterFormValues, "toOrg">
-                        control={form.control}
-                        name="toOrg"
-                        label="Organization Name"
-                    >
-                        {(field) => (
-                            <Input
-                                placeholder="Enter organization name"
-                                disabled={saving}
-                                {...field}
-                            />
-                        )}
+                    <FieldWrapper<LetterFormValues, "toOrg"> control={form.control} name="toOrg" label="Organization Name">
+                        {(field) => <Input placeholder="Enter organization name" disabled={saving} {...field} />}
                     </FieldWrapper>
 
-                    {/* Recipient Name */}
-                    <FieldWrapper<LetterFormValues, "toName">
-                        control={form.control}
-                        name="toName"
-                        label="Name"
-                    >
-                        {(field) => (
-                            <Input
-                                placeholder="Enter recipient name"
-                                disabled={saving}
-                                {...field}
-                            />
-                        )}
+                    <FieldWrapper<LetterFormValues, "toName"> control={form.control} name="toName" label="Name">
+                        {(field) => <Input placeholder="Enter recipient name" disabled={saving} {...field} />}
                     </FieldWrapper>
 
-                    {/* Address */}
                     <div className="col-span-full">
-                        <FieldWrapper<LetterFormValues, "toAddr">
-                            control={form.control}
-                            name="toAddr"
-                            label="Address"
-                        >
+                        <FieldWrapper<LetterFormValues, "toAddr"> control={form.control} name="toAddr" label="Address">
                             {(field) => (
                                 <textarea
                                     className="border-input placeholder:text-muted-foreground dark:bg-input/30 h-20 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
@@ -148,38 +103,14 @@ export function LetterTab({ leadId }: LetterTabProps) {
                         </FieldWrapper>
                     </div>
 
-                    {/* Pin Code */}
-                    <FieldWrapper<LetterFormValues, "toPin">
-                        control={form.control}
-                        name="toPin"
-                        label="Pin Code"
-                    >
-                        {(field) => (
-                            <Input
-                                placeholder="Enter pin code"
-                                disabled={saving}
-                                {...field}
-                            />
-                        )}
+                    <FieldWrapper<LetterFormValues, "toPin"> control={form.control} name="toPin" label="Pin Code">
+                        {(field) => <Input placeholder="Enter pin code" disabled={saving} {...field} />}
                     </FieldWrapper>
 
-                    {/* Mobile Number */}
-                    <FieldWrapper<LetterFormValues, "toMobile">
-                        control={form.control}
-                        name="toMobile"
-                        label="Mobile Number"
-                    >
-                        {(field) => (
-                            <Input
-                                type="tel"
-                                placeholder="Enter mobile number"
-                                disabled={saving}
-                                {...field}
-                            />
-                        )}
+                    <FieldWrapper<LetterFormValues, "toMobile"> control={form.control} name="toMobile" label="Mobile Number">
+                        {(field) => <Input type="tel" placeholder="Enter mobile number" disabled={saving} {...field} />}
                     </FieldWrapper>
 
-                    {/* Courier From */}
                     <SelectField<LetterFormValues, "empFrom">
                         control={form.control}
                         name="empFrom"
@@ -188,12 +119,7 @@ export function LetterTab({ leadId }: LetterTabProps) {
                         placeholder="Select Employee"
                     />
 
-                    {/* Expected Delivery Date */}
-                    <FieldWrapper<LetterFormValues, "delDate">
-                        control={form.control}
-                        name="delDate"
-                        label="Expected Delivery Date"
-                    >
+                    <FieldWrapper<LetterFormValues, "delDate"> control={form.control} name="delDate" label="Expected Delivery Date">
                         {(field) => (
                             <input
                                 type="date"
@@ -204,7 +130,6 @@ export function LetterTab({ leadId }: LetterTabProps) {
                         )}
                     </FieldWrapper>
 
-                    {/* Dispatch Urgency */}
                     <SelectField<LetterFormValues, "urgency">
                         control={form.control}
                         name="urgency"
@@ -213,12 +138,7 @@ export function LetterTab({ leadId }: LetterTabProps) {
                         placeholder="Select Urgency"
                     />
 
-                    {/* Next Follow-up Date */}
-                    <FieldWrapper<LetterFormValues, "nextFollowupDate">
-                        control={form.control}
-                        name="nextFollowupDate"
-                        label="Next Follow-up Date"
-                    >
+                    <FieldWrapper<LetterFormValues, "nextFollowupDate"> control={form.control} name="nextFollowupDate" label="Next Follow-up Date">
                         {(field) => (
                             <input
                                 type="date"
@@ -230,8 +150,7 @@ export function LetterTab({ leadId }: LetterTabProps) {
                         )}
                     </FieldWrapper>
 
-                    {/* Soft Copy Attachments - ✅ REPLACED */}
-                    <div className="col-span-full space-y-2">
+                    <div className="col-span-full">
                         <TenderFileUploader
                             context="followups"
                             value={attachmentPaths}
@@ -240,16 +159,19 @@ export function LetterTab({ leadId }: LetterTabProps) {
                             disabled={saving}
                         />
                     </div>
-
                 </div>
 
-                {/* Submit */}
                 <div className="flex justify-end pt-2">
                     <Button type="submit" disabled={saving}>
                         {saving ? (
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 Saving...
+                            </>
+                        ) : isEditMode ? (
+                            <>
+                                <Save className="mr-2 h-4 w-4" />
+                                Update Letter Follow-up
                             </>
                         ) : (
                             <>
@@ -261,5 +183,112 @@ export function LetterTab({ leadId }: LetterTabProps) {
                 </div>
             </form>
         </Form>
+    );
+}
+
+// ─── List View ────────────────────────────────────────────────────────────────
+
+function LetterFollowupList({ leadId }: { leadId: number }) {
+    const { data: allFollowups = [] } = useFollowups(leadId);
+
+    const letterFollowups = useMemo(
+        () => allFollowups
+            .filter(f => f.type === 'letter')
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        [allFollowups]
+    );
+
+    if (letterFollowups.length === 0) {
+        return (
+            <div className="text-center py-12 text-muted-foreground">
+                No letter follow-ups yet
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-3">
+            {letterFollowups.map(followup => (
+                <LetterFollowupCard key={followup.id} followup={followup} leadId={leadId} />
+            ))}
+        </div>
+    );
+}
+
+// ─── Followup Card ────────────────────────────────────────────────────────────
+
+function LetterFollowupCard({ followup, leadId }: { followup: BaseFollowup; leadId: number }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const navigate = useNavigate();
+
+    return (
+        <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border rounded-lg">
+            <CollapsibleTrigger className="w-full p-4 hover:bg-muted/50 transition-colors">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="text-left">
+                            <p className="font-medium">
+                                {format(new Date(followup.createdAt), 'PPp')}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                by {followup.createdByName || "Unknown"}
+                            </p>
+                        </div>
+                        {isToday(followup.createdAt) && (
+                            <Badge className="bg-green-500">Today</Badge>
+                        )}
+                    </div>
+                    {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                </div>
+            </CollapsibleTrigger>
+
+            <CollapsibleContent className="p-4 pt-0 space-y-4">
+                <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Courier ID</p>
+                    <p className="text-sm">{followup.courierId || "—"}</p>
+                </div>
+
+                {followup.attachments && followup.attachments.length > 0 && (
+                    <div>
+                        <p className="text-sm font-medium text-muted-foreground mb-2">Attachments</p>
+                        <div className="space-y-2">
+                            {followup.attachments.map((path, idx) => (
+                                <a
+                                    key={idx}
+                                    href={tenderFilesService.getFileUrl(path)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
+                                >
+                                    <ExternalLink className="h-3 w-3" />
+                                    {path.split('/').pop()}
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {followup.nextFollowupDate && (
+                    <div>
+                        <p className="text-sm font-medium text-muted-foreground mb-1">Next Follow-up Date</p>
+                        <p className="text-sm">{format(new Date(followup.nextFollowupDate), 'PP')}</p>
+                    </div>
+                )}
+
+                {isToday(followup.createdAt) && (
+                    <Button
+                        size="sm"
+                        onClick={() =>
+                            navigate(
+                                `${paths.crm.leadFollowup(leadId)}?tab=letter&followupId=${followup.id}`
+                            )
+                        }
+                    >
+                        <Edit className="h-3 w-3 mr-1" />
+                        Edit
+                    </Button>
+                )}
+            </CollapsibleContent>
+        </Collapsible>
     );
 }

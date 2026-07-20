@@ -1,11 +1,9 @@
-import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
     Card,
     CardContent,
-    CardDescription,
     CardHeader,
-    CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,6 +17,7 @@ import {
     FileText,
     MessageCircle,
     AlertCircle,
+    History, 
 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { useLead } from "@/hooks/api/useLeads";
@@ -28,11 +27,9 @@ import { VisitTab }    from "./components/VisitTab";
 import { LetterTab }   from "./components/LetterTab";
 import { WhatsappTab } from "./components/WhatsappTab";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 type FollowupTabType = 'mail' | 'call' | 'visit' | 'letter' | 'whatsapp';
 
-// ─── Tab Config ───────────────────────────────────────────────────────────────
+const VALID_TABS: FollowupTabType[] = ['mail', 'call', 'visit', 'letter', 'whatsapp'];
 
 const FOLLOWUP_TABS: {
     key: FollowupTabType;
@@ -46,17 +43,46 @@ const FOLLOWUP_TABS: {
     { key: 'whatsapp', label: 'WhatsApp',  icon: <MessageCircle className="h-4 w-4" /> },
 ];
 
-// ─── Component ────────────────────────────────────────────────────────────────
+const LAST_TAB_KEY = 'crm_followup_last_tab';
+
+const getValidTab = (tab: string | null): FollowupTabType => {
+    if (tab && VALID_TABS.includes(tab as FollowupTabType)) {
+        return tab as FollowupTabType;
+    }
+    return 'mail';
+};
 
 export default function FollowupListPage() {
     const { leadId } = useParams<{ leadId: string }>();
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<FollowupTabType>('mail');
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    const getInitialTab = (): FollowupTabType => {
+        const urlTab = searchParams.get('tab');
+        if (urlTab && VALID_TABS.includes(urlTab as FollowupTabType)) {
+            return urlTab as FollowupTabType;
+        }
+        const savedTab = localStorage.getItem(LAST_TAB_KEY);
+        return getValidTab(savedTab);
+    };
+
+    const [activeTab, setActiveTab] = useState<FollowupTabType>(getInitialTab);
 
     const leadIdNum = leadId ? Number(leadId) : null;
     const { data: lead, isLoading: leadLoading } = useLead(leadIdNum);
 
-    // ── Loading ───────────────────────────────────────────────────────
+    useEffect(() => {
+        if (!searchParams.get('tab')) {
+            setSearchParams({ tab: activeTab }, { replace: true });
+        }
+    }, []);
+
+    const handleTabChange = (value: string) => {
+        const newTab = value as FollowupTabType;
+        setActiveTab(newTab);
+        setSearchParams({ tab: newTab });
+        localStorage.setItem(LAST_TAB_KEY, newTab);
+    };
 
     if (leadLoading) {
         return (
@@ -67,8 +93,6 @@ export default function FollowupListPage() {
             </div>
         );
     }
-
-    // ── Error ─────────────────────────────────────────────────────────
 
     if (!leadIdNum || isNaN(leadIdNum) || !lead) {
         return (
@@ -89,42 +113,40 @@ export default function FollowupListPage() {
         );
     }
 
-    // ── Render ────────────────────────────────────────────────────────
-
     return (
         <Card className="min-h-[calc(100vh-2rem)] flex flex-col border-0 shadow-none">
             <CardHeader className="flex-none pb-4">
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle>Update Follow-up</CardTitle>
-                        <CardDescription>
-                            <span className="font-medium text-foreground">
-                                {lead.companyName || "—"}
-                            </span>
-                            {lead.name && (
-                                <span className="text-muted-foreground">
-                                    {" "}— {lead.name}
-                                </span>
-                            )}
-                        </CardDescription>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mb-1 -ml-2"
+                            onClick={() => navigate(paths.crm.leads)}
+                        >
+                            <ArrowLeft className="h-4 w-4 mr-1" />
+                            Back to Leads
+                        </Button>
+                        
                     </div>
-                    <Button
-                        variant="outline"
-                        onClick={() => navigate(paths.crm.leads)}
-                    >
-                        <ArrowLeft className="h-4 w-4 mr-1" />
-                        Back to Leads
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => navigate(paths.crm.leadFollowupHistory(leadIdNum))}
+                        >
+                            <History className="h-4 w-4 mr-1" />
+                            View History
+                        </Button>
+                    </div>
                 </div>
             </CardHeader>
 
             <CardContent className="flex-1">
                 <Tabs
                     value={activeTab}
-                    onValueChange={(v) => setActiveTab(v as FollowupTabType)}
+                    onValueChange={handleTabChange}
                     className="w-full"
                 >
-                    {/* ── Tab List ─────────────────────────────────── */}
                     <TabsList className="mb-6">
                         {FOLLOWUP_TABS.map(tab => (
                             <TabsTrigger
@@ -138,7 +160,6 @@ export default function FollowupListPage() {
                         ))}
                     </TabsList>
 
-                    {/* ── Tab Contents ─────────────────────────────── */}
                     <TabsContent value="mail">
                         <MailTab leadId={leadIdNum} />
                     </TabsContent>
