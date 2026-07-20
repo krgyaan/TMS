@@ -91,7 +91,7 @@ export interface StatusUpdateDto {
   repairDescription?: string | null;
   
   // Financial
-  deductionAmount?: string | null;
+  deductionAmount?: number | null;
   deductionReason?: string | null;
   
   // Disposal fields

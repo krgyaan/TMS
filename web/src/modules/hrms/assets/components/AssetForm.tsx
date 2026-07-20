@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, AlertCircle, Loader2, Plus, Save, Upload, X } from "lucide-react";
+import { ArrowLeft, AlertCircle, Loader2, Plus, Save, X } from "lucide-react";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -56,7 +56,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
       : undefined,
   });
 
-  const { handleSubmit, formState: { isSubmitting }, setValue, watch, control, reset } = form;
+  const { handleSubmit, setValue, watch, control, reset } = form;
   const watchAssetType = watch("assetType");
   const watchAssetCategory = watch("assetCategory");
   const isMobile = MOBILE_TYPES.includes(watchAssetType);
@@ -346,7 +346,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
                 <FieldWrapper control={control} name="purchaseDate" label="Purchase Date">
                   {field => <DateInput value={field.value ?? ""} onChange={field.onChange} />}
                 </FieldWrapper>
-                <FieldWrapper control={control} name="purchasePrice" label="Purchase Price ($)">
+                <FieldWrapper control={control} name="purchasePrice" label="Purchase Price">
                   {field => <NumberInput value={field.value} onChange={field.onChange} placeholder="0.00" />}
                 </FieldWrapper>
                 <FieldWrapper control={control} name="purchaseFrom" label="Vendor">

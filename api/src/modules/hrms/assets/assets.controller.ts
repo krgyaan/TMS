@@ -28,7 +28,7 @@ const BaseAssetSchema = z.object({
   serialNumber: z.string().optional().nullable(),
   imeiNumber: z.string().optional().nullable(),
   licenseKey: z.string().optional().nullable(),
-  assetValue: z.string().optional().nullable(),
+  assetValue: z.coerce.number().optional().nullable(),
   assetCondition: z.string().optional(),
   assignedDate: z.coerce.date().optional(),
   assignedBy: z.coerce.number().optional().nullable(),
@@ -48,9 +48,9 @@ const BaseAssetSchema = z.object({
   returnDate: optionalDate,
   returnCondition: z.string().optional().nullable(),
   damageRemarks: z.string().optional().nullable(),
-  deductionAmount: z.string().optional().nullable(),
+  deductionAmount: z.coerce.number().optional().nullable(),
   purchaseDate: optionalDate,
-  purchasePrice: z.string().optional().nullable(),
+  purchasePrice: z.coerce.number().optional().nullable(),
   purchaseFrom: z.string().optional().nullable(),
   remarks: z.string().optional().nullable(),
 });
@@ -95,7 +95,7 @@ const StatusUpdateSchema = z.object({
   repairDescription: z.string().optional().nullable(),
 
   // Financial
-  deductionAmount: z.string().optional().nullable(),
+  deductionAmount: z.coerce.number().optional().nullable(),
   deductionReason: z.string().optional().nullable(),
 
   // Disposal
