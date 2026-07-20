@@ -43,7 +43,7 @@ export const buildCreateFormData = (
 
   const assetPhotos = fileRefs.assetPhotosRef?.current?.files;
   if (assetPhotos) {
-    Array.from(assetPhotos).forEach((photo: File) =>
+    Array.from(assetPhotos).forEach((photo) =>
       formData.append("assetPhotos", photo),
     );
   }
@@ -74,10 +74,6 @@ export const buildEditFormData = (
     formData.append("typeSpecs", JSON.stringify(data.typeSpecs));
   }
 
-  if (currentUserId) {
-    formData.append("assignedBy", String(currentUserId));
-  }
-
   formData.append("removedFiles", JSON.stringify(removedFiles));
 
   if (newFiles.purchaseInvoice)
@@ -89,7 +85,7 @@ export const buildEditFormData = (
   if (newFiles.assignmentForm)
     formData.append("assignmentForm", newFiles.assignmentForm);
 
-  newFiles.assetPhotos.forEach((file: File) => {
+  newFiles.assetPhotos.forEach((file: any) => {
     formData.append("assetPhotos", file);
   });
 

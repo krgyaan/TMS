@@ -260,6 +260,7 @@ export class AssetsService {
         assetUpdate.expectedReturnDate = data.expectedReturnDate || null;
         assetUpdate.purpose = data.purpose || null;
         assetUpdate.assetLocation = data.assetLocation || null;
+        assetUpdate.assignedBy = data.changedByUserId;
         break;
 
       case "available":

@@ -27,7 +27,7 @@ export const createAssetSchema = z.object({
   accessories: z.array(z.string()).optional(),
   accessoryDetails: z.string().optional(),
   assetStatus: z.string().min(1, "Current Status is required"),
-  typeSpecs: z.record(z.any()).optional(),
+  typeSpecs: z.record(z.string(), z.any()).optional(),
   remarks: z.string().optional(),
 });
 
@@ -44,6 +44,7 @@ export const editAssetSchema = z.object({
   assetValue: z.string().optional(),
   assetCondition: z.string().min(1, "Asset Condition is required"),
   assignedDate: z.string().optional().or(z.literal("")),
+  expectedReturnDate: z.string().optional().or(z.literal("")),
   purpose: z.string().optional(),
   assetLocation: z.string().optional(),
   serialNumber: z.string().optional(),
@@ -62,7 +63,7 @@ export const editAssetSchema = z.object({
   purchaseDate: z.string().optional().or(z.literal("")),
   purchasePrice: z.string().optional(),
   purchaseFrom: z.string().optional(),
-  typeSpecs: z.record(z.any()).optional(),
+  typeSpecs: z.record(z.string(), z.any()).optional(),
 });
 
 export type EditAssetFormData = z.infer<typeof editAssetSchema>;
@@ -92,7 +93,7 @@ export const statusUpdateSchema = z.object({
   repairDescription: z.string().optional().transform(emptyToNull),
   deductionAmount: z.string().optional().transform(emptyToNull),
   deductionReason: z.string().optional().transform(emptyToNull),
-  typeSpecs: z.record(z.any()).optional(),
+  typeSpecs: z.record(z.string(), z.any()).optional(),
   disposalDate: z.string().optional().transform(emptyToNull),
   disposalType: z.string().optional().transform(emptyToNull),
   disposalReason: z.string().optional().transform(emptyToNull),

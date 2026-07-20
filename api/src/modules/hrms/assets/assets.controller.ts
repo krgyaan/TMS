@@ -39,7 +39,7 @@ const BaseAssetSchema = z.object({
   warrantyTo: z.coerce.date().optional().nullable(),
   insuranceDetails: z.string().optional().nullable(),
   accessories: z.array(z.any()).optional().nullable(),
-  typeSpecs: z.record(z.any()).optional(),
+  typeSpecs: z.record(z.string(), z.any()).optional(),
   assetPhotos: z.array(z.string()).optional().nullable(),
   purchaseInvoiceUrl: z.string().optional().nullable(),
   warrantyCardUrl: z.string().optional().nullable(),
@@ -335,7 +335,7 @@ export class AssetsController {
     const cleanParsed = {
       ...parsed,
       assignedDate: toDateString(parsed.assignedDate),
-      expectedReturnDate: parsed.expectedReturnDate ? toDateString(parsed.expectedReturnDate) : null,
+      expectedReturnDate: parsed.expectedReturnDate ? toDateString(parsed.expectedReturnDate) : undefined,
       warrantyFrom: parsed.warrantyFrom ? toDateString(parsed.warrantyFrom) : null,
       warrantyTo: parsed.warrantyTo ? toDateString(parsed.warrantyTo) : null,
       returnDate: parsed.returnDate ? toDateString(parsed.returnDate) : null,

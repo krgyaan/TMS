@@ -75,6 +75,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
         assetValue: asset.assetValue || "",
         assetCondition: asset.assetCondition || "",
         assignedDate: toDateInput(asset.assignedDate),
+        expectedReturnDate: toDateInput(asset.expectedReturnDate),
         purpose: asset.purpose || "",
         assetLocation: asset.assetLocation || "",
         serialNumber: asset.serialNumber || "",
