@@ -10,12 +10,13 @@ import { users } from "@/db/schemas/auth/users.schema";
 
 const ASSET_TYPE_LABELS: Record<string, string> = {
   laptop: "Laptop", desktop: "Desktop", mobile: "Mobile", monitor: "Monitor",
-  keyboard: "Keyboard", mouse: "Mouse", printer: "Printer", vehicle: "Vehicle",
+  keyboard: "Keyboard", mouse: "Mouse", printer: "Printer",
   id_card: "ID Card", access_card: "Access Card", sim_card: "SIM Card", other: "Other",
+  car: "Car", bike: "Bike", scooter: "Scooter", bus: "Bus",
 };
 
 const ASSET_CATEGORY_LABELS: Record<string, string> = {
-  it_equipment: "IT Equipment", office_furniture: "Office Furniture", vehicle: "Vehicle", stationery: "Stationery",
+  it_equipment: "IT Equipment", vehicle: "Vehicle", documents: "Documents",
 };
 
 const ASSET_CONDITION_LABELS: Record<string, string> = {
@@ -33,8 +34,9 @@ const ASSET_STATUS_LABELS: Record<string, string> = {
 
 const ASSET_TYPE_PREFIXES: Record<string, string> = {
   laptop: "LAP", desktop: "DSK", mobile: "MOB", monitor: "MON", keyboard: "KEY",
-  mouse: "MOU", printer: "PRT", vehicle: "VEH", id_card: "IDC", access_card: "ACC",
+  mouse: "MOU", printer: "PRT", id_card: "IDC", access_card: "ACC",
   sim_card: "SIM", other: "OTH",
+  car: "CAR", bike: "BIK", scooter: "SCO", bus: "BUS",
 };
 
 const ACTION_TYPE_MAP: Record<string, string> = {

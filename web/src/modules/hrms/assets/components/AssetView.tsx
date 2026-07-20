@@ -9,7 +9,7 @@ import { format } from "date-fns";
 import { AlertCircle, ArrowLeft, Calendar, CheckCircle2, Download, Edit, FileText, Image as ImageIcon, MapPin, Package, Shield, User } from "lucide-react";
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { ACCESSORIES_LIST, ASSET_TYPE } from "../constants";
+import { ASSET_TYPE } from "../constants";
 import { getAssetFileUrl } from "../helpers/asset.mappers";
 import { getTypeSpecFields } from "../helpers/typeSpecs";
 
@@ -265,14 +265,9 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
-                  {asset.accessories.map((accessoryId: string, idx: number) => {
-                    const found = ACCESSORIES_LIST.find((a) => a.id === accessoryId);
-                    return (
-                      <Badge key={idx} variant="secondary">
-                        {found?.label ?? accessoryId}
-                      </Badge>
-                    );
-                  })}
+                  {asset.accessories.map((item: string, idx: number) => (
+                      <Badge key={idx} variant="secondary">{item}</Badge>
+                  ))}
                 </div>
               </CardContent>
             </Card>

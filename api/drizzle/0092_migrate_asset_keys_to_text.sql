@@ -10,7 +10,7 @@ UPDATE "hrms_employee_assets" SET "asset_type" = 'monitor' WHERE "asset_type" = 
 UPDATE "hrms_employee_assets" SET "asset_type" = 'keyboard' WHERE "asset_type" = '5';
 UPDATE "hrms_employee_assets" SET "asset_type" = 'mouse' WHERE "asset_type" = '6';
 UPDATE "hrms_employee_assets" SET "asset_type" = 'printer' WHERE "asset_type" = '7';
-UPDATE "hrms_employee_assets" SET "asset_type" = 'vehicle' WHERE "asset_type" = '8';
+UPDATE "hrms_employee_assets" SET "asset_type" = 'car' WHERE "asset_type" = '8';
 UPDATE "hrms_employee_assets" SET "asset_type" = 'id_card' WHERE "asset_type" = '9';
 UPDATE "hrms_employee_assets" SET "asset_type" = 'access_card' WHERE "asset_type" = '10';
 UPDATE "hrms_employee_assets" SET "asset_type" = 'sim_card' WHERE "asset_type" = '11';

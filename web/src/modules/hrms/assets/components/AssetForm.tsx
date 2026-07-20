@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, AlertCircle, Loader2, Save, Upload } from "lucide-react";
+import { ArrowLeft, AlertCircle, Loader2, Plus, Save, Upload, X } from "lucide-react";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
@@ -18,7 +18,7 @@ import { NumberInput } from "@/components/form/NumberInput";
 import { paths } from "@/app/routes/paths";
 import { useCurrentUser } from "@/hooks/api/useAuth";
 import { useCreateHrmsAsset, useHrmsAssetView, useUpdateHrmsAsset } from "@/hooks/api/useHrmsAssets";
-import { ACCESSORIES_LIST, ASSET_CATEGORY, ASSET_CONDITION, ASSET_LOCATION, ASSET_TYPE, toOptions } from "../constants";
+import { ASSET_CATEGORY, ASSET_CONDITION, ASSET_TYPE, CATEGORY_TYPES, getTypesForCategory, toOptions } from "../constants";
 import { createAssetSchema, editAssetSchema } from "../helpers/asset.schema";
 import { buildCreateFormData, buildEditFormData, getAssetFileUrl, toDateInput } from "../helpers/asset.mappers";
 import { MOBILE_TYPES } from "../helpers/asset.types";
@@ -36,7 +36,8 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
   const createAssetMutation = useCreateHrmsAsset();
   const updateAssetMutation = useUpdateHrmsAsset();
 
-  const [selectedAccessories, setSelectedAccessories] = useState<string[]>([]);
+  const [accessories, setAccessories] = useState<string[]>([]);
+  const [accessoryInput, setAccessoryInput] = useState("");
   const [existingFiles, setExistingFiles] = useState({ purchaseInvoice: "", warrantyCard: "", assignmentForm: "", assetPhotos: [] as string[] });
   const [removedFiles, setRemovedFiles] = useState<string[]>([]);
 
@@ -57,6 +58,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
 
   const { handleSubmit, formState: { isSubmitting }, setValue, watch, control, reset } = form;
   const watchAssetType = watch("assetType");
+  const watchAssetCategory = watch("assetCategory");
   const isMobile = MOBILE_TYPES.includes(watchAssetType);
   const isSubmittingForm = createAssetMutation.isPending || updateAssetMutation.isPending;
 
@@ -92,7 +94,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
         typeSpecs: asset.typeSpecs || {},
       });
       if (asset.accessories && Array.isArray(asset.accessories)) {
-        setSelectedAccessories(asset.accessories);
+        setAccessories(asset.accessories);
         setValue("accessories", asset.accessories);
       }
       setExistingFiles({
@@ -115,10 +117,28 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
     }
   }, [watchAssetType, setValue]);
 
-  const handleAccessoryChange = (accessoryId: string, checked: boolean) => {
-    const updated = checked ? [...selectedAccessories, accessoryId] : selectedAccessories.filter(id => id !== accessoryId);
-    setSelectedAccessories(updated);
-    setValue("accessories", updated);
+  useEffect(() => {
+    if (!watchAssetCategory) return;
+    const allowedTypes = CATEGORY_TYPES[watchAssetCategory] ?? [];
+    if (watchAssetType && !allowedTypes.includes(watchAssetType)) {
+      setValue("assetType", allowedTypes[0] ?? "");
+    }
+  }, [watchAssetCategory, watchAssetType, setValue]);
+
+  const addAccessory = () => {
+    const trimmed = accessoryInput.trim();
+    if (!trimmed) return;
+    setAccessories(prev => [...prev, trimmed]);
+    setValue("accessories", [...accessories, trimmed]);
+    setAccessoryInput("");
+  };
+
+  const removeAccessory = (index: number) => {
+    setAccessories(prev => {
+      const updated = prev.filter((_, i) => i !== index);
+      setValue("accessories", updated);
+      return updated;
+    });
   };
 
   const handleRemoveFile = (type: string) => {
@@ -135,7 +155,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
     try {
       if (mode === "create") {
         const fileRefs = { purchaseInvoiceRef, warrantyCardRef, assetPhotosRef, assignmentFormRef };
-        const formData = buildCreateFormData(data, fileRefs, selectedAccessories, currentUser?.id);
+        const formData = buildCreateFormData(data, fileRefs, accessories, currentUser?.id);
         await createAssetMutation.mutateAsync(formData);
         navigate(paths.hrms.assets.list);
       } else {
@@ -217,17 +237,17 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
                 )}
                 <SelectField
                   control={control}
-                  name="assetType"
-                  label={<>Asset Type <span className="text-destructive">*</span></>}
-                  options={toOptions(ASSET_TYPE)}
-                  placeholder="Select Asset Type"
-                />
-                <SelectField
-                  control={control}
                   name="assetCategory"
                   label={<>Asset Category <span className="text-destructive">*</span></>}
                   options={toOptions(ASSET_CATEGORY)}
                   placeholder="Select Category"
+                />
+                <SelectField
+                  control={control}
+                  name="assetType"
+                  label={<>Asset Type <span className="text-destructive">*</span></>}
+                  options={getTypesForCategory(watchAssetCategory)}
+                  placeholder={watchAssetCategory ? "Select Asset Type" : "Select a category first"}
                 />
                 <FieldWrapper control={control} name="brand" label={<>Brand <span className="text-destructive">*</span></>}>
                   {field => <Input {...field} placeholder="e.g. Apple, Dell, HP" />}
@@ -292,10 +312,35 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
                   </div>
                 </div>
               )}
+              <h3 className="text-lg font-semibold">Accessories</h3>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={accessoryInput}
+                  onChange={e => setAccessoryInput(e.target.value)}
+                  placeholder="Type accessory name..."
+                  className="max-w-xs"
+                  onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addAccessory())}
+                />
+                <Button type="button" size="sm" variant="outline" onClick={addAccessory} disabled={!accessoryInput.trim()}>
+                  <Plus className="h-4 w-4 mr-1" /> Add
+                </Button>
+              </div>
+              {accessories.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {accessories.map((item, i) => (
+                    <Badge key={i} variant="secondary" className="gap-1 pr-1">
+                      {item}
+                      <button type="button" onClick={() => removeAccessory(i)} className="ml-1 hover:text-destructive">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="border rounded-lg border-dashed p-4 space-y-4">
-              <h3 className="text-lg font-semibold">Purchase Details</h3>
+              <h3 className="text-lg font-semibold">Purchase & Identification Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <FieldWrapper control={control} name="purchaseDate" label="Purchase Date">
                   {field => <DateInput value={field.value ?? ""} onChange={field.onChange} />}
@@ -306,12 +351,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
                 <FieldWrapper control={control} name="purchaseFrom" label="Vendor">
                   {field => <Input {...field} placeholder="Vendor name" />}
                 </FieldWrapper>
-              </div>
-            </div>
-
-            <div className="border rounded-lg border-dashed p-4 space-y-4">
-              <h3 className="text-lg font-semibold">Identification</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
                 <FieldWrapper control={control} name="serialNumber" label="Serial Number">
                   {field => <Input {...field} placeholder="Serial number" className="font-mono" />}
                 </FieldWrapper>
@@ -340,32 +380,12 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
             </div>
 
             <div className="border rounded-lg border-dashed p-4 space-y-4">
-              <h3 className="text-lg font-semibold">Accessories</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                {ACCESSORIES_LIST.map(a => (
-                  <label key={a.id} className="flex items-center gap-2 border rounded-lg p-3 cursor-pointer hover:bg-muted/50">
-                    <Checkbox
-                      id={a.id}
-                      checked={selectedAccessories.includes(a.id)}
-                      onCheckedChange={c => handleAccessoryChange(a.id, c as boolean)}
-                      disabled={isSubmittingForm}
-                    />
-                    <span className="text-sm cursor-pointer">{a.label}</span>
-                  </label>
-                ))}
-              </div>
-              <FieldWrapper control={control} name="accessoryDetails" label="Additional Details">
-                {field => <Textarea {...field} placeholder="Describe any additional accessories..." rows={2} />}
-              </FieldWrapper>
-            </div>
-
-            <div className="border rounded-lg border-dashed p-4 space-y-4">
               <h3 className="text-lg font-semibold">Documents</h3>
 
               {mode === "edit" && (existingFiles.purchaseInvoice || existingFiles.warrantyCard || existingFiles.assignmentForm) && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-muted-foreground">Existing Documents</p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     {existingFiles.purchaseInvoice && (
                       <div className="border rounded-lg p-3 flex items-center justify-between gap-2">
                         <span className="text-sm truncate">Purchase Invoice</span>
@@ -400,7 +420,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {[
                   { ref: purchaseInvoiceRef, id: "purchaseInvoice", label: "Purchase Invoice", accept: ".pdf,image/*" },
                   { ref: warrantyCardRef, id: "warrantyCard", label: "Warranty Card", accept: ".pdf,image/*" },
@@ -408,16 +428,12 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
                   { ref: assignmentFormRef, id: "assignmentForm", label: "Assignment Form", accept: ".pdf,image/*" },
                 ].map(item => (
                   <div key={item.id} className="border border-dashed rounded-lg p-4 text-center">
-                    <Upload className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
                     <Label htmlFor={item.id} className="text-sm font-medium cursor-pointer">{item.label}</Label>
                     <Input id={item.id} ref={item.ref as any} type="file" accept={item.accept} multiple={item.multiple} disabled={isSubmittingForm} className="mt-2 max-w-xs mx-auto" />
                   </div>
                 ))}
               </div>
-            </div>
-
-            <div className="border rounded-lg border-dashed p-4 space-y-4">
-              <h3 className="text-lg font-semibold">Remarks</h3>
+              
               <FieldWrapper control={control} name="remarks" label="Remarks">
                 {field => <Textarea {...field} placeholder="Additional notes..." rows={4} />}
               </FieldWrapper>
@@ -433,7 +449,6 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
                 )}
               </Button>
             </div>
-
           </form>
         </Form>
       </CardContent>

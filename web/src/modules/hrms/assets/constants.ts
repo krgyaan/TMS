@@ -16,7 +16,7 @@ export const ASSET_STATUS: Record<string, string> = {
   lost: "Lost",
   returned: "Returned",
   disposed: "Disposed",
-};
+}
 
 export const ASSET_CONDITION: Record<string, string> = {
   new: "New",
@@ -34,18 +34,20 @@ export const ASSET_TYPE: Record<string, string> = {
   keyboard: "Keyboard",
   mouse: "Mouse",
   printer: "Printer",
-  vehicle: "Vehicle",
   id_card: "ID Card",
   access_card: "Access Card",
   sim_card: "SIM Card",
   other: "Other",
+  car: "Car",
+  bike: "Bike",
+  scooter: "Scooter",
+  bus: "Bus",
 };
 
 export const ASSET_CATEGORY: Record<string, string> = {
   it_equipment: "IT Equipment",
-  office_furniture: "Office Furniture",
   vehicle: "Vehicle",
-  stationery: "Stationery",
+  documents: "Documents",
 };
 
 export const ASSET_LOCATION: Record<string, string> = {
@@ -73,18 +75,16 @@ export const DISPOSAL_TYPE: Record<string, string> = {
   returned_to_vendor: "Returned to Vendor",
 };
 
-export const ACCESSORIES_LIST = [
-  { id: "charger", label: "Charger" },
-  { id: "battery", label: "Battery" },
-  { id: "bag", label: "Bag/Case" },
-  { id: "mouse", label: "Mouse" },
-  { id: "keyboard", label: "Keyboard" },
-  { id: "cables", label: "Cables" },
-  { id: "adapter", label: "Adapter" },
-  { id: "headphones", label: "Headphones" },
-  { id: "stand", label: "Stand/Dock" },
-  { id: "stylus", label: "Stylus/Pen" },
-];
+export const CATEGORY_TYPES: Record<string, string[]> = {
+  it_equipment: ["laptop", "desktop", "mobile", "monitor", "keyboard", "mouse", "printer", "sim_card", "other"],
+  vehicle: ["car", "bike", "scooter", "bus"],
+  documents: ["id_card", "access_card"],
+};
+
+export const getTypesForCategory = (category?: string) =>
+  toOptions(ASSET_TYPE).filter(({ value }) =>
+    category ? (CATEGORY_TYPES[category] ?? []).includes(value) : true
+  );
 
 export const toOptions = (obj: Record<string, string>) =>
   Object.entries(obj).map(([value, label]) => ({ value, label }));

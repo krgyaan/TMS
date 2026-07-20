@@ -151,6 +151,49 @@ export const TYPE_SPECS: Record<string, TypeSpecField[]> = {
     { key: "imei", label: "SIM IMEI", type: "number", placeholder: "Written on SIM Card" }
   ],
   other: [],
+  car: [
+    { key: "licensePlate", label: "License Plate", type: "text", placeholder: "e.g. MH-01-AB-1234" },
+    { key: "fuelType", label: "Fuel Type", type: "select", options: [
+      { value: "petrol", label: "Petrol" },
+      { value: "diesel", label: "Diesel" },
+      { value: "cng", label: "CNG" },
+      { value: "ev", label: "Electric" },
+      { value: "hybrid", label: "Hybrid" },
+    ]},
+    { key: "color", label: "Color", type: "text", placeholder: "e.g. White" },
+    { key: "year", label: "Year", type: "number", placeholder: "e.g. 2024" },
+    { key: "engineNumber", label: "Engine Number", type: "text" },
+    { key: "chassisNumber", label: "Chassis Number", type: "text" },
+  ],
+  bike: [
+    { key: "licensePlate", label: "License Plate", type: "text", placeholder: "e.g. MH-01-AB-1234" },
+    { key: "fuelType", label: "Fuel Type", type: "select", options: [
+      { value: "petrol", label: "Petrol" },
+      { value: "ev", label: "Electric" },
+    ]},
+    { key: "color", label: "Color", type: "text", placeholder: "e.g. Red" },
+    { key: "cc", label: "Engine CC", type: "text", placeholder: "e.g. 150cc" },
+  ],
+  scooter: [
+    { key: "licensePlate", label: "License Plate", type: "text", placeholder: "e.g. MH-01-AB-1234" },
+    { key: "fuelType", label: "Fuel Type", type: "select", options: [
+      { value: "petrol", label: "Petrol" },
+      { value: "ev", label: "Electric" },
+    ]},
+    { key: "color", label: "Color", type: "text", placeholder: "e.g. Blue" },
+    { key: "batteryCapacity", label: "Battery Capacity", type: "text", placeholder: "e.g. 3 kWh" },
+  ],
+  bus: [
+    { key: "licensePlate", label: "License Plate", type: "text", placeholder: "e.g. MH-01-AB-1234" },
+    { key: "fuelType", label: "Fuel Type", type: "select", options: [
+      { value: "diesel", label: "Diesel" },
+      { value: "cng", label: "CNG" },
+      { value: "ev", label: "Electric" },
+    ]},
+    { key: "capacity", label: "Seating Capacity", type: "number", placeholder: "e.g. 40" },
+    { key: "color", label: "Color", type: "text", placeholder: "e.g. White" },
+    { key: "year", label: "Year", type: "number", placeholder: "e.g. 2024" },
+  ],
 };
 
 export const getTypeSpecFields = (assetType: string): TypeSpecField[] => {
