@@ -39,6 +39,7 @@ const BaseAssetSchema = z.object({
   warrantyTo: z.coerce.date().optional().nullable(),
   insuranceDetails: z.string().optional().nullable(),
   accessories: z.array(z.any()).optional().nullable(),
+  typeSpecs: z.record(z.any()).optional(),
   assetPhotos: z.array(z.string()).optional().nullable(),
   purchaseInvoiceUrl: z.string().optional().nullable(),
   warrantyCardUrl: z.string().optional().nullable(),
