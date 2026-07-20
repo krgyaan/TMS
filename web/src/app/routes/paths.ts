@@ -403,10 +403,19 @@ export const paths = {
         dashboard: "/hrms/admin",
         
         assetAdminDashboard: "/hrms/admin/assets",
-        assignAsset: "/hrms/admin/assets/assign",
+        assignAsset: "/hrms/admin/assets/create",
         assetEdit: (id: number) => `/hrms/admin/assets/edit/${id}`,
         assetStatus: (id: number) => `/hrms/admin/assets/status/${id}`,
         assetView: (id: number) => `/hrms/admin/assets/view/${id}`,
+
+        assets: {
+            list: "/hrms/admin/assets",
+            create: "/hrms/admin/assets/create",
+            edit: (id: number) => `/hrms/admin/assets/edit/${id}`,
+            show: (id: number) => `/hrms/admin/assets/view/${id}`,
+            status: (id: number) => `/hrms/admin/assets/status/${id}`,
+            my: "/hrms/assets/my",
+        },
         
         //================ onboarding  ==============================//
         onboardingDashboard: "/hrms/onboarding/dashboard",
