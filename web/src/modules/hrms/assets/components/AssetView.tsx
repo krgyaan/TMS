@@ -10,7 +10,7 @@ import { AlertCircle, ArrowLeft, Calendar, CheckCircle2, Download, Edit, FileTex
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { ACCESSORIES_LIST } from "../constants";
-import { getAssetFileUrl, formatAssetDate } from "../helpers/asset.mappers";
+import { getAssetFileUrl } from "../helpers/asset.mappers";
 
 interface AssetViewProps {
   assetId: number;
@@ -74,6 +74,7 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
       Damaged: { variant: "destructive", className: "bg-red-800 text-red-100 hover:bg-red-800" },
       Lost: { variant: "destructive", className: "bg-red-800 text-red-100 hover:bg-red-800" },
       Returned: { variant: "secondary", className: "bg-gray-800 text-gray-100 hover:bg-gray-800" },
+      Disposed: { variant: "secondary", className: "bg-neutral-800 text-neutral-100 hover:bg-neutral-800" },
     };
     const config = statusMap[status ?? "Available"] ?? statusMap["Available"];
     return (

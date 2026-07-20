@@ -5,6 +5,7 @@ export const ASSET_STATUS_KEYS = {
   DAMAGED: "4",
   LOST: "5",
   RETURNED: "6",
+  DISPOSED: "7",
 } as const;
 
 export const ASSET_STATUS: Record<string, string> = {
@@ -14,6 +15,7 @@ export const ASSET_STATUS: Record<string, string> = {
   "4": "Damaged",
   "5": "Lost",
   "6": "Returned",
+  "7": "Disposed",
 };
 
 export const ASSET_CONDITION: Record<string, string> = {
@@ -60,6 +62,15 @@ export const DAMAGE_TYPE: Record<string, string> = {
   "3": "Electrical Damage",
   "4": "Software/System Failure",
   "5": "Other",
+};
+
+export const DISPOSAL_TYPE: Record<string, string> = {
+  "1": "Sold",
+  "2": "Scrapped",
+  "3": "Donated",
+  "4": "Destroyed",
+  "5": "Write-off",
+  "6": "Returned to Vendor",
 };
 
 export const ACCESSORIES_LIST = [

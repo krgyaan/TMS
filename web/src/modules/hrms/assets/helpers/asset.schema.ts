@@ -107,6 +107,11 @@ export const statusUpdateSchema = z.object({
   repairDescription: z.string().optional().transform(emptyToNull),
   deductionAmount: z.string().optional().transform(emptyToNull),
   deductionReason: z.string().optional().transform(emptyToNull),
+  disposalDate: z.string().optional().transform(emptyToNull),
+  disposalType: z.string().optional().transform(emptyToNull),
+  disposalReason: z.string().optional().transform(emptyToNull),
+  disposalAmount: z.string().optional().transform(emptyToNull),
+  disposalApprovedBy: z.string().optional().transform(emptyToNull),
   remarks: z.string().optional().transform(emptyToNull),
 });
 

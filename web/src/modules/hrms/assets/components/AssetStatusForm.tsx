@@ -2,12 +2,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import {
   AlertCircle, AlertTriangle, ArrowLeft, CheckCircle, CheckCircle2, DollarSign,
-  History, Info, Package, RotateCcw, Save, User, Wrench, XCircle,
+  History, Info, Package, RotateCcw, Save, Trash2, User, Wrench, XCircle,
 } from "lucide-react";
 import React, { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { paths } from "@/app/routes/paths";
 import { useHrmsAssetDetails, useHrmsAssetHistory, useHrmsAssetView, useUpdateHrmsAssetStatus } from "@/hooks/api/useHrmsAssets";
 import { useUsers } from "@/hooks/api/useUsers";
-import { ASSET_CONDITION, ASSET_LOCATION, ASSET_STATUS_KEYS, DAMAGE_TYPE, toOptions } from "../constants";
+import { ASSET_CONDITION, ASSET_LOCATION, ASSET_STATUS_KEYS, DAMAGE_TYPE, DISPOSAL_TYPE, toOptions } from "../constants";
 import { statusUpdateSchema, type StatusUpdateFormData } from "../helpers/asset.schema";
 
 const STATUS_CONFIG: Record<string, {
@@ -37,6 +36,7 @@ const STATUS_CONFIG: Record<string, {
   "4": { label: "Damaged", badgeClass: "bg-red-800 text-red-100 hover:bg-red-800", icon: AlertTriangle, description: "Asset has been damaged" },
   "5": { label: "Lost", badgeClass: "bg-red-800 text-red-100 hover:bg-red-800", icon: XCircle, description: "Asset has been lost" },
   "6": { label: "Returned", badgeClass: "bg-gray-800 text-gray-100 hover:bg-gray-800", icon: RotateCcw, description: "Asset has been returned" },
+  "7": { label: "Disposed", badgeClass: "bg-neutral-800 text-neutral-100 hover:bg-neutral-800", icon: Trash2, description: "Asset has been disposed" },
 };
 
 const StatusCard: React.FC<{
@@ -217,6 +217,7 @@ const AssetStatusForm: React.FC<AssetStatusFormProps> = ({ assetId }) => {
   const isDamaged = status === ASSET_STATUS_KEYS.DAMAGED;
   const isLost = status === ASSET_STATUS_KEYS.LOST;
   const isUnderRepair = status === ASSET_STATUS_KEYS.UNDER_REPAIR;
+  const isDisposed = status === ASSET_STATUS_KEYS.DISPOSED;
 
   if (assetLoading) {
     return (
@@ -485,6 +486,35 @@ const AssetStatusForm: React.FC<AssetStatusFormProps> = ({ assetId }) => {
               </FormField>
               <FormField label="Repair Description" className="md:col-span-2">
                 <Textarea {...register("repairDescription")} placeholder="Describe what needs to be repaired..." rows={3} />
+              </FormField>
+            </div>
+          </FormSection>
+        )}
+
+        {isDisposed && (
+          <FormSection icon={Trash2} title="Disposal Details" description="Record the disposal of this asset">
+            <InfoBox type="warning" title="Asset Disposed">Document the disposal details. The asset will be removed from active inventory.</InfoBox>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+              <FormField label="Disposal Date" required><Input type="date" {...register("disposalDate")} /></FormField>
+              <FormField label="Disposal Type" required>
+                <Controller control={control} name="disposalType" render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger><SelectValue placeholder="Select disposal type..." /></SelectTrigger>
+                    <SelectContent>
+                      {toOptions(DISPOSAL_TYPE).map((opt) => (<SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                )} />
+              </FormField>
+              <FormField label="Disposal Amount">
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input type="number" step="0.01" {...register("disposalAmount")} placeholder="0.00" className="pl-10" />
+                </div>
+              </FormField>
+              <FormField label="Approved By"><Input {...register("disposalApprovedBy")} placeholder="Name of approving authority" /></FormField>
+              <FormField label="Disposal Reason" className="md:col-span-2">
+                <Textarea {...register("disposalReason")} placeholder="Reason for disposal..." rows={3} />
               </FormField>
             </div>
           </FormSection>

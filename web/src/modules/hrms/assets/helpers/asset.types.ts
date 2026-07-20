@@ -71,6 +71,11 @@ export interface StatusUpdatePayload {
     repairDescription?: string;
     deductionAmount?: string;
     deductionReason?: string;
+    disposalDate?: string;
+    disposalType?: string;
+    disposalReason?: string;
+    disposalAmount?: string;
+    disposalApprovedBy?: string;
     remarks?: string;
 }
 
@@ -111,6 +116,11 @@ export interface AssetHistoryEntry {
     deductionReason?: string | null;
     assetConditionAfter?: string | null;
     assetConditionAfterLabel?: string | null;
+    disposalDate?: string | null;
+    disposalType?: string | null;
+    disposalReason?: string | null;
+    disposalAmount?: string | null;
+    disposalApprovedBy?: string | null;
     remarks?: string | null;
     changedByUserId?: number | null;
     createdAt: string;

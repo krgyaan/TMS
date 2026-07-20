@@ -1,4 +1,3 @@
-// src/services/api/hrms-assets.service.ts
 import { BaseApiService } from "./base.service";
 
 export interface EmployeeAsset {
@@ -87,6 +86,13 @@ export interface StatusUpdatePayload {
     deductionAmount?: string;
     deductionReason?: string;
     
+    // Disposal
+    disposalDate?: string;
+    disposalType?: string;
+    disposalReason?: string;
+    disposalAmount?: string;
+    disposalApprovedBy?: string;
+    
     // General
     remarks?: string;
 }
@@ -128,6 +134,11 @@ export interface AssetHistoryEntry {
     deductionReason?: string | null;
     assetConditionAfter?: string | null;
     assetConditionAfterLabel?: string | null;
+    disposalDate?: string | null;
+    disposalType?: string | null;
+    disposalReason?: string | null;
+    disposalAmount?: string | null;
+    disposalApprovedBy?: string | null;
     remarks?: string | null;
     changedByUserId?: number | null;
     createdAt: string;
