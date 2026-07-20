@@ -228,6 +228,7 @@ export const paths = {
         leadCreate: "/crm/leads/create",
         leadEdit: (id: number | string) => `/crm/leads/${id}/edit`,
         leadView: (id: number | string) => `/crm/leads/${id}`,
+        leadFollowup: (leadId: number | string) => `/crm/followup/${leadId}`,
 
         enquiries: "/crm/enquiries",
         costings: "/crm/costings",

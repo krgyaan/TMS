@@ -154,7 +154,7 @@ const LeadListPage = () => {
     const leadActions: ActionItem<LeadWithNames>[] = [
         {
             label: "Update Followup",
-            onClick: (row) => console.log("Update followup for lead:", row.id),
+            onClick: (row) => navigate(paths.crm.leadFollowup(row.id)),  
             icon: <Calendar className="h-4 w-4" />,
         },
         {

@@ -293,9 +293,6 @@ export function LeadView({
     );
 }
 
-/**
- * Smart Section component for Lead Details
- */
 export function LeadDetailsSection({ leadId }: { leadId: number | null }) {
     const { data: lead, isLoading } = useLead(leadId);
 

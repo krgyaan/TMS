@@ -40,6 +40,8 @@ import { ItemHeadingsModule } from "@/modules/master/item-headings/item-headings
 import { ItemsModule } from "@/modules/master/items/items.module";
 import { LeadTypesModule } from "@/modules/master/lead-types/lead-types.module";
 import { LeadsModule } from "@/modules/crm/leads/leads.module";
+import { FollowupsModule } from "@/modules/crm/followups/followups.module";
+
 import { LeadIndustriesModule } from "@/modules/master/lead-industries/lead-industries.module";
 import { LoanPartiesModule } from "@/modules/master/loan-parties/loan-parties.module";
 import { LocationsModule } from "@/modules/master/locations/locations.module";
@@ -177,6 +179,7 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         LeadTypesModule,
         LeadIndustriesModule,
         LeadsModule,
+        FollowupsModule,
         TendersModule,
         EmployeeImprestModule,
         TenderInfoSheetsModule,
