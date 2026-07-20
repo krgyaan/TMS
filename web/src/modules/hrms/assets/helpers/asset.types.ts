@@ -127,4 +127,4 @@ export interface AssetHistoryEntry {
     createdAt: string;
 }
 
-export const MOBILE_TYPES = ["3", "11"];
+export const MOBILE_TYPES = ["mobile", "sim_card"];

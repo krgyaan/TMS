@@ -30,13 +30,13 @@ const STATUS_CONFIG: Record<string, {
   icon: React.ElementType;
   description: string;
 }> = {
-  "1": { label: "Assigned", badgeClass: "bg-green-800 text-green-100 hover:bg-green-800", icon: User, description: "Asset is assigned to an employee" },
-  "2": { label: "Available", badgeClass: "bg-blue-800 text-blue-100 hover:bg-blue-800", icon: Package, description: "Asset is available for assignment" },
-  "3": { label: "Under Repair", badgeClass: "bg-yellow-800 text-yellow-100 hover:bg-yellow-800", icon: Wrench, description: "Asset is being repaired" },
-  "4": { label: "Damaged", badgeClass: "bg-red-800 text-red-100 hover:bg-red-800", icon: AlertTriangle, description: "Asset has been damaged" },
-  "5": { label: "Lost", badgeClass: "bg-red-800 text-red-100 hover:bg-red-800", icon: XCircle, description: "Asset has been lost" },
-  "6": { label: "Returned", badgeClass: "bg-gray-800 text-gray-100 hover:bg-gray-800", icon: RotateCcw, description: "Asset has been returned" },
-  "7": { label: "Disposed", badgeClass: "bg-neutral-800 text-neutral-100 hover:bg-neutral-800", icon: Trash2, description: "Asset has been disposed" },
+  assigned: { label: "Assigned", badgeClass: "bg-green-800 text-green-100 hover:bg-green-800", icon: User, description: "Asset is assigned to an employee" },
+  available: { label: "Available", badgeClass: "bg-blue-800 text-blue-100 hover:bg-blue-800", icon: Package, description: "Asset is available for assignment" },
+  under_repair: { label: "Under Repair", badgeClass: "bg-yellow-800 text-yellow-100 hover:bg-yellow-800", icon: Wrench, description: "Asset is being repaired" },
+  damaged: { label: "Damaged", badgeClass: "bg-red-800 text-red-100 hover:bg-red-800", icon: AlertTriangle, description: "Asset has been damaged" },
+  lost: { label: "Lost", badgeClass: "bg-red-800 text-red-100 hover:bg-red-800", icon: XCircle, description: "Asset has been lost" },
+  returned: { label: "Returned", badgeClass: "bg-gray-800 text-gray-100 hover:bg-gray-800", icon: RotateCcw, description: "Asset has been returned" },
+  disposed: { label: "Disposed", badgeClass: "bg-neutral-800 text-neutral-100 hover:bg-neutral-800", icon: Trash2, description: "Asset has been disposed" },
 };
 
 const StatusCard: React.FC<{
@@ -246,7 +246,7 @@ const AssetStatusForm: React.FC<AssetStatusFormProps> = ({ assetId }) => {
     );
   }
 
-  const currentConfig = STATUS_CONFIG[currentStatus || "2"];
+  const currentConfig = STATUS_CONFIG[currentStatus || "available"];
 
   return (
     <div className="container mx-auto py-6 max-w-5xl space-y-6">

@@ -7,7 +7,7 @@ export interface TypeSpecField {
 }
 
 export const TYPE_SPECS: Record<string, TypeSpecField[]> = {
-  "1": [
+  laptop: [
     { key: "ram", label: "RAM", type: "text", placeholder: "e.g. 16GB DDR5" },
     { key: "storage", label: "Storage", type: "text", placeholder: "e.g. 512GB SSD" },
     { key: "processor", label: "Processor", type: "text", placeholder: "e.g. Apple M3 Pro" },
@@ -15,7 +15,7 @@ export const TYPE_SPECS: Record<string, TypeSpecField[]> = {
     { key: "os", label: "Operating System", type: "text", placeholder: "e.g. macOS Sonoma" },
     { key: "gpu", label: "GPU", type: "text", placeholder: "e.g. Integrated" },
   ],
-  "2": [
+  desktop: [
     { key: "ram", label: "RAM", type: "text", placeholder: "e.g. 32GB DDR5" },
     { key: "storage", label: "Storage", type: "text", placeholder: "e.g. 1TB NVMe SSD" },
     { key: "processor", label: "Processor", type: "text", placeholder: "e.g. Intel Core i7-14700K" },
@@ -33,7 +33,7 @@ export const TYPE_SPECS: Record<string, TypeSpecField[]> = {
       ],
     },
   ],
-  "3": [
+  mobile: [
     { key: "ram", label: "RAM", type: "text", placeholder: "e.g. 8GB LPDDR5" },
     { key: "storage", label: "Storage", type: "text", placeholder: "e.g. 256GB" },
     { key: "screenSize", label: "Screen Size", type: "text", placeholder: "e.g. 6.7-inch" },
@@ -41,7 +41,7 @@ export const TYPE_SPECS: Record<string, TypeSpecField[]> = {
     { key: "batteryCapacity", label: "Battery Capacity", type: "text", placeholder: "e.g. 5000mAh" },
     { key: "processor", label: "Processor", type: "text", placeholder: "e.g. Snapdragon 8 Gen 3" },
   ],
-  "4": [
+  monitor: [
     { key: "screenSize", label: "Screen Size", type: "text", placeholder: "e.g. 27-inch" },
     { key: "resolution", label: "Resolution", type: "text", placeholder: "e.g. 3840x2160" },
     { key: "refreshRate", label: "Refresh Rate", type: "text", placeholder: "e.g. 144Hz" },
@@ -56,7 +56,7 @@ export const TYPE_SPECS: Record<string, TypeSpecField[]> = {
       ],
     },
   ],
-  "5": [
+  keyboard: [
     {
       key: "switchType", label: "Switch Type", type: "select",
       options: [
@@ -76,7 +76,7 @@ export const TYPE_SPECS: Record<string, TypeSpecField[]> = {
       ],
     },
   ],
-  "6": [
+  mouse: [
     {
       key: "connection", label: "Connection", type: "select",
       options: [
@@ -88,7 +88,7 @@ export const TYPE_SPECS: Record<string, TypeSpecField[]> = {
     { key: "dpi", label: "DPI", type: "text", placeholder: "e.g. 1600 DPI" },
     { key: "buttons", label: "Number of Buttons", type: "number", placeholder: "e.g. 6" },
   ],
-  "7": [
+  printer: [
     {
       key: "printerType", label: "Printer Type", type: "select",
       options: [
@@ -116,7 +116,7 @@ export const TYPE_SPECS: Record<string, TypeSpecField[]> = {
       ],
     },
   ],
-  "8": [
+  vehicle: [
     { key: "licensePlate", label: "License Plate", type: "text", placeholder: "e.g. MH-01-AB-1234" },
     {
       key: "fuelType", label: "Fuel Type", type: "select",
@@ -133,24 +133,24 @@ export const TYPE_SPECS: Record<string, TypeSpecField[]> = {
     { key: "engineNumber", label: "Engine Number", type: "text" },
     { key: "chassisNumber", label: "Chassis Number", type: "text" },
   ],
-  "9": [
+  id_card: [
     { key: "employeeName", label: "Employee Name", type: "text" },
     { key: "designation", label: "Designation", type: "text" },
     { key: "validFrom", label: "Valid From", type: "date" },
     { key: "validUntil", label: "Valid Until", type: "date" },
   ],
-  "10": [
+  access_card: [
     { key: "accessLevel", label: "Access Level", type: "text", placeholder: "e.g. Level 3" },
     { key: "zones", label: "Accessible Zones", type: "text", placeholder: "e.g. Floor 1-5, Server Room" },
     { key: "validFrom", label: "Valid From", type: "date" },
     { key: "validUntil", label: "Valid Until", type: "date" },
   ],
-  "11": [
+  sim_card: [
     { key: "phoneNumber", label: "Phone Number", type: "text", placeholder: "e.g. +91 98765 43210" },
     { key: "networkProvider", label: "Network Provider", type: "text", placeholder: "e.g. Airtel, Jio" },
     { key: "imei", label: "SIM IMEI", type: "number", placeholder: "Written on SIM Card" }
   ],
-  "12": [],
+  other: [],
 };
 
 export const getTypeSpecFields = (assetType: string): TypeSpecField[] => {

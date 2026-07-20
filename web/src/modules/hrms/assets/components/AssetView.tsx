@@ -144,10 +144,10 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
           <div>
             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
               <span className="font-mono text-primary">{asset.assetCode}</span>
-              {getStatusBadge(asset.assetStatus)}
+              {getStatusBadge(asset.assetStatusLabel)}
             </h1>
             <p className="text-muted-foreground mt-1">
-              {asset.assetType} • {asset.brand} {asset.model}
+              {asset.assetTypeLabel || asset.assetType} • {asset.brand} {asset.model}
             </p>
           </div>
         </div>
@@ -166,15 +166,15 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
             <CardContent>
               <div className="grid grid-cols-2 gap-6">
                 <InfoField label="Asset Code" value={asset.assetCode} mono />
-                <InfoField label="Asset Type" value={asset.assetType} />
-                <InfoField label="Category" value={asset.assetCategory} />
+                <InfoField label="Asset Type" value={asset.assetTypeLabel || asset.assetType} />
+                <InfoField label="Category" value={asset.assetCategoryLabel || asset.assetCategory} />
                 <InfoField label="Brand" value={asset.brand} />
                 <InfoField label="Model" value={asset.model} />
                 <InfoField label="Serial Number" value={asset.serialNumber} mono />
                 <InfoField label="IMEI Number" value={asset.imeiNumber} mono />
                 <InfoField label="License Key" value={asset.licenseKey} mono />
                 <InfoField label="Asset Value" value={asset.assetValue ? `$${asset.assetValue}` : undefined} />
-                <InfoField label="Condition" value={<span>{getConditionBadge(asset.assetCondition)}</span>} />
+                <InfoField label="Condition" value={<span>{getConditionBadge(asset.assetConditionLabel)}</span>} />
               </div>
               {asset.specifications && (
                 <>
@@ -222,8 +222,8 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
                 <InfoField label="Assigned By" value={asset.assignedBy ? `EMP-${asset.assignedBy}` : undefined} />
                 <InfoField label="Assigned Date" value={formatDate(asset.assignedDate)} icon={<Calendar className="h-4 w-4" />} />
                 <InfoField label="Expected Return" value={formatDate(asset.expectedReturnDate)} icon={<Calendar className="h-4 w-4" />} />
-                <InfoField label="Location" value={asset.assetLocation} icon={<MapPin className="h-4 w-4" />} />
-                <InfoField label="Status" value={<span>{getStatusBadge(asset.assetStatus)}</span>} />
+                <InfoField label="Location" value={asset.assetLocationLabel || asset.assetLocation} icon={<MapPin className="h-4 w-4" />} />
+                <InfoField label="Status" value={<span>{getStatusBadge(asset.assetStatusLabel)}</span>} />
               </div>
               {asset.purpose && (
                 <>
@@ -278,7 +278,7 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
             </Card>
           )}
 
-          {asset.assetStatus === "Returned" && (
+          {asset.assetStatusLabel === "Returned" && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Return Information</CardTitle>
@@ -286,7 +286,7 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
               <CardContent>
                 <div className="grid grid-cols-2 gap-6">
                   <InfoField label="Return Date" value={formatDate(asset.returnDate)} />
-                  <InfoField label="Return Condition" value={<span>{getConditionBadge(asset.returnCondition)}</span>} />
+                  <InfoField label="Return Condition" value={<span>{getConditionBadge(asset.returnConditionLabel)}</span>} />
                   {asset.deductionAmount && <InfoField label="Deduction Amount" value={`$${asset.deductionAmount}`} />}
                   {asset.damageRemarks && <InfoField label="Damage Remarks" value={asset.damageRemarks} className="col-span-2" />}
                 </div>

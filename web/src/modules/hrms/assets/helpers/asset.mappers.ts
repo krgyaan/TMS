@@ -18,7 +18,6 @@ export const buildCreateFormData = (
   fileRefs: Record<string, any>,
   selectedAccessories: string[],
   currentUserId?: number,
-  isAssigning?: boolean,
 ): FormData => {
   const formData = new FormData();
 
@@ -31,10 +30,6 @@ export const buildCreateFormData = (
   formData.append("accessories", JSON.stringify(selectedAccessories));
   if (data.typeSpecs && Object.keys(data.typeSpecs).length > 0) {
     formData.append("typeSpecs", JSON.stringify(data.typeSpecs));
-  }
-
-  if (currentUserId && isAssigning) {
-    formData.append("assignedBy", String(currentUserId));
   }
 
   const purchaseInvoice = fileRefs.purchaseInvoiceRef?.current?.files?.[0];

@@ -29,23 +29,6 @@ export const createAssetSchema = z.object({
   assetStatus: z.string().min(1, "Current Status is required"),
   typeSpecs: z.record(z.any()).optional(),
   remarks: z.string().optional(),
-}).superRefine((data, ctx) => {
-  if (data.assetStatus === "1") {
-    if (!data.userId || data.userId <= 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Employee is required when assigning an asset",
-        path: ["userId"],
-      });
-    }
-    if (!data.assignedDate) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Assignment date is required when assigning an asset",
-        path: ["assignedDate"],
-      });
-    }
-  }
 });
 
 export type CreateAssetFormData = z.infer<typeof createAssetSchema>;

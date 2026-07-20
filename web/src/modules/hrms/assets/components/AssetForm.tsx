@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, AlertCircle, Loader2, Save, Upload, UserCheck } from "lucide-react";
+import { ArrowLeft, AlertCircle, Loader2, Save, Upload } from "lucide-react";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -18,8 +18,7 @@ import { NumberInput } from "@/components/form/NumberInput";
 import { paths } from "@/app/routes/paths";
 import { useCurrentUser } from "@/hooks/api/useAuth";
 import { useCreateHrmsAsset, useHrmsAssetView, useUpdateHrmsAsset } from "@/hooks/api/useHrmsAssets";
-import { useUsers } from "@/hooks/api/useUsers";
-import { ACCESSORIES_LIST, ASSET_CATEGORY, ASSET_CONDITION, ASSET_LOCATION, ASSET_STATUS, ASSET_TYPE, toOptions } from "../constants";
+import { ACCESSORIES_LIST, ASSET_CATEGORY, ASSET_CONDITION, ASSET_LOCATION, ASSET_TYPE, toOptions } from "../constants";
 import { createAssetSchema, editAssetSchema } from "../helpers/asset.schema";
 import { buildCreateFormData, buildEditFormData, getAssetFileUrl, toDateInput } from "../helpers/asset.mappers";
 import { MOBILE_TYPES } from "../helpers/asset.types";
@@ -32,7 +31,6 @@ interface AssetFormProps {
 
 const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
   const navigate = useNavigate();
-  const { data: users = [], isLoading: usersLoading } = useUsers();
   const { data: currentUser } = useCurrentUser();
   const { data: asset, isLoading: assetLoading } = useHrmsAssetView(mode === "edit" ? assetId : undefined);
   const createAssetMutation = useCreateHrmsAsset();
@@ -53,15 +51,13 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
   const form = useForm<any>({
     resolver: zodResolver(schema),
     defaultValues: mode === "create"
-      ? { assetType: "1", assetCategory: "1", assetCondition: "1", assetStatus: "2", accessories: [] }
+      ? { assetType: "laptop", assetCategory: "it_equipment", assetCondition: "new", assetStatus: "available", accessories: [] }
       : undefined,
   });
 
   const { handleSubmit, formState: { isSubmitting }, setValue, watch, control, reset } = form;
   const watchAssetType = watch("assetType");
-  const watchAssetStatus = watch("assetStatus");
   const isMobile = MOBILE_TYPES.includes(watchAssetType);
-  const isAssigning = watchAssetStatus === "1";
   const isSubmittingForm = createAssetMutation.isPending || updateAssetMutation.isPending;
 
   useEffect(() => {
@@ -119,18 +115,6 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
     }
   }, [watchAssetType, setValue]);
 
-  useEffect(() => {
-    if (mode !== "create") return;
-    if (watchAssetStatus === "1") {
-      setValue("assignedDate", new Date().toISOString().split("T")[0]);
-    } else {
-      setValue("userId", undefined);
-      setValue("assignedDate", "");
-      setValue("purpose", "");
-      setValue("assetLocation", "");
-    }
-  }, [watchAssetStatus, mode, setValue]);
-
   const handleAccessoryChange = (accessoryId: string, checked: boolean) => {
     const updated = checked ? [...selectedAccessories, accessoryId] : selectedAccessories.filter(id => id !== accessoryId);
     setSelectedAccessories(updated);
@@ -151,7 +135,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
     try {
       if (mode === "create") {
         const fileRefs = { purchaseInvoiceRef, warrantyCardRef, assetPhotosRef, assignmentFormRef };
-        const formData = buildCreateFormData(data, fileRefs, selectedAccessories, currentUser?.id, isAssigning);
+        const formData = buildCreateFormData(data, fileRefs, selectedAccessories, currentUser?.id);
         await createAssetMutation.mutateAsync(formData);
         navigate(paths.hrms.assets.list);
       } else {
@@ -197,9 +181,9 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
     );
   }
 
-  const title = mode === "create" ? (isAssigning ? "Assign Asset" : "Add Asset to Inventory") : "Edit Asset";
+  const title = mode === "create" ? "Add Asset to Inventory" : "Edit Asset";
   const description = mode === "create"
-    ? (isAssigning ? "Allocate hardware or software to an employee" : "Register a new asset in the inventory")
+    ? "Register a new asset in the inventory"
     : `Update information for ${asset?.assetCode}`;
 
   const typeSpecFields = getTypeSpecFields(watchAssetType);
@@ -222,22 +206,6 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
       <CardContent>
         <Form {...form}>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-
-            {mode === "create" && (
-              <div className="border rounded-lg border-dashed p-4 space-y-4 bg-muted/30">
-                <h3 className="text-lg font-semibold">Asset Status</h3>
-                <p className="text-sm text-muted-foreground">Choose "Assigned" to allocate to an employee immediately</p>
-                <div className="max-w-xs">
-                  <SelectField
-                    control={control}
-                    name="assetStatus"
-                    label="Status"
-                    options={toOptions(ASSET_STATUS).slice(0, 2)}
-                    placeholder="Select status"
-                  />
-                </div>
-              </div>
-            )}
 
             <div className="border rounded-lg border-dashed p-4 space-y-4">
               <h3 className="text-lg font-semibold">Asset Information</h3>
@@ -325,37 +293,6 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
                 </div>
               )}
             </div>
-
-            {mode === "create" && isAssigning && (
-              <div className="border rounded-lg border-dashed p-4 space-y-4 bg-muted/30">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <UserCheck className="h-4 w-4" /> Assignment Details
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <SelectField
-                    control={control}
-                    name="userId"
-                    label={<>Assign To <span className="text-destructive">*</span></>}
-                    options={users.map((u: any) => ({ id: String(u.id), name: u.name }))}
-                    placeholder={usersLoading ? "Loading users..." : "Select employee"}
-                    disabled={isSubmittingForm || usersLoading}
-                  />
-                  <FieldWrapper control={control} name="assignedDate" label={<>Date <span className="text-destructive">*</span></>}>
-                    {field => <DateInput value={field.value ?? ""} onChange={field.onChange} />}
-                  </FieldWrapper>
-                  <SelectField
-                    control={control}
-                    name="assetLocation"
-                    label="Location"
-                    options={toOptions(ASSET_LOCATION)}
-                    placeholder="Select Location"
-                  />
-                </div>
-                <FieldWrapper control={control} name="purpose" label="Purpose">
-                  {field => <Textarea {...field} placeholder="Reason for assignment..." rows={2} />}
-                </FieldWrapper>
-              </div>
-            )}
 
             <div className="border rounded-lg border-dashed p-4 space-y-4">
               <h3 className="text-lg font-semibold">Purchase Details</h3>
@@ -492,7 +429,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
                 {isSubmittingForm ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
                 ) : (
-                  <><Save className="mr-2 h-4 w-4" /> {mode === "create" ? (isAssigning ? "Complete Assignment" : "Add to Inventory") : "Save Changes"}</>
+                  <><Save className="mr-2 h-4 w-4" /> {mode === "create" ? "Add to Inventory" : "Save Changes"}</>
                 )}
               </Button>
             </div>
