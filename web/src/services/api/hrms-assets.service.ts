@@ -27,6 +27,7 @@ export interface EmployeeAsset {
     warrantyTo?: string;
     insuranceDetails?: string;
     accessories?: string[];
+    typeSpecs?: Record<string, any>;
     assetPhotos?: string[];
     purchaseInvoiceUrl?: string;
     warrantyCardUrl?: string;

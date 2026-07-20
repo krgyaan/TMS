@@ -24,11 +24,14 @@ export const buildCreateFormData = (
 
   Object.entries(data).forEach(([key, val]) => {
     if (val === undefined || val === null || val === "") return;
-    if (key === "accessories") return;
+    if (key === "accessories" || key === "typeSpecs") return;
     formData.append(key, String(val));
   });
 
   formData.append("accessories", JSON.stringify(selectedAccessories));
+  if (data.typeSpecs && Object.keys(data.typeSpecs).length > 0) {
+    formData.append("typeSpecs", JSON.stringify(data.typeSpecs));
+  }
 
   if (currentUserId && isAssigning) {
     formData.append("assignedBy", String(currentUserId));
@@ -63,6 +66,7 @@ export const buildEditFormData = (
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "" && value !== "null") {
+      if (key === "typeSpecs") return;
       if (Array.isArray(value)) {
         formData.append(key, JSON.stringify(value));
       } else {
@@ -70,6 +74,10 @@ export const buildEditFormData = (
       }
     }
   });
+
+  if (data.typeSpecs && Object.keys(data.typeSpecs).length > 0) {
+    formData.append("typeSpecs", JSON.stringify(data.typeSpecs));
+  }
 
   if (currentUserId) {
     formData.append("assignedBy", String(currentUserId));

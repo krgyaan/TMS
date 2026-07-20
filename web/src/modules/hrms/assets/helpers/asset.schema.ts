@@ -27,6 +27,7 @@ export const createAssetSchema = z.object({
   accessories: z.array(z.string()).optional(),
   accessoryDetails: z.string().optional(),
   assetStatus: z.string().min(1, "Current Status is required"),
+  typeSpecs: z.record(z.any()).optional(),
   remarks: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.assetStatus === "1") {
@@ -78,6 +79,7 @@ export const editAssetSchema = z.object({
   purchaseDate: z.string().optional().or(z.literal("")),
   purchasePrice: z.string().optional(),
   purchaseFrom: z.string().optional(),
+  typeSpecs: z.record(z.any()).optional(),
 });
 
 export type EditAssetFormData = z.infer<typeof editAssetSchema>;
@@ -107,6 +109,7 @@ export const statusUpdateSchema = z.object({
   repairDescription: z.string().optional().transform(emptyToNull),
   deductionAmount: z.string().optional().transform(emptyToNull),
   deductionReason: z.string().optional().transform(emptyToNull),
+  typeSpecs: z.record(z.any()).optional(),
   disposalDate: z.string().optional().transform(emptyToNull),
   disposalType: z.string().optional().transform(emptyToNull),
   disposalReason: z.string().optional().transform(emptyToNull),

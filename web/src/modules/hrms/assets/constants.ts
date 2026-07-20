@@ -64,7 +64,7 @@ export const DAMAGE_TYPE: Record<string, string> = {
   "5": "Other",
 };
 
-export const DISPOSAL_TYPE: Record<string, string> = {
+export const DISPOSAL_TYPE: Record<string, string> = {  
   "1": "Sold",
   "2": "Scrapped",
   "3": "Donated",

@@ -9,8 +9,9 @@ import { format } from "date-fns";
 import { AlertCircle, ArrowLeft, Calendar, CheckCircle2, Download, Edit, FileText, Image as ImageIcon, MapPin, Package, Shield, User } from "lucide-react";
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { ACCESSORIES_LIST } from "../constants";
+import { ACCESSORIES_LIST, ASSET_TYPE } from "../constants";
 import { getAssetFileUrl } from "../helpers/asset.mappers";
+import { getTypeSpecFields } from "../helpers/typeSpecs";
 
 interface AssetViewProps {
   assetId: number;
@@ -181,6 +182,30 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-muted-foreground">Specifications</p>
                     <p className="text-sm">{asset.specifications}</p>
+                  </div>
+                </>
+              )}
+              {asset.typeSpecs && Object.keys(asset.typeSpecs).length > 0 && (
+                <>
+                  <Separator className="my-6" />
+                  <div className="space-y-4">
+                    <p className="text-sm font-medium text-muted-foreground">{ASSET_TYPE[asset.assetType] || "Asset"} Details</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      {(() => {
+                        const fields = getTypeSpecFields(asset.assetType);
+                        return fields.map((field) => {
+                          const value = asset.typeSpecs?.[field.key];
+                          if (!value) return null;
+                          return (
+                            <InfoField
+                              key={field.key}
+                              label={field.label}
+                              value={value}
+                            />
+                          );
+                        });
+                      })()}
+                    </div>
                   </div>
                 </>
               )}
