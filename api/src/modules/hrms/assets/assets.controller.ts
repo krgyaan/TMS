@@ -175,6 +175,14 @@ export class AssetsController {
       }
     }
 
+    if (typeof body.typeSpecs === "string") {
+      try {
+        body.typeSpecs = JSON.parse(body.typeSpecs);
+      } catch {
+        body.typeSpecs = {};
+      }
+    }
+
     delete body.assetPhotos;
     delete body.purchaseInvoice;
     delete body.warrantyCard;
@@ -226,6 +234,14 @@ export class AssetsController {
         body.accessories = JSON.parse(body.accessories);
       } catch {
         body.accessories = [];
+      }
+    }
+
+    if (typeof body.typeSpecs === "string") {
+      try {
+        body.typeSpecs = JSON.parse(body.typeSpecs);
+      } catch {
+        body.typeSpecs = {};
       }
     }
 
