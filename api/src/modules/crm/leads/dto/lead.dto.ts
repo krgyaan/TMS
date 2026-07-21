@@ -14,6 +14,9 @@ export const CreateLeadSchema = z.object({
     team: z.string().optional().nullable(),
     bdPerson: z.number().int().optional().nullable(),
     allocatedTe: z.number().int().optional().nullable(),
+    allocatedBy: z.number().int().optional().nullable(),
+    allocationNotes: z.string().max(2000).optional().nullable(),
+    allocatedAt: z.string().optional().nullable(),
     pointsDiscussed: z.string().max(2000).optional().nullable(),
     veResponsibility: z.string().max(2000).optional().nullable(),
     leadPriority: z.string().optional().nullable(),
@@ -31,7 +34,43 @@ export const CreateLeadSchema = z.object({
     whatsappFollowupCount: z.number().int().default(0),
 });
 
-export const UpdateLeadSchema = CreateLeadSchema.partial();
+export const UpdateLeadSchema = z.object({
+    companyName: z.string().min(1).optional(),
+    name: z.string().min(1).optional(),
+    designation: z.string().min(1).optional(),
+    phone: z.string().min(1).optional(),
+    email: z.string().email().optional(),
+    address: z.string().min(1).optional(),
+    country: z.string().min(1).optional(),
+    state: z.string().min(1).optional(),
+    type: z.string().optional().nullable(),
+    industry: z.string().optional().nullable(),
+    team: z.string().optional().nullable(),
+    bdPerson: z.number().int().optional().nullable(),
+    allocatedTe: z.number().int().optional().nullable(),
+    allocatedBy: z.number().int().optional().nullable(),
+    allocationNotes: z.string().max(2000).optional().nullable(),
+    allocatedAt: z.string().optional().nullable(),
+    pointsDiscussed: z.string().max(2000).optional().nullable(),
+    veResponsibility: z.string().max(2000).optional().nullable(),
+    leadPriority: z.enum(['Cold', 'Warm', 'Hot']).optional().nullable(),
+    recentFollowUp: z.enum(['visit', 'whatsapp', 'letter', 'mail', 'call']).optional().nullable(),
+});
+
+export const AllocateLeadSchema = z.object({
+    allocatedTe: z.number({
+        required_error: 'Technical Executive is required',
+        invalid_type_error: 'Technical Executive must be a number',
+    }).int().positive({ message: 'Please select a valid Technical Executive' }),
+    allocationNotes: z.string().max(2000).optional().nullable(),
+});
+
+// ← NEW
+export const DeleteLeadSchema = z.object({
+    reason: z.string().max(2000).optional().nullable(),
+});
 
 export type CreateLeadDto = z.infer<typeof CreateLeadSchema>;
 export type UpdateLeadDto = z.infer<typeof UpdateLeadSchema>;
+export type AllocateLeadDto = z.infer<typeof AllocateLeadSchema>;
+export type DeleteLeadDto = z.infer<typeof DeleteLeadSchema>;   // ← NEW

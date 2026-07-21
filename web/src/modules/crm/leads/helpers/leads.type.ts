@@ -13,6 +13,9 @@ export interface Lead {
     team: string | null;
     bdPerson: number | null;
     allocatedTe: number | null;
+    allocatedBy: number | null;
+    allocationNotes: string | null;
+    allocatedAt: string | null;
     pointsDiscussed: string | null;
     veResponsibility: string | null;
     mailFollowupCount: number | null;
@@ -28,6 +31,9 @@ export interface Lead {
     lastWhatsappSentAt: string | null;
     leadPriority: string | null;
     recentFollowUp: 'visit' | 'whatsapp' | 'letter' | 'mail' | 'call' | null;
+    isDeleted: boolean;
+    deleteReason: string | null;
+    deletedAt: string | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -38,6 +44,8 @@ export interface LeadWithNames extends Lead {
     teamName?: string | null;
     bdPersonName?: string | null;
     allocatedTeName?: string | null;
+    allocatedByName?: string | null;
+    nextFollowupDate?: string | null;
 }
 
 export interface CreateLeadRequest {
@@ -54,6 +62,7 @@ export interface CreateLeadRequest {
     team?: string | null;
     bdPerson?: number | null;
     allocatedTe?: number | null;
+    allocationNotes?: string | null;
     pointsDiscussed?: string | null;
     veResponsibility?: string | null;
     leadPriority?: string | null;
@@ -62,10 +71,18 @@ export interface CreateLeadRequest {
 
 export interface UpdateLeadRequest extends Partial<CreateLeadRequest> {}
 
+export interface AllocateLeadRequest {
+    allocatedTe: number;
+    allocationNotes?: string | null;
+}
+
 export interface LeadListParams {
     page?: number;
     limit?: number;
     search?: string;
+    priority?: string;
+    status?: string;
+    team?: string;          // ✅ NEW
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 }

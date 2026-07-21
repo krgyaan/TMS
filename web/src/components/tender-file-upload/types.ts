@@ -75,7 +75,8 @@ export type TenderFileContext =
     | 'kickoff-mom'
     | 'contract-agreement'
     | 'cancel-tender'
-    | "payment-proof";
+    | 'payment-proof'
+    | 'followups';    
 
 export interface FileConfig {
     context: string;
@@ -83,6 +84,7 @@ export interface FileConfig {
     maxSizeBytes: number;
     maxSizeFormatted: string;
     allowedExtensions: string[];
+    allowedMimeTypes?: string[];
 }
 
 export interface UploadedFile {

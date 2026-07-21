@@ -1,5 +1,4 @@
 import {
-    Body,
     Controller,
     Delete,
     Get,
@@ -12,9 +11,19 @@ import {
     HttpStatus,
 } from '@nestjs/common';
 import { LeadsService } from './leads.service';
-import { CreateLeadSchema, UpdateLeadSchema } from './dto/lead.dto';
+import {
+    CreateLeadSchema,
+    UpdateLeadSchema,
+    AllocateLeadSchema,
+    DeleteLeadSchema,
+} from './dto/lead.dto';
 import { ValidatedBody } from '@/decorators/validated-body.decorator';
-import type { CreateLeadDto, UpdateLeadDto } from './dto/lead.dto';
+import type {
+    CreateLeadDto,
+    UpdateLeadDto,
+    AllocateLeadDto,
+    DeleteLeadDto,
+} from './dto/lead.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
@@ -24,10 +33,13 @@ export class LeadsController {
 
     @Get()
     async list(
-        @Query('page') page?: string,
-        @Query('limit') limit?: string,
-        @Query('search') search?: string,
-        @Query('sortBy') sortBy?: string,
+        @Query('page')      page?:      string,
+        @Query('limit')     limit?:     string,
+        @Query('search')    search?:    string,
+        @Query('priority')  priority?:  string,
+        @Query('status')    status?:    string,
+        @Query('team')      team?:      string,   
+        @Query('sortBy')    sortBy?:    string,
         @Query('sortOrder') sortOrder?: string,
     ) {
         const parseNumber = (v?: string): number | undefined => {
@@ -40,6 +52,9 @@ export class LeadsController {
             page: parseNumber(page),
             limit: parseNumber(limit),
             search,
+            priority,
+            status,
+            team,                                  // ✅ ADD THIS
             sortBy,
             sortOrder: sortOrder as 'asc' | 'desc' | undefined,
         });
@@ -54,18 +69,35 @@ export class LeadsController {
     @HttpCode(HttpStatus.CREATED)
     async create(
         @ValidatedBody(CreateLeadSchema) body: CreateLeadDto,
-        @CurrentUser() user: ValidatedUser, // ← GET LOGGED IN USER
+        @CurrentUser() user: ValidatedUser,
     ) {
-        return this.leadsService.create(body, user.sub); // ← PASS USER ID
+        return this.leadsService.create(body, user.sub);
     }
 
     @Patch(':id')
     async update(
         @Param('id', ParseIntPipe) id: number,
-        @Body() body: unknown,
+        @ValidatedBody(UpdateLeadSchema) body: UpdateLeadDto,
     ) {
-        const parsed = UpdateLeadSchema.parse(body);
-        return this.leadsService.update(id, parsed);
+        return this.leadsService.update(id, body);
+    }
+
+    @Patch(':id/allocate')
+    async allocate(
+        @Param('id', ParseIntPipe) id: number,
+        @ValidatedBody(AllocateLeadSchema) body: AllocateLeadDto,
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        return this.leadsService.allocate(id, body, user.sub);
+    }
+
+    @Patch(':id/disqualify')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    async disqualify(
+        @Param('id', ParseIntPipe) id: number,
+        @ValidatedBody(DeleteLeadSchema) body: DeleteLeadDto,
+    ) {
+        await this.leadsService.delete(id, body);
     }
 
     @Delete(':id')

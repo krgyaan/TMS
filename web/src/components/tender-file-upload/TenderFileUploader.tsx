@@ -8,13 +8,22 @@ import { useFileConfig, useFileUpload } from '@/hooks/api/useTenderFiles';
 import { tenderFilesService } from '@/services/api/tender-files.service';
 import type { TenderFileContext, FileConfig } from './types';
 
-// Fallback default config when API fails
 const DEFAULT_CONFIG: FileConfig = {
     context: 'tender-documents',
     maxFiles: 10,
-    maxSizeBytes: 10 * 1024 * 1024, // 10MB
+    maxSizeBytes: 10 * 1024 * 1024,
     maxSizeFormatted: '10 MB',
     allowedExtensions: ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.doc', '.docx', '.xls', '.xlsx'],
+    allowedMimeTypes: [ // ✅ ADD THIS
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ],
 };
 
 interface TenderFileUploaderProps {
@@ -69,10 +78,12 @@ export function TenderFileUploader({
         onDrop,
         disabled: disabled || isUploading || !effectiveConfig || value.length >= effectiveConfig.maxFiles,
         maxSize: effectiveConfig.maxSizeBytes,
-        accept: effectiveConfig.allowedExtensions.reduce(
-            (acc, ext) => ({ ...acc, [`${ext}`]: [] }),
-            {},
-        ),
+        accept: effectiveConfig.allowedMimeTypes
+            ? effectiveConfig.allowedMimeTypes.reduce(
+                (acc, mime) => ({ ...acc, [mime]: [] }),
+                {} as Record<string, string[]>,
+            )
+            : undefined,
     });
 
     if (isLoading) {

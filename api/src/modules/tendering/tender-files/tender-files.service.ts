@@ -63,6 +63,7 @@ export class TenderFilesService implements OnModuleInit {
             maxSizeBytes: config.maxSizeBytes,
             maxSizeFormatted: formatBytes(config.maxSizeBytes),
             allowedExtensions: config.allowedExtensions,
+             allowedMimeTypes: config.allowedMimeTypes,
         };
     }
 

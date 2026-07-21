@@ -19,8 +19,9 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { useCreateLead } from "@/hooks/api/useLeads";
+import { useCreateLead, useUpdateLead } from "@/hooks/api/useLeads";
 import axiosInstance from "@/lib/axios";
+import type { LeadWithNames } from "../helpers/leads.type";
 
 type Option = { value: string; label: string };
 
@@ -53,6 +54,7 @@ type LeadFormValues = z.infer<typeof LeadFormSchema>;
 
 interface LeadFormProps {
     mode: "create" | "edit";
+    lead?: LeadWithNames;
 }
 
 const fetchStates = async (): Promise<Option[]> => {
@@ -80,11 +82,14 @@ const fetchIndustries = async (): Promise<Option[]> => {
 };
 
 const fetchTeams = async (): Promise<Option[]> => {
-    const res = await axiosInstance.get('/teams');
-    return res.data.map((t: { id: number; name: string }) => ({
-        label: t.name,
-        value: t.id.toString(),
-    }));
+    const res = await axiosInstance.get("/teams");
+
+    return res.data
+        .filter((team: { id: number }) => [1, 2, 6].includes(team.id))
+        .map((team: { id: number; name: string }) => ({
+            label: team.name,
+            value: team.id.toString(),
+        }));
 };
 
 const SectionSeparator = ({ text }: { text: string }) => (
@@ -96,9 +101,10 @@ const SectionSeparator = ({ text }: { text: string }) => (
     </div>
 );
 
-export function LeadForm({ mode }: LeadFormProps) {
+export function LeadForm({ mode, lead }: LeadFormProps) {
     const navigate = useNavigate();
     const createLead = useCreateLead();
+    const updateLead = useUpdateLead();
 
     const isInitialLoad = useRef(true);
     const previousCountry = useRef<string>("");
@@ -126,19 +132,19 @@ export function LeadForm({ mode }: LeadFormProps) {
     const form = useForm<LeadFormValues>({
         resolver: zodResolver(LeadFormSchema) as any,
         defaultValues: {
-            companyName: "",
-            name: "",
-            designation: "",
-            phone: "",
-            email: "",
-            address: "",
-            country: "",
-            state: "",
-            type: undefined,
-            industry: undefined,
-            team: undefined,
-            pointsDiscussed: "",
-            veResponsibility: "",
+            companyName: lead?.companyName || "",
+            name: lead?.name || "",
+            designation: lead?.designation || "",
+            phone: lead?.phone || "",
+            email: lead?.email || "",
+            address: lead?.address || "",
+            country: lead?.country || "",
+            state: lead?.state || "",
+            type: lead?.type || "",
+            industry: lead?.industry || "",
+            team: lead?.team || "",
+            pointsDiscussed: lead?.pointsDiscussed || "",
+            veResponsibility: lead?.veResponsibility || "",
         },
     });
 
@@ -160,7 +166,7 @@ export function LeadForm({ mode }: LeadFormProps) {
 
     const handleSubmit: SubmitHandler<LeadFormValues> = async (values) => {
         try {
-            await createLead.mutateAsync({
+            const payload = {
                 companyName: values.companyName,
                 name: values.name,
                 designation: values.designation,
@@ -174,13 +180,24 @@ export function LeadForm({ mode }: LeadFormProps) {
                 team: values.team || null,
                 pointsDiscussed: values.pointsDiscussed || null,
                 veResponsibility: values.veResponsibility || null,
-            });
+            };
+
+            if (mode === "create") {
+                await createLead.mutateAsync(payload);
+            } else if (mode === "edit" && lead) {
+                await updateLead.mutateAsync({
+                    id: lead.id,
+                    data: payload,
+                });
+            }
+
+            navigate(paths.crm.leads);
         } catch (error) {
             console.error("Lead form submission error:", error);
         }
     };
 
-    const saving = createLead.isPending;
+    const saving = createLead.isPending || updateLead.isPending;
 
     return (
         <Card>

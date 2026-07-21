@@ -2,13 +2,22 @@ import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { leads, type NewLead, type Lead } from '@db/schemas/crm/leads.schema';
-import { eq, sql, SQL } from 'drizzle-orm';
-import type { CreateLeadDto, UpdateLeadDto } from './dto/lead.dto';
+import { leadFollowups } from '@db/schemas/crm/lead-followups.schema';
+import { leadIndustries } from '@db/schemas/master/lead-industries.schema';
+import { leadTypes } from '@db/schemas/crm/lead-types.schema';
+import { teams } from '@db/schemas/master/teams.schema';
+import { users } from '@db/schemas/auth/users.schema';
+import { and, asc, desc, eq, ilike, isNotNull, or, sql, type SQL } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
+import type { CreateLeadDto, UpdateLeadDto, AllocateLeadDto, DeleteLeadDto } from './dto/lead.dto';
 
 export type LeadListFilters = {
     page?: number;
     limit?: number;
     search?: string;
+    priority?: string;
+    status?: string;
+    team?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 };
@@ -19,7 +28,13 @@ export type LeadWithNames = Lead & {
     teamName?: string | null;
     bdPersonName?: string | null;
     allocatedTeName?: string | null;
+    allocatedByName?: string | null;
+    nextFollowupDate?: string | null;
 };
+
+const bdUser = alias(users, 'bd_user');
+const teUser = alias(users, 'te_user');
+const allocatedByUser = alias(users, 'allocated_by_user');
 
 @Injectable()
 export class LeadsService {
@@ -27,167 +42,178 @@ export class LeadsService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
     ) {}
 
-    private mapJoinedRow = (row: any): LeadWithNames => {
-        return {
-            id: row.id,
-            companyName: row.company_name,
-            name: row.name,
-            designation: row.designation,
-            phone: row.phone,
-            email: row.email,
-            address: row.address,
-            country: row.country,
-            state: row.state,
-            type: row.type,
-            industry: row.industry,
-            team: row.team,
-            bdPerson: row.bd_person,
-            allocatedTe: row.allocated_te,
-            pointsDiscussed: row.points_discussed,
-            veResponsibility: row.ve_responsibility,
-            mailFollowupCount: row.mail_followup_count,
-            callFollowupCount: row.call_followup_count,
-            visitFollowupCount: row.visit_followup_count,
-            letterSentCount: row.letter_sent_count,
-            whatsappFollowupCount: row.whatsapp_followup_count,
-            enquiryReceivedAt: row.enquiry_received_at,
-            lastMailSentAt: row.last_mail_sent_at,
-            lastCallAt: row.last_call_at,
-            lastVisitAt: row.last_visit_at,
-            lastLetterSentAt: row.last_letter_sent_at,
-            lastWhatsappSentAt: row.last_whatsapp_sent_at,
-            leadPriority: row.lead_priority,
-            recentFollowUp: row.recent_follow_up,
-            createdAt: row.created_at,
-            updatedAt: row.updated_at,
-            industryName: row.industry_name,
-            typeName: row.type_name,
-            teamName: row.team_name,
-            bdPersonName: row.bd_person_name,
-            allocatedTeName: row.allocated_te_name,
-        };
-    };
+    // ─── Private Helpers ──────────────────────────────────────────────
 
-    async findAll(filters?: LeadListFilters) {
+    /**
+     * Creates the subquery for the latest followup per lead.
+     * This is reused in count and data queries.
+     */
+    private getLatestFollowupSubquery() {
+        return this.db
+            .selectDistinctOn([leadFollowups.leadId], {
+                leadId: leadFollowups.leadId,
+                nextFollowupDate: leadFollowups.nextFollowupDate,
+            })
+            .from(leadFollowups)
+            .where(isNotNull(leadFollowups.nextFollowupDate))
+            .orderBy(
+                leadFollowups.leadId,
+                desc(leadFollowups.createdAt),
+                desc(leadFollowups.id),
+            )
+            .as('latest_followup');
+    }
+
+    // ─── Public Methods ───────────────────────────────────────────────
+
+    async findAll(filters?: LeadListFilters): Promise<{
+        data: LeadWithNames[];
+        meta: { total: number; page: number; limit: number; totalPages: number };
+    }> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
 
+        const latestFollowupSubquery = this.getLatestFollowupSubquery();
         const conditions: SQL[] = [];
 
+        // 1. Disqualified Filter
+        if (filters?.status === 'disqualified') {
+            conditions.push(eq(leads.isDeleted, true));
+        } else {
+            conditions.push(eq(leads.isDeleted, false));
+        }
+
+        // 2. Search Filter
         if (filters?.search) {
-            const searchStr = `%${filters.search}%`;
             conditions.push(
-                sql`(
-                    leads.company_name ILIKE ${searchStr} OR
-                    leads.name ILIKE ${searchStr} OR
-                    leads.email ILIKE ${searchStr} OR
-                    leads.phone ILIKE ${searchStr}
-                )`
+                or(
+                    ilike(leads.companyName, `%${filters.search}%`),
+                    ilike(leads.name, `%${filters.search}%`),
+                    ilike(leads.email, `%${filters.search}%`),
+                    ilike(leads.phone, `%${filters.search}%`),
+                ) as SQL
             );
         }
 
-        const whereClause = conditions.length > 0
-            ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
-            : sql``;
-
-        const countResults = await this.db.execute(
-            sql`SELECT COUNT(*) as count FROM leads ${whereClause}`
-        );
-
-        const total = Number((countResults.rows as any[])[0]?.count || 0);
-
-        let orderByClause = sql`ORDER BY leads.created_at DESC`;
-
-        if (filters?.sortBy) {
-            const direction = filters.sortOrder === 'desc' ? sql`DESC` : sql`ASC`;
-            switch (filters.sortBy) {
-                case 'companyName':
-                    orderByClause = sql`ORDER BY leads.company_name ${direction}`;
-                    break;
-                case 'name':
-                    orderByClause = sql`ORDER BY leads.name ${direction}`;
-                    break;
-                case 'email':
-                    orderByClause = sql`ORDER BY leads.email ${direction}`;
-                    break;
-                case 'createdAt':
-                    orderByClause = sql`ORDER BY leads.created_at ${direction}`;
-                    break;
-                default:
-                    orderByClause = sql`ORDER BY leads.created_at DESC`;
-            }
+        // 3. Priority Filter
+        if (filters?.priority) {
+            conditions.push(eq(leads.leadPriority, filters.priority));
         }
 
-        const results = await this.db.execute(sql`
-            SELECT 
-                leads.*,
-                lead_industries.name        AS industry_name,
-                lead_types.name             AS type_name,
-                teams.name                  AS team_name,
-                bd_user.name                AS bd_person_name,
-                te_user.name                AS allocated_te_name
-            FROM leads
-            LEFT JOIN lead_industries
-                ON lead_industries.id = CAST(leads.industry AS BIGINT)
-            LEFT JOIN lead_types
-                ON lead_types.id = CAST(leads.type AS BIGINT)
-            LEFT JOIN teams
-                ON teams.id = CAST(leads.team AS BIGINT)
-            LEFT JOIN users bd_user
-                ON bd_user.id = leads.bd_person
-            LEFT JOIN users te_user
-                ON te_user.id = leads.allocated_te
-            ${whereClause}
-            ${orderByClause}
-            LIMIT ${limit} OFFSET ${offset}
-        `);
+        // 4. Team Filter (via name)
+        if (filters?.team) {
+            conditions.push(eq(teams.name, filters.team));
+        }
 
-        const rows = results.rows as any[];
-        const data = rows.map(this.mapJoinedRow);
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        // ── Count Query ───────────────────────────────────────────────
+        const [countResult] = await this.db
+            .select({ count: sql<number>`count(*)` })
+            .from(leads)
+            .leftJoin(teams, eq(teams.id, sql`NULLIF(${leads.team}, '')::BIGINT`))
+            .where(whereClause);
+
+        const total = Number(countResult?.count || 0);
+
+        // ── Data Query ────────────────────────────────────────────────
+        const sortFn = filters?.sortOrder === 'desc' ? desc : asc;
+        let orderByClause: SQL<unknown>;
+
+        switch (filters?.sortBy) {
+            case 'companyName': orderByClause = sortFn(leads.companyName); break;
+            case 'name':        orderByClause = sortFn(leads.name); break;
+            case 'email':       orderByClause = sortFn(leads.email); break;
+            case 'createdAt':   orderByClause = sortFn(leads.createdAt); break;
+            default:            orderByClause = desc(leads.createdAt);
+        }
+
+        const rows = await this.db
+            .select({
+                leads,
+                industryName: leadIndustries.name,
+                typeName: leadTypes.name,
+                teamName: teams.name,
+                bdPersonName: bdUser.name,
+                allocatedTeName: teUser.name,
+                allocatedByName: allocatedByUser.name,
+                nextFollowupDate: latestFollowupSubquery.nextFollowupDate, // Qualified from subquery
+            })
+            .from(leads)
+            .leftJoin(leadIndustries, eq(leadIndustries.id, sql`NULLIF(${leads.industry}, '')::BIGINT`))
+            .leftJoin(leadTypes, eq(leadTypes.id, sql`NULLIF(${leads.type}, '')::BIGINT`))
+            .leftJoin(teams, eq(teams.id, sql`NULLIF(${leads.team}, '')::BIGINT`))
+            .leftJoin(bdUser, eq(bdUser.id, leads.bdPerson))
+            .leftJoin(teUser, eq(teUser.id, leads.allocatedTe))
+            .leftJoin(allocatedByUser, eq(allocatedByUser.id, leads.allocatedBy))
+            .leftJoin(latestFollowupSubquery, eq(latestFollowupSubquery.leadId, leads.id))
+            .where(whereClause)
+            .orderBy(orderByClause)
+            .limit(limit)
+            .offset(offset);
 
         return {
-            data,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            },
+            data: rows.map(row => ({
+                ...row.leads,
+                industryName: row.industryName ?? null,
+                typeName: row.typeName ?? null,
+                teamName: row.teamName ?? null,
+                bdPersonName: row.bdPersonName ?? null,
+                allocatedTeName: row.allocatedTeName ?? null,
+                allocatedByName: row.allocatedByName ?? null,
+                nextFollowupDate: row.nextFollowupDate ? row.nextFollowupDate.toISOString() : null,
+            })),
+            meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
     }
 
     async findById(id: number): Promise<LeadWithNames> {
-        const results = await this.db.execute(sql`
-            SELECT 
-                leads.*,
-                lead_industries.name        AS industry_name,
-                lead_types.name             AS type_name,
-                teams.name                  AS team_name,
-                bd_user.name                AS bd_person_name,
-                te_user.name                AS allocated_te_name
-            FROM leads
-            LEFT JOIN lead_industries
-                ON lead_industries.id = CAST(leads.industry AS BIGINT)
-            LEFT JOIN lead_types
-                ON lead_types.id = CAST(leads.type AS BIGINT)
-            LEFT JOIN teams
-                ON teams.id = CAST(leads.team AS BIGINT)
-            LEFT JOIN users bd_user
-                ON bd_user.id = leads.bd_person
-            LEFT JOIN users te_user
-                ON te_user.id = leads.allocated_te
-            WHERE leads.id = ${id}
-            LIMIT 1
-        `);
+        const latestFollowupSubquery = this.getLatestFollowupSubquery();
+        
+        const [row] = await this.db
+            .select({
+                leads,
+                industryName: leadIndustries.name,
+                typeName: leadTypes.name,
+                teamName: teams.name,
+                bdPersonName: bdUser.name,
+                allocatedTeName: teUser.name,
+                allocatedByName: allocatedByUser.name,
+                nextFollowupDate: latestFollowupSubquery.nextFollowupDate,
+            })
+            .from(leads)
+            .leftJoin(leadIndustries, eq(leadIndustries.id, sql`NULLIF(${leads.industry}, '')::BIGINT`))
+            .leftJoin(leadTypes, eq(leadTypes.id, sql`NULLIF(${leads.type}, '')::BIGINT`))
+            .leftJoin(teams, eq(teams.id, sql`NULLIF(${leads.team}, '')::BIGINT`))
+            .leftJoin(bdUser, eq(bdUser.id, leads.bdPerson))
+            .leftJoin(teUser, eq(teUser.id, leads.allocatedTe))
+            .leftJoin(allocatedByUser, eq(allocatedByUser.id, leads.allocatedBy))
+            .leftJoin(latestFollowupSubquery, eq(latestFollowupSubquery.leadId, leads.id))
+            .where(eq(leads.id, id))
+            .limit(1);
 
-        const rows = results.rows as any[];
+        if (!row) throw new NotFoundException(`Lead with ID ${id} not found`);
+        
+        return {
+            ...row.leads,
+            industryName: row.industryName ?? null,
+            typeName: row.typeName ?? null,
+            teamName: row.teamName ?? null,
+            bdPersonName: row.bdPersonName ?? null,
+            allocatedTeName: row.allocatedTeName ?? null,
+            allocatedByName: row.allocatedByName ?? null,
+            nextFollowupDate: row.nextFollowupDate ? row.nextFollowupDate.toISOString() : null,
+        };
+    }
 
-        if (!rows[0]) {
-            throw new NotFoundException(`Lead with ID ${id} not found`);
-        }
-
-        return this.mapJoinedRow(rows[0]);
+    async exists(id: number): Promise<boolean> {
+        const [result] = await this.db
+            .select({ id: leads.id })
+            .from(leads)
+            .where(eq(leads.id, id))
+            .limit(1);
+        return !!result;
     }
 
     async create(data: CreateLeadDto, createdBy: number): Promise<Lead> {
@@ -196,33 +222,49 @@ export class LeadsService {
             .values({
                 ...data as NewLead,
                 bdPerson: createdBy,
+                leadPriority: data.leadPriority || 'Cold',
             })
             .returning();
-
         return newLead;
     }
 
     async update(id: number, data: UpdateLeadDto): Promise<Lead> {
-        await this.findById(id);
-
         const [updated] = await this.db
             .update(leads)
-            .set({ ...data, updatedAt: new Date() } as any)
+            .set({ ...data as Partial<NewLead>, updatedAt: new Date() })
             .where(eq(leads.id, id))
             .returning();
 
-        if (!updated) {
-            throw new NotFoundException(`Lead with ID ${id} not found`);
-        }
-
+        if (!updated) throw new NotFoundException(`Lead with ID ${id} not found`);
         return updated;
     }
 
-    async delete(id: number): Promise<void> {
-        await this.findById(id);
+    async allocate(id: number, data: AllocateLeadDto, allocatedBy: number): Promise<Lead> {
+        const [updated] = await this.db
+            .update(leads)
+            .set({
+                allocatedTe: data.allocatedTe,
+                allocationNotes: data.allocationNotes ?? null,
+                allocatedBy: allocatedBy,
+                allocatedAt: new Date(),
+                updatedAt: new Date(),
+            })
+            .where(eq(leads.id, id))
+            .returning();
 
+        if (!updated) throw new NotFoundException(`Lead with ID ${id} not found`);
+        return updated;
+    }
+
+    async delete(id: number, data?: DeleteLeadDto): Promise<void> {
         await this.db
-            .delete(leads)
+            .update(leads)
+            .set({
+                isDeleted: true,
+                deleteReason: data?.reason ?? null,
+                deletedAt: new Date(),
+                updatedAt: new Date(),
+            })
             .where(eq(leads.id, id));
     }
 }
