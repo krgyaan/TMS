@@ -1,10 +1,13 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { eq, count, desc } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { employeeAssets, type NewEmployeeAsset, type EmployeeAsset } from "@/db/schemas/hrms/employee-assets.schema";
 import { assetTrackingHistory, type NewAssetTrackingHistory } from "@/db/schemas/hrms/asset-tracking-history.schema";
 import { users } from "@/db/schemas/auth/users.schema";
+
+const assignedByUser = alias(users, "assigned_by_user");
 
 // ─── Label Maps ───────────────────────────────────────────────────────────────
 
@@ -149,27 +152,51 @@ export class AssetsService {
   async findAll(): Promise<any[]> {
     const rows = await this.db
       .select({
-        asset: employeeAssets,
+        id: employeeAssets.id,
+        assetCode: employeeAssets.assetCode,
+        assetType: employeeAssets.assetType,
+        assetCategory: employeeAssets.assetCategory,
+        brand: employeeAssets.brand,
+        model: employeeAssets.model,
+        serialNumber: employeeAssets.serialNumber,
+        assetCondition: employeeAssets.assetCondition,
+        assetLocation: employeeAssets.assetLocation,
+        assetStatus: employeeAssets.assetStatus,
+        assignedDate: employeeAssets.assignedDate,
+        returnCondition: employeeAssets.returnCondition,
+        userId: employeeAssets.userId,
+        assignedBy: employeeAssets.assignedBy,
         assignedTo: users.name,
+        assignedByName: assignedByUser.name,
       })
       .from(employeeAssets)
-      .leftJoin(users, eq(employeeAssets.userId, users.id));
+      .leftJoin(users, eq(employeeAssets.userId, users.id))
+      .leftJoin(assignedByUser, eq(employeeAssets.assignedBy, assignedByUser.id));
 
-    return rows.map(row => {
-      // Merge user name into the asset object for labels resolution
-      return this.resolveLabels({
-        ...row.asset,
-        assignedTo: row.assignedTo
-      } as any);
-    });
+    return rows.map(row => this.resolveLabels(row as any));
   }
 
   async findByUserId(userId: number): Promise<any[]> {
     const rows = await this.db
-      .select()
+      .select({
+        id: employeeAssets.id,
+        assetCode: employeeAssets.assetCode,
+        assetType: employeeAssets.assetType,
+        assetCategory: employeeAssets.assetCategory,
+        brand: employeeAssets.brand,
+        model: employeeAssets.model,
+        serialNumber: employeeAssets.serialNumber,
+        assetCondition: employeeAssets.assetCondition,
+        assetLocation: employeeAssets.assetLocation,
+        assetStatus: employeeAssets.assetStatus,
+        assignedDate: employeeAssets.assignedDate,
+        returnCondition: employeeAssets.returnCondition,
+        userId: employeeAssets.userId,
+        assignedBy: employeeAssets.assignedBy,
+      })
       .from(employeeAssets)
       .where(eq(employeeAssets.userId, userId));
-    return rows.map(row => this.resolveLabels(row));
+    return rows.map(row => this.resolveLabels(row as any));
   }
 
   // Returns raw values (for forms/edits)

@@ -17,6 +17,7 @@ export interface EmployeeAsset {
     assetConditionLabel?: string;
     assignedDate: string;
     assignedBy?: number;
+    assignedByName?: string;
     expectedReturnDate?: string;
     purpose?: string;
     assetLocation?: string;
