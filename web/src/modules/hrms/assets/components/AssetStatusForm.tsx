@@ -1,164 +1,24 @@
-import { zodResolver } from "@hookform/resolvers/zod";
-import { format } from "date-fns";
-import {
-  AlertCircle, AlertTriangle, ArrowLeft, CheckCircle, CheckCircle2, DollarSign,
-  History, Info, Package, RotateCcw, Save, Trash2, User, Wrench, XCircle,
-} from "lucide-react";
-import React, { useEffect } from "react";
-import { Controller, useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
+import { paths } from "@/app/routes/paths";
+import { DateInput } from "@/components/form/DateInput";
+import { FieldWrapper } from "@/components/form/FieldWrapper";
+import { SelectField } from "@/components/form/SelectField";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
-import { paths } from "@/app/routes/paths";
-import { useHrmsAssetDetails, useHrmsAssetHistory, useHrmsAssetView, useUpdateHrmsAssetStatus } from "@/hooks/api/useHrmsAssets";
+import { useHrmsAssetView, useUpdateHrmsAssetStatus } from "@/hooks/api/useHrmsAssets";
 import { useUsers } from "@/hooks/api/useUsers";
-import { ASSET_CONDITION, ASSET_LOCATION, ASSET_STATUS_KEYS, DAMAGE_TYPE, DISPOSAL_TYPE, toOptions } from "../constants";
+import { useEffect, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
+import { ASSET_CONDITION, ASSET_LOCATION, ASSET_STATUS, DAMAGE_TYPE, DISPOSAL_TYPE, toOptions } from "../constants";
 import { statusUpdateSchema, type StatusUpdateFormData } from "../helpers/asset.schema";
-
-const STATUS_CONFIG: Record<string, {
-  label: string;
-  badgeClass: string;
-  icon: React.ElementType;
-  description: string;
-}> = {
-  assigned: { label: "Assigned", badgeClass: "bg-green-800 text-green-100 hover:bg-green-800", icon: User, description: "Asset is assigned to an employee" },
-  available: { label: "Available", badgeClass: "bg-blue-800 text-blue-100 hover:bg-blue-800", icon: Package, description: "Asset is available for assignment" },
-  under_repair: { label: "Under Repair", badgeClass: "bg-yellow-800 text-yellow-100 hover:bg-yellow-800", icon: Wrench, description: "Asset is being repaired" },
-  damaged: { label: "Damaged", badgeClass: "bg-red-800 text-red-100 hover:bg-red-800", icon: AlertTriangle, description: "Asset has been damaged" },
-  lost: { label: "Lost", badgeClass: "bg-red-800 text-red-100 hover:bg-red-800", icon: XCircle, description: "Asset has been lost" },
-  returned: { label: "Returned", badgeClass: "bg-gray-800 text-gray-100 hover:bg-gray-800", icon: RotateCcw, description: "Asset has been returned" },
-  disposed: { label: "Disposed", badgeClass: "bg-neutral-800 text-neutral-100 hover:bg-neutral-800", icon: Trash2, description: "Asset has been disposed" },
-};
-
-const StatusCard: React.FC<{
-  value: string;
-  selected: boolean;
-  onClick: () => void;
-  currentStatus?: string;
-}> = ({ value, selected, onClick, currentStatus }) => {
-  const config = STATUS_CONFIG[value];
-  const Icon = config.icon;
-  const isCurrent = currentStatus === value;
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "relative flex flex-col items-center justify-center p-4 rounded-lg border transition-all duration-200",
-        "hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary/50",
-        selected ? "border-primary bg-muted/50 shadow-sm" : "border-border hover:border-muted-foreground/30",
-      )}
-    >
-      {isCurrent && (
-        <Badge variant="secondary" className="absolute -top-2 -right-2 text-xs">Current</Badge>
-      )}
-      <div className={cn("w-12 h-12 rounded-full flex items-center justify-center mb-2 transition-colors", selected ? "bg-primary" : "bg-muted")}>
-        <Icon className={cn("w-6 h-6", selected ? "text-primary-foreground" : "text-muted-foreground")} />
-      </div>
-      <span className={cn("text-sm font-medium", selected ? "text-foreground" : "text-muted-foreground")}>
-        {config.label}
-      </span>
-      {selected && (
-        <div className="absolute top-2 left-2">
-          <CheckCircle className="w-4 h-4 text-primary" />
-        </div>
-      )}
-    </button>
-  );
-};
-
-const InfoBox: React.FC<{ type: "info" | "warning" | "error" | "success"; title: string; children: React.ReactNode }> = ({ type, title, children }) => {
-  const configs = {
-    info: { icon: Info, iconColor: "text-blue-600" },
-    warning: { icon: AlertCircle, iconColor: "text-yellow-600" },
-    error: { icon: AlertTriangle, iconColor: "text-red-600" },
-    success: { icon: CheckCircle2, iconColor: "text-green-600" },
-  };
-  const config = configs[type];
-  const Icon = config.icon;
-
-  return (
-    <div className="rounded-lg border p-4 bg-muted/50">
-      <div className="flex items-start gap-3">
-        <Icon className={cn("w-5 h-5 mt-0.5 flex-shrink-0", config.iconColor)} />
-        <div>
-          <h4 className="font-medium text-foreground">{title}</h4>
-          <div className="mt-1 text-sm text-muted-foreground">{children}</div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const FormSection: React.FC<{ icon: React.ElementType; title: string; description?: string; children: React.ReactNode; className?: string }> = ({ icon: Icon, title, description, children, className }) => (
-  <Card className={className}>
-    <CardHeader>
-      <CardTitle className="flex items-center gap-2"><Icon className="w-5 h-5" /> {title}</CardTitle>
-      {description && <CardDescription>{description}</CardDescription>}
-    </CardHeader>
-    <CardContent>{children}</CardContent>
-  </Card>
-);
-
-const FormField: React.FC<{ label: string; required?: boolean; children: React.ReactNode; className?: string; error?: string }> = ({ label, required, children, className, error }) => (
-  <div className={cn("space-y-2", className)}>
-    <Label className="text-sm font-medium text-muted-foreground">
-      {label}
-      {required && <span className="text-destructive ml-1">*</span>}
-    </Label>
-    {children}
-    {error && <p className="text-sm text-destructive">{error}</p>}
-  </div>
-);
-
-const HistoryTimeline: React.FC<{ history: any[] }> = ({ history }) => {
-  if (!history.length) return null;
-  return (
-    <div className="space-y-4">
-      {history.map((entry, index) => {
-        const config = STATUS_CONFIG[entry.newStatus];
-        const Icon = config?.icon || Package;
-        return (
-          <div key={entry.id} className="flex gap-4">
-            <div className="flex flex-col items-center">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-muted">
-                <Icon className="w-5 h-5 text-muted-foreground" />
-              </div>
-              {index < history.length - 1 && <div className="w-0.5 h-full bg-border mt-2" />}
-            </div>
-            <div className="flex-1 pb-4">
-              <div className="flex items-center justify-between">
-                <p className="font-medium">{entry.newStatusLabel || config?.label || entry.newStatus}</p>
-                <span className="text-sm text-muted-foreground">{format(new Date(entry.createdAt), "MMM d, yyyy h:mm a")}</span>
-              </div>
-              {entry.previousStatus && (
-                <p className="text-sm text-muted-foreground mt-0.5">
-                  From: {entry.previousStatusLabel || STATUS_CONFIG[entry.previousStatus]?.label || entry.previousStatus}
-                </p>
-              )}
-              {entry.assignedTo && (
-                <p className="text-sm text-muted-foreground mt-0.5">Assigned To: {entry.assignedTo}</p>
-              )}
-              {entry.remarks && (
-                <p className="text-sm text-muted-foreground mt-1 bg-muted/50 p-2 rounded">{entry.remarks}</p>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
+import { AlertCircle, ArrowLeft, Save } from "lucide-react";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 interface AssetStatusFormProps {
   assetId: number;
@@ -167,20 +27,16 @@ interface AssetStatusFormProps {
 const AssetStatusForm: React.FC<AssetStatusFormProps> = ({ assetId }) => {
   const navigate = useNavigate();
   const { data: asset, isLoading: assetLoading } = useHrmsAssetView(assetId);
-  const { data: assetDetails } = useHrmsAssetDetails(assetId);
-  const { data: history = [] } = useHrmsAssetHistory(assetId);
   const { data: users = [] } = useUsers();
   const updateStatusMutation = useUpdateHrmsAssetStatus();
-  const [showAllHistory, setShowAllHistory] = React.useState(false);
-  const hasInitialized = React.useRef(false);
+  const hasInitialized = useRef(false);
 
-  const { register, handleSubmit, control, reset, watch, setValue, formState: { errors, isSubmitting } } = useForm<StatusUpdateFormData>({
+  const form = useForm<StatusUpdateFormData>({
     resolver: zodResolver(statusUpdateSchema),
     defaultValues: { assetStatus: "" },
   });
-
+  const { handleSubmit, control, reset, formState: { isSubmitting }, watch } = form;
   const status = watch("assetStatus");
-  const currentStatus = asset?.assetStatus;
 
   useEffect(() => {
     if (!asset || hasInitialized.current) return;
@@ -211,28 +67,21 @@ const AssetStatusForm: React.FC<AssetStatusFormProps> = ({ assetId }) => {
     }
   };
 
-  const isAssigned = status === ASSET_STATUS_KEYS.ASSIGNED;
-  const isAvailable = status === ASSET_STATUS_KEYS.AVAILABLE;
-  const isReturned = status === ASSET_STATUS_KEYS.RETURNED;
-  const isDamaged = status === ASSET_STATUS_KEYS.DAMAGED;
-  const isLost = status === ASSET_STATUS_KEYS.LOST;
-  const isUnderRepair = status === ASSET_STATUS_KEYS.UNDER_REPAIR;
-  const isDisposed = status === ASSET_STATUS_KEYS.DISPOSED;
-
   if (assetLoading) {
     return (
-      <div className="container mx-auto py-6 max-w-5xl space-y-6">
+      <div className="container mx-auto py-6 max-w-6xl">
         <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-64 w-full" />
+        <div className="space-y-6">
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
       </div>
     );
   }
 
   if (!asset) {
     return (
-      <div className="container mx-auto py-6 max-w-5xl">
+      <div className="container mx-auto py-6 max-w-6xl">
         <Card>
           <CardContent className="flex flex-col items-center justify-center h-64">
             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
@@ -246,306 +95,258 @@ const AssetStatusForm: React.FC<AssetStatusFormProps> = ({ assetId }) => {
     );
   }
 
-  const currentConfig = STATUS_CONFIG[currentStatus || "available"];
-
   return (
-    <div className="container mx-auto py-6 max-w-5xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="flex items-center space-x-2">
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back</span>
-          </Button>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
-              <span className="font-mono text-primary">{asset.assetCode}</span>
-              <Badge className={cn("border-none", currentConfig?.badgeClass)}>
-                {currentConfig?.label || "Unknown"}
-              </Badge>
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              {assetDetails?.assetTypeLabel || asset.assetType} • Update Status
-            </p>
+            <CardTitle>Update Status — {asset.assetCode}</CardTitle>
+            <CardDescription className="mt-1">Change the status and update related fields</CardDescription>
           </div>
+          <CardAction>
+            <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Back
+            </Button>
+          </CardAction>
         </div>
-      </div>
-
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <FormSection icon={Package} title="Asset Summary">
-          <CardContent className="pt-0">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">Brand & Model</p>
-                <p className="text-sm">{asset.brand || "N/A"} {asset.model || ""}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">Serial Number</p>
-                <p className="text-sm font-mono">{asset.serialNumber || "N/A"}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">Current Location</p>
-                <p className="text-sm">{assetDetails?.assetLocationLabel || "N/A"}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-1">Condition</p>
-                <p className="text-sm">{assetDetails?.assetConditionLabel || "N/A"}</p>
-              </div>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <SelectField
+                control={control}
+                name="assetStatus"
+                label={<>Status <span className="text-destructive">*</span></>}
+                options={toOptions(ASSET_STATUS)}
+                placeholder="Select status..."
+              />
             </div>
-          </CardContent>
-        </FormSection>
 
-        <FormSection icon={Package} title="Select New Status" description="Choose the new status for this asset">
-          <Controller
-            control={control}
-            name="assetStatus"
-            render={({ field }) => (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                {Object.keys(STATUS_CONFIG).map((value) => (
-                  <StatusCard
-                    key={value}
-                    value={value}
-                    selected={field.value === value}
-                    onClick={() => field.onChange(value)}
-                    currentStatus={currentStatus}
+            {status === "assigned" && (
+              <div className="border rounded-lg border-dashed p-4 space-y-4">
+                <h3 className="text-lg font-semibold">Assignment Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <SelectField
+                    control={control}
+                    name="userId"
+                    label="Assign To"
+                    options={users.map((u: any) => ({ id: String(u.id), name: u.name, description: u.email }))}
+                    placeholder="Select employee..."
                   />
-                ))}
+                  <SelectField
+                    control={control}
+                    name="assetLocation"
+                    label="Location"
+                    options={toOptions(ASSET_LOCATION)}
+                    placeholder="Select location..."
+                  />
+                  <FieldWrapper control={control} name="assignedDate" label="Assignment Date">
+                    {field => <DateInput value={field.value ?? ""} onChange={field.onChange} />}
+                  </FieldWrapper>
+                  <FieldWrapper control={control} name="purpose" label="Purpose">
+                    {field => <Textarea {...field} placeholder="Purpose of assignment..." rows={3} />}
+                  </FieldWrapper>
+                </div>
               </div>
             )}
-          />
-          {errors.assetStatus && <p className="text-sm text-destructive mt-2">{errors.assetStatus.message}</p>}
-        </FormSection>
 
-        {isAssigned && (
-          <FormSection icon={User} title="Assignment Details" description="Assign this asset to an employee">
-            <InfoBox type="info" title="Assigning Asset">Fill in the assignment details. The employee will be notified about this assignment.</InfoBox>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-              <FormField label="Assign To" required>
-                <Controller control={control} name="userId" render={({ field }) => (
-                  <Select onValueChange={(val) => field.onChange(Number(val))} value={field.value?.toString()}>
-                    <SelectTrigger><SelectValue placeholder="Select employee..." /></SelectTrigger>
-                    <SelectContent>
-                      {users.map((user: any) => (
-                        <SelectItem key={user.id} value={String(user.id)}>
-                          <div className="flex flex-col">
-                            <span>{user.name}</span>
-                            <span className="text-xs text-muted-foreground">{user.email}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )} />
-              </FormField>
-              <FormField label="Location">
-                <Controller control={control} name="assetLocation" render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger><SelectValue placeholder="Select location..." /></SelectTrigger>
-                    <SelectContent>
-                      {toOptions(ASSET_LOCATION).map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )} />
-              </FormField>
-              <FormField label="Assignment Date" required>
-                <Input type="date" {...register("assignedDate")} />
-              </FormField>
-              <FormField label="Purpose" className="md:col-span-2">
-                <Textarea {...register("purpose")} placeholder="Describe the purpose of this assignment..." rows={3} />
-              </FormField>
-            </div>
-          </FormSection>
-        )}
-
-        {isAvailable && (
-          <FormSection icon={Package} title="Mark as Available" description="This asset will be available for assignment">
-            <InfoBox type="success" title="Asset Available">The asset will be marked as available in the inventory and can be assigned to employees.</InfoBox>
-            <div className="mt-6">
-              <FormField label="Remarks">
-                <Textarea {...register("remarks")} placeholder="Any notes about marking this asset as available..." rows={3} />
-              </FormField>
-            </div>
-          </FormSection>
-        )}
-
-        {isReturned && (
-          <FormSection icon={RotateCcw} title="Return Details" description="Record the return of this asset">
-            <InfoBox type="success" title="Asset Return">Document the asset's condition upon return.</InfoBox>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-              <FormField label="Return Date" required><Input type="date" {...register("returnDate")} /></FormField>
-              <FormField label="Return Condition" required>
-                <Controller control={control} name="assetCondition" render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger><SelectValue placeholder="Select condition..." /></SelectTrigger>
-                    <SelectContent>
-                      {toOptions(ASSET_CONDITION).map((opt) => (<SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
-                )} />
-              </FormField>
-              <FormField label="Deduction Amount">
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input type="number" step="0.01" {...register("deductionAmount")} placeholder="0.00" className="pl-10" />
+            {status === "returned" && (
+              <div className="border rounded-lg border-dashed p-4 space-y-4">
+                <h3 className="text-lg font-semibold">Return Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <FieldWrapper control={control} name="returnDate" label="Return Date">
+                    {field => <DateInput value={field.value ?? ""} onChange={field.onChange} />}
+                  </FieldWrapper>
+                  <SelectField
+                    control={control}
+                    name="returnCondition"
+                    label="Return Condition"
+                    options={toOptions(ASSET_CONDITION)}
+                    placeholder="Select condition..."
+                  />
+                  <SelectField
+                    control={control}
+                    name="assetCondition"
+                    label="Asset Condition"
+                    options={toOptions(ASSET_CONDITION)}
+                    placeholder="Select condition..."
+                  />
+                  <FieldWrapper control={control} name="deductionAmount" label="Deduction Amount">
+                    {field => (
+                      <div className="relative">
+                        <Input type="number" step="0.01" value={field.value ?? ""} onChange={e => field.onChange(e.target.value)} placeholder="0.00" />
+                      </div>
+                    )}
+                  </FieldWrapper>
+                  <FieldWrapper control={control} name="deductionReason" label="Deduction Reason">
+                    {field => <Input {...field} placeholder="Reason for deduction..." />}
+                  </FieldWrapper>
                 </div>
-              </FormField>
-              <FormField label="Deduction Reason"><Input {...register("deductionReason")} placeholder="Reason for deduction..." /></FormField>
-              <FormField label="Remarks" className="md:col-span-2">
-                <Textarea {...register("remarks")} placeholder="Additional notes about the return..." rows={3} />
-              </FormField>
-            </div>
-          </FormSection>
-        )}
+              </div>
+            )}
 
-        {isDamaged && (
-          <FormSection icon={AlertTriangle} title="Damage Report" description="Document the damage to this asset">
-            <InfoBox type="warning" title="Asset Damaged">Provide detailed information about the damage.</InfoBox>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-              <FormField label="Damage Date" required><Input type="date" {...register("damageDate")} /></FormField>
-              <FormField label="Damage Type" required>
-                <Controller control={control} name="damageType" render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger><SelectValue placeholder="Select damage type..." /></SelectTrigger>
-                    <SelectContent>
-                      {toOptions(DAMAGE_TYPE).map((opt) => (<SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
-                )} />
-              </FormField>
-              <FormField label="Is Repairable?">
-                <Controller control={control} name="isRepairable" render={({ field }) => (
-                  <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="yes" id="rep-yes" /><Label htmlFor="rep-yes">Yes</Label></div>
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="no" id="rep-no" /><Label htmlFor="rep-no">No</Label></div>
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="unknown" id="rep-unknown" /><Label htmlFor="rep-unknown">Unknown</Label></div>
-                  </RadioGroup>
-                )} />
-              </FormField>
-              <FormField label="Asset Condition After">
-                <Controller control={control} name="assetCondition" render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger><SelectValue placeholder="Select condition..." /></SelectTrigger>
-                    <SelectContent>
-                      {toOptions(ASSET_CONDITION).map((opt) => (<SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
-                )} />
-              </FormField>
-              <FormField label="Damage Description" className="md:col-span-2">
-                <Textarea {...register("damageDescription")} placeholder="Describe the damage in detail..." rows={3} />
-              </FormField>
-              <Separator className="md:col-span-2" />
-              <FormField label="Deduction Amount">
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input type="number" step="0.01" {...register("deductionAmount")} placeholder="0.00" className="pl-10" />
+            {status === "damaged" && (
+              <div className="border rounded-lg border-dashed p-4 space-y-4">
+                <h3 className="text-lg font-semibold">Damage Report</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <FieldWrapper control={control} name="damageDate" label="Damage Date">
+                    {field => <DateInput value={field.value ?? ""} onChange={field.onChange} />}
+                  </FieldWrapper>
+                  <SelectField
+                    control={control}
+                    name="damageType"
+                    label="Damage Type"
+                    options={toOptions(DAMAGE_TYPE)}
+                    placeholder="Select damage type..."
+                  />
+                  <FieldWrapper control={control} name="isRepairable" label="Is Repairable?">
+                    {field => (
+                      <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="yes" id="rep-yes" /><Label htmlFor="rep-yes">Yes</Label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="no" id="rep-no" /><Label htmlFor="rep-no">No</Label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="unknown" id="rep-unknown" /><Label htmlFor="rep-unknown">Unknown</Label></div>
+                      </RadioGroup>
+                    )}
+                  </FieldWrapper>
+                  <FieldWrapper control={control} name="damageDescription" label="Damage Description">
+                    {field => <Textarea {...field} placeholder="Describe the damage..." rows={3} />}
+                  </FieldWrapper>
+                  <SelectField
+                    control={control}
+                    name="assetCondition"
+                    label="Asset Condition"
+                    options={toOptions(ASSET_CONDITION)}
+                    placeholder="Select condition..."
+                  />
+                  <FieldWrapper control={control} name="deductionAmount" label="Deduction Amount">
+                    {field => (
+                      <div className="relative">
+                        <Input type="number" step="0.01" value={field.value ?? ""} onChange={e => field.onChange(e.target.value)} placeholder="0.00" />
+                      </div>
+                    )}
+                  </FieldWrapper>
+                  <FieldWrapper control={control} name="deductionReason" label="Deduction Reason">
+                    {field => <Input {...field} placeholder="Reason for deduction..." />}
+                  </FieldWrapper>
                 </div>
-              </FormField>
-              <FormField label="Deduction Reason"><Input {...register("deductionReason")} placeholder="Reason for deduction..." /></FormField>
-            </div>
-          </FormSection>
-        )}
+              </div>
+            )}
 
-        {isLost && (
-          <FormSection icon={XCircle} title="Loss Report" description="Document the loss of this asset">
-            <InfoBox type="error" title="Asset Lost">Provide all available information about the loss.</InfoBox>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-              <FormField label="Date Lost" required><Input type="date" {...register("lostDate")} /></FormField>
-              <FormField label="Location Where Lost"><Input {...register("lostLocation")} placeholder="Where was the asset lost?" /></FormField>
-              <FormField label="Circumstances" className="md:col-span-2">
-                <Textarea {...register("lostCircumstances")} placeholder="Describe the circumstances of the loss..." rows={3} />
-              </FormField>
-              <Separator className="md:col-span-2" />
-              <FormField label="Police Report Number"><Input {...register("policeReportNumber")} placeholder="FIR / Police report number" /></FormField>
-              <FormField label="Police Report Date"><Input type="date" {...register("policeReportDate")} /></FormField>
-              <Separator className="md:col-span-2" />
-              <FormField label="Deduction Amount" required>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input type="number" step="0.01" {...register("deductionAmount")} placeholder="0.00" className="pl-10" />
+            {status === "lost" && (
+              <div className="border rounded-lg border-dashed p-4 space-y-4">
+                <h3 className="text-lg font-semibold">Loss Report</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <FieldWrapper control={control} name="lostDate" label="Date Lost">
+                    {field => <DateInput value={field.value ?? ""} onChange={field.onChange} />}
+                  </FieldWrapper>
+                  <FieldWrapper control={control} name="lostLocation" label="Location Lost">
+                    {field => <Input {...field} placeholder="Where was it lost?" />}
+                  </FieldWrapper>
+                  <FieldWrapper control={control} name="lostCircumstances" label="Circumstances">
+                    {field => <Textarea {...field} placeholder="Circumstances of loss..." rows={3} />}
+                  </FieldWrapper>
+                  <FieldWrapper control={control} name="policeReportNumber" label="Police Report #">
+                    {field => <Input {...field} placeholder="FIR / Police report number" />}
+                  </FieldWrapper>
+                  <FieldWrapper control={control} name="policeReportDate" label="Police Report Date">
+                    {field => <DateInput value={field.value ?? ""} onChange={field.onChange} />}
+                  </FieldWrapper>
+                  <FieldWrapper control={control} name="deductionAmount" label="Deduction Amount">
+                    {field => (
+                      <div className="relative">
+                        <Input type="number" step="0.01" value={field.value ?? ""} onChange={e => field.onChange(e.target.value)} placeholder="0.00" />
+                      </div>
+                    )}
+                  </FieldWrapper>
+                  <FieldWrapper control={control} name="deductionReason" label="Deduction Reason">
+                    {field => <Input {...field} placeholder="Reason for deduction..." />}
+                  </FieldWrapper>
                 </div>
-              </FormField>
-              <FormField label="Deduction Reason"><Input {...register("deductionReason")} placeholder="Reason for deduction..." /></FormField>
-            </div>
-          </FormSection>
-        )}
+              </div>
+            )}
 
-        {isUnderRepair && (
-          <FormSection icon={Wrench} title="Repair Details" description="Track repair information for this asset">
-            <InfoBox type="info" title="Under Repair">Document the repair process.</InfoBox>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-              <FormField label="Repair Start Date" required><Input type="date" {...register("repairStartDate")} /></FormField>
-              <FormField label="Expected End Date"><Input type="date" {...register("repairEndDate")} /></FormField>
-              <FormField label="Repair Vendor"><Input {...register("repairVendor")} placeholder="Vendor / Service provider name" /></FormField>
-              <FormField label="Estimated Cost">
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input type="number" step="0.01" {...register("repairEstimatedCost")} placeholder="0.00" className="pl-10" />
+            {status === "under_repair" && (
+              <div className="border rounded-lg border-dashed p-4 space-y-4">
+                <h3 className="text-lg font-semibold">Repair Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <FieldWrapper control={control} name="repairStartDate" label="Repair Start Date">
+                    {field => <DateInput value={field.value ?? ""} onChange={field.onChange} />}
+                  </FieldWrapper>
+                  <FieldWrapper control={control} name="repairEndDate" label="Repair End Date">
+                    {field => <DateInput value={field.value ?? ""} onChange={field.onChange} />}
+                  </FieldWrapper>
+                  <FieldWrapper control={control} name="repairEstimatedCost" label="Estimated Cost">
+                    {field => (
+                      <div className="relative">
+                        <Input type="number" step="0.01" value={field.value ?? ""} onChange={e => field.onChange(e.target.value)} placeholder="0.00" />
+                      </div>
+                    )}
+                  </FieldWrapper>
+                  <FieldWrapper control={control} name="repairVendor" label="Repair Vendor">
+                    {field => <Input {...field} placeholder="Vendor / Service provider..." />}
+                  </FieldWrapper>
+                  <FieldWrapper control={control} name="repairDescription" label="Repair Description">
+                    {field => <Textarea {...field} placeholder="Describe repairs needed..." rows={3} />}
+                  </FieldWrapper>
                 </div>
-              </FormField>
-              <FormField label="Repair Description" className="md:col-span-2">
-                <Textarea {...register("repairDescription")} placeholder="Describe what needs to be repaired..." rows={3} />
-              </FormField>
-            </div>
-          </FormSection>
-        )}
+              </div>
+            )}
 
-        {isDisposed && (
-          <FormSection icon={Trash2} title="Disposal Details" description="Record the disposal of this asset">
-            <InfoBox type="warning" title="Asset Disposed">Document the disposal details. The asset will be removed from active inventory.</InfoBox>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-              <FormField label="Disposal Date" required><Input type="date" {...register("disposalDate")} /></FormField>
-              <FormField label="Disposal Type" required>
-                <Controller control={control} name="disposalType" render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger><SelectValue placeholder="Select disposal type..." /></SelectTrigger>
-                    <SelectContent>
-                      {toOptions(DISPOSAL_TYPE).map((opt) => (<SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
-                )} />
-              </FormField>
-              <FormField label="Disposal Amount">
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input type="number" step="0.01" {...register("disposalAmount")} placeholder="0.00" className="pl-10" />
+            {status === "disposed" && (
+              <div className="border rounded-lg border-dashed p-4 space-y-4">
+                <h3 className="text-lg font-semibold">Disposal Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <FieldWrapper control={control} name="disposalDate" label="Disposal Date">
+                    {field => <DateInput value={field.value ?? ""} onChange={field.onChange} />}
+                  </FieldWrapper>
+                  <SelectField
+                    control={control}
+                    name="disposalType"
+                    label="Disposal Type"
+                    options={toOptions(DISPOSAL_TYPE)}
+                    placeholder="Select disposal type..."
+                  />
+                  <FieldWrapper control={control} name="disposalAmount" label="Disposal Amount">
+                    {field => (
+                      <div className="relative">
+                        <Input type="number" step="0.01" value={field.value ?? ""} onChange={e => field.onChange(e.target.value)} placeholder="0.00" />
+                      </div>
+                    )}
+                  </FieldWrapper>
+                  <FieldWrapper control={control} name="disposalApprovedBy" label="Approved By">
+                    {field => <Input {...field} placeholder="Approving authority name" />}
+                  </FieldWrapper>
+                  <FieldWrapper control={control} name="disposalReason" label="Disposal Reason">
+                    {field => <Textarea {...field} placeholder="Reason for disposal..." rows={3} />}
+                  </FieldWrapper>
                 </div>
-              </FormField>
-              <FormField label="Approved By"><Input {...register("disposalApprovedBy")} placeholder="Name of approving authority" /></FormField>
-              <FormField label="Disposal Reason" className="md:col-span-2">
-                <Textarea {...register("disposalReason")} placeholder="Reason for disposal..." rows={3} />
-              </FormField>
-            </div>
-          </FormSection>
-        )}
+              </div>
+            )}
 
-        {history.length > 0 && (
-          <FormSection icon={History} title="Status History" description="Recent status changes for this asset">
-            <HistoryTimeline history={showAllHistory ? history : history.slice(0, 5)} />
-            {history.length > 5 && (
-              <Button type="button" variant="outline" className="w-full mt-4" onClick={() => setShowAllHistory((prev) => !prev)}>
-                {showAllHistory ? "Show Less" : `View All History (${history.length} entries)`}
+            <div className="border rounded-lg border-dashed p-4 space-y-4">
+              <h3 className="text-lg font-semibold">Remarks</h3>
+              <FieldWrapper control={control} name="remarks" label="Remarks">
+                {field => <Textarea {...field} placeholder="Additional notes..." rows={4} />}
+              </FieldWrapper>
+            </div>
+
+            <div className="flex items-center justify-between pt-4">
+              <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
+                Cancel
               </Button>
-            )}
-          </FormSection>
-        )}
-
-        <div className="flex items-center justify-between pt-6">
-          <Button type="button" variant="outline" onClick={() => navigate(-1)} className="flex items-center space-x-2">
-            <ArrowLeft className="w-4 h-4" />
-            <span>Cancel</span>
-          </Button>
-          <Button type="submit" disabled={isSubmitting || updateStatusMutation.isPending} size="lg">
-            {isSubmitting || updateStatusMutation.isPending ? (
-              <><div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" /> Updating...</>
-            ) : (
-              <><Save className="w-4 h-4 mr-2" /> Update Status</>
-            )}
-          </Button>
-        </div>
-      </form>
-    </div>
+              <Button type="submit" disabled={isSubmitting || updateStatusMutation.isPending}>
+                {isSubmitting || updateStatusMutation.isPending ? (
+                  <><div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" /> Saving...</>
+                ) : (
+                  <><Save className="mr-2 h-4 w-4" /> Update Status</>
+                )}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
   );
 };
 
