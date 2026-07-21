@@ -212,11 +212,59 @@ export class AssetsService {
   // Returns with labels (for display)
   async findByIdWithLabels(id: number): Promise<any | null> {
     const rows = await this.db
-      .select()
+      .select({
+        id: employeeAssets.id,
+        assetCode: employeeAssets.assetCode,
+        assetType: employeeAssets.assetType,
+        assetCategory: employeeAssets.assetCategory,
+        brand: employeeAssets.brand,
+        model: employeeAssets.model,
+        serialNumber: employeeAssets.serialNumber,
+        imeiNumber: employeeAssets.imeiNumber,
+        licenseKey: employeeAssets.licenseKey,
+        assetValue: employeeAssets.assetValue,
+        assetCondition: employeeAssets.assetCondition,
+        assetLocation: employeeAssets.assetLocation,
+        assetStatus: employeeAssets.assetStatus,
+        assignedDate: employeeAssets.assignedDate,
+        assignedBy: employeeAssets.assignedBy,
+        expectedReturnDate: employeeAssets.expectedReturnDate,
+        returnDate: employeeAssets.returnDate,
+        returnCondition: employeeAssets.returnCondition,
+        purpose: employeeAssets.purpose,
+        userId: employeeAssets.userId,
+        warrantyFrom: employeeAssets.warrantyFrom,
+        warrantyTo: employeeAssets.warrantyTo,
+        insuranceDetails: employeeAssets.insuranceDetails,
+        accessories: employeeAssets.accessories,
+        typeSpecs: employeeAssets.typeSpecs,
+        assetPhotos: employeeAssets.assetPhotos,
+        specifications: employeeAssets.specifications,
+        purchaseInvoiceUrl: employeeAssets.purchaseInvoiceUrl,
+        warrantyCardUrl: employeeAssets.warrantyCardUrl,
+        assignmentFormUrl: employeeAssets.assignmentFormUrl,
+        purchaseDate: employeeAssets.purchaseDate,
+        purchasePrice: employeeAssets.purchasePrice,
+        purchaseFrom: employeeAssets.purchaseFrom,
+        damageRemarks: employeeAssets.damageRemarks,
+        deductionAmount: employeeAssets.deductionAmount,
+        disposalDate: employeeAssets.disposalDate,
+        disposalType: employeeAssets.disposalType,
+        disposalReason: employeeAssets.disposalReason,
+        disposalAmount: employeeAssets.disposalAmount,
+        disposalApprovedBy: employeeAssets.disposalApprovedBy,
+        remarks: employeeAssets.remarks,
+        createdAt: employeeAssets.createdAt,
+        updatedAt: employeeAssets.updatedAt,
+        assignedTo: users.name,
+        assignedByName: assignedByUser.name,
+      })
       .from(employeeAssets)
+      .leftJoin(users, eq(employeeAssets.userId, users.id))
+      .leftJoin(assignedByUser, eq(employeeAssets.assignedBy, assignedByUser.id))
       .where(eq(employeeAssets.id, id))
       .limit(1);
-    return rows[0] ? this.resolveLabels(rows[0]) : null;
+    return rows[0] ? this.resolveLabels(rows[0] as any) : null;
   }
 
   async create(data: NewEmployeeAsset): Promise<EmployeeAsset> {
