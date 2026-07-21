@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useHrmsAssetDetails } from "@/hooks/api/useHrmsAssets";
+import { useHrmsAssetDetails, useHrmsAssetHistory } from "@/hooks/api/useHrmsAssets";
 import { format } from "date-fns";
-import { AlertCircle, ArrowLeft, Calendar, CheckCircle2, Download, Edit, FileText, Image as ImageIcon, MapPin, Package, Shield, User } from "lucide-react";
+import { AlertCircle, ArrowLeft, Calendar, CheckCircle2, Clock, Download, Edit, FileText, History, Image as ImageIcon, MapPin, Package, Shield, User, Wrench } from "lucide-react";
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { ASSET_TYPE } from "../constants";
@@ -57,6 +57,7 @@ const DocumentLink: React.FC<{ label: string; url: string }> = ({ label, url }) 
 const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
   const navigate = useNavigate();
   const { data: asset, isLoading } = useHrmsAssetDetails(assetId);
+  const { data: history = [] } = useHrmsAssetHistory(assetId);
 
   const formatDate = (date: string | null | undefined) => {
     if (!date) return "N/A";
@@ -273,7 +274,7 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
             </Card>
           )}
 
-          {asset.assetStatusLabel === "Returned" && (
+          {asset.assetStatus === "returned" && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Return Information</CardTitle>
@@ -284,6 +285,109 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
                   <InfoField label="Return Condition" value={<span>{getConditionBadge(asset.returnConditionLabel)}</span>} />
                   {asset.deductionAmount && <InfoField label="Deduction Amount" value={`$${asset.deductionAmount}`} />}
                   {asset.damageRemarks && <InfoField label="Damage Remarks" value={asset.damageRemarks} className="col-span-2" />}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {asset.assetStatus === "damaged" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><AlertCircle className="h-5 w-5" /> Damage Report</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-6">
+                  <InfoField label="Asset Condition" value={<span>{getConditionBadge(asset.assetConditionLabel)}</span>} />
+                  {asset.damageRemarks && <InfoField label="Damage Description" value={asset.damageRemarks} className="col-span-2" />}
+                  {asset.deductionAmount && <InfoField label="Deduction Amount" value={`$${asset.deductionAmount}`} />}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {asset.assetStatus === "lost" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><AlertCircle className="h-5 w-5" /> Loss Report</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-6">
+                  {asset.damageRemarks && <InfoField label="Circumstances" value={asset.damageRemarks} className="col-span-2" />}
+                  {asset.deductionAmount && <InfoField label="Deduction Amount" value={`$${asset.deductionAmount}`} />}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {asset.assetStatus === "under_repair" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Wrench className="h-5 w-5" /> Repair Details</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-6">
+                  <InfoField label="Current Condition" value={<span>{getConditionBadge(asset.assetConditionLabel)}</span>} />
+                  {asset.damageRemarks && <InfoField label="Repair Description" value={asset.damageRemarks} className="col-span-2" />}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {asset.assetStatus === "disposed" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" /> Disposal Details</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-6">
+                  <InfoField label="Disposal Date" value={formatDate(asset.disposalDate)} />
+                  <InfoField label="Disposal Type" value={asset.disposalTypeLabel || asset.disposalType} />
+                  {asset.disposalAmount && <InfoField label="Disposal Amount" value={`$${asset.disposalAmount}`} />}
+                  {asset.disposalApprovedBy && <InfoField label="Approved By" value={asset.disposalApprovedBy} />}
+                  {asset.disposalReason && <InfoField label="Disposal Reason" value={asset.disposalReason} className="col-span-2" />}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {history.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><History className="h-5 w-5" /> Status History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {history.map((entry, idx) => (
+                    <div key={entry.id} className="flex gap-4">
+                      <div className="flex flex-col items-center">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-muted">
+                          <Clock className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                        {idx < history.length - 1 && <div className="w-0.5 h-full bg-border mt-2" />}
+                      </div>
+                      <div className="flex-1 pb-4">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            {getStatusBadge(entry.newStatusLabel || entry.newStatus)}
+                          </div>
+                          <span className="text-sm text-muted-foreground whitespace-nowrap">
+                            {format(new Date(entry.createdAt), "MMM d, yyyy h:mm a")}
+                          </span>
+                        </div>
+                        {entry.previousStatus && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            From: {entry.previousStatusLabel || entry.previousStatus}
+                          </p>
+                        )}
+                        {entry.assignedTo && (
+                          <p className="text-sm text-muted-foreground mt-0.5">Assigned to: {entry.assignedTo}</p>
+                        )}
+                        {entry.remarks && (
+                          <p className="text-sm text-muted-foreground mt-2 bg-muted/50 p-2 rounded">{entry.remarks}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>

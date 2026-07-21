@@ -130,9 +130,9 @@ export class AssetsService {
       ...history,
       previousStatusLabel: history.previousStatus ? ASSET_STATUS_LABELS[history.previousStatus] ?? history.previousStatus : null,
       newStatusLabel: ASSET_STATUS_LABELS[history.newStatus] ?? history.newStatus,
-      // assetLocationLabel: history.assetLocation ? ASSET_LOCATION_LABELS[history.assetLocation] ?? history.assetLocation : null,
-      // returnConditionLabel: history.returnCondition ? ASSET_CONDITION_LABELS[history.returnCondition] ?? history.returnCondition : null,
-      // assetConditionAfterLabel: history.assetConditionAfter ? ASSET_CONDITION_LABELS[history.assetConditionAfter] ?? history.assetConditionAfter : null,
+      assetLocationLabel: history.assetLocation ? ASSET_LOCATION_LABELS[history.assetLocation] ?? history.assetLocation : null,
+      returnConditionLabel: history.returnCondition ? ASSET_CONDITION_LABELS[history.returnCondition] ?? history.returnCondition : null,
+      assetConditionAfterLabel: history.assetConditionAfter ? ASSET_CONDITION_LABELS[history.assetConditionAfter] ?? history.assetConditionAfter : null,
     };
   }
 
@@ -389,14 +389,50 @@ export class AssetsService {
   async getAssetHistory(assetId: number): Promise<any[]> {
     const rows = await this.db
       .select({
+        id: assetTrackingHistory.id,
+        assetId: assetTrackingHistory.assetId,
         previousStatus: assetTrackingHistory.previousStatus,
         newStatus: assetTrackingHistory.newStatus,
-        createdAt : assetTrackingHistory.createdAt,
+        actionType: assetTrackingHistory.actionType,
+        assignedToUserId: assetTrackingHistory.assignedToUserId,
+        assignedByUserId: assetTrackingHistory.assignedByUserId,
+        assignedDate: assetTrackingHistory.assignedDate,
+        expectedReturnDate: assetTrackingHistory.expectedReturnDate,
+        purpose: assetTrackingHistory.purpose,
+        assetLocation: assetTrackingHistory.assetLocation,
+        returnDate: assetTrackingHistory.returnDate,
+        returnCondition: assetTrackingHistory.returnCondition,
+        damageDate: assetTrackingHistory.damageDate,
+        damageType: assetTrackingHistory.damageType,
+        damageDescription: assetTrackingHistory.damageDescription,
+        isRepairable: assetTrackingHistory.isRepairable,
+        lostDate: assetTrackingHistory.lostDate,
+        lostLocation: assetTrackingHistory.lostLocation,
+        lostCircumstances: assetTrackingHistory.lostCircumstances,
+        policeReportNumber: assetTrackingHistory.policeReportNumber,
+        policeReportDate: assetTrackingHistory.policeReportDate,
+        repairStartDate: assetTrackingHistory.repairStartDate,
+        repairEndDate: assetTrackingHistory.repairEndDate,
+        repairEstimatedCost: assetTrackingHistory.repairEstimatedCost,
+        repairActualCost: assetTrackingHistory.repairActualCost,
+        repairVendor: assetTrackingHistory.repairVendor,
+        repairDescription: assetTrackingHistory.repairDescription,
+        deductionAmount: assetTrackingHistory.deductionAmount,
+        deductionReason: assetTrackingHistory.deductionReason,
+        assetConditionAfter: assetTrackingHistory.assetConditionAfter,
+        disposalDate: assetTrackingHistory.disposalDate,
+        disposalType: assetTrackingHistory.disposalType,
+        disposalReason: assetTrackingHistory.disposalReason,
+        disposalAmount: assetTrackingHistory.disposalAmount,
+        disposalApprovedBy: assetTrackingHistory.disposalApprovedBy,
+        remarks: assetTrackingHistory.remarks,
+        changedByUserId: assetTrackingHistory.changedByUserId,
+        createdAt: assetTrackingHistory.createdAt,
         assignedTo: users.name,
       })
       .from(assetTrackingHistory)
       .where(eq(assetTrackingHistory.assetId, assetId))
-      .innerJoin(users, eq(assetTrackingHistory.assignedToUserId, users.id))
+      .leftJoin(users, eq(assetTrackingHistory.assignedToUserId, users.id))
       .orderBy(desc(assetTrackingHistory.createdAt));
     
     return rows.map(row => this.resolveHistoryLabels(row));

@@ -105,6 +105,7 @@ export interface AssetHistoryEntry {
     previousStatusLabel?: string | null;
     newStatus: string;
     newStatusLabel?: string;
+    assignedTo?: string | null;
     actionType: string;
     assignedToUserId?: number | null;
     assignedByUserId?: number | null;
