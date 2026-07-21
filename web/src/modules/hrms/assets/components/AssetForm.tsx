@@ -72,7 +72,6 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
         assetCategory: asset.assetCategory || "",
         brand: asset.brand || "",
         model: asset.model || "",
-        specifications: asset.specifications || "",
         assetValue: asset.assetValue || "",
         assetCondition: asset.assetCondition || "",
         assignedDate: toDateInput(asset.assignedDate),
@@ -276,10 +275,6 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
                   {field => <NumberInput value={field.value} onChange={field.onChange} placeholder="0.00" />}
                 </FieldWrapper>
               </div>
-
-              <FieldWrapper control={control} name="specifications" label="Specifications">
-                {field => <Textarea {...field} placeholder="Detailed specs: RAM, Storage, Processor, Screen Size, etc." rows={3} />}
-              </FieldWrapper>
 
               {typeSpecFields.length > 0 && (
                 <div className="space-y-4 pt-2">
