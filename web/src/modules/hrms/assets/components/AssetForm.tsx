@@ -21,7 +21,7 @@ import { useCreateHrmsAsset, useHrmsAssetView, useUpdateHrmsAsset } from "@/hook
 import { ASSET_CATEGORY, ASSET_CONDITION, ASSET_TYPE, CATEGORY_TYPES, getTypesForCategory, toOptions } from "../constants";
 import { createAssetSchema, editAssetSchema } from "../helpers/asset.schema";
 import { buildCreateFormData, buildEditFormData, getAssetFileUrl, toDateInput } from "../helpers/asset.mappers";
-import { MOBILE_TYPES } from "../helpers/asset.types";
+import { BRANDLESS_TYPES, MOBILE_TYPES } from "../helpers/asset.types";
 import { getTypeSpecFields } from "../helpers/typeSpecs";
 
 interface AssetFormProps {
@@ -60,6 +60,7 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
   const watchAssetType = watch("assetType");
   const watchAssetCategory = watch("assetCategory");
   const isMobile = MOBILE_TYPES.includes(watchAssetType);
+  const isBrandless = BRANDLESS_TYPES.includes(watchAssetType);
   const isSubmittingForm = createAssetMutation.isPending || updateAssetMutation.isPending;
 
   useEffect(() => {
@@ -115,6 +116,10 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
     if (!MOBILE_TYPES.includes(watchAssetType)) {
       setValue("imeiNumber", "");
       setValue("licenseKey", "");
+    }
+    if (BRANDLESS_TYPES.includes(watchAssetType)) {
+      setValue("brand", "");
+      setValue("model", "");
     }
   }, [watchAssetType, setValue]);
 
@@ -250,12 +255,16 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
                   options={getTypesForCategory(watchAssetCategory)}
                   placeholder={watchAssetCategory ? "Select Asset Type" : "Select a category first"}
                 />
-                <FieldWrapper control={control} name="brand" label={<>Brand <span className="text-destructive">*</span></>}>
-                  {field => <Input {...field} placeholder="e.g. Apple, Dell, HP" />}
-                </FieldWrapper>
-                <FieldWrapper control={control} name="model" label={<>Model <span className="text-destructive">*</span></>}>
-                  {field => <Input {...field} placeholder="e.g. MacBook Pro 14-inch" />}
-                </FieldWrapper>
+                {!isBrandless && (
+                  <>
+                    <FieldWrapper control={control} name="brand" label="Brand">
+                      {field => <Input {...field} placeholder="e.g. Apple, Dell, HP" />}
+                    </FieldWrapper>
+                    <FieldWrapper control={control} name="model" label="Model">
+                      {field => <Input {...field} placeholder="e.g. MacBook Pro 14-inch" />}
+                    </FieldWrapper>
+                  </>
+                )}
                 <SelectField
                   control={control}
                   name="assetCondition"

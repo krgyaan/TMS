@@ -130,3 +130,4 @@ export interface AssetHistoryEntry {
 }
 
 export const MOBILE_TYPES = ["mobile", "sim_card"];
+export const BRANDLESS_TYPES = ["sim_card", "id_card", "access_card"];
