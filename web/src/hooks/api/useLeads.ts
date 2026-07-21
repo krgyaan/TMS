@@ -24,7 +24,8 @@ type LeadsPaginationParams = {
     limit: number;
     search?: string;
     priority?: string;
-    status?: string;    // ← NEW
+    status?: string;
+    team?: string;      // ✅ NEW - team filter
 };
 
 export const useLeads = (
@@ -36,7 +37,8 @@ export const useLeads = (
         limit: pagination.limit,
         search: pagination.search,
         priority: pagination.priority,
-        status: pagination.status,      // ← NEW
+        status: pagination.status,
+        team: pagination.team,          // ✅ NEW
         ...(sort?.sortBy    && { sortBy: sort.sortBy }),
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
     };
@@ -102,7 +104,6 @@ export const useAllocateLead = () => {
 export const useDeleteLead = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        // ← UPDATED: accepts reason
         mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
             leadsService.remove(id, reason),
         onSuccess: () => {

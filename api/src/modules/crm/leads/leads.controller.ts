@@ -33,12 +33,13 @@ export class LeadsController {
 
     @Get()
     async list(
-        @Query('page') page?: string,
-        @Query('limit') limit?: string,
-        @Query('search') search?: string,
-        @Query('priority') priority?: string,
-        @Query('status') status?: string,
-        @Query('sortBy') sortBy?: string,
+        @Query('page')      page?:      string,
+        @Query('limit')     limit?:     string,
+        @Query('search')    search?:    string,
+        @Query('priority')  priority?:  string,
+        @Query('status')    status?:    string,
+        @Query('team')      team?:      string,   
+        @Query('sortBy')    sortBy?:    string,
         @Query('sortOrder') sortOrder?: string,
     ) {
         const parseNumber = (v?: string): number | undefined => {
@@ -53,6 +54,7 @@ export class LeadsController {
             search,
             priority,
             status,
+            team,                                  // ✅ ADD THIS
             sortBy,
             sortOrder: sortOrder as 'asc' | 'desc' | undefined,
         });
@@ -89,7 +91,6 @@ export class LeadsController {
         return this.leadsService.allocate(id, body, user.sub);
     }
 
-    // ← CHANGED: from DELETE to PATCH /id/disqualify
     @Patch(':id/disqualify')
     @HttpCode(HttpStatus.NO_CONTENT)
     async disqualify(
@@ -99,7 +100,6 @@ export class LeadsController {
         await this.leadsService.delete(id, body);
     }
 
-    // ← Keep DELETE for actual hard delete if needed in future
     @Delete(':id')
     @HttpCode(HttpStatus.NO_CONTENT)
     async delete(@Param('id', ParseIntPipe) id: number) {

@@ -9,10 +9,10 @@ import { toast } from 'sonner';
 import { showErrorToast } from '@/utils/errorToast';
 import { useLead } from './useLeads';
 import { paths } from '@/app/routes/paths';
-import type { 
-    CreateFollowupRequest, 
-    ContactPerson, 
-    VisitFollowupRequest, 
+import type {
+    CreateFollowupRequest,
+    ContactPerson,
+    VisitFollowupRequest,
     CallFollowupRequest,
     MailFollowupRequest,
     WhatsappFollowupRequest,
@@ -160,11 +160,12 @@ export const useDeleteFollowup = (leadId: number) => {
 };
 
 // ─── Visit Form Hook ──────────────────────────────────────────────────────────
+// ── UNCHANGED ────────────────────────────────────────────────────────────────
 
 export const useVisitForm = (leadId: number) => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-    
+
     const followupIdParam = searchParams.get("followupId");
     const followupId = followupIdParam ? Number(followupIdParam) : null;
     const isEditMode = !!followupId;
@@ -251,7 +252,7 @@ export const useVisitForm = (leadId: number) => {
             } else {
                 await createFollowup.mutateAsync(payload);
                 form.reset();
-                
+
                 if (lead) {
                     const leadData = lead as any;
                     if (
@@ -300,11 +301,12 @@ export const useVisitForm = (leadId: number) => {
 };
 
 // ─── Call Form Hook ───────────────────────────────────────────────────────────
+// ── UNCHANGED ────────────────────────────────────────────────────────────────
 
 export const useCallForm = (leadId: number) => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-    
+
     const followupIdParam = searchParams.get("followupId");
     const followupId = followupIdParam ? Number(followupIdParam) : null;
     const isEditMode = !!followupId;
@@ -391,7 +393,7 @@ export const useCallForm = (leadId: number) => {
             } else {
                 await createFollowup.mutateAsync(payload);
                 form.reset();
-                
+
                 if (lead) {
                     const leadData = lead as any;
                     if (
@@ -440,11 +442,12 @@ export const useCallForm = (leadId: number) => {
 };
 
 // ─── Mail Form Hook ───────────────────────────────────────────────────────────
+// ── UNCHANGED ────────────────────────────────────────────────────────────────
 
 export const useMailForm = (leadId: number) => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-    
+
     const followupIdParam = searchParams.get("followupId");
     const followupId = followupIdParam ? Number(followupIdParam) : null;
     const isEditMode = !!followupId;
@@ -521,11 +524,12 @@ export const useMailForm = (leadId: number) => {
 };
 
 // ─── WhatsApp Form Hook ───────────────────────────────────────────────────────
+// ── UNCHANGED ────────────────────────────────────────────────────────────────
 
 export const useWhatsappForm = (leadId: number) => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-    
+
     const followupIdParam = searchParams.get("followupId");
     const followupId = followupIdParam ? Number(followupIdParam) : null;
     const isEditMode = !!followupId;
@@ -599,11 +603,12 @@ export const useWhatsappForm = (leadId: number) => {
 };
 
 // ─── Letter Form Hook ─────────────────────────────────────────────────────────
+// ── CHANGED: useEffect block updated to read from existingFollowup.courier ───
 
 export const useLetterForm = (leadId: number) => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-    
+
     const followupIdParam = searchParams.get("followupId");
     const followupId = followupIdParam ? Number(followupIdParam) : null;
     const isEditMode = !!followupId;
@@ -612,8 +617,10 @@ export const useLetterForm = (leadId: number) => {
     const updateFollowup = useUpdateFollowup(leadId);
     const { data: allFollowups = [] } = useFollowups(leadId);
 
+    // Cast to any because the base type does not include the nested `courier`
+    // object that the API now returns. The backend embeds it for letter type.
     const existingFollowup = isEditMode
-        ? allFollowups.find(f => f.id === followupId) ?? null
+        ? (allFollowups.find(f => f.id === followupId) as any) ?? null
         : null;
 
     const [attachmentPaths, setAttachmentPaths] = useState<string[]>([]);
@@ -627,35 +634,52 @@ export const useLetterForm = (leadId: number) => {
         },
     });
 
+    // ── CHANGED ───────────────────────────────────────────────────────
     useEffect(() => {
         if (isEditMode && existingFollowup) {
-            // Letter followup data comes from courier table, we need to handle this differently
-            form.reset({
-                toOrg: "",
-                toName: "",
-                toAddr: "",
-                toPin: "",
-                toMobile: "",
-                empFrom: "",
-                delDate: "",
-                urgency: "",
-                nextFollowupDate: formatDateForInput(existingFollowup.nextFollowupDate),
-            });
-            setAttachmentPaths(existingFollowup.attachments || []);
+            // The API now returns a nested `courier` object for letter type.
+            // All letter-specific fields live inside it.
+            const courierData = existingFollowup.courier;
+
+            if (courierData) {
+                form.reset({
+                    // These fields come directly from the courier record
+                    toOrg:    courierData.toOrg    || "",
+                    toName:   courierData.toName   || "",
+                    toAddr:   courierData.toAddr   || "",
+                    toPin:    courierData.toPin    || "",
+                    toMobile: courierData.toMobile || "",
+                    // empFrom and urgency are integers in the DB but the
+                    // form schema expects strings (for <select> elements)
+                    empFrom:  courierData.empFrom  ? String(courierData.empFrom)  : "",
+                    urgency:  courierData.urgency  ? String(courierData.urgency)  : "",
+                    // delDate is a timestamp from the DB, format it for
+                    // <input type="date"> which needs "YYYY-MM-DD"
+                    delDate:  formatDateForInput(courierData.delDate),
+                    // nextFollowupDate lives on the main followup record, not courier
+                    nextFollowupDate: formatDateForInput(existingFollowup.nextFollowupDate),
+                });
+
+                // Attachments are stored as `courierDocs` in the couriers table.
+                // Your create/update service maps `attachments` → `courierDocs`.
+                setAttachmentPaths(courierData.courierDocs || []);
+            }
         }
     }, [existingFollowup, isEditMode, form]);
+    // ── END CHANGED ───────────────────────────────────────────────────
 
     const handleSubmit = async (values: LetterFormValues) => {
         const payload: LetterFollowupRequest = {
             type: 'letter',
-            toOrg: values.toOrg,
-            toName: values.toName,
-            toAddr: values.toAddr,
-            toPin: values.toPin,
+            toOrg:    values.toOrg,
+            toName:   values.toName,
+            toAddr:   values.toAddr,
+            toPin:    values.toPin,
             toMobile: values.toMobile,
-            empFrom: Number(values.empFrom),
-            delDate: values.delDate,
-            urgency: Number(values.urgency),
+            // Convert strings back to numbers for the API/DTO
+            empFrom:  Number(values.empFrom),
+            delDate:  values.delDate,
+            urgency:  Number(values.urgency),
             attachments: attachmentPaths,
             nextFollowupDate: values.nextFollowupDate || null,
         };

@@ -46,15 +46,18 @@ export class FollowupsService {
             .where(eq(leadFollowups.leadId, leadId))
             .orderBy(desc(leadFollowups.createdAt));
 
-        // For each followup, fetch related contacts if call/visit
+        // For each followup, fetch related data
         const result = await Promise.all(
             followups.map(async (row) => {
-                const followup = {
+                // ── CHANGED: added `courier: null` initialization ──
+                const followup: any = {
                     ...row.followup,
                     createdByName: row.createdByName ?? null,
                     contacts: [] as any[],
+                    courier: null,
                 };
 
+                // Fetch contacts for call/visit (unchanged)
                 if (
                     row.followup.type === 'call' ||
                     row.followup.type === 'visit'
@@ -65,6 +68,25 @@ export class FollowupsService {
                         .where(eq(leadContacts.followupId, row.followup.id));
 
                     followup.contacts = contacts;
+                }
+
+                // ── CHANGED: fetch and embed courier data for letter type ──
+                if (
+                    row.followup.type === 'letter' &&
+                    row.followup.courierId
+                ) {
+                    const [courierData] = await this.db
+                        .select()
+                        .from(couriers)
+                        .where(eq(couriers.id, row.followup.courierId))
+                        .limit(1);
+
+                    if (courierData) {
+                        // Drizzle already maps snake_case columns to camelCase
+                        // via the schema definition, so this object is already
+                        // in camelCase and ready for the frontend.
+                        followup.courier = courierData;
+                    }
                 }
 
                 return followup;
@@ -92,13 +114,16 @@ export class FollowupsService {
         }
 
         const row = rows[0];
+
+        // ── CHANGED: added `courier: null` initialization ──
         const followup: any = {
             ...row.followup,
             createdByName: row.createdByName ?? null,
             contacts: [],
+            courier: null,
         };
 
-        // Fetch contacts if call/visit
+        // Fetch contacts if call/visit (unchanged)
         if (row.followup.type === 'call' || row.followup.type === 'visit') {
             followup.contacts = await this.db
                 .select()
@@ -106,10 +131,24 @@ export class FollowupsService {
                 .where(eq(leadContacts.followupId, id));
         }
 
+        // ── CHANGED: fetch and embed courier data for letter type ──
+        if (row.followup.type === 'letter' && row.followup.courierId) {
+            const [courierData] = await this.db
+                .select()
+                .from(couriers)
+                .where(eq(couriers.id, row.followup.courierId))
+                .limit(1);
+
+            if (courierData) {
+                followup.courier = courierData;
+            }
+        }
+
         return followup;
     }
 
     // ─── Create Followup ──────────────────────────────────────────────
+    // ── UNCHANGED ────────────────────────────────────────────────────
 
     async create(
         leadId: number,
@@ -243,126 +282,128 @@ export class FollowupsService {
         });
     }
 
-    // Add this method after the create method
+    // ─── Update Followup ──────────────────────────────────────────────
+    // ── UNCHANGED ────────────────────────────────────────────────────
 
-async update(
-    id: number,
-    data: CreateFollowupDto,
-    updatedBy: number,
-): Promise<any> {
-    // Get existing followup
-    const existingFollowup = await this.findById(id);
+    async update(
+        id: number,
+        data: CreateFollowupDto,
+        updatedBy: number,
+    ): Promise<any> {
+        // Get existing followup
+        const existingFollowup = await this.findById(id);
 
-    // Check if it was created today (only today's followups can be edited)
-    const createdAt = new Date(existingFollowup.createdAt);
-    const today = new Date();
-    const isToday = 
-        createdAt.getDate() === today.getDate() &&
-        createdAt.getMonth() === today.getMonth() &&
-        createdAt.getFullYear() === today.getFullYear();
+        // Check if it was created today (only today's followups can be edited)
+        const createdAt = new Date(existingFollowup.createdAt);
+        const today = new Date();
+        const isToday =
+            createdAt.getDate() === today.getDate() &&
+            createdAt.getMonth() === today.getMonth() &&
+            createdAt.getFullYear() === today.getFullYear();
 
-    if (!isToday) {
-        throw new BadRequestException('Only today\'s follow-ups can be edited');
+        if (!isToday) {
+            throw new BadRequestException('Only today\'s follow-ups can be edited');
+        }
+
+        return this.db.transaction(async (tx) => {
+            let courierId = existingFollowup.courierId;
+
+            // Handle Letter: update courier record if needed
+            if (data.type === 'letter') {
+                const letterData = data as LetterFollowupDto;
+
+                if (courierId) {
+                    // Update existing courier
+                    await tx
+                        .update(couriers)
+                        .set({
+                            toOrg: letterData.toOrg,
+                            toName: letterData.toName,
+                            toAddr: letterData.toAddr,
+                            toPin: letterData.toPin,
+                            toMobile: letterData.toMobile,
+                            empFrom: letterData.empFrom,
+                            delDate: new Date(letterData.delDate),
+                            urgency: letterData.urgency,
+                            courierDocs: letterData.attachments ?? [],
+                        })
+                        .where(eq(couriers.id, courierId));
+                } else {
+                    // Create new courier if it didn't exist
+                    const [courier] = await tx
+                        .insert(couriers)
+                        .values({
+                            userId: updatedBy,
+                            toOrg: letterData.toOrg,
+                            toName: letterData.toName,
+                            toAddr: letterData.toAddr,
+                            toPin: letterData.toPin,
+                            toMobile: letterData.toMobile,
+                            empFrom: letterData.empFrom,
+                            delDate: new Date(letterData.delDate),
+                            urgency: letterData.urgency,
+                            courierDocs: letterData.attachments ?? [],
+                            status: 0,
+                        })
+                        .returning();
+                    courierId = courier.id;
+                }
+            }
+
+            // Build update payload
+            const updatePayload: Partial<NewLeadFollowup> = {
+                courierId,
+                updatedAt: new Date(),
+            };
+
+            if ('body' in data)             updatePayload.body = data.body;
+            if ('veResponsibility' in data) updatePayload.veResponsibility = data.veResponsibility ?? null;
+            if ('attachments' in data)      updatePayload.attachments = data.attachments ?? [];
+            if ('nextFollowupDate' in data) updatePayload.nextFollowupDate = data.nextFollowupDate ? new Date(data.nextFollowupDate) : null;
+            if ('frequency' in data)        updatePayload.frequency = data.frequency ?? null;
+
+            // Update followup
+            const [updatedFollowup] = await tx
+                .update(leadFollowups)
+                .set(updatePayload)
+                .where(eq(leadFollowups.id, id))
+                .returning();
+
+            // Update contacts for call/visit
+            if (
+                (data.type === 'call' || data.type === 'visit') &&
+                'contacts' in data
+            ) {
+                // Delete old contacts
+                await tx
+                    .delete(leadContacts)
+                    .where(eq(leadContacts.followupId, id));
+
+                // Insert new contacts
+                if ((data as CallFollowupDto | VisitFollowupDto).contacts.length > 0) {
+                    const contactSource = data.type === 'call' ? 'call_followup' : 'visit_followup';
+                    const contactsPayload = (data as CallFollowupDto | VisitFollowupDto)
+                        .contacts
+                        .map((contact: ContactDto) => ({
+                            leadId: updatedFollowup.leadId,
+                            followupId: id,
+                            name: contact.name,
+                            designation: contact.designation ?? null,
+                            phone: contact.phone ?? null,
+                            email: contact.email ?? null,
+                            source: contactSource as 'call_followup' | 'visit_followup',
+                        }));
+
+                    await tx.insert(leadContacts).values(contactsPayload);
+                }
+            }
+
+            return updatedFollowup;
+        });
     }
 
-    return this.db.transaction(async (tx) => {
-        let courierId = existingFollowup.courierId;
-
-        // Handle Letter: update courier record if needed
-        if (data.type === 'letter') {
-            const letterData = data as LetterFollowupDto;
-
-            if (courierId) {
-                // Update existing courier
-                await tx
-                    .update(couriers)
-                    .set({
-                        toOrg: letterData.toOrg,
-                        toName: letterData.toName,
-                        toAddr: letterData.toAddr,
-                        toPin: letterData.toPin,
-                        toMobile: letterData.toMobile,
-                        empFrom: letterData.empFrom,
-                        delDate: new Date(letterData.delDate),
-                        urgency: letterData.urgency,
-                        courierDocs: letterData.attachments ?? [],
-                    })
-                    .where(eq(couriers.id, courierId));
-            } else {
-                // Create new courier if it didn't exist
-                const [courier] = await tx
-                    .insert(couriers)
-                    .values({
-                        userId: updatedBy,
-                        toOrg: letterData.toOrg,
-                        toName: letterData.toName,
-                        toAddr: letterData.toAddr,
-                        toPin: letterData.toPin,
-                        toMobile: letterData.toMobile,
-                        empFrom: letterData.empFrom,
-                        delDate: new Date(letterData.delDate),
-                        urgency: letterData.urgency,
-                        courierDocs: letterData.attachments ?? [],
-                        status: 0,
-                    })
-                    .returning();
-                courierId = courier.id;
-            }
-        }
-
-        // Build update payload
-        const updatePayload: Partial<NewLeadFollowup> = {
-            courierId,
-            updatedAt: new Date(),
-        };
-
-        if ('body' in data)             updatePayload.body = data.body;
-        if ('veResponsibility' in data) updatePayload.veResponsibility = data.veResponsibility ?? null;
-        if ('attachments' in data)      updatePayload.attachments = data.attachments ?? [];
-        if ('nextFollowupDate' in data) updatePayload.nextFollowupDate = data.nextFollowupDate ? new Date(data.nextFollowupDate) : null;
-        if ('frequency' in data)        updatePayload.frequency = data.frequency ?? null;
-
-        // Update followup
-        const [updatedFollowup] = await tx
-            .update(leadFollowups)
-            .set(updatePayload)
-            .where(eq(leadFollowups.id, id))
-            .returning();
-
-        // Update contacts for call/visit
-        if (
-            (data.type === 'call' || data.type === 'visit') &&
-            'contacts' in data
-        ) {
-            // Delete old contacts
-            await tx
-                .delete(leadContacts)
-                .where(eq(leadContacts.followupId, id));
-
-            // Insert new contacts
-            if ((data as CallFollowupDto | VisitFollowupDto).contacts.length > 0) {
-                const contactSource = data.type === 'call' ? 'call_followup' : 'visit_followup';
-                const contactsPayload = (data as CallFollowupDto | VisitFollowupDto)
-                    .contacts
-                    .map((contact: ContactDto) => ({
-                        leadId: updatedFollowup.leadId,
-                        followupId: id,
-                        name: contact.name,
-                        designation: contact.designation ?? null,
-                        phone: contact.phone ?? null,
-                        email: contact.email ?? null,
-                        source: contactSource as 'call_followup' | 'visit_followup',
-                    }));
-
-                await tx.insert(leadContacts).values(contactsPayload);
-            }
-        }
-
-        return updatedFollowup;
-    });
-}
-
     // ─── Delete Followup ──────────────────────────────────────────────
+    // ── UNCHANGED ────────────────────────────────────────────────────
 
     async delete(id: number): Promise<void> {
         const followup = await this.findById(id);

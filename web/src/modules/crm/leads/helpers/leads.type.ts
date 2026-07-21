@@ -45,7 +45,7 @@ export interface LeadWithNames extends Lead {
     bdPersonName?: string | null;
     allocatedTeName?: string | null;
     allocatedByName?: string | null;
-    nextFollowupDate?: string | null; // ✅ Latest next followup date from lead_followups
+    nextFollowupDate?: string | null;
 }
 
 export interface CreateLeadRequest {
@@ -82,6 +82,7 @@ export interface LeadListParams {
     search?: string;
     priority?: string;
     status?: string;
+    team?: string;          // ✅ NEW
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 }

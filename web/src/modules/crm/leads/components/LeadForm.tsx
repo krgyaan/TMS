@@ -82,11 +82,14 @@ const fetchIndustries = async (): Promise<Option[]> => {
 };
 
 const fetchTeams = async (): Promise<Option[]> => {
-    const res = await axiosInstance.get('/teams');
-    return res.data.map((t: { id: number; name: string }) => ({
-        label: t.name,
-        value: t.id.toString(),
-    }));
+    const res = await axiosInstance.get("/teams");
+
+    return res.data
+        .filter((team: { id: number }) => [1, 2, 6].includes(team.id))
+        .map((team: { id: number; name: string }) => ({
+            label: team.name,
+            value: team.id.toString(),
+        }));
 };
 
 const SectionSeparator = ({ text }: { text: string }) => (

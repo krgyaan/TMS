@@ -7,7 +7,7 @@ import { leadIndustries } from '@db/schemas/master/lead-industries.schema';
 import { leadTypes } from '@db/schemas/crm/lead-types.schema';
 import { teams } from '@db/schemas/master/teams.schema';
 import { users } from '@db/schemas/auth/users.schema';
-import { and, asc, desc, eq, isNotNull, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, isNotNull, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { CreateLeadDto, UpdateLeadDto, AllocateLeadDto, DeleteLeadDto } from './dto/lead.dto';
 
@@ -17,6 +17,7 @@ export type LeadListFilters = {
     search?: string;
     priority?: string;
     status?: string;
+    team?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 };
@@ -34,7 +35,6 @@ export type LeadWithNames = Lead & {
 const bdUser = alias(users, 'bd_user');
 const teUser = alias(users, 'te_user');
 const allocatedByUser = alias(users, 'allocated_by_user');
-const latestFollowup = alias(leadFollowups, 'latest_followup');
 
 @Injectable()
 export class LeadsService {
@@ -44,22 +44,12 @@ export class LeadsService {
 
     // ─── Private Helpers ──────────────────────────────────────────────
 
-    private getLeadBaseSelect() {
-        return {
-            leads,
-            industryName: leadIndustries.name,
-            typeName: leadTypes.name,
-            teamName: teams.name,
-            bdPersonName: bdUser.name,
-            allocatedTeName: teUser.name,
-            allocatedByName: allocatedByUser.name,
-            nextFollowupDate: latestFollowup.nextFollowupDate,
-        };
-    }
-
-    private getBaseQueryBuilder() {
-        // ── Subquery: latest followup per lead that has nextFollowupDate ──
-        const latestFollowupSubquery = this.db
+    /**
+     * Creates the subquery for the latest followup per lead.
+     * This is reused in count and data queries.
+     */
+    private getLatestFollowupSubquery() {
+        return this.db
             .selectDistinctOn([leadFollowups.leadId], {
                 leadId: leadFollowups.leadId,
                 nextFollowupDate: leadFollowups.nextFollowupDate,
@@ -72,40 +62,7 @@ export class LeadsService {
                 desc(leadFollowups.id),
             )
             .as('latest_followup');
-
-        return this.db
-            .select(this.getLeadBaseSelect())
-            .from(leads)
-            .leftJoin(leadIndustries, eq(leadIndustries.id, sql`CAST(${leads.industry} AS BIGINT)`))
-            .leftJoin(leadTypes, eq(leadTypes.id, sql`CAST(${leads.type} AS BIGINT)`))
-            .leftJoin(teams, eq(teams.id, sql`CAST(${leads.team} AS BIGINT)`))
-            .leftJoin(bdUser, eq(bdUser.id, leads.bdPerson))
-            .leftJoin(teUser, eq(teUser.id, leads.allocatedTe))
-            .leftJoin(allocatedByUser, eq(allocatedByUser.id, leads.allocatedBy))
-            .leftJoin(latestFollowupSubquery, eq(latestFollowupSubquery.leadId, leads.id));
     }
-
-    private mapJoinedRow = (row: {
-        leads: typeof leads.$inferSelect;
-        industryName: string | null;
-        typeName: string | null;
-        teamName: string | null;
-        bdPersonName: string | null;
-        allocatedTeName: string | null;
-        allocatedByName: string | null;
-        nextFollowupDate: Date | null;
-    }): LeadWithNames => ({
-        ...row.leads,
-        industryName: row.industryName ?? null,
-        typeName: row.typeName ?? null,
-        teamName: row.teamName ?? null,
-        bdPersonName: row.bdPersonName ?? null,
-        allocatedTeName: row.allocatedTeName ?? null,
-        allocatedByName: row.allocatedByName ?? null,
-        nextFollowupDate: row.nextFollowupDate
-            ? row.nextFollowupDate.toISOString()
-            : null,
-    });
 
     // ─── Public Methods ───────────────────────────────────────────────
 
@@ -117,42 +74,50 @@ export class LeadsService {
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
 
+        const latestFollowupSubquery = this.getLatestFollowupSubquery();
         const conditions: SQL[] = [];
 
-        // ── Status filter (disqualified tab) ──────────────────────────
+        // 1. Disqualified Filter
         if (filters?.status === 'disqualified') {
             conditions.push(eq(leads.isDeleted, true));
         } else {
             conditions.push(eq(leads.isDeleted, false));
         }
 
-        // ── Search filter ─────────────────────────────────────────────
+        // 2. Search Filter
         if (filters?.search) {
-            const searchStr = `%${filters.search}%`;
             conditions.push(
-                sql`(
-                    ${leads.companyName} ILIKE ${searchStr} OR
-                    ${leads.name} ILIKE ${searchStr} OR
-                    ${leads.email} ILIKE ${searchStr} OR
-                    ${leads.phone} ILIKE ${searchStr}
-                )`
+                or(
+                    ilike(leads.companyName, `%${filters.search}%`),
+                    ilike(leads.name, `%${filters.search}%`),
+                    ilike(leads.email, `%${filters.search}%`),
+                    ilike(leads.phone, `%${filters.search}%`),
+                ) as SQL
             );
         }
 
-        // ── Priority filter ───────────────────────────────────────────
+        // 3. Priority Filter
         if (filters?.priority) {
             conditions.push(eq(leads.leadPriority, filters.priority));
         }
 
+        // 4. Team Filter (via name)
+        if (filters?.team) {
+            conditions.push(eq(teams.name, filters.team));
+        }
+
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
+        // ── Count Query ───────────────────────────────────────────────
         const [countResult] = await this.db
             .select({ count: sql<number>`count(*)` })
             .from(leads)
+            .leftJoin(teams, eq(teams.id, sql`NULLIF(${leads.team}, '')::BIGINT`))
             .where(whereClause);
 
         const total = Number(countResult?.count || 0);
 
+        // ── Data Query ────────────────────────────────────────────────
         const sortFn = filters?.sortOrder === 'desc' ? desc : asc;
         let orderByClause: SQL<unknown>;
 
@@ -164,25 +129,82 @@ export class LeadsService {
             default:            orderByClause = desc(leads.createdAt);
         }
 
-        const rows = await this.getBaseQueryBuilder()
+        const rows = await this.db
+            .select({
+                leads,
+                industryName: leadIndustries.name,
+                typeName: leadTypes.name,
+                teamName: teams.name,
+                bdPersonName: bdUser.name,
+                allocatedTeName: teUser.name,
+                allocatedByName: allocatedByUser.name,
+                nextFollowupDate: latestFollowupSubquery.nextFollowupDate, // Qualified from subquery
+            })
+            .from(leads)
+            .leftJoin(leadIndustries, eq(leadIndustries.id, sql`NULLIF(${leads.industry}, '')::BIGINT`))
+            .leftJoin(leadTypes, eq(leadTypes.id, sql`NULLIF(${leads.type}, '')::BIGINT`))
+            .leftJoin(teams, eq(teams.id, sql`NULLIF(${leads.team}, '')::BIGINT`))
+            .leftJoin(bdUser, eq(bdUser.id, leads.bdPerson))
+            .leftJoin(teUser, eq(teUser.id, leads.allocatedTe))
+            .leftJoin(allocatedByUser, eq(allocatedByUser.id, leads.allocatedBy))
+            .leftJoin(latestFollowupSubquery, eq(latestFollowupSubquery.leadId, leads.id))
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
             .offset(offset);
 
         return {
-            data: rows.map(this.mapJoinedRow),
+            data: rows.map(row => ({
+                ...row.leads,
+                industryName: row.industryName ?? null,
+                typeName: row.typeName ?? null,
+                teamName: row.teamName ?? null,
+                bdPersonName: row.bdPersonName ?? null,
+                allocatedTeName: row.allocatedTeName ?? null,
+                allocatedByName: row.allocatedByName ?? null,
+                nextFollowupDate: row.nextFollowupDate ? row.nextFollowupDate.toISOString() : null,
+            })),
             meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
     }
 
     async findById(id: number): Promise<LeadWithNames> {
-        const rows = await this.getBaseQueryBuilder()
+        const latestFollowupSubquery = this.getLatestFollowupSubquery();
+        
+        const [row] = await this.db
+            .select({
+                leads,
+                industryName: leadIndustries.name,
+                typeName: leadTypes.name,
+                teamName: teams.name,
+                bdPersonName: bdUser.name,
+                allocatedTeName: teUser.name,
+                allocatedByName: allocatedByUser.name,
+                nextFollowupDate: latestFollowupSubquery.nextFollowupDate,
+            })
+            .from(leads)
+            .leftJoin(leadIndustries, eq(leadIndustries.id, sql`NULLIF(${leads.industry}, '')::BIGINT`))
+            .leftJoin(leadTypes, eq(leadTypes.id, sql`NULLIF(${leads.type}, '')::BIGINT`))
+            .leftJoin(teams, eq(teams.id, sql`NULLIF(${leads.team}, '')::BIGINT`))
+            .leftJoin(bdUser, eq(bdUser.id, leads.bdPerson))
+            .leftJoin(teUser, eq(teUser.id, leads.allocatedTe))
+            .leftJoin(allocatedByUser, eq(allocatedByUser.id, leads.allocatedBy))
+            .leftJoin(latestFollowupSubquery, eq(latestFollowupSubquery.leadId, leads.id))
             .where(eq(leads.id, id))
             .limit(1);
 
-        if (!rows[0]) throw new NotFoundException(`Lead with ID ${id} not found`);
-        return this.mapJoinedRow(rows[0]);
+        if (!row) throw new NotFoundException(`Lead with ID ${id} not found`);
+        
+        return {
+            ...row.leads,
+            industryName: row.industryName ?? null,
+            typeName: row.typeName ?? null,
+            teamName: row.teamName ?? null,
+            bdPersonName: row.bdPersonName ?? null,
+            allocatedTeName: row.allocatedTeName ?? null,
+            allocatedByName: row.allocatedByName ?? null,
+            nextFollowupDate: row.nextFollowupDate ? row.nextFollowupDate.toISOString() : null,
+        };
     }
 
     async exists(id: number): Promise<boolean> {
@@ -207,8 +229,6 @@ export class LeadsService {
     }
 
     async update(id: number, data: UpdateLeadDto): Promise<Lead> {
-        await this.findById(id);
-
         const [updated] = await this.db
             .update(leads)
             .set({ ...data as Partial<NewLead>, updatedAt: new Date() })
@@ -219,11 +239,7 @@ export class LeadsService {
         return updated;
     }
 
-    // ─── Allocate TE ──────────────────────────────────────────────────
-
     async allocate(id: number, data: AllocateLeadDto, allocatedBy: number): Promise<Lead> {
-        await this.findById(id);
-
         const [updated] = await this.db
             .update(leads)
             .set({
@@ -240,11 +256,7 @@ export class LeadsService {
         return updated;
     }
 
-    // ─── Soft Delete with reason ──────────────────────────────────────
-
     async delete(id: number, data?: DeleteLeadDto): Promise<void> {
-        await this.findById(id);
-
         await this.db
             .update(leads)
             .set({
