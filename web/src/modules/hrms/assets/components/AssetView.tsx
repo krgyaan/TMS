@@ -6,7 +6,10 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHrmsAssetDetails, useHrmsAssetHistory } from "@/hooks/api/useHrmsAssets";
 import { format } from "date-fns";
-import { AlertCircle, ArrowLeft, Calendar, CheckCircle2, Clock, Download, Edit, FileText, History, Image as ImageIcon, MapPin, Package, Shield, User, Wrench } from "lucide-react";
+import { 
+  AlertCircle, ArrowLeft, Calendar, CheckCircle2, Clock, Download, FileText, 
+  History, Image as ImageIcon, MapPin, Package, Shield, User, Wrench 
+} from "lucide-react";
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { ASSET_TYPE } from "../constants";
