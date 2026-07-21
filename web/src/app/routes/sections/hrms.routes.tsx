@@ -41,6 +41,9 @@ export default function HrmsRoutes() {
             <Route path="admin/assets/view/:id" element={<AssetShowPage />} />
             <Route path="admin/assets/status/:id" element={<AssetStatusPage />} />
             <Route path="admin/assets/edit/:id" element={<AssetEditPage />} />
+
+            <Route path="training" element={<TrainingDashboard />} />
+            <Route path="training/upload-video" element={ <UploadVideo />} />
         </Routes>
     );
 }
