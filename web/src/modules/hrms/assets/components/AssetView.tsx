@@ -135,13 +135,8 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6 max-w-6xl">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button variant="outline" size="sm" onClick={() => navigate(paths.hrms.assets.list)} className="flex items-center space-x-2">
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back</span>
-          </Button>
+    <Card>
+        <CardHeader className="flex items-center justify-between space-x-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
               <span className="font-mono text-primary">{asset.assetCode}</span>
@@ -151,15 +146,14 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
               {asset.assetTypeLabel || asset.assetType} • {asset.brand} {asset.model}
             </p>
           </div>
-        </div>
-        <Button onClick={() => navigate(paths.hrms.assets.edit(assetId))} size="lg">
-          <Edit className="h-4 w-4 mr-2" />
-          Edit Asset
-        </Button>
-      </div>
+          <Button variant="outline" size="sm" onClick={() => navigate(paths.hrms.assets.list)} className="flex items-center space-x-2">
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back</span>
+          </Button>
+        </CardHeader>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+      <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" /> Asset Information</CardTitle>
@@ -350,6 +344,61 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
             </Card>
           )}
 
+          {asset.assetPhotos && asset.assetPhotos.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base"><ImageIcon className="h-4 w-4" /> Asset Photos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-6 gap-2">
+                  {asset.assetPhotos.map((photo: string, idx: number) => (
+                    <a
+                      key={idx}
+                      href={getAssetFileUrl(photo)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="aspect-square rounded-lg overflow-hidden border hover:opacity-80 transition-opacity"
+                    >
+                      <img src={getAssetFileUrl(photo)} alt={`Asset ${idx + 1}`} className="w-full h-full object-cover" />
+                    </a>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base"><FileText className="h-4 w-4" /> Documents</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {asset.purchaseInvoiceUrl && <DocumentLink label="Purchase Invoice" url={asset.purchaseInvoiceUrl} />}
+              {asset.warrantyCardUrl && <DocumentLink label="Warranty Card" url={asset.warrantyCardUrl} />}
+              {asset.assignmentFormUrl && <DocumentLink label="Assignment Form" url={asset.assignmentFormUrl} />}
+              {!asset.purchaseInvoiceUrl && !asset.warrantyCardUrl && !asset.assignmentFormUrl && (
+                <p className="text-sm text-muted-foreground text-center py-4">No documents attached</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Metadata</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Created</span>
+                <span className="font-medium">{formatDate(asset.createdAt)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Last Updated</span>
+                <span className="font-medium">{formatDate(asset.updatedAt)}</span>
+              </div>
+            </CardContent>
+          </Card>
+
           {history.length > 0 && (
             <Card>
               <CardHeader>
@@ -393,63 +442,8 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
             </Card>
           )}
         </div>
-
-        <div className="space-y-6">
-          {asset.assetPhotos && asset.assetPhotos.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base"><ImageIcon className="h-4 w-4" /> Asset Photos</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-2">
-                  {asset.assetPhotos.map((photo: string, idx: number) => (
-                    <a
-                      key={idx}
-                      href={getAssetFileUrl(photo)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="aspect-square rounded-lg overflow-hidden border hover:opacity-80 transition-opacity"
-                    >
-                      <img src={getAssetFileUrl(photo)} alt={`Asset ${idx + 1}`} className="w-full h-full object-cover" />
-                    </a>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base"><FileText className="h-4 w-4" /> Documents</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {asset.purchaseInvoiceUrl && <DocumentLink label="Purchase Invoice" url={asset.purchaseInvoiceUrl} />}
-              {asset.warrantyCardUrl && <DocumentLink label="Warranty Card" url={asset.warrantyCardUrl} />}
-              {asset.assignmentFormUrl && <DocumentLink label="Assignment Form" url={asset.assignmentFormUrl} />}
-              {!asset.purchaseInvoiceUrl && !asset.warrantyCardUrl && !asset.assignmentFormUrl && (
-                <p className="text-sm text-muted-foreground text-center py-4">No documents attached</p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Metadata</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Created</span>
-                <span className="font-medium">{formatDate(asset.createdAt)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Last Updated</span>
-                <span className="font-medium">{formatDate(asset.updatedAt)}</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };
 
