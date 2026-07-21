@@ -1,10 +1,13 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { eq, count, desc } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { employeeAssets, type NewEmployeeAsset, type EmployeeAsset } from "@/db/schemas/hrms/employee-assets.schema";
 import { assetTrackingHistory, type NewAssetTrackingHistory } from "@/db/schemas/hrms/asset-tracking-history.schema";
 import { users } from "@/db/schemas/auth/users.schema";
+
+const assignedByUser = alias(users, "assigned_by_user");
 
 // ─── Label Maps ───────────────────────────────────────────────────────────────
 
@@ -149,27 +152,51 @@ export class AssetsService {
   async findAll(): Promise<any[]> {
     const rows = await this.db
       .select({
-        asset: employeeAssets,
+        id: employeeAssets.id,
+        assetCode: employeeAssets.assetCode,
+        assetType: employeeAssets.assetType,
+        assetCategory: employeeAssets.assetCategory,
+        brand: employeeAssets.brand,
+        model: employeeAssets.model,
+        serialNumber: employeeAssets.serialNumber,
+        assetCondition: employeeAssets.assetCondition,
+        assetLocation: employeeAssets.assetLocation,
+        assetStatus: employeeAssets.assetStatus,
+        assignedDate: employeeAssets.assignedDate,
+        returnCondition: employeeAssets.returnCondition,
+        userId: employeeAssets.userId,
+        assignedBy: employeeAssets.assignedBy,
         assignedTo: users.name,
+        assignedByName: assignedByUser.name,
       })
       .from(employeeAssets)
-      .leftJoin(users, eq(employeeAssets.userId, users.id));
+      .leftJoin(users, eq(employeeAssets.userId, users.id))
+      .leftJoin(assignedByUser, eq(employeeAssets.assignedBy, assignedByUser.id));
 
-    return rows.map(row => {
-      // Merge user name into the asset object for labels resolution
-      return this.resolveLabels({
-        ...row.asset,
-        assignedTo: row.assignedTo
-      } as any);
-    });
+    return rows.map(row => this.resolveLabels(row as any));
   }
 
   async findByUserId(userId: number): Promise<any[]> {
     const rows = await this.db
-      .select()
+      .select({
+        id: employeeAssets.id,
+        assetCode: employeeAssets.assetCode,
+        assetType: employeeAssets.assetType,
+        assetCategory: employeeAssets.assetCategory,
+        brand: employeeAssets.brand,
+        model: employeeAssets.model,
+        serialNumber: employeeAssets.serialNumber,
+        assetCondition: employeeAssets.assetCondition,
+        assetLocation: employeeAssets.assetLocation,
+        assetStatus: employeeAssets.assetStatus,
+        assignedDate: employeeAssets.assignedDate,
+        returnCondition: employeeAssets.returnCondition,
+        userId: employeeAssets.userId,
+        assignedBy: employeeAssets.assignedBy,
+      })
       .from(employeeAssets)
       .where(eq(employeeAssets.userId, userId));
-    return rows.map(row => this.resolveLabels(row));
+    return rows.map(row => this.resolveLabels(row as any));
   }
 
   // Returns raw values (for forms/edits)
@@ -185,11 +212,59 @@ export class AssetsService {
   // Returns with labels (for display)
   async findByIdWithLabels(id: number): Promise<any | null> {
     const rows = await this.db
-      .select()
+      .select({
+        id: employeeAssets.id,
+        assetCode: employeeAssets.assetCode,
+        assetType: employeeAssets.assetType,
+        assetCategory: employeeAssets.assetCategory,
+        brand: employeeAssets.brand,
+        model: employeeAssets.model,
+        serialNumber: employeeAssets.serialNumber,
+        imeiNumber: employeeAssets.imeiNumber,
+        licenseKey: employeeAssets.licenseKey,
+        assetValue: employeeAssets.assetValue,
+        assetCondition: employeeAssets.assetCondition,
+        assetLocation: employeeAssets.assetLocation,
+        assetStatus: employeeAssets.assetStatus,
+        assignedDate: employeeAssets.assignedDate,
+        assignedBy: employeeAssets.assignedBy,
+        expectedReturnDate: employeeAssets.expectedReturnDate,
+        returnDate: employeeAssets.returnDate,
+        returnCondition: employeeAssets.returnCondition,
+        purpose: employeeAssets.purpose,
+        userId: employeeAssets.userId,
+        warrantyFrom: employeeAssets.warrantyFrom,
+        warrantyTo: employeeAssets.warrantyTo,
+        insuranceDetails: employeeAssets.insuranceDetails,
+        accessories: employeeAssets.accessories,
+        typeSpecs: employeeAssets.typeSpecs,
+        assetPhotos: employeeAssets.assetPhotos,
+        specifications: employeeAssets.specifications,
+        purchaseInvoiceUrl: employeeAssets.purchaseInvoiceUrl,
+        warrantyCardUrl: employeeAssets.warrantyCardUrl,
+        assignmentFormUrl: employeeAssets.assignmentFormUrl,
+        purchaseDate: employeeAssets.purchaseDate,
+        purchasePrice: employeeAssets.purchasePrice,
+        purchaseFrom: employeeAssets.purchaseFrom,
+        damageRemarks: employeeAssets.damageRemarks,
+        deductionAmount: employeeAssets.deductionAmount,
+        disposalDate: employeeAssets.disposalDate,
+        disposalType: employeeAssets.disposalType,
+        disposalReason: employeeAssets.disposalReason,
+        disposalAmount: employeeAssets.disposalAmount,
+        disposalApprovedBy: employeeAssets.disposalApprovedBy,
+        remarks: employeeAssets.remarks,
+        createdAt: employeeAssets.createdAt,
+        updatedAt: employeeAssets.updatedAt,
+        assignedTo: users.name,
+        assignedByName: assignedByUser.name,
+      })
       .from(employeeAssets)
+      .leftJoin(users, eq(employeeAssets.userId, users.id))
+      .leftJoin(assignedByUser, eq(employeeAssets.assignedBy, assignedByUser.id))
       .where(eq(employeeAssets.id, id))
       .limit(1);
-    return rows[0] ? this.resolveLabels(rows[0]) : null;
+    return rows[0] ? this.resolveLabels(rows[0] as any) : null;
   }
 
   async create(data: NewEmployeeAsset): Promise<EmployeeAsset> {

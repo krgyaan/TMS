@@ -51,10 +51,7 @@ export default function AssetListPage() {
         headerName: "Asset Code",
         width: 150,
         sortable: true,
-        filter: true,
-        cellRenderer: (params: any) => (
-          <span className="font-mono text-sm font-medium text-primary">{params.value || "—"}</span>
-        ),
+        filter: true
       },
       {
         field: "brand",
@@ -74,6 +71,14 @@ export default function AssetListPage() {
         ),
       },
       {
+        field: "assignedByName",
+        headerName: "Assigned By",
+        width: 150,
+        sortable: true,
+        filter: true,
+        cellRenderer: (params: any) => <span className="font-medium">{params.value ?? "—"}</span>,
+      },
+      {
         field: "assignedTo",
         headerName: "Assigned To",
         width: 150,
@@ -82,6 +87,26 @@ export default function AssetListPage() {
         cellRenderer: (params: any) => <span className="font-medium">{params.value ?? "—"}</span>,
       },
       dateCol<any>("assignedDate", { includeTime: false }, { headerName: "Assigned Date", width: 150 }),
+      {
+        field: "assetCategoryLabel",
+        headerName: "Category",
+        width: 130,
+        sortable: true,
+        filter: true,
+        cellRenderer: (params: any) => <span>{params.value ?? "—"}</span>,
+      },
+      {
+        field: "assetConditionLabel",
+        headerName: "Condition",
+        width: 110,
+        sortable: true,
+        filter: true,
+        cellRenderer: (params: any) => {
+          const val = params.value;
+          if (!val) return <span className="text-muted-foreground">—</span>;
+          return <Badge variant="secondary">{val}</Badge>;
+        },
+      },
       {
         field: "assetStatus",
         headerName: "Status",

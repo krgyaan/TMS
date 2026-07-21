@@ -17,6 +17,7 @@ export interface EmployeeAsset {
     assetConditionLabel?: string;
     assignedDate: string;
     assignedBy?: number;
+    assignedByName?: string;
     expectedReturnDate?: string;
     purpose?: string;
     assetLocation?: string;
@@ -24,9 +25,9 @@ export interface EmployeeAsset {
     warrantyFrom?: string;
     warrantyTo?: string;
     insuranceDetails?: string;
-  accessories?: string[];
-  typeSpecs?: Record<string, any>;
-  assetPhotos?: string[];
+    accessories?: string[];
+    typeSpecs?: Record<string, any>;
+    assetPhotos?: string[];
     purchaseInvoiceUrl?: string;
     warrantyCardUrl?: string;
     assignmentFormUrl?: string;
@@ -129,3 +130,4 @@ export interface AssetHistoryEntry {
 }
 
 export const MOBILE_TYPES = ["mobile", "sim_card"];
+export const BRANDLESS_TYPES = ["sim_card", "id_card", "access_card"];

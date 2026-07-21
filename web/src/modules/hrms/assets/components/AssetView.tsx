@@ -6,9 +6,9 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHrmsAssetDetails, useHrmsAssetHistory } from "@/hooks/api/useHrmsAssets";
 import { format } from "date-fns";
-import { 
-  AlertCircle, ArrowLeft, Calendar, CheckCircle2, Clock, Download, FileText, 
-  History, Image as ImageIcon, MapPin, Package, Shield, User, Wrench 
+import {
+  AlertCircle, ArrowLeft, Calendar, CheckCircle2, Clock, Download, FileText,
+  History, Image as ImageIcon, MapPin, Package, Shield, User, Wrench
 } from "lucide-react";
 import React from "react";
 import { useNavigate } from "react-router-dom";
@@ -139,21 +139,21 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
 
   return (
     <Card>
-        <CardHeader className="flex items-center justify-between space-x-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
-              <span className="font-mono text-primary">{asset.assetCode}</span>
-              {getStatusBadge(asset.assetStatusLabel)}
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              {asset.assetTypeLabel || asset.assetType} • {asset.brand} {asset.model}
-            </p>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => navigate(paths.hrms.assets.list)} className="flex items-center space-x-2">
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back</span>
-          </Button>
-        </CardHeader>
+      <CardHeader className="flex items-center justify-between space-x-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
+            <span className="font-mono text-primary">{asset.assetCode}</span>
+            {getStatusBadge(asset.assetStatusLabel)}
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {asset.assetTypeLabel || asset.assetType} • {asset.brand} {asset.model}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => navigate(paths.hrms.assets.list)} className="flex items-center space-x-2">
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back</span>
+        </Button>
+      </CardHeader>
 
       <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
@@ -207,6 +207,17 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
                   </div>
                 </>
               )}
+              {asset.accessories && asset.accessories.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <Separator className="my-4" />
+                  <p className="text-sm font-medium text-muted-foreground">Accessories</p>
+                  <div className="flex flex-wrap gap-2">
+                    {asset.accessories.map((item: string, idx: number) => (
+                      <Badge key={idx} variant="secondary">{item}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -216,8 +227,8 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-6">
-                <InfoField label="Assigned To" value={`EMP-${asset.userId}`} />
-                <InfoField label="Assigned By" value={asset.assignedBy ? `EMP-${asset.assignedBy}` : undefined} />
+                <InfoField label="Assigned To" value={asset.assignedTo || "N/A"} />
+                <InfoField label="Assigned By" value={asset.assignedByName || "N/A"} />
                 <InfoField label="Assigned Date" value={formatDate(asset.assignedDate)} icon={<Calendar className="h-4 w-4" />} />
                 <InfoField label="Expected Return" value={formatDate(asset.expectedReturnDate)} icon={<Calendar className="h-4 w-4" />} />
                 <InfoField label="Location" value={asset.assetLocationLabel || asset.assetLocation} icon={<MapPin className="h-4 w-4" />} />
@@ -255,21 +266,6 @@ const AssetView: React.FC<AssetViewProps> = ({ assetId }) => {
               )}
             </CardContent>
           </Card>
-
-          {asset.accessories && asset.accessories.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" /> Accessories</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {asset.accessories.map((item: string, idx: number) => (
-                      <Badge key={idx} variant="secondary">{item}</Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {asset.assetStatus === "returned" && (
             <Card>
