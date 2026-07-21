@@ -10,8 +10,10 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { NumberInput } from "@/components/form/NumberInput";
 import { SelectField } from "@/components/form/SelectField";
 import { TenderFileUploader } from "@/components/tender-file-upload";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useUploadResult, useTenderResultByTenderId } from "@/hooks/api/useTenderResults";
 import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
+import { toast } from "sonner";
 
 interface UploadResultFormPageProps {
     tenderId: number;
@@ -67,6 +69,7 @@ export default function UploadResultFormPage({ tenderId, tenderDetails, isEditMo
             technicallyQualified: 'Yes',
             disqualificationReason: '',
             qualifiedPartiesCount: '',
+            uploadLineItemsNow: false,
             details: isItemWise ? ([] as DetailFormEntry[]) : [{ ...defaultDetail }],
         },
     });
@@ -83,12 +86,14 @@ export default function UploadResultFormPage({ tenderId, tenderDetails, isEditMo
 
     useEffect(() => {
         if (existingResult) {
+            const hasDetails = isEditMode && existingResult.details && existingResult.details.length > 0;
             reset({
                 technicallyQualified: ['Yes', 'No'].includes(existingResult.technicallyQualified ?? '')
                     ? (existingResult.technicallyQualified ?? 'Yes') : 'Yes',
                 disqualificationReason: existingResult.disqualificationReason ?? '',
                 qualifiedPartiesCount: existingResult.qualifiedPartiesCount ?? '',
-                details: isEditMode && existingResult.details
+                uploadLineItemsNow: hasDetails,
+                details: hasDetails
                     ? existingResult.details.map((d: any) => ({
                         result: d.result ?? '',
                         resultReason: d.resultReason ?? '',
@@ -122,6 +127,39 @@ export default function UploadResultFormPage({ tenderId, tenderDetails, isEditMo
     const onSubmit = handleSubmit(async (data) => {
         setSubmitting(true);
         try {
+            if (data.uploadLineItemsNow) {
+                if (!data.details || data.details.length === 0) {
+                    toast.error('Please add at least one line item result');
+                    setSubmitting(false);
+                    return;
+                }
+                for (let i = 0; i < data.details.length; i++) {
+                    const detail = data.details[i];
+                    if (!detail.result) {
+                        toast.error(`Line item ${i + 1}: Result is required`);
+                        setSubmitting(false);
+                        return;
+                    }
+                    if (!detail.resultReason?.trim()) {
+                        toast.error(`Line item ${i + 1}: Result reason is required`);
+                        setSubmitting(false);
+                        return;
+                    }
+                    if (detail.result !== 'Cancelled') {
+                        if (detail.l1Price == null || isNaN(Number(detail.l1Price))) {
+                            toast.error(`Line item ${i + 1}: L1 Price is required`);
+                            setSubmitting(false);
+                            return;
+                        }
+                        if (detail.ourPrice == null || isNaN(Number(detail.ourPrice))) {
+                            toast.error(`Line item ${i + 1}: Our Price is required`);
+                            setSubmitting(false);
+                            return;
+                        }
+                    }
+                }
+            }
+
             const submitData: any = {
                 technicallyQualified: data.technicallyQualified,
             };
@@ -206,47 +244,60 @@ export default function UploadResultFormPage({ tenderId, tenderDetails, isEditMo
                         )}
 
                         {technicallyQualified === 'Yes' && (
-                            <>
-                                <div>
-                                    <label className="text-sm font-medium mb-1 block">No. of Qualified Parties</label>
-                                    <Input
-                                        value={watch('qualifiedPartiesCount')}
-                                        onChange={(e) => setValue('qualifiedPartiesCount', e.target.value)}
-                                        placeholder="e.g., 5 or 'not known'"
-                                    />
-                                </div>
-
-                                <div className="flex gap-2 items-end">
-                                    <div className="flex-1">
-                                        <label className="text-sm font-medium mb-1 block">Name of Qualified Parties</label>
+                            <div className="col-span-4">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div>
+                                        <label className="text-sm font-medium mb-1 block">No. of Qualified Parties</label>
                                         <Input
-                                            value={newPartyName}
-                                            onChange={(e) => setNewPartyName(e.target.value)}
-                                            placeholder="Enter party name"
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') { e.preventDefault(); addPartyName(); }
-                                            }}
+                                            value={watch('qualifiedPartiesCount')}
+                                            onChange={(e) => setValue('qualifiedPartiesCount', e.target.value)}
+                                            placeholder="e.g., 5 or 'not known'"
                                         />
                                     </div>
-                                    <Button type="button" onClick={addPartyName} size="icon">
-                                        <Plus className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                                {qualifiedPartiesNames.length > 0 && (
-                                    <div className="flex flex-wrap gap-2">
-                                        {qualifiedPartiesNames.map((name, index) => (
-                                            <Badge key={index} variant="secondary" className="gap-1">
-                                                {name}
-                                                <button onClick={() => removePartyName(index)} className="ml-1">&times;</button>
-                                            </Badge>
-                                        ))}
+                                    <div>
+                                        <div className="flex gap-2 items-end">
+                                            <div className="flex-1">
+                                                <label className="text-sm font-medium mb-1 block">Name of Qualified Parties</label>
+                                                <Input
+                                                    value={newPartyName}
+                                                    onChange={(e) => setNewPartyName(e.target.value)}
+                                                    placeholder="Enter party name"
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') { e.preventDefault(); addPartyName(); }
+                                                    }}
+                                                />
+                                            </div>
+                                            <Button type="button" onClick={addPartyName} size="icon">
+                                                <Plus className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </div>
-                                )}
-                            </>
+                                    {qualifiedPartiesNames.length > 0 && (
+                                        <div className="">
+                                            {qualifiedPartiesNames.map((name, index) => (
+                                                <Badge key={index} variant="secondary" className="gap-1">
+                                                    {name}
+                                                    <button onClick={() => removePartyName(index)} className="ml-1">&times;</button>
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="mt-4 flex items-center gap-2">
+                                    <Checkbox
+                                        id="uploadLineItemsNow"
+                                        checked={watch('uploadLineItemsNow')}
+                                        onCheckedChange={(checked) => setValue('uploadLineItemsNow', checked === true)}
+                                    />
+                                    <label htmlFor="uploadLineItemsNow" className="text-sm font-medium cursor-pointer select-none">
+                                        Upload line item results now?
+                                    </label>
+                                </div>
+                            </div>
                         )}
                     </div>
 
-                    {technicallyQualified === 'Yes' && (
+                    {technicallyQualified === 'Yes' && watch('uploadLineItemsNow') && (
                         <div className="space-y-4">
                             <div className="flex items-center justify-between">
                                 <h4 className="font-semibold text-base text-primary border-b pb-2">
