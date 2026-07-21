@@ -325,7 +325,6 @@ const AssetStatusForm: React.FC<AssetStatusFormProps> = ({ assetId }) => {
             )}
 
             <div className="border rounded-lg border-dashed p-4 space-y-4">
-              <h3 className="text-lg font-semibold">Remarks</h3>
               <FieldWrapper control={control} name="remarks" label="Remarks">
                 {field => <Textarea {...field} placeholder="Additional notes..." rows={4} />}
               </FieldWrapper>

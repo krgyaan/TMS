@@ -68,7 +68,7 @@ export type EditAssetFormData = z.infer<typeof editAssetSchema>;
 
 export const statusUpdateSchema = z.object({
   assetStatus: z.string().min(1, "Status is required"),
-  userId: z.number().optional(),
+  userId: z.number().optional().nullable(),
   assignedDate: z.string().optional(),
   purpose: z.string().optional(),
   assetLocation: z.string().optional(),
@@ -98,6 +98,30 @@ export const statusUpdateSchema = z.object({
   disposalAmount: z.string().optional(),
   disposalApprovedBy: z.string().optional(),
   remarks: z.string().optional(),
+}).superRefine((data, ctx) => {
+  const s = data.assetStatus;
+  if (s === "assigned") {
+    if (data.userId == null) ctx.addIssue({ code: "custom", message: "Assignee is required", path: ["userId"] });
+    if (!data.assignedDate) ctx.addIssue({ code: "custom", message: "Assignment date is required", path: ["assignedDate"] });
+  }
+  if (s === "returned") {
+    if (!data.returnDate) ctx.addIssue({ code: "custom", message: "Return date is required", path: ["returnDate"] });
+    if (!data.returnCondition) ctx.addIssue({ code: "custom", message: "Return condition is required", path: ["returnCondition"] });
+  }
+  if (s === "damaged") {
+    if (!data.damageDate) ctx.addIssue({ code: "custom", message: "Damage date is required", path: ["damageDate"] });
+    if (!data.damageType) ctx.addIssue({ code: "custom", message: "Damage type is required", path: ["damageType"] });
+  }
+  if (s === "lost") {
+    if (!data.lostDate) ctx.addIssue({ code: "custom", message: "Date lost is required", path: ["lostDate"] });
+  }
+  if (s === "under_repair") {
+    if (!data.repairStartDate) ctx.addIssue({ code: "custom", message: "Repair start date is required", path: ["repairStartDate"] });
+  }
+  if (s === "disposed") {
+    if (!data.disposalDate) ctx.addIssue({ code: "custom", message: "Disposal date is required", path: ["disposalDate"] });
+    if (!data.disposalType) ctx.addIssue({ code: "custom", message: "Disposal type is required", path: ["disposalType"] });
+  }
 });
 
 export type StatusUpdateFormData = z.infer<typeof statusUpdateSchema>;
