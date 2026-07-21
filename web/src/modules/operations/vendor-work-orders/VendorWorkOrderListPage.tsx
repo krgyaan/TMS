@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { getShortId } from "@/lib/id-utils";
 import { useAllVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
 import type { VendorWorkOrderRow } from "./helpers/vwoForm.types";
 
@@ -58,7 +59,7 @@ const VendorWorkOrderListPage: React.FC = () => {
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <span>{p.value || "-"}</span>
+                            <span>{getShortId(p.value)}</span>
                         </TooltipTrigger>
                         <TooltipContent>{p.value}</TooltipContent>
                     </Tooltip>
@@ -200,7 +201,7 @@ const VendorWorkOrderListPage: React.FC = () => {
                     onGridReady={onGridReady}
                     gridOptions={{
                         pagination: true,
-                        paginationPageSize: 10,
+                        paginationPageSize: 100,
                         domLayout: "autoHeight",
                     }}
                 />

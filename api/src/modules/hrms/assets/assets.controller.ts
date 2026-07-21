@@ -28,7 +28,7 @@ const BaseAssetSchema = z.object({
   serialNumber: z.string().optional().nullable(),
   imeiNumber: z.string().optional().nullable(),
   licenseKey: z.string().optional().nullable(),
-  assetValue: z.string().optional().nullable(),
+  assetValue: z.coerce.number().optional().nullable(),
   assetCondition: z.string().optional(),
   assignedDate: z.coerce.date().optional(),
   assignedBy: z.coerce.number().optional().nullable(),
@@ -39,6 +39,7 @@ const BaseAssetSchema = z.object({
   warrantyTo: z.coerce.date().optional().nullable(),
   insuranceDetails: z.string().optional().nullable(),
   accessories: z.array(z.any()).optional().nullable(),
+  typeSpecs: z.record(z.string(), z.any()).optional(),
   assetPhotos: z.array(z.string()).optional().nullable(),
   purchaseInvoiceUrl: z.string().optional().nullable(),
   warrantyCardUrl: z.string().optional().nullable(),
@@ -47,9 +48,9 @@ const BaseAssetSchema = z.object({
   returnDate: optionalDate,
   returnCondition: z.string().optional().nullable(),
   damageRemarks: z.string().optional().nullable(),
-  deductionAmount: z.string().optional().nullable(),
+  deductionAmount: z.coerce.number().optional().nullable(),
   purchaseDate: optionalDate,
-  purchasePrice: z.string().optional().nullable(),
+  purchasePrice: z.coerce.number().optional().nullable(),
   purchaseFrom: z.string().optional().nullable(),
   remarks: z.string().optional().nullable(),
 });
@@ -59,32 +60,32 @@ const UpdateAssetSchema = BaseAssetSchema.partial();
 // Schema for status updates
 const StatusUpdateSchema = z.object({
   assetStatus: z.string(),
-  
+
   // Assignment
   userId: z.coerce.number().optional().nullable(),
   assignedDate: z.string().optional().nullable().transform(emptyToNull),
   expectedReturnDate: z.string().optional().nullable(),
   purpose: z.string().optional().nullable(),
   assetLocation: z.string().optional().nullable(),
-  
+
   // Return
   returnDate: z.string().optional().nullable().transform(emptyToNull),
   returnCondition: z.string().optional().nullable(),
-  
+
   // Damage
   damageDate: z.string().optional().nullable(),
   damageType: z.string().optional().nullable(),
   damageDescription: z.string().optional().nullable(),
   isRepairable: z.string().optional().nullable(),
   assetCondition: z.string().optional().nullable(),
-  
+
   // Loss
   lostDate: z.string().optional().nullable(),
   lostLocation: z.string().optional().nullable(),
   lostCircumstances: z.string().optional().nullable(),
   policeReportNumber: z.string().optional().nullable(),
   policeReportDate: z.string().optional().nullable(),
-  
+
   // Repair
   repairStartDate: z.string().optional().nullable(),
   repairEndDate: z.string().optional().nullable().transform(emptyToNull),
@@ -92,11 +93,18 @@ const StatusUpdateSchema = z.object({
   repairActualCost: z.string().optional().nullable(),
   repairVendor: z.string().optional().nullable(),
   repairDescription: z.string().optional().nullable(),
-  
+
   // Financial
-  deductionAmount: z.string().optional().nullable(),
+  deductionAmount: z.coerce.number().optional().nullable(),
   deductionReason: z.string().optional().nullable(),
-  
+
+  // Disposal
+  disposalDate: z.string().optional().nullable(),
+  disposalType: z.string().optional().nullable(),
+  disposalReason: z.string().optional().nullable(),
+  disposalAmount: z.string().optional().nullable(),
+  disposalApprovedBy: z.string().optional().nullable(),
+
   // General
   remarks: z.string().optional().nullable(),
 });
@@ -119,7 +127,7 @@ const multerConfig = {
 
 @Controller("assets")
 export class AssetsController {
-  constructor(private readonly assetsService: AssetsService) {}
+  constructor(private readonly assetsService: AssetsService) { }
 
   @Get()
   async listAll() {
@@ -158,12 +166,20 @@ export class AssetsController {
     const warrantyCard = files.find(f => f.fieldname === 'warrantyCard' || f.fieldname === 'warrantyCard[]')?.filename || null;
     const assignmentForm = files.find(f => f.fieldname === 'assignmentForm' || f.fieldname === 'assignmentForm[]')?.filename || null;
 
-    if (typeof body.userId === "string") body.userId = parseInt(body.userId, 10);
+    if (typeof body.userId === "string") body.userId = Number.parseInt(body.userId, 10);
     if (typeof body.accessories === "string") {
       try {
         body.accessories = JSON.parse(body.accessories);
       } catch {
         body.accessories = [];
+      }
+    }
+
+    if (typeof body.typeSpecs === "string") {
+      try {
+        body.typeSpecs = JSON.parse(body.typeSpecs);
+      } catch {
+        body.typeSpecs = {};
       }
     }
 
@@ -218,6 +234,14 @@ export class AssetsController {
         body.accessories = JSON.parse(body.accessories);
       } catch {
         body.accessories = [];
+      }
+    }
+
+    if (typeof body.typeSpecs === "string") {
+      try {
+        body.typeSpecs = JSON.parse(body.typeSpecs);
+      } catch {
+        body.typeSpecs = {};
       }
     }
 
@@ -327,7 +351,7 @@ export class AssetsController {
     const cleanParsed = {
       ...parsed,
       assignedDate: toDateString(parsed.assignedDate),
-      expectedReturnDate: parsed.expectedReturnDate ? toDateString(parsed.expectedReturnDate) : null,
+      expectedReturnDate: parsed.expectedReturnDate ? toDateString(parsed.expectedReturnDate) : undefined,
       warrantyFrom: parsed.warrantyFrom ? toDateString(parsed.warrantyFrom) : null,
       warrantyTo: parsed.warrantyTo ? toDateString(parsed.warrantyTo) : null,
       returnDate: parsed.returnDate ? toDateString(parsed.returnDate) : null,

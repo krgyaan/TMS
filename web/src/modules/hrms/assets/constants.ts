@@ -1,80 +1,90 @@
-// src/pages/hrms/assets/constants.ts
 export const ASSET_STATUS_KEYS = {
-  ASSIGNED: "1",
-  AVAILABLE: "2",
-  UNDER_REPAIR: "3",
-  DAMAGED: "4",
-  LOST: "5",
-  RETURNED: "6",
+  ASSIGNED: "assigned",
+  AVAILABLE: "available",
+  UNDER_REPAIR: "under_repair",
+  DAMAGED: "damaged",
+  LOST: "lost",
+  RETURNED: "returned",
+  DISPOSED: "disposed",
 } as const;
 
 export const ASSET_STATUS: Record<string, string> = {
-  "1": "Assigned",
-  "2": "Available",
-  "3": "Under Repair",
-  "4": "Damaged",
-  "5": "Lost",
-  "6": "Returned",
-};
+  assigned: "Assigned",
+  available: "Available",
+  under_repair: "Under Repair",
+  damaged: "Damaged",
+  lost: "Lost",
+  returned: "Returned",
+  disposed: "Disposed",
+}
 
 export const ASSET_CONDITION: Record<string, string> = {
-  "1": "New",
-  "2": "Good",
-  "3": "Fair",
-  "4": "Poor",
-  "5": "Damaged",
+  new: "New",
+  good: "Good",
+  fair: "Fair",
+  poor: "Poor",
+  damaged: "Damaged",
 };
 
 export const ASSET_TYPE: Record<string, string> = {
-  "1": "Laptop",
-  "2": "Desktop",
-  "3": "Mobile",
-  "4": "Monitor",
-  "5": "Keyboard",
-  "6": "Mouse",
-  "7": "Printer",
-  "8": "Vehicle",
-  "9": "ID Card",
-  "10": "Access Card",
-  "11": "SIM Card",
-  "12": "Other",
+  laptop: "Laptop",
+  desktop: "Desktop",
+  mobile: "Mobile",
+  monitor: "Monitor",
+  keyboard: "Keyboard",
+  mouse: "Mouse",
+  printer: "Printer",
+  id_card: "ID Card",
+  access_card: "Access Card",
+  sim_card: "SIM Card",
+  other: "Other",
+  car: "Car",
+  bike: "Bike",
+  scooter: "Scooter",
+  bus: "Bus",
 };
 
 export const ASSET_CATEGORY: Record<string, string> = {
-  "1": "IT Equipment",
-  "2": "Office Furniture",
-  "3": "Vehicle",
-  "4": "Stationery",
+  it_equipment: "IT Equipment",
+  vehicle: "Vehicle",
+  documents: "Documents",
 };
 
 export const ASSET_LOCATION: Record<string, string> = {
-  "1": "Office",
-  "2": "Home",
-  "3": "Field",
-  "4": "Warehouse",
-  "5": "Repair Center",
+  office: "Office",
+  home: "Home",
+  field: "Field",
+  warehouse: "Warehouse",
+  repair_center: "Repair Center",
 };
 
 export const DAMAGE_TYPE: Record<string, string> = {
-  "1": "Physical Damage",
-  "2": "Water Damage",
-  "3": "Electrical Damage",
-  "4": "Software/System Failure",
-  "5": "Other",
+  physical: "Physical Damage",
+  water: "Water Damage",
+  electrical: "Electrical Damage",
+  software: "Software/System Failure",
+  other: "Other",
 };
 
-export const ACCESSORIES_LIST = [
-  { id: "charger", label: "Charger" },
-  { id: "battery", label: "Battery" },
-  { id: "bag", label: "Bag/Case" },
-  { id: "mouse", label: "Mouse" },
-  { id: "keyboard", label: "Keyboard" },
-  { id: "cables", label: "Cables" },
-  { id: "adapter", label: "Adapter" },
-  { id: "headphones", label: "Headphones" },
-  { id: "stand", label: "Stand/Dock" },
-  { id: "stylus", label: "Stylus/Pen" },
-];
+export const DISPOSAL_TYPE: Record<string, string> = {  
+  sold: "Sold",
+  scrapped: "Scrapped",
+  donated: "Donated",
+  destroyed: "Destroyed",
+  write_off: "Write-off",
+  returned_to_vendor: "Returned to Vendor",
+};
+
+export const CATEGORY_TYPES: Record<string, string[]> = {
+  it_equipment: ["laptop", "desktop", "mobile", "monitor", "keyboard", "mouse", "printer", "sim_card", "other"],
+  vehicle: ["car", "bike", "scooter", "bus"],
+  documents: ["id_card", "access_card"],
+};
+
+export const getTypesForCategory = (category?: string) =>
+  toOptions(ASSET_TYPE).filter(({ value }) =>
+    category ? (CATEGORY_TYPES[category] ?? []).includes(value) : true
+  );
 
 export const toOptions = (obj: Record<string, string>) =>
   Object.entries(obj).map(([value, label]) => ({ value, label }));

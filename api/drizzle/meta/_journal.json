@@ -281,6 +281,83 @@
       "when": 1764323534176,
       "tag": "0081_add_dd_fdr_to_payment_purpose_enum",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1768000000000,
+      "tag": "0082_add_po_type_and_pi_attachments",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1768100000000,
+      "tag": "0083_add_category_to_purchase_orders",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1768200000000,
+      "tag": "0084_add_vendor_work_order_id_to_payment_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1768300000000,
+      "tag": "0085_change_qty_to_numeric",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1768400000000,
+      "tag": "0086_add_po_approval_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1784948800001,
+      "tag": "0074_drop_old_result_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1785948800000,
+      "tag": "0075_change_screenshots_to_jsonb",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1784948800000,
+      "tag": "0073_add_tender_result_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1786140800000,
+      "tag": "0087_create_sale_invoices_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1786140800001,
+      "tag": "0088_add_missing_purchase_order_id_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1784453857516,
+      "tag": "0089_add_action_logs_to_sale_invoices",
+      "breakpoints": true
     }
   ]
 }

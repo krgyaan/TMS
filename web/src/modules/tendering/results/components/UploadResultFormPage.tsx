@@ -1,46 +1,17 @@
 import { useEffect, useState } from "react";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { type Resolver, type SubmitHandler, useForm, useWatch } from "react-hook-form";
+import { useForm, useWatch, useFieldArray, FormProvider } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
+import { NumberInput } from "@/components/form/NumberInput";
 import { SelectField } from "@/components/form/SelectField";
 import { TenderFileUploader } from "@/components/tender-file-upload";
 import { useUploadResult, useTenderResultByTenderId } from "@/hooks/api/useTenderResults";
-import { ArrowLeft, IndianRupee, Plus, X, Save } from "lucide-react";
-
-const UploadResultSchema = z.object({
-    technicallyQualified: z.enum(['Yes', 'No']),
-    disqualificationReason: z.string().optional(),
-    qualifiedPartiesCount: z.string().optional(),
-    qualifiedPartiesNames: z.array(z.string()).optional(),
-    result: z.enum(['Won', 'Lost', 'Cancelled']).optional(),
-    resultReason: z.string().optional(),
-    l1Price: z.string().optional(),
-    l2Price: z.string().optional(),
-    ourPrice: z.string().optional(),
-    qualifiedPartiesScreenshot: z.array(z.string()).default([]),
-    finalResultScreenshot: z.array(z.string()).default([]),
-}).refine((data) => {
-    if (data.technicallyQualified === 'No' && !data.disqualificationReason) {
-        return false;
-    }
-    return true;
-}, {
-    message: 'Disqualification reason is required when not qualified',
-    path: ['disqualificationReason'],
-});
-
-type FormValues = z.infer<typeof UploadResultSchema>;
+import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
 
 interface UploadResultFormPageProps {
     tenderId: number;
@@ -51,7 +22,18 @@ interface UploadResultFormPageProps {
         partiesNames: string[];
     };
     isEditMode?: boolean;
+    isItemWise?: boolean;
     onSuccess?: () => void;
+}
+
+interface DetailFormEntry {
+    result: string;
+    resultReason: string;
+    l1Price: number | null;
+    l2Price: number | null;
+    ourPrice: number | null;
+    qualifiedPartiesScreenshot: string[];
+    finalResultScreenshot: string[];
 }
 
 const yesNoOptions = [
@@ -65,142 +47,106 @@ const resultOptions = [
     { label: "Cancelled", value: "Cancelled" },
 ];
 
-export default function UploadResultFormPage({
-    tenderId,
-    tenderDetails,
-    isEditMode = false,
-    onSuccess,
-}: UploadResultFormPageProps) {
+const defaultDetail: DetailFormEntry = {
+    result: '',
+    resultReason: '',
+    l1Price: null,
+    l2Price: null,
+    ourPrice: null,
+    qualifiedPartiesScreenshot: [],
+    finalResultScreenshot: [],
+};
+
+export default function UploadResultFormPage({ tenderId, tenderDetails, isEditMode = false, isItemWise = false, onSuccess }: UploadResultFormPageProps) {
     const navigate = useNavigate();
     const uploadResultMutation = useUploadResult();
     const { data: existingResult } = useTenderResultByTenderId(tenderId);
-    const [newPartyName, setNewPartyName] = useState('');
-    const [showResultDetails, setShowResultDetails] = useState(isEditMode);
 
-    console.log('existingResult', existingResult);
-
-    const form = useForm<FormValues>({
-        resolver: zodResolver(UploadResultSchema) as Resolver<FormValues>,
+    const form = useForm({
         defaultValues: {
-            technicallyQualified: existingResult?.technicallyQualified as 'Yes' | 'No' || 'Yes',
-            disqualificationReason: existingResult?.disqualificationReason || '',
-            qualifiedPartiesCount: existingResult?.qualifiedPartiesCount || '',
-            qualifiedPartiesNames: existingResult?.qualifiedPartiesNames || [],
-            result: existingResult?.result as 'Won' | 'Lost' || 'Won',
-            resultReason: existingResult?.resultReason || '',
-            l1Price: existingResult?.l1Price || '',
-            l2Price: existingResult?.l2Price || '',
-            ourPrice: existingResult?.ourPrice || '',
-            qualifiedPartiesScreenshot: existingResult?.qualifiedPartiesScreenshot as string[] | undefined || [],
-            finalResultScreenshot: existingResult?.finalResultScreenshot as string[] | undefined || [],
+            technicallyQualified: 'Yes',
+            disqualificationReason: '',
+            qualifiedPartiesCount: '',
+            details: isItemWise ? ([] as DetailFormEntry[]) : [{ ...defaultDetail }],
         },
     });
+    const { control, handleSubmit, reset, setValue, watch } = form;
 
-    // Watch file values for display
-    const qualifiedPartiesScreenshot = useWatch({ control: form.control, name: 'qualifiedPartiesScreenshot' });
-    const finalResultScreenshot = useWatch({ control: form.control, name: 'finalResultScreenshot' });
+    const { fields, append, remove } = useFieldArray({ control, name: 'details' });
 
-    // Pre-populate form in edit mode when data loads
+    const technicallyQualified = useWatch({ control, name: 'technicallyQualified' });
+    const detailsValues = useWatch({ control, name: 'details' });
+
+    const [qualifiedPartiesNames, setQualifiedPartiesNames] = useState<string[]>([]);
+    const [newPartyName, setNewPartyName] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+
     useEffect(() => {
-        if (isEditMode && existingResult) {
-            const result = existingResult;
-            // Ensure technicallyQualified is 'Yes' or 'No', defaulting to 'Yes' if null
-            const technicallyQualifiedValue = (result.technicallyQualified === 'Yes' || result.technicallyQualified === 'No')
-                ? result.technicallyQualified
-                : 'Yes';
-
-            form.reset({
-                technicallyQualified: technicallyQualifiedValue,
-                disqualificationReason: result.disqualificationReason ?? '',
-                qualifiedPartiesCount: result.qualifiedPartiesCount ?? '',
-                qualifiedPartiesNames: result.qualifiedPartiesNames ?? [],
-                result: (result.result === 'Won' || result.result === 'Lost' || result.result === 'Cancelled') ? result.result : undefined,
-                resultReason: result.resultReason ?? '',
-                l1Price: result.l1Price ?? '',
-                l2Price: result.l2Price ?? '',
-                ourPrice: result.ourPrice ?? '',
-                qualifiedPartiesScreenshot: result.qualifiedPartiesScreenshot ? [result.qualifiedPartiesScreenshot] : [],
-                finalResultScreenshot: result.finalResultScreenshot ? [result.finalResultScreenshot] : [],
+        if (existingResult) {
+            reset({
+                technicallyQualified: ['Yes', 'No'].includes(existingResult.technicallyQualified ?? '')
+                    ? (existingResult.technicallyQualified ?? 'Yes') : 'Yes',
+                disqualificationReason: existingResult.disqualificationReason ?? '',
+                qualifiedPartiesCount: existingResult.qualifiedPartiesCount ?? '',
+                details: isEditMode && existingResult.details
+                    ? existingResult.details.map((d: any) => ({
+                        result: d.result ?? '',
+                        resultReason: d.resultReason ?? '',
+                        l1Price: d.l1Price ? Number(d.l1Price) : null,
+                        l2Price: d.l2Price ? Number(d.l2Price) : null,
+                        ourPrice: d.ourPrice ? Number(d.ourPrice) : null,
+                        qualifiedPartiesScreenshot: Array.isArray(d.qualifiedPartiesScreenshot) ? d.qualifiedPartiesScreenshot : d.qualifiedPartiesScreenshot ? [d.qualifiedPartiesScreenshot] : [],
+                        finalResultScreenshot: Array.isArray(d.finalResultScreenshot) ? d.finalResultScreenshot : d.finalResultScreenshot ? [d.finalResultScreenshot] : [],
+                    }))
+                    : (isItemWise ? [] : [{ ...defaultDetail }]),
             });
-
-            // If result fields exist, show Form 2
-            if (result.result || result.l1Price || result.l2Price || result.ourPrice) {
-                setShowResultDetails(true);
-            }
+            setQualifiedPartiesNames(existingResult.qualifiedPartiesNames ?? []);
         }
-    }, [isEditMode, existingResult]);
+    }, [existingResult, isEditMode, reset]);
 
-    const technicallyQualified = useWatch({
-        control: form.control,
-        name: 'technicallyQualified',
-    });
+    const addDetail = () => append({ ...defaultDetail });
 
-    const qualifiedPartiesNames = useWatch({
-        control: form.control,
-        name: 'qualifiedPartiesNames',
-    }) || [];
-
-    const result = useWatch({
-        control: form.control,
-        name: 'result',
-    });
-
-    const isSubmitting = form.formState.isSubmitting;
+    const removeDetail = (index: number) => remove(index);
 
     const addPartyName = () => {
         if (newPartyName.trim()) {
-            const current = form.getValues('qualifiedPartiesNames') || [];
-            form.setValue('qualifiedPartiesNames', [...current, newPartyName.trim()]);
+            setQualifiedPartiesNames(prev => [...prev, newPartyName.trim()]);
             setNewPartyName('');
         }
     };
 
     const removePartyName = (index: number) => {
-        const current = form.getValues('qualifiedPartiesNames') || [];
-        form.setValue('qualifiedPartiesNames', current.filter((_, i) => i !== index));
+        setQualifiedPartiesNames(prev => prev.filter((_, i) => i !== index));
     };
 
-    const onSubmit: SubmitHandler<FormValues> = async (data) => {
-        if (showResultDetails && data.result && !data.resultReason) {
-            form.setError('resultReason', { message: 'Reason is required' });
-            return;
-        }
-        if (isEditMode && data.result && !data.resultReason) {
-            form.setError('resultReason', { message: 'Reason is required' });
-            return;
-        }
+    const onSubmit = handleSubmit(async (data) => {
+        setSubmitting(true);
         try {
             const submitData: any = {
                 technicallyQualified: data.technicallyQualified,
             };
 
             if (data.technicallyQualified === 'No') {
-                // Disqualified: Only send disqualification reason
                 submitData.disqualificationReason = data.disqualificationReason;
             } else {
-                // Qualified: Always include qualified parties data
                 submitData.qualifiedPartiesCount = data.qualifiedPartiesCount;
-                submitData.qualifiedPartiesNames = data.qualifiedPartiesNames;
-                submitData.qualifiedPartiesScreenshot = data.qualifiedPartiesScreenshot.length > 0 ? data.qualifiedPartiesScreenshot[0] : null;
+                submitData.qualifiedPartiesNames = qualifiedPartiesNames;
 
-                // Only include result details if checkbox is checked (or in edit mode with result details visible)
-                // Check if result details should be included based on checkbox state or if result data exists
-                const shouldIncludeResultDetails = showResultDetails || (isEditMode && data.result);
-                if (shouldIncludeResultDetails && data.result) {
-                    submitData.result = data.result;
-                    submitData.resultReason = data.resultReason;
-                    
-                    if (data.result !== 'Cancelled') {
-                        submitData.l1Price = data.l1Price;
-                        submitData.l2Price = data.l2Price;
-                        submitData.ourPrice = data.ourPrice;
-                        submitData.finalResultScreenshot = data.finalResultScreenshot.length > 0 ? data.finalResultScreenshot[0] : null;
-                    }
+                if (data.details.length > 0) {
+                    submitData.details = data.details.map(d => ({
+                        result: d.result || undefined,
+                        resultReason: d.resultReason || undefined,
+                        l1Price: d.l1Price != null ? d.l1Price.toString() : undefined,
+                        l2Price: d.l2Price != null ? d.l2Price.toString() : undefined,
+                        ourPrice: d.ourPrice != null ? d.ourPrice.toString() : undefined,
+                        qualifiedPartiesScreenshot: Array.isArray(d.qualifiedPartiesScreenshot) && d.qualifiedPartiesScreenshot.length > 0 ? d.qualifiedPartiesScreenshot : d.qualifiedPartiesScreenshot ? [d.qualifiedPartiesScreenshot] : undefined,
+                        finalResultScreenshot: Array.isArray(d.finalResultScreenshot) && d.finalResultScreenshot.length > 0 ? d.finalResultScreenshot : d.finalResultScreenshot ? [d.finalResultScreenshot] : undefined,
+                    }));
                 }
             }
 
             await uploadResultMutation.mutateAsync({
-                tenderId: tenderId,
+                tenderId,
                 data: submitData,
             });
             if (onSuccess) {
@@ -210,8 +156,10 @@ export default function UploadResultFormPage({
             }
         } catch (error) {
             console.error('Error uploading result:', error);
+        } finally {
+            setSubmitting(false);
         }
-    };
+    });
 
     return (
         <Card>
@@ -228,256 +176,221 @@ export default function UploadResultFormPage({
                 </CardAction>
             </CardHeader>
             <CardContent>
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
-                            {/* Technically Qualified */}
-                            <SelectField
-                                control={form.control}
-                                name="technicallyQualified"
-                                label="Technically Qualified"
-                                options={yesNoOptions}
-                                placeholder="Select qualification status"
-                            />
+                <FormProvider {...form}>
+                    <div className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-start">
+                        <SelectField
+                            control={control}
+                            name="technicallyQualified"
+                            label="Technically Qualified"
+                            options={yesNoOptions}
+                            placeholder="Select qualification status"
+                        />
 
-                            {/* Disqualification Reason */}
-                            {technicallyQualified === 'No' && (
+                        {technicallyQualified === 'No' && (
+                            <div className="md:col-span-2">
                                 <FieldWrapper
-                                    control={form.control}
+                                    control={control}
                                     name="disqualificationReason"
                                     label="Reason for Disqualification"
-                                    className="md:col-span-2"
                                 >
-                                    {(field) => (
-                                        <Textarea
-                                            {...field}
+                                    {field => (
+                                        <textarea
+                                            className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                                             placeholder="Enter reason for disqualification"
-                                            rows={3}
+                                            {...field}
                                         />
                                     )}
                                 </FieldWrapper>
-                            )}
+                            </div>
+                        )}
 
-                            {/* Qualified Details */}
-                            {technicallyQualified === 'Yes' && (
-                                <>
-                                    {/* No. of Qualified Parties */}
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="qualifiedPartiesCount"
-                                        label="No. of Qualified Parties"
-                                        description="Enter number or 'not known'"
-                                    >
-                                        {(field) => (
-                                            <Input
-                                                {...field}
-                                                placeholder="e.g., 5 or 'not known'"
-                                            />
-                                        )}
-                                    </FieldWrapper>
+                        {technicallyQualified === 'Yes' && (
+                            <>
+                                <div>
+                                    <label className="text-sm font-medium mb-1 block">No. of Qualified Parties</label>
+                                    <Input
+                                        value={watch('qualifiedPartiesCount')}
+                                        onChange={(e) => setValue('qualifiedPartiesCount', e.target.value)}
+                                        placeholder="e.g., 5 or 'not known'"
+                                    />
+                                </div>
 
-                                    {/* Name of Qualified Parties */}
-                                    <div className="flex gap-2 items-center">
-                                        <div className="flex gap-2 items-center">
-                                            <FieldWrapper
-                                                control={form.control}
-                                                name="qualifiedPartiesNames"
-                                                label="Name of Qualified Parties"
-                                                description="Add party names or enter 'not known' if unknown"
-                                            >
-                                                {(_field) => (
-                                                    <Input
-                                                        value={newPartyName}
-                                                        onChange={(e) => setNewPartyName(e.target.value)}
-                                                        placeholder="Enter party name"
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') {
-                                                                e.preventDefault();
-                                                                addPartyName();
-                                                            }
-                                                        }}
-                                                    />
-                                                )}
-                                            </FieldWrapper>
-                                            <Button type="button" onClick={addPartyName} size="icon">
-                                                <Plus className="h-4 w-4" />
-                                            </Button>
-                                        </div>
+                                <div className="flex gap-2 items-end">
+                                    <div className="flex-1">
+                                        <label className="text-sm font-medium mb-1 block">Name of Qualified Parties</label>
+                                        <Input
+                                            value={newPartyName}
+                                            onChange={(e) => setNewPartyName(e.target.value)}
+                                            placeholder="Enter party name"
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') { e.preventDefault(); addPartyName(); }
+                                            }}
+                                        />
                                     </div>
-                                    {qualifiedPartiesNames.length > 0 && (
-                                        <div className="flex flex-wrap gap-2 mt-2">
-                                            {qualifiedPartiesNames.map((name, index) => (
-                                                <Badge key={index} variant="secondary" className="gap-1">
-                                                    {name}
-                                                    <X
-                                                        className="h-3 w-3 cursor-pointer"
-                                                        onClick={() => removePartyName(index)}
-                                                    />
-                                                </Badge>
-                                            ))}
-                                        </div>
-                                    )}
+                                    <Button type="button" onClick={addPartyName} size="icon">
+                                        <Plus className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                {qualifiedPartiesNames.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                        {qualifiedPartiesNames.map((name, index) => (
+                                            <Badge key={index} variant="secondary" className="gap-1">
+                                                {name}
+                                                <button onClick={() => removePartyName(index)} className="ml-1">&times;</button>
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
 
-                                    {/* Checkbox to show Result Details */}
-                                    {!isEditMode && (
-                                        <div className="flex items-center space-x-2 pt-4 md:col-span-3">
-                                            <Checkbox
-                                                id="showResultDetails"
-                                                checked={showResultDetails}
-                                                onCheckedChange={(checked) => setShowResultDetails(checked === true)}
-                                            />
-                                            <Label htmlFor="showResultDetails" className="text-sm font-medium cursor-pointer">
-                                                Add Result Details Right Away (Optional)
-                                            </Label>
-                                        </div>
-                                    )}
+                    {technicallyQualified === 'Yes' && (
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h4 className="font-semibold text-base text-primary border-b pb-2">
+                                    {isItemWise ? `Line Item Results (${fields.length})` : 'Result Details'}
+                                </h4>
+                                {isItemWise && (
+                                    <Button type="button" variant="outline" size="sm" onClick={addDetail}>
+                                        <Plus className="mr-2 h-4 w-4" /> Add Line Item
+                                    </Button>
+                                )}
+                            </div>
 
-                                    {/* Result Details */}
-                                    {(showResultDetails || isEditMode) && (
-                                        <>
-                                            {/* Result */}
+                            {fields.map((field, index) => {
+                                const detailValues = detailsValues?.[index];
+                                const isCancelled = detailValues?.result === 'Cancelled';
+
+                                return (
+                                    <div key={field.id} className="border rounded-lg p-4 space-y-4 bg-white dark:bg-gray-950">
+                                        <div className="flex items-center justify-between">
+                                            <h5 className="font-semibold text-sm">Line Item</h5>
+                                            {isItemWise && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => removeDetail(index)}
+                                                >
+                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                </Button>
+                                            )}
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 space-y-4">
                                             <SelectField
-                                                control={form.control}
-                                                name="result"
+                                                control={control}
+                                                name={`details.${index}.result`}
                                                 label="Result"
-                                                options={resultOptions.map(option => ({
-                                                    value: String(option.value),
-                                                    label: option.label
-                                                }))}
-                                                placeholder="Select result status"
+                                                options={resultOptions}
+                                                placeholder="Select result"
                                             />
 
-                                            {/* Price Fields - Only if not Cancelled */}
-                                            {result !== 'Cancelled' && (
+                                            {!isCancelled && (
                                                 <>
-                                                    {/* L1 Price */}
                                                     <FieldWrapper
-                                                        control={form.control}
-                                                        name="l1Price"
+                                                        control={control}
+                                                        name={`details.${index}.l1Price`}
                                                         label="L1 Price"
                                                     >
-                                                        {(field) => (
-                                                            <div className="relative">
-                                                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                                <Input
-                                                                    {...field}
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    className="pl-10"
-                                                                    placeholder="Enter L1 price"
-                                                                />
-                                                            </div>
+                                                        {field => (
+                                                            <NumberInput
+                                                                step={0.01}
+                                                                placeholder="L1 Price"
+                                                                value={field.value}
+                                                                onChange={field.onChange}
+                                                            />
                                                         )}
                                                     </FieldWrapper>
-
-                                                    {/* L2 Price */}
                                                     <FieldWrapper
-                                                        control={form.control}
-                                                        name="l2Price"
+                                                        control={control}
+                                                        name={`details.${index}.l2Price`}
                                                         label="L2 Price"
                                                     >
-                                                        {(field) => (
-                                                            <div className="relative">
-                                                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                                <Input
-                                                                    {...field}
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    className="pl-10"
-                                                                    placeholder="Enter L2 price"
-                                                                />
-                                                            </div>
+                                                        {field => (
+                                                            <NumberInput
+                                                                step={0.01}
+                                                                placeholder="L2 Price"
+                                                                value={field.value}
+                                                                onChange={field.onChange}
+                                                            />
                                                         )}
                                                     </FieldWrapper>
-                                                </>
-                                            )}
-
-                                            {/* Reason for Win/Loss/Cancellation */}
-                                            <FieldWrapper
-                                                control={form.control}
-                                                name="resultReason"
-                                                label={result === 'Cancelled' ? "Reason for Cancellation" : "Reason for Win/Loss"}
-                                                className="md:col-span-3"
-                                            >
-                                                {(field) => (
-                                                    <Textarea
-                                                        {...field}
-                                                        placeholder={result === 'Cancelled' ? "Enter reason for cancellation" : "Enter the reason for winning or losing this tender"}
-                                                        rows={3}
-                                                    />
-                                                )}
-                                            </FieldWrapper>
-
-                                            {/* Our Price and Screenshots - Only if not Cancelled */}
-                                            {result !== 'Cancelled' && (
-                                                <>
-                                                    {/* Our Price */}
                                                     <FieldWrapper
-                                                        control={form.control}
-                                                        name="ourPrice"
+                                                        control={control}
+                                                        name={`details.${index}.ourPrice`}
                                                         label="Our Price"
                                                     >
-                                                        {(field) => (
-                                                            <div className="relative">
-                                                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                                <Input
-                                                                    {...field}
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    className="pl-10"
-                                                                    placeholder="Enter our price"
-                                                                />
-                                                            </div>
+                                                        {field => (
+                                                            <NumberInput
+                                                                step={0.01}
+                                                                placeholder="Our Price"
+                                                                value={field.value}
+                                                                onChange={field.onChange}
+                                                            />
                                                         )}
                                                     </FieldWrapper>
-
-                                                    {/* Screenshots */}
-                                                    <div className="space-y-4 md:col-span-3">
-                                                        <h4 className="font-semibold text-sm text-primary border-b pb-2">
-                                                            Upload Screenshots
-                                                        </h4>
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                            <TenderFileUploader
-                                                                context="result-screenshots"
-                                                                value={qualifiedPartiesScreenshot}
-                                                                onChange={(paths) => form.setValue('qualifiedPartiesScreenshot', paths)}
-                                                                label="Screenshot of Qualified Parties"
-                                                                disabled={isSubmitting}
-                                                            />
-                                                            <TenderFileUploader
-                                                                context="result-screenshots"
-                                                                value={finalResultScreenshot}
-                                                                onChange={(paths) => form.setValue('finalResultScreenshot', paths)}
-                                                                label="Final Result Screenshot"
-                                                                disabled={isSubmitting}
-                                                            />
-                                                        </div>
-                                                    </div>
                                                 </>
                                             )}
-                                        </>
-                                    )}
-                                </>
-                            )}
-                        </div>
 
-                        <div className="flex justify-end gap-2 pt-4">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => navigate(paths.tendering.results)}
-                                disabled={isSubmitting}
-                            >
-                                Cancel
-                            </Button>
-                            <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting && <span className="animate-spin mr-2">⏳</span>}
-                                <Save className="mr-2 h-4 w-4" />
-                                Upload Result
-                            </Button>
+                                            <div>
+                                                <FieldWrapper
+                                                    control={control}
+                                                    name={`details.${index}.resultReason`}
+                                                    label="Result Reason"
+                                                >
+                                                    {field => (
+                                                        <textarea
+                                                            className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                            placeholder={isCancelled ? "Reason for cancellation" : "Reason for Win/Loss"}
+                                                            {...field}
+                                                        />
+                                                    )}
+                                                </FieldWrapper>
+                                            </div>
+                                            {!isCancelled && (
+                                                <>
+                                                    <TenderFileUploader
+                                                        context="result-screenshots"
+                                                        value={detailValues?.qualifiedPartiesScreenshot || []}
+                                                        onChange={(paths) => setValue(`details.${index}.qualifiedPartiesScreenshot`, paths)}
+                                                        label="Screenshot of Qualified Parties"
+                                                        disabled={submitting}
+                                                    />
+                                                    <TenderFileUploader
+                                                        context="result-screenshots"
+                                                        value={detailValues?.finalResultScreenshot || []}
+                                                        onChange={(paths) => setValue(`details.${index}.finalResultScreenshot`, paths)}
+                                                        label="Final Result Screenshot"
+                                                        disabled={submitting}
+                                                    />
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
-                    </form>
-                </Form>
+                    )}
+
+                    <div className="flex justify-end gap-2 pt-4">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => navigate(paths.tendering.results)}
+                            disabled={submitting}
+                        >
+                            Cancel
+                        </Button>
+                        <Button onClick={onSubmit} disabled={submitting}>
+                            <Save className="mr-2 h-4 w-4" />
+                            Upload Result
+                        </Button>
+                    </div>
+                </div>
+                </FormProvider>
             </CardContent>
         </Card>
     );

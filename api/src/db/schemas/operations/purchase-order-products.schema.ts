@@ -9,7 +9,7 @@ export const purchaseOrderProducts = pgTable(
       .references(() => purchaseOrders.id, { onDelete: "cascade" }),
     description: text("description"),
     hsnSac: varchar("hsn_sac", { length: 100 }),
-    qty: integer("qty").notNull(),
+    qty: numeric("qty", { precision: 5, scale: 2 }).notNull(),
     rate: numeric("rate", { precision: 12, scale: 2 }).notNull(),
     taxableAmount: numeric("taxable_amount", { precision: 14,scale: 2 }).notNull(),
     gstRate: numeric("gst_rate", { precision: 5, scale: 2 }).notNull(),

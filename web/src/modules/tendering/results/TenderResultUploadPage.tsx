@@ -6,6 +6,7 @@ import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { paths } from '@/app/routes/paths';
 import { useTenderResult, useTenderResultByTenderId } from '@/hooks/api/useTenderResults';
+import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SubmissionChecklist, type Checkpoint } from '@/components/tendering/SubmissionChecklist';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -31,6 +32,9 @@ export default function TenderResultUploadPage() {
     const effectiveTenderId = isEditMode ? result?.tenderId : tenderIdNum;
 
     const { data: tenderDetails, isLoading: tenderLoading } = useTender(effectiveTenderId ?? null);
+    const { data: infoSheet } = useInfoSheet(effectiveTenderId ?? null);
+    const ITEM_WISE_TYPES = ['ITEM_WISE_PRE_GST', 'ITEM_WISE_GST_INCLUSIVE'];
+    const isItemWise = infoSheet && ITEM_WISE_TYPES.includes(infoSheet.commercialEvaluation ?? '');
 
     if (resultLoading || tenderLoading || (isEditMode && !result)) {
         return (
@@ -83,12 +87,6 @@ export default function TenderResultUploadPage() {
     const raStatus = result ? result?.raStatus : 'pending';
     const tqStatus = result ? result?.tqStatus : 'pending';
 
-    // for status checks--
-    //                   |
-    //                   v
-    // we will check simply the tender_result-> ra_status && tender_result->tq_status
-
-
     const checkpoints: Checkpoint[] = [
         {
             id: 'tq',
@@ -117,6 +115,7 @@ export default function TenderResultUploadPage() {
                     partiesNames: result?.qualifiedPartiesNames || [],
                 }}
                 isEditMode={isEditMode}
+                isItemWise={isItemWise ?? false}
                 onSuccess={() => navigate(paths.tendering.results)}
             />
         </>

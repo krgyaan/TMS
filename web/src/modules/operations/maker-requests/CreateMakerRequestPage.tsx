@@ -36,7 +36,7 @@ const defaultFormValues: MakerRequestFormValues = {
 
 const headings = [
     {label: 'fixed', value: 'Fixed'},
-    {label: 'loan_return', value: 'Loan Return'},
+    {label: 'loan_return', value: 'Loan Repayment/Return'},
     {label: 'own_bank', value: 'Own Bank'},
     {label: 'capital_asset_purchase', value: 'Capital/Asset Purchase'},
 ];
@@ -62,12 +62,12 @@ const loanReturnCategory = [
 ];
 
 const ownBankCategory = [
-    {label: 'au_1', value: 'AU-1'},
-    {label: 'au_2', value: 'AU-2'},
-    {label: 'au_3', value: 'AU-3'},
-    {label: 'au_4', value: 'AU-4'},
-    {label: 'au_5', value: 'AU-5'},
-    {label: 'au_6', value: 'AU-6'},
+    {label: 'AU_5242', value: 'AU Current Account (AU_5242)'},
+    {label: 'AU_5180', value: 'AU Inflow Account (AU_5180)'},
+    {label: 'AU_5190', value: 'AU Expenses Account (AU_5190)'},
+    {label: 'AU_8316', value: 'AU Outflow Account (AU_8316)'},
+    {label: 'AU_9589', value: 'AU EMD Account (AU_9589)'},
+    {label: 'AU_9284', value: 'AU Cash Reserve Account (AU_9284)'},
 ];
 
 const capitalAssetPurchaseCategory = [

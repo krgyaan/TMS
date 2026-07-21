@@ -28,11 +28,14 @@ const Operations_ContractAgreementShow = lazy(() => import("@/modules/operations
 
 const Operations_ProjectDashboard = lazy(() => import("@/modules/operations/project-dashboard/ProjectDashboardPage"));
 const Operations_ProjectShowPage = lazy(() => import("@/modules/operations/project-dashboard/ProjectShowPage"));
-const Operations_RaisePoFormPage = lazy(() => import("@/modules/operations/project-dashboard/RaisePoFormPage"));
-const Operations_ViewPoPage = lazy(() => import("@/modules/operations/project-dashboard/ViewPOPage"));
-const Operations_EditPOPage = lazy(() => import("@/modules/operations/project-dashboard/EditPOPage"));
-const Operations_PoPdfVersions = lazy(() => import("@/modules/operations/project-dashboard/PoPdfVersionsPage"));
-const Operations_PurchaseOrderList = lazy(() => import("@/modules/shared/purchase-orders/PurchaseOrderListPage"));
+const Operations_RaisePoFormPage = lazy(() => import("@/modules/operations/purchase-orders/pages/CreatePurchaseOrderPage"));
+const Operations_ViewPoPage = lazy(() => import("@/modules/operations/purchase-orders/pages/ViewPurchaseOrderPage"));
+const Operations_EditPOPage = lazy(() => import("@/modules/operations/purchase-orders/pages/EditPurchaseOrderPage"));
+const Operations_PoPdfVersions = lazy(() => import("@/modules/operations/purchase-orders/pages/PoPdfVersionsPage"));
+const Operations_PurchaseOrderTabs = lazy(() => import("@/modules/shared/purchase-orders/PurchaseOrderTabsPage"));
+const Operations_RaiseSaleInvoiceFormPage = lazy(() => import("@/modules/operations/sale-invoices/CreateSaleInvoicePage"));
+const Operations_SaleInvoiceTabs = lazy(() => import("@/modules/shared/sale-invoices/SaleInvoiceTabsPage"));
+const Operations_ViewSaleInvoice = lazy(() => import("@/modules/shared/sale-invoices/ViewSaleInvoicePage"));
 
 const Operations_RaiseVendorWoFormPage = lazy(() => import("@/modules/operations/vendor-work-orders/CreateVendorWorkOrderPage"));
 const Operations_EditVendorWoPage = lazy(() => import("@/modules/operations/vendor-work-orders/EditVendorWorkOrderPage"));
@@ -78,12 +81,15 @@ export default function OperationsRoutes() {
             <Route path="project-dashboard/:projectId/purchase-order/:poId" element={<RouteWrapper><Operations_ViewPoPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/purchase-order/:poId/edit" element={<RouteWrapper><Operations_EditPOPage /></RouteWrapper>}></Route>
             <Route path="project-dashboard/:projectId/purchase-order/:poId/pdf-versions" element={<RouteWrapper><Operations_PoPdfVersions /></RouteWrapper>} />
-            <Route path="purchase-orders" element={<RouteWrapper><Operations_PurchaseOrderList /></RouteWrapper>} />
+            <Route path="purchase-orders" element={<RouteWrapper><Operations_PurchaseOrderTabs /></RouteWrapper>} />
             <Route path="vendor-work-orders" element={<RouteWrapper><Operations_VendorWorkOrderList /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/create" element={<RouteWrapper><Operations_RaiseVendorWoFormPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId" element={<RouteWrapper><Operations_EditVendorWoPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId/edit" element={<RouteWrapper><Operations_EditVendorWoPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId/pdf-versions" element={<RouteWrapper><Operations_VendorWoPdfVersions /></RouteWrapper>} />
+            <Route path="project-dashboard/:projectId/sale-invoice/create" element={<RouteWrapper><Operations_RaiseSaleInvoiceFormPage /></RouteWrapper>} />
+            <Route path="sale-invoices" element={<RouteWrapper><Operations_SaleInvoiceTabs /></RouteWrapper>} />
+            <Route path="sale-invoices/:siId" element={<RouteWrapper><Operations_ViewSaleInvoice /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/project-purchase-invoice/create" element={<RouteWrapper><Operations_CreatePurchaseInvoice /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/project-purchase-invoice/:piId/edit" element={<RouteWrapper><Operations_EditPurchaseInvoice /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/project-payment-request/create" element={<RouteWrapper><Operations_CreatePaymentRequest /></RouteWrapper>} />

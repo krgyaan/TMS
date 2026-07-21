@@ -9,6 +9,7 @@ export const createPurchaseInvoiceSchema = z.object({
     invoiceDate: z.string().min(1, "Invoice date is required"),
     uploadedBy: z.number().optional(),
     invoiceFile: z.string().optional(),
+    purchaseOrderId: z.number().optional(),
 });
 
 export type CreatePurchaseInvoiceDto = z.infer<typeof createPurchaseInvoiceSchema>;

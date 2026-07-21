@@ -51,6 +51,7 @@ const navMain: NavGroup[] = [
             { title: "TQ Management", url: paths.tendering.tqManagement, permission: "tq-management" },
             { title: "RA Management", url: paths.tendering.ras, permission: "reverse-auction" },
             { title: "Results", url: paths.tendering.results, permission: "tender-result" },
+            // { title: "Timer Dashboard", url: paths.tendering.timerDashboard, permission: "tenders" },
         ],
     },
     {
@@ -63,6 +64,7 @@ const navMain: NavGroup[] = [
             { title: "Contract Agreement", url: paths.operations.contractAgreementListPage, permission: "ops.contract-agreement" },
             { title: "Project Dashboard", url: paths.operations.projectDashboard(), permission: "ops.dashboard" },
             { title: "Purchase Orders", url: paths.operations.purchaseOrders, permission: "ops.purchase-orders" },
+            { title: "Sale Invoices", url: paths.operations.saleInvoices, permission: "ops.sale-invoices" },
             { title: "Payment Requests", url: paths.operations.paymentRequests, permission: "ops.payment-requests" },
         ],
     },
@@ -102,6 +104,7 @@ const navMain: NavGroup[] = [
             { title: "Fixed Expenses", url: paths.accounts.fixedExpenses, permission: "accounts.fixed-expenses" },
             { title: "Delegation Dashboard", url: paths.accounts.delegation, permission: "accounts.delegation" },
             { title: "Purchase Orders", url: paths.accounts.purchaseOrders, permission: "accounts.purchase-orders" },
+            { title: "Sale Invoices", url: paths.accounts.saleInvoices, permission: "accounts.sale-invoices" },
             { title: "Payment Requests", url: paths.accounts.paymentRequests, permission: "accounts.payment-requests" },
         ],
     },

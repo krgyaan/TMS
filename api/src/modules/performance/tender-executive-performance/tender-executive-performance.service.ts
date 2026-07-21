@@ -8,6 +8,7 @@ import { timerTrackers } from "@db/schemas/workflow/timer.schema";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { STAGE_CONFIG } from "../config/stage-config";
+import { tenderResultDetails } from "@/db/schemas/tendering/tender-result-details.schema";
 import { tenderResults } from "@/db/schemas/tendering/tender-result.schema";
 import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
 import { TenderListQuery } from "./zod/tender.dto";
@@ -1823,7 +1824,7 @@ export class TenderExecutiveService {
                 tenderName: tenderInfos.tenderName,
                 tenderStatus: tenderInfos.status,
 
-                resultDeclaredAt: tenderResults.resultUploadedAt,
+                resultDeclaredAt: sql`(SELECT MAX(${tenderResultDetails.resultUploadedAt}) FROM ${tenderResultDetails} WHERE ${tenderResultDetails.tenderResultId} = ${tenderResults.id})`,
             })
             .from(paymentRequests)
             .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))

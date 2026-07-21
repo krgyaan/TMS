@@ -14,8 +14,10 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCreatePoParty, usePoParties, useProjectOverview } from "@/hooks/api/useProjectDashboard";
+import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
+import { useCreatePoParty, usePoParties } from "@/hooks/api/usePurchaseOrders";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
+import { useAuth } from "@/contexts/AuthContext";
 import { useNextVWONumber, useCreateVendorWorkOrder } from "@/hooks/api/useVendorWorkOrders";
 import { VWOProductsField } from "./components/VWOProductsField";
 import { VWOTermsField } from "./components/VWOTermsField";
@@ -60,7 +62,7 @@ const defaultFormValues: VendorWorkOrderFormValues = {
   shippingAddress: "",
   shipToGst: "",
   shipToPan: "",
-  products: [{ description: "", hsnSac: "", qty: null, rate: null, gstRate: 18 }],
+  products: [{ description: "", qty: null, rate: null, gstRate: 18 }],
   termsAndConditions: DEFAULT_VWO_TERMS_ROWS,
   scopeOfWork: [],
   accessoriesPackagingListAttachments: [],
@@ -96,6 +98,8 @@ export default function CreateVendorWorkOrderPage() {
   const navigate = useNavigate();
   const { projectId: projectIdParam } = useParams<{ projectId: string }>();
   const projectId = Number(projectIdParam);
+
+  const { teamId } = useAuth();
 
   const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
   const { data: partiesData } = usePoParties();
@@ -226,6 +230,7 @@ export default function CreateVendorWorkOrderPage() {
           onBack={() => setShowPreview(false)}
           onSubmit={form.handleSubmit(handleSubmit)}
           teamMembers={activeTeamMembers}
+          teamId={teamId}
         />
       </div>
     );

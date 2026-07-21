@@ -18,6 +18,7 @@ import { FdrModule } from "@/modules/bi-dashboard/fdr/fdr.module";
 import { PayOnPortalModule } from "@/modules/bi-dashboard/pay-on-portal/pay-on-portal.module";
 import { TenderFeeModule } from "@/modules/bi-dashboard/tender-fee/tender-fee.module";
 import { CourierModule } from "@/modules/courier/courier.module";
+import { LeadsModule } from "@/modules/crm/leads/leads.module";
 import { EmailModule } from "@/modules/email/email.module";
 import { EmployeeImprestModule } from "@/modules/employee-imprest/employee-imprest.module";
 import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
@@ -41,8 +42,8 @@ import { ItemsModule } from "@/modules/master/items/items.module";
 import { LeadTypesModule } from "@/modules/master/lead-types/lead-types.module";
 import { LeadsModule } from "@/modules/crm/leads/leads.module";
 import { FollowupsModule } from "@/modules/crm/followups/followups.module";
-
 import { LeadIndustriesModule } from "@/modules/master/lead-industries/lead-industries.module";
+import { LeadTypesModule } from "@/modules/master/lead-types/lead-types.module";
 import { LoanPartiesModule } from "@/modules/master/loan-parties/loan-parties.module";
 import { LocationsModule } from "@/modules/master/locations/locations.module";
 import { OauthAccountsModule } from "@/modules/master/oauth-accounts/oauth-accounts.module";
@@ -83,6 +84,7 @@ import { TenderFilesModule } from "@/modules/tendering/tender-files/tender-files
 import { TenderResultModule } from "@/modules/tendering/tender-result/tender-result.module";
 import { TendersModule } from "@/modules/tendering/tenders/tenders.module";
 import { TqManagementModule } from "@/modules/tendering/tq-management/tq-management.module";
+import { TimerDashboardModule } from "@/modules/timer-dashboard/timer-dashboard.module";
 import { TimersModule } from "@/modules/timers/timers.module";
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
@@ -91,7 +93,6 @@ import { ServeStaticModule } from "@nestjs/serve-static";
 import { SentryGlobalFilter, SentryModule } from "@sentry/nestjs/setup";
 import { join } from "path";
 import { AllExceptionsFilter } from "./logger/all-exception.filter";
-import { AccountChecklistSchedulerModule } from "./modules/accounts/account-checklist/account-checklist-scheduler.module";
 import { AccountChecklistModule } from './modules/accounts/account-checklist/account-checklist.module';
 import { LoanAdvanceModule } from "./modules/accounts/loan-advance/loan-advance.module";
 import { EmployeeOnboardingModule } from './modules/hrms/employee-onboarding/employee-onboarding.module';
@@ -105,6 +106,8 @@ import { MakerRequestModule } from "./modules/operations/maker-requests/maker-re
 import { PaymentRequestModule } from "./modules/operations/payment-requests/payment-request.module";
 import { ProjectDashboardModule } from "./modules/operations/projects/project-dashboard.module";
 import { PurchaseInvoiceModule } from "./modules/operations/purchase-invoices/purchase-invoice.module";
+import { PurchaseOrderModule } from "./modules/operations/purchase-orders/purchase-order.module";
+import { SaleInvoiceModule } from "./modules/operations/sale-invoices/sale-invoice.module";
 import { VendorWorkOrderModule } from "./modules/operations/vendor-work-orders/vendor-work-order.module";
 import { WoAmendmentsModule } from "./modules/operations/wo-amendments/wo-amendments.module";
 import { WoContactsModule } from "./modules/operations/wo-contacts/wo-contacts.module";
@@ -215,6 +218,7 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         ChequeModule,
         TenderFeeModule,
         TimersModule,
+        TimerDashboardModule,
         WoBasicDetailsModule,
         WoDetailsModule,
         WoContactsModule,
@@ -236,13 +240,14 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         LocationPerformanceModule,
         ContractAgreementModule,
         VendorWorkOrderModule,
+        SaleInvoiceModule,
+        PurchaseOrderModule,
         PurchaseInvoiceModule,
         PaymentRequestModule,
         MakerRequestModule,
         EmployeeProfilesModule,
         AssetsModule,
         AccountChecklistModule,
-        AccountChecklistSchedulerModule,
         SchedulerModule,
         OnboardingModule,
         EmployeeOnboardingModule,

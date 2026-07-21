@@ -1,35 +1,35 @@
 // ImprestEmployeeDashboard.tsx
-import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { data, useNavigate, useParams } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
-import { Trash2, Plus, Loader2, CheckCircle, ListChecks, FileCheck, MessageSquarePlus, ImagePlus, Download, Eye, AlertCircle, ArrowLeft } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle, Download, Eye, FileCheck, ImagePlus, ListChecks, Loader2, MessageSquarePlus, Trash2 } from "lucide-react";
 
+import { saveAs } from "file-saver";
+import * as XLSX from "xlsx";
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
-import * as XLSX from "xlsx";
-import { saveAs } from "file-saver";
 
 import { paths } from "@/app/routes/paths";
-import { useImprestList, useDeleteImprest, useUploadImprestProofs, useApproveImprest, useTallyImprest, useProofImprest } from "../../shared/imprest/imprest.hooks";
+import { useApproveImprest, useDeleteImprest, useImprestList, useProofImprest, useTallyImprest, useUploadImprestProofs } from "../../shared/imprest/imprest.hooks";
 
-import type { ImprestRow } from "../../shared/imprest/imprest.types";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import type { ImprestRow } from "../../shared/imprest/imprest.types";
 
-import type { GridApi } from "ag-grid-community";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUser } from "@/hooks/api/useUsers";
+import type { GridApi } from "ag-grid-community";
 
 /** INR formatter */
 const formatINR = (num: number) =>
     new Intl.NumberFormat("en-IN", {
-        style: "currency",
+        style: "currency", 
         currency: "INR",
         maximumFractionDigits: 0,
     }).format(num);
@@ -340,7 +340,7 @@ const ImprestAdminUserView: React.FC = () => {
 
                     return (
                         <div className="flex items-center gap-1">
-                            <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />
+                            {canUpdate("imprests.shared") &&  <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />}
                             <IconAction icon={ImagePlus} label="Add Proof" onClick={() => openAddProof(row.id)} />
                             {canUpdate("imprests.shared") && <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />}
                         </div>

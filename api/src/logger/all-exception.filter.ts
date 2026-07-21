@@ -8,6 +8,19 @@ import { Logger } from "winston";
 import { SentryExceptionCaptured } from "@sentry/nestjs";
 import * as Sentry from "@sentry/nestjs";
 
+function extractErrorChain(err: unknown, depth = 0): Record<string, unknown> {
+  if (depth > 5 || !(err instanceof Error)) return {};
+  const result: Record<string, unknown> = {
+    name: err.name,
+    message: err.message,
+  };
+  if (err.stack) result.stack = err.stack;
+  if ((err as any).cause) {
+    result.cause = extractErrorChain((err as any).cause, depth + 1);
+  }
+  return result;
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   constructor(
@@ -29,9 +42,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       ? exception.getResponse()
       : { statusCode: status, message: "Internal server error" };
 
-    // Enrich Sentry with request context
+    const errorChain = extractErrorChain(exception);
+
+    // Enrich Sentry with request context + full error chain
     Sentry.withScope((scope) => {
-      // Attach user if available (from JWT/session)
       if (request?.user) {
         scope.setUser({
           id: request.user.id,
@@ -40,22 +54,22 @@ export class AllExceptionsFilter implements ExceptionFilter {
         });
       }
 
-      // Tag for easy filtering in Sentry dashboard
       scope.setTag("http.method", request?.method);
       scope.setTag("http.status_code", status.toString());
       scope.setTag("http.route", request?.route?.path || request?.url);
 
-      // Extra context
       scope.setContext("request", {
         url: request?.url,
         method: request?.method,
         params: request?.params,
         query: request?.query,
-        // Don't log body in production for privacy
         body: process.env.NODE_ENV !== "production" ? request?.body : "[redacted]",
       });
 
-      // Set severity
+      if (errorChain.cause) {
+        scope.setContext("error_cause", errorChain.cause as Record<string, unknown>);
+      }
+
       scope.setLevel(status >= 500 ? "error" : "warning");
     });
 
@@ -64,9 +78,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       status,
       url: request?.url,
       method: request?.method,
-      exceptionMessage: exception instanceof Error ? exception.message : String(exception),
-      exceptionStack: exception instanceof Error ? exception.stack : undefined,
-      exceptionName: exception instanceof Error ? exception.name : typeof exception,
+      exceptionName: errorChain.name,
+      exceptionMessage: errorChain.message,
+      exceptionStack: errorChain.stack,
+      exceptionCause: errorChain.cause,
       userId: request?.user?.id,
     });
 

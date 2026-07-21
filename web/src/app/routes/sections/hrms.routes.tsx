@@ -3,14 +3,14 @@ import { Route, Routes } from "react-router-dom";
 
 const EmployeeRegistration = lazy(() => import("@/modules/hrms/employees/registration"));
 const EmployeeProfileView = lazy(() => import("@/modules/hrms/employees/profile-view"));
-const AssetAdminDashboard = lazy(() => import("@/modules/hrms/assets/dashboard"));
 
-const AdminAssetView = lazy(() => import("@/modules/hrms/assets/AssetView"));
-const AdminAssetEdit = lazy(() => import("@/modules/hrms/assets/AssetEdit"));
-const AdminAssetStatus = lazy(() => import("@/modules/hrms/assets/AssetStatus"));
-
-const AssetAssignment = lazy(() => import("@/modules/hrms/assets/assignment"));
-const MyAssets = lazy(() => import("@/modules/hrms/assets/my-assets"));
+// Assets — restructured following tendering module pattern
+const AssetListPage = lazy(() => import("@/modules/hrms/assets/AssetListPage"));
+const AssetCreatePage = lazy(() => import("@/modules/hrms/assets/AssetCreatePage"));
+const AssetEditPage = lazy(() => import("@/modules/hrms/assets/AssetEditPage"));
+const AssetShowPage = lazy(() => import("@/modules/hrms/assets/AssetShowPage"));
+const AssetStatusPage = lazy(() => import("@/modules/hrms/assets/AssetStatusPage"));
+const MyAssetsListPage = lazy(() => import("@/modules/hrms/assets/MyAssetsListPage"));
 
 const OnboardingDashboard = lazy(() => import('@/modules/hrms/onboarding/OnboardingDashboard'));
 const ProfileDetailsDashboard = lazy(() => import('@/modules/hrms/onboarding/ProfileDetailsDashboard'));
@@ -34,16 +34,13 @@ export default function HrmsRoutes() {
             <Route path="onboarding/approval" element={<ApprovalDashboard />} />
             <Route path="onboarding/induction" element={<InductionDashboard />}/>
             
-            <Route path="assets/my" element={<MyAssets />} />
+            <Route path="assets/my" element={<MyAssetsListPage />} />
             
-            <Route path="admin/assets" element={<AssetAdminDashboard />} />
-            <Route path="admin/assets/view/:id" element={<AdminAssetView />} />
-            <Route path="admin/assets/status/:id" element={<AdminAssetStatus />} />
-            <Route path="admin/assets/edit/:id" element={<AdminAssetEdit />} />
-            <Route path="admin/assets/assign" element={<AssetAssignment />} />
-
-            <Route path="training" element={<TrainingDashboard />} />
-            <Route path="training/upload-video" element={ <UploadVideo />} />
+            <Route path="admin/assets" element={<AssetListPage />} />
+            <Route path="admin/assets/create" element={<AssetCreatePage />} />
+            <Route path="admin/assets/view/:id" element={<AssetShowPage />} />
+            <Route path="admin/assets/status/:id" element={<AssetStatusPage />} />
+            <Route path="admin/assets/edit/:id" element={<AssetEditPage />} />
         </Routes>
     );
 }

@@ -20,6 +20,7 @@ export function mapPurchaseInvoiceFormToCreateDTO(
         gstAmount: values.gstAmount!,
         invoiceDate: values.invoiceDate,
         invoiceFile: values.invoiceFile?.length ? values.invoiceFile[0] : undefined,
+        purchaseOrderId: values.selectedPoId ? Number(values.selectedPoId) : undefined,
     };
 }
 
@@ -33,5 +34,6 @@ export function mapPurchaseInvoiceFormToUpdateDTO(
         gstAmount: values.gstAmount!,
         invoiceDate: values.invoiceDate,
         invoiceFile: values.invoiceFile?.length ? values.invoiceFile[0] : undefined,
+        purchaseOrderId: values.selectedPoId ? Number(values.selectedPoId) : undefined,
     };
 }

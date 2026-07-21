@@ -13,8 +13,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
-import { useAllPurchaseOrders } from "@/hooks/api/useProjectDashboard";
-import type { PurchaseOrderRow } from "@/modules/operations/project-dashboard/helpers/projectDashboard.types";
+import { getShortId } from "@/lib/id-utils";
+import { useAllPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
+import type { PurchaseOrderRow } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
 import { SetTdsDialog } from "./components/SetTdsDialog";
 
 const PurchaseOrderListPage: React.FC = () => {
@@ -75,7 +76,7 @@ const PurchaseOrderListPage: React.FC = () => {
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <span>{p.value || "-"}</span>
+                            <span>{getShortId(p.value)}</span>
                         </TooltipTrigger>
                         <TooltipContent>{p.value}</TooltipContent>
                     </Tooltip>
@@ -268,7 +269,7 @@ const PurchaseOrderListPage: React.FC = () => {
                     onGridReady={onGridReady}
                     gridOptions={{
                         pagination: true,
-                        paginationPageSize: 10,
+                        paginationPageSize: 100,
                         domLayout: "autoHeight",
                     }}
                 />

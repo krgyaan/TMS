@@ -102,6 +102,7 @@ export const paths = {
         submitQueryCreate: (tenderId: number) => `/tendering/submit-queries/${tenderId}/create`,
         submitQueryEdit: (tenderId: number, id: number) => `/tendering/submit-queries/${tenderId}/edit/${id}`,
         submitQueryView: (tenderId: number, id: number) => `/tendering/submit-queries/${tenderId}/view/${id}`,
+        timerDashboard: "/tendering/timer-dashboard",
     },
 
     // ==================== OPERATIONS ====================
@@ -141,9 +142,15 @@ export const paths = {
         editVendorWoPage: (woId: number, projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/${woId}/edit`,
         vendorWoPdfVersions: (woId: number, projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/${woId}/pdf-versions`,
 
-        raiseProjectPurchaseInvoiceForm: (projectId: number) => `/operations/project-dashboard/${projectId}/project-purchase-invoice/create`,
+        raiseProjectPurchaseInvoiceForm: (projectId: number, poId?: number) =>
+            `/operations/project-dashboard/${projectId}/project-purchase-invoice/create${poId ? `?poId=${poId}` : ''}`,
         editProjectPurchaseInvoicePage: (piId: number, projectId: number) => `/operations/project-dashboard/${projectId}/project-purchase-invoice/${piId}/edit`,
-        raiseProjectPaymentRequestForm: (projectId: number) => `/operations/project-dashboard/${projectId}/project-payment-request/create`,
+        raiseSaleInvoiceForm: (projectId: number) =>
+            `/operations/project-dashboard/${projectId}/sale-invoice/create`,
+        saleInvoices: "/operations/sale-invoices",
+        viewSaleInvoice: (siId: number) => `/operations/sale-invoices/${siId}`,
+        raiseProjectPaymentRequestForm: (projectId: number, poId?: number) =>
+            `/operations/project-dashboard/${projectId}/project-payment-request/create${poId ? `?poId=${poId}` : ''}`,
         editProjectPaymentRequestPage: (prId: number, projectId: number) => `/operations/project-dashboard/${projectId}/project-payment-request/${prId}/edit`,
         paymentRequests: "/operations/payment-requests",
     },
@@ -218,6 +225,7 @@ export const paths = {
         delegationView: (id: string) => `/accounts/delegation/${id}`,
         delegationUpdate: (id: string) => `/accounts/delegation/${id}/update`,
         purchaseOrders: "/accounts/purchase-orders",
+        saleInvoices: "/accounts/sale-invoices",
         paymentRequests: "/accounts/payment-requests",
         makerRequestCreate: "/accounts/maker-requests/create",
     },
@@ -396,10 +404,19 @@ export const paths = {
         dashboard: "/hrms/admin",
         
         assetAdminDashboard: "/hrms/admin/assets",
-        assignAsset: "/hrms/admin/assets/assign",
+        assignAsset: "/hrms/admin/assets/create",
         assetEdit: (id: number) => `/hrms/admin/assets/edit/${id}`,
         assetStatus: (id: number) => `/hrms/admin/assets/status/${id}`,
         assetView: (id: number) => `/hrms/admin/assets/view/${id}`,
+
+        assets: {
+            list: "/hrms/admin/assets",
+            create: "/hrms/admin/assets/create",
+            edit: (id: number) => `/hrms/admin/assets/edit/${id}`,
+            show: (id: number) => `/hrms/admin/assets/view/${id}`,
+            status: (id: number) => `/hrms/admin/assets/status/${id}`,
+            my: "/hrms/assets/my",
+        },
         
         //================ onboarding  ==============================//
         onboardingDashboard: "/hrms/onboarding/dashboard",

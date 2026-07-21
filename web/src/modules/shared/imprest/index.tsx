@@ -1,33 +1,31 @@
-// ImprestEmployeeDashboard.tsx
-import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
-import { Trash2, Plus, Loader2, CheckCircle, ListChecks, FileCheck, MessageSquarePlus, ImagePlus, Download, Eye, AlertCircle, ArrowLeft, Pencil } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle, Download, Eye, FileCheck, ImagePlus, ListChecks, Loader2, MessageSquarePlus, Pencil, Plus, Trash2 } from "lucide-react";
 
-import "yet-another-react-lightbox/styles.css";
-import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import * as XLSX from "xlsx";
+import "yet-another-react-lightbox/styles.css";
 
 import { paths } from "@/app/routes/paths";
-import { useImprestList, useDeleteImprest, useUploadImprestProofs, useApproveImprest, useTallyImprest, useProofImprest, useUpdateImprest, useAddImprestAccRemark} from "./imprest.hooks";
+import { useAddImprestAccRemark, useApproveImprest, useDeleteImprest, useImprestList, useProofImprest, useTallyImprest, useUpdateImprest, useUploadImprestProofs } from "./imprest.hooks";
 
-import type { ImprestProof, ImprestRow, ProofItem } from "./imprest.types";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import type { ImprestRow, ProofItem } from "./imprest.types";
 
-import type { GridApi } from "ag-grid-community";
-import { useAuth } from "@/contexts/AuthContext";
-import { useUser } from "@/hooks/api/useUsers";
-import SelectField from "@/components/form/SelectField";
-import { imprestCategoriesKey, useImprestCategories } from "@/hooks/api/useImprestCategories";
-import { useProjectOptions } from "@/hooks/useSelectOptions";
 import SelectInput from "@/components/SelectInput";
+import { useAuth } from "@/contexts/AuthContext";
+import { useImprestCategories } from "@/hooks/api/useImprestCategories";
+import { useUser } from "@/hooks/api/useUsers";
+import { useProjectOptions } from "@/hooks/useSelectOptions";
+import type { GridApi } from "ag-grid-community";
 
 /** INR formatter */
 const formatINR = (num: number) =>
@@ -511,7 +509,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
                     return (
                         <div className="flex items-center gap-1">
-                            <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />
+                            {canDeleteStatus && <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />}
                             <IconAction icon={ImagePlus} label="Add Proof" onClick={() => openAddProof(row.id)} />
                             {/* {canMutateStatus && <IconAction icon={Pencil} label="Edit Imprest" onClick={() => openEditModal(row)} />} */}
                             {canMutateStatusAdmin && <IconAction icon={Pencil} label="Edit Imprest" onClick={() => navigate(paths.shared.imprestEdit(row.id))} />}

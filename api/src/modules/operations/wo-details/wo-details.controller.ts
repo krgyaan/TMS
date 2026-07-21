@@ -105,19 +105,6 @@ export class WoDetailsController {
     await this.woDetailsService.delete(id);
   }
   // WIZARD OPERATIONS - EXACTLY AS ORIGINAL
-  @Post('initialize')
-  @HttpCode(HttpStatus.CREATED)
-  async initializeWizard(
-    @Body() body: unknown,
-    @CurrentUser() user: ValidatedUser,
-  ) {
-    const parsed = CreateWoDetailSchema.parse(body) as CreateWoDetailDto;
-    return this.woDetailsService.initializeWizard(
-      parsed.woBasicDetailId,
-      user.sub,
-    );
-  }
-
   @Get(':id/wizard/progress')
   async getWizardProgress(@Param('id', ParseIntPipe) id: number) {
     return this.woDetailsService.getWizardProgress(id);

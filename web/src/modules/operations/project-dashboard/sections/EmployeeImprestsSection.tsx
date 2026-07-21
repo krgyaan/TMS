@@ -255,8 +255,7 @@ export const EmployeeImprestsSection: React.FC<EmployeeImprestsSectionProps> = (
                         }}
                         gridOptions={{
                             pagination: true,
-                            paginationPageSize: 10,
-                            paginationPageSizeSelector: [5, 10, 20, 50],
+                            paginationPageSize: 20,
                             domLayout: 'autoHeight',
                         }}
                     />

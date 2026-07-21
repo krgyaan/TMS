@@ -1,4 +1,4 @@
-import { bidSubmissions, emailLogs, tenderResults, timerTrackers } from '@/db/schemas';
+import { bidSubmissions, emailLogs, tenderResultDetails, tenderResults, timerTrackers } from '@/db/schemas';
 import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
 import { AppLogger } from '@/logger/app-logger.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -125,10 +125,10 @@ export class TenderInfosService {
                 return sql`${bidSubmissions.submissionDatetime} DESC NULLS LAST`;
 
             case 'tender-won':
-                return sql`${tenderResults.resultUploadedAt} DESC NULLS LAST`;
+                return sql`(SELECT MAX(${tenderResultDetails.resultUploadedAt}) FROM ${tenderResultDetails} WHERE ${tenderResultDetails.tenderResultId} = ${tenderResults.id}) DESC NULLS LAST`;
 
             case 'tender-lost':
-                return sql`${tenderResults.resultUploadedAt} DESC NULLS LAST`;
+                return sql`(SELECT MAX(${tenderResultDetails.resultUploadedAt}) FROM ${tenderResultDetails} WHERE ${tenderResultDetails.tenderResultId} = ${tenderResults.id}) DESC NULLS LAST`;
 
             default:
                 return sql`${tenderInfos.dueDate} ASC NULLS LAST`;
@@ -366,7 +366,7 @@ export class TenderInfosService {
                 url: websites.url,
             },
             bidSubmissionDate: bidSubmissions.submissionDatetime,
-            resultDate: tenderResults.resultUploadedAt,
+            resultDate: sql<Date | null>`(SELECT MAX(${tenderResultDetails.resultUploadedAt}) FROM ${tenderResultDetails} WHERE ${tenderResultDetails.tenderResultId} = ${tenderResults.id})`,
         };
     }
 
@@ -506,7 +506,7 @@ export class TenderInfosService {
                     orderByClause = sortFn(organizations.name);
                     break;
                 case 'resultDate':
-                    orderByClause = sortFn(tenderResults.resultUploadedAt);
+                    orderByClause = sortFn(sql`(SELECT MAX(${tenderResultDetails.resultUploadedAt}) FROM ${tenderResultDetails} WHERE ${tenderResultDetails.tenderResultId} = ${tenderResults.id})`);
                     break;
                 case 'submissionDate':
                     orderByClause = sortFn(bidSubmissions.submissionDatetime);
@@ -742,9 +742,6 @@ export class TenderInfosService {
             this.db.select({ name: statuses.name }).from(statuses).where(eq(statuses.id, prevStatus)).limit(1),
             this.db.select({ name: statuses.name }).from(statuses).where(eq(statuses.id, newStatus)).limit(1),
         ]);
-
-        const oldStatusName = oldStatusRow[0]?.name || `Status ${prevStatus}`;
-        const newStatusName = newStatusRow[0]?.name || `Status ${newStatus}`;
 
         // Update status in transaction
         const updated = await this.db.transaction(async (tx) => {
@@ -1137,7 +1134,7 @@ export class TenderInfosService {
             .where(eq(organizations.id, organizationId))
             .limit(1);
 
-        if (!organization || !organization.acronym) {
+        if (!organization?.acronym) {
             throw new NotFoundException(`Organization with ID ${organizationId} not found or has no acronym`);
         }
 
@@ -1148,7 +1145,7 @@ export class TenderInfosService {
             .where(eq(items.id, itemId))
             .limit(1);
 
-        if (!item || !item.name) {
+        if (!item?.name) {
             throw new NotFoundException(`Item with ID ${itemId} not found`);
         }
 
@@ -1163,7 +1160,7 @@ export class TenderInfosService {
                 .where(eq(locations.id, locationId))
                 .limit(1);
 
-            if (location && location.name) {
+            if (location?.name) {
                 nameParts.push(location.name.trim());
             }
         }
@@ -1209,7 +1206,7 @@ export class TenderInfosService {
         // Uses canSwitchTeams and dataScope instead of hardcoded role IDs so
         // any role configured with canSwitchTeams: true gets team-switching access.
         const roleFilterConditions: any[] = [];
-        if (user && user.roleId) {
+        if (user?.roleId) {
             if (user.dataScope === 'all') {
                 // Super User or Admin: Show all, respect teamId filter if provided
                 if (teamId !== undefined && teamId !== null) {

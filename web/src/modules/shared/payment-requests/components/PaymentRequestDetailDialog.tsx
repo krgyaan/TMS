@@ -4,17 +4,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getShortId } from "@/lib/id-utils";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { usePaymentRequestDetails } from "@/hooks/api/useProjectPaymentRequests";
 import { tenderFilesService } from "@/services/api/tender-files.service";
-import { projectDashboardApi } from "@/services/api/project-dashboard.api";
+import { purchaseOrderApi } from "@/services/api/purchase-order.api";
+import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
 
 export const PAYMENT_AGAINST_LABELS: Record<string, string> = {
     upload_invoice: "Upload Invoice",
     new_pi: "New PI",
     po: "PO",
+    vwo: "VWO",
     others: "Imprest",
     imprest: "Imprest",
 };
@@ -47,7 +51,14 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
             <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-4">
                 <div className="col-span-2">
                     <Label className="text-muted-foreground text-xs">Request No</Label>
-                    <p className="font-mono font-medium">{detail.requestNo}</p>
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <p className="font-mono font-medium">{getShortId(detail.requestNo)}</p>
+                            </TooltipTrigger>
+                            <TooltipContent>{detail.requestNo}</TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                 </div>
                 <div>
                     <Label className="text-muted-foreground text-xs">Project</Label>
@@ -83,7 +94,14 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                         <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">PO Number:</span>
-                                <span className="font-medium">{detail.poNumber || `#${detail.purchaseOrderId}`}</span>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="font-medium">{getShortId(detail.poNumber) || `#${detail.purchaseOrderId}`}</span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>{detail.poNumber}</TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Total (Pre-GST):</span>
@@ -135,12 +153,75 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                             })()}
                             <div className="pt-2">
                                 <a
-                                    href={projectDashboardApi.getPurchaseOrderPdfUrl(detail.purchaseOrderId)}
+                                    href={purchaseOrderApi.getPurchaseOrderPdfUrl(detail.purchaseOrderId)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-blue-600 underline text-xs"
                                 >
                                     View Latest PO PDF
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {detail.vendorWorkOrderId && (
+                    <div className="col-span-2 space-y-2">
+                        <Label className="text-muted-foreground text-xs">VWO Details</Label>
+                        <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">VWO Number:</span>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="font-medium">{getShortId(detail.vwoNumber) || `#${detail.vendorWorkOrderId}`}</span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>{detail.vwoNumber}</TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Total (Pre-GST):</span>
+                                <span>{formatINR(detail.vwoTotalAmount || 0)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">GST Amount:</span>
+                                <span>{formatINR(detail.vwoTotalGstAmt || 0)}</span>
+                            </div>
+                            <div className="flex justify-between font-medium">
+                                <span>Grand Total:</span>
+                                <span>{formatINR(detail.vwoGrandTotal || 0)}</span>
+                            </div>
+                            <div className="border-t my-1.5" />
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Payment Requested:</span>
+                                <span>{formatINR(detail.vwoTotalPaymentRequested || 0)}</span>
+                            </div>
+                            <div className="flex justify-between pl-2 text-muted-foreground">
+                                <span>Maker Done:</span>
+                                <span>{formatINR(detail.vwoTotalMakerDone || 0)}</span>
+                            </div>
+                            <div className="flex justify-between pl-2 text-muted-foreground">
+                                <span>Payment Done:</span>
+                                <span>{formatINR(detail.vwoTotalPaymentDone || 0)}</span>
+                            </div>
+                            {(() => {
+                                const cap = Number(detail.vwoGrandTotal || 0);
+                                const remaining = cap - Number(detail.vwoTotalPaymentRequested || 0);
+                                return (
+                                    <div className={`flex justify-between font-medium ${remaining < 0 ? "text-destructive" : ""}`}>
+                                        <span>Remaining:</span>
+                                        <span>{formatINR(remaining)}</span>
+                                    </div>
+                                );
+                            })()}
+                            <div className="pt-2">
+                                <a
+                                    href={vendorWorkOrderApi.getPdfDownloadUrl(detail.vendorWorkOrderId)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 underline text-xs"
+                                >
+                                    View Latest VWO PDF
                                 </a>
                             </div>
                         </div>

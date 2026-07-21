@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useProjectPurchaseInvoices } from "@/hooks/api/usePurchaseInvoices";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { getShortId } from "@/lib/id-utils";
 import type { PurchaseInvoiceRow } from "@/modules/operations/purchase-invoices/helpers/purchaseInvoice.types";
 import type { ColDef, GridApi, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
@@ -45,7 +47,32 @@ export const PurchaseInvoicesSection: React.FC<PurchaseInvoicesSectionProps> = (
             width: 250,
             flex: 1,
             cellRenderer: (p: CustomCellRendererProps<PurchaseInvoiceRow>) => (
-                <span className="font-mono text-sm font-medium">{p.value || "-"}</span>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span className="font-mono text-sm font-medium">{getShortId(p.value)}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>{p.value}</TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            ),
+        },
+        {
+            field: "poNumber",
+            headerName: "PO Number",
+            sortable: true,
+            filter: true,
+            width: 200,
+            flex: 1,
+            cellRenderer: (p: CustomCellRendererProps<PurchaseInvoiceRow>) => (
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span className="text-sm">{getShortId(p.value)}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>{p.value}</TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
             ),
         },
         {
@@ -74,6 +101,17 @@ export const PurchaseInvoicesSection: React.FC<PurchaseInvoicesSectionProps> = (
             headerName: "GST Amount",
             sortable: true,
             valueFormatter: (p: ValueFormatterParams<PurchaseInvoiceRow>) => formatINR(p.value),
+        },
+        {
+            field: "total",
+            headerName: "Amount",
+            sortable: true,
+            cellRenderer: (p: ValueFormatterParams<PurchaseInvoiceRow>) => {
+                console.log(Number(p?.data?.valuePreGst || 0) + Number(p?.data?.gstAmount || 0));
+                
+                const total = Number(p?.data?.valuePreGst || 0) + Number(p?.data?.gstAmount || 0);
+                return <span>{formatINR(total)}</span>;
+            }
         },
         {
             field: "invoiceDate",
@@ -135,7 +173,7 @@ export const PurchaseInvoicesSection: React.FC<PurchaseInvoicesSectionProps> = (
                     onGridReady={(params) => setPiGridApi(params.api)}
                     gridOptions={{
                         pagination: true,
-                        paginationPageSize: 5,
+                        paginationPageSize: 10,
                         domLayout: 'autoHeight',
                     }}
                 />

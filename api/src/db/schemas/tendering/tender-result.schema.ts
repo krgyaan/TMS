@@ -4,7 +4,6 @@ import {
     bigint,
     varchar,
     text,
-    decimal,
     timestamp,
     jsonb,
     index,
@@ -35,22 +34,6 @@ export const tenderResults = pgTable(
         // Qualified Parties Info
         qualifiedPartiesCount: varchar("qualified_parties_count", { length: 50 }),
         qualifiedPartiesNames: jsonb("qualified_parties_names").$type<string[]>(),
-
-        // Result
-        result: varchar("result", { length: 50 }),
-        resultReason: text("result_reason"),
-
-        // Pricing
-        l1Price: decimal("l1_price", { precision: 15, scale: 2 }),
-        l2Price: decimal("l2_price", { precision: 15, scale: 2 }),
-        ourPrice: decimal("our_price", { precision: 15, scale: 2 }),
-
-        // Screenshots
-        qualifiedPartiesScreenshot: text("qualified_parties_screenshot"),
-        finalResultScreenshot: text("final_result_screenshot"),
-
-        // When result was uploaded
-        resultUploadedAt: timestamp("result_uploaded_at", { withTimezone: true }),
 
         tenderCancelledScreenshot: text("tender_cancelled_screenshot"),
 

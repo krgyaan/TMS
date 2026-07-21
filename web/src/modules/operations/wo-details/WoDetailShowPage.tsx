@@ -9,7 +9,7 @@ import { BasicDetailsSection } from "@/modules/operations/wo-basic-details/compo
 import { WoDetailsSection } from "@/modules/operations/wo-details/components/WoDetailsSection";
 import { KickOffSection } from "@/modules/operations/kick-off/components/KickOffSection";
 import { ContractAgreementSection } from "@/modules/operations/contract-agreement/components/ContractAgreementSection";
-import { PoDashboardSection } from "@/modules/operations/project-dashboard/components/PoDashboardSection";
+import { PoDashboardSection } from "@/modules/operations/purchase-orders/components/PoDashboardSection";
 import { paths } from "@/app/routes/paths";
 
 export default function WoDetailShowPage() {

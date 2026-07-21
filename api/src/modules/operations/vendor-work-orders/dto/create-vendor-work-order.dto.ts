@@ -28,7 +28,6 @@ export const createVendorWorkOrderSchema = z.object({
 
     products: z.array(z.object({
         description: z.string().min(1, "Description is required"),
-        hsnSac: z.string().min(1, "HSN/SAC is required"),
         qty: z.number(),
         rate: z.number(),
         gstRate: z.number().default(18),

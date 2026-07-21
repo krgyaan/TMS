@@ -7,16 +7,16 @@
         Tender Number : {{data.tender_no}} --}}
         View Tender : {{data.tender_link}}
     </p>
-    <p>Attached Below:</p>
-    <ul>
-        <li>
-            Screenshot of the Final result:
-            {{#if data.final_screenshot}}
-                Attached
-            {{else}}
-                Not Available
-            {{/if}}
-        </li>
+    {{#if data.final_screenshot_url}}
+    <p>
+        Screenshot:
+        <a href="{{data.final_screenshot_url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">
+            {{data.final_screenshot_name}}
+        </a>
+    </p>
+    {{else}}
+    <p>No screenshot available.</p>
+    {{/if}}
         <li>
             {{#if data.reason}}
             Reason For Tender Cancellation : {{data.reason}}

@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, Table
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Copy, Trash2, AlertCircle, Calculator } from "lucide-react";
-import { calculateTotals, formatCurrency } from "@/modules/operations/project-dashboard/helpers/projectDashboard.mapper";
+import { calculateTotals, formatCurrency } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.mapper";
 import type { VendorWorkOrderFormValues } from "../helpers/vwoForm.schema";
 import { useMemo } from "react";
 
@@ -28,7 +28,7 @@ export function VWOProductsField({ control }: VWOProductsFieldProps) {
     const calculations = useMemo(() => calculateTotals(products), [products]);
 
     const addProduct = () => {
-        append({ description: "", hsnSac: "", qty: null, rate: null, gstRate: 18 } as any);
+        append({ description: "", qty: null, rate: null, gstRate: 18 } as any);
     };
 
     const duplicateProduct = (index: number) => {
@@ -64,7 +64,6 @@ export function VWOProductsField({ control }: VWOProductsFieldProps) {
                         <TableRow>
                             <TableHead className="w-[5%]">#</TableHead>
                             <TableHead className="w-[50%]">Description *</TableHead>
-                            <TableHead className="w-[10%]">HSN/SAC *</TableHead>
                             <TableHead className="w-[9%]">Qty *</TableHead>
                             <TableHead className="w-[11%]">Rate (₹) *</TableHead>
                             <TableHead className="w-[9%]">GST % *</TableHead>
@@ -97,19 +96,13 @@ export function VWOProductsField({ control }: VWOProductsFieldProps) {
                                         </FieldWrapper>
                                     </TableCell>
                                     <TableCell className="p-1 align-top pt-2">
-                                        <FieldWrapper control={control} name={`products.${index}.hsnSac` as any} label="">
-                                            {(fieldProps) => (
-                                                <Input {...fieldProps} placeholder="HSN" className="h-9 font-mono" />
-                                            )}
-                                        </FieldWrapper>
-                                    </TableCell>
-                                    <TableCell className="p-1 align-top pt-2">
                                         <FieldWrapper control={control} name={`products.${index}.qty` as any} label="">
                                             {(fieldProps) => (
                                                 <NumberInput
                                                     value={fieldProps.value}
                                                     onChange={fieldProps.onChange}
                                                     min={0}
+                                                    step={0.01}
                                                     placeholder="0"
                                                     className="h-9 text-right"
                                                 />

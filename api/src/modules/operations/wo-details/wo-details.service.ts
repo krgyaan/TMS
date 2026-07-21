@@ -4,7 +4,10 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { ClientDirectorySyncService } from '@/modules/shared/client-directory/client-directory-sync.service';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
-import { woAcceptance, woAmendments, woBasicDetails, woBillingAddresses, woBillingBoq, woBuybackBoq, woContacts, woDetails, woDocuments, woKickoffMeetings, woQueries, woShippingAddresses } from '@db/schemas/operations';
+import {
+  woAcceptance, woAmendments, woBasicDetails, woBillingAddresses, woBillingBoq, woBuybackBoq,
+  woContacts, woDetails, woDocuments, woKickoffMeetings, woQueries, woShippingAddresses
+} from '@db/schemas/operations';
 import { rfqResponseDocuments, rfqResponses, rfqs, tenderCostingSheets, tenderInfos } from '@db/schemas/tendering';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, ilike, isNull, ne, or, sql } from 'drizzle-orm';
@@ -16,7 +19,10 @@ import type { SavePage4Dto, SubmitPage4Dto } from './dto/page4-billing.dto';
 import type { SavePage5Dto, SubmitPage5Dto } from './dto/page5-execution.dto';
 import type { SavePage6Dto, SubmitPage6Dto } from './dto/page6-profitability.dto';
 import type { SavePage7Dto, SubmitPage7Dto } from './dto/page7-acceptance.dto';
-import type { CreateWoDetailDto, ImportContactsResponse, TenderDocumentsChecklist, UpdateWoDetailDto, WizardInitResponse, WizardValidationResult, WoDetailsListResponseDto, WoDetailsQueryDto, WoDetailsStatus } from './dto/wo-details.dto';
+import type {
+  CreateWoDetailDto, ImportContactsResponse, TenderDocumentsChecklist, UpdateWoDetailDto,
+  WizardValidationResult, WoDetailsListResponseDto, WoDetailsQueryDto, WoDetailsStatus
+} from './dto/wo-details.dto';
 
 const oeFirstUser = alias(users, 'oeFirstUser');
 const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
@@ -670,62 +676,6 @@ export class WoDetailsService {
     await this.db.delete(woDetails).where(eq(woDetails.id, id));
   }
   // WIZARD OPERATIONS
-  async initializeWizard(
-    woBasicDetailId: number,
-    userId?: number,
-  ): Promise<WizardInitResponse> {
-    const [basicDetail] = await this.db
-      .select({ id: woBasicDetails.id })
-      .from(woBasicDetails)
-      .where(eq(woBasicDetails.id, woBasicDetailId))
-      .limit(1);
-
-    if (!basicDetail) {
-      throw new NotFoundException(
-        `WO Basic Detail with ID ${woBasicDetailId} not found`,
-      );
-    }
-
-    const now = new Date();
-
-    const [row] = await this.db
-      .insert(woDetails)
-      .values({
-        woBasicDetailId,
-        currentPage: 1,
-        completedPages: [],
-        skippedPages: [],
-        status: 'draft',
-        startedAt: now,
-        createdAt: now,
-        updatedAt: now,
-        createdBy: userId ?? null,
-      })
-      .onConflictDoUpdate({
-        target: woDetails.woBasicDetailId,
-        set: { updatedAt: now },
-      })
-      .returning();
-
-    await this.db
-      .update(woBasicDetails)
-      .set({ currentStage: 'wo_details', updatedAt: now })
-      .where(eq(woBasicDetails.id, woBasicDetailId));
-
-    const isExisting = row.createdAt !== row.updatedAt;
-    const mapped = this.mapRowToResponse(row);
-    return {
-      id: mapped.id,
-      woBasicDetailId: mapped.woBasicDetailId,
-      status: mapped.status,
-      currentPage: mapped.currentPage,
-      completedPages: mapped.completedPages as number[],
-      skippedPages: mapped.skippedPages as number[],
-      createdAt: mapped.createdAt,
-      isExisting,
-    };
-  }
-
   async getWizardProgress(id: number) {
     const detail = await this.findById(id);
 

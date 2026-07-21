@@ -1,46 +1,47 @@
-// src/modules/hrms/assets/assets.service.ts
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { eq, count, desc } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { employeeAssets, type NewEmployeeAsset, type EmployeeAsset } from "@/db/schemas/hrms/employee-assets.schema";
-import { assetTrackingHistory, type NewAssetTrackingHistory, type AssetTrackingHistory } from "@/db/schemas/hrms/asset-tracking-history.schema";
+import { assetTrackingHistory, type NewAssetTrackingHistory } from "@/db/schemas/hrms/asset-tracking-history.schema";
 import { users } from "@/db/schemas/auth/users.schema";
 
 // ─── Label Maps ───────────────────────────────────────────────────────────────
 
 const ASSET_TYPE_LABELS: Record<string, string> = {
-  "1": "Laptop", "2": "Desktop", "3": "Mobile", "4": "Monitor",
-  "5": "Keyboard", "6": "Mouse", "7": "Printer", "8": "Vehicle",
-  "9": "ID Card", "10": "Access Card", "11": "SIM Card", "12": "Other",
+  laptop: "Laptop", desktop: "Desktop", mobile: "Mobile", monitor: "Monitor",
+  keyboard: "Keyboard", mouse: "Mouse", printer: "Printer",
+  id_card: "ID Card", access_card: "Access Card", sim_card: "SIM Card", other: "Other",
+  car: "Car", bike: "Bike", scooter: "Scooter", bus: "Bus",
 };
 
 const ASSET_CATEGORY_LABELS: Record<string, string> = {
-  "1": "IT Equipment", "2": "Office Furniture", "3": "Vehicle", "4": "Stationery",
+  it_equipment: "IT Equipment", vehicle: "Vehicle", documents: "Documents",
 };
 
 const ASSET_CONDITION_LABELS: Record<string, string> = {
-  "1": "New", "2": "Good", "3": "Fair", "4": "Poor", "5": "Damaged",
+  new: "New", good: "Good", fair: "Fair", poor: "Poor", damaged: "Damaged",
 };
 
 const ASSET_LOCATION_LABELS: Record<string, string> = {
-  "1": "Office", "2": "Home", "3": "Field", "4": "Warehouse", "5": "Repair Center",
+  office: "Office", home: "Home", field: "Field", warehouse: "Warehouse", repair_center: "Repair Center",
 };
 
 const ASSET_STATUS_LABELS: Record<string, string> = {
-  "1": "Assigned", "2": "Available", "3": "Under Repair",
-  "4": "Damaged", "5": "Lost", "6": "Returned",
+  assigned: "Assigned", available: "Available", under_repair: "Under Repair",
+  damaged: "Damaged", lost: "Lost", returned: "Returned", disposed: "Disposed",
 };
 
 const ASSET_TYPE_PREFIXES: Record<string, string> = {
-  "1": "LAP", "2": "DSK", "3": "MOB", "4": "MON", "5": "KEY",
-  "6": "MOU", "7": "PRT", "8": "VEH", "9": "IDC", "10": "ACC",
-  "11": "SIM", "12": "OTH",
+  laptop: "LAP", desktop: "DSK", mobile: "MOB", monitor: "MON", keyboard: "KEY",
+  mouse: "MOU", printer: "PRT", id_card: "IDC", access_card: "ACC",
+  sim_card: "SIM", other: "OTH",
+  car: "CAR", bike: "BIK", scooter: "SCO", bus: "BUS",
 };
 
 const ACTION_TYPE_MAP: Record<string, string> = {
-  "1": "ASSIGN", "2": "AVAILABLE", "3": "REPAIR",
-  "4": "DAMAGE", "5": "LOSS", "6": "RETURN",
+  assigned: "ASSIGN", available: "AVAILABLE", under_repair: "REPAIR",
+  damaged: "DAMAGE", lost: "LOSS", returned: "RETURN", disposed: "DISPOSAL",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -90,9 +91,16 @@ export interface StatusUpdateDto {
   repairDescription?: string | null;
   
   // Financial
-  deductionAmount?: string | null;
+  deductionAmount?: number | null;
   deductionReason?: string | null;
   
+  // Disposal fields
+  disposalDate?: string | null;
+  disposalType?: string | null;
+  disposalReason?: string | null;
+  disposalAmount?: string | null;
+  disposalApprovedBy?: string | null;
+
   // General
   remarks?: string | null;
   changedByUserId?: number | null;
@@ -113,6 +121,7 @@ export class AssetsService {
       assetConditionLabel: ASSET_CONDITION_LABELS[asset.assetCondition ?? ""] ?? asset.assetCondition,
       assetLocationLabel: ASSET_LOCATION_LABELS[asset.assetLocation ?? ""] ?? asset.assetLocation,
       assetStatusLabel: ASSET_STATUS_LABELS[asset.assetStatus ?? ""] ?? asset.assetStatus,
+      returnConditionLabel: ASSET_CONDITION_LABELS[asset.returnCondition ?? ""] ?? asset.returnCondition,
     };
   }
 
@@ -121,9 +130,9 @@ export class AssetsService {
       ...history,
       previousStatusLabel: history.previousStatus ? ASSET_STATUS_LABELS[history.previousStatus] ?? history.previousStatus : null,
       newStatusLabel: ASSET_STATUS_LABELS[history.newStatus] ?? history.newStatus,
-      // assetLocationLabel: history.assetLocation ? ASSET_LOCATION_LABELS[history.assetLocation] ?? history.assetLocation : null,
-      // returnConditionLabel: history.returnCondition ? ASSET_CONDITION_LABELS[history.returnCondition] ?? history.returnCondition : null,
-      // assetConditionAfterLabel: history.assetConditionAfter ? ASSET_CONDITION_LABELS[history.assetConditionAfter] ?? history.assetConditionAfter : null,
+      assetLocationLabel: history.assetLocation ? ASSET_LOCATION_LABELS[history.assetLocation] ?? history.assetLocation : null,
+      returnConditionLabel: history.returnCondition ? ASSET_CONDITION_LABELS[history.returnCondition] ?? history.returnCondition : null,
+      assetConditionAfterLabel: history.assetConditionAfter ? ASSET_CONDITION_LABELS[history.assetConditionAfter] ?? history.assetConditionAfter : null,
     };
   }
 
@@ -193,8 +202,8 @@ export class AssetsService {
       .returning();
 
     // Log initial assignment
-    if (cleanData.assetStatus === "1" && cleanData.userId) {
-      await this.createHistoryRecord(rows[0].id, null, "1", {
+    if (cleanData.assetStatus === "assigned" && cleanData.userId) {
+      await this.createHistoryRecord(rows[0].id, null, "assigned", {
         userId: cleanData.userId as number,
         assignedDate: cleanData.assignedDate as string,
         expectedReturnDate: cleanData.expectedReturnDate as string,
@@ -245,45 +254,52 @@ export class AssetsService {
 
     // Status-specific updates
     switch (newStatus) {
-      case "1": // Assigned
+      case "assigned":
         assetUpdate.userId = data.userId;
         assetUpdate.assignedDate = data.assignedDate;
         assetUpdate.expectedReturnDate = data.expectedReturnDate || null;
         assetUpdate.purpose = data.purpose || null;
         assetUpdate.assetLocation = data.assetLocation || null;
+        assetUpdate.assignedBy = data.changedByUserId;
         break;
 
-      case "2": // Available
-        // Clear assignment
+      case "available":
         assetUpdate.userId = null;
         assetUpdate.returnDate = data.returnDate || new Date().toISOString().split('T')[0];
         break;
 
-      case "3": // Under Repair
-        // assetUpdate.userId = null;
-        assetUpdate.assetLocation = "5"; // Repair Center
+      case "under_repair":
+        assetUpdate.assetLocation = "repair_center";
         assetUpdate.damageRemarks = data.repairDescription || null;
         break;
 
-      case "4": // Damaged
-        // assetUpdate.userId = null;
-        assetUpdate.assetCondition = data.assetCondition || "5";
+      case "damaged":
+        assetUpdate.assetCondition = data.assetCondition || "damaged";
         assetUpdate.damageRemarks = data.damageDescription || null;
-        assetUpdate.deductionAmount = data.deductionAmount || null;
+        assetUpdate.deductionAmount = data.deductionAmount ? String(data.deductionAmount) : null;
         break;
 
-      case "5": // Lost
-        // assetUpdate.userId = null;
+      case "lost":
         assetUpdate.damageRemarks = data.lostCircumstances || null;
-        assetUpdate.deductionAmount = data.deductionAmount || null;
+        assetUpdate.deductionAmount = data.deductionAmount ? String(data.deductionAmount) : null;
         break;
 
-      case "6": // Returned
+      case "returned":
         assetUpdate.userId = null;
         assetUpdate.returnDate = data.returnDate;
         assetUpdate.returnCondition = data.returnCondition || null;
         assetUpdate.assetCondition = data.assetCondition || null;
-        assetUpdate.deductionAmount = data.deductionAmount || null;
+        assetUpdate.deductionAmount = data.deductionAmount ? String(data.deductionAmount) : null;
+        break;
+
+      case "disposed":
+        assetUpdate.userId = null;
+        assetUpdate.assetLocation = null;
+        assetUpdate.disposalDate = data.disposalDate || null;
+        assetUpdate.disposalType = data.disposalType || null;
+        assetUpdate.disposalReason = data.disposalReason || null;
+        assetUpdate.disposalAmount = data.disposalAmount || null;
+        assetUpdate.disposalApprovedBy = data.disposalApprovedBy || null;
         break;
     }
 
@@ -351,9 +367,16 @@ export class AssetsService {
       repairDescription: data.repairDescription ?? null,
       
       // Financial
-      deductionAmount: data.deductionAmount ?? null,
+      deductionAmount: data.deductionAmount != null ? String(data.deductionAmount) : null,
       deductionReason: data.deductionReason ?? null,
       assetConditionAfter: data.assetCondition ?? null,
+      
+      // Disposal
+      disposalDate: data.disposalDate ?? null,
+      disposalType: data.disposalType ?? null,
+      disposalReason: data.disposalReason ?? null,
+      disposalAmount: data.disposalAmount ?? null,
+      disposalApprovedBy: data.disposalApprovedBy ?? null,
       
       // General
       remarks: data.remarks ?? null,
@@ -366,14 +389,50 @@ export class AssetsService {
   async getAssetHistory(assetId: number): Promise<any[]> {
     const rows = await this.db
       .select({
+        id: assetTrackingHistory.id,
+        assetId: assetTrackingHistory.assetId,
         previousStatus: assetTrackingHistory.previousStatus,
         newStatus: assetTrackingHistory.newStatus,
-        createdAt : assetTrackingHistory.createdAt,
+        actionType: assetTrackingHistory.actionType,
+        assignedToUserId: assetTrackingHistory.assignedToUserId,
+        assignedByUserId: assetTrackingHistory.assignedByUserId,
+        assignedDate: assetTrackingHistory.assignedDate,
+        expectedReturnDate: assetTrackingHistory.expectedReturnDate,
+        purpose: assetTrackingHistory.purpose,
+        assetLocation: assetTrackingHistory.assetLocation,
+        returnDate: assetTrackingHistory.returnDate,
+        returnCondition: assetTrackingHistory.returnCondition,
+        damageDate: assetTrackingHistory.damageDate,
+        damageType: assetTrackingHistory.damageType,
+        damageDescription: assetTrackingHistory.damageDescription,
+        isRepairable: assetTrackingHistory.isRepairable,
+        lostDate: assetTrackingHistory.lostDate,
+        lostLocation: assetTrackingHistory.lostLocation,
+        lostCircumstances: assetTrackingHistory.lostCircumstances,
+        policeReportNumber: assetTrackingHistory.policeReportNumber,
+        policeReportDate: assetTrackingHistory.policeReportDate,
+        repairStartDate: assetTrackingHistory.repairStartDate,
+        repairEndDate: assetTrackingHistory.repairEndDate,
+        repairEstimatedCost: assetTrackingHistory.repairEstimatedCost,
+        repairActualCost: assetTrackingHistory.repairActualCost,
+        repairVendor: assetTrackingHistory.repairVendor,
+        repairDescription: assetTrackingHistory.repairDescription,
+        deductionAmount: assetTrackingHistory.deductionAmount,
+        deductionReason: assetTrackingHistory.deductionReason,
+        assetConditionAfter: assetTrackingHistory.assetConditionAfter,
+        disposalDate: assetTrackingHistory.disposalDate,
+        disposalType: assetTrackingHistory.disposalType,
+        disposalReason: assetTrackingHistory.disposalReason,
+        disposalAmount: assetTrackingHistory.disposalAmount,
+        disposalApprovedBy: assetTrackingHistory.disposalApprovedBy,
+        remarks: assetTrackingHistory.remarks,
+        changedByUserId: assetTrackingHistory.changedByUserId,
+        createdAt: assetTrackingHistory.createdAt,
         assignedTo: users.name,
       })
       .from(assetTrackingHistory)
       .where(eq(assetTrackingHistory.assetId, assetId))
-      .innerJoin(users, eq(assetTrackingHistory.assignedToUserId, users.id))
+      .leftJoin(users, eq(assetTrackingHistory.assignedToUserId, users.id))
       .orderBy(desc(assetTrackingHistory.createdAt));
     
     return rows.map(row => this.resolveHistoryLabels(row));

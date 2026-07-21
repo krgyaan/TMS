@@ -68,7 +68,7 @@ export class CostingSheetsService {
         const baseConditions = [baseCondition, TenderInfosService.getApprovedCondition()];
 
         const roleFilterConditions: any[] = [];
-        if (user && user.roleId) {
+        if (user?.roleId) {
             if (user.dataScope === 'all') {
                 if (teamId !== undefined && teamId !== null) {
                     roleFilterConditions.push(eq(tenderInfos.team, teamId));
@@ -95,28 +95,30 @@ export class CostingSheetsService {
         const conditions = [...baseConditions, ...roleFilterConditions];
 
         if (tab === 'pending') {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
-            conditions.push(sql`(
-                EXISTS (SELECT 1 FROM ${tenderCostingDetails}
-                        WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
-                        AND ${tenderCostingDetails.status} IN ('Pending', 'Rejected/Redo'))
-                OR
-                NOT EXISTS (SELECT 1 FROM ${tenderCostingDetails}
-                            WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
-                            AND ${tenderCostingDetails.submittedFinalPrice} IS NOT NULL)
-            )`);
-            conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions)));
+            conditions.push(
+                TenderInfosService.getExcludeStatusCondition(['lost']), 
+                sql`(EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                    WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                    AND ${tenderCostingDetails.status} IN ('Pending', 'Rejected/Redo'))
+                    OR
+                    NOT EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                    WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                    AND ${tenderCostingDetails.submittedFinalPrice} IS NOT NULL)
+                )`,
+                or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions))
+            );
         } else if (tab === 'submitted') {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb']));
-            conditions.push(sql`(
-                EXISTS (SELECT 1 FROM ${tenderCostingDetails}
-                        WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
-                        AND ${tenderCostingDetails.status} = 'Submitted')
-                OR
-                EXISTS (SELECT 1 FROM ${tenderCostingDetails}
-                        WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
-                        AND ${tenderCostingDetails.submittedFinalPrice} IS NOT NULL)
-            )`);
+            conditions.push(
+                TenderInfosService.getExcludeStatusCondition(['dnb']), 
+                sql`(EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                    WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                    AND ${tenderCostingDetails.status} = 'Submitted')
+                    OR
+                    EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                    WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                    AND ${tenderCostingDetails.submittedFinalPrice} IS NOT NULL)
+                )`
+            );
             conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions)));
         } else if (tab === 'tender-dnb') {
             conditions.push(eq(bidSubmissions.status, 'Tender Missed'));
@@ -279,7 +281,7 @@ export class CostingSheetsService {
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; submitted: number; 'tender-dnb': number; total: number }> {
         const roleFilterConditions: any[] = [];
-        if (user && user.roleId) {
+        if (user?.roleId) {
             if (user.dataScope === 'all') {
                 if (teamId !== undefined && teamId !== null) {
                     roleFilterConditions.push(eq(tenderInfos.team, teamId));
@@ -522,9 +524,40 @@ export class CostingSheetsService {
             });
         } catch (error) {
             if (error instanceof ConflictException) {
-                this.logger.warn(`Timer conflict for costing_sheet for tender ${data.tenderId} — skipping`);
+                this.logger.warn(`Timer conflict for costing_sheets for tender ${data.tenderId} — skipping`);
             } else {
                 this.logger.error(`Failed to stop timer: ${error}`);
+            }
+        }
+
+        // Start costing_sheet_approval timer
+        try {
+            const timerInput: any = {
+                entityType: 'TENDER',
+                entityId: data.tenderId,
+                stage: 'costing_sheet_approval',
+                userId: data.submittedBy,
+            };
+            if (currentTender?.dueDate) {
+                const dueDate = new Date(currentTender.dueDate);
+                const hoursBeforeDeadline = -48;
+                timerInput.deadlineAt = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
+                timerInput.timerConfig = {
+                    type: 'NEGATIVE_COUNTDOWN',
+                    hoursBeforeDeadline,
+                };
+            } else {
+                timerInput.timerConfig = {
+                    type: 'FIXED_DURATION',
+                    durationHours: 24,
+                };
+            }
+            await this.timersService.startTimer(timerInput);
+        } catch (error) {
+            if (error instanceof ConflictException) {
+                this.logger.warn(`Timer already running for costing_sheet_approval for tender ${data.tenderId} — skipping`);
+            } else {
+                this.logger.error(`Failed to start timer for costing_sheet_approval for tender ${data.tenderId}:`, error);
             }
         }
 
@@ -638,6 +671,37 @@ export class CostingSheetsService {
                 this.logger.warn(`Timer conflict for costing_sheets for tender ${sheet.tenderId} — skipping`);
             } else {
                 this.logger.error(`Failed to stop timer: ${error}`);
+            }
+        }
+
+        // Start costing_sheet_approval timer
+        try {
+            const timerInput: any = {
+                entityType: 'TENDER',
+                entityId: sheet.tenderId,
+                stage: 'costing_sheet_approval',
+                userId: changedBy,
+            };
+            if (currentTender?.dueDate) {
+                const dueDate = new Date(currentTender.dueDate);
+                const hoursBeforeDeadline = -48;
+                timerInput.deadlineAt = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
+                timerInput.timerConfig = {
+                    type: 'NEGATIVE_COUNTDOWN',
+                    hoursBeforeDeadline,
+                };
+            } else {
+                timerInput.timerConfig = {
+                    type: 'FIXED_DURATION',
+                    durationHours: 24,
+                };
+            }
+            await this.timersService.startTimer(timerInput);
+        } catch (error) {
+            if (error instanceof ConflictException) {
+                this.logger.warn(`Timer already running for costing_sheet_approval for tender ${sheet.tenderId} — skipping`);
+            } else {
+                this.logger.error(`Failed to start timer for costing_sheet_approval for tender ${sheet.tenderId}:`, error);
             }
         }
 
@@ -838,7 +902,7 @@ export class CostingSheetsService {
 
         const teamId = tender.team;
         const teamConfig = this.googleDriveService.getTeamConfig(teamId);
-        if (!teamConfig || !teamConfig.folderId) throw new BadRequestException(`Google Drive not configured for this team`);
+        if (!teamConfig?.folderId) throw new BadRequestException(`Google Drive not configured for this team`);
 
         const existingSheet = await this.db
             .select()
@@ -916,7 +980,7 @@ export class CostingSheetsService {
             .then(r => r[0] || null);
 
         const tender = await this.tenderInfosService.findById(tenderId);
-        if (!tender || !tender.teamMember) return;
+        if (!tender?.teamMember) return;
 
         const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
         let tlName = 'Team Leader';
@@ -938,7 +1002,7 @@ export class CostingSheetsService {
         const formatCurrency = (value: string | null) => {
             if (!value) return '₹0';
             const num = Number(value);
-            return isNaN(num) ? value : `₹${num.toLocaleString('en-IN')}`;
+            return Number.isNaN(num) ? value : `₹${num.toLocaleString('en-IN')}`;
         };
 
         const totals = costingDetails.reduce((acc, d) => ({

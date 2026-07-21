@@ -542,17 +542,6 @@ export const PageSubmitSchemas = {
 
 // RESPONSE TYPES
 
-export interface WizardInitResponse {
-  id: number;
-  woBasicDetailId: number;
-  status: string;
-  currentPage: number;
-  completedPages: number[];
-  skippedPages: number[];
-  createdAt: string;
-  isExisting: boolean;
-}
-
 export interface WizardValidationResult {
   isValid: boolean;
   missingRequiredPages: number[];

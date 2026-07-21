@@ -10,7 +10,7 @@ import { ExtendTimerInput, StartTimerInput, TimerActionInput, TimerWithComputed,
 export class TimersService {
     private readonly logger = new Logger(TimersService.name);
 
-    constructor(@Inject(DRIZZLE) private db: DbInstance) { }
+    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
 
     async startTimer(input: StartTimerInput): Promise<TimerWithComputed> {
         const { entityId, entityType, stage } = input;
@@ -27,12 +27,6 @@ export class TimersService {
 
         // Calculate allocated time
         const allocatedTimeMs = this.calculateAllocatedTime(input);
-
-        //THE CHECK BELOW IS NOT REQUIRED, THE ALLOCATED TIME CAN BE NEGATIVE
-
-        // if (allocatedTimeMs <= 0) {
-        //     throw new BadRequestException('Allocated time must be greater than 0');
-        // }
 
         const now = new Date();
         const deadline = input.deadlineAt || new Date(now.getTime() + allocatedTimeMs);
@@ -461,24 +455,18 @@ export class TimersService {
 
         // Priority 2: Timer config
         if (input.timerConfig) {
-            const { type, durationHours, hoursBeforeDeadline } = input.timerConfig;
+            const { type, durationHours } = input.timerConfig;
 
             switch (type) {
                 case 'FIXED_DURATION':
                     return hoursToMs(durationHours ?? 24);
 
                 case 'DEADLINE_BASED':
+                case 'NEGATIVE_COUNTDOWN':
                     if (input.deadlineAt) {
                         return new Date(input.deadlineAt).getTime() - Date.now();
                     }
-                    break;
-
-                case 'NEGATIVE_COUNTDOWN':
-                    if (input.deadlineAt && hoursBeforeDeadline) {
-                        const targetTime = new Date(input.deadlineAt).getTime() + hoursToMs(hoursBeforeDeadline);
-                        return targetTime - Date.now();
-                    }
-                    break;
+                break;
 
                 case 'NO_TIMER':
                     return 0;
