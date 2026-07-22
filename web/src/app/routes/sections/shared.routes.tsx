@@ -1,4 +1,3 @@
-// src/routes/SharedRoutes.tsx (or wherever your file is)
 import { lazy } from "react";
 import { Routes, Route } from "react-router-dom";
 import { RouteWrapper } from "../components/RouteWrapper";
@@ -18,6 +17,9 @@ const CourierEditPage = lazy(() => import("@/modules/shared/courier/CourierEdit"
 
 // Imprests
 const Shared_Imprest = lazy(() => import("@/modules/shared/imprest"));
+
+// Maker Requests
+const Shared_MakerRequests = lazy(() => import("@/modules/shared/maker-requests/MyMakerRequests"));
 const ImprestCreatePage = lazy(() => import("@/modules/shared/imprest/create"));
 const ImprestEditPage = lazy(() => import("@/modules/shared/imprest/edit"));
 const ImprestPaymentHistoryPage = lazy(() => import("@/modules/shared/imprest/ImprestPaymentHistory"));
@@ -69,6 +71,16 @@ export default function SharedRoutes() {
             <Route path="imprests/:id/edit" element={<RouteWrapper><ImprestEditPage /></RouteWrapper>}/>
 
             {/* <Route path="imprests/show/:id" element={<ImprestViewPage />} /> */}
+
+            {/* Maker Requests Routes */}
+            <Route
+                path="maker-requests"
+                element={
+                    <RouteWrapper>
+                        <Shared_MakerRequests />
+                    </RouteWrapper>
+                }
+            />
         </Routes>
     );
 }

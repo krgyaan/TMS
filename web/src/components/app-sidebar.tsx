@@ -190,6 +190,7 @@ const navMain: NavGroup[] = [
             { title: "Follow Ups", url: paths.shared.followUp, permission: "shared.followups" },
             { title: "Couriers", url: paths.shared.couriers, permission: "shared.couriers" },
             { title: "Imprests", url: paths.shared.imprest, permission: "shared.imprests" },
+            { title: "Maker Requests", url: paths.shared.makerRequests, permission: "shared.maker-requests" },
         ],
     },
 ];

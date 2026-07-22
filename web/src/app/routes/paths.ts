@@ -374,6 +374,8 @@ export const paths = {
 
         imprestVoucherView: (params: { userId: number; from: string; to: string }) =>
             `/shared/imprests/voucher/view?userId=${params.userId}&from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}`,
+
+        makerRequests: "/shared/maker-requests",
     },
 
     // ==================== DOCUMENT DASHBOARD ====================
