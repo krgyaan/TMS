@@ -22,7 +22,7 @@ import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import { useMakerRequests, useMakerRequestDetails, useUpdateMakerRequestStatus } from "@/hooks/api/useMakerRequests";
 import { tenderFilesService } from "@/services/api/tender-files.service";
-import type { MakerRequestRow } from "@/modules/operations/maker-requests/helpers/makerRequest.types";
+import type { MakerRequestRow } from "@/modules/shared/maker-requests/helpers/makerRequest.types";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
     pending: { label: "Pending", color: "text-yellow-600 bg-yellow-50" },
