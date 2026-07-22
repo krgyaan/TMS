@@ -227,7 +227,7 @@ export const paths = {
         purchaseOrders: "/accounts/purchase-orders",
         saleInvoices: "/accounts/sale-invoices",
         paymentRequests: "/accounts/payment-requests",
-        makerRequestCreate: "/accounts/maker-requests/create",
+
     },
 
     
@@ -376,6 +376,7 @@ export const paths = {
             `/shared/imprests/voucher/view?userId=${params.userId}&from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}`,
 
         makerRequests: "/shared/maker-requests",
+        makerRequestCreate: "/shared/maker-requests/create",
     },
 
     // ==================== DOCUMENT DASHBOARD ====================
