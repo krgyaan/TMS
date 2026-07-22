@@ -870,9 +870,9 @@ export class TenderResultService {
             return updated;
         });
 
-        // if (hasResultDetails && dto.technicallyQualified === 'Yes') {
-        //     await this.sendTenderResultEmail(tenderId, changedBy, dto, details);
-        // }
+        if (hasResultDetails && dto.technicallyQualified === 'Yes') {
+            await this.sendTenderResultEmail(tenderId, changedBy, dto, details);
+        }
 
         return result;
     }
