@@ -8,6 +8,13 @@ export function useMakerRequests() {
     });
 }
 
+export function useMyMakerRequests() {
+    return useQuery({
+        queryKey: ["maker-requests", "my"],
+        queryFn: () => makerRequestApi.getMyRequests(),
+    });
+}
+
 export function useMakerRequestDetails(id: number) {
     return useQuery({
         queryKey: ["maker-requests", id],
