@@ -8,3 +8,6 @@ export * from './lead-contacts.schema';
 // Followup Categories
 export * from './followup-categories.schema';
 export * from './followup-categories.relations';
+
+// Lead Enquiries
+export * from './lead-enquiries.schema';

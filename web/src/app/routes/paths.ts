@@ -240,6 +240,10 @@ export const paths = {
         leadFollowupHistory: (leadId: number | string) => `/crm/followup/${leadId}/history`,
 
         enquiries: "/crm/enquiries",
+        enquiryCreate: "/crm/enquiries/create",
+        enquiryCreateFromLead: (leadId: number | string) => `/crm/enquiry/create/${leadId}`,
+        enquiryEdit: (id: number | string) => `/crm/enquiries/${id}/edit`,
+        enquiryView: (id: number | string) => `/crm/enquiries/${id}`,
         costings: "/crm/costings",
         quotations: "/crm/quotations",
     },

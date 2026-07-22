@@ -18,7 +18,6 @@ import { FdrModule } from "@/modules/bi-dashboard/fdr/fdr.module";
 import { PayOnPortalModule } from "@/modules/bi-dashboard/pay-on-portal/pay-on-portal.module";
 import { TenderFeeModule } from "@/modules/bi-dashboard/tender-fee/tender-fee.module";
 import { CourierModule } from "@/modules/courier/courier.module";
-import { LeadsModule } from "@/modules/crm/leads/leads.module";
 import { EmailModule } from "@/modules/email/email.module";
 import { EmployeeImprestModule } from "@/modules/employee-imprest/employee-imprest.module";
 import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
@@ -42,8 +41,8 @@ import { ItemsModule } from "@/modules/master/items/items.module";
 import { LeadTypesModule } from "@/modules/master/lead-types/lead-types.module";
 import { LeadsModule } from "@/modules/crm/leads/leads.module";
 import { FollowupsModule } from "@/modules/crm/followups/followups.module";
+import { LeadEnquiryModule } from "@/modules/crm/lead-enquiry/lead-enquiry.module";
 import { LeadIndustriesModule } from "@/modules/master/lead-industries/lead-industries.module";
-import { LeadTypesModule } from "@/modules/master/lead-types/lead-types.module";
 import { LoanPartiesModule } from "@/modules/master/loan-parties/loan-parties.module";
 import { LocationsModule } from "@/modules/master/locations/locations.module";
 import { OauthAccountsModule } from "@/modules/master/oauth-accounts/oauth-accounts.module";
@@ -183,6 +182,7 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         LeadIndustriesModule,
         LeadsModule,
         FollowupsModule,
+        LeadEnquiryModule,
         TendersModule,
         EmployeeImprestModule,
         TenderInfoSheetsModule,
