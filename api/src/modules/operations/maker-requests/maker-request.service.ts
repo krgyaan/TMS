@@ -134,6 +134,18 @@ export class MakerRequestService {
         return mr;
     }
 
+    async getByUser(userId: number) {
+        return this.db
+            .select({
+                ...this.mrFields,
+                requestedByName: users.name,
+            })
+            .from(makerRequests)
+            .leftJoin(users, eq(makerRequests.requestedBy, users.id))
+            .where(eq(makerRequests.requestedBy, userId))
+            .orderBy(desc(makerRequests.id));
+    }
+
     async getAll() {
         return this.db
             .select({
