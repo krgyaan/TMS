@@ -870,9 +870,9 @@ export class TenderResultService {
             return updated;
         });
 
-        if (hasResultDetails && dto.technicallyQualified === 'Yes') {
-            await this.sendTenderResultEmail(tenderId, changedBy, dto, details);
-        }
+        // if (hasResultDetails && dto.technicallyQualified === 'Yes') {
+        //     await this.sendTenderResultEmail(tenderId, changedBy, dto, details);
+        // }
 
         return result;
     }
@@ -887,11 +887,7 @@ export class TenderResultService {
         
         try{
         //getting the status info
-        let [status] = await this
-                        .db
-                        .select()
-                        .from(statuses)
-                        .where(eq(statuses.id, dto.statusId));
+        let [status] = await this.db.select().from(statuses).where(eq(statuses.id, dto.statusId));
 
         if(!status){
             throw new NotFoundException("Requested Status not Found!");

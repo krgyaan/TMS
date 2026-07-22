@@ -177,8 +177,8 @@ export default function UploadResultFormPage({ tenderId, tenderDetails, isEditMo
                         l1Price: d.l1Price != null ? d.l1Price.toString() : undefined,
                         l2Price: d.l2Price != null ? d.l2Price.toString() : undefined,
                         ourPrice: d.ourPrice != null ? d.ourPrice.toString() : undefined,
-                        qualifiedPartiesScreenshot: Array.isArray(d.qualifiedPartiesScreenshot) && d.qualifiedPartiesScreenshot.length > 0 ? d.qualifiedPartiesScreenshot : d.qualifiedPartiesScreenshot ? [d.qualifiedPartiesScreenshot] : undefined,
-                        finalResultScreenshot: Array.isArray(d.finalResultScreenshot) && d.finalResultScreenshot.length > 0 ? d.finalResultScreenshot : d.finalResultScreenshot ? [d.finalResultScreenshot] : undefined,
+                        qualifiedPartiesScreenshot: Array.isArray(d.qualifiedPartiesScreenshot) ? (d.qualifiedPartiesScreenshot.length > 0 ? d.qualifiedPartiesScreenshot : undefined) : (d.qualifiedPartiesScreenshot ? [d.qualifiedPartiesScreenshot] : undefined),
+                        finalResultScreenshot: Array.isArray(d.finalResultScreenshot) ? (d.finalResultScreenshot.length > 0 ? d.finalResultScreenshot : undefined) : (d.finalResultScreenshot ? [d.finalResultScreenshot] : undefined),
                     }));
                 }
             }
