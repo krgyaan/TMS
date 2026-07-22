@@ -34,10 +34,10 @@ export const useNextPONumber = (projectName: string | undefined) => {
     });
 };
 
-export const useAllPurchaseOrders = () => {
+export const useAllPurchaseOrders = (teamId?: number) => {
     return useQuery({
-        queryKey: [...purchaseOrderKeys.all, "all"],
-        queryFn: () => purchaseOrderApi.getAllPurchaseOrders(),
+        queryKey: [...purchaseOrderKeys.all, "all", teamId],
+        queryFn: () => purchaseOrderApi.getAllPurchaseOrders(teamId),
     });
 };
 

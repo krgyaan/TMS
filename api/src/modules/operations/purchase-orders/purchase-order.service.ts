@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { desc, eq, inArray, like, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, like, sql } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rename } from "node:fs/promises";
 import { join } from "node:path";
@@ -68,7 +68,12 @@ export class PurchaseOrderService {
         return { purchaseOrders: purchaseOrdersData };
     }
 
-    async getAllPurchaseOrders() {
+    async getAllPurchaseOrders(teamId?: number) {
+        const conditions: ReturnType<typeof eq>[] = [];
+        if (teamId !== undefined) {
+            conditions.push(eq(users.team, teamId));
+        }
+
         const purchaseOrdersData = await this.db
                 .select({
                     id: purchaseOrders.id,
@@ -103,6 +108,7 @@ export class PurchaseOrderService {
                 })
                 .from(purchaseOrders)
                 .innerJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
+                .where(conditions.length > 0 ? and(...conditions) : undefined)
                 .orderBy(desc(purchaseOrders.createdAt));
 
         return { purchaseOrders: purchaseOrdersData };

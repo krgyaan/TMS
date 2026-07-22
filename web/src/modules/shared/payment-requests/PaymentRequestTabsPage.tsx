@@ -3,7 +3,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { useAllPaymentRequests } from "@/hooks/api/useProjectPaymentRequests";
+import { useTeamFilter } from "@/hooks/useTeamFilter";
 import { useMakerRequests } from "@/hooks/api/useMakerRequests";
+import { useLocation } from "react-router-dom";
 import PaymentRequestListPage from "./PaymentRequestListPage";
 import MakerRequestListPage from "./MakerRequestListPage";
 
@@ -15,12 +17,16 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 const PaymentRequestTabsPage: React.FC = () => {
+    const location = useLocation();
+    const { teamId } = useTeamFilter();
+    const isOperationsSection = location.pathname.includes("/operations/");
+    const effectiveTeamId = isOperationsSection ? teamId : undefined;
     const { activeTab, setActiveTab } = usePersistentTableState<TabKey>({
         storageKey: "payment-requests",
         defaultTab: "project-pr",
     });
 
-    const { data: prData } = useAllPaymentRequests();
+    const { data: prData } = useAllPaymentRequests(effectiveTeamId ?? undefined);
     const { data: mrData } = useMakerRequests();
 
     const prCount = (prData ?? []).length;

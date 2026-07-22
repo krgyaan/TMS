@@ -5,8 +5,9 @@ class PaymentRequestApiService extends BaseApiService {
         super("/project-payment-requests");
     }
 
-    async getAll() {
-        return this.get<any[]>("/");
+    async getAll(teamId?: number) {
+        const params = teamId ? `?teamId=${teamId}` : '';
+        return this.get<any[]>(`/${params}`);
     }
 
     async getById(id: number) {

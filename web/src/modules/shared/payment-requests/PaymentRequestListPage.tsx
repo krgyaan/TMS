@@ -22,10 +22,16 @@ import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-g
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { Ban, Banknote, CheckCircle2, Eye, Search } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { useTeamFilter } from "@/hooks/useTeamFilter";
 import { PAYMENT_AGAINST_LABELS, PaymentRequestDetailDialog, STATUS_CONFIG } from "./components/PaymentRequestDetailDialog";
 
 const PaymentRequestListPage: React.FC = () => {
-    const { data, isLoading } = useAllPaymentRequests();
+    const location = useLocation();
+    const { teamId } = useTeamFilter();
+    const isOperationsSection = location.pathname.includes("/operations/");
+    const effectiveTeamId = isOperationsSection ? teamId : undefined;
+    const { data, isLoading } = useAllPaymentRequests(effectiveTeamId ?? undefined);
     const updateStatusMutation = useUpdatePaymentRequestStatus();
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
     const [search, setSearch] = useState("");

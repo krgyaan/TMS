@@ -39,8 +39,8 @@ export class PurchaseOrderController {
   }
 
   @Get()
-  getAllPurchaseOrders() {
-    return this.service.getAllPurchaseOrders();
+  getAllPurchaseOrders(@Query("teamId") teamId?: string) {
+    return this.service.getAllPurchaseOrders(teamId ? Number(teamId) : undefined);
   }
 
   @Get(":id/pdf/versions")
