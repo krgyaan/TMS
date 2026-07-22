@@ -15,13 +15,17 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import { useAllPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
+import { useTeamFilter } from "@/hooks/useTeamFilter";
 import type { PurchaseOrderRow } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
 import { SetTdsDialog } from "./components/SetTdsDialog";
 
 const PurchaseOrderListPage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { data } = useAllPurchaseOrders();
+    const { teamId } = useTeamFilter();
+    const isOperationsSection = location.pathname.includes("/operations/");
+    const effectiveTeamId = isOperationsSection ? teamId : undefined;
+    const { data } = useAllPurchaseOrders(effectiveTeamId ?? undefined);
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
     const [search, setSearch] = useState("");
     const debouncedSearch = useDebouncedSearch(search, 300);

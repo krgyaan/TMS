@@ -33,8 +33,8 @@ export class PaymentRequestController {
     }
 
     @Get()
-    getAll() {
-        return this.service.getAll();
+    getAll(@Query("teamId") teamId?: string) {
+        return this.service.getAll(teamId ? Number(teamId) : undefined);
     }
 
     @Patch(":id/status")

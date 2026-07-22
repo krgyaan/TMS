@@ -244,7 +244,12 @@ export class PaymentRequestService {
         return pr;
     }
 
-    async getAll() {
+    async getAll(teamId?: number) {
+        const conditions: ReturnType<typeof eq>[] = [];
+        if (teamId !== undefined) {
+            conditions.push(eq(users.team, teamId));
+        }
+
         return this.db
             .select({
                 ...this.prFields,
@@ -259,6 +264,7 @@ export class PaymentRequestService {
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
             .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
             .leftJoin(purchaseInvoices, eq(paymentRequests.purchaseInvoiceId, purchaseInvoices.id))
+            .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(desc(paymentRequests.id));
     }
 

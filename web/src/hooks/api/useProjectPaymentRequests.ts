@@ -1,10 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { paymentRequestApi } from "@/services/api/payment-request.api";
 
-export function useAllPaymentRequests() {
+export function useAllPaymentRequests(teamId?: number) {
     return useQuery({
-        queryKey: ["payment-requests", "all"],
-        queryFn: () => paymentRequestApi.getAll(),
+        queryKey: ["payment-requests", "all", teamId],
+        queryFn: () => paymentRequestApi.getAll(teamId),
     });
 }
 

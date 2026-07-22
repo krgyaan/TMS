@@ -44,8 +44,9 @@ class PurchaseOrderApiService extends BaseApiService {
         return url;
     }
 
-    async getAllPurchaseOrders(): Promise<{ purchaseOrders: PurchaseOrderRow[] }> {
-        return this.get('');
+    async getAllPurchaseOrders(teamId?: number): Promise<{ purchaseOrders: PurchaseOrderRow[] }> {
+        const params = teamId ? `?teamId=${teamId}` : '';
+        return this.get(`/${params}`);
     }
 
     async getPurchaseOrderPdfVersions(id: number): Promise<Record<string, { path: string; hash: string }>> {
