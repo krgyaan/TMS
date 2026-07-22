@@ -13,7 +13,7 @@ export class MakerRequestController {
         return this.service.create(body, user.id);
     }
 
-    @Get("my-maker-requests")
+    @Get("my")
     getMyRequests(@CurrentUser() user: ValidatedUser) {
         return this.service.getByUser(user.id);
     }
