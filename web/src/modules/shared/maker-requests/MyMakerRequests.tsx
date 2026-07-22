@@ -17,7 +17,7 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { getShortId } from "@/lib/id-utils";
-import type { MakerRequestRow } from "@/modules/operations/maker-requests/helpers/makerRequest.types";
+import type { MakerRequestRow } from "@/modules/shared/maker-requests/helpers/makerRequest.types";
 import { tenderFilesService } from "@/services/api/tender-files.service";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
@@ -138,7 +138,7 @@ const MyMakerRequests: React.FC = () => {
                 <CardHeader className="pb-4">
                     <div className="flex justify-between items-center gap-2">
                         <CardTitle className="text-base font-semibold">My Maker Requests</CardTitle>
-                        <Button size="sm" onClick={() => navigate(paths.accounts.makerRequestCreate)}>
+                        <Button size="sm" onClick={() => navigate(paths.shared.makerRequestCreate)}>
                             <Plus className="mr-1.5 h-4 w-4" />
                             New Request
                         </Button>

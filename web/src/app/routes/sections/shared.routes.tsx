@@ -17,14 +17,15 @@ const CourierEditPage = lazy(() => import("@/modules/shared/courier/CourierEdit"
 
 // Imprests
 const Shared_Imprest = lazy(() => import("@/modules/shared/imprest"));
-
-// Maker Requests
-const Shared_MakerRequests = lazy(() => import("@/modules/shared/maker-requests/MyMakerRequests"));
 const ImprestCreatePage = lazy(() => import("@/modules/shared/imprest/create"));
 const ImprestEditPage = lazy(() => import("@/modules/shared/imprest/edit"));
 const ImprestPaymentHistoryPage = lazy(() => import("@/modules/shared/imprest/ImprestPaymentHistory"));
 const ImprestVoucherPage = lazy(() => import("@/modules/shared/imprest/ImprestVoucher"));
 const ImprestVoucherViewPage = lazy(() => import("@/modules/shared/imprest/ImprestVoucherView"));
+
+// Maker Requests
+const Shared_MakerRequests = lazy(() => import("@/modules/shared/maker-requests/MyMakerRequests"));
+const MakerRequestCreatePage = lazy(() => import("@/modules/shared/maker-requests/CreateMakerRequestPage"));
 
 export default function SharedRoutes() {
     return (
@@ -81,6 +82,7 @@ export default function SharedRoutes() {
                     </RouteWrapper>
                 }
             />
+            <Route path="maker-requests/create" element={<RouteWrapper><MakerRequestCreatePage /></RouteWrapper>} />
         </Routes>
     );
 }
