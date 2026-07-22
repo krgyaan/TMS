@@ -9,6 +9,10 @@ class MakerRequestApiService extends BaseApiService {
         return this.get<any[]>("/");
     }
 
+    async getMyRequests() {
+        return this.get<any[]>("/my-maker-requests");
+    }
+
     async getById(id: number) {
         return this.get<any>(`/${id}`);
     }

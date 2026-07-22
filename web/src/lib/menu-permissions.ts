@@ -140,6 +140,7 @@ function getPermissionModule(title: string, parentMenuTitle?: string): string | 
         // Shared sub-items
         'Follow Ups': 'shared.followups',
         'Couriers': 'shared.couriers',
+        'Maker Requests': 'shared.maker-requests',
     };
 
     return MENU_PERMISSION_MAP[title];
