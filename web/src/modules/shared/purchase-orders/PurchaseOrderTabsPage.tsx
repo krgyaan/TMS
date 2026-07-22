@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { useAllPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
 import { useAllVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
+import { useTeamFilter } from "@/hooks/useTeamFilter";
+import { useLocation } from "react-router-dom";
 import PurchaseOrderListPage from "./PurchaseOrderListPage";
 import VendorWorkOrderListPage from "@/modules/operations/vendor-work-orders/VendorWorkOrderListPage";
 
@@ -15,13 +17,17 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 const PurchaseOrderTabsPage: React.FC = () => {
+    const location = useLocation();
+    const { teamId } = useTeamFilter();
+    const isOperationsSection = location.pathname.includes("/operations/");
+    const effectiveTeamId = isOperationsSection ? teamId : undefined;
     const { activeTab, setActiveTab } = usePersistentTableState<TabKey>({
         storageKey: "purchase-orders",
         defaultTab: "purchase-orders",
     });
 
-    const { data: poData } = useAllPurchaseOrders();
-    const { data: vwoData } = useAllVendorWorkOrders();
+    const { data: poData } = useAllPurchaseOrders(effectiveTeamId ?? undefined);
+    const { data: vwoData } = useAllVendorWorkOrders(effectiveTeamId ?? undefined);
 
     const poCount = (poData?.purchaseOrders ?? []).length;
     const vwoCount = (vwoData ?? []).length;

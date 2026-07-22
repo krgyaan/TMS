@@ -2,10 +2,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 import type { CreateVendorWorkOrderDTO, UpdateVendorWorkOrderDTO } from "@/modules/operations/vendor-work-orders/helpers/vwoForm.types";
 
-export function useAllVendorWorkOrders() {
+export function useAllVendorWorkOrders(teamId?: number) {
     return useQuery({
-        queryKey: ["vendor-work-orders", "all"],
-        queryFn: () => vendorWorkOrderApi.getAll(),
+        queryKey: ["vendor-work-orders", "all", teamId],
+        queryFn: () => vendorWorkOrderApi.getAll(teamId),
     });
 }
 

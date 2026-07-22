@@ -44,8 +44,8 @@ export class VendorWorkOrderController {
   }
 
   @Get()
-  getAll() {
-    return this.service.getAll();
+  getAll(@Query("teamId") teamId?: number) {
+    return this.service.getAll(teamId);
   }
 
   @Get(":id")

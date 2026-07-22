@@ -9,17 +9,22 @@ import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import { useAllVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
+import { useTeamFilter } from "@/hooks/useTeamFilter";
 import type { VendorWorkOrderRow } from "./helpers/vwoForm.types";
 
 const VendorWorkOrderListPage: React.FC = () => {
     const navigate = useNavigate();
-    const { data } = useAllVendorWorkOrders();
+    const location = useLocation();
+    const { teamId } = useTeamFilter();
+    const isOperationsSection = location.pathname.includes("/operations/");
+    const effectiveTeamId = isOperationsSection ? teamId : undefined;
+    const { data } = useAllVendorWorkOrders(effectiveTeamId ?? undefined);
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
     const [search, setSearch] = useState("");
     const debouncedSearch = useDebouncedSearch(search, 300);

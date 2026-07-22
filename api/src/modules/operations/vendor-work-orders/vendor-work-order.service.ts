@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, like, desc, sql, inArray } from "drizzle-orm";
+import { and, eq, like, desc, sql, inArray } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { rename, readFile } from "node:fs/promises";
@@ -264,7 +264,12 @@ export class VendorWorkOrderService {
         };
     }
 
-    async getAll() {
+    async getAll(teamId?: number) {
+        const conditions: ReturnType<typeof eq>[] = [];
+        if (teamId !== undefined) {
+            conditions.push(eq(users.team, teamId));
+        }
+
         const rows = await this.db
             .select({
                 id: vendorWorkOrders.id,
@@ -291,6 +296,7 @@ export class VendorWorkOrderService {
             })
             .from(vendorWorkOrders)
             .leftJoin(users, eq(vendorWorkOrders.woRaisedBy, users.id))
+            .where(conditions.length > 0 ? and(...conditions) : undefined)
             .orderBy(desc(vendorWorkOrders.id));
 
         return rows;

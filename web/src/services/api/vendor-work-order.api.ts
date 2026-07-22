@@ -10,8 +10,9 @@ class VendorWorkOrderApiService extends BaseApiService {
         super("/vendor-work-orders");
     }
 
-    async getAll() {
-        return this.get<any[]>("/");
+    async getAll(teamId?: number) {
+        const params = teamId ? `?teamId=${teamId}` : '';
+        return this.get<any[]>(`/${params}`);
     }
 
     async getById(id: number) {
