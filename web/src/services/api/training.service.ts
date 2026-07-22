@@ -22,6 +22,7 @@ export interface VideoCourse {
     duration?: string; // formatted duration
     progress?: number; // employee's progress
     videoUrl?: string; // stream url
+    category?: string; // category of the video
 }
 
 export interface Employee {
