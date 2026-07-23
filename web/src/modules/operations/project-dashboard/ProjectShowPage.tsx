@@ -2,7 +2,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useState, useCallback } from "react";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useWoStepStatuses } from "@/hooks/api/useWoStepStatuses";
-import { useWoDetailWithRelations } from "@/hooks/api/useWoDetails";
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,9 +24,6 @@ export default function ProjectShowPage() {
     const woBasicDetailId = overview?.woBasicDetail?.id ?? null;
 
     const { steps, woDetailId } = useWoStepStatuses(null, woBasicDetailId);
-
-    const { data: woDetailRelations } = useWoDetailWithRelations(woDetailId ?? 0);
-
     const [activeTab, setActiveTab] = useState<"operation" | "tendering">("operation");
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["basic-details"]));

@@ -10,12 +10,13 @@ import { useProjectPaymentRequests } from "@/hooks/api/useProjectPaymentRequests
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
-import { PAYMENT_AGAINST_LABELS, PaymentRequestDetailDialog } from "@/modules/shared/payment-requests/components/PaymentRequestDetailDialog";
+import { PaymentRequestDetailDialog } from "@/modules/shared/payment-requests/components/PaymentRequestDetailDialog";
 import type { ColDef, GridApi, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { Edit, Eye, Plus } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { PAYMENT_AGAINST_LABELS } from "@/modules/shared/payment-requests/constants";
 
 interface PaymentRequestsSectionProps {
     projectId: number | null;
