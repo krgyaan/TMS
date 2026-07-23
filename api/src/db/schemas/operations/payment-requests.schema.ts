@@ -1,10 +1,10 @@
-import { pgTable, bigserial, bigint, varchar, text, numeric, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, varchar, text, numeric, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 
 export const paymentRequests = pgTable(
     "project_payment_requests",
     {
         id: bigserial("id", { mode: "number" }).primaryKey(),
-        projectId: bigint("project_id", { mode: "number" }).notNull(),
+        projectId: bigint("project_id", { mode: "number" }),
         requestNo: varchar("request_no", { length: 255 }),
         partyName: varchar("party_name", { length: 255 }),
         accountNumber: varchar("account_number", { length: 100 }),
@@ -17,6 +17,9 @@ export const paymentRequests = pgTable(
         vendorWorkOrderId: bigint("vendor_work_order_id", { mode: "number" }),
         uploadedInvoiceFile: varchar("uploaded_invoice_file", { length: 500 }),
         poFile: varchar("po_file", { length: 500 }),
+        paymentMode: varchar("payment_mode", { length: 50 }).notNull().default("BANK_TRANSFER"),
+        portalLink: text("portal_link"),
+        billFiles: jsonb("bill_files").notNull().default([]),
         remark: text("remark"),
         utrNumber: text("utr_number"),
         rejectionReason: text("rejection_reason"),
