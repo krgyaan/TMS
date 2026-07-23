@@ -16,6 +16,9 @@ import {
     UpdateLeadEnquirySchema,
     CreateSiteVisitSchema,
     UpdateSiteVisitSchema,
+    UpdateSiteVisitDetailsSchema,
+    CreateSiteVisitContactArraySchema,
+    CreateCostingSheetSchema,
 } from './dto/lead-enquiry.dto';
 import { ValidatedBody } from '@/decorators/validated-body.decorator';
 import type {
@@ -23,9 +26,13 @@ import type {
     UpdateLeadEnquiryDto,
     CreateSiteVisitDto,
     UpdateSiteVisitDto,
+    UpdateSiteVisitDetailsDto,
+    CreateSiteVisitContactArrayDto,
+    CreateCostingSheetDto,
 } from './dto/lead-enquiry.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import type { SiteVisitContact } from '@db/schemas/crm/site-visit-contacts.schema';
 
 @Controller('lead-enquiries')
 export class LeadEnquiryController {
@@ -69,12 +76,60 @@ export class LeadEnquiryController {
         return this.leadEnquiryService.findSiteVisitsByEnquiry(enquiryId);
     }
 
+    @Get('site-visits/first/:enquiryId')
+    async getFirstSiteVisitByEnquiry(@Param('enquiryId', ParseIntPipe) enquiryId: number) {
+        return this.leadEnquiryService.findFirstSiteVisitByEnquiry(enquiryId);
+    }
+
+    @Patch('site-visits/details/:id')
+    async updateSiteVisitDetails(
+        @Param('id', ParseIntPipe) id: number,
+        @ValidatedBody(UpdateSiteVisitDetailsSchema) body: UpdateSiteVisitDetailsDto,
+    ) {
+        return this.leadEnquiryService.updateSiteVisitDetails(id, body);
+    }
+
     @Patch('site-visits/:id')
     async updateSiteVisit(
         @Param('id', ParseIntPipe) id: number,
         @ValidatedBody(UpdateSiteVisitSchema) body: UpdateSiteVisitDto,
     ) {
         return this.leadEnquiryService.updateSiteVisit(id, body);
+    }
+
+    @Get('site-visits/contacts/:siteVisitId')
+    async getSiteVisitContacts(@Param('siteVisitId', ParseIntPipe) siteVisitId: number) {
+        return this.leadEnquiryService.findSiteVisitContacts(siteVisitId);
+    }
+
+    @Post('site-visits/contacts/bulk')
+    @HttpCode(HttpStatus.CREATED)
+    async createSiteVisitContacts(
+        @ValidatedBody(CreateSiteVisitContactArraySchema) body: CreateSiteVisitContactArrayDto,
+    ) {
+        const results: SiteVisitContact[] = [];
+        for (const contact of body.contacts) {
+            const created = await this.leadEnquiryService.createSiteVisitContact({
+                siteVisitId: body.siteVisitId,
+                ...contact,
+            });
+            results.push(created);
+        }
+        return results;
+    }
+
+    @Get('check-drive-scopes')
+    async checkDriveScopes(@CurrentUser() user: ValidatedUser) {
+        return this.leadEnquiryService.checkDriveScopes(user.sub);
+    }
+
+    @Post('create-costing-sheet')
+    @HttpCode(HttpStatus.CREATED)
+    async createCostingSheet(
+        @ValidatedBody(CreateCostingSheetSchema) body: CreateCostingSheetDto,
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        return this.leadEnquiryService.createCostingSheet(body, user.sub);
     }
 
     @Get(':id')

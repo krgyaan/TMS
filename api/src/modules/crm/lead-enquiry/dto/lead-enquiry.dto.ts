@@ -16,6 +16,7 @@ export const CreateLeadEnquirySchema = z.object({
     enquiryNumber: z.string().max(255).optional().nullable(),
     rejectionReason: z.string().max(255).optional().nullable(),
     status: z.string().max(50).optional().nullable(),
+    costingDocument: z.string().max(500).optional().nullable(),
     notes: z.string().optional().nullable(),
 });
 
@@ -35,6 +36,7 @@ export const UpdateLeadEnquirySchema = z.object({
     enquiryNumber: z.string().max(255).optional().nullable(),
     rejectionReason: z.string().max(255).optional().nullable(),
     status: z.string().max(50).optional().nullable(),
+    costingDocument: z.string().max(500).optional().nullable(),
     notes: z.string().optional().nullable(),
 });
 
@@ -62,3 +64,33 @@ export const UpdateSiteVisitSchema = z.object({
 
 export type CreateSiteVisitDto = z.infer<typeof CreateSiteVisitSchema>;
 export type UpdateSiteVisitDto = z.infer<typeof UpdateSiteVisitSchema>;
+
+export const UpdateSiteVisitDetailsSchema = z.object({
+    information: z.string().optional().nullable(),
+    documents: z.string().optional().nullable(),
+});
+
+export type UpdateSiteVisitDetailsDto = z.infer<typeof UpdateSiteVisitDetailsSchema>;
+
+export const CreateSiteVisitContactSchema = z.object({
+    siteVisitId: z.number().int().positive(),
+    name: z.string().min(1, 'Contact name is required').max(255),
+    designation: z.string().max(255).optional().nullable(),
+    phone: z.string().max(255).optional().nullable(),
+    email: z.string().email().optional().nullable().or(z.literal('')),
+});
+
+export type CreateSiteVisitContactDto = z.infer<typeof CreateSiteVisitContactSchema>;
+
+export const CreateSiteVisitContactArraySchema = z.object({
+    siteVisitId: z.number().int().positive(),
+    contacts: z.array(CreateSiteVisitContactSchema.omit({ siteVisitId: true })),
+});
+
+export type CreateSiteVisitContactArrayDto = z.infer<typeof CreateSiteVisitContactArraySchema>;
+
+export const CreateCostingSheetSchema = z.object({
+    enquiryId: z.number().int().positive(),
+});
+
+export type CreateCostingSheetDto = z.infer<typeof CreateCostingSheetSchema>;

@@ -28,6 +28,7 @@ export const leadEnquiries = pgTable("lead_enquiries", {
     enquiryNumber: varchar("enquiry_number", { length: 255 }),
     rejectionReason: varchar("rejection_reason", { length: 255 }),
     status: varchar("status", { length: 50 }),
+    costingDocument: varchar("costing_document", { length: 500 }),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

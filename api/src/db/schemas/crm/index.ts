@@ -14,3 +14,6 @@ export * from './lead-enquiries.schema';
 
 // Site Visits
 export * from './site-visits.schema';
+
+// Site Visit Contacts
+export * from './site-visit-contacts.schema';

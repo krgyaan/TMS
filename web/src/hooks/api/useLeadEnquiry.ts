@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadEnquiryService } from '@/services/api/lead-enquiry.service';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/utils/errorToast';
-import type { CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, LeadEnquiryWithNames, CreateSiteVisitRequest, UpdateSiteVisitRequest, SiteVisit } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
+import type { CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, LeadEnquiryWithNames, CreateSiteVisitRequest, UpdateSiteVisitRequest, SiteVisit, SiteVisitContact, CreateSiteVisitContactRequest, UpdateSiteVisitDetailsRequest, CreateCostingSheetResponse, DriveScopesResponse } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
 import type { PaginatedResult } from '@/types/api.types';
 
 export const leadEnquiryKey = {
@@ -110,6 +110,69 @@ export const useUpdateSiteVisit = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: leadEnquiryKey.lists() });
             toast.success('Site visit updated successfully');
+        },
+        onError: showErrorToast,
+    });
+};
+
+export const useUpdateSiteVisitDetails = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: UpdateSiteVisitDetailsRequest }) => leadEnquiryService.updateSiteVisitDetails(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: leadEnquiryKey.lists() });
+            toast.success('Site visit details saved successfully');
+        },
+        onError: showErrorToast,
+    });
+};
+
+export const useCreateSiteVisitContacts = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ siteVisitId, contacts }: { siteVisitId: number; contacts: CreateSiteVisitContactRequest[] }) => leadEnquiryService.createSiteVisitContacts(siteVisitId, contacts),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: leadEnquiryKey.lists() });
+            toast.success('Contacts saved successfully');
+        },
+        onError: showErrorToast,
+    });
+};
+
+export const useSiteVisitContacts = (siteVisitId: number | null) => {
+    return useQuery<SiteVisitContact[]>({
+        queryKey: [...leadEnquiryKey.all, 'site-visit-contacts', siteVisitId],
+        queryFn: () => leadEnquiryService.getSiteVisitContacts(siteVisitId!),
+        enabled: !!siteVisitId,
+    });
+};
+
+export const useFirstSiteVisit = (enquiryId: number | null) => {
+    return useQuery<SiteVisit | null>({
+        queryKey: [...leadEnquiryKey.all, 'first-site-visit', enquiryId],
+        queryFn: () => leadEnquiryService.getFirstSiteVisitByEnquiry(enquiryId!),
+        enabled: !!enquiryId,
+    });
+};
+
+export const useCheckDriveScopes = () => {
+    return useQuery<DriveScopesResponse>({
+        queryKey: [...leadEnquiryKey.all, 'driveScopes'],
+        queryFn: () => leadEnquiryService.checkDriveScopes(),
+        staleTime: 60000,
+    });
+};
+
+export const useCreateCostingSheet = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (enquiryId: number) => leadEnquiryService.createCostingSheet(enquiryId),
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: leadEnquiryKey.lists() });
+            toast.success('Costing sheet created successfully');
+            if (data.sheetUrl) {
+                window.open(data.sheetUrl, '_blank');
+            }
         },
         onError: showErrorToast,
     });

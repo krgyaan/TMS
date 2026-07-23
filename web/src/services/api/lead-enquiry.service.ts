@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service';
-import type { LeadEnquiry, LeadEnquiryWithNames, CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, SiteVisit, CreateSiteVisitRequest, UpdateSiteVisitRequest } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
+import type { LeadEnquiry, LeadEnquiryWithNames, CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, SiteVisit, CreateSiteVisitRequest, UpdateSiteVisitRequest, SiteVisitContact, CreateSiteVisitContactRequest, UpdateSiteVisitDetailsRequest, CreateCostingSheetResponse, DriveScopesResponse } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
 import type { PaginatedResult } from '@/types/api.types';
 
 class LeadEnquiryService extends BaseApiService {
@@ -43,8 +43,32 @@ class LeadEnquiryService extends BaseApiService {
         return this.get<SiteVisit[]>(`/site-visits/enquiry/${enquiryId}`);
     }
 
+    async getFirstSiteVisitByEnquiry(enquiryId: number): Promise<SiteVisit | null> {
+        return this.get<SiteVisit | null>(`/site-visits/first/${enquiryId}`);
+    }
+
     async updateSiteVisit(id: number, data: UpdateSiteVisitRequest): Promise<SiteVisit> {
         return this.patch<SiteVisit>(`/site-visits/${id}`, data);
+    }
+
+    async updateSiteVisitDetails(id: number, data: UpdateSiteVisitDetailsRequest): Promise<SiteVisit> {
+        return this.patch<SiteVisit>(`/site-visits/details/${id}`, data);
+    }
+
+    async getSiteVisitContacts(siteVisitId: number): Promise<SiteVisitContact[]> {
+        return this.get<SiteVisitContact[]>(`/site-visits/contacts/${siteVisitId}`);
+    }
+
+    async createSiteVisitContacts(siteVisitId: number, contacts: CreateSiteVisitContactRequest[]): Promise<SiteVisitContact[]> {
+        return this.post<SiteVisitContact[]>('/site-visits/contacts/bulk', { siteVisitId, contacts });
+    }
+
+    async checkDriveScopes(): Promise<DriveScopesResponse> {
+        return this.get<DriveScopesResponse>('/check-drive-scopes');
+    }
+
+    async createCostingSheet(enquiryId: number): Promise<CreateCostingSheetResponse> {
+        return this.post<CreateCostingSheetResponse>('/create-costing-sheet', { enquiryId });
     }
 }
 

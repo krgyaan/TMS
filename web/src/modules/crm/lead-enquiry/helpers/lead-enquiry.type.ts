@@ -17,6 +17,7 @@ export interface LeadEnquiry {
     enquiryNumber: string | null;
     rejectionReason: string | null;
     status: string | null;
+    costingDocument: string | null;
     notes: string | null;
     createdAt: string;
     updatedAt: string;
@@ -28,6 +29,7 @@ export interface LeadEnquiryWithNames extends LeadEnquiry {
     orgName?: string | null;
     createdByName?: string | null;
     updatedByName?: string | null;
+    hasSiteVisit?: boolean;
 }
 
 export interface CreateLeadEnquiryRequest {
@@ -49,7 +51,42 @@ export interface CreateLeadEnquiryRequest {
     notes?: string | null;
 }
 
-export interface UpdateLeadEnquiryRequest extends Partial<CreateLeadEnquiryRequest> {}
+export interface UpdateLeadEnquiryRequest extends Partial<CreateLeadEnquiryRequest> {
+    costingDocument?: string | null;
+}
+
+export interface SiteVisitContact {
+    id: number;
+    siteVisitId: number;
+    name: string;
+    designation: string | null;
+    phone: string | null;
+    email: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateSiteVisitContactRequest {
+    name: string;
+    designation?: string | null;
+    phone?: string | null;
+    email?: string | null;
+}
+
+export interface UpdateSiteVisitDetailsRequest {
+    information?: string | null;
+    documents?: string | null;
+}
+
+export interface CreateCostingSheetResponse {
+    sheetUrl: string;
+}
+
+export type DriveScopesResponse = {
+    hasScopes: boolean;
+    missingScopes: string[];
+    grantedScopes: string[];
+};
 
 export interface LeadEnquiryListParams {
     page?: number;
