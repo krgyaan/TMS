@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { Eye, History, Percent, Search } from "lucide-react";
+import { CheckCircle, Eye, History, Search } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import DataTable from "@/components/ui/data-table";
@@ -29,7 +29,7 @@ const PurchaseOrderListPage: React.FC = () => {
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
     const [search, setSearch] = useState("");
     const debouncedSearch = useDebouncedSearch(search, 300);
-    const [selectedPoForTds, setSelectedPoForTds] = useState<PurchaseOrderRow | null>(null);
+    const [poApproval, setPoApproval] = useState<PurchaseOrderRow | null>(null);
 
     const isAccountsSection = location.pathname.includes("/accounts/");
 
@@ -59,9 +59,9 @@ const PurchaseOrderListPage: React.FC = () => {
 
         if (isAccountsSection) {
             actions.unshift({
-                label: "Set TDS %",
-                icon: <Percent className="h-4 w-4" />,
-                onClick: (row) => setSelectedPoForTds(row),
+                label: "PO Approval",
+                icon: <CheckCircle className="h-4 w-4" />,
+                onClick: (row) => setPoApproval(row),
             });
         }
 
@@ -279,11 +279,11 @@ const PurchaseOrderListPage: React.FC = () => {
                 />
             </CardContent>
 
-            {selectedPoForTds && (
+            {poApproval && (
                 <SetTdsDialog
-                    po={selectedPoForTds}
-                    open={!!selectedPoForTds}
-                    onClose={() => setSelectedPoForTds(null)}
+                    po={poApproval}
+                    open={!!poApproval}
+                    onClose={() => setPoApproval(null)}
                 />
             )}
         </Card>
