@@ -185,7 +185,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             valueFormatter: (p: ValueFormatterParams<PaymentRequestRow>) => formatDate(p.value),
         },
         {
-            headerName: "Actions",
+            headerName: "",
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer<PaymentRequestRow>(actions),
