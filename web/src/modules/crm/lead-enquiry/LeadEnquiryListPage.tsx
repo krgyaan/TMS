@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
-import { Plus, Search, Pencil, Eye, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Eye, XCircle, MapPin } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { useLeadEnquiries, useDeleteLeadEnquiry } from "@/hooks/api/useLeadEnquiry";
+import { useLeadEnquiries, useUpdateLeadEnquiry, useCreateSiteVisit } from "@/hooks/api/useLeadEnquiry";
+import { LeadEnquiryRejectModal } from "./components/LeadEnquiryRejectModal";
+import { LeadEnquirySiteVisitModal } from "./components/LeadEnquirySiteVisitModal";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
@@ -17,6 +19,8 @@ import type { LeadEnquiryWithNames } from "./helpers/lead-enquiry.type";
 
 const EnquiryListPage = () => {
     const navigate = useNavigate();
+    const updateEnquiry = useUpdateLeadEnquiry();
+    const createSiteVisit = useCreateSiteVisit();
 
     const {
         search, setSearch, debouncedSearch,
@@ -34,6 +38,26 @@ const EnquiryListPage = () => {
     const enquiries = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
+    const [rejectModal, setRejectModal] = useState<{
+        open: boolean;
+        enquiryId: number | null;
+        enquiryName?: string;
+    }>({ open: false, enquiryId: null });
+
+    const [siteVisitModal, setSiteVisitModal] = useState<{
+        open: boolean;
+        enquiryId: number | null;
+        enquiryName?: string;
+    }>({ open: false, enquiryId: null });
+
+    const handleRejectConfirm = async (enquiryId: number, reason?: string) => {
+        await updateEnquiry.mutateAsync({ id: enquiryId, data: { status: "Rejected", rejectionReason: reason || null } });
+    };
+
+    const handleSiteVisitConfirm = async (data: { enquiryId: number; assignedTo?: number | null; scheduledAt?: string | null; information?: string | null }) => {
+        await createSiteVisit.mutateAsync(data);
+    };
+
     const enquiryActions: ActionItem<LeadEnquiryWithNames>[] = [
         {
             label: "View",
@@ -46,14 +70,16 @@ const EnquiryListPage = () => {
             icon: <Pencil className="h-4 w-4" />,
         },
         {
-            label: "Delete",
+            label: "Reject Enquiry",
             className: "text-red-600",
-            onClick: (row) => {
-                if (confirm(`Delete enquiry "${row.enqName}"?`)) {
-                    deleteEnquiry.mutate(row.id);
-                }
-            },
-            icon: <Trash2 className="h-4 w-4 text-red-600" />,
+            onClick: (row) => setRejectModal({ open: true, enquiryId: row.id, enquiryName: row.enqName }),
+            icon: <XCircle className="h-4 w-4 text-red-600" />,
+        },
+        {
+            label: "Allocate Site Visit",
+            icon: <MapPin className="h-4 w-4" />,
+            visible: (row) => row.siteVisitRequired === true,
+            onClick: (row) => setSiteVisitModal({ open: true, enquiryId: row.id, enquiryName: row.enqName }),
         },
     ];
 
@@ -130,6 +156,22 @@ const EnquiryListPage = () => {
                     enableSorting={true}
                 />
             </CardContent>
+
+            <LeadEnquiryRejectModal
+                open={rejectModal.open}
+                onOpenChange={(open) => setRejectModal({ ...rejectModal, open })}
+                enquiryId={rejectModal.enquiryId}
+                enquiryName={rejectModal.enquiryName}
+                onConfirm={handleRejectConfirm}
+            />
+
+            <LeadEnquirySiteVisitModal
+                open={siteVisitModal.open}
+                onOpenChange={(open) => setSiteVisitModal({ ...siteVisitModal, open })}
+                enquiryId={siteVisitModal.enquiryId}
+                enquiryName={siteVisitModal.enquiryName}
+                onConfirm={handleSiteVisitConfirm}
+            />
         </Card>
     );
 };

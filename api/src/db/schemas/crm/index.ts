@@ -11,3 +11,6 @@ export * from './followup-categories.relations';
 
 // Lead Enquiries
 export * from './lead-enquiries.schema';
+
+// Site Visits
+export * from './site-visits.schema';

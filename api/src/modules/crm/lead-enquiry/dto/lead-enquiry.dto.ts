@@ -40,3 +40,25 @@ export const UpdateLeadEnquirySchema = z.object({
 
 export type CreateLeadEnquiryDto = z.infer<typeof CreateLeadEnquirySchema>;
 export type UpdateLeadEnquiryDto = z.infer<typeof UpdateLeadEnquirySchema>;
+
+export const CreateSiteVisitSchema = z.object({
+    enquiryId: z.number().int().positive(),
+    assignedTo: z.number().int().positive().optional().nullable(),
+    scheduledAt: z.string().optional().nullable(),
+    information: z.string().optional().nullable(),
+    additionalNotes: z.string().optional().nullable(),
+    documents: z.string().optional().nullable(),
+});
+
+export const UpdateSiteVisitSchema = z.object({
+    assignedTo: z.number().int().positive().optional().nullable(),
+    scheduledAt: z.string().optional().nullable(),
+    conductedAt: z.string().optional().nullable(),
+    information: z.string().optional().nullable(),
+    additionalNotes: z.string().optional().nullable(),
+    documents: z.string().optional().nullable(),
+    status: z.string().max(50).optional(),
+});
+
+export type CreateSiteVisitDto = z.infer<typeof CreateSiteVisitSchema>;
+export type UpdateSiteVisitDto = z.infer<typeof UpdateSiteVisitSchema>;

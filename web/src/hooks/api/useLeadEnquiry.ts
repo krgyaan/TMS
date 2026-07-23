@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadEnquiryService } from '@/services/api/lead-enquiry.service';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/utils/errorToast';
-import type { CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, LeadEnquiryWithNames } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
+import type { CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, LeadEnquiryWithNames, CreateSiteVisitRequest, UpdateSiteVisitRequest, SiteVisit } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
 import type { PaginatedResult } from '@/types/api.types';
 
 export const leadEnquiryKey = {
@@ -78,6 +78,38 @@ export const useDeleteLeadEnquiry = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: leadEnquiryKey.lists() });
             toast.success('Enquiry deleted successfully');
+        },
+        onError: showErrorToast,
+    });
+};
+
+export const useCreateSiteVisit = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: CreateSiteVisitRequest) => leadEnquiryService.createSiteVisit(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: leadEnquiryKey.lists() });
+            toast.success('Site visit allocated successfully');
+        },
+        onError: showErrorToast,
+    });
+};
+
+export const useSiteVisits = (enquiryId: number | null) => {
+    return useQuery<SiteVisit[]>({
+        queryKey: [...leadEnquiryKey.all, 'site-visits', enquiryId],
+        queryFn: () => leadEnquiryService.getSiteVisitsByEnquiry(enquiryId!),
+        enabled: !!enquiryId,
+    });
+};
+
+export const useUpdateSiteVisit = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: UpdateSiteVisitRequest }) => leadEnquiryService.updateSiteVisit(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: leadEnquiryKey.lists() });
+            toast.success('Site visit updated successfully');
         },
         onError: showErrorToast,
     });

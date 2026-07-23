@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { leadEnquiries, type NewLeadEnquiry, type LeadEnquiry } from '@db/schemas/crm/lead-enquiries.schema';
+import { siteVisits, type SiteVisit, type NewSiteVisit } from '@db/schemas/crm/site-visits.schema';
 import { leads } from '@db/schemas/crm/leads.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { organizations } from '@db/schemas/master/organizations.schema';
@@ -9,7 +10,7 @@ import { locations } from '@db/schemas/master/locations.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { and, asc, desc, eq, ilike, like, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import type { CreateLeadEnquiryDto, UpdateLeadEnquiryDto } from './dto/lead-enquiry.dto';
+import type { CreateLeadEnquiryDto, UpdateLeadEnquiryDto, CreateSiteVisitDto, UpdateSiteVisitDto } from './dto/lead-enquiry.dto';
 
 export type LeadEnquiryListFilters = {
     page?: number;
@@ -279,5 +280,43 @@ export class LeadEnquiryService {
             .returning({ id: leadEnquiries.id });
 
         if (!deleted) throw new NotFoundException(`Lead enquiry with ID ${id} not found`);
+    }
+
+    async createSiteVisit(data: CreateSiteVisitDto): Promise<SiteVisit> {
+        const [visit] = await this.db
+            .insert(siteVisits)
+            .values({
+                enquiryId: data.enquiryId,
+                assignedTo: data.assignedTo ?? null,
+                scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
+                information: data.information ?? null,
+                additionalNotes: data.additionalNotes ?? null,
+                documents: data.documents ?? null,
+            })
+            .returning();
+        return visit;
+    }
+
+    async findSiteVisitsByEnquiry(enquiryId: number): Promise<SiteVisit[]> {
+        return this.db
+            .select()
+            .from(siteVisits)
+            .where(eq(siteVisits.enquiryId, enquiryId))
+            .orderBy(desc(siteVisits.createdAt));
+    }
+
+    async updateSiteVisit(id: number, data: UpdateSiteVisitDto): Promise<SiteVisit> {
+        const updateData: Record<string, unknown> = { ...data, updatedAt: new Date() };
+        if (data.scheduledAt) updateData.scheduledAt = new Date(data.scheduledAt);
+        if (data.conductedAt) updateData.conductedAt = new Date(data.conductedAt);
+
+        const [updated] = await this.db
+            .update(siteVisits)
+            .set(updateData)
+            .where(eq(siteVisits.id, id))
+            .returning();
+
+        if (!updated) throw new NotFoundException(`Site visit with ID ${id} not found`);
+        return updated;
     }
 }

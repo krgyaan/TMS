@@ -59,3 +59,36 @@ export interface LeadEnquiryListParams {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 }
+
+export interface SiteVisit {
+    id: number;
+    enquiryId: number;
+    assignedTo: number | null;
+    scheduledAt: string | null;
+    conductedAt: string | null;
+    information: string | null;
+    additionalNotes: string | null;
+    documents: string | null;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateSiteVisitRequest {
+    enquiryId: number;
+    assignedTo?: number | null;
+    scheduledAt?: string | null;
+    information?: string | null;
+    additionalNotes?: string | null;
+    documents?: string | null;
+}
+
+export interface UpdateSiteVisitRequest {
+    assignedTo?: number | null;
+    scheduledAt?: string | null;
+    conductedAt?: string | null;
+    information?: string | null;
+    additionalNotes?: string | null;
+    documents?: string | null;
+    status?: string;
+}

@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service';
-import type { LeadEnquiry, LeadEnquiryWithNames, CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
+import type { LeadEnquiry, LeadEnquiryWithNames, CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, SiteVisit, CreateSiteVisitRequest, UpdateSiteVisitRequest } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
 import type { PaginatedResult } from '@/types/api.types';
 
 class LeadEnquiryService extends BaseApiService {
@@ -33,6 +33,18 @@ class LeadEnquiryService extends BaseApiService {
 
     async remove(id: number): Promise<void> {
         return this.delete<void>(`/${id}`);
+    }
+
+    async createSiteVisit(data: CreateSiteVisitRequest): Promise<SiteVisit> {
+        return this.post<SiteVisit>('/site-visits', data);
+    }
+
+    async getSiteVisitsByEnquiry(enquiryId: number): Promise<SiteVisit[]> {
+        return this.get<SiteVisit[]>(`/site-visits/enquiry/${enquiryId}`);
+    }
+
+    async updateSiteVisit(id: number, data: UpdateSiteVisitRequest): Promise<SiteVisit> {
+        return this.patch<SiteVisit>(`/site-visits/${id}`, data);
     }
 }
 

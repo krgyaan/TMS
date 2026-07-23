@@ -14,11 +14,15 @@ import { LeadEnquiryService } from './lead-enquiry.service';
 import {
     CreateLeadEnquirySchema,
     UpdateLeadEnquirySchema,
+    CreateSiteVisitSchema,
+    UpdateSiteVisitSchema,
 } from './dto/lead-enquiry.dto';
 import { ValidatedBody } from '@/decorators/validated-body.decorator';
 import type {
     CreateLeadEnquiryDto,
     UpdateLeadEnquiryDto,
+    CreateSiteVisitDto,
+    UpdateSiteVisitDto,
 } from './dto/lead-enquiry.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -50,6 +54,27 @@ export class LeadEnquiryController {
             sortBy,
             sortOrder: sortOrder as 'asc' | 'desc' | undefined,
         });
+    }
+
+    @Post('site-visits')
+    @HttpCode(HttpStatus.CREATED)
+    async createSiteVisit(
+        @ValidatedBody(CreateSiteVisitSchema) body: CreateSiteVisitDto,
+    ) {
+        return this.leadEnquiryService.createSiteVisit(body);
+    }
+
+    @Get('site-visits/enquiry/:enquiryId')
+    async getSiteVisitsByEnquiry(@Param('enquiryId', ParseIntPipe) enquiryId: number) {
+        return this.leadEnquiryService.findSiteVisitsByEnquiry(enquiryId);
+    }
+
+    @Patch('site-visits/:id')
+    async updateSiteVisit(
+        @Param('id', ParseIntPipe) id: number,
+        @ValidatedBody(UpdateSiteVisitSchema) body: UpdateSiteVisitDto,
+    ) {
+        return this.leadEnquiryService.updateSiteVisit(id, body);
     }
 
     @Get(':id')
