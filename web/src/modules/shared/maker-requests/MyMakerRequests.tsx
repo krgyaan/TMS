@@ -21,16 +21,11 @@ import type { MakerRequestRow } from "@/modules/shared/maker-requests/helpers/ma
 import { tenderFilesService } from "@/services/api/tender-files.service";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { Eye, Plus, Search } from "lucide-react";
+import { Copy, Eye, Plus, Search } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-    pending: { label: "Pending", color: "text-yellow-600 bg-yellow-50" },
-    maker_done: { label: "Maker Done", color: "text-blue-600 bg-blue-50" },
-    payment_done: { label: "Payment Done", color: "text-green-600 bg-green-50" },
-    rejected: { label: "Rejected", color: "text-red-600 bg-red-50" },
-};
+import { PAYMENT_AGAINST_LABELS, STATUS_CONFIG } from "../payment-requests/constants";
+import { toast } from "sonner";
 
 const MyMakerRequests: React.FC = () => {
     const navigate = useNavigate();
@@ -93,7 +88,39 @@ const MyMakerRequests: React.FC = () => {
             sortable: true, 
             filter: true, 
             flex: 1, 
-            minWidth: 150 
+            minWidth: 150,
+            cellRenderer: ({ value, data }: CustomCellRendererProps<MakerRequestRow>) => {
+                if (value) {
+                    return <span className="capitalize">{value.toLowerCase()}</span>;
+                }
+                if (!data?.portalLink) return null;
+                return (
+                    <button
+                        type="button"
+                        onClick={async () => {
+                            await navigator.clipboard.writeText(data?.portalLink ?? "No Link");
+                            toast.success(`Portal link copied to clipboard - ${data?.portalLink ?? "No Link"}`);
+                        }}
+                        className="flex items-center gap-1 text-blue-600 hover:text-blue-800"
+                        title={data?.portalLink ?? "No Link"}
+                    >
+                        <Copy size={16} />
+                        <span>Copy Link</span>
+                    </button>
+                );
+            },
+
+        },
+        {
+            field: "paymentMode",
+            headerName: "Mode",
+            sortable: true,
+            filter: true,
+            width: 120,
+            cellRenderer: (p: CustomCellRendererProps<MakerRequestRow>) => {
+                const mode = p.value.replaceAll('_', ' ').toLowerCase();
+                return <span className="capitalize">{mode}</span>;
+            },
         },
         { 
             field: "amount", 
@@ -106,18 +133,15 @@ const MyMakerRequests: React.FC = () => {
             headerName: "Category", 
             sortable: true, 
             filter: true, 
-            width: 140 
+            width: 140,
+            valueFormatter: (p: ValueFormatterParams<MakerRequestRow>) => PAYMENT_AGAINST_LABELS[p.value] || p.value || "-",
         },
         {
             field: "status",
             headerName: "Status",
             sortable: true,
             filter: true,
-            width: 130,
-            cellRenderer: (p: CustomCellRendererProps<MakerRequestRow>) => {
-                const config = STATUS_CONFIG[p.value] || { label: p.value, color: "" };
-                return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${config.color}`}>{config.label}</span>;
-            },
+            width: 130
         },
         { 
             field: "createdAt", 

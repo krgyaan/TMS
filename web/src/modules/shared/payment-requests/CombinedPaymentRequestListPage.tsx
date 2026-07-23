@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { Search, Eye, CheckCircle2, Ban, Banknote } from "lucide-react";
+import { Search, Eye, CheckCircle2, Ban, Banknote, Copy } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import type { PaymentRequestRow } from "@/modules/operations/payment-requests/he
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { PAYMENT_AGAINST_LABELS, STATUS_CONFIG } from "./constants";
+import { toast } from "sonner";
 
 type SubTab = "all" | "pending" | "payment_done" | "rejected";
 
@@ -124,13 +125,34 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                 </TooltipProvider>
             ),
         },
-        {
-            field: "partyName",
-            headerName: "Party Name",
-            sortable: true,
-            filter: true,
-            flex: 1,
+        { 
+            field: "partyName", 
+            headerName: "Party Name", 
+            sortable: true, 
+            filter: true, 
+            flex: 1, 
             minWidth: 150,
+            cellRenderer: ({ value, data }: CustomCellRendererProps<PaymentRequestRow>) => {
+                if (value) {
+                    return <span className="capitalize">{value.toLowerCase()}</span>;
+                }
+                if (!data?.portalLink) return null;
+                return (
+                    <button
+                        type="button"
+                        onClick={async () => {
+                            await navigator.clipboard.writeText(data?.portalLink ?? "No Link");
+                            toast.success(`Portal link copied to clipboard - ${data?.portalLink ?? "No Link"}`);
+                        }}
+                        className="flex items-center gap-1 text-blue-600 hover:text-blue-800"
+                        title={data?.portalLink ?? "No Link"}
+                    >
+                        <Copy size={16} />
+                        <span>Copy Link</span>
+                    </button>
+                );
+            },
+
         },
         {
             field: "amount",
