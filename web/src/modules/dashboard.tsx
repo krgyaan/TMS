@@ -283,7 +283,7 @@ const Dashboard = () => {
             icon: Receipt,
             color: "text-teal-600",
             bgColor: "bg-teal-50 dark:bg-teal-950/30",
-            path: paths.accounts.makerRequestCreate
+            path: paths.shared.makerRequestCreate
         },
         {
             title: "New Work Order",

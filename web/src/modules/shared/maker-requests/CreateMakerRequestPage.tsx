@@ -144,7 +144,7 @@ export default function CreateMakerRequestPage() {
             const dto = mapMakerRequestFormToCreateDTO(values);
             await createMakerMutation.mutateAsync(dto);
             toast.success("Maker Request created successfully.");
-            navigate(paths.accounts.paymentRequests);
+            navigate(paths.shared.makerRequests);
         } catch {
             toast.error("Failed to create maker request. Please try again.");
         }

@@ -562,7 +562,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
                 {/* Actions row */}
                 <div className="flex justify-end gap-3 mt-3 pt-2 border-t">
                     <IconAction icon={ImagePlus} label="Add Proof" onClick={() => openAddProof(row.id)} />
-                    <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />
+                    {/* <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} /> */}
                 </div>
             </div>
         );
