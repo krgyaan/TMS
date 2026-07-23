@@ -1,17 +1,18 @@
-import React from "react";
+import React, { useMemo } from "react";
+import { CheckCircle, Clock, XCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { useAllPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
-import { useAllVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
 import { useTeamFilter } from "@/hooks/useTeamFilter";
 import { useLocation } from "react-router-dom";
 import PurchaseOrderListPage from "./PurchaseOrderListPage";
-import VendorWorkOrderListPage from "@/modules/operations/vendor-work-orders/VendorWorkOrderListPage";
+import type { PurchaseOrderRow } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
 
 const TABS = [
-    { key: "purchase-orders" as const, name: "Purchase Orders" },
-    { key: "vendor-wo" as const, name: "Vendor Work Orders" },
+    { key: "pending" as const, label: "Pending", icon: <Clock className="h-4 w-4" />, filter: (po: PurchaseOrderRow) => po.poApproved === null || po.poApproved === undefined },
+    { key: "approved" as const, label: "Approved", icon: <CheckCircle className="h-4 w-4" />, filter: (po: PurchaseOrderRow) => po.poApproved === true },
+    { key: "rejected" as const, label: "Rejected", icon: <XCircle className="h-4 w-4" />, filter: (po: PurchaseOrderRow) => po.poApproved === false },
 ];
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -23,19 +24,23 @@ const PurchaseOrderTabsPage: React.FC = () => {
     const effectiveTeamId = isOperationsSection ? teamId : undefined;
     const { activeTab, setActiveTab } = usePersistentTableState<TabKey>({
         storageKey: "purchase-orders",
-        defaultTab: "purchase-orders",
+        defaultTab: "pending",
     });
 
     const { data: poData } = useAllPurchaseOrders(effectiveTeamId ?? undefined);
-    const { data: vwoData } = useAllVendorWorkOrders(effectiveTeamId ?? undefined);
+    const allPurchaseOrders = poData?.purchaseOrders ?? [];
 
-    const poCount = (poData?.purchaseOrders ?? []).length;
-    const vwoCount = (vwoData ?? []).length;
-
-    const tabCounts: Record<TabKey, number> = {
-        "purchase-orders": poCount,
-        "vendor-wo": vwoCount,
-    };
+    const filteredByTab = useMemo(() => {
+        const result: Record<TabKey, PurchaseOrderRow[]> = {
+            pending: [],
+            approved: [],
+            rejected: [],
+        };
+        for (const tab of TABS) {
+            result[tab.key] = allPurchaseOrders.filter(tab.filter);
+        }
+        return result;
+    }, [allPurchaseOrders]);
 
     return (
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)}>
@@ -46,19 +51,22 @@ const PurchaseOrderTabsPage: React.FC = () => {
                         value={tab.key}
                         className="data-[state=active]:shadow-md flex items-center gap-1"
                     >
-                        <span className="font-semibold text-sm">{tab.name}</span>
+                        {tab.icon}
+                        <span className="font-semibold text-sm">{tab.label}</span>
                         <Badge variant="secondary" className="text-xs">
-                            {tabCounts[tab.key]}
+                            {filteredByTab[tab.key].length}
                         </Badge>
                     </TabsTrigger>
                 ))}
             </TabsList>
-            <TabsContent value="purchase-orders">
-                <PurchaseOrderListPage />
-            </TabsContent>
-            <TabsContent value="vendor-wo">
-                <VendorWorkOrderListPage />
-            </TabsContent>
+            {TABS.map((tab) => (
+                <TabsContent key={tab.key} value={tab.key}>
+                    <PurchaseOrderListPage
+                        purchaseOrders={filteredByTab[tab.key]}
+                        showApprovalAction={tab.key === "pending"}
+                    />
+                </TabsContent>
+            ))}
         </Tabs>
     );
 };

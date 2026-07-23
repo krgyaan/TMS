@@ -6,6 +6,7 @@ import DataTable from "@/components/ui/data-table";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
+import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
@@ -19,7 +20,15 @@ import { useTeamFilter } from "@/hooks/useTeamFilter";
 import type { PurchaseOrderRow } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
 import { SetTdsDialog } from "./components/SetTdsDialog";
 
-const PurchaseOrderListPage: React.FC = () => {
+interface PurchaseOrderListPageProps {
+    purchaseOrders?: PurchaseOrderRow[];
+    showApprovalAction?: boolean;
+}
+
+const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
+    purchaseOrders: propPurchaseOrders,
+    showApprovalAction,
+}) => {
     const navigate = useNavigate();
     const location = useLocation();
     const { teamId } = useTeamFilter();
@@ -32,8 +41,9 @@ const PurchaseOrderListPage: React.FC = () => {
     const [poApproval, setPoApproval] = useState<PurchaseOrderRow | null>(null);
 
     const isAccountsSection = location.pathname.includes("/accounts/");
+    const isApprovalEnabled = showApprovalAction ?? isAccountsSection;
 
-    const purchaseOrders = data?.purchaseOrders ?? [];
+    const purchaseOrders = propPurchaseOrders ?? data?.purchaseOrders ?? [];
 
     const onGridReady = useCallback((event: GridReadyEvent<PurchaseOrderRow>) => {
         setGridApi(event.api);
@@ -57,7 +67,7 @@ const PurchaseOrderListPage: React.FC = () => {
             },
         ];
 
-        if (isAccountsSection) {
+        if (isApprovalEnabled) {
             actions.unshift({
                 label: "PO Approval",
                 icon: <CheckCircle className="h-4 w-4" />,
@@ -223,6 +233,61 @@ const PurchaseOrderListPage: React.FC = () => {
                     <span className={val ? "" : "text-muted-foreground"}>
                         {val ? `${Number(val)}%` : "Not Set"}
                     </span>
+                );
+            },
+        },
+        {
+            field: "poApproved",
+            headerName: "Status",
+            sortable: true,
+            filter: true,
+            width: 110,
+            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => {
+                const d = p.data;
+                const isApproved = d?.poApproved === true;
+                const isRejected = d?.poApproved === false;
+                const tdsPct = d?.tdsPercentage ? Number(d.tdsPercentage) : null;
+
+                let label: string;
+                let variant: "default" | "secondary" | "destructive" | "outline" = "secondary";
+
+                if (isApproved) {
+                    label = "Approved";
+                    variant = "default";
+                } else if (isRejected) {
+                    label = "Rejected";
+                    variant = "destructive";
+                } else {
+                    label = "Pending";
+                    variant = "outline";
+                }
+
+                return (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Badge variant={variant} className="gap-1 cursor-pointer">
+                                    {label}
+                                </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start" className="max-w-xs">
+                                <div className="space-y-1 text-xs">
+                                    {tdsPct !== null && isApproved && (
+                                        <>
+                                            <p><strong>TDS:</strong> {tdsPct}% (-{formatINR(d?.tdsAmount || 0)})</p>
+                                            <p><strong>After TDS:</strong> {formatINR(d?.amountAfterTds || 0)}</p>
+                                        </>
+                                    )}
+                                    {d?.poApprovalRemark && (
+                                        <p><strong>Remark:</strong> {d.poApprovalRemark}</p>
+                                    )}
+                                    {!d?.poApprovalRemark && !tdsPct && (
+                                        <p className="text-muted-foreground">Awaiting approval</p>
+                                    )}
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
                 );
             },
         },
