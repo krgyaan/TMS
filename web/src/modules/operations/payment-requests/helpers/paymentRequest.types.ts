@@ -1,6 +1,6 @@
 export interface PaymentRequestRow {
     id: number;
-    projectId: number;
+    projectId: number | null;
     requestNo: string;
     partyName: string;
     accountNumber: string;
@@ -13,6 +13,9 @@ export interface PaymentRequestRow {
     vendorWorkOrderId?: number;
     uploadedInvoiceFile?: string;
     poFile?: string;
+    paymentMode: string;
+    portalLink?: string;
+    billFiles: string[];
     remark?: string;
     status: string;
     requestedBy: string;
@@ -47,7 +50,7 @@ export interface PaymentRequestRow {
 }
 
 export interface CreatePaymentRequestDTO {
-    projectId: number;
+    projectId?: number | null;
     projectName?: string;
     partyName: string;
     accountNumber: string;
@@ -60,6 +63,9 @@ export interface CreatePaymentRequestDTO {
     vendorWorkOrderId?: number;
     uploadedInvoiceFile?: string;
     poFile?: string;
+    paymentMode?: string;
+    portalLink?: string;
+    billFiles?: string[];
     remark?: string;
 }
 
@@ -75,5 +81,8 @@ export interface UpdatePaymentRequestDTO {
     vendorWorkOrderId?: number;
     uploadedInvoiceFile?: string;
     poFile?: string;
+    paymentMode?: string;
+    portalLink?: string;
+    billFiles?: string[];
     remark?: string;
 }
