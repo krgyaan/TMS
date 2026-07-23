@@ -143,10 +143,10 @@ export class MakerRequestService {
                 ...this.mrFields,
                 requestedByName: users.name,
             })
-            .from(makerRequests)
-            .leftJoin(users, eq(makerRequests.requestedBy, users.id))
-            .where(eq(makerRequests.requestedBy, userId))
-            .orderBy(desc(makerRequests.id));
+            .from(paymentRequests)
+            .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
+            .where(eq(paymentRequests.requestedBy, userId))
+            .orderBy(desc(paymentRequests.id));
     }
 
     async getAll() {
