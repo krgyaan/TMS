@@ -1,8 +1,8 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { eq, like, desc } from "drizzle-orm";
+import { and, eq, like, desc, sql } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
-import { makerRequests } from "@/db/schemas/operations/maker-requests.schema";
+import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
 import { users } from "@/db/schemas/";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -23,10 +23,10 @@ export class MakerRequestService {
         const fy = `${from}${to}`;
 
         const last = await this.db
-            .select({ id: makerRequests.id, requestNo: makerRequests.requestNo })
-            .from(makerRequests)
-            .where(like(makerRequests.requestNo, `MR/${fy}/%`))
-            .orderBy(desc(makerRequests.id));
+            .select({ id: paymentRequests.id, requestNo: paymentRequests.requestNo })
+            .from(paymentRequests)
+            .where(and(like(paymentRequests.requestNo, `MR/${fy}/%`), sql`${paymentRequests.projectId} IS NULL`))
+            .orderBy(desc(paymentRequests.id));
 
         let next = 1;
         if (last[0]?.requestNo) {
@@ -42,14 +42,16 @@ export class MakerRequestService {
 
         const mr = (
             await this.db
-                .insert(makerRequests)
+                .insert(paymentRequests)
                 .values({
+                    projectId: null,
                     requestNo,
                     partyName: body.partyName,
                     accountNumber: body.accountNumber,
+                    bankName: body.bankName,
                     ifsc: body.ifsc,
                     amount: body.amount?.toString(),
-                    category: body.category,
+                    paymentAgainst: body.category,
                     paymentMode: body.paymentMode || "BANK_TRANSFER",
                     portalLink: body.portalLink || null,
                     billFiles: body.billFiles || [],
@@ -66,8 +68,8 @@ export class MakerRequestService {
     async updateStatus(id: number, body: { status: string; utrNumber?: string; rejectionReason?: string }) {
         const existing = await this.db
             .select()
-            .from(makerRequests)
-            .where(eq(makerRequests.id, id))
+            .from(paymentRequests)
+            .where(and(eq(paymentRequests.id, id), sql`${paymentRequests.projectId} IS NULL`))
             .then(rows => rows[0]);
         if (!existing) throw new NotFoundException("Maker Request not found");
 
@@ -84,14 +86,14 @@ export class MakerRequestService {
 
         const updated = (
             await this.db
-                .update(makerRequests)
+                .update(paymentRequests)
                 .set({
                     status: body.status,
                     utrNumber: body.utrNumber || null,
                     rejectionReason: body.rejectionReason || null,
                     updatedAt: new Date(),
                 })
-                .where(eq(makerRequests.id, id))
+                .where(and(eq(paymentRequests.id, id), sql`${paymentRequests.projectId} IS NULL`))
                 .returning()
         )[0];
 
@@ -100,23 +102,24 @@ export class MakerRequestService {
     }
 
     private readonly mrFields = {
-        id: makerRequests.id,
-        requestNo: makerRequests.requestNo,
-        partyName: makerRequests.partyName,
-        accountNumber: makerRequests.accountNumber,
-        ifsc: makerRequests.ifsc,
-        amount: makerRequests.amount,
-        category: makerRequests.category,
-        paymentMode: makerRequests.paymentMode,
-        portalLink: makerRequests.portalLink,
-        billFiles: makerRequests.billFiles,
-        remark: makerRequests.remark,
-        status: makerRequests.status,
-        utrNumber: makerRequests.utrNumber,
-        rejectionReason: makerRequests.rejectionReason,
-        requestedBy: makerRequests.requestedBy,
-        createdAt: makerRequests.createdAt,
-        updatedAt: makerRequests.updatedAt,
+        id: paymentRequests.id,
+        requestNo: paymentRequests.requestNo,
+        partyName: paymentRequests.partyName,
+        accountNumber: paymentRequests.accountNumber,
+        bankName: paymentRequests.bankName,
+        ifsc: paymentRequests.ifsc,
+        amount: paymentRequests.amount,
+        category: paymentRequests.paymentAgainst,
+        paymentMode: paymentRequests.paymentMode,
+        portalLink: paymentRequests.portalLink,
+        billFiles: paymentRequests.billFiles,
+        remark: paymentRequests.remark,
+        status: paymentRequests.status,
+        utrNumber: paymentRequests.utrNumber,
+        rejectionReason: paymentRequests.rejectionReason,
+        requestedBy: paymentRequests.requestedBy,
+        createdAt: paymentRequests.createdAt,
+        updatedAt: paymentRequests.updatedAt,
     };
 
     async getById(id: number) {
@@ -125,9 +128,9 @@ export class MakerRequestService {
                 ...this.mrFields,
                 requestedByName: users.name,
             })
-            .from(makerRequests)
-            .leftJoin(users, eq(makerRequests.requestedBy, users.id))
-            .where(eq(makerRequests.id, id));
+            .from(paymentRequests)
+            .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
+            .where(and(eq(paymentRequests.id, id), sql`${paymentRequests.projectId} IS NULL`));
 
         const mr = rows[0];
         if (!mr) throw new NotFoundException("Maker Request not found");
@@ -140,8 +143,9 @@ export class MakerRequestService {
                 ...this.mrFields,
                 requestedByName: users.name,
             })
-            .from(makerRequests)
-            .leftJoin(users, eq(makerRequests.requestedBy, users.id))
-            .orderBy(desc(makerRequests.id));
+            .from(paymentRequests)
+            .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
+            .where(sql`${paymentRequests.projectId} IS NULL`)
+            .orderBy(desc(paymentRequests.id));
     }
 }

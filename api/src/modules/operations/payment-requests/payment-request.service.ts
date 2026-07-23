@@ -85,7 +85,7 @@ export class PaymentRequestService {
             await this.db
                 .insert(paymentRequests)
                 .values({
-                    projectId: body.projectId,
+                    projectId: body.projectId || null,
                     requestNo,
                     partyName: body.partyName,
                     accountNumber: body.accountNumber,
@@ -98,6 +98,9 @@ export class PaymentRequestService {
                     vendorWorkOrderId: body.vendorWorkOrderId,
                     uploadedInvoiceFile: body.uploadedInvoiceFile,
                     poFile: body.poFile,
+                    paymentMode: body.paymentMode || 'BANK_TRANSFER',
+                    portalLink: body.portalLink || null,
+                    billFiles: body.billFiles || [],
                     remark: body.remark,
                     requestedBy: userId,
                 })
@@ -131,6 +134,9 @@ export class PaymentRequestService {
                     vendorWorkOrderId: body.vendorWorkOrderId,
                     uploadedInvoiceFile: body.uploadedInvoiceFile,
                     poFile: body.poFile,
+                    paymentMode: body.paymentMode,
+                    portalLink: body.portalLink,
+                    billFiles: body.billFiles,
                     remark: body.remark,
                     updatedAt: new Date(),
                 })
@@ -192,6 +198,9 @@ export class PaymentRequestService {
         vendorWorkOrderId: paymentRequests.vendorWorkOrderId,
         uploadedInvoiceFile: paymentRequests.uploadedInvoiceFile,
         poFile: paymentRequests.poFile,
+        paymentMode: paymentRequests.paymentMode,
+        portalLink: paymentRequests.portalLink,
+        billFiles: paymentRequests.billFiles,
         remark: paymentRequests.remark,
         utrNumber: paymentRequests.utrNumber,
         rejectionReason: paymentRequests.rejectionReason,
@@ -244,10 +253,15 @@ export class PaymentRequestService {
         return pr;
     }
 
-    async getAll(teamId?: number) {
+    async getAll(teamId?: number, type?: 'project' | 'maker') {
         const conditions: ReturnType<typeof eq>[] = [];
         if (teamId !== undefined) {
             conditions.push(eq(users.team, teamId));
+        }
+        if (type === 'project') {
+            conditions.push(sql`${paymentRequests.projectId} IS NOT NULL`);
+        } else if (type === 'maker') {
+            conditions.push(sql`${paymentRequests.projectId} IS NULL`);
         }
 
         return this.db
