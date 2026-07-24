@@ -358,6 +358,41 @@
       "when": 1784453857516,
       "tag": "0089_add_action_logs_to_sale_invoices",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1784782345000,
+      "tag": "0090_add_disposal_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1784782346000,
+      "tag": "0091_add_type_specs",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1784782347000,
+      "tag": "0092_migrate_asset_keys_to_text",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1784782348000,
+      "tag": "0093_unify_payment_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1784891421218,
+      "tag": "0094_add_category_to_vendor_work_orders",
+      "breakpoints": true
     }
   ]
 }
