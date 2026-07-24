@@ -24,7 +24,7 @@ import { VWOTermsField } from "./components/VWOTermsField";
 import { DEFAULT_VWO_TERMS_ROWS } from "./helpers/vwoForm.constants";
 import { VWOFormPreview } from "./components/VWOFormPreview";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Building2, Calendar, Eye, Hash, Info, Loader2, Mail, MapPin, Phone, UserCheck, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, Eye, FileText, Hash, Info, Loader2, Mail, MapPin, Phone, UserCheck, UserPlus } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
@@ -44,6 +44,7 @@ interface NewPartyForm {
 
 const defaultFormValues: VendorWorkOrderFormValues = {
   woDate: formatDateForInput(new Date()),
+  category: "",
   sellerId: "",
   sellerName: "",
   sellerEmail: "",
@@ -273,7 +274,7 @@ export default function CreateVendorWorkOrderPage() {
         {/* ── WO Details ── */}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Hash className="h-3.5 w-3.5 text-muted-foreground" />
@@ -292,6 +293,16 @@ export default function CreateVendorWorkOrderPage() {
               <FieldWrapper control={form.control} name="woDate" label={<><Calendar className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />WO Date <span className="text-destructive">*</span></>}>
                 {(field) => <DateInput value={field.value} onChange={field.onChange} />}
               </FieldWrapper>
+              <SelectField
+                control={form.control}
+                name="category"
+                label={<><FileText className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Category</>}
+                options={[
+                  { id: "Service", name: "Service" },
+                  { id: "Freight", name: "Freight" },
+                ]}
+                placeholder="Select category..."
+              />
             </div>
 
             <div className="flex flex-col md:flex-row gap-6 mt-6">

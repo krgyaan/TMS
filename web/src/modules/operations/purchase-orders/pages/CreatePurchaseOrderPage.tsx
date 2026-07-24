@@ -294,11 +294,8 @@ export default function CreatePurchaseOrderPage() {
                   label={<><FileText className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Category <span className="text-destructive">*</span></>}
                   options={[
                     { id: "Supply", name: "Supply" },
-                    { id: "Service", name: "Service" },
-                    { id: "Freight", name: "Freight" },
                     { id: "Admin/Misc.", name: "Admin/Misc." },
                     { id: "Buyback/Sale", name: "Buyback/Sale" },
-                    { id: "GEM Charges", name: "GEM Charges" },
                   ]}
                   placeholder="Select category..."
                 />

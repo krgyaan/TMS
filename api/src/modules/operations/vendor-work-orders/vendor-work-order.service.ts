@@ -88,6 +88,7 @@ export class VendorWorkOrderService {
                     shippingAddress: body.shippingAddress,
                     shipToGst: body.shipToGst,
                     shipToPan: body.shipToPan,
+                    category: body.category,
 
                     termsAndConditions: body.termsAndConditions
                         ? (typeof body.termsAndConditions === 'string' ? JSON.parse(body.termsAndConditions) : body.termsAndConditions)
@@ -164,6 +165,7 @@ export class VendorWorkOrderService {
                     shippingAddress: body.shippingAddress,
                     shipToGst: body.shipToGst,
                     shipToPan: body.shipToPan,
+                    category: body.category,
                     termsAndConditions: body.termsAndConditions
                         ? (typeof body.termsAndConditions === 'string' ? JSON.parse(body.termsAndConditions) : body.termsAndConditions)
                         : [],

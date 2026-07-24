@@ -17,6 +17,7 @@ export type TermFormItem = z.infer<typeof termRowSchema>;
 
 export const vendorWorkOrderFormSchema = z.object({
     woDate: z.string().min(1, "WO date is required"),
+    category: z.string().default(""),
 
     sellerId: z.string().default(""),
     sellerName: z.string().min(1, "Vendor name is required"),

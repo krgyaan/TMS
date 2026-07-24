@@ -8,6 +8,7 @@ export const vendorWorkOrders = pgTable(
         shippingAddress: text("shipping_address"),
         shipToGst: varchar("ship_to_gst", { length: 50 }),
         shipToPan: varchar("ship_to_pan", { length: 50 }),
+        category: varchar("category", { length: 100 }),
         projectName: varchar("project_name", { length: 255 }),
         contactPersonName: varchar("contact_person_name", { length: 255 }),
         contactPersonPhone: varchar("contact_person_phone", { length: 20 }),

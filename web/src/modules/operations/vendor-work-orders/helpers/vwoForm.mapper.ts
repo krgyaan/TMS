@@ -17,6 +17,7 @@ export function mapVwoFormToCreateDTO(
         projectId,
         projectName: projectName || undefined,
         woDate: values.woDate,
+        category: values.category || undefined,
         sellerId: values.sellerId ? Number(values.sellerId) : undefined,
         shipToPartyId: values.partyId ? Number(values.partyId) : undefined,
         sellerName: values.sellerName,
@@ -54,6 +55,7 @@ export function mapVwoFormToUpdateDTO(
 ): UpdateVendorWorkOrderDTO {
     return {
         woDate: values.woDate,
+        category: values.category || undefined,
         sellerId: values.sellerId ? Number(values.sellerId) : undefined,
         shipToPartyId: values.partyId ? Number(values.partyId) : undefined,
         sellerName: values.sellerName,
