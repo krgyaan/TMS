@@ -40,19 +40,25 @@ export class PurchaseOrderController {
 
   @Get()
   getAllPurchaseOrders(
-    @Query("teamId") teamId?: string,
     @Query("status") status?: string,
+    @Query("section") section?: string,
+    @CurrentUser() user?: ValidatedUser,
   ) {
     return this.service.getAllPurchaseOrders(
-      teamId ? Number(teamId) : undefined,
       status,
+      section,
+      user,
     );
   }
 
   @Get("approval-counts")
-  getApprovalCounts(@Query("teamId") teamId?: string) {
+  getApprovalCounts(
+    @Query("section") section?: string,
+    @CurrentUser() user?: ValidatedUser,
+  ) {
     return this.service.getApprovalCounts(
-      teamId ? Number(teamId) : undefined,
+      section,
+      user,
     );
   }
 

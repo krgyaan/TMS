@@ -4,7 +4,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { useAllPurchaseOrders, usePurchaseOrderApprovalCounts } from "@/hooks/api/usePurchaseOrders";
-import { useTeamFilter } from "@/hooks/useTeamFilter";
 import { useLocation } from "react-router-dom";
 import PurchaseOrderListPage from "./PurchaseOrderListPage";
 
@@ -20,12 +19,10 @@ interface TabConfig {
 
 const PurchaseOrderTabsPage: React.FC = () => {
     const location = useLocation();
-    const { teamId } = useTeamFilter();
-    const isOperationsSection = location.pathname.includes("/operations/");
     const isAccountsSection = location.pathname.includes("/accounts/");
-    const effectiveTeamId = isOperationsSection ? teamId : undefined;
+    const section = isAccountsSection ? "accounts" : "operations";
 
-    const isAccounts = isAccountsSection || !isOperationsSection;
+    const isAccounts = isAccountsSection;
 
     const tabsConfig: TabConfig[] = isAccounts
         ? [
@@ -48,8 +45,8 @@ const PurchaseOrderTabsPage: React.FC = () => {
 
     const currentTab = tabsConfig.find((t) => t.key === activeTab) ?? tabsConfig[0];
 
-    const { data: counts } = usePurchaseOrderApprovalCounts(effectiveTeamId ?? undefined);
-    const { data: poData } = useAllPurchaseOrders(effectiveTeamId ?? undefined, currentTab.status);
+    const { data: counts } = usePurchaseOrderApprovalCounts(section);
+    const { data: poData } = useAllPurchaseOrders(currentTab.status, section);
 
     const purchaseOrders = poData?.purchaseOrders ?? [];
 

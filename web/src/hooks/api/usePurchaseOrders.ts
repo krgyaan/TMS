@@ -34,18 +34,18 @@ export const useNextPONumber = (projectName: string | undefined) => {
     });
 };
 
-export const useAllPurchaseOrders = (teamId?: number, status?: string) => {
+export const useAllPurchaseOrders = (status?: string, section?: string) => {
     return useQuery({
-        queryKey: [...purchaseOrderKeys.all, "all", teamId, status],
-        queryFn: () => purchaseOrderApi.getAllPurchaseOrders(teamId, status),
+        queryKey: [...purchaseOrderKeys.all, "all", section, status],
+        queryFn: () => purchaseOrderApi.getAllPurchaseOrders(status, section),
         placeholderData: (previousData) => previousData,
     });
 };
 
-export const usePurchaseOrderApprovalCounts = (teamId?: number) => {
+export const usePurchaseOrderApprovalCounts = (section?: string) => {
     return useQuery({
-        queryKey: [...purchaseOrderKeys.all, "approval-counts", teamId],
-        queryFn: () => purchaseOrderApi.getApprovalCounts(teamId),
+        queryKey: [...purchaseOrderKeys.all, "approval-counts", section],
+        queryFn: () => purchaseOrderApi.getApprovalCounts(section),
         staleTime: 30 * 1000,
     });
 };

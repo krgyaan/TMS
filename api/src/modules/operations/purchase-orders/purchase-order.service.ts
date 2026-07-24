@@ -68,10 +68,12 @@ export class PurchaseOrderService {
         return { purchaseOrders: purchaseOrdersData };
     }
 
-    async getAllPurchaseOrders(teamId?: number, status?: string) {
-        const conditions: ReturnType<typeof eq>[] = [];
-        if (teamId !== undefined) {
-            conditions.push(eq(users.team, teamId));
+    async getAllPurchaseOrders(status?: string, section?: string, user?: any) {
+        const conditions: any[] = [];
+        if (section === "operations" && user && user.dataScope !== "all") {
+            if (user.teamId) {
+                conditions.push(eq(purchaseOrders.team, user.teamId));
+            }
         }
         if (status === "pending") {
             conditions.push(isNull(purchaseOrders.poApproved));
@@ -125,8 +127,10 @@ export class PurchaseOrderService {
         return { purchaseOrders: purchaseOrdersData };
     }
 
-    async getApprovalCounts(teamId?: number) {
-        const userCondition = teamId !== undefined ? eq(users.team, teamId) : undefined;
+    async getApprovalCounts(section?: string, user?: any) {
+        const teamCondition = section === "operations" && user && user.dataScope !== "all" && user.teamId
+            ? eq(purchaseOrders.team, user.teamId)
+            : undefined;
 
         const baseQuery = this.db
             .select({ id: purchaseOrders.id })
@@ -135,7 +139,7 @@ export class PurchaseOrderService {
 
         const buildCount = async (condition: any) => {
             const q = baseQuery.where(
-                userCondition ? and(userCondition, condition) : condition
+                teamCondition ? and(teamCondition, condition) : condition
             );
             const rows = await q;
             return rows.length;

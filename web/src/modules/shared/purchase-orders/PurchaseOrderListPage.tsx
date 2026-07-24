@@ -15,8 +15,6 @@ import { paths } from "@/app/routes/paths";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
-import { useAllPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
-import { useTeamFilter } from "@/hooks/useTeamFilter";
 import type { PurchaseOrderRow } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
 import { SetTdsDialog } from "./components/SetTdsDialog";
 
@@ -35,10 +33,6 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
 }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { teamId } = useTeamFilter();
-    const isOperationsSection = location.pathname.includes("/operations/");
-    const effectiveTeamId = isOperationsSection ? teamId : undefined;
-    const { data } = useAllPurchaseOrders(effectiveTeamId ?? undefined);
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
     const [internalSearch, setInternalSearch] = useState("");
     const search = propSearch !== undefined ? propSearch : internalSearch;
@@ -49,7 +43,7 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
     const isAccountsSection = location.pathname.includes("/accounts/");
     const isApprovalEnabled = showApprovalAction ?? isAccountsSection;
 
-    const purchaseOrders = propPurchaseOrders ?? data?.purchaseOrders ?? [];
+    const purchaseOrders = propPurchaseOrders ?? [];
 
     const onGridReady = useCallback((event: GridReadyEvent<PurchaseOrderRow>) => {
         setGridApi(event.api);
@@ -189,7 +183,7 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
                             <TooltipTrigger asChild>
                                 <span className="truncate block">{formatINR(p.value)}</span>
                             </TooltipTrigger>
-                            <TooltipContent side="top" align="start" className="max-w-xs">
+                            <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
                                 <div className="space-y-1 text-xs">
                                     <p><strong>Total (Pre-GST):</strong> {formatINR(d?.totalAmount || 0)}</p>
                                     <p><strong>GST Amount:</strong> {formatINR(d?.totalGstAmt || 0)}</p>
@@ -276,7 +270,7 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
                                     {label}
                                 </Badge>
                             </TooltipTrigger>
-                            <TooltipContent side="top" align="start" className="max-w-xs">
+                            <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
                                 <div className="space-y-1 text-xs">
                                     {tdsPct !== null && isApproved && (
                                         <>

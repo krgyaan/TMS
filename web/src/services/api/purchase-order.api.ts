@@ -44,17 +44,17 @@ class PurchaseOrderApiService extends BaseApiService {
         return url;
     }
 
-    async getApprovalCounts(teamId?: number): Promise<{ pending: number; approved: number; rejected: number; new: number }> {
+    async getApprovalCounts(section?: string): Promise<{ pending: number; approved: number; rejected: number; new: number }> {
         const searchParams = new URLSearchParams();
-        if (teamId) searchParams.set('teamId', String(teamId));
+        if (section) searchParams.set('section', section);
         const qs = searchParams.toString();
         return this.get(`/approval-counts${qs ? `?${qs}` : ''}`);
     }
 
-    async getAllPurchaseOrders(teamId?: number, status?: string): Promise<{ purchaseOrders: PurchaseOrderRow[] }> {
+    async getAllPurchaseOrders(status?: string, section?: string): Promise<{ purchaseOrders: PurchaseOrderRow[] }> {
         const searchParams = new URLSearchParams();
-        if (teamId) searchParams.set('teamId', String(teamId));
         if (status) searchParams.set('status', status);
+        if (section) searchParams.set('section', section);
         const qs = searchParams.toString();
         return this.get(`/${qs ? `?${qs}` : ''}`);
     }
