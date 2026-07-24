@@ -44,7 +44,7 @@ class PurchaseOrderApiService extends BaseApiService {
         return url;
     }
 
-    async getApprovalCounts(teamId?: number): Promise<{ pending: number; approved: number; rejected: number }> {
+    async getApprovalCounts(teamId?: number): Promise<{ pending: number; approved: number; rejected: number; new: number }> {
         const searchParams = new URLSearchParams();
         if (teamId) searchParams.set('teamId', String(teamId));
         const qs = searchParams.toString();

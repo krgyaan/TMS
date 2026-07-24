@@ -79,6 +79,8 @@ export class PurchaseOrderService {
             conditions.push(eq(purchaseOrders.poApproved, true));
         } else if (status === "rejected") {
             conditions.push(eq(purchaseOrders.poApproved, false));
+        } else if (status === "new") {
+            conditions.push(sql`${purchaseOrders.poApproved} IS NOT FALSE`);
         }
 
         const purchaseOrdersData = await this.db
@@ -139,13 +141,14 @@ export class PurchaseOrderService {
             return rows.length;
         };
 
-        const [pending, approved, rejected] = await Promise.all([
+        const [pending, approved, newCount, rejected] = await Promise.all([
             buildCount(isNull(purchaseOrders.poApproved)),
             buildCount(eq(purchaseOrders.poApproved, true)),
+            buildCount(sql`${purchaseOrders.poApproved} IS NOT FALSE`),
             buildCount(eq(purchaseOrders.poApproved, false)),
         ]);
 
-        return { pending, approved, rejected };
+        return { pending, approved, rejected, new: newCount };
     }
 
     private sanitizeProjectName(name: string): string {
