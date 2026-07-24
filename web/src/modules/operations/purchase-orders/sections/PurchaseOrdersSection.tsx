@@ -48,6 +48,7 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
         {
             label: "Edit PO",
             icon: <Edit className="h-4 w-4" />,
+            visible: (row) => row.poApproved !== true,
             onClick: (row) => navigate(paths.operations.editPoPage(row.id, projectId!)),
         },
         {

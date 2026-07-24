@@ -18,6 +18,7 @@ import { usePurchaseOrderDetails, useUpdatePurchaseOrder } from "@/hooks/api/use
 import { useCreatePoParty, usePoParties } from "@/hooks/api/usePurchaseOrders";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, ArrowLeft, Building2, Calendar, FileText, Hash, Info, Loader2, Mail, MapPin, Phone, Save, UserCheck, UserPlus } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -282,6 +283,37 @@ export default function EditPurchaseOrderPage() {
         );
     }
 
+    if (poData.poApproved === true) {
+        return (
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Edit Purchase Order</CardTitle>
+                            <CardDescription className="mt-2">
+                                <Badge variant="outline">{poData.poNumber || "N/A"}</Badge>
+                            </CardDescription>
+                        </div>
+                        <CardAction>
+                            <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+                                <ArrowLeft className="h-4 w-4 mr-1" /> Go Back
+                            </Button>
+                        </CardAction>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <Alert variant="default" className="border-yellow-400 bg-yellow-50 dark:bg-yellow-950/20">
+                        <AlertCircle className="h-5 w-5 text-yellow-600" />
+                        <AlertTitle>Approved Purchase Order</AlertTitle>
+                        <AlertDescription>
+                            This PO has been approved and cannot be edited. If changes are needed, please coordinate with the Accounts team.
+                        </AlertDescription>
+                    </Alert>
+                </CardContent>
+            </Card>
+        );
+    }
+
     return (
         <Card>
             <CardHeader>
@@ -308,6 +340,15 @@ export default function EditPurchaseOrderPage() {
                 </div>
             </CardHeader>
             <CardContent className="space-y-8">
+                {poData.poApproved === false && (
+                    <Alert variant="default" className="border-blue-400 bg-blue-50 dark:bg-blue-950/20">
+                        <Info className="h-5 w-5 text-blue-600" />
+                        <AlertTitle>Re-approval Required</AlertTitle>
+                        <AlertDescription>
+                            This PO was rejected by Accounts. After saving your changes, it will be sent for re-approval.
+                        </AlertDescription>
+                    </Alert>
+                )}
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)}>
                         {/* ── PO Type ── */}

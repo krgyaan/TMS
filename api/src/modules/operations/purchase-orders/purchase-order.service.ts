@@ -120,7 +120,7 @@ export class PurchaseOrderService {
                     totalPiCount: sql<number>`COALESCE((SELECT COUNT(*) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 })
                 .from(purchaseOrders)
-                .innerJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
+                .leftJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
                 .where(conditions.length > 0 ? and(...conditions) : undefined)
                 .orderBy(desc(purchaseOrders.createdAt));
 
@@ -682,6 +682,11 @@ export class PurchaseOrderService {
             throw new NotFoundException("Purchase Order not found");
         }
 
+        if (existingPO.poApproved === true) {
+            throw new BadRequestException("Cannot edit an approved Purchase Order. Only rejected or pending POs can be updated.");
+        }
+
+        const wasRejected = existingPO.poApproved === false;
         const [woBasic] = await this.db
             .select({ team: woBasicDetails.team })
             .from(woBasicDetails)
@@ -725,6 +730,14 @@ export class PurchaseOrderService {
                     poRaisedBy: userId ?? body.poRaisedBy,
 
                     team: woBasic?.team ?? existingPO.team,
+
+                    ...(wasRejected && {
+                        poApproved: null,
+                        tdsPercentage: null,
+                        tdsAmount: null,
+                        amountAfterTds: null,
+                        poApprovalRemark: null,
+                    }),
 
                     updatedAt: new Date(),
                 })
