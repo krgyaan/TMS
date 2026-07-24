@@ -12,11 +12,13 @@ import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
 import { Plus, Search, Pencil, Eye, XCircle, MapPin, FileText, ExternalLink, Loader2 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { useLeadEnquiries, useUpdateLeadEnquiry, useCreateSiteVisit, useUpdateSiteVisitDetails, useCreateSiteVisitContacts, useCheckDriveScopes, useCreateCostingSheet, useSubmitCostingSheet } from "@/hooks/api/useLeadEnquiry";
+import { useLeadEnquiries, useUpdateLeadEnquiry, useCreateSiteVisit, useUpdateSiteVisitDetails, useCreateSiteVisitContacts, useCheckDriveScopes, useCreateCostingSheet } from "@/hooks/api/useLeadEnquiry";
 import { LeadEnquiryRejectModal } from "./components/LeadEnquiryRejectModal";
 import { LeadEnquirySiteVisitModal } from "./components/LeadEnquirySiteVisitModal";
 import { LeadEnquirySiteVisitDetailsModal } from "./components/LeadEnquirySiteVisitDetailsModal";
-import { LeadEnquirySubmitCostingSheetModal } from "./components/LeadEnquirySubmitCostingSheetModal";
+import { SubmitCostingSheetModal } from "../enquirycosting/components/SubmitCostingSheetModal";
+import { useSubmitCostingSheet } from "@/hooks/api/useEnquiryCosting";
+
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
@@ -364,7 +366,7 @@ const EnquiryListPage = () => {
                 onSave={handleSiteVisitDetailsSave}
             />
 
-            <LeadEnquirySubmitCostingSheetModal
+            <SubmitCostingSheetModal
                 open={submitCostingModal.open}
                 onOpenChange={(open) => setSubmitCostingModal({ ...submitCostingModal, open })}
                 enquiryId={submitCostingModal.enquiryId}

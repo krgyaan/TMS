@@ -42,6 +42,7 @@ import { LeadTypesModule } from "@/modules/master/lead-types/lead-types.module";
 import { LeadsModule } from "@/modules/crm/leads/leads.module";
 import { FollowupsModule } from "@/modules/crm/followups/followups.module";
 import { LeadEnquiryModule } from "@/modules/crm/lead-enquiry/lead-enquiry.module";
+import { EnquiryCostingModule } from "@/modules/crm/enquirycosting/enquirycosting.module";
 import { LeadIndustriesModule } from "@/modules/master/lead-industries/lead-industries.module";
 import { LoanPartiesModule } from "@/modules/master/loan-parties/loan-parties.module";
 import { LocationsModule } from "@/modules/master/locations/locations.module";
@@ -183,6 +184,7 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         LeadsModule,
         FollowupsModule,
         LeadEnquiryModule,
+        EnquiryCostingModule,
         TendersModule,
         EmployeeImprestModule,
         TenderInfoSheetsModule,

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     Dialog,
     DialogContent,
@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Loader2, FileText } from "lucide-react";
 
-interface LeadEnquirySubmitCostingSheetModalProps {
+interface SubmitCostingSheetModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     enquiryId: number | null;
@@ -28,19 +28,30 @@ interface LeadEnquirySubmitCostingSheetModalProps {
     }) => Promise<void>;
 }
 
-export function LeadEnquirySubmitCostingSheetModal({
+export function SubmitCostingSheetModal({
     open,
     onOpenChange,
     enquiryId,
     enquiryName,
     onConfirm,
-}: LeadEnquirySubmitCostingSheetModalProps) {
+}: SubmitCostingSheetModalProps) {
     const [finalPrice, setFinalPrice] = useState("");
     const [receiptPreGst, setReceiptPreGst] = useState("");
     const [budgetPreGst, setBudgetPreGst] = useState("");
     const [grossMargin, setGrossMargin] = useState("");
     const [remarks, setRemarks] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        const receipt = parseFloat(receiptPreGst) || 0;
+        const budget = parseFloat(budgetPreGst) || 0;
+        if (receipt > 0) {
+            const gm = ((receipt - budget) / receipt) * 100;
+            setGrossMargin(gm.toFixed(2));
+        } else {
+            setGrossMargin("");
+        }
+    }, [receiptPreGst, budgetPreGst]);
 
     const handleConfirm = async () => {
         if (!enquiryId) return;
@@ -147,13 +158,16 @@ export function LeadEnquirySubmitCostingSheetModal({
                             <Input
                                 id="grossMargin"
                                 type="text"
-                                placeholder="0.00"
+                                placeholder="Auto-calculated"
                                 value={grossMargin}
-                                onChange={(e) => setGrossMargin(e.target.value)}
-                                className="pl-8"
+                                readOnly
+                                className="pl-8 bg-muted"
                                 disabled={isSubmitting}
                             />
                         </div>
+                        <p className="text-xs text-muted-foreground">
+                            Auto-calculated: ((Receipt - Budget) / Receipt) &times; 100
+                        </p>
                     </div>
 
                     <div className="space-y-2">

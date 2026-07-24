@@ -244,7 +244,7 @@ export const paths = {
         enquiryCreateFromLead: (leadId: number | string) => `/crm/enquiry/create/${leadId}`,
         enquiryEdit: (id: number | string) => `/crm/enquiries/${id}/edit`,
         enquiryView: (id: number | string) => `/crm/enquiries/${id}`,
-        costings: "/crm/costings",
+        enquiryCostings: "/crm/enquiry-costings",
         quotations: "/crm/quotations",
     },
 
