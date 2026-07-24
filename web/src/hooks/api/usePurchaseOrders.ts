@@ -34,10 +34,19 @@ export const useNextPONumber = (projectName: string | undefined) => {
     });
 };
 
-export const useAllPurchaseOrders = (teamId?: number) => {
+export const useAllPurchaseOrders = (teamId?: number, status?: string) => {
     return useQuery({
-        queryKey: [...purchaseOrderKeys.all, "all", teamId],
-        queryFn: () => purchaseOrderApi.getAllPurchaseOrders(teamId),
+        queryKey: [...purchaseOrderKeys.all, "all", teamId, status],
+        queryFn: () => purchaseOrderApi.getAllPurchaseOrders(teamId, status),
+        placeholderData: (previousData) => previousData,
+    });
+};
+
+export const usePurchaseOrderApprovalCounts = (teamId?: number) => {
+    return useQuery({
+        queryKey: [...purchaseOrderKeys.all, "approval-counts", teamId],
+        queryFn: () => purchaseOrderApi.getApprovalCounts(teamId),
+        staleTime: 30 * 1000,
     });
 };
 

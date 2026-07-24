@@ -39,8 +39,21 @@ export class PurchaseOrderController {
   }
 
   @Get()
-  getAllPurchaseOrders(@Query("teamId") teamId?: string) {
-    return this.service.getAllPurchaseOrders(teamId ? Number(teamId) : undefined);
+  getAllPurchaseOrders(
+    @Query("teamId") teamId?: string,
+    @Query("status") status?: string,
+  ) {
+    return this.service.getAllPurchaseOrders(
+      teamId ? Number(teamId) : undefined,
+      status,
+    );
+  }
+
+  @Get("approval-counts")
+  getApprovalCounts(@Query("teamId") teamId?: string) {
+    return this.service.getApprovalCounts(
+      teamId ? Number(teamId) : undefined,
+    );
   }
 
   @Get(":id/pdf/versions")

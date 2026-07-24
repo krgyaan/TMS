@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, inArray, like, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, like, sql } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rename } from "node:fs/promises";
 import { join } from "node:path";
@@ -68,10 +68,17 @@ export class PurchaseOrderService {
         return { purchaseOrders: purchaseOrdersData };
     }
 
-    async getAllPurchaseOrders(teamId?: number) {
+    async getAllPurchaseOrders(teamId?: number, status?: string) {
         const conditions: ReturnType<typeof eq>[] = [];
         if (teamId !== undefined) {
             conditions.push(eq(users.team, teamId));
+        }
+        if (status === "pending") {
+            conditions.push(isNull(purchaseOrders.poApproved));
+        } else if (status === "approved") {
+            conditions.push(eq(purchaseOrders.poApproved, true));
+        } else if (status === "rejected") {
+            conditions.push(eq(purchaseOrders.poApproved, false));
         }
 
         const purchaseOrdersData = await this.db
@@ -97,6 +104,8 @@ export class PurchaseOrderService {
                     tdsPercentage: purchaseOrders.tdsPercentage,
                     tdsAmount: purchaseOrders.tdsAmount,
                     amountAfterTds: purchaseOrders.amountAfterTds,
+                    poApproved: purchaseOrders.poApproved,
+                    poApprovalRemark: purchaseOrders.poApprovalRemark,
                     totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
@@ -112,6 +121,31 @@ export class PurchaseOrderService {
                 .orderBy(desc(purchaseOrders.createdAt));
 
         return { purchaseOrders: purchaseOrdersData };
+    }
+
+    async getApprovalCounts(teamId?: number) {
+        const userCondition = teamId !== undefined ? eq(users.team, teamId) : undefined;
+
+        const baseQuery = this.db
+            .select({ id: purchaseOrders.id })
+            .from(purchaseOrders)
+            .innerJoin(users, eq(users.id, purchaseOrders.poRaisedBy));
+
+        const buildCount = async (condition: any) => {
+            const q = baseQuery.where(
+                userCondition ? and(userCondition, condition) : condition
+            );
+            const rows = await q;
+            return rows.length;
+        };
+
+        const [pending, approved, rejected] = await Promise.all([
+            buildCount(isNull(purchaseOrders.poApproved)),
+            buildCount(eq(purchaseOrders.poApproved, true)),
+            buildCount(eq(purchaseOrders.poApproved, false)),
+        ]);
+
+        return { pending, approved, rejected };
     }
 
     private sanitizeProjectName(name: string): string {

@@ -44,9 +44,19 @@ class PurchaseOrderApiService extends BaseApiService {
         return url;
     }
 
-    async getAllPurchaseOrders(teamId?: number): Promise<{ purchaseOrders: PurchaseOrderRow[] }> {
-        const params = teamId ? `?teamId=${teamId}` : '';
-        return this.get(`/${params}`);
+    async getApprovalCounts(teamId?: number): Promise<{ pending: number; approved: number; rejected: number }> {
+        const searchParams = new URLSearchParams();
+        if (teamId) searchParams.set('teamId', String(teamId));
+        const qs = searchParams.toString();
+        return this.get(`/approval-counts${qs ? `?${qs}` : ''}`);
+    }
+
+    async getAllPurchaseOrders(teamId?: number, status?: string): Promise<{ purchaseOrders: PurchaseOrderRow[] }> {
+        const searchParams = new URLSearchParams();
+        if (teamId) searchParams.set('teamId', String(teamId));
+        if (status) searchParams.set('status', status);
+        const qs = searchParams.toString();
+        return this.get(`/${qs ? `?${qs}` : ''}`);
     }
 
     async getPurchaseOrderPdfVersions(id: number): Promise<Record<string, { path: string; hash: string }>> {
