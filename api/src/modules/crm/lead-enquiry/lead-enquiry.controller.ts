@@ -19,6 +19,7 @@ import {
     UpdateSiteVisitDetailsSchema,
     CreateSiteVisitContactArraySchema,
     CreateCostingSheetSchema,
+    SubmitCostingSheetSchema,
 } from './dto/lead-enquiry.dto';
 import { ValidatedBody } from '@/decorators/validated-body.decorator';
 import type {
@@ -29,6 +30,7 @@ import type {
     UpdateSiteVisitDetailsDto,
     CreateSiteVisitContactArrayDto,
     CreateCostingSheetDto,
+    SubmitCostingSheetDto,
 } from './dto/lead-enquiry.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -130,6 +132,15 @@ export class LeadEnquiryController {
         @CurrentUser() user: ValidatedUser,
     ) {
         return this.leadEnquiryService.createCostingSheet(body, user.sub);
+    }
+
+    @Post('submit-costing-sheet')
+    @HttpCode(HttpStatus.OK)
+    async submitCostingSheet(
+        @ValidatedBody(SubmitCostingSheetSchema) body: SubmitCostingSheetDto,
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        return this.leadEnquiryService.submitCostingSheet(body, user.sub);
     }
 
     @Get(':id')

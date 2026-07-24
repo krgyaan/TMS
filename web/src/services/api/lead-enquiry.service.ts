@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service';
-import type { LeadEnquiry, LeadEnquiryWithNames, CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, SiteVisit, CreateSiteVisitRequest, UpdateSiteVisitRequest, SiteVisitContact, CreateSiteVisitContactRequest, UpdateSiteVisitDetailsRequest, CreateCostingSheetResponse, DriveScopesResponse } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
+import type { LeadEnquiry, LeadEnquiryWithNames, CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, SiteVisit, CreateSiteVisitRequest, UpdateSiteVisitRequest, SiteVisitContact, CreateSiteVisitContactRequest, UpdateSiteVisitDetailsRequest, CreateCostingSheetResponse, SubmitCostingSheetRequest, SubmitCostingSheetResponse, DriveScopesResponse } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
 import type { PaginatedResult } from '@/types/api.types';
 
 class LeadEnquiryService extends BaseApiService {
@@ -69,6 +69,10 @@ class LeadEnquiryService extends BaseApiService {
 
     async createCostingSheet(enquiryId: number): Promise<CreateCostingSheetResponse> {
         return this.post<CreateCostingSheetResponse>('/create-costing-sheet', { enquiryId });
+    }
+
+    async submitCostingSheet(data: SubmitCostingSheetRequest): Promise<SubmitCostingSheetResponse> {
+        return this.post<SubmitCostingSheetResponse>('/submit-costing-sheet', data);
     }
 }
 

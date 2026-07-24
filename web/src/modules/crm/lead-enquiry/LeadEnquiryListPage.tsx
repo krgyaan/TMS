@@ -12,10 +12,11 @@ import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
 import { Plus, Search, Pencil, Eye, XCircle, MapPin, FileText, ExternalLink, Loader2 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { useLeadEnquiries, useUpdateLeadEnquiry, useCreateSiteVisit, useUpdateSiteVisitDetails, useCreateSiteVisitContacts, useCheckDriveScopes, useCreateCostingSheet } from "@/hooks/api/useLeadEnquiry";
+import { useLeadEnquiries, useUpdateLeadEnquiry, useCreateSiteVisit, useUpdateSiteVisitDetails, useCreateSiteVisitContacts, useCheckDriveScopes, useCreateCostingSheet, useSubmitCostingSheet } from "@/hooks/api/useLeadEnquiry";
 import { LeadEnquiryRejectModal } from "./components/LeadEnquiryRejectModal";
 import { LeadEnquirySiteVisitModal } from "./components/LeadEnquirySiteVisitModal";
 import { LeadEnquirySiteVisitDetailsModal } from "./components/LeadEnquirySiteVisitDetailsModal";
+import { LeadEnquirySubmitCostingSheetModal } from "./components/LeadEnquirySubmitCostingSheetModal";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
@@ -23,6 +24,8 @@ import type { LeadEnquiryWithNames } from "./helpers/lead-enquiry.type";
 import { leadEnquiryService } from "@/services/api/lead-enquiry.service";
 import axiosInstance from "@/lib/axios";
 import { toast } from "sonner";
+import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
+
 
 const EnquiryListPage = () => {
     const navigate = useNavigate();
@@ -32,6 +35,7 @@ const EnquiryListPage = () => {
     const createSiteVisitContacts = useCreateSiteVisitContacts();
     const { data: driveScopes, refetch: refetchDriveScopes } = useCheckDriveScopes();
     const createCostingSheet = useCreateCostingSheet();
+    const submitCostingSheet = useSubmitCostingSheet();
     const pendingEnquiryId = useRef<number | null>(null);
     const [connectDriveOpen, setConnectDriveOpen] = useState(false);
     const [isConnectingDrive, setIsConnectingDrive] = useState(false);
@@ -72,6 +76,7 @@ const EnquiryListPage = () => {
         sortModel, handleSortChanged, handlePageSizeChange,
     } = usePersistentTableState({
         storageKey: 'lead-enquiries',
+        defaultTab: 'all',
     });
 
     const { data: apiResponse, isLoading } = useLeadEnquiries(
@@ -98,6 +103,12 @@ const EnquiryListPage = () => {
         open: boolean;
         siteVisitId: number | null;
     }>({ open: false, siteVisitId: null });
+
+    const [submitCostingModal, setSubmitCostingModal] = useState<{
+        open: boolean;
+        enquiryId: number | null;
+        enquiryName?: string;
+    }>({ open: false, enquiryId: null });
 
     const handleRejectConfirm = async (enquiryId: number, reason?: string) => {
         await updateEnquiry.mutateAsync({ id: enquiryId, data: { status: "Rejected", rejectionReason: reason || null } });
@@ -163,6 +174,17 @@ const EnquiryListPage = () => {
         createCostingSheet.mutate(row.id);
     };
 
+    const handleSubmitCostingConfirm = async (data: {
+        enquiryId: number;
+        finalPrice?: string | null;
+        receiptPreGst?: string | null;
+        budgetPreGst?: string | null;
+        grossMargin?: string | null;
+        remarks?: string | null;
+    }) => {
+        await submitCostingSheet.mutateAsync(data);
+    };
+
     const enquiryActions: ActionItem<LeadEnquiryWithNames>[] = [
         {
             label: "View",
@@ -208,33 +230,63 @@ const EnquiryListPage = () => {
             label: "Submit Costing Sheet",
             icon: <FileText className="h-4 w-4" />,
             visible: (row) => !!row.costingDocument,
-            onClick: () => toast.info("Submit Costing Sheet - Coming soon"),
-            className: "opacity-50",
+            onClick: (row) => setSubmitCostingModal({ open: true, enquiryId: row.id, enquiryName: row.enqName }),
         },
     ];
 
 
 
     const colDefs = useMemo<ColDef<LeadEnquiryWithNames>[]>(() => [
-        { field: "enquiryNumber", headerName: "Enquiry No", width: 140 },
+        { field: "enquiryNumber", headerName: "Enquiry No.", width: 140 },
         { field: "enqName", headerName: "Enquiry Name", width: 220 },
-        { field: "organizationName", headerName: "Organization", width: 180 },
+        { field: "createdByName", headerName: "BD Lead", width: 160 },
+        { field: "organizationName", headerName: "Company Name", width: 180 },
+        { field: "orgAbbName", headerName: "Organisation Name", width: 160 },
         { field: "itemName", headerName: "Item", width: 160 },
-        { field: "locationCode", headerName: "Location", width: 120 },
         { field: "approxValue", headerName: "Approx Value", width: 130 },
+        {
+            headerName: "Site Visit",
+            width: 110,
+            cellRenderer: (params: any) => {
+                if (!params.data?.siteVisitRequired) return "No";
+                if (params.data?.hasSiteVisit) return "Done";
+                return "Yes";
+            },
+        },
+        
         {
             field: "status",
             headerName: "Status",
-            width: 120,
+            width: 160,
             cellRenderer: (params: any) => params.value || "-",
         },
-        { field: "leadName", headerName: "Lead", width: 160 },
         {
-            field: "createdAt",
-            headerName: "Created At",
-            width: 150,
-            valueFormatter: (params) => params.value ? new Date(params.value).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" }) : "-",
-        },
+    headerName: "Timer",
+    width: 130,
+    cellStyle: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    cellRenderer: (params: any) => {
+        const createdAt = params.data?.createdAt;
+        if (!createdAt) {
+            return (
+                <TenderTimerDisplay
+                    remainingSeconds={0}
+                    status="NOT_STARTED"
+                />
+            );
+        }
+        return (
+            <TenderTimerDisplay
+                remainingSeconds={0}
+                status="RUNNING"
+                deadline={new Date(createdAt)}
+            />
+        );
+    },
+},
         {
             headerName: "Action",
             cellRenderer: createActionColumnRenderer(enquiryActions),
@@ -310,6 +362,14 @@ const EnquiryListPage = () => {
                 onOpenChange={(open) => setSiteVisitDetailsModal({ ...siteVisitDetailsModal, open })}
                 siteVisitId={siteVisitDetailsModal.siteVisitId}
                 onSave={handleSiteVisitDetailsSave}
+            />
+
+            <LeadEnquirySubmitCostingSheetModal
+                open={submitCostingModal.open}
+                onOpenChange={(open) => setSubmitCostingModal({ ...submitCostingModal, open })}
+                enquiryId={submitCostingModal.enquiryId}
+                enquiryName={submitCostingModal.enquiryName}
+                onConfirm={handleSubmitCostingConfirm}
             />
 
             <Dialog open={connectDriveOpen} onOpenChange={setConnectDriveOpen}>

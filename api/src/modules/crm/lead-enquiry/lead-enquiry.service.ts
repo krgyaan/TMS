@@ -4,6 +4,7 @@ import type { DbInstance } from '@db';
 import { leadEnquiries, type NewLeadEnquiry, type LeadEnquiry } from '@db/schemas/crm/lead-enquiries.schema';
 import { siteVisits, type SiteVisit, type NewSiteVisit } from '@db/schemas/crm/site-visits.schema';
 import { siteVisitContacts, type SiteVisitContact } from '@db/schemas/crm/site-visit-contacts.schema';
+import { privateCostingSheets } from '@db/schemas/crm/private-costing-sheets.schema';
 import { leads } from '@db/schemas/crm/leads.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { organizations } from '@db/schemas/master/organizations.schema';
@@ -12,7 +13,7 @@ import { users } from '@db/schemas/auth/users.schema';
 import { and, asc, desc, eq, ilike, like, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { GoogleDriveService } from '@/modules/integrations/google/google-drive.service';
-import type { CreateLeadEnquiryDto, UpdateLeadEnquiryDto, CreateSiteVisitDto, UpdateSiteVisitDto, UpdateSiteVisitDetailsDto, CreateSiteVisitContactDto, CreateSiteVisitContactArrayDto } from './dto/lead-enquiry.dto';
+import type { CreateLeadEnquiryDto, UpdateLeadEnquiryDto, CreateSiteVisitDto, UpdateSiteVisitDto, UpdateSiteVisitDetailsDto, CreateSiteVisitContactDto, CreateSiteVisitContactArrayDto, SubmitCostingSheetDto } from './dto/lead-enquiry.dto';
 
 export type LeadEnquiryListFilters = {
     page?: number;
@@ -404,9 +405,38 @@ export class LeadEnquiryService {
 
         await this.db
             .update(leadEnquiries)
-            .set({ costingDocument: sheetResult.sheetUrl, updatedAt: new Date() })
+            .set({ costingDocument: sheetResult.sheetUrl, status: "Costing Sheet Created", updatedAt: new Date() })
             .where(eq(leadEnquiries.id, data.enquiryId));
 
         return { sheetUrl: sheetResult.sheetUrl };
+    }
+
+    async submitCostingSheet(data: SubmitCostingSheetDto, userId: number): Promise<{ success: boolean }> {
+        const enquiry = await this.findById(data.enquiryId);
+        if (!enquiry) throw new NotFoundException(`Lead enquiry with ID ${data.enquiryId} not found`);
+
+        const title = enquiry.enqName || `Enquiry-${enquiry.id}`;
+
+        await this.db
+            .insert(privateCostingSheets)
+            .values({
+                enquiryId: data.enquiryId,
+                title,
+                sheetUrl: enquiry.costingDocument,
+                preparedBy: userId,
+                status: 'Costing Sheet Submitted',
+                finalPrice: data.finalPrice ?? null,
+                receiptPreGst: data.receiptPreGst ?? null,
+                budgetPreGst: data.budgetPreGst ?? null,
+                grossMargin: data.grossMargin ?? null,
+                remarks: data.remarks ?? null,
+            });
+
+        await this.db
+            .update(leadEnquiries)
+            .set({ status: 'Costing Sheet Submitted', updatedAt: new Date() })
+            .where(eq(leadEnquiries.id, data.enquiryId));
+
+        return { success: true };
     }
 }

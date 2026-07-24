@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadEnquiryService } from '@/services/api/lead-enquiry.service';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/utils/errorToast';
-import type { CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, LeadEnquiryWithNames, CreateSiteVisitRequest, UpdateSiteVisitRequest, SiteVisit, SiteVisitContact, CreateSiteVisitContactRequest, UpdateSiteVisitDetailsRequest, CreateCostingSheetResponse, DriveScopesResponse } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
+import type { CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, LeadEnquiryWithNames, CreateSiteVisitRequest, UpdateSiteVisitRequest, SiteVisit, SiteVisitContact, CreateSiteVisitContactRequest, UpdateSiteVisitDetailsRequest, CreateCostingSheetResponse, SubmitCostingSheetRequest, SubmitCostingSheetResponse, DriveScopesResponse } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
 import type { PaginatedResult } from '@/types/api.types';
 
 export const leadEnquiryKey = {
@@ -173,6 +173,18 @@ export const useCreateCostingSheet = () => {
             if (data.sheetUrl) {
                 window.open(data.sheetUrl, '_blank');
             }
+        },
+        onError: showErrorToast,
+    });
+};
+
+export const useSubmitCostingSheet = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: SubmitCostingSheetRequest) => leadEnquiryService.submitCostingSheet(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: leadEnquiryKey.lists() });
+            toast.success('Costing sheet submitted successfully');
         },
         onError: showErrorToast,
     });

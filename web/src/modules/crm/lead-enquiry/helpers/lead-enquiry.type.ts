@@ -82,6 +82,19 @@ export interface CreateCostingSheetResponse {
     sheetUrl: string;
 }
 
+export interface SubmitCostingSheetRequest {
+    enquiryId: number;
+    finalPrice?: string | null;
+    receiptPreGst?: string | null;
+    budgetPreGst?: string | null;
+    grossMargin?: string | null;
+    remarks?: string | null;
+}
+
+export interface SubmitCostingSheetResponse {
+    success: boolean;
+}
+
 export type DriveScopesResponse = {
     hasScopes: boolean;
     missingScopes: string[];
