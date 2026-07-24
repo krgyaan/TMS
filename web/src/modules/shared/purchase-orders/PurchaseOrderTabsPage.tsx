@@ -22,7 +22,7 @@ const PurchaseOrderTabsPage: React.FC = () => {
     const isOperationsSection = location.pathname.includes("/operations/");
     const effectiveTeamId = isOperationsSection ? teamId : undefined;
 
-    const { activeTab, setActiveTab } = usePersistentTableState<PoApprovalTab>({
+    const { activeTab, setActiveTab, search, setSearch } = usePersistentTableState<PoApprovalTab>({
         storageKey: "purchase-orders",
         defaultTab: "pending",
     });
@@ -57,6 +57,8 @@ const PurchaseOrderTabsPage: React.FC = () => {
                         <PurchaseOrderListPage
                             purchaseOrders={purchaseOrders}
                             showApprovalAction={tab.key === "pending"}
+                            search={search}
+                            onSearchChange={setSearch}
                         />
                     )}
                 </TabsContent>

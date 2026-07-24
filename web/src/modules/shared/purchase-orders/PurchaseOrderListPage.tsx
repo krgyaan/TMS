@@ -23,11 +23,15 @@ import { SetTdsDialog } from "./components/SetTdsDialog";
 interface PurchaseOrderListPageProps {
     purchaseOrders?: PurchaseOrderRow[];
     showApprovalAction?: boolean;
+    search?: string;
+    onSearchChange?: (value: string) => void;
 }
 
 const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
     purchaseOrders: propPurchaseOrders,
     showApprovalAction,
+    search: propSearch,
+    onSearchChange: propOnSearchChange,
 }) => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -36,7 +40,9 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
     const effectiveTeamId = isOperationsSection ? teamId : undefined;
     const { data } = useAllPurchaseOrders(effectiveTeamId ?? undefined);
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
-    const [search, setSearch] = useState("");
+    const [internalSearch, setInternalSearch] = useState("");
+    const search = propSearch !== undefined ? propSearch : internalSearch;
+    const setSearch = propOnSearchChange ?? setInternalSearch;
     const debouncedSearch = useDebouncedSearch(search, 300);
     const [poApproval, setPoApproval] = useState<PurchaseOrderRow | null>(null);
 
