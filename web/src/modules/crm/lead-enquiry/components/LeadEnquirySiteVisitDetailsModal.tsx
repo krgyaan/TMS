@@ -28,6 +28,7 @@ interface LeadEnquirySiteVisitDetailsModalProps {
     onSave: (data: {
         information: string;
         documents: string;
+        conductedAt: string;
         contacts: ContactEntry[];
     }) => Promise<void>;
 }
@@ -40,6 +41,7 @@ export function LeadEnquirySiteVisitDetailsModal({
 }: LeadEnquirySiteVisitDetailsModalProps) {
     const [information, setInformation] = useState("");
     const [documents, setDocuments] = useState<File[]>([]);
+    const [conductedAt, setConductedAt] = useState("");
     const [contacts, setContacts] = useState<ContactEntry[]>([
         { name: "", designation: "", phone: "", email: "" },
     ]);
@@ -72,6 +74,7 @@ export function LeadEnquirySiteVisitDetailsModal({
             await onSave({
                 information,
                 documents: documents.map((f) => f.name).join(","),
+                conductedAt,
                 contacts: contacts.filter((c) => c.name.trim()),
             });
             handleClose();
@@ -85,6 +88,7 @@ export function LeadEnquirySiteVisitDetailsModal({
     const handleClose = () => {
         setInformation("");
         setDocuments([]);
+        setConductedAt("");
         setContacts([{ name: "", designation: "", phone: "", email: "" }]);
         onOpenChange(false);
     };
@@ -109,6 +113,17 @@ export function LeadEnquirySiteVisitDetailsModal({
                             Provide details gathered during the site visit.
                         </AlertDescription>
                     </Alert>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="conductedAt">Conducted At</Label>
+                        <Input
+                            id="conductedAt"
+                            type="datetime-local"
+                            value={conductedAt}
+                            onChange={(e) => setConductedAt(e.target.value)}
+                            disabled={isSaving}
+                        />
+                    </div>
 
                     <div className="space-y-2">
                         <Label htmlFor="information">Site Visit Information Received</Label>

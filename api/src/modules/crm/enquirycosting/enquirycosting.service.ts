@@ -1,12 +1,13 @@
-import { Injectable, NotFoundException, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, BadRequestException } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { privateCostingSheets } from '@db/schemas/crm/private-costing-sheets.schema';
 import { leadEnquiries } from '@db/schemas/crm/lead-enquiries.schema';
 import { users } from '@db/schemas/auth/users.schema';
+import { vendors } from '@db/schemas/vendors/vendors.schema';
 import { and, asc, desc, eq, ilike, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import type { SubmitCostingSheetDto } from './dto/enquirycosting.dto';
+import type { SubmitCostingSheetDto, ResubmitCostingSheetDto, ApproveCostingSheetDto, RedoCostingSheetDto } from './dto/enquirycosting.dto';
 
 export type EnquiryCostingListFilters = {
     page?: number;
@@ -182,25 +183,195 @@ export class EnquiryCostingService {
 
         const title = enquiry.enqName || `Enquiry-${enquiry.id}`;
 
-        await this.db
-            .insert(privateCostingSheets)
-            .values({
-                enquiryId: data.enquiryId,
-                title,
-                sheetUrl: enquiry.costingDocument,
-                preparedBy: userId,
-                status: 'Costing Sheet Submitted',
-                finalPrice: data.finalPrice ?? null,
-                receiptPreGst: data.receiptPreGst ?? null,
-                budgetPreGst: data.budgetPreGst ?? null,
-                grossMargin: data.grossMargin ?? null,
-                remarks: data.remarks ?? null,
-            });
+        const [existing] = await this.db
+            .select()
+            .from(privateCostingSheets)
+            .where(eq(privateCostingSheets.enquiryId, data.enquiryId))
+            .limit(1);
+
+        if (existing) {
+            await this.db
+                .update(privateCostingSheets)
+                .set({
+                    title,
+                    sheetUrl: enquiry.costingDocument,
+                    preparedBy: userId,
+                    status: 'Pending',
+                    finalPrice: data.finalPrice ?? null,
+                    receiptPreGst: data.receiptPreGst ?? null,
+                    budgetPreGst: data.budgetPreGst ?? null,
+                    grossMargin: data.grossMargin ?? null,
+                    remarks: data.remarks ?? null,
+                    updatedAt: new Date(),
+                })
+                .where(eq(privateCostingSheets.id, existing.id));
+        } else {
+            await this.db
+                .insert(privateCostingSheets)
+                .values({
+                    enquiryId: data.enquiryId,
+                    title,
+                    sheetUrl: enquiry.costingDocument,
+                    preparedBy: userId,
+                    status: 'Pending',
+                    finalPrice: data.finalPrice ?? null,
+                    receiptPreGst: data.receiptPreGst ?? null,
+                    budgetPreGst: data.budgetPreGst ?? null,
+                    grossMargin: data.grossMargin ?? null,
+                    remarks: data.remarks ?? null,
+                });
+        }
 
         await this.db
             .update(leadEnquiries)
             .set({ status: 'Costing Sheet Submitted', updatedAt: new Date() })
             .where(eq(leadEnquiries.id, data.enquiryId));
+
+        return { success: true };
+    }
+
+    async findByEnquiryId(enquiryId: number): Promise<EnquiryCostingWithNames | null> {
+        const [row] = await this.db
+            .select({
+                id: privateCostingSheets.id,
+                enquiryId: leadEnquiries.id,
+                enquiryNumber: leadEnquiries.enquiryNumber,
+                enqName: leadEnquiries.enqName,
+                createdByName: createdByUser.name,
+                organizationName: leadEnquiries.organizationName,
+                orgAbbName: leadEnquiries.orgAbbName,
+                approxValue: leadEnquiries.approxValue,
+                finalPrice: privateCostingSheets.finalPrice,
+                receiptPreGst: privateCostingSheets.receiptPreGst,
+                budgetPreGst: privateCostingSheets.budgetPreGst,
+                grossMargin: privateCostingSheets.grossMargin,
+                preparedByName: preparedByUser.name,
+                status: privateCostingSheets.status,
+                sheetUrl: privateCostingSheets.sheetUrl,
+                remarks: privateCostingSheets.remarks,
+                createdAt: privateCostingSheets.createdAt,
+                updatedAt: privateCostingSheets.updatedAt,
+            })
+            .from(privateCostingSheets)
+            .innerJoin(leadEnquiries, eq(privateCostingSheets.enquiryId, leadEnquiries.id))
+            .leftJoin(preparedByUser, eq(preparedByUser.id, privateCostingSheets.preparedBy))
+            .leftJoin(createdByUser, eq(createdByUser.id, leadEnquiries.createdBy))
+            .where(eq(privateCostingSheets.enquiryId, enquiryId))
+            .limit(1);
+
+        if (!row) return null;
+
+        return {
+            ...row,
+            createdByName: row.createdByName ?? null,
+            preparedByName: row.preparedByName ?? null,
+        };
+    }
+
+    async resubmitCostingSheet(data: ResubmitCostingSheetDto, userId: number): Promise<{ success: boolean }> {
+        const [existing] = await this.db
+            .select()
+            .from(privateCostingSheets)
+            .where(eq(privateCostingSheets.enquiryId, data.enquiryId))
+            .limit(1);
+
+        if (!existing) throw new NotFoundException(`No costing sheet found for enquiry ID ${data.enquiryId}`);
+
+        await this.db
+            .update(privateCostingSheets)
+            .set({
+                preparedBy: userId,
+                status: 'Pending',
+                finalPrice: data.finalPrice ?? null,
+                receiptPreGst: data.receiptPreGst ?? null,
+                budgetPreGst: data.budgetPreGst ?? null,
+                grossMargin: data.grossMargin ?? null,
+                remarks: data.remarks ?? null,
+                updatedAt: new Date(),
+            })
+            .where(eq(privateCostingSheets.id, existing.id));
+
+        await this.db
+            .update(leadEnquiries)
+            .set({ status: 'Costing Sheet Resubmitted', updatedAt: new Date() })
+            .where(eq(leadEnquiries.id, data.enquiryId));
+
+        return { success: true };
+    }
+
+    async approveCosting(id: number, data: ApproveCostingSheetDto, userId: number): Promise<{ success: boolean }> {
+        const [sheet] = await this.db
+            .select()
+            .from(privateCostingSheets)
+            .where(eq(privateCostingSheets.id, id))
+            .limit(1);
+
+        if (!sheet) throw new NotFoundException(`Costing sheet with ID ${id} not found`);
+
+        await this.db
+            .update(privateCostingSheets)
+            .set({
+                status: 'Approved',
+                approvedFinalPrice: data.finalPrice ?? null,
+                approvedReceiptPreGst: data.receiptPreGst ?? null,
+                approvedBudgetPreGst: data.budgetPreGst ?? null,
+                approvedGrossMargin: data.grossMargin ?? null,
+                oemVendorId: data.oemVendorId ?? null,
+                approvalRemarks: data.approvalRemarks ?? null,
+                approvedBy: userId,
+                approvedAt: new Date(),
+                updatedAt: new Date(),
+            })
+            .where(eq(privateCostingSheets.id, id));
+
+        await this.db
+            .update(leadEnquiries)
+            .set({ status: 'Approved', updatedAt: new Date() })
+            .where(eq(leadEnquiries.id, sheet.enquiryId));
+
+        return { success: true };
+    }
+
+    async redoCosting(id: number, data: RedoCostingSheetDto, userId: number): Promise<{ success: boolean }> {
+        const [sheet] = await this.db
+            .select()
+            .from(privateCostingSheets)
+            .where(eq(privateCostingSheets.id, id))
+            .limit(1);
+
+        if (!sheet) throw new NotFoundException(`Costing sheet with ID ${id} not found`);
+
+        await this.db
+            .update(privateCostingSheets)
+            .set({
+                status: 'Redo',
+                redoReason: data.reason,
+                redoBy: userId,
+                updatedAt: new Date(),
+            })
+            .where(eq(privateCostingSheets.id, id));
+
+        await this.db
+            .update(leadEnquiries)
+            .set({ status: 'Redo', updatedAt: new Date() })
+            .where(eq(leadEnquiries.id, sheet.enquiryId));
+
+        return { success: true };
+    }
+
+    async rejectEnquiry(id: number, data: { reason?: string | null }, userId: number): Promise<{ success: boolean }> {
+        const [sheet] = await this.db
+            .select()
+            .from(privateCostingSheets)
+            .where(eq(privateCostingSheets.id, id))
+            .limit(1);
+
+        if (!sheet) throw new NotFoundException(`Costing sheet with ID ${id} not found`);
+
+        await this.db
+            .update(leadEnquiries)
+            .set({ status: 'Rejected', rejectionReason: data.reason ?? null, updatedAt: new Date() })
+            .where(eq(leadEnquiries.id, sheet.enquiryId));
 
         return { success: true };
     }

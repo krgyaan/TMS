@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service';
-import type { EnquiryCosting, EnquiryCostingListParams, SubmitCostingSheetRequest, SubmitCostingSheetResponse } from '@/modules/crm/enquirycosting/helpers/enquirycosting.type';
+import type { EnquiryCosting, EnquiryCostingListParams, SubmitCostingSheetRequest, SubmitCostingSheetResponse, ResubmitCostingSheetRequest, ApproveCostingSheetRequest, RedoCostingSheetRequest, RejectEnquiryRequest } from '@/modules/crm/enquirycosting/helpers/enquirycosting.type';
 import type { PaginatedResult } from '@/types/api.types';
 
 class EnquiryCostingService extends BaseApiService {
@@ -23,8 +23,28 @@ class EnquiryCostingService extends BaseApiService {
         return this.get<EnquiryCosting>(`/${id}`);
     }
 
+    async getByEnquiryId(enquiryId: number): Promise<EnquiryCosting | null> {
+        return this.get<EnquiryCosting | null>(`/by-enquiry/${enquiryId}`);
+    }
+
     async submitCostingSheet(data: SubmitCostingSheetRequest): Promise<SubmitCostingSheetResponse> {
         return this.post<SubmitCostingSheetResponse>('/submit-costing-sheet', data);
+    }
+
+    async resubmitCostingSheet(data: ResubmitCostingSheetRequest): Promise<SubmitCostingSheetResponse> {
+        return this.post<SubmitCostingSheetResponse>('/resubmit-costing-sheet', data);
+    }
+
+    async approveCosting(id: number, data: ApproveCostingSheetRequest): Promise<SubmitCostingSheetResponse> {
+        return this.post<SubmitCostingSheetResponse>(`/${id}/approve`, data);
+    }
+
+    async redoCosting(id: number, data: RedoCostingSheetRequest): Promise<SubmitCostingSheetResponse> {
+        return this.post<SubmitCostingSheetResponse>(`/${id}/redo`, data);
+    }
+
+    async rejectEnquiry(id: number, data: RejectEnquiryRequest): Promise<SubmitCostingSheetResponse> {
+        return this.post<SubmitCostingSheetResponse>(`/${id}/reject`, data);
     }
 }
 

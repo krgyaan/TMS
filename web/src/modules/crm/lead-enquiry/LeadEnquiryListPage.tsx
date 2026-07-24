@@ -18,6 +18,7 @@ import { LeadEnquirySiteVisitModal } from "./components/LeadEnquirySiteVisitModa
 import { LeadEnquirySiteVisitDetailsModal } from "./components/LeadEnquirySiteVisitDetailsModal";
 import { SubmitCostingSheetModal } from "../enquirycosting/components/SubmitCostingSheetModal";
 import { useSubmitCostingSheet } from "@/hooks/api/useEnquiryCosting";
+import { enquiryCostingService } from "@/services/api/enquirycosting.service";
 
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
@@ -110,6 +111,13 @@ const EnquiryListPage = () => {
         open: boolean;
         enquiryId: number | null;
         enquiryName?: string;
+        initialData?: {
+            finalPrice?: string | null;
+            receiptPreGst?: string | null;
+            budgetPreGst?: string | null;
+            grossMargin?: string | null;
+            remarks?: string | null;
+        } | null;
     }>({ open: false, enquiryId: null });
 
     const handleRejectConfirm = async (enquiryId: number, reason?: string) => {
@@ -129,11 +137,11 @@ const EnquiryListPage = () => {
         }
     };
 
-    const handleSiteVisitDetailsSave = async (data: { information: string; documents: string; contacts: { name: string; designation: string; phone: string; email: string }[] }) => {
+    const handleSiteVisitDetailsSave = async (data: { information: string; documents: string; conductedAt: string; contacts: { name: string; designation: string; phone: string; email: string }[] }) => {
         if (!siteVisitDetailsModal.siteVisitId) return;
         await updateSiteVisitDetails.mutateAsync({
             id: siteVisitDetailsModal.siteVisitId,
-            data: { information: data.information || null, documents: data.documents || null },
+            data: { information: data.information || null, documents: data.documents || null, conductedAt: data.conductedAt || null },
         });
         if (data.contacts.length > 0) {
             await createSiteVisitContacts.mutateAsync({
@@ -231,8 +239,30 @@ const EnquiryListPage = () => {
         {
             label: "Submit Costing Sheet",
             icon: <FileText className="h-4 w-4" />,
-            visible: (row) => !!row.costingDocument,
-            onClick: (row) => setSubmitCostingModal({ open: true, enquiryId: row.id, enquiryName: row.enqName }),
+            visible: (row) => !!row.costingDocument && !row.costingSheetStatus,
+            onClick: (row) => setSubmitCostingModal({ open: true, enquiryId: row.id, enquiryName: row.enqName, initialData: null }),
+        },
+        {
+            label: "Edit Submit Costing Sheet",
+            icon: <FileText className="h-4 w-4" />,
+            visible: (row) => !!row.costingDocument && (row.costingSheetStatus === 'Pending' || row.costingSheetStatus === 'Redo'),
+            onClick: async (row) => {
+                const costing = await enquiryCostingService.getByEnquiryId(row.id);
+                setSubmitCostingModal({
+                    open: true,
+                    enquiryId: row.id,
+                    enquiryName: row.enqName,
+                    initialData: costing
+                        ? {
+                            finalPrice: costing.finalPrice,
+                            receiptPreGst: costing.receiptPreGst,
+                            budgetPreGst: costing.budgetPreGst,
+                            grossMargin: costing.grossMargin,
+                            remarks: costing.remarks,
+                        }
+                        : null,
+                });
+            },
         },
     ];
 
@@ -371,6 +401,7 @@ const EnquiryListPage = () => {
                 onOpenChange={(open) => setSubmitCostingModal({ ...submitCostingModal, open })}
                 enquiryId={submitCostingModal.enquiryId}
                 enquiryName={submitCostingModal.enquiryName}
+                initialData={submitCostingModal.initialData}
                 onConfirm={handleSubmitCostingConfirm}
             />
 

@@ -30,6 +30,7 @@ export interface LeadEnquiryWithNames extends LeadEnquiry {
     createdByName?: string | null;
     updatedByName?: string | null;
     hasSiteVisit?: boolean;
+    costingSheetStatus?: string | null;
 }
 
 export interface CreateLeadEnquiryRequest {

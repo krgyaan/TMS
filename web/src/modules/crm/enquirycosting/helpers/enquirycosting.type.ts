@@ -32,6 +32,32 @@ export interface SubmitCostingSheetResponse {
     success: boolean;
 }
 
+export interface ResubmitCostingSheetRequest {
+    enquiryId: number;
+    finalPrice?: string | null;
+    receiptPreGst?: string | null;
+    budgetPreGst?: string | null;
+    grossMargin?: string | null;
+    remarks?: string | null;
+}
+
+export interface ApproveCostingSheetRequest {
+    finalPrice?: string | null;
+    receiptPreGst?: string | null;
+    budgetPreGst?: string | null;
+    grossMargin?: string | null;
+    oemVendorId?: number | null;
+    approvalRemarks?: string | null;
+}
+
+export interface RedoCostingSheetRequest {
+    reason: string;
+}
+
+export interface RejectEnquiryRequest {
+    reason?: string | null;
+}
+
 export interface EnquiryCostingListParams {
     page?: number;
     limit?: number;

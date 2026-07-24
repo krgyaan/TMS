@@ -1,25 +1,27 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
-import { Search, Eye, ExternalLink } from "lucide-react";
+import { Search, Eye, ExternalLink, CheckCircle, RefreshCw, XCircle } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { useEnquiryCostings, useSubmitCostingSheet } from "@/hooks/api/useEnquiryCosting";
-import { SubmitCostingSheetModal } from "./components/SubmitCostingSheetModal";
+import { useEnquiryCostings, useApproveCosting, useRedoCosting, useRejectEnquiryFromCosting } from "@/hooks/api/useEnquiryCosting";
+import { ApproveCostingSheetModal } from "./components/ApproveCostingSheetModal";
+import { RedoCostingDialog } from "./components/RedoCostingDialog";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import type { EnquiryCosting } from "./helpers/enquirycosting.type";
-import { toast } from "sonner";
+import { LeadEnquiryRejectModal } from "@/modules/crm/lead-enquiry/components/LeadEnquiryRejectModal";
 
 const EnquiryCostingListPage = () => {
     const navigate = useNavigate();
-    const submitCostingSheet = useSubmitCostingSheet();
+    const approveCosting = useApproveCosting();
+    const redoCosting = useRedoCosting();
+    const rejectEnquiry = useRejectEnquiryFromCosting();
 
     const {
         search, setSearch, debouncedSearch,
@@ -38,22 +40,43 @@ const EnquiryCostingListPage = () => {
     const costings = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const [submitCostingModal, setSubmitCostingModal] = useState<{
+    const [approveModal, setApproveModal] = useState<{
         open: boolean;
-        enquiryId: number | null;
-        enquiryName?: string;
-    }>({ open: false, enquiryId: null });
+        costing: EnquiryCosting | null;
+    }>({ open: false, costing: null });
 
-    const handleSubmitCostingConfirm = async (data: {
-        enquiryId: number;
+    const [redoDialog, setRedoDialog] = useState<{
+        open: boolean;
+        costingId: number | null;
+    }>({ open: false, costingId: null });
+
+    const [rejectModal, setRejectModal] = useState<{
+        open: boolean;
+        costingId: number | null;
+        enquiryName?: string;
+    }>({ open: false, costingId: null });
+
+    const handleApproveConfirm = useCallback(async (data: {
         finalPrice?: string | null;
         receiptPreGst?: string | null;
         budgetPreGst?: string | null;
         grossMargin?: string | null;
-        remarks?: string | null;
+        oemVendorId?: number | null;
+        approvalRemarks?: string | null;
     }) => {
-        await submitCostingSheet.mutateAsync(data);
-    };
+        if (!approveModal.costing) return;
+        await approveCosting.mutateAsync({ id: approveModal.costing.id, data });
+    }, [approveModal.costing, approveCosting]);
+
+    const handleRedoConfirm = useCallback(async (reason: string) => {
+        if (!redoDialog.costingId) return;
+        await redoCosting.mutateAsync({ id: redoDialog.costingId, data: { reason } });
+    }, [redoDialog.costingId, redoCosting]);
+
+    const handleRejectConfirm = useCallback(async (enquiryId: number, reason?: string) => {
+        if (!rejectModal.costingId) return;
+        await rejectEnquiry.mutateAsync({ id: rejectModal.costingId, data: { reason: reason || null } });
+    }, [rejectModal.costingId, rejectEnquiry]);
 
     const costingActions: ActionItem<EnquiryCosting>[] = [
         {
@@ -68,10 +91,21 @@ const EnquiryCostingListPage = () => {
             onClick: (row) => window.open(row.sheetUrl!, '_blank'),
         },
         {
-            label: "Submit Costing Sheet",
-            icon: <ExternalLink className="h-4 w-4" />,
-            visible: (row) => row.status !== 'Costing Sheet Submitted',
-            onClick: (row) => setSubmitCostingModal({ open: true, enquiryId: row.enquiryId, enquiryName: row.enqName }),
+            label: "Approve",
+            icon: <CheckCircle className="h-4 w-4 text-green-600" />,
+            visible: (row) => row.status === 'Pending',
+            onClick: (row) => setApproveModal({ open: true, costing: row }),
+        },
+        {
+            label: "Redo Costing",
+            icon: <RefreshCw className="h-4 w-4 text-amber-600" />,
+            visible: (row) => row.status === 'Pending',
+            onClick: (row) => setRedoDialog({ open: true, costingId: row.id }),
+        },
+        {
+            label: "Reject Enquiry",
+            icon: <XCircle className="h-4 w-4 text-red-600" />,
+            onClick: (row) => setRejectModal({ open: true, costingId: row.id, enquiryName: row.enqName }),
         },
     ];
 
@@ -158,12 +192,32 @@ const EnquiryCostingListPage = () => {
                 />
             </CardContent>
 
-            <SubmitCostingSheetModal
-                open={submitCostingModal.open}
-                onOpenChange={(open) => setSubmitCostingModal({ ...submitCostingModal, open })}
-                enquiryId={submitCostingModal.enquiryId}
-                enquiryName={submitCostingModal.enquiryName}
-                onConfirm={handleSubmitCostingConfirm}
+            <ApproveCostingSheetModal
+                open={approveModal.open}
+                onOpenChange={(open) => setApproveModal({ ...approveModal, open })}
+                costingId={approveModal.costing?.id ?? null}
+                submittedValues={{
+                    finalPrice: approveModal.costing?.finalPrice,
+                    receiptPreGst: approveModal.costing?.receiptPreGst,
+                    budgetPreGst: approveModal.costing?.budgetPreGst,
+                    grossMargin: approveModal.costing?.grossMargin,
+                }}
+                onConfirm={handleApproveConfirm}
+            />
+
+            <RedoCostingDialog
+                open={redoDialog.open}
+                onOpenChange={(open) => setRedoDialog({ ...redoDialog, open })}
+                costingId={redoDialog.costingId}
+                onConfirm={handleRedoConfirm}
+            />
+
+            <LeadEnquiryRejectModal
+                open={rejectModal.open}
+                onOpenChange={(open) => setRejectModal({ ...rejectModal, open })}
+                enquiryId={rejectModal.costingId}
+                enquiryName={rejectModal.enquiryName}
+                onConfirm={handleRejectConfirm}
             />
         </Card>
     );

@@ -4,6 +4,7 @@ import type { DbInstance } from '@db';
 import { leadEnquiries, type NewLeadEnquiry, type LeadEnquiry } from '@db/schemas/crm/lead-enquiries.schema';
 import { siteVisits, type SiteVisit, type NewSiteVisit } from '@db/schemas/crm/site-visits.schema';
 import { siteVisitContacts, type SiteVisitContact } from '@db/schemas/crm/site-visit-contacts.schema';
+import { privateCostingSheets } from '@db/schemas/crm/private-costing-sheets.schema';
 import { leads } from '@db/schemas/crm/leads.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { organizations } from '@db/schemas/master/organizations.schema';
@@ -30,6 +31,7 @@ export type LeadEnquiryWithNames = LeadEnquiry & {
     createdByName?: string | null;
     updatedByName?: string | null;
     hasSiteVisit?: boolean;
+    costingSheetStatus?: string | null;
 };
 
 const createdByUser = alias(users, 'created_by_user');
@@ -86,6 +88,7 @@ export class LeadEnquiryService {
         }
 
         const hasSiteVisitExpr = sql<boolean>`EXISTS (SELECT 1 FROM site_visits sv WHERE sv.enquiry_id = ${leadEnquiries.id})`;
+        const costingSheetStatusExpr = sql<string | null>`(SELECT pcs.status FROM private_costing_sheets pcs WHERE pcs.enquiry_id = ${leadEnquiries.id} LIMIT 1)`;
 
         const rows = await this.db
             .select({
@@ -96,6 +99,7 @@ export class LeadEnquiryService {
                 createdByName: createdByUser.name,
                 updatedByName: updatedByUser.name,
                 hasSiteVisit: hasSiteVisitExpr,
+                costingSheetStatus: costingSheetStatusExpr,
             })
             .from(leadEnquiries)
             .leftJoin(leads, eq(leads.id, leadEnquiries.leadId))
@@ -116,7 +120,8 @@ export class LeadEnquiryService {
                 orgName: row.orgName ?? null,
                 createdByName: row.createdByName ?? null,
                 updatedByName: row.updatedByName ?? null,
-                hasSiteVisit: row.hasSiteVisit ?? false,
+hasSiteVisit: row.hasSiteVisit ?? false,
+                costingSheetStatus: row.costingSheetStatus ?? null,
             })),
             meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
@@ -124,6 +129,7 @@ export class LeadEnquiryService {
 
     async findById(id: number): Promise<LeadEnquiryWithNames> {
         const hasSiteVisitExpr = sql<boolean>`EXISTS (SELECT 1 FROM site_visits sv WHERE sv.enquiry_id = ${leadEnquiries.id})`;
+        const costingSheetStatusExpr = sql<string | null>`(SELECT pcs.status FROM private_costing_sheets pcs WHERE pcs.enquiry_id = ${leadEnquiries.id} LIMIT 1)`;
 
         const [row] = await this.db
             .select({
@@ -134,6 +140,7 @@ export class LeadEnquiryService {
                 createdByName: createdByUser.name,
                 updatedByName: updatedByUser.name,
                 hasSiteVisit: hasSiteVisitExpr,
+                costingSheetStatus: costingSheetStatusExpr,
             })
             .from(leadEnquiries)
             .leftJoin(leads, eq(leads.id, leadEnquiries.leadId))
@@ -153,7 +160,8 @@ export class LeadEnquiryService {
             orgName: row.orgName ?? null,
             createdByName: row.createdByName ?? null,
             updatedByName: row.updatedByName ?? null,
-            hasSiteVisit: row.hasSiteVisit ?? false,
+hasSiteVisit: row.hasSiteVisit ?? false,
+                costingSheetStatus: row.costingSheetStatus ?? null,
         };
     }
 
@@ -302,8 +310,8 @@ export class LeadEnquiryService {
                 enquiryId: data.enquiryId,
                 assignedTo: data.assignedTo ?? null,
                 scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
-                information: data.information ?? null,
-                additionalNotes: data.additionalNotes ?? null,
+                information: null,
+                additionalNotes: data.information ?? null,
                 documents: data.documents ?? null,
             })
             .returning();
@@ -355,6 +363,7 @@ export class LeadEnquiryService {
             status: 'completed',
             updatedAt: new Date(),
         };
+        if (data.conductedAt) updateData.conductedAt = new Date(data.conductedAt);
 
         const [updated] = await this.db
             .update(siteVisits)

@@ -68,6 +68,7 @@ export type UpdateSiteVisitDto = z.infer<typeof UpdateSiteVisitSchema>;
 export const UpdateSiteVisitDetailsSchema = z.object({
     information: z.string().optional().nullable(),
     documents: z.string().optional().nullable(),
+    conductedAt: z.string().optional().nullable(),
 });
 
 export type UpdateSiteVisitDetailsDto = z.infer<typeof UpdateSiteVisitDetailsSchema>;
