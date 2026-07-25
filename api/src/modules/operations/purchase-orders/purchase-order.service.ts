@@ -444,7 +444,7 @@ export class PurchaseOrderService {
         if (!po) throw new NotFoundException("Purchase Order not found");
 
         if (approve) {
-            if (!tdsPercentage || tdsPercentage <= 0) {
+            if (tdsPercentage == null || tdsPercentage < 0) {
                 throw new BadRequestException("TDS percentage is required when approving");
             }
 

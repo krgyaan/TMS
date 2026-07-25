@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 const TDS_RATES = [
+    { value: "NA", label: "N/A - No TDS" },
     { value: "194C_1", label: "194C @1%" },
     { value: "194C_2", label: "194C @2%" },
     { value: "194J_2", label: "194J @2%" },
@@ -33,6 +34,7 @@ const TDS_RATES = [
 ];
 
 function parsePercentage(rateValue: string): number {
+    if (rateValue === "NA") return 0;
     const parts = rateValue.split("_");
     return Number(parts.at(-1)) || 0;
 }
@@ -76,7 +78,7 @@ export const SetTdsDialog: React.FC<SetTdsDialogProps> = ({ po, open, onClose })
                 { onSuccess: () => onClose() }
             );
         } else {
-            if (!selectedRate || tdsPercentage <= 0) return;
+            if (!selectedRate) return;
             saveTds(
                 { id: po.id, data: { approve: true, tdsPercentage, remark } },
                 { onSuccess: () => onClose() }
@@ -84,7 +86,7 @@ export const SetTdsDialog: React.FC<SetTdsDialogProps> = ({ po, open, onClose })
         }
     };
 
-    const canSave = isReject || (selectedRate && tdsPercentage > 0);
+    const canSave = isReject || (selectedRate && tdsPercentage >= 0);
     const selectedLabel = TDS_RATES.find(r => r.value === selectedRate)?.label ?? "";
 
     const selectOptions = useMemo(() => TDS_RATES.map(r => ({ value: r.value, label: r.label })), []);
