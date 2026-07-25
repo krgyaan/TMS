@@ -77,6 +77,7 @@ export interface CreateSiteVisitContactRequest {
 export interface UpdateSiteVisitDetailsRequest {
     information?: string | null;
     documents?: string | null;
+    conductedAt?: string | null;
 }
 
 export interface CreateCostingSheetResponse {
@@ -107,6 +108,8 @@ export interface LeadEnquiryListParams {
     limit?: number;
     search?: string;
     status?: string;
+    team?: string;
+    leadId?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 }

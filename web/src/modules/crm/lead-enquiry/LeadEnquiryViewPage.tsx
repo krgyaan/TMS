@@ -1,10 +1,9 @@
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { ShowPageLayout, type StepConfig } from "@/components/layout/ShowPageLayout";
-import { Building2, User, MapPin, DollarSign, FileText, ClipboardList } from "lucide-react";
+import { User, FileText, ClipboardList } from "lucide-react";
 import { useLeadEnquiry } from "@/hooks/api/useLeadEnquiry";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";

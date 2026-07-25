@@ -12,6 +12,7 @@ class LeadEnquiryService extends BaseApiService {
             if (params.limit)     search.set('limit',     String(params.limit));
             if (params.search)    search.set('search',    params.search);
             if (params.status)    search.set('status',    params.status);
+            if (params.team)      search.set('team',      params.team);
             if (params.sortBy)    search.set('sortBy',    params.sortBy);
             if (params.sortOrder) search.set('sortOrder', params.sortOrder);
         }

@@ -31,6 +31,10 @@ export type EnquiryCostingWithNames = {
     receiptPreGst: string | null;
     budgetPreGst: string | null;
     grossMargin: string | null;
+    approvedFinalPrice: string | null;
+    approvedReceiptPreGst: string | null;
+    approvedBudgetPreGst: string | null;
+    approvedGrossMargin: string | null;
     preparedByName: string | null;
     status: string | null;
     sheetUrl: string | null;
@@ -70,7 +74,16 @@ export class EnquiryCostingService {
         }
 
         if (filters?.status) {
-            conditions.push(eq(privateCostingSheets.status, filters.status));
+            if (filters.status.includes(',')) {
+                const statuses = filters.status.split(',').map(s => s.trim()).filter(Boolean);
+                if (statuses.length > 0) {
+                    conditions.push(
+                        or(...statuses.map(s => eq(privateCostingSheets.status, s))) as SQL
+                    );
+                }
+            } else {
+                conditions.push(eq(privateCostingSheets.status, filters.status));
+            }
         }
 
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -108,6 +121,10 @@ export class EnquiryCostingService {
                 receiptPreGst: privateCostingSheets.receiptPreGst,
                 budgetPreGst: privateCostingSheets.budgetPreGst,
                 grossMargin: privateCostingSheets.grossMargin,
+                approvedFinalPrice: privateCostingSheets.approvedFinalPrice,
+                approvedReceiptPreGst: privateCostingSheets.approvedReceiptPreGst,
+                approvedBudgetPreGst: privateCostingSheets.approvedBudgetPreGst,
+                approvedGrossMargin: privateCostingSheets.approvedGrossMargin,
                 preparedByName: preparedByUser.name,
                 status: privateCostingSheets.status,
                 sheetUrl: privateCostingSheets.sheetUrl,
@@ -149,6 +166,10 @@ export class EnquiryCostingService {
                 receiptPreGst: privateCostingSheets.receiptPreGst,
                 budgetPreGst: privateCostingSheets.budgetPreGst,
                 grossMargin: privateCostingSheets.grossMargin,
+                approvedFinalPrice: privateCostingSheets.approvedFinalPrice,
+                approvedReceiptPreGst: privateCostingSheets.approvedReceiptPreGst,
+                approvedBudgetPreGst: privateCostingSheets.approvedBudgetPreGst,
+                approvedGrossMargin: privateCostingSheets.approvedGrossMargin,
                 preparedByName: preparedByUser.name,
                 status: privateCostingSheets.status,
                 sheetUrl: privateCostingSheets.sheetUrl,
@@ -245,6 +266,10 @@ export class EnquiryCostingService {
                 receiptPreGst: privateCostingSheets.receiptPreGst,
                 budgetPreGst: privateCostingSheets.budgetPreGst,
                 grossMargin: privateCostingSheets.grossMargin,
+                approvedFinalPrice: privateCostingSheets.approvedFinalPrice,
+                approvedReceiptPreGst: privateCostingSheets.approvedReceiptPreGst,
+                approvedBudgetPreGst: privateCostingSheets.approvedBudgetPreGst,
+                approvedGrossMargin: privateCostingSheets.approvedGrossMargin,
                 preparedByName: preparedByUser.name,
                 status: privateCostingSheets.status,
                 sheetUrl: privateCostingSheets.sheetUrl,
@@ -367,6 +392,11 @@ export class EnquiryCostingService {
             .limit(1);
 
         if (!sheet) throw new NotFoundException(`Costing sheet with ID ${id} not found`);
+
+        await this.db
+            .update(privateCostingSheets)
+            .set({ status: 'Enquiry Rejected', updatedAt: new Date() })
+            .where(eq(privateCostingSheets.id, id));
 
         await this.db
             .update(leadEnquiries)

@@ -1,9 +1,10 @@
 import { useMemo, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
     Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
 import { Search, Eye, ExternalLink, CheckCircle, RefreshCw, XCircle } from "lucide-react";
@@ -16,12 +17,32 @@ import type { ActionItem } from "@/components/ui/ActionMenu";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import type { EnquiryCosting } from "./helpers/enquirycosting.type";
 import { LeadEnquiryRejectModal } from "@/modules/crm/lead-enquiry/components/LeadEnquiryRejectModal";
+import { cn } from "@/lib/utils";
+
+const STATUS_TABS = [
+    { key: 'pending', label: 'Pending', status: 'Pending' },
+    { key: 'approved', label: 'Approved', status: 'Approved' },
+    { key: 'reject', label: 'Redo/Rejected', status: 'Redo,Rejected,Enquiry Rejected' },
+];
+
+const TAB_TO_STATUS: Record<string, string> = {};
+STATUS_TABS.forEach(t => { TAB_TO_STATUS[t.key] = t.status; });
 
 const EnquiryCostingListPage = () => {
     const navigate = useNavigate();
     const approveCosting = useApproveCosting();
     const redoCosting = useRedoCosting();
     const rejectEnquiry = useRejectEnquiryFromCosting();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = searchParams.get('tab') || 'pending';
+    const statusParam = TAB_TO_STATUS[activeTab] || activeTab;
+
+    const setActiveTab = (tab: string) => {
+        const next = new URLSearchParams(searchParams);
+        next.set('tab', tab);
+        next.delete('page');
+        setSearchParams(next, { replace: true });
+    };
 
     const {
         search, setSearch, debouncedSearch,
@@ -30,10 +51,31 @@ const EnquiryCostingListPage = () => {
     } = usePersistentTableState({
         storageKey: 'enquiry-costings',
         defaultTab: 'all',
+        tabParam: 'costingTab',
     });
 
+    const { data: pendingResponse } = useEnquiryCostings(
+        { page: 1, limit: 1, status: 'Pending' },
+    );
+    const { data: approvedResponse } = useEnquiryCostings(
+        { page: 1, limit: 1, status: 'Approved' },
+    );
+    const { data: redoRejectedResponse } = useEnquiryCostings(
+        { page: 1, limit: 1, status: 'Redo,Rejected,Enquiry Rejected' },
+    );
+
+    const pendingCount = pendingResponse?.meta?.total ?? 0;
+    const approvedCount = approvedResponse?.meta?.total ?? 0;
+    const redoRejectedCount = redoRejectedResponse?.meta?.total ?? 0;
+
+    const getCount = (key: string) => {
+        if (key === 'pending') return pendingCount;
+        if (key === 'approved') return approvedCount;
+        return redoRejectedCount;
+    };
+
     const { data: apiResponse, isLoading } = useEnquiryCostings(
-        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined },
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined, status: statusParam },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
@@ -73,10 +115,15 @@ const EnquiryCostingListPage = () => {
         await redoCosting.mutateAsync({ id: redoDialog.costingId, data: { reason } });
     }, [redoDialog.costingId, redoCosting]);
 
-    const handleRejectConfirm = useCallback(async (enquiryId: number, reason?: string) => {
-        if (!rejectModal.costingId) return;
-        await rejectEnquiry.mutateAsync({ id: rejectModal.costingId, data: { reason: reason || null } });
-    }, [rejectModal.costingId, rejectEnquiry]);
+    const handleRejectConfirm = useCallback(
+        async (costingId: number, reason?: string) => {
+            await rejectEnquiry.mutateAsync({
+            id: costingId,
+            data: { reason: reason || null },
+            });
+        },
+        [rejectEnquiry]
+    );
 
     const costingActions: ActionItem<EnquiryCosting>[] = [
         {
@@ -117,29 +164,46 @@ const EnquiryCostingListPage = () => {
         { field: "orgAbbName", headerName: "Organisation Name", width: 150 },
         { field: "approxValue", headerName: "Approx. Value (GST Inclusive)", width: 180 },
         {
-            field: "finalPrice",
             headerName: "Final Price (GST Inclusive)",
             width: 170,
-            cellRenderer: (params: any) => params.value ? `₹${params.value}` : "-",
+            cellRenderer: (params: any) => {
+                const row = params.data as EnquiryCosting;
+                const val = row.status === 'Approved' ? row.approvedFinalPrice : row.finalPrice;
+                return val ? `₹${val}` : "-";
+            },
         },
         {
-            field: "budgetPreGst",
             headerName: "Budget",
             width: 140,
-            cellRenderer: (params: any) => params.value ? `₹${params.value}` : "-",
+            cellRenderer: (params: any) => {
+                const row = params.data as EnquiryCosting;
+                const val = row.status === 'Approved' ? row.approvedBudgetPreGst : row.budgetPreGst;
+                return val ? `₹${val}` : "-";
+            },
         },
         {
-            field: "grossMargin",
             headerName: "Gross Margin %",
             width: 130,
-            cellRenderer: (params: any) => params.value ? `${params.value}%` : "-",
+            cellRenderer: (params: any) => {
+                const row = params.data as EnquiryCosting;
+                const val = row.status === 'Approved' ? row.approvedGrossMargin : row.grossMargin;
+                return val ? `${val}%` : "-";
+            },
         },
         { field: "preparedByName", headerName: "Private TE Name", width: 150 },
         {
             field: "status",
             headerName: "Status",
             width: 170,
-            cellRenderer: (params: any) => params.value || "-",
+            cellRenderer: (params: any) => {
+                const val = params.value || "-";
+                const isApproved = val === 'Approved';
+                return (
+                    <Badge variant={isApproved ? "default" : "secondary"} className={cn(isApproved && "bg-green-600 hover:bg-green-600")}>
+                        {val}
+                    </Badge>
+                );
+            },
         },
         {
             headerName: "Action",
@@ -160,7 +224,33 @@ const EnquiryCostingListPage = () => {
                 </div>
             </CardHeader>
             <CardContent className="flex-1 px-0">
-                <div className="flex items-center justify-end px-6 pb-4">
+                <div className="flex items-center justify-between px-6 pb-4">
+                    <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+                        {STATUS_TABS.map(tab => (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                onClick={() => setActiveTab(tab.key)}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                                    activeTab === tab.key
+                                        ? "bg-background text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {tab.label}
+                                <Badge
+                                    variant="secondary"
+                                    className={cn(
+                                        "text-xs h-4 min-w-4 px-1",
+                                        activeTab === tab.key && "bg-primary/10 text-primary"
+                                    )}
+                                >
+                                    {getCount(tab.key)}
+                                </Badge>
+                            </button>
+                        ))}
+                    </div>
                     <div className="relative">
                         <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input

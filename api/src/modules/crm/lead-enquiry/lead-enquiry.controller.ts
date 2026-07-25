@@ -44,6 +44,7 @@ export class LeadEnquiryController {
         @Query('limit')     limit?:     string,
         @Query('search')    search?:    string,
         @Query('status')    status?:    string,
+        @Query('team')      team?:      string,
         @Query('sortBy')    sortBy?:    string,
         @Query('sortOrder') sortOrder?: string,
     ) {
@@ -58,6 +59,7 @@ export class LeadEnquiryController {
             limit: parseNumber(limit),
             search,
             status,
+            team,
             sortBy,
             sortOrder: sortOrder as 'asc' | 'desc' | undefined,
         });

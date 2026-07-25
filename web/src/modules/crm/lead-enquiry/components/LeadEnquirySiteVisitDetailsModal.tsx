@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     Dialog,
     DialogContent,
@@ -25,6 +25,12 @@ interface LeadEnquirySiteVisitDetailsModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     siteVisitId: number | null;
+    initialData?: {
+        information: string | null;
+        conductedAt: string | null;
+        documents: string | null;
+        contacts: { name: string; designation: string | null; phone: string | null; email: string | null }[];
+    } | null;
     onSave: (data: {
         information: string;
         documents: string;
@@ -37,15 +43,34 @@ export function LeadEnquirySiteVisitDetailsModal({
     open,
     onOpenChange,
     siteVisitId,
+    initialData,
     onSave,
 }: LeadEnquirySiteVisitDetailsModalProps) {
     const [information, setInformation] = useState("");
     const [documents, setDocuments] = useState<File[]>([]);
+    const [documentsStr, setDocumentsStr] = useState("");
     const [conductedAt, setConductedAt] = useState("");
     const [contacts, setContacts] = useState<ContactEntry[]>([
         { name: "", designation: "", phone: "", email: "" },
     ]);
     const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (open && initialData) {
+            setInformation(initialData.information || "");
+            setConductedAt(initialData.conductedAt ? initialData.conductedAt.slice(0, 16) : "");
+            setDocumentsStr(initialData.documents || "");
+            setDocuments([]);
+            if (initialData.contacts && initialData.contacts.length > 0) {
+                setContacts(initialData.contacts.map(c => ({
+                    name: c.name,
+                    designation: c.designation || "",
+                    phone: c.phone || "",
+                    email: c.email || "",
+                })));
+            }
+        }
+    }, [open, initialData]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -73,7 +98,7 @@ export function LeadEnquirySiteVisitDetailsModal({
         try {
             await onSave({
                 information,
-                documents: documents.map((f) => f.name).join(","),
+                documents: documents.length > 0 ? documents.map((f) => f.name).join(",") : documentsStr,
                 conductedAt,
                 contacts: contacts.filter((c) => c.name.trim()),
             });
@@ -88,6 +113,7 @@ export function LeadEnquirySiteVisitDetailsModal({
     const handleClose = () => {
         setInformation("");
         setDocuments([]);
+        setDocumentsStr("");
         setConductedAt("");
         setContacts([{ name: "", designation: "", phone: "", email: "" }]);
         onOpenChange(false);
@@ -152,6 +178,15 @@ export function LeadEnquirySiteVisitDetailsModal({
                         {documents.length > 0 && (
                             <div className="mt-2 text-sm text-muted-foreground">
                                 {documents.length} file(s) selected: {documents.map((f) => f.name).join(", ")}
+                            </div>
+                        )}
+                        {documentsStr && documents.length === 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                                {documentsStr.split(",").map((doc, i) => (
+                                    <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-muted text-muted-foreground">
+                                        {doc.trim()}
+                                    </span>
+                                ))}
                             </div>
                         )}
                         <p className="text-xs text-muted-foreground">

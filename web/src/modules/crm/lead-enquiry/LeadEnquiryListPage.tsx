@@ -1,8 +1,9 @@
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
     Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
     Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -28,6 +29,13 @@ import { leadEnquiryService } from "@/services/api/lead-enquiry.service";
 import axiosInstance from "@/lib/axios";
 import { toast } from "sonner";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
+import { cn } from "@/lib/utils";
+
+const TEAM_TABS = [
+    { key: 'AC', label: 'AC' },
+    { key: 'DC', label: 'DC' },
+    { key: 'Business Development', label: 'Business Development' },
+];
 
 
 const EnquiryListPage = () => {
@@ -42,6 +50,15 @@ const EnquiryListPage = () => {
     const pendingEnquiryId = useRef<number | null>(null);
     const [connectDriveOpen, setConnectDriveOpen] = useState(false);
     const [isConnectingDrive, setIsConnectingDrive] = useState(false);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTeam = searchParams.get('tab') || 'AC';
+
+    const setActiveTeam = (team: string) => {
+        const next = new URLSearchParams(searchParams);
+        next.set('tab', team);
+        next.delete('page');
+        setSearchParams(next, { replace: true });
+    };
 
     useEffect(() => {
         const handler = (event: MessageEvent) => {
@@ -80,10 +97,25 @@ const EnquiryListPage = () => {
     } = usePersistentTableState({
         storageKey: 'lead-enquiries',
         defaultTab: 'all',
+        tabParam: 'enquiryTab',
     });
 
+    const { data: acResponse } = useLeadEnquiries({ page: 1, limit: 1, team: 'AC' });
+    const { data: dcResponse } = useLeadEnquiries({ page: 1, limit: 1, team: 'DC' });
+    const { data: bdResponse } = useLeadEnquiries({ page: 1, limit: 1, team: 'Business Development' });
+
+    const acCount = acResponse?.meta?.total ?? 0;
+    const dcCount = dcResponse?.meta?.total ?? 0;
+    const bdCount = bdResponse?.meta?.total ?? 0;
+
+    const getTeamCount = (key: string) => {
+        if (key === 'AC') return acCount;
+        if (key === 'DC') return dcCount;
+        return bdCount;
+    };
+
     const { data: apiResponse, isLoading } = useLeadEnquiries(
-        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined },
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined, team: activeTeam },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
@@ -105,6 +137,12 @@ const EnquiryListPage = () => {
     const [siteVisitDetailsModal, setSiteVisitDetailsModal] = useState<{
         open: boolean;
         siteVisitId: number | null;
+        initialData?: {
+            information: string | null;
+            conductedAt: string | null;
+            documents: string | null;
+            contacts: { name: string; designation: string | null; phone: string | null; email: string | null }[];
+        } | null;
     }>({ open: false, siteVisitId: null });
 
     const [submitCostingModal, setSubmitCostingModal] = useState<{
@@ -131,7 +169,22 @@ const EnquiryListPage = () => {
     const handleSiteVisitDetailsClick = async (row: LeadEnquiryWithNames) => {
         const visit = await leadEnquiryService.getFirstSiteVisitByEnquiry(row.id);
         if (visit) {
-            setSiteVisitDetailsModal({ open: true, siteVisitId: visit.id });
+            const contacts = await leadEnquiryService.getSiteVisitContacts(visit.id);
+            setSiteVisitDetailsModal({
+                open: true,
+                siteVisitId: visit.id,
+                initialData: {
+                    information: visit.information,
+                    conductedAt: visit.conductedAt,
+                    documents: visit.documents,
+                    contacts: contacts.map(c => ({
+                        name: c.name,
+                        designation: c.designation,
+                        phone: c.phone,
+                        email: c.email,
+                    })),
+                },
+            });
         } else {
             toast.error("No site visit found for this enquiry");
         }
@@ -290,7 +343,20 @@ const EnquiryListPage = () => {
             field: "status",
             headerName: "Status",
             width: 160,
-            cellRenderer: (params: any) => params.value || "-",
+            cellRenderer: (params: any) => {
+                const val = params.value;
+                if (!val) return "-";
+                const isRejected = val === 'Rejected';
+                const isCosting = val === 'Costing Sheet Submitted' || val === 'Costing Sheet Created';
+                return (
+                    <Badge
+                        variant={isRejected ? "destructive" : isCosting ? "default" : "secondary"}
+                        className={cn(isCosting && "bg-amber-500 hover:bg-amber-500")}
+                    >
+                        {val}
+                    </Badge>
+                );
+            },
         },
         {
     headerName: "Timer",
@@ -330,14 +396,44 @@ const EnquiryListPage = () => {
     return (
         <Card className="min-h-[calc(100vh-2rem)] flex flex-col border-0 shadow-none">
             <CardHeader className="flex-none pb-4">
-                <div className="flex items-center justify-between gap-4">
-                    <div>
+                <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex-1">
                         <CardTitle>Enquiries</CardTitle>
                         <CardDescription>Manage all enquiries</CardDescription>
                     </div>
-                    <Button onClick={() => navigate(paths.crm.enquiryCreate)} className="flex items-center gap-2">
-                        <Plus className="h-4 w-4" /> Add Enquiry
-                    </Button>
+                    <div className="flex justify-center">
+                        <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+                            {TEAM_TABS.map(tab => (
+                                <button
+                                    key={tab.key}
+                                    type="button"
+                                    onClick={() => setActiveTeam(tab.key)}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                                        activeTeam === tab.key
+                                            ? "bg-background text-foreground shadow-sm"
+                                            : "text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    {tab.label}
+                                    <Badge
+                                        variant="secondary"
+                                        className={cn(
+                                            "text-xs h-4 min-w-4 px-1",
+                                            activeTeam === tab.key && "bg-primary/10 text-primary"
+                                        )}
+                                    >
+                                        {getTeamCount(tab.key)}
+                                    </Badge>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="flex-1 flex justify-end">
+                        <Button onClick={() => navigate(paths.crm.enquiryCreate)} className="flex items-center gap-2">
+                            <Plus className="h-4 w-4" /> Add Enquiry
+                        </Button>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent className="flex-1 px-0">
@@ -391,8 +487,9 @@ const EnquiryListPage = () => {
 
             <LeadEnquirySiteVisitDetailsModal
                 open={siteVisitDetailsModal.open}
-                onOpenChange={(open) => setSiteVisitDetailsModal({ ...siteVisitDetailsModal, open })}
+                onOpenChange={(open) => setSiteVisitDetailsModal({ ...siteVisitDetailsModal, open, initialData: open ? siteVisitDetailsModal.initialData : null })}
                 siteVisitId={siteVisitDetailsModal.siteVisitId}
+                initialData={siteVisitDetailsModal.initialData}
                 onSave={handleSiteVisitDetailsSave}
             />
 

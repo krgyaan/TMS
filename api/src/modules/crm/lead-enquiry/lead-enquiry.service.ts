@@ -8,6 +8,7 @@ import { privateCostingSheets } from '@db/schemas/crm/private-costing-sheets.sch
 import { leads } from '@db/schemas/crm/leads.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { organizations } from '@db/schemas/master/organizations.schema';
+import { teams } from '@db/schemas/master/teams.schema';
 import { locations } from '@db/schemas/master/locations.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { and, asc, desc, eq, ilike, like, or, sql, type SQL } from 'drizzle-orm';
@@ -20,6 +21,7 @@ export type LeadEnquiryListFilters = {
     limit?: number;
     search?: string;
     status?: string;
+    team?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 };
@@ -68,11 +70,16 @@ export class LeadEnquiryService {
             conditions.push(eq(leadEnquiries.status, filters.status));
         }
 
+        if (filters?.team) {
+            conditions.push(eq(teams.name, filters.team));
+        }
+
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
         const [countResult] = await this.db
             .select({ count: sql<number>`count(*)` })
             .from(leadEnquiries)
+            .leftJoin(teams, eq(teams.id, sql`NULLIF(${leadEnquiries.team}, '')::BIGINT`))
             .where(whereClause);
 
         const total = Number(countResult?.count || 0);
@@ -102,6 +109,7 @@ export class LeadEnquiryService {
                 costingSheetStatus: costingSheetStatusExpr,
             })
             .from(leadEnquiries)
+            .leftJoin(teams, eq(teams.id, sql`NULLIF(${leadEnquiries.team}, '')::BIGINT`))
             .leftJoin(leads, eq(leads.id, leadEnquiries.leadId))
             .leftJoin(items, eq(items.id, leadEnquiries.itemId))
             .leftJoin(organizations, eq(organizations.id, leadEnquiries.organisationId))

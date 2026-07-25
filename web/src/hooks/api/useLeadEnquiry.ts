@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadEnquiryService } from '@/services/api/lead-enquiry.service';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/utils/errorToast';
-import type { CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, LeadEnquiryWithNames, CreateSiteVisitRequest, UpdateSiteVisitRequest, SiteVisit, SiteVisitContact, CreateSiteVisitContactRequest, UpdateSiteVisitDetailsRequest, CreateCostingSheetResponse, SubmitCostingSheetRequest, SubmitCostingSheetResponse, DriveScopesResponse } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
+import type { CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, LeadEnquiryWithNames, CreateSiteVisitRequest, UpdateSiteVisitRequest, SiteVisit, SiteVisitContact, CreateSiteVisitContactRequest, UpdateSiteVisitDetailsRequest, SubmitCostingSheetRequest, DriveScopesResponse } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
 import type { PaginatedResult } from '@/types/api.types';
 
 export const leadEnquiryKey = {
@@ -13,7 +13,7 @@ export const leadEnquiryKey = {
     detail: (id: number) => [...leadEnquiryKey.details(), id] as const,
 };
 
-type EnquiryPaginationParams = { page: number; limit: number; search?: string; status?: string; };
+type EnquiryPaginationParams = { page: number; limit: number; search?: string; status?: string; team?: string; };
 
 export const useLeadEnquiries = (
     pagination: EnquiryPaginationParams = { page: 1, limit: 50 },
@@ -24,6 +24,7 @@ export const useLeadEnquiries = (
         limit: pagination.limit,
         search: pagination.search,
         status: pagination.status,
+        team: pagination.team,
         ...(sort?.sortBy && { sortBy: sort.sortBy }),
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
     };
