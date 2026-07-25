@@ -37,6 +37,7 @@ export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ contro
     }, [preSelectedPoId, setValue]);
 
     const poOptions = (poData?.purchaseOrders || [])
+        .filter((po: any) => po.poApproved === true)
         .filter((po: any) => !preSelectedPoId || String(po.id) === String(preSelectedPoId))
         .map((po: any) => ({
             id: String(po.id),

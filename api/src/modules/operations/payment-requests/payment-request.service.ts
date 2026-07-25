@@ -56,6 +56,14 @@ export class PaymentRequestService {
                 .where(eq(purchaseOrders.id, body.purchaseOrderId))
                 .then(rows => rows[0]);
 
+            if (!po) {
+                throw new NotFoundException("Purchase Order not found");
+            }
+
+            if (po.poApproved !== true) {
+                throw new BadRequestException("Cannot create payment request against an unapproved PO. Only approved POs are eligible.");
+            }
+
             if (po?.amountAfterTds) {
                 const amountAfterTds = Number(po.amountAfterTds);
                 const existingSumResult = await this.db
