@@ -62,7 +62,7 @@ export class PurchaseOrderService {
                     totalPiCount: sql<number>`COALESCE((SELECT COUNT(*) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 })
                 .from(purchaseOrders)
-                .innerJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
+                .leftJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
                 .where(eq(purchaseOrders.projectId, projectId));
 
         return { purchaseOrders: purchaseOrdersData };
@@ -135,7 +135,7 @@ export class PurchaseOrderService {
         const baseQuery = this.db
             .select({ id: purchaseOrders.id })
             .from(purchaseOrders)
-            .innerJoin(users, eq(users.id, purchaseOrders.poRaisedBy));
+            .leftJoin(users, eq(users.id, purchaseOrders.poRaisedBy));
 
         const buildCount = async (condition: any) => {
             const q = baseQuery.where(

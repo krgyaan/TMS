@@ -1030,7 +1030,7 @@ export class CostingSheetsService {
             dueDate, dueTime, teName,
         };
 
-        await this.sendEmail('costing-sheet.submitted', tenderId, 13,
+        await this.sendEmail('costing-sheet.submitted', tenderId, submittedBy,
             `Costing Sheet submitted - ${tender.tenderName}`,
             'costing-sheet-submitted', emailData,
             {
