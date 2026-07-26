@@ -6,7 +6,7 @@ import { permissions } from '@db/schemas/auth/permissions.schema';
 import { rolePermissions } from '@db/schemas/auth/role-permissions.schema';
 import { userPermissions } from '@db/schemas/auth/user-permissions.schema';
 import { DataScope, RoleName } from '@/common/constants/roles.constant';
-import { userRoles, users } from '@/db/schemas';
+import { users } from '@/db/schemas';
 
 export type PermissionCheck = {
     module: string;
@@ -178,19 +178,13 @@ export class PermissionService implements OnModuleInit {
             .limit(1)
             .then((rows) => rows[0]);
 
-
         if(!user){
             throw new Error("User not found");
         }
 
         const perms = new Set<string>();
 
-        const roleId = await this.db
-            .select()
-            .from(userRoles)
-            .where(eq(userRoles.userId, id))
-            .limit(1)
-            .then((rows) => rows[0]?.roleId ?? null);
+        const roleId = user.roleId;
 
         // Add role permissions
         if (roleId) {

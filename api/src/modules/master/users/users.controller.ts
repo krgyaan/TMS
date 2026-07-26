@@ -28,6 +28,7 @@ const UpdateUserSchema = z.object({
     email: z.string().email("Invalid email address").optional(),
     mobile: z.string().max(20, "Mobile number too long").optional().nullable(),
     password: z.string().min(6, "Password must be at least 6 characters long").max(255).optional(),
+    roleId: z.number().int().positive("Role ID must be a positive integer").optional(),
     isActive: z.boolean().optional(),
 });
 

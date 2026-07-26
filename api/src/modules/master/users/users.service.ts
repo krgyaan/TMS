@@ -6,7 +6,6 @@ import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { users, type NewUser, type User } from "@db/schemas/auth/users.schema";
 import { userProfiles } from "@db/schemas/auth/user-profiles.schema";
-import { userRoles } from "@db/schemas/auth/user-roles.schema";
 import { userPermissions } from "@db/schemas/auth/user-permissions.schema";
 import { rolePermissions } from "@db/schemas/auth/role-permissions.schema";
 import { roles } from "@db/schemas/auth/roles.schema";
@@ -130,8 +129,7 @@ export class UsersService {
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
             .leftJoin(teams, eq(teams.id, sql<number>`COALESCE(${users.primaryTeamId}, ${users.team})`))
             .leftJoin(subTeams, eq(subTeams.id, users.team))
-            .leftJoin(userRoles, eq(userRoles.userId, users.id)) // NEW
-            .leftJoin(roles, eq(roles.id, userRoles.roleId))// NEW
+            .leftJoin(roles, eq(roles.id, users.roleId))
             .leftJoin(oauthAccounts, eq(oauthAccounts.userId, users.id));
     }
 
@@ -220,10 +218,9 @@ export class UsersService {
             })
             .from(users)
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-            .leftJoin(userRoles, eq(userRoles.userId, users.id))
+            .leftJoin(roles, eq(roles.id, users.roleId))
             .leftJoin(userPermissions, eq(userPermissions.userId, users.id))
             .leftJoin(permissions, eq(permissions.id, userPermissions.permissionId))
-            .leftJoin(roles, eq(roles.id, userRoles.roleId))
             .where(and(eq(users.id, userId), isNull(users.deletedAt)));
 
             if (!rows.length) return null;
@@ -259,41 +256,33 @@ export class UsersService {
             };
     }
 
-    // NEW: Assign role to user
     async assignRole(userId: number, roleId: number): Promise<void> {
-        // Verify user exists
         const user = await this.findById(userId);
         if (!user) {
             throw new NotFoundException(`User with ID ${userId} not found`);
         }
 
-        // Verify role exists
         const role = await this.db.select().from(roles).where(eq(roles.id, roleId)).limit(1);
         if (!role[0]) {
             throw new NotFoundException(`Role with ID ${roleId} not found`);
         }
 
-        await this.db
-            .insert(userRoles)
-            .values({ userId, roleId })
-            .onConflictDoUpdate({
-                target: userRoles.userId,
-                set: { roleId, updatedAt: new Date() },
-            });
+        await this.db.update(users).set({ roleId, updatedAt: new Date() }).where(eq(users.id, userId));
     }
 
-    // NEW: Get user's role
     async getUserRole(userId: number): Promise<{ id: number; name: string } | null> {
-        const result = await this.db
-            .select({
-                id: roles.id,
-                name: roles.name,
-            })
-            .from(userRoles)
-            .innerJoin(roles, eq(roles.id, userRoles.roleId))
-            .where(eq(userRoles.userId, userId))
+        const [user] = await this.db
+            .select({ roleId: users.roleId })
+            .from(users)
+            .where(and(eq(users.id, userId), isNull(users.deletedAt)))
             .limit(1);
-        return result[0] ?? null;
+        if (!user?.roleId) return null;
+        const [role] = await this.db
+            .select({ id: roles.id, name: roles.name })
+            .from(roles)
+            .where(eq(roles.id, user.roleId))
+            .limit(1);
+        return role ?? null;
     }
 
     // NEW: Assign permissions to user (bulk)
@@ -507,6 +496,7 @@ export class UsersService {
                     password: hashed,
                     team,
                     primaryTeamId,
+                    roleId: data.roleId,
                     isActive: data.isActive ?? true,
                 })
                 .returning() as unknown as User[];
@@ -517,8 +507,6 @@ export class UsersService {
                 lastName: data.lastName,
                 employeeCode,
             });
-
-            await tx.insert(userRoles).values({ userId: user.id, roleId: data.roleId });
 
             return user;
         });
@@ -536,7 +524,7 @@ export class UsersService {
         return rows[0];
     }
 
-    async update(id: number, data: Partial<Pick<NewUser, "name" | "username" | "email" | "mobile" | "password" | "isActive">>): Promise<User> {
+    async update(id: number, data: Partial<Pick<NewUser, "name" | "username" | "email" | "mobile" | "password" | "isActive" | "roleId">>): Promise<User> {
         const updatePayload: Partial<NewUser> = {
             ...data,
             updatedAt: new Date(),
@@ -690,10 +678,9 @@ export class UsersService {
                 team: teams.name,
             })
             .from(users)
-            .innerJoin(userRoles, eq(userRoles.userId, users.id))
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
             .leftJoin(teams, eq(teams.id, sql<number>`COALESCE(${users.primaryTeamId}, ${users.team})`))
-            .where(and(eq(userRoles.roleId, roleId), isNull(users.deletedAt), eq(users.isActive, true)))
+            .where(and(eq(users.roleId, roleId), isNull(users.deletedAt), eq(users.isActive, true)))
             .orderBy(asc(users.name));
     }
 

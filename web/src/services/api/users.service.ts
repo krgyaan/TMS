@@ -1,5 +1,5 @@
 import { BaseApiService } from "./base.service";
-import type { User, CreateUserDto, UpdateUserDto, AssignRoleDto, AssignPermissionsDto, UserPermission, Role } from "@/types/api.types";
+import type { User, CreateUserDto, UpdateUserDto, AssignPermissionsDto, UserPermission } from "@/types/api.types";
 
 class UsersService extends BaseApiService {
     constructor() {
@@ -29,19 +29,6 @@ class UsersService extends BaseApiService {
 
     async deleteUser(id: number): Promise<void> {
         return this.delete<void>(`/${id}`);
-    }
-
-    // User Roles
-    async getUserRole(id: number): Promise<Role | null> {
-        return this.get<Role>(`/${id}/roles`);
-    }
-
-    async assignRole(id: number, data: AssignRoleDto): Promise<{ message: string }> {
-        return this.post<{ message: string }>(`/${id}/roles`, data);
-    }
-
-    async updateUserRole(id: number, data: AssignRoleDto): Promise<{ message: string }> {
-        return this.patch<{ message: string }>(`/${id}/roles`, data);
     }
 
     // User Permissions
