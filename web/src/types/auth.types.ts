@@ -21,6 +21,7 @@ export interface UserRole {
 export interface Team {
     id: number;
     name: string;
+    category?: string | null;
     parentId?: number | null;
 }
 
@@ -32,7 +33,6 @@ export interface UserProfile {
     dateOfBirth: string | null;
     gender: string | null;
     employeeCode: string | null;
-    designationId: number | null;
     altEmail: string | null;
     emergencyContactName: string | null;
     emergencyContactPhone: string | null;
@@ -69,7 +69,6 @@ export interface AuthUser {
     updatedAt: string;
     profile: UserProfile | null;
     team: Team | null;
-    designation: { id: number; name: string } | null;
     role: UserRole | null;
     permissions: string[];
 }

@@ -13,7 +13,6 @@ export { websitesService } from './website.service'
 export { imprestCategoriesService } from './imprest-category.service'
 export { followupCategoriesService } from './followup-category.service'
 export { documentsSubmittedService } from './document-submitted.service'
-export { designationsService } from './designation.service'
 export { industriesService } from './industry.service';
 export { teamService } from './team.service';
 export { rolesService } from './role.service';

@@ -12,12 +12,13 @@ export const teamKeys = {
 
 interface UseTeamsOptions {
     enabled?: boolean;
+    category?: string;
 }
 
 export function useTeams(options: UseTeamsOptions = {}) {
     return useQuery({
-        queryKey: teamKeys.list(),
-        queryFn: () => teamService.getAll(),
+        queryKey: [...teamKeys.list(), options.category],
+        queryFn: () => teamService.getAll(options.category),
         enabled: options.enabled ?? true,
         staleTime: 5 * 60 * 1000,
     });

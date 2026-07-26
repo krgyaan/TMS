@@ -14,7 +14,6 @@ export interface User {
     profile: UserProfile | null;
     team: Team | null;
     subTeam: Team | null;
-    designation: { id: number; name: string } | null;
     role: UserRole | null;
 }
 
@@ -66,7 +65,6 @@ export interface CreateUserDto {
     teamId: number;
     subTeamId?: number | null;
     roleId: number;
-    designationId: number;
     isActive?: boolean;
 }
 
@@ -400,21 +398,6 @@ export interface CreateFollowupCategoryDto {
 }
 
 export interface UpdateFollowupCategoryDto extends Partial<CreateFollowupCategoryDto> {}
-
-export interface Designation {
-    id: number;
-    name: string;
-    status: boolean;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface CreateDesignationDto {
-    name: string;
-    status?: boolean;
-}
-
-export interface UpdateDesignationDto extends Partial<CreateDesignationDto> {}
 
 export interface DocumentSubmitted {
     id: number;

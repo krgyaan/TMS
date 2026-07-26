@@ -7,8 +7,9 @@ class TeamService extends BaseApiService {
         super('/teams');
     }
 
-    async getAll(): Promise<Team[]> {
-        return this.get<Team[]>('');
+    async getAll(category?: string): Promise<Team[]> {
+        const params = category ? { category } : undefined;
+        return this.get<Team[]>('', { params });
     }
 
     async getById(id: number): Promise<Team> {

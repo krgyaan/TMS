@@ -67,9 +67,6 @@ const Master_EMDResponsibility = lazy(() => import("@/modules/master/emd-respons
 const Master_EMDResponsibility_Create = lazy(() => import("@/modules/master/emd-responsibility/create"));
 const Master_EMDResponsibility_Edit = lazy(() => import("@/modules/master/emd-responsibility/edit"));
 
-// Designations
-const Master_Designation = lazy(() => import("@/modules/master/designation"));
-
 // Roles
 const Master_Role = lazy(() => import("@/modules/master/role"));
 
@@ -474,16 +471,6 @@ export default function MasterRoutes() {
                     }
                 />
             </Route>
-
-            {/* Designations */}
-            <Route
-                path="designations"
-                element={
-                    <RouteWrapper>
-                        <Master_Designation />
-                    </RouteWrapper>
-                }
-            />
 
             {/* Roles */}
             <Route
