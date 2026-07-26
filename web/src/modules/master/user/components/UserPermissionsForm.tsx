@@ -4,13 +4,13 @@ import { PermissionSelector } from "@/components/PermissionSelector";
 import { rolesService } from "@/services/api/role.service";
 import { useAssignUserRole } from "@/hooks/api/useUserRoles";
 import { useAssignUserPermissions } from "@/hooks/api/useUserPermissions";
-import type { UserPermission } from "@/types/api.types";
+import type { Permission, UserPermission } from "@/types/api.types";
 import type { UserRole } from "@/types/auth.types";
 
 interface UserPermissionsFormProps {
     userId: number;
     roles: { id: number; name: string }[];
-    allPermissions: { id: number; module: string; action: string; description?: string | null }[];
+    allPermissions: Permission[];
     userRole?: UserRole | null;
     userPermissionsData?: UserPermission[];
 }

@@ -34,7 +34,7 @@ export default function UserCreateForm({ mode = "create", user }: UserCreateForm
     const { data: secondaryTeams = [] } = useTeams({ category: 'secondary' });
     const [showPassword, setShowPassword] = useState(false);
     const [expectedCode, setExpectedCode] = useState("");
-    const emailDebounceRef = useRef<ReturnType<typeof setTimeout>>();
+    const emailDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const isEdit = mode === "edit";
 
