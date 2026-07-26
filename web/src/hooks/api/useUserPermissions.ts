@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { usersService } from '@/services/api/users.service'
 import { userKeys } from './useUsers'
+import { authKeys } from './useAuth'
 import { toast } from 'sonner'
 import type { AssignPermissionsDto, UserPermission } from '@/types/api.types'
 
@@ -28,6 +29,7 @@ export const useAssignUserPermissions = () => {
             queryClient.invalidateQueries({ queryKey: userPermissionsKey.user(variables.userId) })
             queryClient.invalidateQueries({ queryKey: userKeys.detail(variables.userId) })
             queryClient.invalidateQueries({ queryKey: userKeys.lists() })
+            queryClient.invalidateQueries({ queryKey: authKeys.currentUser })
             toast.success('Permissions assigned successfully')
         },
         onError: (error: any) => {
@@ -46,6 +48,7 @@ export const useUpdateUserPermissions = () => {
             queryClient.invalidateQueries({ queryKey: userPermissionsKey.user(variables.userId) })
             queryClient.invalidateQueries({ queryKey: userKeys.detail(variables.userId) })
             queryClient.invalidateQueries({ queryKey: userKeys.lists() })
+            queryClient.invalidateQueries({ queryKey: authKeys.currentUser })
             toast.success('Permissions updated successfully')
         },
         onError: (error: any) => {
@@ -64,6 +67,7 @@ export const useRemoveUserPermission = () => {
             queryClient.invalidateQueries({ queryKey: userPermissionsKey.user(variables.userId) })
             queryClient.invalidateQueries({ queryKey: userKeys.detail(variables.userId) })
             queryClient.invalidateQueries({ queryKey: userKeys.lists() })
+            queryClient.invalidateQueries({ queryKey: authKeys.currentUser })
             toast.success('Permission removed successfully')
         },
         onError: (error: any) => {

@@ -268,6 +268,7 @@ export class UsersService {
         }
 
         await this.db.update(users).set({ roleId, updatedAt: new Date() }).where(eq(users.id, userId));
+        await this.permissionService.refreshUserOverrides(userId);
     }
 
     async getUserRole(userId: number): Promise<{ id: number; name: string } | null> {
@@ -542,6 +543,10 @@ export class UsersService {
 
         if (!rows[0]) {
             throw new NotFoundException(`User with ID ${id} not found`);
+        }
+
+        if (data.roleId !== undefined) {
+            await this.permissionService.refreshUserOverrides(id);
         }
 
         return rows[0];

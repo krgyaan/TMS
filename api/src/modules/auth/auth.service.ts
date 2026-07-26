@@ -173,6 +173,7 @@ export class AuthService {
 
         // Get all permissions (role + user overrides)
         const permissions = await this.permissionService.getUserPermissions(userId, authInfo?.roleId ?? null);
+        console.log(`[AuthService] issueSession(userId=${userId}) roleId=${authInfo?.roleId} permissions=${permissions.length} [${permissions.slice(0, 10).join(', ')}${permissions.length > 10 ? '...' : ''}]`);
 
         // Update last login timestamp (fire-and-forget)
         await this.usersService.updateLastLogin(userId);

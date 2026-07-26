@@ -36,7 +36,7 @@ export class PermissionService implements OnModuleInit {
         lastUpdated: 0,
     };
 
-    private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+    private readonly CACHE_TTL = 1 * 60 * 1000; // 1 minute
 
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
 
@@ -164,7 +164,9 @@ export class PermissionService implements OnModuleInit {
             });
         }
 
-        return Array.from(perms);
+        const result = Array.from(perms);
+        console.log(`[PermissionService] getUserPermissions(userId=${userId}, roleId=${roleId}) => ${result.length} permissions`);
+        return result;
     }
     
     
