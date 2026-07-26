@@ -4,9 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Shield } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { useUser } from "@/hooks/api/useUsers";
-import { useRoles } from "@/hooks/api/useRoles";
 import { usePermissions } from "@/hooks/api/usePermissions";
-import { useUserRole } from "@/hooks/api/useUserRoles";
 import { useUserPermissions } from "@/hooks/api/useUserPermissions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -18,12 +16,10 @@ export default function UserPermissionsPage() {
     const userId = Number(id);
     const navigate = useNavigate();
     const { data: user, isLoading: userLoading, error: userError } = useUser(userId);
-    const { data: roles = [] } = useRoles();
     const { data: allPermissions = [] } = usePermissions();
-    const { data: userRole, isLoading: roleLoading } = useUserRole(userId);
     const { data: userPermissionsData, isLoading: permsLoading } = useUserPermissions(userId);
 
-    const loading = userLoading || roleLoading || permsLoading;
+    const loading = userLoading || permsLoading;
 
     if (!userId) {
         return (
@@ -55,7 +51,7 @@ export default function UserPermissionsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>User Permissions</CardTitle>
-                    <CardDescription>Manage role and permissions</CardDescription>
+                    <CardDescription>Manage permission overrides</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Alert variant="destructive">
@@ -87,9 +83,7 @@ export default function UserPermissionsPage() {
             <CardContent>
                 <UserPermissionsForm
                     userId={userId}
-                    roles={roles}
                     allPermissions={allPermissions}
-                    userRole={userRole}
                     userPermissionsData={userPermissionsData}
                 />
             </CardContent>

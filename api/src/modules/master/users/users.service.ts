@@ -518,13 +518,7 @@ export class UsersService {
                 employeeCode,
             });
 
-            await tx
-                .insert(userRoles)
-                .values({ userId: user.id, roleId: data.roleId })
-                .onConflictDoUpdate({
-                    target: userRoles.userId,
-                    set: { roleId: data.roleId, updatedAt: new Date() },
-                });
+            await tx.insert(userRoles).values({ userId: user.id, roleId: data.roleId });
 
             return user;
         });
