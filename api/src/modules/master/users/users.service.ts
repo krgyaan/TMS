@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
 import { randomBytes } from "node:crypto";
 import { hash, verify } from "argon2";
-import { and, eq, isNull, inArray, asc, sql, or } from "drizzle-orm";
+import { and, eq, isNull, inArray, asc, sql, or, aliasedTable } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { users, type NewUser, type User } from "@db/schemas/auth/users.schema";
@@ -13,6 +13,8 @@ import { roles } from "@db/schemas/auth/roles.schema";
 import { permissions } from "@db/schemas/auth/permissions.schema";
 import { designations } from "@db/schemas/master/designations.schema";
 import { teams } from "@db/schemas/master/teams.schema";
+
+const subTeams = aliasedTable(teams, 'sub_teams');
 import { RoleName, DataScope, getDataScope, canSwitchTeams } from "@/common/constants/roles.constant";
 import { PermissionService } from "@/modules/auth/services/permission.service";
 import { oauthAccounts } from "@/db/schemas";
@@ -57,6 +59,7 @@ export type UserRoleInfo = {
 export type UserWithRelations = Omit<SafeUser, "team"> & {
     profile: UserProfileSummary | null;
     team: { id: number; name: string | null } | null;
+    subTeam: { id: number; name: string | null } | null;
     designation: { id: number; name: string | null } | null;
     role: UserRoleInfo | null; // NEW
 };
@@ -119,6 +122,8 @@ export class UsersService {
                 teamId: teams.id,
                 teamName: teams.name,
                 primaryTeamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team})`,
+                subTeamId: subTeams.id,
+                subTeamName: subTeams.name,
                 // Designation fields
                 designationId: designations.id,
                 designationName: designations.name,
@@ -131,6 +136,7 @@ export class UsersService {
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
             .leftJoin(designations, eq(userProfiles.designationId, designations.id))
             .leftJoin(teams, eq(teams.id, sql<number>`COALESCE(${users.primaryTeamId}, ${users.team})`))
+            .leftJoin(subTeams, eq(subTeams.id, users.team))
             .leftJoin(userRoles, eq(userRoles.userId, users.id)) // NEW
             .leftJoin(roles, eq(roles.id, userRoles.roleId))// NEW
             .leftJoin(oauthAccounts, eq(oauthAccounts.userId, users.id));
@@ -172,6 +178,14 @@ export class UsersService {
                   }
                 : null;
 
+        const subTeam =
+            row.subTeamId != null && row.subTeamId !== row.teamId
+                ? {
+                      id: row.subTeamId,
+                      name: row.subTeamName,
+                  }
+                : null;
+
         const designation =
             row.designationId != null
                 ? {
@@ -201,7 +215,8 @@ export class UsersService {
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             profile,
-            team: row.teamId != null ? { id: row.teamId, name: row.teamName } : null,
+            team,
+            subTeam,
             designation,
             role, // NEW
         };
@@ -422,6 +437,15 @@ export class UsersService {
         return result[0] ?? null;
     }
 
+    async findByUsername(username: string): Promise<User | null> {
+        const result = await this.db
+            .select()
+            .from(users)
+            .where(and(eq(users.username, username), isNull(users.deletedAt)))
+            .limit(1);
+        return result[0] ?? null;
+    }
+
     // UPDATED: sanitizeUser now returns UserWithRelations for auth
     async sanitizeUserWithRelations(userId: number): Promise<UserWithRelations | null> {
         return this.findDetailById(userId);
@@ -441,6 +465,88 @@ export class UsersService {
             createdAt,
             updatedAt,
         };
+    }
+
+    async generateEmployeeCode(tx?: any): Promise<string> {
+        const db = tx || this.db;
+        const [result] = await db
+            .select({ maxCode: sql<string>`MAX(employee_code)` })
+            .from(userProfiles);
+        const maxCode = result?.maxCode;
+        let num = 0;
+        if (maxCode) {
+            num = parseInt(maxCode.replace('VE', ''), 10);
+            if (isNaN(num)) num = 0;
+        }
+        return `VE${String(num + 1).padStart(3, '0')}`;
+    }
+
+    async createWithDetails(data: {
+        firstName: string;
+        lastName: string;
+        email: string;
+        username?: string | null;
+        mobile?: string | null;
+        password: string;
+        teamId: number;
+        subTeamId?: number | null;
+        roleId: number;
+        designationId: number;
+        isActive?: boolean;
+    }): Promise<User> {
+        if (!data.password) {
+            throw new Error("Password is required");
+        }
+
+        return this.db.transaction(async (tx) => {
+            let username = data.username || data.email.split('@')[0];
+            const existing = await tx
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.username, username))
+                .limit(1);
+            if (existing.length > 0) {
+                username = `${username}_${Math.floor(Math.random() * 1000)}`;
+            }
+
+            const employeeCode = await this.generateEmployeeCode(tx);
+            const hashed = await hash(data.password);
+
+            const primaryTeamId = data.teamId;
+            const team = data.subTeamId ?? data.teamId;
+
+            const [user] = await tx
+                .insert(users)
+                .values({
+                    name: `${data.firstName} ${data.lastName}`.trim(),
+                    username,
+                    email: data.email.toLowerCase().trim(),
+                    mobile: data.mobile || null,
+                    password: hashed,
+                    team,
+                    primaryTeamId,
+                    isActive: data.isActive ?? true,
+                })
+                .returning() as unknown as User[];
+
+            await tx.insert(userProfiles).values({
+                userId: user.id,
+                firstName: data.firstName,
+                lastName: data.lastName,
+                employeeCode,
+                designationId: data.designationId,
+            });
+
+            await tx
+                .insert(userRoles)
+                .values({ userId: user.id, roleId: data.roleId })
+                .onConflictDoUpdate({
+                    target: userRoles.userId,
+                    set: { roleId: data.roleId, updatedAt: new Date() },
+                });
+
+            return user;
+        });
     }
 
     async create(data: NewUser): Promise<User> {

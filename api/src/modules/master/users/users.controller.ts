@@ -8,19 +8,28 @@ import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, HttpStatus
 import { z } from "zod";
 
 const CreateUserSchema = z.object({
-    name: z.string().min(1, "Name is required").max(255, "Name cannot exceed 255 characters"),
-    username: z.string().max(100, "Username cannot exceed 100 characters").optional().nullable(),
+    firstName: z.string().min(1, "First name is required").max(255),
+    lastName: z.string().min(1, "Last name is required").max(255),
     email: z.string().email("Invalid email address"),
+    username: z.string().max(100, "Username cannot exceed 100 characters").optional().nullable(),
     mobile: z.string().max(20, "Mobile number too long").optional().nullable(),
     password: z.string().min(6, "Password must be at least 6 characters long").max(255),
+    teamId: z.number().int().positive("Team is required"),
+    subTeamId: z.number().int().positive().optional().nullable(),
+    roleId: z.number().int().positive("Role is required"),
+    designationId: z.number().int().positive("Designation is required"),
     isActive: z.boolean().optional(),
-    roleId: z.number().int().positive("Role ID must be a positive integer"),
 });
 
 type CreateUserDto = z.infer<typeof CreateUserSchema>;
 
-const UpdateUserSchema = CreateUserSchema.partial().extend({
-    password: z.string().min(6, "Password must be at least 6 characters long").optional(),
+const UpdateUserSchema = z.object({
+    name: z.string().min(1, "Name is required").max(255, "Name cannot exceed 255 characters").optional(),
+    username: z.string().max(100, "Username cannot exceed 100 characters").optional().nullable(),
+    email: z.string().email("Invalid email address").optional(),
+    mobile: z.string().max(20, "Mobile number too long").optional().nullable(),
+    password: z.string().min(6, "Password must be at least 6 characters long").max(255).optional(),
+    isActive: z.boolean().optional(),
 });
 
 type UpdateUserDto = z.infer<typeof UpdateUserSchema>;
@@ -33,6 +42,25 @@ export class UsersController {
     @CanRead("users")
     async list() {
         return this.usersService.findAll();
+    }
+
+    @Public()
+    @Get("generate-info")
+    async getGenerateInfo(@Query("email") email?: string) {
+        const employeeCode = await this.usersService.generateEmployeeCode();
+        let username = "";
+        if (email) {
+            const prefix = email.split("@")[0];
+            if (prefix) {
+                const existing = await this.usersService.findByUsername(prefix);
+                if (existing) {
+                    username = `${prefix}_${prefix[0]}_ve`;
+                } else {
+                    username = prefix;
+                }
+            }
+        }
+        return { employeeCode, username };
     }
 
     @Public()
@@ -63,24 +91,23 @@ export class UsersController {
 
     @Public()
     @Post()
-    // @HttpCode(HttpStatus.CREATED)
-    // @CanCreate("users")
+    @HttpCode(HttpStatus.CREATED)
     async create(@Body() body: unknown) {
-        console.log("Creating user with payload:", body);
         const parsed = CreateUserSchema.parse(body);
-        const payload: CreateUserDto = {
-            ...parsed,
-            name: parsed.name.trim(),
-            username: parsed.username?.trim() || null,
+        const user = await this.usersService.createWithDetails({
+            firstName: parsed.firstName.trim(),
+            lastName: parsed.lastName.trim(),
             email: parsed.email.trim().toLowerCase(),
+            username: parsed.username?.trim() || null,
             mobile: parsed.mobile?.trim() || null,
             password: parsed.password,
+            teamId: parsed.teamId,
+            subTeamId: parsed.subTeamId ?? null,
+            roleId: parsed.roleId,
+            designationId: parsed.designationId,
             isActive: parsed.isActive ?? true,
-        };
-        const user = await this.usersService.create(payload);
-        // Auto-assign role after user creation
-        await this.usersService.assignRole(user.id, parsed.roleId);
-        return user;
+        });
+        return this.usersService.findDetailById(user.id);
     }
 
     @Patch(":id")
