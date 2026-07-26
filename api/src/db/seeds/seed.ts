@@ -2,7 +2,6 @@
 import { createDb, createPool } from '@db';
 import { roles } from '@db/schemas/auth/roles.schema';
 import { teams } from '@db/schemas/master/teams.schema';
-import { designations } from '@db/schemas/master/designations.schema';
 import { sql } from 'drizzle-orm';
 
 async function main() {
@@ -13,9 +12,6 @@ async function main() {
     const db = createDb(pool);
 
     await db.execute(sql`TRUNCATE TABLE ${roles} RESTART IDENTITY CASCADE`);
-    await db.execute(
-        sql`TRUNCATE TABLE ${designations} RESTART IDENTITY CASCADE`,
-    );
     await db.execute(sql`TRUNCATE TABLE ${teams} RESTART IDENTITY CASCADE`);
 
     await db
@@ -30,20 +26,6 @@ async function main() {
             { name: 'Field' },
         ])
         .onConflictDoNothing({ target: [roles.name, roles.guardName] });
-
-    const designationNames = [
-        'CEO',
-        'COO',
-        'Coordinator',
-        'Team Leader',
-        'Executive',
-        'Engineer',
-        'Intern',
-    ];
-    await db
-        .insert(designations)
-        .values(designationNames.map((name) => ({ name })))
-        .onConflictDoNothing({ target: [designations.name] });
 
     const teamNames = [
         'AC',

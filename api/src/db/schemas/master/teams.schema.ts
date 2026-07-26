@@ -9,6 +9,7 @@ import {
 export const teams = pgTable('teams', {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     name: varchar('name', { length: 100 }).notNull(),
+    category: varchar('category', { length: 20 }),
     parentId: bigint('parent_id', { mode: 'number' }),
     createdAt: timestamp('created_at', { withTimezone: true })
         .notNull()

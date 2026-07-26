@@ -1,6 +1,5 @@
 import { pgTable, bigserial, bigint, varchar, date, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
 import { users } from "@db/schemas/auth/users.schema";
-import { designations } from "@db/schemas/master/designations.schema";
 
 export const userProfiles = pgTable("user_profiles", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
@@ -10,7 +9,6 @@ export const userProfiles = pgTable("user_profiles", {
     dateOfBirth: date("date_of_birth"),
     gender: varchar("gender", { length: 20 }),
     employeeCode: varchar("employee_code", { length: 50 }).unique(),
-    designationId: bigint("designation_id", { mode: "number" }),
     altEmail: varchar("alt_email", { length: 255 }),
     emergencyContactName: varchar("emergency_contact_name", { length: 255 }),
     emergencyContactPhone: varchar("emergency_contact_phone", { length: 20 }),

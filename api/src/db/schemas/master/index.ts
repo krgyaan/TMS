@@ -32,8 +32,6 @@ export * from "./teams.schema";
 export * from "./teams.relations";
 
 // Designations
-export * from "./designations.schema";
-export * from "./designations.relations";
 
 // Items
 export * from "./items.schema";
