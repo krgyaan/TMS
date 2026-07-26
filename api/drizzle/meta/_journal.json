@@ -393,6 +393,13 @@
       "when": 1784891421218,
       "tag": "0094_add_category_to_vendor_work_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1785000000000,
+      "tag": "0095_remove_designations_add_team_category",
+      "breakpoints": true
     }
   ]
 }
