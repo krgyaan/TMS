@@ -1,5 +1,4 @@
 import { tenderInformation } from '@/db/schemas';
-import { userRoles } from '@/db/schemas/auth/user-roles.schema';
 import { users } from '@/db/schemas/auth/users.schema';
 import { AppLogger } from '@/logger/app-logger.service';
 import { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -841,12 +840,7 @@ export class PaymentRequestsCommandService {
             
             if (user) {
                 userName = user.name;
-                const [role] = await tx
-                    .select({ roleId: userRoles.roleId })
-                    .from(userRoles)
-                    .where(eq(userRoles.userId, userId))
-                    .limit(1);
-                userRoleId = role?.roleId || 0;
+                userRoleId = user.roleId || 0;
             }
         }
 

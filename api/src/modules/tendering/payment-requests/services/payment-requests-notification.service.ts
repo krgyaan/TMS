@@ -1,4 +1,5 @@
-import { couriers, tenderInfos, userRoles, users, emdResponsibility } from '@/db/schemas';
+import { couriers, emdResponsibility, tenderInfos, users } from '@/db/schemas';
+import { AppLogger } from '@/logger/app-logger.service';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
@@ -6,11 +7,9 @@ import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
 import { Inject, Injectable } from '@nestjs/common';
-import * as path from 'path';
 import { ConfigService } from '@nestjs/config';
-import { and, eq, notInArray, isNull } from 'drizzle-orm';
 import { differenceInDays } from 'date-fns';
-import { AppLogger } from '@/logger/app-logger.service';
+import { and, eq, isNull, notInArray } from 'drizzle-orm';
 
 @Injectable()
 export class PaymentRequestsNotificationService {
@@ -703,11 +702,10 @@ export class PaymentRequestsNotificationService {
         const [tlUser] = await this.db
             .select({ name: users.name })
             .from(users)
-            .leftJoin(userRoles, eq(users.id, userRoles.userId))
             .where(
                 and(
                     eq(users.team, tenderTeamId),
-                    eq(userRoles.roleId, 3)
+                    eq(users.roleId, 3)
                 )
             )
             .limit(1);
