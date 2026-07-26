@@ -261,6 +261,7 @@ export const paths = {
         users: "/master/users",
         users_create: "/master/users/create",
         users_edit: (id: number | string) => `/master/users/${id}/edit`,
+        users_permissions: (id: number | string) => `/master/users/${id}/permissions`,
 
         statuses: "/master/statuses",
         statuses_create: "/master/statuses/create",
