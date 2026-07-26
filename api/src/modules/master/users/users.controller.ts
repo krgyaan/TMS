@@ -17,7 +17,6 @@ const CreateUserSchema = z.object({
     teamId: z.number().int().positive("Team is required"),
     subTeamId: z.number().int().positive().optional().nullable(),
     roleId: z.number().int().positive("Role is required"),
-    designationId: z.number().int().positive("Designation is required"),
     isActive: z.boolean().optional(),
 });
 
@@ -104,7 +103,6 @@ export class UsersController {
             teamId: parsed.teamId,
             subTeamId: parsed.subTeamId ?? null,
             roleId: parsed.roleId,
-            designationId: parsed.designationId,
             isActive: parsed.isActive ?? true,
         });
         return this.usersService.findDetailById(user.id);

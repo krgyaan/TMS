@@ -13,6 +13,7 @@ export function createMockJwtToken(user: Partial<ValidatedUser> = {}): string {
 
     const payload: ValidatedUser = {
         sub: user.sub || 1,
+        name: user.name || 'Test User',
         email: user.email || 'test@example.com',
         role: user.role || null,
         roleId: user.roleId || null,
@@ -41,6 +42,7 @@ export function createAuthHeader(user: Partial<ValidatedUser> = {}): string {
 export function createMockUser(overrides: Partial<ValidatedUser> = {}): ValidatedUser {
     return {
         sub: overrides.sub || 1,
+        name: overrides.name || 'Test User',
         email: overrides.email || 'test@example.com',
         role: overrides.role || null,
         roleId: overrides.roleId || null,

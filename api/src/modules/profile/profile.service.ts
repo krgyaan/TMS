@@ -37,7 +37,6 @@ import {
 } from '@/db/schemas/hrms/onboarding';
 import { complaints } from '@/db/schemas/hrms/complaints.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
-import { designations } from '@/db/schemas/master/designations.schema';
 import { OnboardingService } from '../hrms/onboarding/onboarding.service';
 
 @Injectable()
@@ -152,12 +151,10 @@ export class ProfileService {
     const [userProfileRowData] = await this.db
       .select({
           profile: userProfiles,
-          designationName: designations.name,
           departmentName: teams.name,
         })
       .from(userProfiles)
       .leftJoin(users, eq(users.id, userProfiles.userId))
-      .leftJoin(designations, eq(userProfiles.designationId, designations.id))
       .leftJoin(teams, eq(teams.id, sql<number>`COALESCE(${users.primaryTeamId}, ${users.team})`))
       .where(eq(userProfiles.userId, userId))
       .limit(1);
@@ -241,7 +238,6 @@ export class ProfileService {
       inductionDate: empProfileRow.inductionDate || null,
       idCardIssuedDate: empProfileRow.idCardIssuedDate || null,
       joiningDate: upr?.dateOfJoining || null,
-      designation: userProfileRowData?.designationName || null,
       department: userProfileRowData?.departmentName || null,
     } : null;
 

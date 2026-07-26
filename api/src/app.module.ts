@@ -27,7 +27,6 @@ import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employe
 import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module";
 import { GoogleIntegrationModule } from "@/modules/integrations/google/google.module";
 import { CompaniesModule } from "@/modules/master/companies/companies.module";
-import { DesignationsModule } from "@/modules/master/designations/designations.module";
 import { DocumentsSubmittedModule } from "@/modules/master/documents-submitted/documents-submitted.module";
 import { EmdResponsibilitiesModule } from "@/modules/master/emd-responsibilities/emd-responsibilities.module";
 import { FinanceDocTypeModule } from "@/modules/master/finance-doc-type/finance-doc-type.module";
@@ -150,7 +149,6 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         UsersModule,
         RolesModule,
         PermissionsModule,
-        DesignationsModule,
         TeamsModule,
         UserProfilesModule,
         OauthAccountsModule,

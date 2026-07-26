@@ -11,7 +11,6 @@ import { userPermissions } from "@db/schemas/auth/user-permissions.schema";
 import { rolePermissions } from "@db/schemas/auth/role-permissions.schema";
 import { roles } from "@db/schemas/auth/roles.schema";
 import { permissions } from "@db/schemas/auth/permissions.schema";
-import { designations } from "@db/schemas/master/designations.schema";
 import { teams } from "@db/schemas/master/teams.schema";
 
 const subTeams = aliasedTable(teams, 'sub_teams');
@@ -60,7 +59,6 @@ export type UserWithRelations = Omit<SafeUser, "team"> & {
     profile: UserProfileSummary | null;
     team: { id: number; name: string | null } | null;
     subTeam: { id: number; name: string | null } | null;
-    designation: { id: number; name: string | null } | null;
     role: UserRoleInfo | null; // NEW
 };
 
@@ -106,7 +104,6 @@ export class UsersService {
                 profileDateOfBirth: userProfiles.dateOfBirth,
                 profileGender: userProfiles.gender,
                 profileEmployeeCode: userProfiles.employeeCode,
-                profileDesignationId: userProfiles.designationId,
                 profileAltEmail: userProfiles.altEmail,
                 profileEmergencyContactName: userProfiles.emergencyContactName,
                 profileEmergencyContactPhone: userProfiles.emergencyContactPhone,
@@ -124,9 +121,6 @@ export class UsersService {
                 primaryTeamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team})`,
                 subTeamId: subTeams.id,
                 subTeamName: subTeams.name,
-                // Designation fields
-                designationId: designations.id,
-                designationName: designations.name,
                 // Role fields (NEW)
                 roleId: roles.id,
                 roleName: roles.name,
@@ -134,7 +128,6 @@ export class UsersService {
             })
             .from(users)
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-            .leftJoin(designations, eq(userProfiles.designationId, designations.id))
             .leftJoin(teams, eq(teams.id, sql<number>`COALESCE(${users.primaryTeamId}, ${users.team})`))
             .leftJoin(subTeams, eq(subTeams.id, users.team))
             .leftJoin(userRoles, eq(userRoles.userId, users.id)) // NEW
@@ -155,7 +148,6 @@ export class UsersService {
                   dateOfBirth: row.profileDateOfBirth,
                   gender: row.profileGender,
                   employeeCode: row.profileEmployeeCode,
-                  designationId: row.profileDesignationId,
                   oldTeamId: row.team,
                   altEmail: row.profileAltEmail,
                   emergencyContactName: row.profileEmergencyContactName,
@@ -186,14 +178,6 @@ export class UsersService {
                   }
                 : null;
 
-        const designation =
-            row.designationId != null
-                ? {
-                      id: row.designationId,
-                      name: row.designationName,
-                  }
-                : null;
-
         // NEW: Map role with computed properties
         const role: UserRoleInfo | null =
             row.roleId != null
@@ -217,7 +201,6 @@ export class UsersService {
             profile,
             team,
             subTeam,
-            designation,
             role, // NEW
         };
     }
@@ -491,7 +474,6 @@ export class UsersService {
         teamId: number;
         subTeamId?: number | null;
         roleId: number;
-        designationId: number;
         isActive?: boolean;
     }): Promise<User> {
         if (!data.password) {
@@ -534,7 +516,6 @@ export class UsersService {
                 firstName: data.firstName,
                 lastName: data.lastName,
                 employeeCode,
-                designationId: data.designationId,
             });
 
             await tx

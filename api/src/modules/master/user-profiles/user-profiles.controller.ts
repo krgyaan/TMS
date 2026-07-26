@@ -20,8 +20,6 @@ const CreateUserProfileSchema = z.object({
 
     employeeCode: z.string().nullable().optional(),
 
-    designationId: z.number().nullable().optional(),
-
     altEmail: z.string().email().nullable().optional(),
 
     emergencyContactName: z.string().nullable().optional(),
