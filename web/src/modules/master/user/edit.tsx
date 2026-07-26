@@ -1,18 +1,16 @@
-import { useParams, useNavigate } from "react-router-dom";
-import { UserForm } from "./components/UserForm";
-import { useUser } from "@/hooks/api/useUsers";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useUser } from "@/hooks/api/useUsers";
 import { AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { paths } from "@/app/routes/paths";
+import { useParams } from "react-router-dom";
+import { UserForm } from "./components/UserForm";
 
 const EditUserPage = () => {
     const { id } = useParams<{ id: string }>();
     const userId = Number(id);
     const { data, isLoading, error, refetch } = useUser(userId);
-    const navigate = useNavigate();
 
     if (!userId) {
         return (

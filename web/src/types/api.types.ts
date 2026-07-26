@@ -13,6 +13,7 @@ export interface User {
     deletedAt: Date | string | null;
     profile: UserProfile | null;
     team: Team | null;
+    subTeam: Team | null;
     designation: { id: number; name: string } | null;
     role: UserRole | null;
 }
@@ -56,16 +57,27 @@ export interface NamedEntity {
 }
 
 export interface CreateUserDto {
-    name: string;
+    firstName: string;
+    lastName: string;
     email: string;
     username?: string | null;
     mobile?: string | null;
     password: string;
-    isActive?: boolean;
+    teamId: number;
+    subTeamId?: number | null;
     roleId: number;
+    designationId: number;
+    isActive?: boolean;
 }
 
-export interface UpdateUserDto extends Partial<CreateUserDto> {}
+export interface UpdateUserDto {
+    name?: string;
+    username?: string | null;
+    email?: string;
+    mobile?: string | null;
+    password?: string;
+    isActive?: boolean;
+}
 
 export interface Location {
     id: number;

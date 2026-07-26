@@ -53,6 +53,10 @@ const UserPage = () => {
             onClick: row => setViewState({ open: true, data: row }),
         },
         {
+            label: "Permissions",
+            onClick: row => navigate(paths.master.users_permissions(row.id)),
+        },
+        {
             label: "Edit",
             onClick: row => navigate(paths.master.users_edit(row.id)),
         },
@@ -74,6 +78,12 @@ const UserPage = () => {
 
     const colDefs: ColDef<User>[] = [
         {
+            headerName: "Employee Code",
+            field: "profile.employeeCode",
+            flex: 1,
+            valueGetter: params => params.data?.profile?.employeeCode || "—",
+        },
+        {
             field: "name",
             headerName: "Name",
             flex: 1.2,
@@ -85,12 +95,23 @@ const UserPage = () => {
             ),
         },
         { field: "email", headerName: "Email", flex: 1 },
-        { field: "mobile", headerName: "Mobile", flex: 0.8 },
         {
             headerName: "Team",
             field: "team",
+            flex: 1,
+            cellRenderer: ({ data }: { data: User }): ReactNode => {
+                const mainTeam = data.team?.name;
+                const subTeam = data.subTeam?.name;
+                if (!mainTeam) return "—";
+                if (subTeam) return `${mainTeam} (${subTeam})`;
+                return mainTeam;
+            },
+        },
+        {
+            headerName: "Role",
+            field: "role",
             flex: 0.8,
-            valueGetter: params => params.data?.team?.name || "—",
+            valueGetter: params => params.data?.role?.name || "—",
         },
         {
             headerName: "Designation",
@@ -99,16 +120,23 @@ const UserPage = () => {
             valueGetter: params => params.data?.designation?.name || "—",
         },
         {
-            headerName: "Employee Code",
-            field: "profile.employeeCode",
-            flex: 0.8,
-            valueGetter: params => params.data?.profile?.employeeCode || "—",
-        },
-        {
             field: "isActive",
             headerName: "Status",
-            width: 120,
+            width: 100,
             cellRenderer: (params: any) => <Badge variant={params.value ? "default" : "secondary"}>{params.value ? "Active" : "Inactive"}</Badge>,
+        },
+        {
+            headerName: "Created on",
+            field: "createdAt",
+            width: 120,
+            valueGetter: params => {
+                if (!params.data?.createdAt) return "—";
+                return new Date(params.data.createdAt).toLocaleDateString("en-IN", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                });
+            },
         },
         {
             headerName: "Actions",

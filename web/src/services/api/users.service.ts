@@ -15,8 +15,12 @@ class UsersService extends BaseApiService {
     }
 
     async create(data: CreateUserDto): Promise<User> {
-        console.log("Creating user with data:", data);
         return this.post("", data);
+    }
+
+    async getGenerateInfo(email?: string): Promise<{ employeeCode: string; username: string }> {
+        const params = email ? `?email=${encodeURIComponent(email)}` : "";
+        return this.get<{ employeeCode: string; username: string }>(`/generate-info${params}`);
     }
 
     async update(id: number, data: UpdateUserDto): Promise<User> {
