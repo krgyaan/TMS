@@ -523,10 +523,6 @@ export interface UserPermission {
     granted: boolean;
 }
 
-export interface AssignRoleDto {
-    roleId: number;
-}
-
 export interface AssignPermissionDto {
     permissionId: number;
     granted: boolean;

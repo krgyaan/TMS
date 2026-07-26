@@ -860,7 +860,6 @@ async function cleanupTestDataInternal(db: DbInstance): Promise<void> {
 
     // Level 20: User-related tables (depend on users)
     await deleteSafely('user_profiles');
-    await deleteSafely('user_roles');
     await deleteSafely('user_permissions');
     await deleteSafely('oauth_accounts');
     await deleteSafely('follow_ups');
