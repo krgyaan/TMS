@@ -8,8 +8,8 @@ class TeamService extends BaseApiService {
     }
 
     async getAll(category?: string): Promise<Team[]> {
-        const params = category ? { category } : undefined;
-        return this.get<Team[]>('', { params });
+        const endpoint = category ? `?category=${category}` : '';
+        return this.get<Team[]>(endpoint);
     }
 
     async getById(id: number): Promise<Team> {
