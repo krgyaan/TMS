@@ -1,12 +1,8 @@
-import { Injectable, Inject } from "@nestjs/common";
-import { eq, and } from "drizzle-orm";
-
+import { Inject, Injectable } from "@nestjs/common";
+import { and, eq } from "drizzle-orm";
 import { users } from "@db/schemas/auth/users.schema";
-import { userRoles } from "@db/schemas/auth/user-roles.schema";
-
-import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
-import { id } from "zod/v4/locales";
+import { DRIZZLE } from "@/db/database.module";
 
 @Injectable()
 export class MailAudienceService {
@@ -16,9 +12,9 @@ export class MailAudienceService {
     ) {}
 
     async getEmailsByRoleId(roleId: number, teamId?: number): Promise<string[]> {
-        const conditions = teamId ? and(eq(userRoles.roleId, roleId), eq(users.team, teamId)) : eq(userRoles.roleId, roleId);
+        const conditions = teamId ? and(eq(users.roleId, roleId), eq(users.team, teamId)) : eq(users.roleId, roleId);
 
-        const result = await this.db.select({ email: users.email }).from(users).innerJoin(userRoles, eq(users.id, userRoles.userId)).where(conditions);
+        const result = await this.db.select({ email: users.email }).from(users).where(conditions);
 
         return result.map(r => r.email);
     }
@@ -36,7 +32,7 @@ export class MailAudienceService {
     }
 
     async getCoordinator(): Promise<typeof users.$inferSelect | null> {
-        const result = await this.db.select({ user: users }).from(users).innerJoin(userRoles, eq(users.id, userRoles.userId)).where(eq(userRoles.roleId, 4)).limit(1);
+        const result = await this.db.select({ user: users }).from(users).where(eq(users.roleId, 4)).limit(1);
 
         return result.length ? result[0].user : null;
     }
@@ -44,10 +40,9 @@ export class MailAudienceService {
     async getTlEmail(team : number){
         const tlMails = await this.db.select({email : users.email})
         .from(users)
-            .innerJoin(userRoles, eq(userRoles.userId, users.id))
             .where(and(
                     eq(users.team, team),
-                    eq(userRoles.roleId, 3)
+                    eq(users.roleId, 3)
                 )
             );
 

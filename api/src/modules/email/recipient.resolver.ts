@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
-import { users, userRoles, userProfiles, roles, teams } from '@/db/schemas';
+import { users, userProfiles, roles, teams } from '@/db/schemas';
 import { RecipientSource } from './dto/send-email.dto';
 import { and, eq } from 'drizzle-orm';
 import type { DbInstance } from '@/db';
@@ -30,7 +30,7 @@ export class RecipientResolver implements OnModuleInit {
 
             this.logger.log(`Loaded ${allRoles.length} roles, ${allTeams.length} teams`);
         } catch (error) {
-            this.logger.error('Failed to load caches:', error.message);
+            this.logger.error('Failed to load caches:', {error});
         }
     }
 
@@ -119,11 +119,9 @@ export class RecipientResolver implements OnModuleInit {
                 const result = await this.db
                     .select({ email: users.email })
                     .from(users)
-                    .innerJoin(userRoles, eq(userRoles.userId, users.id))
-                    /*.innerJoin(userProfiles, eq(userProfiles.userId, users.id))*/
                     .where(
                         and(
-                            eq(userRoles.roleId, foundRoleId),
+                            eq(users.roleId, foundRoleId),
                             eq(users.team, teamId),
                             eq(users.isActive, true),
                         ),
@@ -143,11 +141,9 @@ export class RecipientResolver implements OnModuleInit {
         const result = await this.db
             .select({ email: users.email })
             .from(users)
-            .innerJoin(userRoles, eq(userRoles.userId, users.id))
-            /*.innerJoin(userProfiles, eq(userProfiles.userId, users.id))*/
             .where(
                 and(
-                    eq(userRoles.roleId, roleId),
+                    eq(users.roleId, roleId),
                     eq(users.team, teamId),
                     eq(users.isActive, true),
                 ),
