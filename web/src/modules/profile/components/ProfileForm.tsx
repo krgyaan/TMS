@@ -5,11 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form'
 import { FieldWrapper } from '@/components/form/FieldWrapper'
 import { Input } from '@/components/ui/input'
-import { SelectField } from '@/components/form/SelectField'
 import { useUpdateUserProfile, useCreateUserProfile } from '@/hooks/api/useUserProfiles'
 import { useUpdateUser } from '@/hooks/api/useUsers'
 import { useTeams } from '@/hooks/api/useTeams'
-import { useDesignations } from '@/hooks/api/useDesignations'
 import type { User } from '@/types/api.types'
 import type { UserProfile } from '@/types/auth.types'
 import { toast } from 'sonner'
@@ -34,7 +32,6 @@ const ProfileSchema = z.object({
     dateOfBirth: optionalString(50, 'Invalid date'),
     gender: optionalString(20, 'Gender too long'),
     employeeCode: optionalString(50, 'Employee code too long'),
-    designationId: optionalString(20, 'Designation is not valid'),
     altEmail: optionalEmail(),
     emergencyContactName: optionalString(255, 'Contact name too long'),
     emergencyContactPhone: optionalString(20, 'Contact phone too long'),
@@ -67,7 +64,6 @@ export const ProfileForm = ({ user, profile, onCancel, onSuccess }: ProfileFormP
     const updateProfile = useUpdateUserProfile()
     const createProfile = useCreateUserProfile()
     const { data: teams = [] } = useTeams()
-    const { data: designations = [] } = useDesignations()
 
     const form = useForm<ProfileFormValues>({
         resolver: zodResolver(ProfileFormSchema),
@@ -81,7 +77,6 @@ export const ProfileForm = ({ user, profile, onCancel, onSuccess }: ProfileFormP
                 dateOfBirth: profile?.dateOfBirth ?? '',
                 gender: profile?.gender ?? '',
                 employeeCode: profile?.employeeCode ?? '',
-                designationId: profile?.designationId ? String(profile.designationId) : '',
                 altEmail: profile?.altEmail ?? '',
                 emergencyContactName: profile?.emergencyContactName ?? '',
                 emergencyContactPhone: profile?.emergencyContactPhone ?? '',
@@ -98,11 +93,6 @@ export const ProfileForm = ({ user, profile, onCancel, onSuccess }: ProfileFormP
     const teamOptions = [
         { id: '', name: 'None' },
         ...teams.map((team) => ({ id: String(team.id), name: team.name })),
-    ]
-
-    const designationOptions = [
-        { id: '', name: 'None' },
-        ...designations.map((designation) => ({ id: String(designation.id), name: designation.name })),
     ]
 
     const handleSubmit = async (values: ProfileFormValues) => {
@@ -125,7 +115,6 @@ export const ProfileForm = ({ user, profile, onCancel, onSuccess }: ProfileFormP
                 dateOfBirth: values.profile.dateOfBirth || null,
                 gender: values.profile.gender || null,
                 employeeCode: values.profile.employeeCode || null,
-                designationId: values.profile.designationId ? Number(values.profile.designationId) : null,
                 altEmail: values.profile.altEmail || null,
                 emergencyContactName: values.profile.emergencyContactName || null,
                 emergencyContactPhone: values.profile.emergencyContactPhone || null,
@@ -193,13 +182,6 @@ export const ProfileForm = ({ user, profile, onCancel, onSuccess }: ProfileFormP
                         <FieldWrapper control={form.control} name="profile.employeeCode" label="Employee Code">
                             {(field) => <Input placeholder="EMP-001" {...field} value={field.value ?? ''} />}
                         </FieldWrapper>
-                        <SelectField
-                            control={form.control}
-                            name="profile.designationId"
-                            label="Designation"
-                            options={designationOptions}
-                            placeholder="Select designation"
-                        />
                         <FieldWrapper control={form.control} name="profile.altEmail" label="Alternate Email">
                             {(field) => <Input type="email" placeholder="example@company.com" {...field} value={field.value ?? ''} />}
                         </FieldWrapper>
