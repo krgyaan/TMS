@@ -1,15 +1,12 @@
-import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, desc, asc, sql, and, gte, lte, isNull } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
-import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { woQueries, woDetails, woBasicDetails, woAcceptance } from '@db/schemas/operations';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { DRIZZLE } from '@db/database.module';
 import { users } from '@db/schemas/auth/users.schema';
-import { userRoles } from '@db/schemas/auth/user-roles.schema';
-import { roles } from '@db/schemas/auth/roles.schema';
-import { inArray } from 'drizzle-orm';
-import type { CreateWoQueryDto, CreateBulkWoQueriesDto, RespondToQueryDto, CloseQueryDto, UpdateQueryStatusDto, WoQueriesQueryDto, UpdateWoQueryDto } from './dto/wo-queries.dto';
+import { woAcceptance, woBasicDetails, woDetails, woQueries } from '@db/schemas/operations';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, asc, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
+import type { CloseQueryDto, CreateBulkWoQueriesDto, CreateWoQueryDto, RespondToQueryDto, UpdateQueryStatusDto, UpdateWoQueryDto, WoQueriesQueryDto } from './dto/wo-queries.dto';
 
 export type WoQueryRow = typeof woQueries.$inferSelect;
 
@@ -664,11 +661,10 @@ export class WoQueriesService {
             email: users.email,
           })
           .from(users)
-          .innerJoin(userRoles, eq(users.id, userRoles.userId))
           .where(
             and(
               eq(users.team, tender.teamId),
-              eq(userRoles.roleId, 3), // Role ID 3 = Team Leader
+              eq(users.roleId, 3), // Role ID 3 = Team Leader
               eq(users.isActive, true),
               isNull(users.deletedAt)
             )
