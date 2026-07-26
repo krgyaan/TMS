@@ -10,12 +10,12 @@ const ACTION_ORDER = ["create", "delete", "read", "update"];
 export function PermissionSelector({
     permissions = [],
     selectedPermissions = [],
-    rolePermissions = [],
+    rolePermissions,
     onChange,
 }: {
     permissions: Permission[];
     selectedPermissions: UserPermission[];
-    rolePermissions: UserPermission[];
+    rolePermissions?: UserPermission[];
     onChange: (permissionId: number, granted: boolean) => void;
 }) {
     const grouped = permissions.reduce((acc, perm) => {
@@ -25,7 +25,7 @@ export function PermissionSelector({
     }, {} as Record<string, Permission[]>);
 
     const selectedMap = new Map(selectedPermissions.map((p) => [p.permissionId, p.granted]));
-    const inheritedSet = new Set(rolePermissions.map((p) => p.id));
+    const inheritedSet = new Set((rolePermissions ?? []).map((p) => p.id));
 
     const getState = (id: number) => {
         if (selectedMap.has(id)) return selectedMap.get(id) ? "granted" : "denied";
