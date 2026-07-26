@@ -11,11 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Eye, EyeOff, Shield } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { useCreateUser, useUpdateUser } from "@/hooks/api/useUsers";
-import { useCreateUserProfile, useUpdateUserProfile } from "@/hooks/api/useUserProfiles";
-import { useDesignations } from "@/hooks/api/useDesignations";
-import { SelectField } from "@/components/form/SelectField";
-import type { User, CreateUserDto } from "@/types/api.types";
+import { useUpdateUser } from "@/hooks/api/useUsers";
+import { useUpdateUserProfile } from "@/hooks/api/useUserProfiles";
+import type { User } from "@/types/api.types";
 
 const preprocessText = (value: unknown) => {
     if (typeof value !== "string") {
@@ -35,7 +33,6 @@ const ProfileSchema = z.object({
     dateOfBirth: optionalString(50, "Invalid date"),
     gender: optionalString(20, "Gender too long"),
     employeeCode: optionalString(50, "Employee code too long"),
-    designationId: optionalString(20, "Designation is not valid"),
     altEmail: optionalEmail(),
     emergencyContactName: optionalString(255, "Contact name too long"),
     emergencyContactPhone: optionalString(20, "Contact phone too long"),
@@ -53,7 +50,6 @@ const PROFILE_DEFAULTS = {
     dateOfBirth: "",
     gender: "",
     employeeCode: "",
-    designationId: "",
     altEmail: "",
     emergencyContactName: "",
     emergencyContactPhone: "",
@@ -94,8 +90,7 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
     const updateUser = useUpdateUser();
     const createProfile = useCreateUserProfile();
     const updateProfile = useUpdateUserProfile();
-    const { data: designations = [] } = useDesignations();
-    const [showPassword, setShowPassword] = useState<boolean>(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     const form = useForm<UserFormValues>({
         resolver: zodResolver(UserFormSchema) as any,
@@ -126,7 +121,6 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
                     dateOfBirth: user.profile?.dateOfBirth ?? "",
                     gender: user.profile?.gender ?? "",
                     employeeCode: user.profile?.employeeCode ?? "",
-                    designationId: user.profile?.designationId ? String(user.profile.designationId) : "",
                     altEmail: user.profile?.altEmail ?? "",
                     emergencyContactName: user.profile?.emergencyContactName ?? "",
                     emergencyContactPhone: user.profile?.emergencyContactPhone ?? "",
@@ -140,11 +134,6 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
             });
         }
     }, [form, mode, user]);
-
-    const designationOptions = useMemo(
-        () => [{ id: "", name: "None" }, ...designations.map(designation => ({ id: String(designation.id), name: designation.name }))],
-        [designations]
-    );
 
     const hasProfileData = (profile: UserFormValues["profile"]) => {
         return Object.entries(profile).some(([key, value]) => {
@@ -176,7 +165,6 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
             dateOfBirth: profile.dateOfBirth ?? null,
             gender: profile.gender ?? null,
             employeeCode: profile.employeeCode ?? null,
-            designationId: profile.designationId ? Number(profile.designationId) : null,
             altEmail: profile.altEmail ?? null,
             emergencyContactName: profile.emergencyContactName ?? null,
             emergencyContactPhone: profile.emergencyContactPhone ?? null,
@@ -351,13 +339,6 @@ export const UserForm = ({ mode, user }: UserFormProps) => {
                                 <FieldWrapper control={form.control} name="profile.employeeCode" label="Employee Code">
                                     {field => <Input placeholder="EMP-001" {...field} value={field.value ?? ""} />}
                                 </FieldWrapper>
-                                <SelectField
-                                    control={form.control}
-                                    name="profile.designationId"
-                                    label="Designation"
-                                    options={designationOptions}
-                                    placeholder="Select designation"
-                                />
                                 <FieldWrapper control={form.control} name="profile.altEmail" label="Alternate Email">
                                     {field => <Input type="email" placeholder="example@company.com" {...field} value={field.value ?? ""} />}
                                 </FieldWrapper>

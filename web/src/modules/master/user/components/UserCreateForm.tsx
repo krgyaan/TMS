@@ -15,9 +15,7 @@ import { paths } from "@/app/routes/paths";
 import { useCreateUser } from "@/hooks/api/useUsers";
 import { useRoles } from "@/hooks/api/useRoles";
 import { useTeams } from "@/hooks/api/useTeams";
-import { useDesignations } from "@/hooks/api/useDesignations";
 import type { CreateUserDto } from "@/types/api.types";
-import type { Team } from "@/types/auth.types";
 import { usersService } from "@/services/api/users.service";
 
 const UserCreateFormSchema = z.object({
@@ -30,7 +28,6 @@ const UserCreateFormSchema = z.object({
     teamId: z.string().min(1, "Team is required"),
     subTeamId: z.string().optional(),
     roleId: z.string().min(1, "Role is required"),
-    designationId: z.string().min(1, "Designation is required"),
     isActive: z.boolean().default(true),
 });
 
@@ -40,28 +37,11 @@ export default function UserCreateForm() {
     const navigate = useNavigate();
     const createUser = useCreateUser();
     const { data: roles = [] } = useRoles();
-    const { data: allTeams = [] } = useTeams();
-    const { data: designations = [] } = useDesignations();
+    const { data: primaryTeams = [] } = useTeams({ category: 'primary' });
+    const { data: secondaryTeams = [] } = useTeams({ category: 'secondary' });
     const [showPassword, setShowPassword] = useState(false);
     const [expectedCode, setExpectedCode] = useState("");
     const emailDebounceRef = useRef<ReturnType<typeof setTimeout>>();
-
-    const parentTeams = useMemo(
-        () => allTeams.filter(t => t.parentId == null),
-        [allTeams]
-    );
-
-    const teamChildrenMap = useMemo(() => {
-        const map = new Map<number, Team[]>();
-        allTeams.forEach(t => {
-            if (t.parentId != null) {
-                const existing = map.get(t.parentId) || [];
-                existing.push(t);
-                map.set(t.parentId, existing);
-            }
-        });
-        return map;
-    }, [allTeams]);
 
     const form = useForm<UserCreateFormValues>({
         resolver: zodResolver(UserCreateFormSchema) as any,
@@ -75,18 +55,9 @@ export default function UserCreateForm() {
             teamId: "",
             subTeamId: "",
             roleId: "",
-            designationId: "",
             isActive: true,
         },
     });
-
-    const selectedTeamId = form.watch("teamId");
-    const subTeams = selectedTeamId ? teamChildrenMap.get(Number(selectedTeamId)) || [] : [];
-
-    // Reset sub-team when parent team changes
-    useEffect(() => {
-        form.setValue("subTeamId", "");
-    }, [selectedTeamId, form]);
 
     // Fetch next employee code on mount
     useEffect(() => {
@@ -123,11 +94,6 @@ export default function UserCreateForm() {
     );
 
     const handleSubmit = async (values: UserCreateFormValues) => {
-        if (subTeams.length > 0 && !values.subTeamId) {
-            form.setError("subTeamId", { type: "manual", message: "Sub-team is required for this team" });
-            return;
-        }
-
         const payload: CreateUserDto = {
             firstName: values.firstName.trim(),
             lastName: values.lastName.trim(),
@@ -138,7 +104,6 @@ export default function UserCreateForm() {
             teamId: Number(values.teamId),
             subTeamId: values.subTeamId ? Number(values.subTeamId) : null,
             roleId: Number(values.roleId),
-            designationId: Number(values.designationId),
             isActive: values.isActive,
         };
 
@@ -147,23 +112,18 @@ export default function UserCreateForm() {
     };
 
     const teamOptions = useMemo(
-        () => parentTeams.map(t => ({ id: String(t.id), name: t.name })),
-        [parentTeams]
+        () => primaryTeams.map(t => ({ id: String(t.id), name: t.name })),
+        [primaryTeams]
     );
 
     const subTeamOptions = useMemo(
-        () => subTeams.map(t => ({ id: String(t.id), name: t.name })),
-        [subTeams]
+        () => secondaryTeams.map(t => ({ id: String(t.id), name: t.name })),
+        [secondaryTeams]
     );
 
     const roleOptions = useMemo(
         () => roles.map(r => ({ id: String(r.id), name: r.name })),
         [roles]
-    );
-
-    const designationOptions = useMemo(
-        () => designations.map(d => ({ id: String(d.id), name: d.name })),
-        [designations]
     );
 
     return (
@@ -242,7 +202,7 @@ export default function UserCreateForm() {
                         <div className="space-y-4 rounded-md border p-4">
                             <div>
                                 <p className="text-sm font-semibold">Employee Details</p>
-                                <p className="text-xs text-muted-foreground">Employment information including team, role, and designation.</p>
+                                <p className="text-xs text-muted-foreground">Employment information including team and role.</p>
                             </div>
                             <div className="grid gap-6 md:grid-cols-2">
                                 <div className="space-y-2">
@@ -256,28 +216,19 @@ export default function UserCreateForm() {
                                     options={teamOptions}
                                     placeholder="Select a team"
                                 />
-                                {subTeams.length > 0 && (
-                                    <SelectField
-                                        control={form.control}
-                                        name="subTeamId"
-                                        label="Sub-team"
-                                        options={subTeamOptions}
-                                        placeholder="Select sub-team"
-                                    />
-                                )}
+                                <SelectField
+                                    control={form.control}
+                                    name="subTeamId"
+                                    label="Sub-team"
+                                    options={subTeamOptions}
+                                    placeholder="Select sub-team"
+                                />
                                 <SelectField
                                     control={form.control}
                                     name="roleId"
                                     label="Role"
                                     options={roleOptions}
                                     placeholder="Select a role"
-                                />
-                                <SelectField
-                                    control={form.control}
-                                    name="designationId"
-                                    label="Designation"
-                                    options={designationOptions}
-                                    placeholder="Select a designation"
                                 />
                             </div>
                         </div>
