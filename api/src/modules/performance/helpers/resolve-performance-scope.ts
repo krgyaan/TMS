@@ -1,9 +1,8 @@
-import { eq, inArray } from "drizzle-orm";
-import { users } from "@db/schemas/auth/users.schema";
-import { roles } from "@db/schemas/auth/roles.schema";
-import { userRoles } from "@db/schemas/auth/user-roles.schema";
-import { STAGE_CONFIG } from "../config/stage-config";
 import type { DbInstance } from "@/db";
+import { roles } from "@db/schemas/auth/roles.schema";
+import { users } from "@db/schemas/auth/users.schema";
+import { eq } from "drizzle-orm";
+import { STAGE_CONFIG } from "../config/stage-config";
 
 interface PerformanceScope {
     role: "executive" | "team_leader";
@@ -27,9 +26,9 @@ export async function resolvePerformanceScope(db: DbInstance, userId: number): P
         .select({
             roleName: roles.name,
         })
-        .from(userRoles)
-        .innerJoin(roles, eq(userRoles.roleId, roles.id))
-        .where(eq(userRoles.userId, userId))
+        .from(users)
+        .innerJoin(roles, eq(roles.id, users.roleId))
+        .where(eq(users.id, userId))
         .limit(1);
 
     const roleName = roleRow[0]?.roleName;
