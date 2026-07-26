@@ -8,7 +8,6 @@ export * from './user-profiles.relations';
 export * from './roles.schema';
 export * from './roles.relations';
 export * from './permissions.schema';
-export * from './user-roles.schema';
 export * from './user-permissions.schema';
 export * from './role-permissions.schema';
 

@@ -9,6 +9,7 @@ import {
     integer,
 } from 'drizzle-orm/pg-core';
 import { teams } from '../master/teams.schema';
+import { roles } from './roles.schema';
 
 export const users = pgTable(
     'users',
@@ -21,6 +22,7 @@ export const users = pgTable(
         password: varchar('password', { length: 255 }).notNull(),
         team: integer('team').references(() => teams.id),
         primaryTeamId: bigint('primary_team_id', { mode: 'number' }),
+        roleId: bigint('role_id', { mode: 'number' }).references(() => roles.id),
         emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
         lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
         isActive: boolean('is_active').notNull().default(true),
