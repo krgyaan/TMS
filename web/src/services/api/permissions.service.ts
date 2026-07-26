@@ -1,5 +1,5 @@
-import { BaseApiService } from './base.service'
 import type { Permission } from '@/types/api.types'
+import { BaseApiService } from './base.service'
 
 class PermissionsService extends BaseApiService {
     constructor() {
@@ -18,6 +18,10 @@ class PermissionsService extends BaseApiService {
         return this.post<Permission>('', data)
     }
 
+    async bulkCreate(data: BulkCreatePermissionDto): Promise<Permission[]> {
+        return this.post<Permission[]>('/bulk', data)
+    }
+
     async deletePermission(id: number): Promise<void> {
         return this.delete<void>(`/${id}`)
     }
@@ -26,6 +30,12 @@ class PermissionsService extends BaseApiService {
 export interface CreatePermissionDto {
     module: string
     action: string
+    description?: string
+}
+
+export interface BulkCreatePermissionDto {
+    module: string
+    actions: string[]
     description?: string
 }
 

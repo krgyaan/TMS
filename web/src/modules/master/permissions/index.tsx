@@ -1,33 +1,34 @@
-import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useEffect, useMemo, useState } from "react";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
 
-import { AlertCircle, ChevronDown, KeyRound, Plus, Save, Search, Trash2, X, Shield, Info } from "lucide-react";
+import { AlertCircle, ChevronDown, Info, KeyRound, Plus, Search, Shield, Trash2, X } from "lucide-react";
 
-import type { Permission } from "@/types/api.types";
-import { usePermissions, useCreatePermission, useDeletePermission } from "@/hooks/api/usePermissions";
-import { useRoles, useRole, useAssignRolePermissions } from "@/hooks/api/useRoles";
+import { useBulkCreatePermission, useDeletePermission, usePermissions } from "@/hooks/api/usePermissions";
+import { useRole } from "@/hooks/api/useRoles";
 import { cn } from "@/lib/utils";
+import type { Permission } from "@/types/api.types";
+
+const CRUD_ACTIONS = ["create", "read", "update", "delete"] as const;
 
 const PermissionFormSchema = z.object({
     module: z.string().min(1, "Module is required").max(100),
-    action: z.string().min(1, "Action is required").max(50),
+    actions: z.array(z.enum(CRUD_ACTIONS)).min(1, "Select at least one action"),
+    extraActions: z.string().max(200).optional(),
     description: z.string().max(500).optional(),
 });
 
@@ -40,11 +41,9 @@ function includesText(haystack: string | null | undefined, needle: string) {
 
 const PermissionsPage = () => {
     const { data: permissions, isLoading, error, refetch } = usePermissions();
-    const { data: roles = [] } = useRoles();
 
     const deletePermission = useDeletePermission();
-    const createPermission = useCreatePermission();
-    const assignPermissions = useAssignRolePermissions();
+    const bulkCreatePermission = useBulkCreatePermission();
 
     const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
     const { data: selectedRolePermissions = [] } = useRole(selectedRoleId);
@@ -58,7 +57,7 @@ const PermissionsPage = () => {
 
     const permissionForm = useForm<PermissionFormValues>({
         resolver: zodResolver(PermissionFormSchema),
-        defaultValues: { module: "", action: "", description: "" },
+        defaultValues: { module: "", actions: [...CRUD_ACTIONS], extraActions: "", description: "" },
     });
 
     useEffect(() => {
@@ -87,14 +86,6 @@ const PermissionsPage = () => {
 
         setIsDirty(false);
     }, [selectedRoleId, selectedRolePermissions]);
-
-    // Auto-expand all modules on initial load
-    // useEffect(() => {
-    //     if (permissions && expandedModules.size === 0) {
-    //         const modules = new Set(permissions.map(p => p.module || "unknown"));
-    //         setExpandedModules(modules);
-    //     }
-    // }, [permissions]);
 
     const filteredAndGrouped = useMemo(() => {
         const list = permissions ?? [];
@@ -140,22 +131,29 @@ const PermissionsPage = () => {
 
     const openCreateForModule = (module: string) => {
         setCreateModulePreset(module);
-        permissionForm.reset({ module, action: "", description: "" });
+        permissionForm.reset({ module, actions: [...CRUD_ACTIONS], extraActions: "", description: "" });
         setCreateModalOpen(true);
     };
 
     const openCreateGlobal = () => {
         setCreateModulePreset("");
-        permissionForm.reset({ module: "", action: "", description: "" });
+        permissionForm.reset({ module: "", actions: [...CRUD_ACTIONS], extraActions: "", description: "" });
         setCreateModalOpen(true);
     };
 
     const handleCreatePermission = async (values: PermissionFormValues) => {
         try {
-            await createPermission.mutateAsync(values);
+            const extra = values.extraActions
+                ? values.extraActions.split(",").map(s => s.trim()).filter(Boolean)
+                : [];
+            const allActions = [...values.actions, ...extra];
+            await bulkCreatePermission.mutateAsync({
+                module: values.module,
+                actions: allActions,
+                description: values.description,
+            });
             setCreateModalOpen(false);
             permissionForm.reset();
-            refetch();
         } catch {
             // handled in hook
         }
@@ -198,19 +196,6 @@ const PermissionsPage = () => {
             return next;
         });
         setIsDirty(true);
-    };
-
-    const handleSaveRolePermissions = async () => {
-        if (!selectedRoleId) return;
-        try {
-            await assignPermissions.mutateAsync({
-                roleId: selectedRoleId,
-                permissionIds: Array.from(selectedPermissionMap.keys()),
-            });
-            setIsDirty(false);
-        } catch {
-            // handled in hook
-        }
     };
 
     if (isLoading) {
@@ -483,7 +468,7 @@ const PermissionsPage = () => {
                         <DialogHeader className="pb-2">
                             <DialogTitle className="text-base">Create Permission</DialogTitle>
                             <DialogDescription className="text-xs">
-                                {createModulePreset ? `Add permission to "${createModulePreset}"` : "Add a new system permission"}
+                                {createModulePreset ? `Add permissions to "${createModulePreset}"` : "Add a new system permission"}
                             </DialogDescription>
                         </DialogHeader>
 
@@ -505,12 +490,46 @@ const PermissionsPage = () => {
 
                                 <FormField
                                     control={permissionForm.control}
-                                    name="action"
+                                    name="actions"
+                                    render={() => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs">CRUD Actions *</FormLabel>
+                                            <div className="flex gap-3 pt-1">
+                                                {CRUD_ACTIONS.map(action => (
+                                                    <FormField
+                                                        key={action}
+                                                        control={permissionForm.control}
+                                                        name="actions"
+                                                        render={({ field }) => (
+                                                            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                                                <Checkbox
+                                                                    checked={field.value?.includes(action)}
+                                                                    onCheckedChange={checked => {
+                                                                        const next = checked
+                                                                            ? [...field.value, action]
+                                                                            : field.value.filter(a => a !== action);
+                                                                        field.onChange(next.length ? next : [action]);
+                                                                    }}
+                                                                />
+                                                                <span className="capitalize">{action}</span>
+                                                            </label>
+                                                        )}
+                                                    />
+                                                ))}
+                                            </div>
+                                            <FormMessage className="text-xs" />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <FormField
+                                    control={permissionForm.control}
+                                    name="extraActions"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel className="text-xs">Action *</FormLabel>
+                                            <FormLabel className="text-xs">Extra Actions</FormLabel>
                                             <FormControl>
-                                                <Input placeholder="e.g., create, read, update" className="h-8 text-sm" {...field} />
+                                                <Input placeholder="e.g., approve, submit (comma-separated)" className="h-8 text-sm" {...field} />
                                             </FormControl>
                                             <FormMessage className="text-xs" />
                                         </FormItem>
@@ -532,11 +551,11 @@ const PermissionsPage = () => {
                                 />
 
                                 <DialogFooter className="pt-2">
-                                    <Button type="button" variant="ghost" size="sm" onClick={() => setCreateModalOpen(false)} disabled={createPermission.isPending}>
+                                    <Button type="button" variant="ghost" size="sm" onClick={() => setCreateModalOpen(false)} disabled={bulkCreatePermission.isPending}>
                                         Cancel
                                     </Button>
-                                    <Button type="submit" size="sm" disabled={createPermission.isPending}>
-                                        {createPermission.isPending ? "Creating..." : "Create"}
+                                    <Button type="submit" size="sm" disabled={bulkCreatePermission.isPending}>
+                                        {bulkCreatePermission.isPending ? "Creating..." : "Create"}
                                     </Button>
                                 </DialogFooter>
                             </form>

@@ -1,7 +1,7 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { permissionsService } from '@/services/api/permissions.service'
-import type { Permission } from '@/types/api.types'
 import { handleQueryError } from '@/lib/react-query'
+import type { BulkCreatePermissionDto } from '@/services/api/permissions.service'
+import { permissionsService } from '@/services/api/permissions.service'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
 export const permissionsKey = {
@@ -35,6 +35,22 @@ export const useCreatePermission = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: permissionsKey.list() })
             toast.success('Permission created successfully')
+        },
+        onError: (error) => {
+            toast.error(handleQueryError(error))
+        },
+    })
+}
+
+export const useBulkCreatePermission = () => {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: (data: BulkCreatePermissionDto) =>
+            permissionsService.bulkCreate(data),
+        onSuccess: (result) => {
+            queryClient.invalidateQueries({ queryKey: permissionsKey.list() })
+            toast.success(`${result.length} permission(s) created successfully`)
         },
         onError: (error) => {
             toast.error(handleQueryError(error))
