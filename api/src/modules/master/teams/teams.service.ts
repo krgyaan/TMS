@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, ilike, like } from 'drizzle-orm';
+import { eq, ilike } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { teams, type Team, type NewTeam } from '@db/schemas/master/teams.schema';
@@ -8,7 +8,10 @@ import { teams, type Team, type NewTeam } from '@db/schemas/master/teams.schema'
 export class TeamsService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
 
-    async findAll(): Promise<Team[]> {
+    async findAll(category?: string): Promise<Team[]> {
+        if (category) {
+            return this.db.select().from(teams).where(eq(teams.category, category));
+        }
         return this.db.select().from(teams);
     }
 

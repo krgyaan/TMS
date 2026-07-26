@@ -28,8 +28,8 @@ export class TeamsController {
     constructor(private readonly teamsService: TeamsService) { }
 
     @Get()
-    async list() {
-        return this.teamsService.findAll();
+    async list(@Query('category') category?: string) {
+        return this.teamsService.findAll(category);
     }
 
     @Get('search')
