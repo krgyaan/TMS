@@ -132,13 +132,13 @@ export class PurchaseOrderService {
             ? eq(purchaseOrders.team, user.teamId)
             : undefined;
 
-        const baseQuery = this.db
+        const baseQuery = () => this.db
             .select({ id: purchaseOrders.id })
             .from(purchaseOrders)
             .leftJoin(users, eq(users.id, purchaseOrders.poRaisedBy));
 
         const buildCount = async (condition: any) => {
-            const q = baseQuery.where(
+            const q = baseQuery().where(
                 teamCondition ? and(teamCondition, condition) : condition
             );
             const rows = await q;
