@@ -8,6 +8,23 @@ import { Logger } from "winston";
 import { SentryExceptionCaptured } from "@sentry/nestjs";
 import * as Sentry from "@sentry/nestjs";
 
+const PG_ERROR_MAP: Record<string, { status: number; message: string }> = {
+  '23505': { status: HttpStatus.CONFLICT, message: 'A record with this value already exists' },
+  '23503': { status: HttpStatus.BAD_REQUEST, message: 'Referenced record not found' },
+  '23502': { status: HttpStatus.BAD_REQUEST, message: 'A required field is missing' },
+  '22P02': { status: HttpStatus.BAD_REQUEST, message: 'Invalid value format' },
+};
+
+function extractPgCode(err: unknown): string | undefined {
+  if (!err || typeof err !== 'object') return undefined;
+  const error = err as Record<string, unknown>;
+  if (typeof error.code === 'string' && /^\d{5}$/.test(error.code)) {
+    return error.code;
+  }
+  if (error.cause) return extractPgCode(error.cause);
+  return undefined;
+}
+
 function extractErrorChain(err: unknown, depth = 0): Record<string, unknown> {
   if (depth > 5 || !(err instanceof Error)) return {};
   const result: Record<string, unknown> = {
@@ -34,13 +51,23 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest();
 
-    const status = exception instanceof HttpException
-      ? exception.getStatus()
-      : HttpStatus.INTERNAL_SERVER_ERROR;
+    let status: number;
+    let errorResponse: Record<string, unknown>;
 
-    const errorResponse = exception instanceof HttpException
-      ? exception.getResponse()
-      : { statusCode: status, message: "Internal server error" };
+    if (exception instanceof HttpException) {
+      status = exception.getStatus();
+      errorResponse = exception.getResponse() as Record<string, unknown>;
+    } else {
+      const pgCode = extractPgCode(exception);
+      const pgMapping = pgCode ? PG_ERROR_MAP[pgCode] : undefined;
+      if (pgMapping) {
+        status = pgMapping.status;
+        errorResponse = { statusCode: status, message: pgMapping.message, pgCode };
+      } else {
+        status = HttpStatus.INTERNAL_SERVER_ERROR;
+        errorResponse = { statusCode: status, message: "Internal server error" };
+      }
+    }
 
     const errorChain = extractErrorChain(exception);
 
