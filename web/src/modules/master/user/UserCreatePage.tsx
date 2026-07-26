@@ -1,5 +1,5 @@
 import UserCreateForm from './components/UserCreateForm'
 
-export default function CreateUserPage() {
+export default function UserCreatePage() {
     return <UserCreateForm />
 }

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,38 +9,34 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Shield } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { useCreateUser } from "@/hooks/api/useUsers";
+import { useCreateUser, useUpdateUser } from "@/hooks/api/useUsers";
+import { useUpdateUserProfile } from "@/hooks/api/useUserProfiles";
 import { useRoles } from "@/hooks/api/useRoles";
 import { useTeams } from "@/hooks/api/useTeams";
-import type { CreateUserDto } from "@/types/api.types";
+import type { User } from "@/types/api.types";
 import { usersService } from "@/services/api/users.service";
+import { UserCreateFormSchema, type UserCreateFormValues } from "../helpers/user.schema";
 
-const UserCreateFormSchema = z.object({
-    firstName: z.string().min(1, "First name is required"),
-    lastName: z.string().min(1, "Last name is required"),
-    email: z.string().email("Invalid email"),
-    username: z.string().min(1, "Username is required"),
-    mobile: z.string().min(1, "Mobile number is required").max(20, "Mobile number too long"),
-    password: z.string().min(6, "Password must be at least 6 characters").max(255),
-    teamId: z.string().min(1, "Team is required"),
-    subTeamId: z.string().optional(),
-    roleId: z.string().min(1, "Role is required"),
-    isActive: z.boolean().default(true),
-});
+type UserCreateFormProps = {
+    mode?: "create" | "edit";
+    user?: User;
+};
 
-type UserCreateFormValues = z.infer<typeof UserCreateFormSchema>;
-
-export default function UserCreateForm() {
+export default function UserCreateForm({ mode = "create", user }: UserCreateFormProps) {
     const navigate = useNavigate();
     const createUser = useCreateUser();
+    const updateUser = useUpdateUser();
+    const updateProfile = useUpdateUserProfile();
     const { data: roles = [] } = useRoles();
     const { data: primaryTeams = [] } = useTeams({ category: 'primary' });
     const { data: secondaryTeams = [] } = useTeams({ category: 'secondary' });
     const [showPassword, setShowPassword] = useState(false);
     const [expectedCode, setExpectedCode] = useState("");
     const emailDebounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+    const isEdit = mode === "edit";
 
     const form = useForm<UserCreateFormValues>({
         resolver: zodResolver(UserCreateFormSchema) as any,
@@ -59,12 +54,32 @@ export default function UserCreateForm() {
         },
     });
 
-    // Fetch next employee code on mount
+    // Pre-fill form in edit mode
     useEffect(() => {
-        usersService.getGenerateInfo().then(res => {
-            if (res?.employeeCode) setExpectedCode(res.employeeCode);
-        });
-    }, []);
+        if (isEdit && user) {
+            form.reset({
+                firstName: user.profile?.firstName ?? "",
+                lastName: user.profile?.lastName ?? "",
+                email: user.email ?? "",
+                username: user.username ?? "",
+                mobile: user.mobile ?? "",
+                password: "",
+                teamId: user.team?.id ? String(user.team.id) : "",
+                subTeamId: user.subTeam?.id ? String(user.subTeam.id) : "",
+                roleId: user.role?.id ? String(user.role.id) : "",
+                isActive: user.isActive ?? true,
+            });
+        }
+    }, [isEdit, user, form]);
+
+    // Fetch next employee code on mount (create mode only)
+    useEffect(() => {
+        if (!isEdit) {
+            usersService.getGenerateInfo().then(res => {
+                if (res?.employeeCode) setExpectedCode(res.employeeCode);
+            });
+        }
+    }, [isEdit]);
 
     const fetchUsernameSuggestion = useCallback(
         (email: string) => {
@@ -81,34 +96,55 @@ export default function UserCreateForm() {
 
     const handleEmailChange = useCallback(
         (email: string) => {
+            if (isEdit) return;
             const prefix = email.split("@")[0];
-            // Immediate fill with raw prefix
             form.setValue("username", prefix, { shouldValidate: true });
-            // Debounced check for uniqueness
             if (emailDebounceRef.current) clearTimeout(emailDebounceRef.current);
             if (prefix) {
                 emailDebounceRef.current = setTimeout(() => fetchUsernameSuggestion(email), 500);
             }
         },
-        [form, fetchUsernameSuggestion]
+        [form, fetchUsernameSuggestion, isEdit]
     );
 
     const handleSubmit = async (values: UserCreateFormValues) => {
-        const payload: CreateUserDto = {
+        if (!isEdit && !values.password) {
+            form.setError("password", { type: "manual", message: "Password is required" });
+            return;
+        }
+
+        const payload: Record<string, unknown> = {
             firstName: values.firstName.trim(),
             lastName: values.lastName.trim(),
             email: values.email.trim().toLowerCase(),
             username: values.username.trim(),
             mobile: values.mobile.trim(),
-            password: values.password,
             teamId: Number(values.teamId),
             subTeamId: values.subTeamId ? Number(values.subTeamId) : null,
             roleId: Number(values.roleId),
             isActive: values.isActive,
         };
 
-        const createdUser = await createUser.mutateAsync(payload);
-        navigate(paths.master.users_permissions(createdUser.id));
+        if (values.password) {
+            payload.password = values.password;
+        }
+
+        if (isEdit && user) {
+            await updateUser.mutateAsync({ id: user.id, data: payload as any });
+            if (values.firstName || values.lastName) {
+                await updateProfile.mutateAsync({
+                    userId: user.id,
+                    data: {
+                        firstName: values.firstName.trim() || null,
+                        lastName: values.lastName.trim() || null,
+                    },
+                });
+            }
+            navigate(paths.master.users);
+        } else {
+            const createdUser = await createUser.mutateAsync(payload as any);
+            navigate(paths.master.users_permissions(createdUser.id));
+        }
     };
 
     const teamOptions = useMemo(
@@ -126,11 +162,15 @@ export default function UserCreateForm() {
         [roles]
     );
 
+    const saving = createUser.isPending || updateUser.isPending || updateProfile.isPending;
+
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Create User</CardTitle>
-                <CardDescription>Fill in the details to create a new employee account.</CardDescription>
+                <CardTitle>{isEdit ? "Edit User" : "Create User"}</CardTitle>
+                <CardDescription>
+                    {isEdit ? "Update employee account details." : "Fill in the details to create a new employee account."}
+                </CardDescription>
                 <CardAction>
                     <Button variant="outline" onClick={() => navigate(paths.master.users)}>
                         <ArrowLeft className="mr-2 h-4 w-4" />
@@ -169,7 +209,7 @@ export default function UserCreateForm() {
                                     )}
                                 </FieldWrapper>
                                 <FieldWrapper control={form.control} name="username" label="Username">
-                                    {field => <Input placeholder="Auto-filled from email" {...(field as any)} value={field.value ?? ""} />}
+                                    {field => <Input placeholder={isEdit ? "Username" : "Auto-filled from email"} {...(field as any)} value={field.value ?? ""} />}
                                 </FieldWrapper>
                                 <FieldWrapper control={form.control} name="mobile" label="Mobile">
                                     {field => <Input placeholder="Phone number" {...(field as any)} value={field.value ?? ""} />}
@@ -179,7 +219,7 @@ export default function UserCreateForm() {
                                         <div className="relative">
                                             <Input
                                                 type={showPassword ? "text" : "password"}
-                                                placeholder="Minimum 6 characters"
+                                                placeholder={isEdit ? "Leave blank to keep current password" : "Minimum 6 characters"}
                                                 {...(field as any)}
                                                 value={field.value ?? ""}
                                                 className="pr-10"
@@ -207,7 +247,11 @@ export default function UserCreateForm() {
                             <div className="grid gap-6 md:grid-cols-2">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Employee Code</label>
-                                    <Input value={expectedCode || "Fetching..."} disabled className="text-muted-foreground" />
+                                    <Input
+                                        value={isEdit ? (user?.profile?.employeeCode || "—") : (expectedCode || "Fetching...")}
+                                        disabled
+                                        className="text-muted-foreground"
+                                    />
                                 </div>
                                 <SelectField
                                     control={form.control}
@@ -251,12 +295,33 @@ export default function UserCreateForm() {
                             )}
                         />
 
+                        {/* Role & Permissions (edit mode only) */}
+                        {isEdit && user && (
+                            <div className="space-y-4 rounded-md border p-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-semibold">Role & Permissions</p>
+                                        <p className="text-xs text-muted-foreground">Manage role assignment and permission overrides.</p>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => navigate(paths.master.users_permissions(user.id))}
+                                    >
+                                        <Shield className="mr-2 h-4 w-4" />
+                                        Manage Permissions
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="flex flex-wrap items-center justify-end gap-2">
-                            <Button type="button" variant="outline" onClick={() => form.reset()}>
+                            <Button type="button" variant="outline" onClick={() => form.reset()} disabled={saving}>
                                 Reset
                             </Button>
-                            <Button type="submit" disabled={createUser.isPending}>
-                                {createUser.isPending ? "Creating..." : "Create User"}
+                            <Button type="submit" disabled={saving}>
+                                {saving ? "Saving..." : isEdit ? "Update User" : "Create User"}
                             </Button>
                         </div>
                     </form>

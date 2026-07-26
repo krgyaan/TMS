@@ -4,10 +4,10 @@ import { RouteWrapper } from "../components/RouteWrapper";
 
 // ==================== LAZY IMPORTS ====================
 // Users
-const Master_User = lazy(() => import("@/modules/master/user"));
-const Master_User_Create = lazy(() => import("@/modules/master/user/create"));
-const Master_User_Edit = lazy(() => import("@/modules/master/user/edit"));
-const Master_User_Permissions = lazy(() => import("@/modules/master/user/permissions"));
+const Master_User_List = lazy(() => import("@/modules/master/user/UserListPage"));
+const Master_User_Create = lazy(() => import("@/modules/master/user/UserCreatePage"));
+const Master_User_Edit = lazy(() => import("@/modules/master/user/UserEditPage"));
+const Master_User_Permissions = lazy(() => import("@/modules/master/user/UserPermissionsPage"));
 
 // Statuses
 const Master_Status = lazy(() => import("@/modules/master/status"));
@@ -124,7 +124,7 @@ export default function MasterRoutes() {
                     index
                     element={
                         <RouteWrapper>
-                            <Master_User />
+                            <Master_User_List />
                         </RouteWrapper>
                     }
                 />

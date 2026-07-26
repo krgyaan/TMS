@@ -1,38 +1,31 @@
-﻿import { useState, type ReactNode } from "react";
+import { paths } from "@/app/routes/paths";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
-import type { ColDef, RowSelectionOptions } from "ag-grid-community";
-import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import type { ActionItem } from "@/components/ui/ActionMenu";
-import { NavLink, useNavigate } from "react-router-dom";
-import { paths } from "@/app/routes/paths";
-import { useUsers, useDeleteUser } from "@/hooks/api/useUsers";
+import { Skeleton } from "@/components/ui/skeleton";
+import { usePermissions } from "@/hooks/api/usePermissions";
 import { useRoles } from "@/hooks/api/useRoles";
 import { useTeams } from "@/hooks/api/useTeams";
-import { usePermissions } from "@/hooks/api/usePermissions";
-import type { User } from "@/types/api.types";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Mail, Phone, UserRound, Shield, Users, KeyRound, ArrowRight } from "lucide-react";
+import { useDeleteUser, useUsers } from "@/hooks/api/useUsers";
 import { RolesDrawer } from "@/modules/master/role/components/RolesDrawer";
 import { TeamsDrawer } from "@/modules/master/team/components/TeamsDrawer";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
+import type { User } from "@/types/api.types";
+import type { ColDef, RowSelectionOptions } from "ag-grid-community";
+import { AlertCircle, ArrowRight, KeyRound, Shield, UserRound, Users } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
+import UserView from "./components/UserView";
 
 const rowSelection: RowSelectionOptions = {
     mode: "multiRow",
     headerCheckbox: false,
 };
 
-const DetailItem = ({ label, value }: { label: string; value?: ReactNode }) => (
-    <div className="space-y-1">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="text-sm font-semibold text-foreground/90">{value ?? "—"}</p>
-    </div>
-);
-
-const UserPage = () => {
+export default function UserListPage() {
     const navigate = useNavigate();
     const { data: users, isLoading, error, refetch } = useUsers();
     const { data: roles = [] } = useRoles();
@@ -176,7 +169,6 @@ const UserPage = () => {
 
     return (
         <>
-            {/* Dashboard Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-6">
                 <Card className="cursor-pointer hover:shadow-md transition-shadow">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -256,74 +248,10 @@ const UserPage = () => {
                 </CardContent>
             </Card>
 
-            <Dialog open={viewState.open} onOpenChange={open => setViewState(prev => ({ open, data: open ? prev.data : null }))}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <UserRound className="h-5 w-5" />
-                            {viewState.data?.name}
-                        </DialogTitle>
-                        <DialogDescription>User account details</DialogDescription>
-                    </DialogHeader>
-                    {viewState.data ? (
-                        <div className="grid gap-6 md:grid-cols-2">
-                            <DetailItem label="Username" value={`@${viewState.data.username ?? "—"}`} />
-                            <DetailItem label="Employee Code" value={viewState.data.profile?.employeeCode || "—"} />
-                            <DetailItem label="Team" value={viewState.data.team?.name || "—"} />
-                            <DetailItem
-                                label="Email"
-                                value={
-                                    <span className="inline-flex items-center gap-2">
-                                        <Mail className="h-4 w-4" />
-                                        {viewState.data.email}
-                                    </span>
-                                }
-                            />
-                            <DetailItem
-                                label="Alternate Email"
-                                value={
-                                    viewState.data.profile?.altEmail ? (
-                                        <span className="inline-flex items-center gap-2">
-                                            <Mail className="h-4 w-4" />
-                                            {viewState.data.profile.altEmail}
-                                        </span>
-                                    ) : (
-                                        "—"
-                                    )
-                                }
-                            />
-                            <DetailItem
-                                label="Mobile"
-                                value={
-                                    viewState.data.mobile ? (
-                                        <span className="inline-flex items-center gap-2">
-                                            <Phone className="h-4 w-4" />
-                                            {viewState.data.mobile}
-                                        </span>
-                                    ) : (
-                                        "—"
-                                    )
-                                }
-                            />
-                            <DetailItem
-                                label="Status"
-                                value={<Badge variant={viewState.data.isActive ? "default" : "secondary"}>{viewState.data.isActive ? "Active" : "Inactive"}</Badge>}
-                            />
-                            <DetailItem label="Emergency Contact" value={viewState.data.profile?.emergencyContactName || "—"} />
-                            <DetailItem label="Contact Phone" value={viewState.data.profile?.emergencyContactPhone || "—"} />
-                            <DetailItem label="Timezone" value={viewState.data.profile?.timezone || "—"} />
-                            <DetailItem label="Locale" value={viewState.data.profile?.locale || "—"} />
-                            <DetailItem label="Created" value={viewState.data.createdAt ? new Date(viewState.data.createdAt).toLocaleString() : "—"} />
-                            <DetailItem label="Updated" value={viewState.data.updatedAt ? new Date(viewState.data.updatedAt).toLocaleString() : "—"} />
-                        </div>
-                    ) : null}
-                </DialogContent>
-            </Dialog>
+            <UserView open={viewState.open} onOpenChange={open => setViewState(prev => ({ open, data: open ? prev.data : null }))} user={viewState.data} />
 
             <RolesDrawer open={rolesDrawerOpen} onOpenChange={setRolesDrawerOpen} />
             <TeamsDrawer open={teamsDrawerOpen} onOpenChange={setTeamsDrawerOpen} />
         </>
     );
-};
-
-export default UserPage;
+}

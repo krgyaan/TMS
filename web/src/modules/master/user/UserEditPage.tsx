@@ -5,9 +5,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useUser } from "@/hooks/api/useUsers";
 import { AlertCircle } from "lucide-react";
 import { useParams } from "react-router-dom";
-import { UserForm } from "./components/UserForm";
+import UserCreateForm from "./components/UserCreateForm";
 
-const EditUserPage = () => {
+export default function UserEditPage() {
     const { id } = useParams<{ id: string }>();
     const userId = Number(id);
     const { data, isLoading, error, refetch } = useUser(userId);
@@ -61,7 +61,5 @@ const EditUserPage = () => {
         );
     }
 
-    return <UserForm mode="edit" user={data} />;
-};
-
-export default EditUserPage;
+    return <UserCreateForm mode="edit" user={data} />;
+}
