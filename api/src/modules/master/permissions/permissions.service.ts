@@ -1,8 +1,8 @@
+import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
+import { permissions, type NewPermission, type Permission } from '@db/schemas/auth/permissions.schema';
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import { permissions, type Permission, type NewPermission } from '@db/schemas/auth/permissions.schema';
 
 @Injectable()
 export class PermissionsService {
@@ -32,6 +32,20 @@ export class PermissionsService {
     async create(data: NewPermission): Promise<Permission> {
         const rows = await this.db.insert(permissions).values(data).returning();
         return rows[0];
+    }
+
+    async bulkCreate(module: string, actions: string[], description?: string): Promise<Permission[]> {
+        const values = actions.map(action => ({
+            module,
+            action,
+            description: description || null,
+        }));
+        const rows = await this.db
+            .insert(permissions)
+            .values(values)
+            .onConflictDoNothing()
+            .returning();
+        return rows;
     }
 
     async delete(id: number): Promise<void> {
