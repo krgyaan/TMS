@@ -13,7 +13,6 @@ import { trainingComments } from '@/db/schemas/hrms/training-comments.schema';
 import { trainingVideoReactions } from '@/db/schemas/hrms/training-video-reactions.schema';
 import { trainingVideos } from '@/db/schemas/hrms/training-videos.schema';
 import { trainingWatchHistory } from '@/db/schemas/hrms/training-watch-history.schema';
-import { designations } from '@/db/schemas/master/designations.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
 
 @Injectable()
@@ -182,19 +181,17 @@ export class TrainingService {
                 id: users.id,
                 name: users.name,
                 dept: teams.name,
-                designation: designations.name,
             })
             .from(users)
             .leftJoin(teams, eq(users.team, teams.id))
             .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
-            .leftJoin(designations, eq(userProfiles.designationId, designations.id))
             .where(eq(users.isActive, true));
 
         return employeesList.map(e => ({
             id: e.id,
             name: e.name,
             dept: e.dept || 'General',
-            designation: e.designation || 'Staff',
+            designation: 'Staff',
         }));
     }
 

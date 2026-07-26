@@ -22,7 +22,6 @@ import {
 } from '@/db/schemas/hrms/onboarding';
 import { users } from '@/db/schemas/auth/users.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
-import { designations } from '@/db/schemas/master/designations.schema';
 import { eq, desc, aliasedTable, and } from 'drizzle-orm';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -311,12 +310,10 @@ export class EmployeeOnboardingService {
     const [obProfileRow] = await this.db
       .select({
         profile: onboardingProfiles,
-        designationName: designations.name,
         departmentName: teams.name,
         reportingTl: reportingTl.id,
       })
       .from(onboardingProfiles)
-      .leftJoin(designations, eq(onboardingProfiles.designationId, designations.id))
       .leftJoin(teams, eq(onboardingProfiles.departmentId, teams.id))
       .leftJoin(reportingTl, eq(onboardingProfiles.reportingTl, reportingTl.id))
       .where(eq(onboardingProfiles.onboardingId, onboardingId))

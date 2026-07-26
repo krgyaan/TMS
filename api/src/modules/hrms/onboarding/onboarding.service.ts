@@ -12,7 +12,6 @@ import {
   onboardingActivityLogs, onboardingBankDetails, onboardingDocuments, onboardingEducation, 
   onboardingExperience, onboardingInduction, onboardingProfiles, OnboardingRequest, onboardingRequests 
 } from '@/db/schemas/hrms/onboarding';
-import { designations } from '@/db/schemas/master/designations.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import * as argon2 from 'argon2';
@@ -35,7 +34,6 @@ export interface UpdateProfileDto {
   probationMonths?: number;
   probationEndDate?: string;
   // Core HR
-  designationId?: number;
   departmentId?: number;
   reportingTl?: number;
   // Compensation
@@ -309,7 +307,6 @@ export class OnboardingService {
 
         employeeType: employeeProfile?.employeeType || null,
         workLocation: employeeProfile?.workLocation || null,
-        designationId: userProfile?.designationId || null,
         departmentId: user.primaryTeamId || null,
         reportingTl: employeeProfile?.reportingTl || null,
         probationMonths: employeeProfile?.probationMonths || null,
@@ -948,12 +945,10 @@ export class OnboardingService {
     const [profileRow] = await this.db
       .select({
         profile: onboardingProfiles,
-        designationName: designations.name,
         departmentName: teams.name,
         reportingTlName: reportingTl.name,
       })
       .from(onboardingProfiles)
-      .leftJoin(designations, eq(onboardingProfiles.designationId, designations.id))
       .leftJoin(teams, eq(onboardingProfiles.departmentId, teams.id))
       .leftJoin(reportingTl, eq(onboardingProfiles.reportingTl, reportingTl.id))
       .where(eq(onboardingProfiles.onboardingId, id))
@@ -1033,7 +1028,6 @@ export class OnboardingService {
       hrStatus: profileRow.profile.hrStatus,
       hrRemark: profileRow.profile.hrRemark,
       
-      designation: profileRow.designationName,
       department: profileRow.departmentName,
       reportingTl: profileRow.reportingTlName,
       education,
@@ -1779,7 +1773,6 @@ export class OnboardingService {
       currentAddress: onProf.currentAddress,
       permanentAddress: onProf.permanentAddress,
       emergencyContact: onProf.emergencyContact,
-      designationId: sanitizeNum(onProf.designationId),
       updatedAt: new Date(),
     };
 
