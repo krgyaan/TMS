@@ -1,21 +1,18 @@
 import { useState, useCallback, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { ShowPageLayout, type StepConfig } from "@/components/layout/ShowPageLayout";
 import { User, FileText, ClipboardList } from "lucide-react";
-import { useLeadEnquiry } from "@/hooks/api/useLeadEnquiry";
+import { useLeadEnquiry, useLeadEnquiries } from "@/hooks/api/useLeadEnquiry";
 import { useLeadStepStatuses } from "@/hooks/api/useLeadStepStatuses";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import type { LeadEnquiryWithNames } from "./helpers/lead-enquiry.type";
 import { LeadDetailsSection } from "../leads/components/LeadView";
 import { FollowupViewPage } from "../followups/FollowupViewPage";
-import { LeadSiteVisitView } from "../lead-enquiry/components/LeadSiteVisitView";
-import { EnquiryCostingView } from "../enquirycosting/EnquiryCostingViewPage";
-import { leadEnquiryService } from "@/services/api/lead-enquiry.service";
-import { enquiryCostingService } from "@/services/api/enquirycosting.service";
+import { LeadSiteVisitsSection } from "./components/LeadSiteVisitView";
+import { LeadCostingsSection } from "../enquirycosting/EnquiryCostingViewPage";
 
 interface LeadEnquiryViewProps {
     enquiry?: LeadEnquiryWithNames | null;
@@ -150,49 +147,23 @@ export function EnquiryDetailsSection({ enquiryId }: { enquiryId: number | null 
     );
 }
 
-// ── Shared section content helpers ────────────────────────────────────────────
-
-function LeadSiteVisitsContent({ leadId }: { leadId: number }) {
-    const { data: siteVisits, isLoading } = useQuery({
-        queryKey: ['site-visits', 'by-lead', leadId],
-        queryFn: () => leadEnquiryService.getSiteVisitsByLead(leadId),
-    });
-
-    if (isLoading) {
-        return <div className="flex items-center justify-center py-8 text-muted-foreground">Loading site visits...</div>;
-    }
-
-    if (!siteVisits?.length) {
-        return <p className="text-sm text-muted-foreground py-4 text-center">No site visits found for this lead.</p>;
-    }
-
-    return (
-        <div className="space-y-4">
-            {siteVisits.map((sv) => (
-                <LeadSiteVisitView key={sv.id} siteVisit={sv as any} />
-            ))}
-        </div>
+export function LeadEnquiriesSection({ leadId }: { leadId: number }) {
+    const { data: apiResponse, isLoading } = useLeadEnquiries(
+        { page: 1, limit: 50, leadId },
     );
-}
-
-function LeadCostingsContent({ leadId }: { leadId: number }) {
-    const { data: costings, isLoading } = useQuery({
-        queryKey: ['enquiry-costings', 'by-lead', leadId],
-        queryFn: () => enquiryCostingService.getByLeadId(leadId),
-    });
 
     if (isLoading) {
-        return <div className="flex items-center justify-center py-8 text-muted-foreground">Loading costings...</div>;
+        return <div className="flex items-center justify-center py-8 text-muted-foreground">Loading enquiries...</div>;
     }
 
-    if (!costings?.length) {
-        return <p className="text-sm text-muted-foreground py-4 text-center">No costings found for this lead.</p>;
+    if (!apiResponse?.data?.length) {
+        return <p className="text-sm text-muted-foreground py-4 text-center">No enquiries found for this lead.</p>;
     }
 
     return (
         <div className="space-y-4">
-            {costings.map((c) => (
-                <EnquiryCostingView key={c.id} costing={c} />
+            {apiResponse.data.map((enquiry) => (
+                <LeadEnquiryView key={enquiry.id} enquiry={enquiry} />
             ))}
         </div>
     );
@@ -247,9 +218,9 @@ export function LeadEnquiryViewPage({ enquiryId, onBack, backLabel }: LeadEnquir
             case "enquiries":
                 return <EnquiryDetailsSection enquiryId={enquiryId} />;
             case "site-visits":
-                return <LeadSiteVisitsContent leadId={leadId} />;
+                return <LeadSiteVisitsSection leadId={leadId} />;
             case "costings":
-                return <LeadCostingsContent leadId={leadId} />;
+                return <LeadCostingsSection leadId={leadId} />;
             default:
                 return null;
         }

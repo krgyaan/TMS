@@ -1,9 +1,11 @@
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, User, ClipboardList, FileText, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { leadEnquiryService } from "@/services/api/lead-enquiry.service";
 import type { SiteVisit } from "../helpers/lead-enquiry.type";
 
 interface SiteVisitWithEnquiry extends SiteVisit {
@@ -126,5 +128,28 @@ export function LeadSiteVisitView({ siteVisit, isLoading = false, className = ""
                 </Table>
             </CardContent>
         </Card>
+    );
+}
+
+export function LeadSiteVisitsSection({ leadId }: { leadId: number }) {
+    const { data: siteVisits, isLoading } = useQuery({
+        queryKey: ['site-visits', 'by-lead', leadId],
+        queryFn: () => leadEnquiryService.getSiteVisitsByLead(leadId),
+    });
+
+    if (isLoading) {
+        return <div className="flex items-center justify-center py-8 text-muted-foreground">Loading site visits...</div>;
+    }
+
+    if (!siteVisits?.length) {
+        return <p className="text-sm text-muted-foreground py-4 text-center">No site visits found for this lead.</p>;
+    }
+
+    return (
+        <div className="space-y-4">
+            {siteVisits.map((sv) => (
+                <LeadSiteVisitView key={sv.id} siteVisit={sv as any} />
+            ))}
+        </div>
     );
 }
