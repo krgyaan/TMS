@@ -242,7 +242,12 @@ export const paths = {
         leadFollowupHistory: (leadId: number | string) => `/crm/followup/${leadId}/history`,
 
         enquiries: "/crm/enquiries",
-        costings: "/crm/costings",
+        enquiryCreate: "/crm/enquiries/create",
+        enquiryCreateFromLead: (leadId: number | string) => `/crm/enquiry/create/${leadId}`,
+        enquiryEdit: (id: number | string) => `/crm/enquiries/${id}/edit`,
+        enquiryView: (id: number | string) => `/crm/enquiries/${id}`,
+        enquiryCostings: "/crm/enquiry-costings",
+        costingView: (id: number | string) => `/crm/enquiry-costings/${id}`,
         quotations: "/crm/quotations",
     },
 

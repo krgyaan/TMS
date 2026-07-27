@@ -215,7 +215,7 @@ const LeadListPage = () => {
         },
         { 
             label: "Enquiry Received", 
-            onClick: (row) => console.log("Enquiry for:", row.id), 
+            onClick: (row) => navigate(paths.crm.enquiryCreateFromLead(row.id)), 
             icon: <Mail className="h-4 w-4" /> 
         },
         { 

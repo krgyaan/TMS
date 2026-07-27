@@ -91,7 +91,7 @@ export class GoogleDriveService {
     /**
      * Get authenticated OAuth2 client for a user
      */
-    private async getAuthenticatedClient(userId: number): Promise<OAuth2Client> {
+    async getAuthenticatedClient(userId: number): Promise<OAuth2Client> {
         const account = await this.db
             .select()
             .from(oauthAccounts)
