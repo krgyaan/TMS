@@ -43,9 +43,30 @@ export class VendorWorkOrderController {
     return this.service.generateWONumber(projectName);
   }
 
+  @Get("approval-counts")
+  getApprovalCounts(
+    @Query("section") section?: string,
+    @CurrentUser() user?: ValidatedUser,
+  ) {
+    return this.service.getApprovalCounts(section, user);
+  }
+
   @Get()
-  getAll(@Query("teamId") teamId?: number) {
-    return this.service.getAll(teamId);
+  getAll(
+    @Query("status") status?: string,
+    @Query("section") section?: string,
+    @CurrentUser() user?: ValidatedUser,
+  ) {
+    return this.service.getAll(status, section, user);
+  }
+
+  @Put(":id/approval")
+  @HttpCode(HttpStatus.OK)
+  setApproval(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() body: { approve: boolean; tdsPercentage?: number; remark?: string },
+  ) {
+    return this.service.setVwoApproval(id, body);
   }
 
   @Get(":id")

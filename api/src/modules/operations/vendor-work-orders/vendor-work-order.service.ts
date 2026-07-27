@@ -1,5 +1,5 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, eq, like, desc, sql, inArray } from "drizzle-orm";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { and, eq, like, desc, sql, inArray, isNull } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { rename, readFile } from "node:fs/promises";
@@ -146,6 +146,12 @@ export class VendorWorkOrderService {
             .then(rows => rows[0]);
         if (!existing) throw new NotFoundException("Vendor Work Order not found");
 
+        if (existing.woApproved === true) {
+            throw new BadRequestException("Cannot edit an approved Vendor Work Order. Only rejected or pending VWOs can be updated.");
+        }
+
+        const wasRejected = existing.woApproved === false;
+
         const updated = (
             await this.db
                 .update(vendorWorkOrders)
@@ -174,6 +180,13 @@ export class VendorWorkOrderService {
                     remarks: body.remarks,
                     certRecipient: body.certRecipient,
                     certRecipients: body.certRecipients ?? [],
+                    ...(wasRejected && {
+                        woApproved: null,
+                        tdsPercentage: null,
+                        tdsAmount: null,
+                        amountAfterTds: null,
+                        woApprovalRemark: null,
+                    }),
                     updatedAt: sql`now()`,
                 })
                 .where(eq(vendorWorkOrders.id, id))
@@ -266,10 +279,21 @@ export class VendorWorkOrderService {
         };
     }
 
-    async getAll(teamId?: number) {
-        const conditions: ReturnType<typeof eq>[] = [];
-        if (teamId !== undefined) {
-            conditions.push(eq(users.team, teamId));
+    async getAll(status?: string, section?: string, user?: any) {
+        const conditions: any[] = [];
+        if (section === "operations" && user && user.dataScope !== "all") {
+            if (user.teamId) {
+                conditions.push(eq(vendorWorkOrders.team, user.teamId));
+            }
+        }
+        if (status === "pending") {
+            conditions.push(isNull(vendorWorkOrders.woApproved));
+        } else if (status === "approved") {
+            conditions.push(eq(vendorWorkOrders.woApproved, true));
+        } else if (status === "rejected") {
+            conditions.push(eq(vendorWorkOrders.woApproved, false));
+        } else if (status === "new") {
+            conditions.push(sql`${vendorWorkOrders.woApproved} IS NOT FALSE`);
         }
 
         const rows = await this.db
@@ -291,6 +315,11 @@ export class VendorWorkOrderService {
                 woDate: vendorWorkOrders.woDate,
                 woRaisedBy: users.name,
                 createdAt: vendorWorkOrders.createdAt,
+                tdsPercentage: vendorWorkOrders.tdsPercentage,
+                tdsAmount: vendorWorkOrders.tdsAmount,
+                amountAfterTds: vendorWorkOrders.amountAfterTds,
+                woApproved: vendorWorkOrders.woApproved,
+                woApprovalRemark: vendorWorkOrders.woApprovalRemark,
                 totalAmount: sql<number>`COALESCE((SELECT SUM(CAST(taxable_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 totalGstAmt: sql<number>`COALESCE((SELECT SUM(CAST(gst_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 grandTotal: sql<number>`COALESCE((SELECT SUM(CAST(total_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
@@ -302,6 +331,88 @@ export class VendorWorkOrderService {
             .orderBy(desc(vendorWorkOrders.id));
 
         return rows;
+    }
+
+    async getApprovalCounts(section?: string, user?: any) {
+        const teamCondition = section === "operations" && user && user.dataScope !== "all" && user.teamId
+            ? eq(vendorWorkOrders.team, user.teamId)
+            : undefined;
+
+        const baseQuery = () => this.db
+            .select({ id: vendorWorkOrders.id })
+            .from(vendorWorkOrders)
+            .leftJoin(users, eq(users.id, vendorWorkOrders.woRaisedBy));
+
+        const buildCount = async (condition: any) => {
+            const q = baseQuery().where(
+                teamCondition ? and(teamCondition, condition) : condition
+            );
+            const rows = await q;
+            return rows.length;
+        };
+
+        const [pending, approved, newCount, rejected] = await Promise.all([
+            buildCount(isNull(vendorWorkOrders.woApproved)),
+            buildCount(eq(vendorWorkOrders.woApproved, true)),
+            buildCount(sql`${vendorWorkOrders.woApproved} IS NOT FALSE`),
+            buildCount(eq(vendorWorkOrders.woApproved, false)),
+        ]);
+
+        return { pending, approved, rejected, new: newCount };
+    }
+
+    async setVwoApproval(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }) {
+        const wo = await this.db
+            .select()
+            .from(vendorWorkOrders)
+            .where(eq(vendorWorkOrders.id, id))
+            .then(rows => rows[0]);
+        if (!wo) throw new NotFoundException("Vendor Work Order not found");
+
+        if (approve) {
+            if (tdsPercentage == null || tdsPercentage < 0) {
+                throw new BadRequestException("TDS percentage is required when approving");
+            }
+
+            const items = await this.db
+                .select()
+                .from(vendorWorkOrderItems)
+                .where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
+
+            const subtotal = items.reduce((acc, item) => acc + Number(item.taxableAmount), 0);
+            const grandTotal = items.reduce((acc, item) => acc + Number(item.totalAmount), 0);
+            const tdsAmt = (subtotal * tdsPercentage) / 100;
+            const amountAfterTds = grandTotal - tdsAmt;
+
+            const [updated] = await this.db
+                .update(vendorWorkOrders)
+                .set({
+                    tdsPercentage: tdsPercentage.toString(),
+                    tdsAmount: tdsAmt.toString(),
+                    amountAfterTds: amountAfterTds.toString(),
+                    woApproved: true,
+                    woApprovalRemark: remark || null,
+                    updatedAt: sql`now()`,
+                })
+                .where(eq(vendorWorkOrders.id, id))
+                .returning();
+
+            this.logger.info(`VWO approved #${id}: ${tdsPercentage}%, TDS Amount: ${tdsAmt}, After TDS: ${amountAfterTds}`);
+            return updated;
+        } else {
+            const [updated] = await this.db
+                .update(vendorWorkOrders)
+                .set({
+                    woApproved: false,
+                    woApprovalRemark: remark || null,
+                    updatedAt: sql`now()`,
+                })
+                .where(eq(vendorWorkOrders.id, id))
+                .returning();
+
+            this.logger.info(`VWO rejected #${id}: ${remark || 'no remark'}`);
+            return updated;
+        }
     }
 
     async getByProject(projectId: number) {
