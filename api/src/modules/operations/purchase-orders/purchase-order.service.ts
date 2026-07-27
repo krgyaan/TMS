@@ -60,6 +60,8 @@ export class PurchaseOrderService {
                     totalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done'), 0)`,
                     totalPiAmount: sql<number>`COALESCE((SELECT SUM(value_pre_gst::numeric + gst_amount::numeric) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     totalPiCount: sql<number>`COALESCE((SELECT COUNT(*) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                    poApproved: purchaseOrders.poApproved,
+                    poApprovalRemark: purchaseOrders.poApprovalRemark,
                 })
                 .from(purchaseOrders)
                 .leftJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
