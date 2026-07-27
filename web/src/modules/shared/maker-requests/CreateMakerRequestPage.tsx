@@ -53,6 +53,8 @@ const fixedCategory = [
     {label: 'office_expenses', value: 'Office Expenses'},
     {label: 'printing_stationary', value: 'Printing & Stationary'},
     {label: 'office_maintenance', value: 'Office Maintenance'},
+    {label: 'portal_renewal_charges', value: 'Portal Renewal Charges'},
+    {label: 'professional_charges', value: 'Professional Charges'},
 ];
 
 const loanReturnCategory = [

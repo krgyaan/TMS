@@ -17,6 +17,7 @@ import { createActionColumnRenderer } from "@/components/data-grid/renderers/Act
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { useAllPaymentRequests, useUpdatePaymentRequestStatus } from "@/hooks/api/useProjectPaymentRequests";
 import { useTeamFilter } from "@/hooks/useTeamFilter";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "react-router-dom";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
@@ -33,6 +34,7 @@ type SubTab = "all" | "pending" | "payment_done" | "rejected";
 const CombinedPaymentRequestListPage: React.FC = () => {
     const location = useLocation();
     const { teamId } = useTeamFilter();
+    const { user } = useAuth();
     const isOperationsSection = location.pathname.includes("/operations/");
     const effectiveTeamId = isOperationsSection ? teamId : undefined;
     const { data, isLoading } = useAllPaymentRequests(effectiveTeamId ?? undefined);
@@ -51,6 +53,38 @@ const CombinedPaymentRequestListPage: React.FC = () => {
 
     const rows = useMemo(() => (data ?? []) as PaymentRequestRow[], [data]);
 
+    const visibleRows = useMemo(() => {
+        const currentTeamId = user?.team?.id ?? null;
+        const currentUserId = user?.id ?? null;
+
+        const team5Categories = new Set([
+            'imprest', 'others', 'communication', 'courier', 'electricity',
+            'rent', 'emi', 'software', 'office_expenses', 'printing_stationary',
+            'office_maintenance', 'portal_renewal_charges', 'professional_charges',
+            'nbfc_oc_acc', 'loan_principal_return',
+            'AU_5242', 'AU_5180', 'AU_5190', 'AU_8316', 'AU_9589', 'AU_9284',
+            'asset_purchase',
+        ]);
+
+        const userAllowedCategories: Record<string, number[]> = {
+            salary: [13, 7, 21, 42, 26],
+            related_party: [13, 7, 21, 26],
+            investment: [13, 7, 21, 26],
+        };
+
+        return rows.filter((row) => {
+            const category = row.paymentAgainst;
+            if (team5Categories.has(category)) {
+                return currentTeamId === 5;
+            }
+            const allowedUsers = userAllowedCategories[category];
+            if (allowedUsers) {
+                return currentUserId !== null && allowedUsers.includes(currentUserId);
+            }
+            return true;
+        });
+    }, [rows, user?.team?.id, user?.id]);
+
     const { activeTab: activeSubTab, setActiveTab: setActiveSubTab } = usePersistentTableState<SubTab>({
         storageKey: "payment-requests-combined-subtab",
         defaultTab: "all",
@@ -58,18 +92,18 @@ const CombinedPaymentRequestListPage: React.FC = () => {
     });
 
     const filteredRows = useMemo(() => {
-        if (activeSubTab === "all") return rows;
-        if (activeSubTab === "payment_done") return rows.filter((r) => r.status === "payment_done");
-        if (activeSubTab === "rejected") return rows.filter((r) => r.status === "rejected");
-        return rows.filter((r) => r.status === "pending" || r.status === "maker_done");
-    }, [rows, activeSubTab]);
+        if (activeSubTab === "all") return visibleRows;
+        if (activeSubTab === "payment_done") return visibleRows.filter((r) => r.status === "payment_done");
+        if (activeSubTab === "rejected") return visibleRows.filter((r) => r.status === "rejected");
+        return visibleRows.filter((r) => r.status === "pending" || r.status === "maker_done");
+    }, [visibleRows, activeSubTab]);
 
     const subtabCounts = useMemo(() => ({
-        all: rows.length,
-        pending: rows.filter((r) => r.status === "pending" || r.status === "maker_done").length,
-        payment_done: rows.filter((r) => r.status === "payment_done").length,
-        rejected: rows.filter((r) => r.status === "rejected").length,
-    }), [rows]);
+        all: visibleRows.length,
+        pending: visibleRows.filter((r) => r.status === "pending" || r.status === "maker_done").length,
+        payment_done: visibleRows.filter((r) => r.status === "payment_done").length,
+        rejected: visibleRows.filter((r) => r.status === "rejected").length,
+    }), [visibleRows]);
 
     const onGridReady = useCallback((event: GridReadyEvent<PaymentRequestRow>) => {
         setGridApi(event.api);
@@ -216,7 +250,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
         },
     ], [actions]);
 
-    const detail = viewingId ? rows.find((r) => r.id === viewingId) : undefined;
+    const detail = viewingId ? visibleRows.find((r) => r.id === viewingId) : undefined;
 
     return (
         <>

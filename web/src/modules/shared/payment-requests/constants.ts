@@ -30,6 +30,8 @@ export const PAYMENT_AGAINST_LABELS: Record<string, string> = {
     AU_9284: 'AU Cash Reserve Account (AU_9284)',
     investment: 'Investment',
     asset_purchase: 'Asset Purchase',
+    portal_renewal_charges: 'Portal Renewal Charges',
+    professional_charges: 'Professional Charges',
 };
 
 export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
