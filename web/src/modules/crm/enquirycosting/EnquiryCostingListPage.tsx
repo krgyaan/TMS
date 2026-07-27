@@ -18,6 +18,7 @@ import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import type { EnquiryCosting } from "./helpers/enquirycosting.type";
 import { LeadEnquiryRejectModal } from "@/modules/crm/lead-enquiry/components/LeadEnquiryRejectModal";
 import { cn } from "@/lib/utils";
+import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 
 const STATUS_TABS = [
     { key: 'pending', label: 'Pending', status: 'Pending' },
@@ -27,6 +28,27 @@ const STATUS_TABS = [
 
 const TAB_TO_STATUS: Record<string, string> = {};
 STATUS_TABS.forEach(t => { TAB_TO_STATUS[t.key] = t.status; });
+
+const HOURS_48_MS = 48 * 60 * 60 * 1000;
+
+function getCostingTimer(costing: EnquiryCosting) {
+    const status = costing.status;
+    if (status === 'Approved') {
+        return { status: 'COMPLETED' as const, remainingSeconds: 0, deadline: null };
+    }
+    if (status === 'Enquiry Rejected') {
+        return { status: 'STOPPED' as const, remainingSeconds: 0, deadline: null };
+    }
+    if (status === 'Redo' && costing.updatedAt) {
+        const deadline = new Date(new Date(costing.updatedAt).getTime() + HOURS_48_MS);
+        return { status: 'RUNNING' as const, remainingSeconds: 0, deadline };
+    }
+    if (status === 'Pending' && costing.createdAt) {
+        const deadline = new Date(new Date(costing.createdAt).getTime() + HOURS_48_MS);
+        return { status: 'RUNNING' as const, remainingSeconds: 0, deadline };
+    }
+    return { status: 'NOT_STARTED' as const, remainingSeconds: 0, deadline: null };
+}
 
 const EnquiryCostingListPage = () => {
     const navigate = useNavigate();
@@ -202,6 +224,22 @@ const EnquiryCostingListPage = () => {
                     <Badge variant={isApproved ? "default" : "secondary"} className={cn(isApproved && "bg-green-600 hover:bg-green-600")}>
                         {val}
                     </Badge>
+                );
+            },
+        },
+        {
+            headerName: "Timer",
+            width: 130,
+            cellStyle: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
+            cellRenderer: (params: any) => {
+                const costing = params.data as EnquiryCosting;
+                const timer = getCostingTimer(costing);
+                return (
+                    <TenderTimerDisplay
+                        remainingSeconds={timer.remainingSeconds}
+                        status={timer.status}
+                        deadline={timer.deadline}
+                    />
                 );
             },
         },

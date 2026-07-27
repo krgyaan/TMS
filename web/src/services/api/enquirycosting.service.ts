@@ -27,6 +27,10 @@ class EnquiryCostingService extends BaseApiService {
         return this.get<EnquiryCosting | null>(`/by-enquiry/${enquiryId}`);
     }
 
+    async getByLeadId(leadId: number): Promise<EnquiryCosting[]> {
+        return this.get<EnquiryCosting[]>(`/by-lead/${leadId}`);
+    }
+
     async submitCostingSheet(data: SubmitCostingSheetRequest): Promise<SubmitCostingSheetResponse> {
         return this.post<SubmitCostingSheetResponse>('/submit-costing-sheet', data);
     }

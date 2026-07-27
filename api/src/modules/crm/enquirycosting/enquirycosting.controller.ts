@@ -61,6 +61,11 @@ export class EnquiryCostingController {
         return this.enquiryCostingService.findByEnquiryId(enquiryId);
     }
 
+    @Get('by-lead/:leadId')
+    async getByLead(@Param('leadId', ParseIntPipe) leadId: number) {
+        return this.enquiryCostingService.findByLeadId(leadId);
+    }
+
     @Post('submit-costing-sheet')
     @HttpCode(HttpStatus.OK)
     async submitCostingSheet(

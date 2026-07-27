@@ -16,15 +16,6 @@ interface LeadEnquiryViewProps {
     className?: string;
 }
 
-function EnquiryDetailRow({ label, value }: { label: string; value: string | null | undefined }) {
-    return (
-        <TableRow>
-            <TableCell className="font-medium text-muted-foreground w-48">{label}</TableCell>
-            <TableCell>{value || "—"}</TableCell>
-        </TableRow>
-    );
-}
-
 export function LeadEnquiryView({ enquiry: manualEnquiry, enquiryId, isLoading: manualLoading = false, className = "" }: LeadEnquiryViewProps) {
     const { data: queryData, isLoading: queryLoading } = useLeadEnquiry(enquiryId ?? null);
     const enquiry = manualEnquiry || queryData;
@@ -56,42 +47,72 @@ export function LeadEnquiryView({ enquiry: manualEnquiry, enquiryId, isLoading: 
                 <Table>
                     <TableBody>
                         <TableRow className="bg-muted/50">
-                            <TableCell colSpan={2} className="font-semibold text-sm">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
                                 <FileText className="h-4 w-4 inline mr-2" /> Basic Information
                             </TableCell>
                         </TableRow>
-                        <EnquiryDetailRow label="Enquiry Number" value={enquiry.enquiryNumber} />
-                        <EnquiryDetailRow label="Enquiry Name" value={enquiry.enqName} />
-                        <EnquiryDetailRow label="Organization" value={enquiry.organizationName} />
-                        <EnquiryDetailRow label="Org Abb Name" value={enquiry.orgAbbName} />
-                        <EnquiryDetailRow label="Item" value={enquiry.itemName} />
-                        <EnquiryDetailRow label="Location Code" value={enquiry.locationCode} />
-                        <EnquiryDetailRow label="Approx Value" value={enquiry.approxValue} />
-                        <EnquiryDetailRow label="Status" value={enquiry.status} />
-                        <EnquiryDetailRow label="Rejection Reason" value={enquiry.rejectionReason} />
-                        <EnquiryDetailRow label="Site Visit Required" value={enquiry.siteVisitRequired ? "Yes" : "No"} />
-                        <EnquiryDetailRow label="Lead" value={enquiry.leadName} />
-                        <EnquiryDetailRow label="Team" value={enquiry.team} />
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Enquiry Number</TableCell>
+                            <TableCell className="text-sm w-1/4">{enquiry.enquiryNumber || "—"}</TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Enquiry Name</TableCell>
+                            <TableCell className="text-sm w-1/4">{enquiry.enqName || "—"}</TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">Organization</TableCell>
+                            <TableCell className="text-sm">{enquiry.organizationName || "—"}</TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">Org Abb Name</TableCell>
+                            <TableCell className="text-sm">{enquiry.orgAbbName || "—"}</TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">Item</TableCell>
+                            <TableCell className="text-sm">{enquiry.itemName || "—"}</TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">Location Code</TableCell>
+                            <TableCell className="text-sm">{enquiry.locationCode || "—"}</TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">Approx Value</TableCell>
+                            <TableCell className="text-sm">{enquiry.approxValue || "—"}</TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">Status</TableCell>
+                            <TableCell className="text-sm">{enquiry.status || "—"}</TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">Rejection Reason</TableCell>
+                            <TableCell className="text-sm">{enquiry.rejectionReason || "—"}</TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">Site Visit Required</TableCell>
+                            <TableCell className="text-sm">{enquiry.siteVisitRequired ? "Yes" : "No"}</TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">Lead</TableCell>
+                            <TableCell className="text-sm">{enquiry.leadName || "—"}</TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">Team</TableCell>
+                            <TableCell className="text-sm">{enquiry.team || "—"}</TableCell>
+                        </TableRow>
 
                         <TableRow className="bg-muted/50">
-                            <TableCell colSpan={2} className="font-semibold text-sm">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
                                 <User className="h-4 w-4 inline mr-2" /> Audit Information
                             </TableCell>
                         </TableRow>
-                        <EnquiryDetailRow label="Created By" value={enquiry.createdByName} />
-                        <EnquiryDetailRow label="Updated By" value={enquiry.updatedByName} />
-                        <EnquiryDetailRow label="Created At" value={enquiry.createdAt ? new Date(enquiry.createdAt).toLocaleString("en-IN") : "—"} />
-                        <EnquiryDetailRow label="Updated At" value={enquiry.updatedAt ? new Date(enquiry.updatedAt).toLocaleString("en-IN") : "—"} />
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">Created By</TableCell>
+                            <TableCell className="text-sm">{enquiry.createdByName || "—"}</TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">Updated By</TableCell>
+                            <TableCell className="text-sm">{enquiry.updatedByName || "—"}</TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">Created At</TableCell>
+                            <TableCell className="text-sm">{enquiry.createdAt ? new Date(enquiry.createdAt).toLocaleString("en-IN") : "—"}</TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">Updated At</TableCell>
+                            <TableCell className="text-sm">{enquiry.updatedAt ? new Date(enquiry.updatedAt).toLocaleString("en-IN") : "—"}</TableCell>
+                        </TableRow>
 
                         {enquiry.notes && (
                             <>
                                 <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={2} className="font-semibold text-sm">
-                                        Notes
-                                    </TableCell>
+                                    <TableCell colSpan={4} className="font-semibold text-sm">Notes</TableCell>
                                 </TableRow>
                                 <TableRow>
-                                    <TableCell colSpan={2}>{enquiry.notes}</TableCell>
+                                    <TableCell colSpan={4} className="text-sm">{enquiry.notes}</TableCell>
                                 </TableRow>
                             </>
                         )}

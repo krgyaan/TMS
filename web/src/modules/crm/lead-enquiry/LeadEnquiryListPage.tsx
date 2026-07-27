@@ -319,8 +319,6 @@ const EnquiryListPage = () => {
         },
     ];
 
-
-
     const colDefs = useMemo<ColDef<LeadEnquiryWithNames>[]>(() => [
         { field: "enquiryNumber", headerName: "Enquiry No.", width: 140 },
         { field: "enqName", headerName: "Enquiry Name", width: 220 },
@@ -338,7 +336,6 @@ const EnquiryListPage = () => {
                 return "Yes";
             },
         },
-        
         {
             field: "status",
             headerName: "Status",
@@ -359,32 +356,32 @@ const EnquiryListPage = () => {
             },
         },
         {
-    headerName: "Timer",
-    width: 130,
-    cellStyle: {
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center'
-    },
-    cellRenderer: (params: any) => {
-        const createdAt = params.data?.createdAt;
-        if (!createdAt) {
-            return (
-                <TenderTimerDisplay
-                    remainingSeconds={0}
-                    status="NOT_STARTED"
-                />
-            );
-        }
-        return (
-            <TenderTimerDisplay
-                remainingSeconds={0}
-                status="RUNNING"
-                deadline={new Date(createdAt)}
-            />
-        );
-    },
-},
+            headerName: "Timer",
+            width: 130,
+            cellStyle: {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+            },
+            cellRenderer: (params: any) => {
+                const createdAt = params.data?.createdAt;
+                if (!createdAt) {
+                    return (
+                        <TenderTimerDisplay
+                            remainingSeconds={0}
+                            status="NOT_STARTED"
+                        />
+                    );
+                }
+                return (
+                    <TenderTimerDisplay
+                        remainingSeconds={0}
+                        status="RUNNING"
+                        deadline={new Date(createdAt)}
+                    />
+                );
+            },
+        },
         {
             headerName: "Action",
             cellRenderer: createActionColumnRenderer(enquiryActions),

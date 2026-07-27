@@ -22,6 +22,7 @@ export type LeadEnquiryListFilters = {
     search?: string;
     status?: string;
     team?: string;
+    leadId?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 };
@@ -72,6 +73,10 @@ export class LeadEnquiryService {
 
         if (filters?.team) {
             conditions.push(eq(teams.name, filters.team));
+        }
+
+        if (filters?.leadId) {
+            conditions.push(eq(leadEnquiries.leadId, filters.leadId));
         }
 
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -350,6 +355,29 @@ hasSiteVisit: row.hasSiteVisit ?? false,
         return visit ?? null;
     }
 
+    async findSiteVisitsByLead(leadId: number): Promise<(SiteVisit & { enqName: string | null; enquiryNumber: string | null })[]> {
+        return this.db
+            .select({
+                id: siteVisits.id,
+                enquiryId: siteVisits.enquiryId,
+                assignedTo: siteVisits.assignedTo,
+                scheduledAt: siteVisits.scheduledAt,
+                conductedAt: siteVisits.conductedAt,
+                information: siteVisits.information,
+                additionalNotes: siteVisits.additionalNotes,
+                documents: siteVisits.documents,
+                status: siteVisits.status,
+                createdAt: siteVisits.createdAt,
+                updatedAt: siteVisits.updatedAt,
+                enqName: leadEnquiries.enqName,
+                enquiryNumber: leadEnquiries.enquiryNumber,
+            })
+            .from(siteVisits)
+            .innerJoin(leadEnquiries, eq(leadEnquiries.id, siteVisits.enquiryId))
+            .where(eq(leadEnquiries.leadId, leadId))
+            .orderBy(desc(siteVisits.createdAt));
+    }
+
     async updateSiteVisit(id: number, data: UpdateSiteVisitDto): Promise<SiteVisit> {
         const updateData: Record<string, unknown> = { ...data, updatedAt: new Date() };
         if (data.scheduledAt) updateData.scheduledAt = new Date(data.scheduledAt);
@@ -381,6 +409,24 @@ hasSiteVisit: row.hasSiteVisit ?? false,
 
         if (!updated) throw new NotFoundException(`Site visit with ID ${id} not found`);
         return updated;
+    }
+
+    async appendSiteVisitDocs(siteVisitId: number, newFilenames: string[]): Promise<void> {
+        const [existing] = await this.db
+            .select({ documents: siteVisits.documents })
+            .from(siteVisits)
+            .where(eq(siteVisits.id, siteVisitId))
+            .limit(1);
+
+        if (!existing) throw new NotFoundException(`Site visit with ID ${siteVisitId} not found`);
+
+        const existingDocs = existing.documents ? existing.documents.split(',').filter(Boolean) : [];
+        const allDocs = [...existingDocs, ...newFilenames];
+
+        await this.db
+            .update(siteVisits)
+            .set({ documents: allDocs.join(','), updatedAt: new Date() })
+            .where(eq(siteVisits.id, siteVisitId));
     }
 
     async createSiteVisitContact(data: CreateSiteVisitContactDto): Promise<SiteVisitContact> {

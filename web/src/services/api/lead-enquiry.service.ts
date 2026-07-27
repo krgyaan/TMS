@@ -13,6 +13,7 @@ class LeadEnquiryService extends BaseApiService {
             if (params.search)    search.set('search',    params.search);
             if (params.status)    search.set('status',    params.status);
             if (params.team)      search.set('team',      params.team);
+            if (params.leadId)    search.set('leadId',    String(params.leadId));
             if (params.sortBy)    search.set('sortBy',    params.sortBy);
             if (params.sortOrder) search.set('sortOrder', params.sortOrder);
         }
@@ -48,12 +49,23 @@ class LeadEnquiryService extends BaseApiService {
         return this.get<SiteVisit | null>(`/site-visits/first/${enquiryId}`);
     }
 
+    async getSiteVisitsByLead(leadId: number): Promise<SiteVisit[]> {
+        return this.get<SiteVisit[]>(`/site-visits/by-lead/${leadId}`);
+    }
+
     async updateSiteVisit(id: number, data: UpdateSiteVisitRequest): Promise<SiteVisit> {
         return this.patch<SiteVisit>(`/site-visits/${id}`, data);
     }
 
     async updateSiteVisitDetails(id: number, data: UpdateSiteVisitDetailsRequest): Promise<SiteVisit> {
         return this.patch<SiteVisit>(`/site-visits/details/${id}`, data);
+    }
+
+    async uploadSiteVisitDocs(siteVisitId: number, files: File[]): Promise<string[]> {
+        const formData = new FormData();
+        files.forEach(f => formData.append('documents', f));
+        const res = await this.post<{ filenames: string[] }>(`/site-visits/${siteVisitId}/upload-docs`, formData);
+        return res.filenames;
     }
 
     async getSiteVisitContacts(siteVisitId: number): Promise<SiteVisitContact[]> {

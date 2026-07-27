@@ -13,7 +13,7 @@ export const leadEnquiryKey = {
     detail: (id: number) => [...leadEnquiryKey.details(), id] as const,
 };
 
-type EnquiryPaginationParams = { page: number; limit: number; search?: string; status?: string; team?: string; };
+type EnquiryPaginationParams = { page: number; limit: number; search?: string; status?: string; team?: string; leadId?: number; };
 
 export const useLeadEnquiries = (
     pagination: EnquiryPaginationParams = { page: 1, limit: 50 },
@@ -25,6 +25,7 @@ export const useLeadEnquiries = (
         search: pagination.search,
         status: pagination.status,
         team: pagination.team,
+        leadId: pagination.leadId,
         ...(sort?.sortBy && { sortBy: sort.sortBy }),
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
     };

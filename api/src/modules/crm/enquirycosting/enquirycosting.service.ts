@@ -293,6 +293,46 @@ export class EnquiryCostingService {
         };
     }
 
+    async findByLeadId(leadId: number): Promise<EnquiryCostingWithNames[]> {
+        const rows = await this.db
+            .select({
+                id: privateCostingSheets.id,
+                enquiryId: leadEnquiries.id,
+                enquiryNumber: leadEnquiries.enquiryNumber,
+                enqName: leadEnquiries.enqName,
+                createdByName: createdByUser.name,
+                organizationName: leadEnquiries.organizationName,
+                orgAbbName: leadEnquiries.orgAbbName,
+                approxValue: leadEnquiries.approxValue,
+                finalPrice: privateCostingSheets.finalPrice,
+                receiptPreGst: privateCostingSheets.receiptPreGst,
+                budgetPreGst: privateCostingSheets.budgetPreGst,
+                grossMargin: privateCostingSheets.grossMargin,
+                approvedFinalPrice: privateCostingSheets.approvedFinalPrice,
+                approvedReceiptPreGst: privateCostingSheets.approvedReceiptPreGst,
+                approvedBudgetPreGst: privateCostingSheets.approvedBudgetPreGst,
+                approvedGrossMargin: privateCostingSheets.approvedGrossMargin,
+                preparedByName: preparedByUser.name,
+                status: privateCostingSheets.status,
+                sheetUrl: privateCostingSheets.sheetUrl,
+                remarks: privateCostingSheets.remarks,
+                createdAt: privateCostingSheets.createdAt,
+                updatedAt: privateCostingSheets.updatedAt,
+            })
+            .from(privateCostingSheets)
+            .innerJoin(leadEnquiries, eq(privateCostingSheets.enquiryId, leadEnquiries.id))
+            .leftJoin(preparedByUser, eq(preparedByUser.id, privateCostingSheets.preparedBy))
+            .leftJoin(createdByUser, eq(createdByUser.id, leadEnquiries.createdBy))
+            .where(eq(leadEnquiries.leadId, leadId))
+            .orderBy(desc(privateCostingSheets.createdAt));
+
+        return rows.map(row => ({
+            ...row,
+            createdByName: row.createdByName ?? null,
+            preparedByName: row.preparedByName ?? null,
+        }));
+    }
+
     async resubmitCostingSheet(data: ResubmitCostingSheetDto, userId: number): Promise<{ success: boolean }> {
         const [existing] = await this.db
             .select()

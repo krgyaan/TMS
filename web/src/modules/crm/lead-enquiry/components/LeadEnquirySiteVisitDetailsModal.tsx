@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, MapPin, Plus, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { leadEnquiryService } from "@/services/api/lead-enquiry.service";
 
 interface ContactEntry {
     name: string;
@@ -96,9 +97,15 @@ export function LeadEnquirySiteVisitDetailsModal({
         if (!siteVisitId) return;
         setIsSaving(true);
         try {
+            let finalDocs = documentsStr;
+            if (documents.length > 0) {
+                const serverFilenames = await leadEnquiryService.uploadSiteVisitDocs(siteVisitId, documents);
+                const existingList = documentsStr ? documentsStr.split(",").map(s => s.trim()).filter(Boolean) : [];
+                finalDocs = [...existingList, ...serverFilenames].join(",");
+            }
             await onSave({
                 information,
-                documents: documents.length > 0 ? documents.map((f) => f.name).join(",") : documentsStr,
+                documents: finalDocs,
                 conductedAt,
                 contacts: contacts.filter((c) => c.name.trim()),
             });

@@ -9,7 +9,12 @@ import {
     Query,
     HttpCode,
     HttpStatus,
+    UseInterceptors,
+    UploadedFiles,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 import { LeadEnquiryService } from './lead-enquiry.service';
 import {
     CreateLeadEnquirySchema,
@@ -45,6 +50,7 @@ export class LeadEnquiryController {
         @Query('search')    search?:    string,
         @Query('status')    status?:    string,
         @Query('team')      team?:      string,
+        @Query('leadId')    leadId?:    string,
         @Query('sortBy')    sortBy?:    string,
         @Query('sortOrder') sortOrder?: string,
     ) {
@@ -60,6 +66,7 @@ export class LeadEnquiryController {
             search,
             status,
             team,
+            leadId: parseNumber(leadId),
             sortBy,
             sortOrder: sortOrder as 'asc' | 'desc' | undefined,
         });
@@ -81,6 +88,11 @@ export class LeadEnquiryController {
     @Get('site-visits/first/:enquiryId')
     async getFirstSiteVisitByEnquiry(@Param('enquiryId', ParseIntPipe) enquiryId: number) {
         return this.leadEnquiryService.findFirstSiteVisitByEnquiry(enquiryId);
+    }
+
+    @Get('site-visits/by-lead/:leadId')
+    async getSiteVisitsByLead(@Param('leadId', ParseIntPipe) leadId: number) {
+        return this.leadEnquiryService.findSiteVisitsByLead(leadId);
     }
 
     @Patch('site-visits/details/:id')
@@ -132,6 +144,28 @@ export class LeadEnquiryController {
         @CurrentUser() user: ValidatedUser,
     ) {
         return this.leadEnquiryService.createCostingSheet(body, user.sub);
+    }
+
+    @Post('site-visits/:id/upload-docs')
+    @UseInterceptors(FilesInterceptor('documents', 10, {
+        storage: diskStorage({
+            destination: './uploads/site-visit',
+            filename: (req, file, callback) => {
+                const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+                const ext = extname(file.originalname);
+                callback(null, `${uniqueSuffix}${ext}`);
+            },
+        }),
+        limits: { fileSize: 25 * 1024 * 1024 },
+    }))
+    @HttpCode(HttpStatus.OK)
+    async uploadSiteVisitDocs(
+        @Param('id', ParseIntPipe) id: number,
+        @UploadedFiles() files: Express.Multer.File[],
+    ) {
+        const filenames = files.map(f => f.filename);
+        await this.leadEnquiryService.appendSiteVisitDocs(id, filenames);
+        return { filenames };
     }
 
     @Get(':id')
