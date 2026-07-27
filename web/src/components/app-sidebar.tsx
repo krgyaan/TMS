@@ -106,7 +106,7 @@ const navMain: NavGroup[] = [
             { title: "Delegation Dashboard", url: paths.accounts.delegation, permission: "accounts.delegation" },
             { title: "Purchase Orders", url: paths.accounts.purchaseOrders, permission: "accounts.purchase-orders" },
             { title: "Sale Invoices", url: paths.accounts.saleInvoices, permission: "accounts.sale-invoices" },
-            { title: "Payment Requests", url: paths.accounts.paymentRequests, permission: "accounts.purchase-orders" },
+            { title: "Payment Requests", url: paths.accounts.paymentRequests, permission: "accounts.payment-requests" },
         ],
     },
     {
