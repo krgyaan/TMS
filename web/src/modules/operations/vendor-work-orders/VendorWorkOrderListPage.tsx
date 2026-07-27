@@ -56,7 +56,7 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
             {
                 label: "View Details",
                 icon: <Eye className="h-4 w-4" />,
-                onClick: (row) => navigate(paths.operations.editVendorWoPage(row.id, row.projectId)),
+                onClick: (row) => navigate(paths.operations.viewVendorWoPage(row.id, row.projectId)),
             },
             {
                 label: "PDF Versions",

@@ -11,6 +11,7 @@ import { ClientDirectorySyncService } from "@/modules/shared/client-directory/cl
 
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
 import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-items.schema";
+import { paymentRequests } from "@/db/schemas/operations";
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
 import { woBasicDetails } from "@/db/schemas/operations/work-order.schema";
 import { users } from "@/db/schemas";
@@ -255,7 +256,7 @@ export class VendorWorkOrderService {
             .from(vendorWorkOrderItems)
             .where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
 
-        const totals = items.reduce(
+        const rawTotal = items.reduce(
             (acc, item) => ({
                 totalAmount: acc.totalAmount + Number(item.taxableAmount),
                 totalGstAmt: acc.totalGstAmt + Number(item.gstAmount),
@@ -264,18 +265,54 @@ export class VendorWorkOrderService {
             { totalAmount: 0, totalGstAmt: 0, grandTotal: 0 }
         );
 
-        const [raisedByUser] = wo.woRaisedBy
-            ? await this.db
+        const total = {
+            total: rawTotal.totalAmount,
+            totalGst: rawTotal.totalGstAmt,
+            totalWithGst: rawTotal.grandTotal,
+        };
+
+        const enrichedProducts = items.map((product) => {
+            const itemTotal = Number(product.rate) * Number(product.qty);
+            const itemTotalGst = (itemTotal * Number(product.gstRate)) / 100;
+            const itemTotalWithGst = itemTotal + itemTotalGst;
+            return {
+                ...product,
+                itemTotal,
+                itemTotalGst,
+                itemTotalWithGst,
+            };
+        });
+
+        let raisedByName: string | null = null;
+        if (wo.woRaisedBy) {
+            const [raisedByUser] = await this.db
                 .select({ name: users.name })
                 .from(users)
-                .where(eq(users.id, wo.woRaisedBy))
-            : [];
+                .where(eq(users.id, wo.woRaisedBy));
+            raisedByName = raisedByUser?.name ?? null;
+        }
+
+        const paymentRequestsData = await this.db
+            .select({
+                id: paymentRequests.id,
+                requestNo: paymentRequests.requestNo,
+                partyName: paymentRequests.partyName,
+                amount: paymentRequests.amount,
+                status: paymentRequests.status,
+                requestedByName: users.name,
+                createdAt: paymentRequests.createdAt,
+            })
+            .from(paymentRequests)
+            .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
+            .where(eq(paymentRequests.vendorWorkOrderId, id))
+            .orderBy(desc(paymentRequests.createdAt));
 
         return {
             ...wo,
-            products: items,
-            ...totals,
-            woRaisedBy: raisedByUser?.name || "—",
+            products: enrichedProducts,
+            total,
+            raisedByName,
+            paymentRequests: paymentRequestsData,
         };
     }
 

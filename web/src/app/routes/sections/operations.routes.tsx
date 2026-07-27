@@ -38,6 +38,7 @@ const Operations_SaleInvoiceTabs = lazy(() => import("@/modules/shared/sale-invo
 const Operations_ViewSaleInvoice = lazy(() => import("@/modules/shared/sale-invoices/ViewSaleInvoicePage"));
 
 const Operations_RaiseVendorWoFormPage = lazy(() => import("@/modules/operations/vendor-work-orders/CreateVendorWorkOrderPage"));
+const Operations_ViewVendorWoPage = lazy(() => import("@/modules/operations/vendor-work-orders/pages/ViewVendorWorkOrderPage"));
 const Operations_EditVendorWoPage = lazy(() => import("@/modules/operations/vendor-work-orders/EditVendorWorkOrderPage"));
 const Operations_VendorWorkOrderTabs = lazy(() => import("@/modules/shared/vendor-work-orders/VendorWorkOrderTabsPage"));
 const Operations_VendorWoPdfVersions = lazy(() => import("@/modules/operations/vendor-work-orders/VendorWoPdfVersionsPage"));
@@ -84,7 +85,7 @@ export default function OperationsRoutes() {
             <Route path="purchase-orders" element={<RouteWrapper><Operations_PurchaseOrderTabs /></RouteWrapper>} />
             <Route path="vendor-work-orders" element={<RouteWrapper><Operations_VendorWorkOrderTabs /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/create" element={<RouteWrapper><Operations_RaiseVendorWoFormPage /></RouteWrapper>} />
-            <Route path="project-dashboard/:projectId/vendor-work-order/:woId" element={<RouteWrapper><Operations_EditVendorWoPage /></RouteWrapper>} />
+            <Route path="project-dashboard/:projectId/vendor-work-order/:woId" element={<RouteWrapper><Operations_ViewVendorWoPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId/edit" element={<RouteWrapper><Operations_EditVendorWoPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId/pdf-versions" element={<RouteWrapper><Operations_VendorWoPdfVersions /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/sale-invoice/create" element={<RouteWrapper><Operations_RaiseSaleInvoiceFormPage /></RouteWrapper>} />
