@@ -1,35 +1,47 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { Eye, History, Search } from "lucide-react";
+import { CheckCircle, Eye, History, Search } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import DataTable from "@/components/ui/data-table";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
+import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
-import { useAllVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
-import { useTeamFilter } from "@/hooks/useTeamFilter";
 import type { VendorWorkOrderRow } from "./helpers/vwoForm.types";
+import { SetVwoApprovalDialog } from "@/modules/shared/vendor-work-orders/components/SetVwoApprovalDialog";
 
-const VendorWorkOrderListPage: React.FC = () => {
+interface VendorWorkOrderListPageProps {
+    workOrders?: VendorWorkOrderRow[];
+    showApprovalAction?: boolean;
+    search?: string;
+    onSearchChange?: (value: string) => void;
+}
+
+const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
+    workOrders: propWorkOrders,
+    showApprovalAction,
+    search: propSearch,
+    onSearchChange: propOnSearchChange,
+}) => {
     const navigate = useNavigate();
-    const location = useLocation();
-    const { teamId } = useTeamFilter();
-    const isOperationsSection = location.pathname.includes("/operations/");
-    const effectiveTeamId = isOperationsSection ? teamId : undefined;
-    const { data } = useAllVendorWorkOrders(effectiveTeamId ?? undefined);
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
-    const [search, setSearch] = useState("");
+    const [internalSearch, setInternalSearch] = useState("");
+    const search = propSearch !== undefined ? propSearch : internalSearch;
+    const setSearch = propOnSearchChange ?? setInternalSearch;
     const debouncedSearch = useDebouncedSearch(search, 300);
+    const [vwoApproval, setVwoApproval] = useState<VendorWorkOrderRow | null>(null);
 
-    const workOrders = data ?? [];
+    const isApprovalEnabled = showApprovalAction ?? false;
+
+    const workOrders = propWorkOrders ?? [];
 
     const onGridReady = useCallback((event: GridReadyEvent<VendorWorkOrderRow>) => {
         setGridApi(event.api);
@@ -39,18 +51,30 @@ const VendorWorkOrderListPage: React.FC = () => {
         gridApi?.setGridOption("quickFilterText", debouncedSearch || undefined);
     }, [debouncedSearch, gridApi]);
 
-    const woActions: ActionItem<VendorWorkOrderRow>[] = useMemo(() => [
-        {
-            label: "View Details",
-            icon: <Eye className="h-4 w-4" />,
-            onClick: (row) => navigate(paths.operations.editVendorWoPage(row.id, row.projectId)),
-        },
-        {
-            label: "PDF Versions",
-            icon: <History className="h-4 w-4" />,
-            onClick: (row) => navigate(paths.operations.vendorWoPdfVersions(row.id, row.projectId)),
-        },
-    ], [navigate]);
+    const woActions: ActionItem<VendorWorkOrderRow>[] = useMemo(() => {
+        const actions: ActionItem<VendorWorkOrderRow>[] = [
+            {
+                label: "View Details",
+                icon: <Eye className="h-4 w-4" />,
+                onClick: (row) => navigate(paths.operations.editVendorWoPage(row.id, row.projectId)),
+            },
+            {
+                label: "PDF Versions",
+                icon: <History className="h-4 w-4" />,
+                onClick: (row) => navigate(paths.operations.vendorWoPdfVersions(row.id, row.projectId)),
+            },
+        ];
+
+        if (isApprovalEnabled) {
+            actions.unshift({
+                label: "VWO Approval",
+                icon: <CheckCircle className="h-4 w-4" />,
+                onClick: (row) => setVwoApproval(row),
+            });
+        }
+
+        return actions;
+    }, [navigate, isApprovalEnabled]);
 
     const woColumns = useMemo<ColDef<VendorWorkOrderRow>[]>(() => [
         {
@@ -144,22 +168,112 @@ const VendorWorkOrderListPage: React.FC = () => {
                 const d = params.data;
                 return `${d.grandTotal} ${d.totalAmount} ${d.totalGstAmt}`;
             },
-            cellRenderer: (p: CustomCellRendererProps<VendorWorkOrderRow>) => (
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span className="truncate block">{formatINR(p.value)}</span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" align="start">
-                            <div className="space-y-1 text-xs">
-                                <p><strong>Total:</strong> {formatINR(p.data?.totalAmount || 0)}</p>
-                                <p><strong>GST:</strong> {formatINR(p.data?.totalGstAmt || 0)}</p>
-                                <p><strong>Grand Total:</strong> {formatINR(p.data?.grandTotal || 0)}</p>
-                            </div>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            ),
+            cellRenderer: (p: CustomCellRendererProps<VendorWorkOrderRow>) => {
+                const d = p.data;
+                const tdsPct = d?.tdsPercentage ? Number(d.tdsPercentage) : null;
+
+                return (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="truncate block">{formatINR(p.value)}</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
+                                <div className="space-y-1 text-xs">
+                                    <p><strong>Total (Pre-GST):</strong> {formatINR(d?.totalAmount || 0)}</p>
+                                    <p><strong>GST Amount:</strong> {formatINR(d?.totalGstAmt || 0)}</p>
+                                    <p><strong>Grand Total:</strong> {formatINR(d?.grandTotal || 0)}</p>
+                                    {tdsPct !== null && (
+                                        <>
+                                            <div className="border-t my-1.5" />
+                                            <p className="text-destructive">
+                                                <strong>TDS @ {tdsPct}%:</strong> -{formatINR(d?.tdsAmount || 0)}
+                                            </p>
+                                            <p className="font-semibold">
+                                                <strong>After TDS:</strong> {formatINR(d?.amountAfterTds || 0)}
+                                            </p>
+                                        </>
+                                    )}
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                );
+            },
+        },
+        {
+            field: "tdsPercentage",
+            headerName: "TDS %",
+            sortable: true,
+            filter: true,
+            width: 80,
+            valueFormatter: (p: ValueFormatterParams<VendorWorkOrderRow>) => {
+                const val = p.value;
+                return val ? `${Number(val)}%` : "—";
+            },
+            cellRenderer: (p: CustomCellRendererProps<VendorWorkOrderRow>) => {
+                const val = p.value;
+                return (
+                    <span className={val ? "" : "text-muted-foreground"}>
+                        {val ? `${Number(val)}%` : "Not Set"}
+                    </span>
+                );
+            },
+        },
+        {
+            field: "woApproved",
+            headerName: "Status",
+            sortable: true,
+            filter: true,
+            width: 110,
+            cellRenderer: (p: CustomCellRendererProps<VendorWorkOrderRow>) => {
+                const d = p.data;
+                const isApproved = d?.woApproved === true;
+                const isRejected = d?.woApproved === false;
+                const tdsPct = d?.tdsPercentage ? Number(d.tdsPercentage) : null;
+
+                let label: string;
+                let variant: "default" | "secondary" | "destructive" | "outline" = "secondary";
+
+                if (isApproved) {
+                    label = "Approved";
+                    variant = "default";
+                } else if (isRejected) {
+                    label = "Rejected";
+                    variant = "destructive";
+                } else {
+                    label = "Pending";
+                    variant = "outline";
+                }
+
+                return (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Badge variant={variant} className="gap-1 cursor-pointer">
+                                    {label}
+                                </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
+                                <div className="space-y-1 text-xs">
+                                    {tdsPct !== null && isApproved && (
+                                        <>
+                                            <p><strong>TDS:</strong> {tdsPct}% (-{formatINR(d?.tdsAmount || 0)})</p>
+                                            <p><strong>After TDS:</strong> {formatINR(d?.amountAfterTds || 0)}</p>
+                                        </>
+                                    )}
+                                    {d?.woApprovalRemark && (
+                                        <p><strong>Remark:</strong> {d.woApprovalRemark}</p>
+                                    )}
+                                    {!d?.woApprovalRemark && !tdsPct && (
+                                        <p className="text-muted-foreground">Awaiting approval</p>
+                                    )}
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                );
+            },
         },
         {
             field: "woRaisedBy",
@@ -175,7 +289,7 @@ const VendorWorkOrderListPage: React.FC = () => {
             width: 80,
             pinned: "right" as "right" | "left",
         },
-    ], [navigate]);
+    ], [navigate, woActions]);
 
     return (
         <Card>
@@ -190,15 +304,17 @@ const VendorWorkOrderListPage: React.FC = () => {
                 </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
-                <div className="relative mb-4">
-                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        type="text"
-                        placeholder="Search by WO number, vendor name, GST…"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="pl-8"
-                    />
+                <div className="flex justify-end">
+                    <div className="relative mb-4">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            type="text"
+                            placeholder="Search by WO number, vendor name, GST…"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="pl-8"
+                        />
+                    </div>
                 </div>
                 <DataTable
                     data={workOrders}
@@ -211,6 +327,14 @@ const VendorWorkOrderListPage: React.FC = () => {
                     }}
                 />
             </CardContent>
+
+            {vwoApproval && (
+                <SetVwoApprovalDialog
+                    vwo={vwoApproval}
+                    open={!!vwoApproval}
+                    onClose={() => setVwoApproval(null)}
+                />
+            )}
         </Card>
     );
 };

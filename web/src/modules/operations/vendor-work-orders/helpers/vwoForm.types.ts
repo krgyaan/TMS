@@ -25,7 +25,18 @@ export interface VendorWorkOrderRow {
     totalAmount: number;
     totalGstAmt: number;
     grandTotal: number;
+    tdsPercentage?: number | string;
+    tdsAmount?: number | string;
+    amountAfterTds?: number | string;
+    woApproved?: boolean;
+    woApprovalRemark?: string;
     generatedPdfVersions?: Record<string, { path: string; hash: string }>;
+}
+
+export interface SetVwoApprovalDTO {
+    approve: boolean;
+    tdsPercentage?: number;
+    remark?: string;
 }
 
 export interface CreateVendorWorkOrderDTO {

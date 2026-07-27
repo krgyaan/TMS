@@ -1,18 +1,33 @@
-import { BaseApiService } from "./base.service";
 import axiosInstance from '@/lib/axios';
 import type {
     CreateVendorWorkOrderDTO,
-    UpdateVendorWorkOrderDTO,
+    SetVwoApprovalDTO,
+    UpdateVendorWorkOrderDTO
 } from "@/modules/operations/vendor-work-orders/helpers/vwoForm.types";
+import { BaseApiService } from "./base.service";
 
 class VendorWorkOrderApiService extends BaseApiService {
     constructor() {
         super("/vendor-work-orders");
     }
 
-    async getAll(teamId?: number) {
-        const params = teamId ? `?teamId=${teamId}` : '';
-        return this.get<any[]>(`/${params}`);
+    async getAll(status?: string, section?: string) {
+        const searchParams = new URLSearchParams();
+        if (status) searchParams.set('status', status);
+        if (section) searchParams.set('section', section);
+        const qs = searchParams.toString();
+        return this.get<any[]>(`/${qs ? `?${qs}` : ''}`);
+    }
+
+    async getApprovalCounts(section?: string): Promise<{ pending: number; approved: number; rejected: number; new: number }> {
+        const searchParams = new URLSearchParams();
+        if (section) searchParams.set('section', section);
+        const qs = searchParams.toString();
+        return this.get(`/approval-counts${qs ? `?${qs}` : ''}`);
+    }
+
+    async setApproval(id: number, data: SetVwoApprovalDTO): Promise<any> {
+        return this.put(`/${id}/approval`, data);
     }
 
     async getById(id: number) {

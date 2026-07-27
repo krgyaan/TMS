@@ -39,7 +39,7 @@ const Operations_ViewSaleInvoice = lazy(() => import("@/modules/shared/sale-invo
 
 const Operations_RaiseVendorWoFormPage = lazy(() => import("@/modules/operations/vendor-work-orders/CreateVendorWorkOrderPage"));
 const Operations_EditVendorWoPage = lazy(() => import("@/modules/operations/vendor-work-orders/EditVendorWorkOrderPage"));
-const Operations_VendorWorkOrderList = lazy(() => import("@/modules/operations/vendor-work-orders/VendorWorkOrderListPage"));
+const Operations_VendorWorkOrderTabs = lazy(() => import("@/modules/shared/vendor-work-orders/VendorWorkOrderTabsPage"));
 const Operations_VendorWoPdfVersions = lazy(() => import("@/modules/operations/vendor-work-orders/VendorWoPdfVersionsPage"));
 
 const Operations_CreatePurchaseInvoice = lazy(() => import("@/modules/operations/purchase-invoices/CreatePurchaseInvoicePage"));
@@ -82,7 +82,7 @@ export default function OperationsRoutes() {
             <Route path="project-dashboard/:projectId/purchase-order/:poId/edit" element={<RouteWrapper><Operations_EditPOPage /></RouteWrapper>}></Route>
             <Route path="project-dashboard/:projectId/purchase-order/:poId/pdf-versions" element={<RouteWrapper><Operations_PoPdfVersions /></RouteWrapper>} />
             <Route path="purchase-orders" element={<RouteWrapper><Operations_PurchaseOrderTabs /></RouteWrapper>} />
-            <Route path="vendor-work-orders" element={<RouteWrapper><Operations_VendorWorkOrderList /></RouteWrapper>} />
+            <Route path="vendor-work-orders" element={<RouteWrapper><Operations_VendorWorkOrderTabs /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/create" element={<RouteWrapper><Operations_RaiseVendorWoFormPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId" element={<RouteWrapper><Operations_EditVendorWoPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId/edit" element={<RouteWrapper><Operations_EditVendorWoPage /></RouteWrapper>} />

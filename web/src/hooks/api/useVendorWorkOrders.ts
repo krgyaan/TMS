@@ -1,11 +1,35 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
-import type { CreateVendorWorkOrderDTO, UpdateVendorWorkOrderDTO } from "@/modules/operations/vendor-work-orders/helpers/vwoForm.types";
+import type { CreateVendorWorkOrderDTO, SetVwoApprovalDTO, UpdateVendorWorkOrderDTO } from "@/modules/operations/vendor-work-orders/helpers/vwoForm.types";
 
-export function useAllVendorWorkOrders(teamId?: number) {
+export const vwoKeys = {
+    all: ["vendor-work-orders"] as const,
+};
+
+export function useAllVendorWorkOrders(status?: string, section?: string) {
     return useQuery({
-        queryKey: ["vendor-work-orders", "all", teamId],
-        queryFn: () => vendorWorkOrderApi.getAll(teamId),
+        queryKey: [...vwoKeys.all, "all", section, status],
+        queryFn: () => vendorWorkOrderApi.getAll(status, section),
+        placeholderData: (previousData) => previousData,
+    });
+}
+
+export function useVendorWorkOrderApprovalCounts(section?: string) {
+    return useQuery({
+        queryKey: [...vwoKeys.all, "approval-counts", section],
+        queryFn: () => vendorWorkOrderApi.getApprovalCounts(section),
+        staleTime: 30 * 1000,
+    });
+}
+
+export function useSetVwoApproval() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: SetVwoApprovalDTO }) =>
+            vendorWorkOrderApi.setApproval(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: vwoKeys.all });
+        },
     });
 }
 
