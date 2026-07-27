@@ -7,6 +7,7 @@ import { users } from '@db/schemas/auth/users.schema';
 import { vendors } from '@db/schemas/vendors/vendors.schema';
 import { and, asc, desc, eq, ilike, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
+import { LeadsQuotationService } from '@/modules/crm/leads-quotation/leads-quotation.service';
 import type { SubmitCostingSheetDto, ResubmitCostingSheetDto, ApproveCostingSheetDto, RedoCostingSheetDto } from './dto/enquirycosting.dto';
 
 export type EnquiryCostingListFilters = {
@@ -50,6 +51,7 @@ const createdByUser = alias(users, 'created_by_user');
 export class EnquiryCostingService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly leadsQuotationService: LeadsQuotationService,
     ) {}
 
     async findAll(filters?: EnquiryCostingListFilters): Promise<{
@@ -393,6 +395,11 @@ export class EnquiryCostingService {
             .update(leadEnquiries)
             .set({ status: 'Approved', updatedAt: new Date() })
             .where(eq(leadEnquiries.id, sheet.enquiryId));
+
+        await this.leadsQuotationService.create({
+            enquiryId: sheet.enquiryId,
+            status: 'Submission Pending',
+        });
 
         return { success: true };
     }

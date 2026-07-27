@@ -20,3 +20,6 @@ export * from './site-visit-contacts.schema';
 
 // Private Costing Sheets
 export * from './private-costing-sheets.schema';
+
+// Private Quotes
+export * from './private-quotes.schema';
