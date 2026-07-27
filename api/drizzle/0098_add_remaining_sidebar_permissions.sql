@@ -40,6 +40,11 @@ INSERT INTO "permissions" ("module", "action", "description") VALUES
   ('accounts.sale-invoices', 'update', 'Update accounts sale invoices'),
   ('accounts.sale-invoices', 'delete', 'Delete accounts sale invoices'),
 
+  ('accounts.vendor-work-orders', 'create', 'Create accounts vendor work orders'),
+  ('accounts.vendor-work-orders', 'read', 'View accounts vendor work orders'),
+  ('accounts.vendor-work-orders', 'update', 'Update accounts vendor work orders'),
+  ('accounts.vendor-work-orders', 'delete', 'Delete accounts vendor work orders'),
+
   ('accounts.payment-requests', 'create', 'Create accounts payment requests'),
   ('accounts.payment-requests', 'read', 'View accounts payment requests'),
   ('accounts.payment-requests', 'update', 'Update accounts payment requests'),

@@ -1,6 +1,6 @@
 "use client";
 
-import { Banknote, BarChart3, FileSearch, Gauge, Headset, LayoutDashboard, Settings, Share2, Shield, Users, Wrench } from "lucide-react";
+import { Banknote, BarChart3, Briefcase, FileSearch, Gauge, Headset, LayoutDashboard, Settings, Share2, Shield, Users, Wrench } from "lucide-react";
 import * as React from "react";
 
 import { paths } from "@/app/routes/paths";
@@ -106,12 +106,13 @@ const navMain: NavGroup[] = [
             { title: "Delegation Dashboard", url: paths.accounts.delegation, permission: "accounts.delegation" },
             { title: "Purchase Orders", url: paths.accounts.purchaseOrders, permission: "accounts.purchase-orders" },
             { title: "Sale Invoices", url: paths.accounts.saleInvoices, permission: "accounts.sale-invoices" },
+            { title: "Vendor Work Orders", url: paths.accounts.vendorWorkOrders, permission: "accounts.vendor-work-orders" },
             { title: "Payment Requests", url: paths.accounts.paymentRequests, permission: "accounts.payment-requests" },
         ],
     },
     {
         title: "Document Dashboard",
-        icon: FileSearch,
+        icon: Briefcase,
         items: [
             { title: "Projects", url: paths.documentDashboard.projects, permission: "document-dashboard.projects" },
             { title: "PQR Documents", url: paths.documentDashboard.pqr, permission: "document-dashboard.pqr" },
@@ -143,11 +144,6 @@ const navMain: NavGroup[] = [
             { title: "Account Team", url: paths.performance.accountTeam, permission: "performance.account-team" },
         ],
     },
-    // {
-    //     title: "HRMS",
-    //     icon: Briefcase,
-    //     items: [{ title: "My Assets", url: paths.hrms.myAssets, permission: "hrms" }],
-    // },
     {
         title: "HRMS",
         icon: Shield,

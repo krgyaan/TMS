@@ -226,6 +226,7 @@ export const paths = {
         delegationUpdate: (id: string) => `/accounts/delegation/${id}/update`,
         purchaseOrders: "/accounts/purchase-orders",
         saleInvoices: "/accounts/sale-invoices",
+        vendorWorkOrders: "/accounts/vendor-work-orders",
         paymentRequests: "/accounts/payment-requests",
 
     },
