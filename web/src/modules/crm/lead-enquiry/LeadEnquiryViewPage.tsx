@@ -1,13 +1,21 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { ShowPageLayout, type StepConfig } from "@/components/layout/ShowPageLayout";
 import { User, FileText, ClipboardList } from "lucide-react";
 import { useLeadEnquiry } from "@/hooks/api/useLeadEnquiry";
+import { useLeadStepStatuses } from "@/hooks/api/useLeadStepStatuses";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import type { LeadEnquiryWithNames } from "./helpers/lead-enquiry.type";
+import { LeadDetailsSection } from "../leads/components/LeadView";
+import { FollowupViewPage } from "../followups/FollowupViewPage";
+import { LeadSiteVisitView } from "../lead-enquiry/components/LeadSiteVisitView";
+import { EnquiryCostingView } from "../enquirycosting/EnquiryCostingViewPage";
+import { leadEnquiryService } from "@/services/api/lead-enquiry.service";
+import { enquiryCostingService } from "@/services/api/enquirycosting.service";
 
 interface LeadEnquiryViewProps {
     enquiry?: LeadEnquiryWithNames | null;
@@ -142,7 +150,55 @@ export function EnquiryDetailsSection({ enquiryId }: { enquiryId: number | null 
     );
 }
 
-// ── View Page with ShowPageLayout ────────────────────────────────────────────
+// ── Shared section content helpers ────────────────────────────────────────────
+
+function LeadSiteVisitsContent({ leadId }: { leadId: number }) {
+    const { data: siteVisits, isLoading } = useQuery({
+        queryKey: ['site-visits', 'by-lead', leadId],
+        queryFn: () => leadEnquiryService.getSiteVisitsByLead(leadId),
+    });
+
+    if (isLoading) {
+        return <div className="flex items-center justify-center py-8 text-muted-foreground">Loading site visits...</div>;
+    }
+
+    if (!siteVisits?.length) {
+        return <p className="text-sm text-muted-foreground py-4 text-center">No site visits found for this lead.</p>;
+    }
+
+    return (
+        <div className="space-y-4">
+            {siteVisits.map((sv) => (
+                <LeadSiteVisitView key={sv.id} siteVisit={sv as any} />
+            ))}
+        </div>
+    );
+}
+
+function LeadCostingsContent({ leadId }: { leadId: number }) {
+    const { data: costings, isLoading } = useQuery({
+        queryKey: ['enquiry-costings', 'by-lead', leadId],
+        queryFn: () => enquiryCostingService.getByLeadId(leadId),
+    });
+
+    if (isLoading) {
+        return <div className="flex items-center justify-center py-8 text-muted-foreground">Loading costings...</div>;
+    }
+
+    if (!costings?.length) {
+        return <p className="text-sm text-muted-foreground py-4 text-center">No costings found for this lead.</p>;
+    }
+
+    return (
+        <div className="space-y-4">
+            {costings.map((c) => (
+                <EnquiryCostingView key={c.id} costing={c} />
+            ))}
+        </div>
+    );
+}
+
+// ── View Page with ShowPageLayout (5-step lead stepper) ──────────────────────
 
 interface LeadEnquiryViewPageProps {
     enquiryId: number;
@@ -150,20 +206,22 @@ interface LeadEnquiryViewPageProps {
     backLabel?: string;
 }
 
-const ENQUIRY_STEPS: StepConfig[] = [
-    {
-        id: "enquiry-details",
-        label: "Enquiry Details",
-        shortLabel: "Details",
-        stepNumber: 1,
-        status: "completed",
-        hasData: true,
-        isLoading: false,
-    },
-];
-
 export function LeadEnquiryViewPage({ enquiryId, onBack, backLabel }: LeadEnquiryViewPageProps) {
-    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["enquiry-details"]));
+    const { data: enquiry } = useLeadEnquiry(enquiryId ?? null);
+    const leadId = enquiry?.leadId ?? null;
+    const stepStatuses = useLeadStepStatuses(leadId);
+
+    const steps = useMemo<StepConfig[]>(() => stepStatuses.map(s => ({
+        id: s.id,
+        label: s.label,
+        shortLabel: s.shortLabel,
+        stepNumber: s.stepNumber,
+        status: s.status,
+        hasData: s.hasData,
+        isLoading: s.isLoading,
+    })), [stepStatuses]);
+
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["enquiries"]));
 
     const toggleSection = useCallback((id: string) => {
         setExpandedSections((prev) => {
@@ -174,21 +232,32 @@ export function LeadEnquiryViewPage({ enquiryId, onBack, backLabel }: LeadEnquir
         });
     }, []);
 
-    const expandAll = useCallback(() => setExpandedSections(new Set(ENQUIRY_STEPS.map((s) => s.id))), []);
+    const expandAll = useCallback(() => setExpandedSections(new Set(steps.map((s) => s.id))), [steps]);
     const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
 
     const renderSectionContent = useCallback((stepId: string) => {
+        if (!leadId) {
+            return <div className="flex items-center justify-center py-8 text-muted-foreground">Loading...</div>;
+        }
         switch (stepId) {
-            case "enquiry-details":
+            case "lead-details":
+                return <LeadDetailsSection leadId={leadId} />;
+            case "followups":
+                return <FollowupViewPage leadId={leadId} />;
+            case "enquiries":
                 return <EnquiryDetailsSection enquiryId={enquiryId} />;
+            case "site-visits":
+                return <LeadSiteVisitsContent leadId={leadId} />;
+            case "costings":
+                return <LeadCostingsContent leadId={leadId} />;
             default:
                 return null;
         }
-    }, [enquiryId]);
+    }, [leadId, enquiryId]);
 
     return (
         <ShowPageLayout
-            steps={ENQUIRY_STEPS}
+            steps={steps}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
             onExpandAll={expandAll}

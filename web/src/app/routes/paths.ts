@@ -245,6 +245,7 @@ export const paths = {
         enquiryEdit: (id: number | string) => `/crm/enquiries/${id}/edit`,
         enquiryView: (id: number | string) => `/crm/enquiries/${id}`,
         enquiryCostings: "/crm/enquiry-costings",
+        costingView: (id: number | string) => `/crm/enquiry-costings/${id}`,
         quotations: "/crm/quotations",
     },
 

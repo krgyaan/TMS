@@ -150,7 +150,7 @@ const EnquiryCostingListPage = () => {
     const costingActions: ActionItem<EnquiryCosting>[] = [
         {
             label: "View",
-            onClick: (row) => navigate(paths.crm.enquiryView(row.enquiryId)),
+            onClick: (row) => navigate(paths.crm.costingView(row.id)),
             icon: <Eye className="h-4 w-4" />,
         },
         {

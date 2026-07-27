@@ -1,18 +1,25 @@
-import { useParams } from "react-router-dom";
-import { EnquiryCostingDetailsSection } from "./EnquiryCostingViewPage";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useParams, useNavigate } from "react-router-dom";
+import { EnquiryCostingViewPage } from "./EnquiryCostingViewPage";
+import { paths } from "@/app/routes/paths";
 
 export default function EnquiryCostingShowPage() {
     const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
+    const costingId = id ? Number(id) : null;
+
+    if (!costingId || isNaN(costingId)) {
+        return (
+            <div className="p-8 text-center">
+                <p className="text-destructive">Invalid costing ID</p>
+            </div>
+        );
+    }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Costing Sheet</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <EnquiryCostingDetailsSection costingId={id ? Number(id) : null} />
-            </CardContent>
-        </Card>
+        <EnquiryCostingViewPage
+            costingId={costingId}
+            onBack={() => navigate(paths.crm.enquiryCostings)}
+            backLabel="Back to Costings"
+        />
     );
 }

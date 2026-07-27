@@ -1,13 +1,23 @@
+import { useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, DollarSign, User, FileText, BadgeCheck } from "lucide-react";
+import { ShowPageLayout, type StepConfig } from "@/components/layout/ShowPageLayout";
+import { DollarSign, User, FileText, BadgeCheck } from "lucide-react";
 import { useEnquiryCosting } from "@/hooks/api/useEnquiryCosting";
+import { useLeadStepStatuses } from "@/hooks/api/useLeadStepStatuses";
+import { useLeadEnquiry, useLeadEnquiries } from "@/hooks/api/useLeadEnquiry";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { EnquiryCosting } from "./helpers/enquirycosting.type";
+import { LeadDetailsSection } from "../leads/components/LeadView";
+import { FollowupViewPage } from "../followups/FollowupViewPage";
+import { LeadEnquiryView } from "../lead-enquiry/LeadEnquiryViewPage";
+import { LeadSiteVisitView } from "../lead-enquiry/components/LeadSiteVisitView";
+import { leadEnquiryService } from "@/services/api/lead-enquiry.service";
+import { paths } from "@/app/routes/paths";
 
 interface EnquiryCostingViewProps {
     costing?: EnquiryCosting | null;
@@ -154,25 +164,148 @@ export function EnquiryCostingDetailsSection({ costingId }: { costingId: number 
     );
 }
 
-const EnquiryCostingViewPage = () => {
-    const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
+// ── Shared section content helpers ────────────────────────────────────────────
+
+function LeadEnquiriesContent({ leadId }: { leadId: number }) {
+    const { data: apiResponse, isLoading } = useLeadEnquiries(
+        { page: 1, limit: 50, leadId },
+    );
+
+    if (isLoading) {
+        return <div className="flex items-center justify-center py-8 text-muted-foreground">Loading enquiries...</div>;
+    }
+
+    if (!apiResponse?.data?.length) {
+        return <p className="text-sm text-muted-foreground py-4 text-center">No enquiries found for this lead.</p>;
+    }
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-center gap-4">
-                    <Button variant="outline" size="icon" onClick={() => navigate(-1)}>
-                        <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <CardTitle>Costing Sheet</CardTitle>
-                </div>
-            </CardHeader>
-            <CardContent>
-                <EnquiryCostingDetailsSection costingId={id ? Number(id) : null} />
-            </CardContent>
-        </Card>
+        <div className="space-y-4">
+            {apiResponse.data.map((enquiry) => (
+                <LeadEnquiryView key={enquiry.id} enquiry={enquiry} />
+            ))}
+        </div>
+    );
+}
+
+function LeadSiteVisitsContent({ leadId }: { leadId: number }) {
+    const { data: siteVisits, isLoading } = useQuery({
+        queryKey: ['site-visits', 'by-lead', leadId],
+        queryFn: () => leadEnquiryService.getSiteVisitsByLead(leadId),
+    });
+
+    if (isLoading) {
+        return <div className="flex items-center justify-center py-8 text-muted-foreground">Loading site visits...</div>;
+    }
+
+    if (!siteVisits?.length) {
+        return <p className="text-sm text-muted-foreground py-4 text-center">No site visits found for this lead.</p>;
+    }
+
+    return (
+        <div className="space-y-4">
+            {siteVisits.map((sv) => (
+                <LeadSiteVisitView key={sv.id} siteVisit={sv as any} />
+            ))}
+        </div>
+    );
+}
+
+// ── View Page with ShowPageLayout (5-step lead stepper) ──────────────────────
+
+interface EnquiryCostingViewPageProps {
+    costingId: number;
+    onBack?: () => void;
+    backLabel?: string;
+}
+
+export function EnquiryCostingViewPage({ costingId, onBack, backLabel }: EnquiryCostingViewPageProps) {
+    const { data: costing } = useEnquiryCosting(costingId ?? null);
+    const enquiryId = costing?.enquiryId ?? null;
+    const { data: enquiry } = useLeadEnquiry(enquiryId);
+    const leadId = enquiry?.leadId ?? null;
+    const stepStatuses = useLeadStepStatuses(leadId);
+
+    const steps = useMemo<StepConfig[]>(() => stepStatuses.map(s => ({
+        id: s.id,
+        label: s.label,
+        shortLabel: s.shortLabel,
+        stepNumber: s.stepNumber,
+        status: s.status,
+        hasData: s.hasData,
+        isLoading: s.isLoading,
+    })), [stepStatuses]);
+
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["costings"]));
+
+    const toggleSection = useCallback((id: string) => {
+        setExpandedSections((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
+
+    const expandAll = useCallback(() => setExpandedSections(new Set(steps.map((s) => s.id))), [steps]);
+    const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
+
+    const renderSectionContent = useCallback((stepId: string) => {
+        if (!leadId) {
+            return <div className="flex items-center justify-center py-8 text-muted-foreground">Loading...</div>;
+        }
+        switch (stepId) {
+            case "lead-details":
+                return <LeadDetailsSection leadId={leadId} />;
+            case "followups":
+                return <FollowupViewPage leadId={leadId} />;
+            case "enquiries":
+                return <LeadEnquiriesContent leadId={leadId} />;
+            case "site-visits":
+                return <LeadSiteVisitsContent leadId={leadId} />;
+            case "costings":
+                return <EnquiryCostingDetailsSection costingId={costingId} />;
+            default:
+                return null;
+        }
+    }, [leadId, costingId]);
+
+    return (
+        <ShowPageLayout
+            steps={steps}
+            expandedSections={expandedSections}
+            onToggleSection={toggleSection}
+            onExpandAll={expandAll}
+            onCollapseAll={collapseAll}
+            onBack={onBack}
+            backLabel={backLabel}
+            renderSectionContent={renderSectionContent}
+        />
+    );
+}
+
+// ── Default export (route page) ──────────────────────────────────────────────
+
+const EnquiryCostingViewPageRoute = () => {
+    const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
+    const costingId = id ? Number(id) : null;
+
+    if (!costingId || isNaN(costingId)) {
+        return (
+            <div className="p-8 text-center">
+                <p className="text-destructive">Invalid costing ID</p>
+            </div>
+        );
+    }
+
+    return (
+        <EnquiryCostingViewPage
+            costingId={costingId}
+            onBack={() => navigate(paths.crm.enquiryCostings)}
+            backLabel="Back to Costings"
+        />
     );
 };
 
-export default EnquiryCostingViewPage;
+export default EnquiryCostingViewPageRoute;
