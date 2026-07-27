@@ -53,20 +53,7 @@ export const SubmitPage2Schema = z
           path: ["maxLd"],
         });
       }
-      if (!data.ldStartDate) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "LD Start Date is required when LD is applicable",
-          path: ["ldStartDate"],
-        });
-      }
-      if (!data.maxLdDate) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Max LD Date is required when LD is applicable",
-          path: ["maxLdDate"],
-        });
-      }
+
     }
 
     // Validate PBG fields

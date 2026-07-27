@@ -744,7 +744,7 @@ export class WoDetailsService {
 
       if (
         detail.ldApplicable &&
-        (!detail.maxLd || !detail.ldStartDate || !detail.maxLdDate)
+        !detail.maxLd
       ) {
         page2Errors.push('LD details are incomplete');
       }
