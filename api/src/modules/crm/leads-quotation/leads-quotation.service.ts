@@ -158,6 +158,17 @@ export class LeadsQuotationService {
         return quote;
     }
 
+    async findByLeadId(leadId: number) {
+        const rows = await this.db
+            .select(quoteSelect)
+            .from(privateQuotes)
+            .innerJoin(leadEnquiries, eq(privateQuotes.enquiryId, leadEnquiries.id))
+            .where(eq(leadEnquiries.leadId, leadId))
+            .orderBy(desc(privateQuotes.createdAt));
+
+        return rows;
+    }
+
     async create(data: CreatePrivateQuoteDto) {
         const [quote] = await this.db
             .insert(privateQuotes)

@@ -48,6 +48,11 @@ export class LeadsQuotationController {
         });
     }
 
+    @Get('by-lead/:leadId')
+    async getByLead(@Param('leadId', ParseIntPipe) leadId: number) {
+        return this.leadsQuotationService.findByLeadId(leadId);
+    }
+
     @Get(':id')
     async get(@Param('id', ParseIntPipe) id: number) {
         return this.leadsQuotationService.findOne(id);

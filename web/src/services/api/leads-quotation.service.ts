@@ -24,6 +24,10 @@ class LeadsQuotationService extends BaseApiService {
         return this.get<PrivateQuote>(`/${id}`);
     }
 
+    async getByLeadId(leadId: number): Promise<PrivateQuote[]> {
+        return this.get<PrivateQuote[]>(`/by-lead/${leadId}`);
+    }
+
     async update(id: number, data: UpdatePrivateQuoteRequest): Promise<PrivateQuote> {
         return this.patch<PrivateQuote>(`/${id}`, data);
     }
