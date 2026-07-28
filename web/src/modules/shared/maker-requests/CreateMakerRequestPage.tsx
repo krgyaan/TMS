@@ -186,6 +186,32 @@ export default function CreateMakerRequestPage() {
 
     const handleSubmit = async (values: MakerRequestFormValues) => {
         try {
+            const config = values.categoryId ? CATEGORY_UPLOAD_CONFIG[values.categoryId] : null;
+
+            form.clearErrors("uploadInvoice");
+            form.clearErrors("uploadPI");
+
+            if (config) {
+                const showInvoice = config.uploadInvoice;
+                const showPI = config.uploadPI;
+                const hasInvoice = (values.uploadInvoice?.length ?? 0) > 0;
+                const hasPI = (values.uploadPI?.length ?? 0) > 0;
+
+                if (showInvoice && showPI && !hasInvoice && !hasPI) {
+                    form.setError("uploadInvoice", { message: "At least one of Upload Invoice or Upload PI is required" });
+                    form.setError("uploadPI", { message: "At least one of Upload Invoice or Upload PI is required" });
+                    return;
+                }
+                if (showInvoice && !hasInvoice) {
+                    form.setError("uploadInvoice", { message: "Upload Invoice is required" });
+                    return;
+                }
+                if (showPI && !hasPI) {
+                    form.setError("uploadPI", { message: "Upload PI is required" });
+                    return;
+                }
+            }
+
             const dto = mapMakerRequestFormToCreateDTO(values);
             await createMakerMutation.mutateAsync(dto);
             toast.success("Maker Request created successfully.");
@@ -348,20 +374,30 @@ export default function CreateMakerRequestPage() {
                             <h3 className="text-lg font-semibold">Proof & Remark</h3>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
                                 {selectedCategoryConfig?.uploadInvoice && (
-                                    <TenderFileUploader
-                                        label="Upload Invoice"
-                                        context="tender-documents"
-                                        value={form.watch("uploadInvoice")}
-                                        onChange={(paths) => form.setValue("uploadInvoice", paths)}
-                                    />
+                                    <div>
+                                        <TenderFileUploader
+                                            label="Upload Invoice"
+                                            context="tender-documents"
+                                            value={form.watch("uploadInvoice")}
+                                            onChange={(paths) => form.setValue("uploadInvoice", paths)}
+                                        />
+                                        {form.formState.errors.uploadInvoice && (
+                                            <p className="text-sm text-destructive mt-1">{form.formState.errors.uploadInvoice.message}</p>
+                                        )}
+                                    </div>
                                 )}
                                 {selectedCategoryConfig?.uploadPI && (
-                                    <TenderFileUploader
-                                        label="Upload PI"
-                                        context="tender-documents"
-                                        value={form.watch("uploadPI")}
-                                        onChange={(paths) => form.setValue("uploadPI", paths)}
-                                    />
+                                    <div>
+                                        <TenderFileUploader
+                                            label="Upload PI"
+                                            context="tender-documents"
+                                            value={form.watch("uploadPI")}
+                                            onChange={(paths) => form.setValue("uploadPI", paths)}
+                                        />
+                                        {form.formState.errors.uploadPI && (
+                                            <p className="text-sm text-destructive mt-1">{form.formState.errors.uploadPI.message}</p>
+                                        )}
+                                    </div>
                                 )}
                                 <FieldWrapper control={form.control} name="remark" label="Remark (if any)">
                                     {(field) => <Input {...field} placeholder="Optional remarks" />}

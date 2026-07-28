@@ -54,6 +54,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
 
     const [uploadInvoiceRow, setUploadInvoiceRow] = useState<PaymentRequestRow | null>(null);
     const [uploadInvoiceFiles, setUploadInvoiceFiles] = useState<string[]>([]);
+    const [uploadInvoiceError, setUploadInvoiceError] = useState("");
     const uploadInvoiceMutation = useUploadPaymentInvoiceAfterPayment();
 
     const rows = useMemo(() => (data ?? []) as PaymentRequestRow[], [data]);
@@ -126,6 +127,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
     const handleUploadInvoice = useCallback((row: PaymentRequestRow) => {
         setUploadInvoiceRow(row);
         setUploadInvoiceFiles([]);
+        setUploadInvoiceError("");
     }, []);
 
     const CATEGORIES_NEED_INVOICE_AFTER_PAYMENT = useMemo(() => new Set([
@@ -133,12 +135,17 @@ const CombinedPaymentRequestListPage: React.FC = () => {
     ]), []);
 
     const confirmUploadInvoice = useCallback(async () => {
-        if (!uploadInvoiceRow || uploadInvoiceFiles.length === 0) return;
+        if (!uploadInvoiceRow) return;
+        if (uploadInvoiceFiles.length === 0) {
+            setUploadInvoiceError("Please upload at least one file");
+            return;
+        }
         try {
             await uploadInvoiceMutation.mutateAsync({ id: uploadInvoiceRow.id, files: uploadInvoiceFiles });
             toast.success("Invoice uploaded successfully.");
             setUploadInvoiceRow(null);
             setUploadInvoiceFiles([]);
+            setUploadInvoiceError("");
         } catch {
             toast.error("Failed to upload invoice.");
         }
@@ -551,7 +558,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             </Dialog>
 
             {/* Upload Invoice after Payment Dialog */}
-            <Dialog open={uploadInvoiceRow !== null} onOpenChange={(open) => { if (!open) { setUploadInvoiceRow(null); setUploadInvoiceFiles([]); } }}>
+            <Dialog open={uploadInvoiceRow !== null} onOpenChange={(open) => { if (!open) { setUploadInvoiceRow(null); setUploadInvoiceFiles([]); setUploadInvoiceError(""); } }}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Upload Invoice after Payment</DialogTitle>
@@ -569,14 +576,17 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                                     label="Upload Invoice"
                                     context="tender-documents"
                                     value={uploadInvoiceFiles}
-                                    onChange={setUploadInvoiceFiles}
+                                    onChange={(files) => { setUploadInvoiceFiles(files); setUploadInvoiceError(""); }}
                                 />
+                                {uploadInvoiceError && (
+                                    <p className="text-sm text-destructive">{uploadInvoiceError}</p>
+                                )}
                             </div>
                         </div>
                     }
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => { setUploadInvoiceRow(null); setUploadInvoiceFiles([]); }}>Cancel</Button>
-                        <Button onClick={confirmUploadInvoice} disabled={uploadInvoiceFiles.length === 0 || uploadInvoiceMutation.isPending}>
+                        <Button variant="outline" onClick={() => { setUploadInvoiceRow(null); setUploadInvoiceFiles([]); setUploadInvoiceError(""); }}>Cancel</Button>
+                        <Button onClick={confirmUploadInvoice} disabled={uploadInvoiceMutation.isPending}>
                             {uploadInvoiceMutation.isPending ? "Uploading..." : "Submit"}
                         </Button>
                     </DialogFooter>
