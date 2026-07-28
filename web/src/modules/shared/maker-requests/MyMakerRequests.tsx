@@ -273,10 +273,20 @@ const MyMakerRequests: React.FC = () => {
                                 <Label className="text-muted-foreground text-xs">Category</Label><p>{detail.category || "—"}</p>
                             </div>
                             <div>
+                                <Label className="text-muted-foreground text-xs">Payment Mode</Label>
+                                <p className="capitalize">{detail.paymentMode?.replaceAll('_', ' ').toLowerCase() || "—"}</p>
+                            </div>
+                            <div>
                                 <Label className="text-muted-foreground text-xs">Account Number</Label><p className="font-mono">{detail.accountNumber}</p>
                             </div>
                             <div>
+                                <Label className="text-muted-foreground text-xs">Bank Name</Label><p>{detail.bankName || "—"}</p>
+                            </div>
+                            <div>
                                 <Label className="text-muted-foreground text-xs">IFSC</Label><p className="font-mono">{detail.ifsc}</p>
+                            </div>
+                            <div>
+                                <Label className="text-muted-foreground text-xs">Requested By</Label><p>{detail.requestedByName || "—"}</p>
                             </div>
                             <div>
                                 <Label className="text-muted-foreground text-xs">Status</Label><Badge variant="outline" className={STATUS_CONFIG[detail.status]?.color || ""}>{STATUS_CONFIG[detail.status]?.label || detail.status}</Badge>
@@ -284,6 +294,12 @@ const MyMakerRequests: React.FC = () => {
                             <div>
                                 <Label className="text-muted-foreground text-xs">Created At</Label><p>{formatDate(detail.createdAt)}</p>
                             </div>
+                            {detail.portalLink && 
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs">Portal Link</Label>
+                                    <p className="font-mono text-sm truncate">{detail.portalLink}</p>
+                                </div>
+                            }
                             {detail.utrNumber && 
                                 <div>
                                     <Label className="text-muted-foreground text-xs">UTR Number</Label><p className="font-mono">{detail.utrNumber}</p>
@@ -306,6 +322,36 @@ const MyMakerRequests: React.FC = () => {
                                     <Label className="text-muted-foreground text-xs">Bill / Proof Files</Label>
                                     <div className="flex flex-wrap gap-2 mt-1">
                                         {detail.billFiles.map((f, i) => (
+                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {detail.uploadInvoice?.length > 0 && (
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs">Upload Invoice</Label>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        {detail.uploadInvoice.map((f, i) => (
+                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {detail.uploadPI?.length > 0 && (
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs">Upload PI</Label>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        {detail.uploadPI.map((f, i) => (
+                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {detail.uploadInvoiceAfterPayment?.length > 0 && (
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs">Upload Invoice after Payment</Label>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        {detail.uploadInvoiceAfterPayment.map((f, i) => (
                                             <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
                                         ))}
                                     </div>

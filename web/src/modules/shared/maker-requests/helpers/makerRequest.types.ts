@@ -3,12 +3,16 @@ export interface MakerRequestRow {
     requestNo: string;
     partyName?: string;
     accountNumber?: string;
+    bankName?: string;
     ifsc?: string;
     amount: number;
     category?: string;
     paymentMode: string;
     portalLink?: string;
     billFiles: string[];
+    uploadInvoice: string[];
+    uploadPI: string[];
+    uploadInvoiceAfterPayment: string[];
     remark?: string;
     status: string;
     utrNumber?: string;

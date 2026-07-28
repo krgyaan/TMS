@@ -16,6 +16,9 @@ export interface PaymentRequestRow {
     paymentMode: string;
     portalLink?: string;
     billFiles: string[];
+    uploadInvoice: string[];
+    uploadPI: string[];
+    uploadInvoiceAfterPayment: string[];
     remark?: string;
     status: string;
     requestedBy: string;

@@ -446,6 +446,36 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                                     </div>
                                 </div>
                             )}
+                            {detail.uploadInvoice?.length > 0 && (
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs">Upload Invoice</Label>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        {detail.uploadInvoice.map((f: string, i: number) => (
+                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {detail.uploadPI?.length > 0 && (
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs">Upload PI</Label>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        {detail.uploadPI.map((f: string, i: number) => (
+                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {detail.uploadInvoiceAfterPayment?.length > 0 && (
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs">Upload Invoice after Payment</Label>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        {detail.uploadInvoiceAfterPayment.map((f: string, i: number) => (
+                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                             {detail.projectId != null && detail.purchaseOrderId && (
                                 <div className="col-span-2 space-y-2">
                                     <Label className="text-muted-foreground text-xs">PO Details</Label>
