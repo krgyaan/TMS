@@ -55,7 +55,9 @@ export class MakerRequestService {
                     paymentMode: body.paymentMode || "BANK_TRANSFER",
                     portalLink: body.portalLink || null,
                     billFiles: body.billFiles || [],
-                    remark: body.remark,
+                    uploadInvoice: body.uploadInvoice || [],
+                    uploadPI: body.uploadPI || [],
+                    uploadInvoiceAfterPayment: body.uploadInvoiceAfterPayment || [],
                     requestedBy: userId,
                 })
                 .returning()
@@ -101,6 +103,29 @@ export class MakerRequestService {
         return updated;
     }
 
+    async uploadInvoiceAfterPayment(id: number, files: string[]) {
+        const existing = await this.db
+            .select({ id: paymentRequests.id })
+            .from(paymentRequests)
+            .where(and(eq(paymentRequests.id, id), sql`${paymentRequests.projectId} IS NULL`))
+            .then(rows => rows[0]);
+        if (!existing) throw new NotFoundException("Maker Request not found");
+
+        const updated = (
+            await this.db
+                .update(paymentRequests)
+                .set({
+                    uploadInvoiceAfterPayment: files,
+                    updatedAt: new Date(),
+                })
+                .where(and(eq(paymentRequests.id, id), sql`${paymentRequests.projectId} IS NULL`))
+                .returning()
+        )[0];
+
+        this.logger.info(`Invoice after payment uploaded for Maker Request #${id}`);
+        return updated;
+    }
+
     private readonly mrFields = {
         id: paymentRequests.id,
         requestNo: paymentRequests.requestNo,
@@ -113,6 +138,9 @@ export class MakerRequestService {
         paymentMode: paymentRequests.paymentMode,
         portalLink: paymentRequests.portalLink,
         billFiles: paymentRequests.billFiles,
+        uploadInvoice: paymentRequests.uploadInvoice,
+        uploadPI: paymentRequests.uploadPI,
+        uploadInvoiceAfterPayment: paymentRequests.uploadInvoiceAfterPayment,
         remark: paymentRequests.remark,
         status: paymentRequests.status,
         utrNumber: paymentRequests.utrNumber,

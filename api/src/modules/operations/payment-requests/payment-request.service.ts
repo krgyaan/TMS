@@ -191,6 +191,29 @@ export class PaymentRequestService {
         return updated;
     }
 
+    async uploadInvoiceAfterPayment(id: number, files: string[]) {
+        const existing = await this.db
+            .select({ id: paymentRequests.id })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, id))
+            .then(rows => rows[0]);
+        if (!existing) throw new NotFoundException("Payment Request not found");
+
+        const updated = (
+            await this.db
+                .update(paymentRequests)
+                .set({
+                    uploadInvoiceAfterPayment: files,
+                    updatedAt: new Date(),
+                })
+                .where(eq(paymentRequests.id, id))
+                .returning()
+        )[0];
+
+        this.logger.info(`Invoice after payment uploaded for Request #${id}`);
+        return updated;
+    }
+
     private readonly prFields = {
         id: paymentRequests.id,
         projectId: paymentRequests.projectId,
