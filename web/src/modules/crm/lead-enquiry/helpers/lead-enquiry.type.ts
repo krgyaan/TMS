@@ -1,0 +1,148 @@
+export interface LeadEnquiry {
+    id: number;
+    leadId: number | null;
+    team: string | null;
+    enqName: string;
+    organisationId: number | null;
+    itemId: number;
+    locationCode: string;
+    approxValue: string;
+    siteVisitRequired: boolean;
+    createdBy: number;
+    updatedBy: number | null;
+    orgAbbName: string | null;
+    enquiryFile: string | null;
+    enquiryPhotos: string | null;
+    organizationName: string | null;
+    enquiryNumber: string | null;
+    rejectionReason: string | null;
+    status: string | null;
+    costingDocument: string | null;
+    notes: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface LeadEnquiryWithNames extends LeadEnquiry {
+    leadName?: string | null;
+    itemName?: string | null;
+    orgName?: string | null;
+    createdByName?: string | null;
+    updatedByName?: string | null;
+    hasSiteVisit?: boolean;
+    costingSheetStatus?: string | null;
+}
+
+export interface CreateLeadEnquiryRequest {
+    leadId?: number | null;
+    team?: string | null;
+    enqName: string;
+    organisationId?: number | null;
+    itemId: number;
+    locationCode: string;
+    approxValue: string;
+    siteVisitRequired?: boolean;
+    orgAbbName?: string | null;
+    enquiryFile?: string | null;
+    enquiryPhotos?: string | null;
+    organizationName?: string | null;
+    enquiryNumber?: string | null;
+    rejectionReason?: string | null;
+    status?: string | null;
+    notes?: string | null;
+}
+
+export interface UpdateLeadEnquiryRequest extends Partial<CreateLeadEnquiryRequest> {
+    costingDocument?: string | null;
+}
+
+export interface SiteVisitContact {
+    id: number;
+    siteVisitId: number;
+    name: string;
+    designation: string | null;
+    phone: string | null;
+    email: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateSiteVisitContactRequest {
+    name: string;
+    designation?: string | null;
+    phone?: string | null;
+    email?: string | null;
+}
+
+export interface UpdateSiteVisitDetailsRequest {
+    information?: string | null;
+    documents?: string | null;
+    conductedAt?: string | null;
+}
+
+export interface CreateCostingSheetResponse {
+    sheetUrl: string;
+}
+
+export interface SubmitCostingSheetRequest {
+    enquiryId: number;
+    finalPrice?: string | null;
+    receiptPreGst?: string | null;
+    budgetPreGst?: string | null;
+    grossMargin?: string | null;
+    remarks?: string | null;
+}
+
+export interface SubmitCostingSheetResponse {
+    success: boolean;
+}
+
+export type DriveScopesResponse = {
+    hasScopes: boolean;
+    missingScopes: string[];
+    grantedScopes: string[];
+};
+
+export interface LeadEnquiryListParams {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    team?: string;
+    leadId?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+}
+
+export interface SiteVisit {
+    id: number;
+    enquiryId: number;
+    assignedTo: number | null;
+    scheduledAt: string | null;
+    conductedAt: string | null;
+    information: string | null;
+    additionalNotes: string | null;
+    documents: string | null;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateSiteVisitRequest {
+    enquiryId: number;
+    assignedTo?: number | null;
+    scheduledAt?: string | null;
+    information?: string | null;
+    additionalNotes?: string | null;
+    documents?: string | null;
+}
+
+export interface UpdateSiteVisitRequest {
+    assignedTo?: number | null;
+    scheduledAt?: string | null;
+    conductedAt?: string | null;
+    information?: string | null;
+    additionalNotes?: string | null;
+    documents?: string | null;
+    status?: string;
+}

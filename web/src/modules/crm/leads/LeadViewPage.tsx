@@ -1,18 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { LeadDetailsSection } from "./components/LeadView";
+import { FollowupViewPage } from "../followups/FollowupViewPage";
 import { ShowPageLayout, type StepConfig } from "@/components/layout/ShowPageLayout";
-
-const LEAD_STEPS: StepConfig[] = [
-    {
-        id: "lead-details",
-        label: "Lead Details",
-        shortLabel: "Details",
-        stepNumber: 1,
-        status: "completed",
-        hasData: true,
-        isLoading: false,
-    },
-];
+import { useLeadStepStatuses } from "@/hooks/api/useLeadStepStatuses";
+import { LeadEnquiriesSection } from "../lead-enquiry/LeadEnquiryViewPage";
+import { LeadSiteVisitsSection } from "../lead-enquiry/components/LeadSiteVisitView";
+import { LeadCostingsSection } from "../enquirycosting/EnquiryCostingViewPage";
 
 interface LeadViewPageProps {
     leadId: number;
@@ -21,6 +14,18 @@ interface LeadViewPageProps {
 }
 
 export function LeadViewPage({ leadId, onBack, backLabel }: LeadViewPageProps) {
+    const stepStatuses = useLeadStepStatuses(leadId);
+
+    const steps = useMemo<StepConfig[]>(() => stepStatuses.map(s => ({
+        id: s.id,
+        label: s.label,
+        shortLabel: s.shortLabel,
+        stepNumber: s.stepNumber,
+        status: s.status,
+        hasData: s.hasData,
+        isLoading: s.isLoading,
+    })), [stepStatuses]);
+
     const [expandedSections, setExpandedSections] = useState<Set<string>>(
         new Set(["lead-details"])
     );
@@ -35,8 +40,8 @@ export function LeadViewPage({ leadId, onBack, backLabel }: LeadViewPageProps) {
     }, []);
 
     const expandAll = useCallback(
-        () => setExpandedSections(new Set(LEAD_STEPS.map((s) => s.id))),
-        []
+        () => setExpandedSections(new Set(steps.map((s) => s.id))),
+        [steps]
     );
 
     const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
@@ -46,6 +51,14 @@ export function LeadViewPage({ leadId, onBack, backLabel }: LeadViewPageProps) {
             switch (stepId) {
                 case "lead-details":
                     return <LeadDetailsSection leadId={leadId} />;
+                case "followups":
+                    return <FollowupViewPage leadId={leadId} />;
+                case "enquiries":
+                    return <LeadEnquiriesSection leadId={leadId} />;
+                case "site-visits":
+                    return <LeadSiteVisitsSection leadId={leadId} />;
+                case "costings":
+                    return <LeadCostingsSection leadId={leadId} />;
                 default:
                     return null;
             }
@@ -55,7 +68,7 @@ export function LeadViewPage({ leadId, onBack, backLabel }: LeadViewPageProps) {
 
     return (
         <ShowPageLayout
-            steps={LEAD_STEPS}
+            steps={steps}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
             onExpandAll={expandAll}
