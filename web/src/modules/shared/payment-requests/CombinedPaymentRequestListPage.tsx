@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { Search, Eye, CheckCircle2, Ban, Banknote, Copy } from "lucide-react";
+import { Search, Eye, CheckCircle2, Ban, Banknote, Copy, Upload } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,10 +15,11 @@ import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
-import { useAllPaymentRequests, useUpdatePaymentRequestStatus } from "@/hooks/api/useProjectPaymentRequests";
+import { useAllPaymentRequests, useUpdatePaymentRequestStatus, useUploadPaymentInvoiceAfterPayment } from "@/hooks/api/useProjectPaymentRequests";
 import { useTeamFilter } from "@/hooks/useTeamFilter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "react-router-dom";
+import { TenderFileUploader } from "@/components/tender-file-upload";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
@@ -51,6 +52,10 @@ const CombinedPaymentRequestListPage: React.FC = () => {
     const [rejectRow, setRejectRow] = useState<PaymentRequestRow | null>(null);
     const [rejectionReason, setRejectionReason] = useState("");
 
+    const [uploadInvoiceRow, setUploadInvoiceRow] = useState<PaymentRequestRow | null>(null);
+    const [uploadInvoiceFiles, setUploadInvoiceFiles] = useState<string[]>([]);
+    const uploadInvoiceMutation = useUploadPaymentInvoiceAfterPayment();
+
     const rows = useMemo(() => (data ?? []) as PaymentRequestRow[], [data]);
 
     const visibleRows = useMemo(() => {
@@ -63,7 +68,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             'office_maintenance', 'portal_renewal_charges', 'professional_charges',
             'nbfc_oc_acc', 'loan_principal_return',
             'AU_5242', 'AU_5180', 'AU_5190', 'AU_8316', 'AU_9589', 'AU_9284',
-            'asset_purchase',
+            'amex_cc', 'asset_purchase',
         ]);
 
         const userAllowedCategories: Record<string, number[]> = {
@@ -118,6 +123,27 @@ const CombinedPaymentRequestListPage: React.FC = () => {
     const handlePaymentDone = useCallback((row: PaymentRequestRow) => { setPaymentDoneRow(row); setUtrNumber(""); }, []);
     const handleReject = useCallback((row: PaymentRequestRow) => { setRejectRow(row); setRejectionReason(""); }, []);
 
+    const handleUploadInvoice = useCallback((row: PaymentRequestRow) => {
+        setUploadInvoiceRow(row);
+        setUploadInvoiceFiles([]);
+    }, []);
+
+    const CATEGORIES_NEED_INVOICE_AFTER_PAYMENT = useMemo(() => new Set([
+        'rent', 'software', 'printing_stationary', 'office_maintenance', 'portal_renewal_charges', 'professional_charges',
+    ]), []);
+
+    const confirmUploadInvoice = useCallback(async () => {
+        if (!uploadInvoiceRow || uploadInvoiceFiles.length === 0) return;
+        try {
+            await uploadInvoiceMutation.mutateAsync({ id: uploadInvoiceRow.id, files: uploadInvoiceFiles });
+            toast.success("Invoice uploaded successfully.");
+            setUploadInvoiceRow(null);
+            setUploadInvoiceFiles([]);
+        } catch {
+            toast.error("Failed to upload invoice.");
+        }
+    }, [uploadInvoiceRow, uploadInvoiceFiles, uploadInvoiceMutation]);
+
     const confirmMakerDone = useCallback(async () => {
         if (!makerDoneRow) return;
         try { await updateStatusMutation.mutateAsync({ id: makerDoneRow.id, data: { status: "maker_done" } }); setMakerDoneRow(null); } catch {}
@@ -125,20 +151,37 @@ const CombinedPaymentRequestListPage: React.FC = () => {
 
     const confirmPaymentDone = useCallback(async () => {
         if (!paymentDoneRow || !utrNumber.trim()) return;
-        try { await updateStatusMutation.mutateAsync({ id: paymentDoneRow.id, data: { status: "payment_done", utrNumber: utrNumber.trim() } }); setPaymentDoneRow(null); setUtrNumber(""); } catch {}
+        try {
+            await updateStatusMutation.mutateAsync({ id: paymentDoneRow.id, data: { status: "payment_done", utrNumber: utrNumber.trim() } });
+            setPaymentDoneRow(null);
+            setUtrNumber("");
+        } catch {}
     }, [paymentDoneRow, utrNumber, updateStatusMutation]);
 
     const confirmReject = useCallback(async () => {
         if (!rejectRow || !rejectionReason.trim()) return;
-        try { await updateStatusMutation.mutateAsync({ id: rejectRow.id, data: { status: "rejected", rejectionReason: rejectionReason.trim() } }); setRejectRow(null); setRejectionReason(""); } catch {}
+        try { 
+            await updateStatusMutation.mutateAsync(
+                { 
+                    id: rejectRow.id, 
+                    data: { status: "rejected", rejectionReason: rejectionReason.trim() } 
+                }
+            ); 
+            setRejectRow(null); setRejectionReason(""); } catch {}
     }, [rejectRow, rejectionReason, updateStatusMutation]);
 
     const actions: ActionItem<PaymentRequestRow>[] = useMemo(() => [
         { label: "View Details", icon: <Eye className="h-4 w-4" />, onClick: handleView },
         { label: "Maker Done", icon: <CheckCircle2 className="h-4 w-4" />, onClick: handleMakerDone, visible: (row) => row.status === "pending" },
         { label: "Payment Done", icon: <Banknote className="h-4 w-4" />, onClick: handlePaymentDone, visible: (row) => row.status === "maker_done" },
+        {
+            label: "Upload Invoice",
+            icon: <Upload className="h-4 w-4" />,
+            onClick: handleUploadInvoice,
+            visible: (row) => row.status !== "rejected" && CATEGORIES_NEED_INVOICE_AFTER_PAYMENT.has(row.paymentAgainst),
+        },
         { label: "Reject", icon: <Ban className="h-4 w-4" />, onClick: handleReject, className: "text-red-600", visible: (row) => row.status === "pending" || row.status === "maker_done" },
-    ], [handleView, handleMakerDone, handlePaymentDone, handleReject]);
+    ], [handleView, handleMakerDone, handlePaymentDone, handleUploadInvoice, handleReject, CATEGORIES_NEED_INVOICE_AFTER_PAYMENT]);
 
     const columns = useMemo<ColDef<PaymentRequestRow>[]>(() => [
         {
@@ -503,6 +546,39 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => { setRejectRow(null); setRejectionReason(""); }}>Cancel</Button>
                         <Button variant="destructive" onClick={confirmReject} disabled={!rejectionReason.trim() || updateStatusMutation.isPending}>{updateStatusMutation.isPending ? "Rejecting..." : "Reject"}</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Upload Invoice after Payment Dialog */}
+            <Dialog open={uploadInvoiceRow !== null} onOpenChange={(open) => { if (!open) { setUploadInvoiceRow(null); setUploadInvoiceFiles([]); } }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Upload Invoice after Payment</DialogTitle>
+                        <DialogDescription>Upload the invoice for this request after payment has been made</DialogDescription>
+                    </DialogHeader>
+                    {uploadInvoiceRow &&
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-1">
+                                <p className="text-sm"><strong>Request No:</strong> {uploadInvoiceRow.requestNo}</p>
+                                <p className="text-sm"><strong>Party:</strong> {uploadInvoiceRow.partyName}</p>
+                                <p className="text-sm"><strong>Amount:</strong> {formatINR(uploadInvoiceRow.amount)}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <TenderFileUploader
+                                    label="Upload Invoice"
+                                    context="tender-documents"
+                                    value={uploadInvoiceFiles}
+                                    onChange={setUploadInvoiceFiles}
+                                />
+                            </div>
+                        </div>
+                    }
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => { setUploadInvoiceRow(null); setUploadInvoiceFiles([]); }}>Cancel</Button>
+                        <Button onClick={confirmUploadInvoice} disabled={uploadInvoiceFiles.length === 0 || uploadInvoiceMutation.isPending}>
+                            {uploadInvoiceMutation.isPending ? "Uploading..." : "Submit"}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
