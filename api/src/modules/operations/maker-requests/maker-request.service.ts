@@ -173,7 +173,7 @@ export class MakerRequestService {
             })
             .from(paymentRequests)
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
-            .where(eq(paymentRequests.requestedBy, userId))
+            .where(and(eq(paymentRequests.requestedBy, userId), sql`${paymentRequests.projectId} IS NULL`))
             .orderBy(desc(paymentRequests.id));
     }
 
