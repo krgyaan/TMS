@@ -19,9 +19,11 @@ import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { getShortId } from "@/lib/id-utils";
 import type { MakerRequestRow } from "@/modules/shared/maker-requests/helpers/makerRequest.types";
 import { tenderFilesService } from "@/services/api/tender-files.service";
+import { TenderFileUploader } from "@/components/tender-file-upload";
+import { useUploadMakerInvoiceAfterPayment } from "@/hooks/api/useMakerRequests";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { Copy, Eye, Plus, Search } from "lucide-react";
+import { Copy, Eye, Plus, Search, Upload } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PAYMENT_AGAINST_LABELS, STATUS_CONFIG } from "../payment-requests/constants";
@@ -36,6 +38,9 @@ const MyMakerRequests: React.FC = () => {
 
     const [viewingId, setViewingId] = useState<number | null>(null);
     const { data: detailData, isLoading: isDetailLoading } = useMakerRequestDetails(viewingId ?? 0);
+    const [uploadInvoiceRow, setUploadInvoiceRow] = useState<MakerRequestRow | null>(null);
+    const [uploadInvoiceFiles, setUploadInvoiceFiles] = useState<string[]>([]);
+    const uploadInvoiceMutation = useUploadMakerInvoiceAfterPayment();
 
     const rows = useMemo(() => (data ?? []) as MakerRequestRow[], [data]);
 
@@ -67,9 +72,36 @@ const MyMakerRequests: React.FC = () => {
 
     const handleView = useCallback((row: MakerRequestRow) => setViewingId(row.id), []);
 
+    const handleUploadInvoice = useCallback((row: MakerRequestRow) => {
+        setUploadInvoiceRow(row);
+        setUploadInvoiceFiles([]);
+    }, []);
+
+    const CATEGORIES_NEED_INVOICE_AFTER_PAYMENT = useMemo(() => new Set([
+        'rent', 'software', 'printing_stationary', 'office_maintenance', 'portal_renewal_charges', 'professional_charges',
+    ]), []);
+
+    const confirmUploadInvoice = useCallback(async () => {
+        if (!uploadInvoiceRow || uploadInvoiceFiles.length === 0) return;
+        try {
+            await uploadInvoiceMutation.mutateAsync({ id: uploadInvoiceRow.id, files: uploadInvoiceFiles });
+            toast.success("Invoice uploaded successfully.");
+            setUploadInvoiceRow(null);
+            setUploadInvoiceFiles([]);
+        } catch {
+            toast.error("Failed to upload invoice.");
+        }
+    }, [uploadInvoiceRow, uploadInvoiceFiles, uploadInvoiceMutation]);
+
     const mrActions: ActionItem<MakerRequestRow>[] = useMemo(() => [
         { label: "View Details", icon: <Eye className="h-4 w-4" />, onClick: handleView },
-    ], [handleView]);
+        {
+            label: "Upload Invoice",
+            icon: <Upload className="h-4 w-4" />,
+            onClick: handleUploadInvoice,
+            visible: (row) => row.status !== "rejected" && !!row.category && CATEGORIES_NEED_INVOICE_AFTER_PAYMENT.has(row.category),
+        },
+    ], [handleView, handleUploadInvoice, CATEGORIES_NEED_INVOICE_AFTER_PAYMENT]);
 
     const mrColumns = useMemo<ColDef<MakerRequestRow>[]>(() => [
         { field: "requestNo", headerName: "Request No", sortable: true, filter: true, width: 260, flex: 1, cellRenderer: (p: CustomCellRendererProps<MakerRequestRow>) => (
@@ -276,6 +308,39 @@ const MyMakerRequests: React.FC = () => {
                     ) : <p className="text-muted-foreground py-4 text-center">No details found.</p>}
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setViewingId(null)}>Close</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Upload Invoice after Payment Dialog */}
+            <Dialog open={uploadInvoiceRow !== null} onOpenChange={(open) => { if (!open) { setUploadInvoiceRow(null); setUploadInvoiceFiles([]); } }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Upload Invoice after Payment</DialogTitle>
+                        <DialogDescription>Upload the invoice for this request after payment has been made</DialogDescription>
+                    </DialogHeader>
+                    {uploadInvoiceRow &&
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-1">
+                                <p className="text-sm"><strong>Request No:</strong> {uploadInvoiceRow.requestNo}</p>
+                                <p className="text-sm"><strong>Party:</strong> {uploadInvoiceRow.partyName}</p>
+                                <p className="text-sm"><strong>Amount:</strong> {formatINR(uploadInvoiceRow.amount)}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <TenderFileUploader
+                                    label="Upload Invoice"
+                                    context="tender-documents"
+                                    value={uploadInvoiceFiles}
+                                    onChange={setUploadInvoiceFiles}
+                                />
+                            </div>
+                        </div>
+                    }
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => { setUploadInvoiceRow(null); setUploadInvoiceFiles([]); }}>Cancel</Button>
+                        <Button onClick={confirmUploadInvoice} disabled={uploadInvoiceFiles.length === 0 || uploadInvoiceMutation.isPending}>
+                            {uploadInvoiceMutation.isPending ? "Uploading..." : "Submit"}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

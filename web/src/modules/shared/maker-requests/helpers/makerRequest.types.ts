@@ -27,5 +27,7 @@ export interface CreateMakerRequestDTO {
     ifsc?: string;
     portalLink?: string;
     billFiles?: string[];
+    uploadInvoice?: string[];
+    uploadPI?: string[];
     remark?: string;
 }

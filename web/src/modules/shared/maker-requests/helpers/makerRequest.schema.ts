@@ -16,6 +16,8 @@ export const makerRequestFormSchema = z.object({
     portalLink: z.string().default(""),
 
     billFiles: z.array(z.string()).default([]),
+    uploadInvoice: z.array(z.string()).default([]),
+    uploadPI: z.array(z.string()).default([]),
     remark: z.string().default(""),
 });
 
