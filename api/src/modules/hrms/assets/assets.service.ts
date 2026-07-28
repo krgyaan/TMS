@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, count, desc, max } from "drizzle-orm";
+import { eq, count, desc, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
@@ -142,17 +142,13 @@ export class AssetsService {
   private async generateAssetCode(assetType?: string | null): Promise<string> {
     const prefix = ASSET_TYPE_PREFIXES[assetType ?? ""] ?? "AST";
     const result = await this.db
-      .select({ maxCode: max(employeeAssets.assetCode) })
+      .select({
+        maxNum: sql<number>`max(CAST(SPLIT_PART(${employeeAssets.assetCode}, '-', 2) AS INTEGER))`,
+      })
       .from(employeeAssets)
       .where(eq(employeeAssets.assetType, assetType ?? ""));
-    const maxCode = result[0]?.maxCode as string | null;
-    let nextNum = 1;
-    if (maxCode) {
-      const parts = maxCode.split('-');
-      const lastNum = parseInt(parts[parts.length - 1], 10);
-      if (!isNaN(lastNum)) nextNum = lastNum + 1;
-    }
-    return `${prefix}-${nextNum}`;
+    const maxNum = result[0]?.maxNum ?? 0;
+    return `${prefix}-${maxNum + 1}`;
   }
 
   async findAll(): Promise<any[]> {
