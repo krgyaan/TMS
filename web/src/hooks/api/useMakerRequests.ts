@@ -43,3 +43,14 @@ export function useUpdateMakerRequestStatus() {
         },
     });
 }
+
+export function useUploadMakerInvoiceAfterPayment() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, files }: { id: number; files: string[] }) =>
+            makerRequestApi.uploadInvoiceAfterPayment(id, files),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["maker-requests"] });
+        },
+    });
+}
