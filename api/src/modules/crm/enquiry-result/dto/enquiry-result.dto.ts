@@ -36,8 +36,11 @@ export type UpdateEnquiryResultDto = z.infer<typeof UpdateEnquiryResultSchema>;
 export const EnquiryResultListSchema = z.object({
     page: z.coerce.number().int().positive().optional().default(1),
     limit: z.coerce.number().int().positive().optional().default(50),
+    search: z.string().optional(),
     enquiryId: z.coerce.number().int().positive().optional(),
     status: z.string().optional(),
+    sortBy: z.string().optional(),
+    sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
 });
 
 export type EnquiryResultListDto = z.infer<typeof EnquiryResultListSchema>;

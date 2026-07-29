@@ -16,6 +16,8 @@ const CRM_EnquiryCostings     = lazy(() => import('@/modules/crm/enquirycosting/
 const CRM_EnquiryCostingShow  = lazy(() => import('@/modules/crm/enquirycosting/EnquiryCostingShowPage'));
 const CRM_LeadsQuotations     = lazy(() => import('@/modules/crm/leads-quotation/LeadsQuotationListPage'));
 const CRM_LeadsQuotationView  = lazy(() => import('@/modules/crm/leads-quotation/LeadsQuotationShowPage'));
+const CRM_EnquiryResults      = lazy(() => import('@/modules/crm/enquiry-result/EnquiryResultListPage'));
+const CRM_EnquiryResultView   = lazy(() => import('@/modules/crm/enquiry-result/EnquiryResultShowPage'));
 
 export default function CRMRoutes() {
     return (
@@ -36,6 +38,8 @@ export default function CRMRoutes() {
             <Route path="enquiry-costings/:id"     element={<RouteWrapper><CRM_EnquiryCostingShow /></RouteWrapper>} />
             <Route path="leads-quotations"         element={<RouteWrapper><CRM_LeadsQuotations /></RouteWrapper>} />
             <Route path="leads-quotations/:id"     element={<RouteWrapper><CRM_LeadsQuotationView /></RouteWrapper>} />
+            <Route path="enquiry-results"          element={<RouteWrapper><CRM_EnquiryResults /></RouteWrapper>} />
+            <Route path="enquiry-results/:id"      element={<RouteWrapper><CRM_EnquiryResultView /></RouteWrapper>} />
         </Routes>
     );
 }

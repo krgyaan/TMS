@@ -2,8 +2,67 @@ import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { enquiryResults } from '@db/schemas/crm/enquiry-result.schema';
+import { leadEnquiries } from '@db/schemas/crm/lead-enquiries.schema';
+import { items } from '@db/schemas/master/items.schema';
+import { users } from '@db/schemas/auth/users.schema';
+import { privateQuotes } from '@db/schemas/crm/private-quotes.schema';
+import { privateCostingSheets } from '@db/schemas/crm/private-costing-sheets.schema';
 import { eq, desc, and, sql, type SQL } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { CreateEnquiryResultDto, UpdateEnquiryResultDto, EnquiryResultListDto } from './dto/enquiry-result.dto';
+
+const createdByUser = alias(users, 'created_by_user');
+
+const resultSelect = {
+    id: enquiryResults.id,
+    enquiryId: enquiryResults.enquiryId,
+    technicallyQualified: enquiryResults.technicallyQualified,
+    disqualificationReason: enquiryResults.disqualificationReason,
+    qualifiedCount: enquiryResults.qualifiedCount,
+    qualifiedParties: enquiryResults.qualifiedParties,
+    result: enquiryResults.result,
+    l1Price: enquiryResults.l1Price,
+    l2Price: enquiryResults.l2Price,
+    ourPrice: enquiryResults.ourPrice,
+    uploadScreenshot: enquiryResults.uploadScreenshot,
+    uploadDocuments: enquiryResults.uploadDocuments,
+    status: enquiryResults.status,
+    createdAt: enquiryResults.createdAt,
+    updatedAt: enquiryResults.updatedAt,
+    enquiryNumber: leadEnquiries.enquiryNumber,
+    enqName: leadEnquiries.enqName,
+    createdByName: createdByUser.name,
+    itemName: items.name,
+    quoteSubmissionDatetime: sql<string>`(
+        SELECT pq.quote_submission_datetime
+        FROM ${privateQuotes} pq
+        WHERE pq.enquiry_id = ${leadEnquiries.id}
+        ORDER BY pq.created_at DESC
+        LIMIT 1
+    )`.as('quote_submission_datetime'),
+    finalPrice: sql<string>`(
+        SELECT pcs.final_price
+        FROM ${privateCostingSheets} pcs
+        WHERE pcs.enquiry_id = ${leadEnquiries.id}
+        ORDER BY pcs.updated_at DESC
+        LIMIT 1
+    )`.as('final_price'),
+    approvedFinalPrice: sql<string>`(
+        SELECT pcs.approved_final_price
+        FROM ${privateCostingSheets} pcs
+        WHERE pcs.enquiry_id = ${leadEnquiries.id}
+        ORDER BY pcs.updated_at DESC
+        LIMIT 1
+    )`.as('approved_final_price'),
+};
+
+const resultBaseQuery = (db: DbInstance) =>
+    db
+        .select(resultSelect)
+        .from(enquiryResults)
+        .leftJoin(leadEnquiries, eq(enquiryResults.enquiryId, leadEnquiries.id))
+        .leftJoin(items, eq(leadEnquiries.itemId, items.id))
+        .leftJoin(createdByUser, eq(createdByUser.id, leadEnquiries.createdBy));
 
 @Injectable()
 export class EnquiryResultService {
@@ -17,6 +76,15 @@ export class EnquiryResultService {
         const offset = (page - 1) * limit;
 
         const conditions: SQL[] = [];
+        if (filters?.search) {
+            const searchPattern = `%${filters.search}%`;
+            conditions.push(
+                sql`(${leadEnquiries.enquiryNumber} ILIKE ${searchPattern}
+                    OR ${leadEnquiries.enqName} ILIKE ${searchPattern}
+                    OR ${createdByUser.name} ILIKE ${searchPattern}
+                    OR ${items.name} ILIKE ${searchPattern})`,
+            );
+        }
         if (filters?.enquiryId) {
             conditions.push(eq(enquiryResults.enquiryId, filters.enquiryId));
         }
@@ -25,15 +93,16 @@ export class EnquiryResultService {
         }
 
         const where = conditions.length > 0 ? and(...conditions) : undefined;
+        const orderBy = filters?.sortBy === 'createdAt' || !filters?.sortBy
+            ? [desc(enquiryResults.createdAt)]
+            : [desc(enquiryResults.createdAt)];
 
         const [data, countResult] = await Promise.all([
-            this.db
-                .select()
-                .from(enquiryResults)
+            resultBaseQuery(this.db)
                 .where(where)
                 .offset(offset)
                 .limit(limit)
-                .orderBy(desc(enquiryResults.createdAt)),
+                .orderBy(...orderBy),
             this.db
                 .select({ count: sql<number>`count(*)` })
                 .from(enquiryResults)
@@ -49,9 +118,7 @@ export class EnquiryResultService {
     }
 
     async findOne(id: number) {
-        const [row] = await this.db
-            .select()
-            .from(enquiryResults)
+        const [row] = await resultBaseQuery(this.db)
             .where(eq(enquiryResults.id, id))
             .limit(1);
 

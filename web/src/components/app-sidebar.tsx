@@ -128,6 +128,7 @@ const navMain: NavGroup[] = [
             { title: "Enquiries", url: paths.crm.enquiries, permission: "crm.enquiries" },
             { title: "Costings", url: paths.crm.enquiryCostings, permission: "crm.enquiry_costings" },
             { title: "Quotations", url: paths.crm.leadsQuotations, permission: "crm.quotations" },
+            { title: "Enquiry Results", url: paths.crm.enquiryResults, permission: "crm.enquiry_results" },
         ],
     },
     {
