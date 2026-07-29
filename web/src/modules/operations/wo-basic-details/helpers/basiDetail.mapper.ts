@@ -45,6 +45,7 @@ export const buildDefaultValues = (): WoBasicDetailFormValues => ({
 export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues => {
   return {
     tenderId: data.tenderId,
+    teamId: data.team,
     woNumber: String(data.woNumber || ""),
     woDate: data.woDate ? new Date(data.woDate) : null,
 
