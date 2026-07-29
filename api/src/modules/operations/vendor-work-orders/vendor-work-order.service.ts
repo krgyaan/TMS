@@ -147,9 +147,9 @@ export class VendorWorkOrderService {
             .then(rows => rows[0]);
         if (!existing) throw new NotFoundException("Vendor Work Order not found");
 
-        if (existing.woApproved === true) {
-            throw new BadRequestException("Cannot edit an approved Vendor Work Order. Only rejected or pending VWOs can be updated.");
-        }
+        // if (existing.woApproved === true) {
+        //     throw new BadRequestException("Cannot edit an approved Vendor Work Order. Only rejected or pending VWOs can be updated.");
+        // }
 
         const wasRejected = existing.woApproved === false;
 

@@ -684,9 +684,9 @@ export class PurchaseOrderService {
             throw new NotFoundException("Purchase Order not found");
         }
 
-        if (existingPO.poApproved === true) {
-            throw new BadRequestException("Cannot edit an approved Purchase Order. Only rejected or pending POs can be updated.");
-        }
+        // if (existingPO.poApproved === true) {
+        //     throw new BadRequestException("Cannot edit an approved Purchase Order. Only rejected or pending POs can be updated.");
+        // }
 
         const wasRejected = existingPO.poApproved === false;
         const [woBasic] = await this.db
