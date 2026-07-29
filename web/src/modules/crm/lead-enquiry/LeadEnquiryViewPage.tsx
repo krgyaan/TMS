@@ -91,7 +91,7 @@ export function LeadEnquiryView({ enquiry: manualEnquiry, enquiryId, isLoading: 
                             <TableCell className="text-sm font-medium text-muted-foreground">Lead</TableCell>
                             <TableCell className="text-sm">{enquiry.leadName || "—"}</TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">Team</TableCell>
-                            <TableCell className="text-sm">{enquiry.team || "—"}</TableCell>
+                            <TableCell className="text-sm">{enquiry.teamName || enquiry.team || "—"}</TableCell>
                         </TableRow>
 
                         <TableRow className="bg-muted/50">

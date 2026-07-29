@@ -9,7 +9,7 @@ import { useLeadsQuotation, useUpdateQuote } from "@/hooks/api/useLeadsQuotation
 import { useLeadStepStatuses } from "@/hooks/api/useLeadStepStatuses";
 import { useLeadEnquiry } from "@/hooks/api/useLeadEnquiry";
 import { leadsQuotationService } from "@/services/api/leads-quotation.service";
-import { ExternalLink, ArrowLeft } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PrivateQuote, ContactEntry } from "./helpers/leads-quotation.type";
 import { LeadDetailsSection } from "../leads/components/LeadView";
@@ -19,7 +19,6 @@ import { LeadSiteVisitsSection } from "../lead-enquiry/components/LeadSiteVisitV
 import { LeadCostingsSection } from "../enquirycosting/EnquiryCostingViewPage";
 import { QuoteSubmissionModal } from "./components/QuoteSubmissionModal";
 import { QuotationDroppedModal } from "./components/QuotationDroppedModal";
-import { paths } from "@/app/routes/paths";
 
 function getStatusVariant(status?: string | null): "default" | "secondary" | "outline" | "destructive" {
     switch (status) {
@@ -42,6 +41,10 @@ function formatDateTime(dateStr: string) {
 }
 
 export function QuotationView({ quote, className }: { quote: PrivateQuote; className?: string }) {
+    const isSubmitted = quote.status === 'Quotation Submitted';
+    const isDropped = quote.status === 'Quotation Dropped';
+    const isPending = quote.status === 'Submission Pending';
+
     return (
         <Card className={cn("mb-6", className)}>
             <CardHeader>
@@ -85,53 +88,79 @@ export function QuotationView({ quote, className }: { quote: PrivateQuote; class
                     </div>
                 </div>
 
+                {/* Common fields for all statuses */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-                    <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Quote Submission Date</Label>
-                        <p className="font-medium">{quote.quoteSubmissionDatetime ? formatDateTime(quote.quoteSubmissionDatetime) : "—"}</p>
-                    </div>
                     <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">Created At</Label>
                         <p className="font-medium">{quote.createdAt ? formatDateTime(quote.createdAt) : "—"}</p>
                     </div>
                 </div>
 
-                {quote.submittedDocuments && (
-                    <div className="space-y-1 pt-4 border-t">
-                        <Label className="text-xs text-muted-foreground">Submitted Documents</Label>
-                        <p className="text-sm">{quote.submittedDocuments}</p>
+                {/* Pending-specific notice */}
+                {isPending && (
+                    <div className="pt-4 border-t">
+                        <Label className="text-xs text-muted-foreground">Status Note</Label>
+                        <p className="text-sm text-muted-foreground italic">
+                            This quotation is pending submission.
+                        </p>
                     </div>
                 )}
-                {quote.contacts && (
-                    <div className="space-y-1 pt-4 border-t">
-                        <Label className="text-xs text-muted-foreground">Contacts</Label>
-                        <p className="text-sm">{quote.contacts}</p>
-                    </div>
+
+                {/* Submitted-specific fields */}
+                {isSubmitted && (
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                            <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Quote Submission Date</Label>
+                                <p className="font-medium">{quote.quoteSubmissionDatetime ? formatDateTime(quote.quoteSubmissionDatetime) : "—"}</p>
+                            </div>
+                        </div>
+                        {quote.submittedDocuments && (
+                            <div className="space-y-1 pt-4 border-t">
+                                <Label className="text-xs text-muted-foreground">Submitted Documents</Label>
+                                <p className="text-sm">{quote.submittedDocuments}</p>
+                            </div>
+                        )}
+                        {quote.contacts && (
+                            <div className="space-y-1 pt-4 border-t">
+                                <Label className="text-xs text-muted-foreground">Contacts</Label>
+                                <p className="text-sm">{quote.contacts}</p>
+                            </div>
+                        )}
+                    </>
                 )}
-                {quote.missedReason && (
-                    <div className="space-y-1 pt-4 border-t">
-                        <Label className="text-xs text-muted-foreground">Missed Reason</Label>
-                        <p className="text-sm text-destructive">{quote.missedReason}</p>
-                    </div>
+
+                {/* Dropped-specific fields */}
+                {isDropped && (
+                    <>
+                        {quote.missedReason && (
+                            <div className="space-y-1 pt-4 border-t">
+                                <Label className="text-xs text-muted-foreground">Missed Reason</Label>
+                                <p className="text-sm text-destructive">{quote.missedReason}</p>
+                            </div>
+                        )}
+                        {quote.oemName && (
+                            <div className="space-y-1 pt-4 border-t">
+                                <Label className="text-xs text-muted-foreground">OEM Name</Label>
+                                <p className="text-sm">{quote.oemName}</p>
+                            </div>
+                        )}
+                        {quote.preventRepeat && (
+                            <div className="space-y-1 pt-4 border-t">
+                                <Label className="text-xs text-muted-foreground">Prevent Repeat</Label>
+                                <p className="text-sm">{quote.preventRepeat}</p>
+                            </div>
+                        )}
+                        {quote.tmsImprovement && (
+                            <div className="space-y-1 pt-4 border-t">
+                                <Label className="text-xs text-muted-foreground">TMS Improvement</Label>
+                                <p className="text-sm">{quote.tmsImprovement}</p>
+                            </div>
+                        )}
+                    </>
                 )}
-                {quote.oemName && (
-                    <div className="space-y-1 pt-4 border-t">
-                        <Label className="text-xs text-muted-foreground">OEM Name</Label>
-                        <p className="text-sm">{quote.oemName}</p>
-                    </div>
-                )}
-                {quote.preventRepeat && (
-                    <div className="space-y-1 pt-4 border-t">
-                        <Label className="text-xs text-muted-foreground">Prevent Repeat</Label>
-                        <p className="text-sm">{quote.preventRepeat}</p>
-                    </div>
-                )}
-                {quote.tmsImprovement && (
-                    <div className="space-y-1 pt-4 border-t">
-                        <Label className="text-xs text-muted-foreground">TMS Improvement</Label>
-                        <p className="text-sm">{quote.tmsImprovement}</p>
-                    </div>
-                )}
+
+                {/* Costing sheet link for all statuses */}
                 {quote.sheetUrl && (
                     <div className="flex gap-2 pt-4 border-t">
                         <Button variant="outline" size="sm" asChild>

@@ -132,6 +132,14 @@ export function EnquiryCostingView({ costing: manualCosting, costingId, isLoadin
                                 <User className="h-4 w-4 inline mr-2" /> Audit Information
                             </TableCell>
                         </TableRow>
+                        {costing.approvedByName && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">Approved By</TableCell>
+                                <TableCell className="text-sm">{costing.approvedByName}</TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground" />
+                                <TableCell className="text-sm" />
+                            </TableRow>
+                        )}
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">Created By</TableCell>
                             <TableCell className="text-sm">{costing.createdByName || "—"}</TableCell>

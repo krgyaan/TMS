@@ -182,7 +182,7 @@ export class LeadsQuotationService {
     }
 
     async update(id: number, data: UpdatePrivateQuoteDto) {
-        await this.findOne(id);
+        const existingQuote = await this.findOne(id);
 
         let contactsStr: string | undefined = undefined;
 
@@ -225,13 +225,22 @@ export class LeadsQuotationService {
             if (updateValues[k] === undefined) delete updateValues[k];
         });
 
-        const [quote] = await this.db
-            .update(privateQuotes)
-            .set(updateValues)
-            .where(eq(privateQuotes.id, id))
-            .returning();
+        return await this.db.transaction(async (tx) => {
+            const [quote] = await tx
+                .update(privateQuotes)
+                .set(updateValues)
+                .where(eq(privateQuotes.id, id))
+                .returning();
 
-        return quote;
+            if (data.status === 'Quotation Submitted' || data.status === 'Quotation Dropped') {
+                await tx
+                    .update(leadEnquiries)
+                    .set({ status: data.status, updatedAt: new Date() })
+                    .where(eq(leadEnquiries.id, existingQuote.enquiryId));
+            }
+
+            return quote;
+        });
     }
 
     async appendQuoteDocs(id: number, newFilenames: string[]): Promise<void> {

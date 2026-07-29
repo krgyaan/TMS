@@ -37,6 +37,7 @@ export type EnquiryCostingWithNames = {
     approvedBudgetPreGst: string | null;
     approvedGrossMargin: string | null;
     preparedByName: string | null;
+    approvedByName: string | null;
     status: string | null;
     sheetUrl: string | null;
     remarks: string | null;
@@ -46,6 +47,7 @@ export type EnquiryCostingWithNames = {
 
 const preparedByUser = alias(users, 'prepared_by_user');
 const createdByUser = alias(users, 'created_by_user');
+const approvedByUser = alias(users, 'approved_by_user');
 
 @Injectable()
 export class EnquiryCostingService {
@@ -128,6 +130,7 @@ export class EnquiryCostingService {
                 approvedBudgetPreGst: privateCostingSheets.approvedBudgetPreGst,
                 approvedGrossMargin: privateCostingSheets.approvedGrossMargin,
                 preparedByName: preparedByUser.name,
+                approvedByName: approvedByUser.name,
                 status: privateCostingSheets.status,
                 sheetUrl: privateCostingSheets.sheetUrl,
                 remarks: privateCostingSheets.remarks,
@@ -138,6 +141,7 @@ export class EnquiryCostingService {
             .innerJoin(leadEnquiries, eq(privateCostingSheets.enquiryId, leadEnquiries.id))
             .leftJoin(preparedByUser, eq(preparedByUser.id, privateCostingSheets.preparedBy))
             .leftJoin(createdByUser, eq(createdByUser.id, leadEnquiries.createdBy))
+            .leftJoin(approvedByUser, eq(approvedByUser.id, privateCostingSheets.approvedBy))
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
@@ -148,6 +152,7 @@ export class EnquiryCostingService {
                 ...row,
                 createdByName: row.createdByName ?? null,
                 preparedByName: row.preparedByName ?? null,
+                approvedByName: row.approvedByName ?? null,
             })),
             meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
@@ -173,6 +178,7 @@ export class EnquiryCostingService {
                 approvedBudgetPreGst: privateCostingSheets.approvedBudgetPreGst,
                 approvedGrossMargin: privateCostingSheets.approvedGrossMargin,
                 preparedByName: preparedByUser.name,
+                approvedByName: approvedByUser.name,
                 status: privateCostingSheets.status,
                 sheetUrl: privateCostingSheets.sheetUrl,
                 remarks: privateCostingSheets.remarks,
@@ -183,6 +189,7 @@ export class EnquiryCostingService {
             .innerJoin(leadEnquiries, eq(privateCostingSheets.enquiryId, leadEnquiries.id))
             .leftJoin(preparedByUser, eq(preparedByUser.id, privateCostingSheets.preparedBy))
             .leftJoin(createdByUser, eq(createdByUser.id, leadEnquiries.createdBy))
+            .leftJoin(approvedByUser, eq(approvedByUser.id, privateCostingSheets.approvedBy))
             .where(eq(privateCostingSheets.id, id))
             .limit(1);
 
@@ -192,6 +199,7 @@ export class EnquiryCostingService {
             ...row,
             createdByName: row.createdByName ?? null,
             preparedByName: row.preparedByName ?? null,
+            approvedByName: row.approvedByName ?? null,
         };
     }
 
@@ -273,6 +281,7 @@ export class EnquiryCostingService {
                 approvedBudgetPreGst: privateCostingSheets.approvedBudgetPreGst,
                 approvedGrossMargin: privateCostingSheets.approvedGrossMargin,
                 preparedByName: preparedByUser.name,
+                approvedByName: approvedByUser.name,
                 status: privateCostingSheets.status,
                 sheetUrl: privateCostingSheets.sheetUrl,
                 remarks: privateCostingSheets.remarks,
@@ -283,6 +292,7 @@ export class EnquiryCostingService {
             .innerJoin(leadEnquiries, eq(privateCostingSheets.enquiryId, leadEnquiries.id))
             .leftJoin(preparedByUser, eq(preparedByUser.id, privateCostingSheets.preparedBy))
             .leftJoin(createdByUser, eq(createdByUser.id, leadEnquiries.createdBy))
+            .leftJoin(approvedByUser, eq(approvedByUser.id, privateCostingSheets.approvedBy))
             .where(eq(privateCostingSheets.enquiryId, enquiryId))
             .limit(1);
 
@@ -292,6 +302,7 @@ export class EnquiryCostingService {
             ...row,
             createdByName: row.createdByName ?? null,
             preparedByName: row.preparedByName ?? null,
+            approvedByName: row.approvedByName ?? null,
         };
     }
 
@@ -315,6 +326,7 @@ export class EnquiryCostingService {
                 approvedBudgetPreGst: privateCostingSheets.approvedBudgetPreGst,
                 approvedGrossMargin: privateCostingSheets.approvedGrossMargin,
                 preparedByName: preparedByUser.name,
+                approvedByName: approvedByUser.name,
                 status: privateCostingSheets.status,
                 sheetUrl: privateCostingSheets.sheetUrl,
                 remarks: privateCostingSheets.remarks,
@@ -325,6 +337,7 @@ export class EnquiryCostingService {
             .innerJoin(leadEnquiries, eq(privateCostingSheets.enquiryId, leadEnquiries.id))
             .leftJoin(preparedByUser, eq(preparedByUser.id, privateCostingSheets.preparedBy))
             .leftJoin(createdByUser, eq(createdByUser.id, leadEnquiries.createdBy))
+            .leftJoin(approvedByUser, eq(approvedByUser.id, privateCostingSheets.approvedBy))
             .where(eq(leadEnquiries.leadId, leadId))
             .orderBy(desc(privateCostingSheets.createdAt));
 
@@ -332,6 +345,7 @@ export class EnquiryCostingService {
             ...row,
             createdByName: row.createdByName ?? null,
             preparedByName: row.preparedByName ?? null,
+            approvedByName: row.approvedByName ?? null,
         }));
     }
 
