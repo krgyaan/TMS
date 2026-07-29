@@ -5,6 +5,7 @@ import { privateQuotes } from '@db/schemas/crm/private-quotes.schema';
 import { leadEnquiries } from '@db/schemas/crm/lead-enquiries.schema';
 import { privateCostingSheets } from '@db/schemas/crm/private-costing-sheets.schema';
 import { leadContacts } from '@db/schemas/crm/lead-contacts.schema';
+import { enquiryResults } from '@db/schemas/crm/enquiry-result.schema';
 import { eq, desc, like, or, and, sql, type SQL } from 'drizzle-orm';
 import type { CreatePrivateQuoteDto, UpdatePrivateQuoteDto, PrivateQuoteListDto, ContactEntryDto } from './dto/leads-quotation.dto';
 
@@ -237,6 +238,23 @@ export class LeadsQuotationService {
                     .update(leadEnquiries)
                     .set({ status: data.status, updatedAt: new Date() })
                     .where(eq(leadEnquiries.id, existingQuote.enquiryId));
+            }
+
+            if (data.status === 'Quotation Submitted') {
+                const [existing] = await tx
+                    .select({ id: enquiryResults.id })
+                    .from(enquiryResults)
+                    .where(eq(enquiryResults.enquiryId, existingQuote.enquiryId))
+                    .limit(1);
+
+                if (!existing) {
+                    await tx
+                        .insert(enquiryResults)
+                        .values({
+                            enquiryId: existingQuote.enquiryId,
+                            status: 'Quotation Submitted',
+                        });
+                }
             }
 
             return quote;
