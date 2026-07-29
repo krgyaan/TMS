@@ -107,40 +107,45 @@ function parseAttachments(value: any): string[] {
 }
 
 function mapVwoDataToFormValues(data: any): VendorWorkOrderFormValues {
-  return {
-    woDate: formatDateForInput(data.woDate) || formatDateForInput(new Date()),
-    category: data.category || "",
-    sellerId: data.sellerId ? String(data.sellerId) : "",
-    sellerName: data.sellerName || "",
-    sellerEmail: data.sellerEmail || "",
-    sellerAddress: data.sellerAddress || "",
-    sellerGstNo: data.sellerGstNo || "",
-    sellerPanNo: data.sellerPanNo || "",
-    sellerMsmeNo: data.sellerMsmeNo || "",
-    sellerCinNo: data.sellerCinNo || "",
-    contactPersonName: data.contactPersonName || "",
-    contactPersonPhone: data.contactPersonPhone || "",
-    contactPersonEmail: data.contactPersonEmail || "",
-    partyId: data.shipToPartyId ? String(data.shipToPartyId) : "",
-    selectedUserId: "",
-    selectedCertRecipients: data.certRecipients?.map(String) ?? (data.certRecipient ? [String(data.certRecipient)] : []),
-    shipToName: data.shipToName || "",
-    shippingAddress: data.shippingAddress || "",
-    shipToGst: data.shipToGst || "",
-    shipToPan: data.shipToPan || "",
-        products: data.products?.length > 0
-      ? data.products.map((p: any) => ({
-          description: p.description || "",
-          qty: Number(p.qty) || null,
-          rate: Number(p.rate) || null,
-          gstRate: Number(p.gstRate) || 18,
-        }))
-      : [{ description: "", qty: null, rate: null, gstRate: 18 }],
-    termsAndConditions: data.termsAndConditions?.length > 0 ? data.termsAndConditions : DEFAULT_VWO_TERMS_ROWS,
-    scopeOfWork: parseAttachments(data.scopeOfWork),
-    accessoriesPackagingListAttachments: parseAttachments(data.accessoriesPackagingListAttachments),
-    remarks: data.remarks || "",
-  };
+  try {
+    return {
+      woDate: formatDateForInput(data.woDate) || formatDateForInput(new Date()),
+      category: data.category || "",
+      sellerId: data.sellerId ? String(data.sellerId) : "",
+      sellerName: data.sellerName || "",
+      sellerEmail: data.sellerEmail || "",
+      sellerAddress: data.sellerAddress || "",
+      sellerGstNo: data.sellerGstNo || "",
+      sellerPanNo: data.sellerPanNo || "",
+      sellerMsmeNo: data.sellerMsmeNo || "",
+      sellerCinNo: data.sellerCinNo || "",
+      contactPersonName: data.contactPersonName || "",
+      contactPersonPhone: data.contactPersonPhone || "",
+      contactPersonEmail: data.contactPersonEmail || "",
+      partyId: data.shipToPartyId ? String(data.shipToPartyId) : "",
+      selectedUserId: "",
+      selectedCertRecipients: data.certRecipients?.map(String) ?? (data.certRecipient ? [String(data.certRecipient)] : []),
+      shipToName: data.shipToName || "",
+      shippingAddress: data.shippingAddress || "",
+      shipToGst: data.shipToGst || "",
+      shipToPan: data.shipToPan || "",
+          products: data.products?.length > 0
+        ? data.products.map((p: any) => ({
+            description: p.description || "",
+            qty: Number(p.qty) || null,
+            rate: Number(p.rate) || null,
+            gstRate: Number(p.gstRate) || 18,
+          }))
+        : [{ description: "", qty: null, rate: null, gstRate: 18 }],
+      termsAndConditions: data.termsAndConditions?.length > 0 ? data.termsAndConditions : DEFAULT_VWO_TERMS_ROWS,
+      scopeOfWork: parseAttachments(data.scopeOfWork),
+      accessoriesPackagingListAttachments: parseAttachments(data.accessoriesPackagingListAttachments),
+      remarks: data.remarks || "",
+    };
+  } catch (err) {
+    console.error("[VWO Edit] Error mapping VWO data to form values:", err, "Raw data:", data);
+    throw err;
+  }
 }
 
 export default function EditVendorWorkOrderPage() {
@@ -172,9 +177,13 @@ export default function EditVendorWorkOrderPage() {
 
   useEffect(() => {
     if (vwoData) {
-      const formValues = mapVwoDataToFormValues(vwoData);
-      form.reset(formValues);
-      setVwoNumber(vwoData.woNumber || "");
+      try {
+        const formValues = mapVwoDataToFormValues(vwoData);
+        form.reset(formValues);
+        setVwoNumber(vwoData.woNumber || "");
+      } catch (err) {
+        console.error("[VWO Edit] Failed to reset form with VWO data:", err);
+      }
     }
   }, [vwoData, form]);
 
@@ -263,6 +272,8 @@ export default function EditVendorWorkOrderPage() {
     const isValid = await form.trigger();
     if (isValid) {
       setShowPreview(true);
+    } else {
+      console.error("[VWO Edit] Form validation failed:", form.formState.errors);
     }
   };
 
@@ -272,7 +283,8 @@ export default function EditVendorWorkOrderPage() {
       await updateVWOMutation.mutateAsync({ id: vwoId, data: vwoData });
       toast.success(`WO has been updated successfully.`);
       navigate(paths.operations.projectDashboard(projectId));
-    } catch {
+    } catch (err) {
+      console.error("[VWO Edit] Failed to update VWO:", err);
       toast.error("Failed to update vendor work order. Please try again.");
     }
   };
