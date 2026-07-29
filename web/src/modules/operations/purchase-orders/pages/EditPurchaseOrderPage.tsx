@@ -262,6 +262,7 @@ export default function EditPurchaseOrderPage() {
             toast.success(`PO #${poData?.poNumber} has been updated successfully.`);
             navigate(paths.operations.projectDashboard(projectId));
         } catch (error: any) {
+            console.error("[PO Edit] Failed to update PO:", error);
             toast.error(error?.message || "Failed to update purchase order. Please try again.");
         }
     };
