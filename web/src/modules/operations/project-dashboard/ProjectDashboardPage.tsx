@@ -2,7 +2,6 @@ import { paths } from "@/app/routes/paths";
 import SelectField from "@/components/form/SelectField";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/contexts/AuthContext";
 import { Eye, FileText } from "lucide-react";
 import { useEffect } from "react";
 import { FormProvider, useForm } from "react-hook-form";
@@ -12,6 +11,7 @@ import { useProjectMasterOptions } from "@/hooks/api/useProjectMaster";
 import { EmployeeImprestsSection } from "./sections/EmployeeImprestsSection";
 import { PaymentRequestsSection } from "./sections/PaymentRequestsSection";
 import { ProjectOverviewSection } from "./sections/ProjectOverviewSection";
+import { ProjectSummarySheetSection } from "./sections/ProjectSummarySheetSection";
 import { PurchaseInvoicesSection } from "./sections/PurchaseInvoicesSection";
 import { PurchaseOrdersSection } from "@/modules/operations/purchase-orders/sections/PurchaseOrdersSection";
 import { SaleInvoicesSection } from "./sections/SaleInvoicesSection";
@@ -20,8 +20,8 @@ import { VendorWorkOrdersSection } from "./sections/VendorWorkOrdersSection";
 export default function ProjectDashboardPage() {
     const { projectId: projectIdParam } = useParams<{ projectId: string }>();
     const navigate = useNavigate();
-    const { isTeamLeader, isAdmin, isSuperUser, teamId } = useAuth();
-    const isOpsTeamLeader = isTeamLeader;
+    // const { isTeamLeader, isAdmin, isSuperUser, teamId } = useAuth();
+    // const isOpsTeamLeader = isTeamLeader;
 
     const form = useForm<{ projectId: string | null }>({
         defaultValues: { projectId: projectIdParam || null },
@@ -95,6 +95,7 @@ export default function ProjectDashboardPage() {
             </Card>
             {/* Sections — each fetches its own data in parallel */}
             <ProjectOverviewSection projectId={Number(projectId)} />
+            <ProjectSummarySheetSection projectId={Number(projectId)} />
             <PurchaseOrdersSection projectId={Number(projectId)} />
             <SaleInvoicesSection projectId={Number(projectId)} />
             <VendorWorkOrdersSection projectId={Number(projectId)} />
