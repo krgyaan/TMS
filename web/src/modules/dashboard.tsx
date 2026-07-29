@@ -377,19 +377,6 @@ const Dashboard = () => {
         return events.filter(event => selectedUser === "all" || event.user === selectedUser);
     }, [dashboardData, teamColors, selectedUser]);
 
-    const getEventBadge = (type: string) => {
-        switch (type) {
-            case "tender_due":
-                return <Badge variant="destructive">Due</Badge>;
-            case "tq_date":
-                return <Badge variant="secondary">TQ</Badge>;
-            case "followup":
-                return <Badge variant="default">Follow-up</Badge>;
-            default:
-                return null;
-        }
-    };
-
     return (
         <div className="space-y-6 p-8">
             {/* Quick Actions */}            

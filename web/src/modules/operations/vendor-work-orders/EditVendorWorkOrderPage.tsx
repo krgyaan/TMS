@@ -128,12 +128,12 @@ function mapVwoDataToFormValues(data: any): VendorWorkOrderFormValues {
     shippingAddress: data.shippingAddress || "",
     shipToGst: data.shipToGst || "",
     shipToPan: data.shipToPan || "",
-    products: data.products?.length > 0
+        products: data.products?.length > 0
       ? data.products.map((p: any) => ({
           description: p.description || "",
-          qty: p.qty ?? null,
-          rate: p.rate ?? null,
-          gstRate: p.gstRate ?? 18,
+          qty: Number(p.qty) || null,
+          rate: Number(p.rate) || null,
+          gstRate: Number(p.gstRate) || 18,
         }))
       : [{ description: "", qty: null, rate: null, gstRate: 18 }],
     termsAndConditions: data.termsAndConditions?.length > 0 ? data.termsAndConditions : DEFAULT_VWO_TERMS_ROWS,
