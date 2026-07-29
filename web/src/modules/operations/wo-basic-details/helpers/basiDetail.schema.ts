@@ -32,7 +32,7 @@ export const WoBasicDetailFormSchema = z.object({
 
   woDraft: z.array(z.string()).optional().nullable(),
   teChecklistConfirmed: z.boolean().default(false),
-  tmsDocuments: z.record(z.string(), z.boolean()).default({}),
+  tmsDocuments: z.record(z.string(), z.boolean().optional()).default({}),
 });
 
 export const AssignOeFormSchema = z.object({
