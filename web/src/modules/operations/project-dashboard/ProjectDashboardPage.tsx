@@ -97,8 +97,8 @@ export default function ProjectDashboardPage() {
             <ProjectOverviewSection projectId={Number(projectId)} />
             <ProjectSummarySheetSection projectId={Number(projectId)} />
             <PurchaseOrdersSection projectId={Number(projectId)} />
-            <SaleInvoicesSection projectId={Number(projectId)} />
             <VendorWorkOrdersSection projectId={Number(projectId)} />
+            <SaleInvoicesSection projectId={Number(projectId)} />
             <PurchaseInvoicesSection projectId={Number(projectId)} />
             <PaymentRequestsSection projectId={Number(projectId)} />
             <EmployeeImprestsSection projectId={Number(projectId)} />

@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MapPin, Package, Receipt, Truck } from "lucide-react";
+import { ChevronDown, MapPin, Package, Receipt, Truck } from "lucide-react";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useWoDetailByBasicDetail, useWoDetailWithRelations } from "@/hooks/api/useWoDetails";
@@ -92,6 +93,8 @@ function AddressCard({ address }: { address: { customerName: string; address: st
 }
 
 export const ProjectSummarySheetSection: React.FC<ProjectSummarySheetSectionProps> = ({ projectId }) => {
+    const [isOpen, setIsOpen] = useState(false);
+
     const { data: overview, isLoading: isOverviewLoading } = useProjectOverview(projectId!);
     const woBasicDetailId = overview?.woBasicDetail?.id ?? null;
 
@@ -143,16 +146,27 @@ export const ProjectSummarySheetSection: React.FC<ProjectSummarySheetSectionProp
     const buybackApplicable = buybackBoq.length > 0;
 
     return (
-        <Card>
-            <CardHeader className="pb-4">
-                <div className="flex justify-between items-center gap-2">
-                    <div>
-                        <CardTitle className="text-base font-semibold">Project Summary Sheet</CardTitle>
-                        <CardDescription>Billing, shipping, and GST details from WO configuration</CardDescription>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+            <Card>
+                <CollapsibleTrigger asChild>
+                    <button className="w-full text-left">
+                        <CardHeader className="pb-4 cursor-pointer hover:bg-muted/30 transition-colors rounded-t-lg">
+                            <div className="flex justify-between items-center gap-2">
+                                <div>
+                                    <CardTitle className="text-base font-semibold">Project Summary Sheet</CardTitle>
+                                    <CardDescription>Billing, shipping, and GST details from WO configuration</CardDescription>
+                                </div>
+                                <ChevronDown
+                                    className={`h-5 w-5 text-muted-foreground shrink-0 transition-transform duration-200 ${
+                                        isOpen ? "rotate-180" : ""
+                                    }`}
+                                />
+                            </div>
+                        </CardHeader>
+                    </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                    <CardContent className="space-y-6 pt-0">
                 {/* Billing BOQ */}
                 <BoqTable
                     title="Billing BOQ"
@@ -213,7 +227,9 @@ export const ProjectSummarySheetSection: React.FC<ProjectSummarySheetSectionProp
                         </CardContent>
                     </Card>
                 </div>
-            </CardContent>
-        </Card>
+                </CardContent>
+                </CollapsibleContent>
+            </Card>
+        </Collapsible>
     );
 };
