@@ -13,9 +13,10 @@ import { getShortId } from "@/lib/id-utils";
 import type { PurchaseInvoiceRow } from "@/modules/operations/purchase-invoices/helpers/purchaseInvoice.types";
 import type { ColDef, GridApi, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { Edit, Plus } from "lucide-react";
+import { Edit, ExternalLink, Plus } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { tenderFilesService } from "@/services/api/tender-files.service";
 
 interface PurchaseInvoicesSectionProps {
     projectId: number | null;
@@ -35,6 +36,11 @@ export const PurchaseInvoicesSection: React.FC<PurchaseInvoicesSectionProps> = (
             label: "Edit Invoice",
             icon: <Edit className="h-4 w-4" />,
             onClick: (row) => navigate(paths.operations.editProjectPurchaseInvoicePage(row.id, projectId!)),
+        },
+        {
+            label: "View File",
+            icon: <ExternalLink className="h-4 w-4" />,
+            onClick: (row) => row.invoiceFile && window.open(tenderFilesService.getFileUrl(row.invoiceFile), '_blank'),
         },
     ], [navigate, projectId]);
 

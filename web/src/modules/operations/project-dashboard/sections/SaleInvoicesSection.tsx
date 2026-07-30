@@ -34,9 +34,9 @@ export const SaleInvoicesSection: React.FC<SaleInvoicesSectionProps> = ({
         {
             label: "View Details",
             icon: <Eye className="h-4 w-4" />,
-            onClick: () => {},
+            onClick: (row) => navigate(paths.operations.viewSaleInvoice(row.id)),
         },
-    ], []);
+    ], [navigate]);
 
     const statusBadgeClass = (status: string) => {
         switch (status) {
