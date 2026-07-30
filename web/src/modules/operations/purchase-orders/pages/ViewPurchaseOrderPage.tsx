@@ -8,6 +8,7 @@ import { usePurchaseOrderDetails } from "@/hooks/api/usePurchaseOrders";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
+import { tenderFilesService } from "@/services/api/tender-files.service";
 import { AlertCircle, ArrowLeft, Calculator, ExternalLink, FileText } from "lucide-react";
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -231,7 +232,7 @@ const ViewPurchaseOrderPage = () => {
                                                     <TableCell>
                                                         {pi.invoiceFile ? (
                                                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" asChild>
-                                                                <a href={pi.invoiceFile} target="_blank" rel="noopener noreferrer">
+                                                                <a href={tenderFilesService.getFileUrl(pi.invoiceFile)} target="_blank" rel="noopener noreferrer">
                                                                     <ExternalLink className="h-4 w-4" />
                                                                 </a>
                                                             </Button>
