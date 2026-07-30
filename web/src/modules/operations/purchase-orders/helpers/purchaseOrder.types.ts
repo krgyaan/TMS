@@ -89,6 +89,7 @@ export interface PurchaseOrderRow {
     totalPaymentDone?: number;
     totalPiAmount?: number;
     totalPiCount?: number;
+    purchaseInvoices?: Array<{ invoiceNo: string; totalAmount: number }>
     poPdfVersions?: Record<string, { path: string; hash: string }>;
 }
 

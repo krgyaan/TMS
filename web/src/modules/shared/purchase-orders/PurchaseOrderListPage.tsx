@@ -168,7 +168,7 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
         },
         {
             field: "grandTotal",
-            headerName: "Amount",
+            headerName: "PO Amount",
             sortable: true,
             valueFormatter: (p: ValueFormatterParams<PurchaseOrderRow>) => formatINR(p.value),
             getQuickFilterText: (params) => {
@@ -177,11 +177,6 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
             },
             cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => {
                 const d = p.data;
-                const remaining = d?.amountAfterTds
-                    ? Number(d.amountAfterTds) - Number(d.totalPaymentRequested ?? 0)
-                    : null;
-                const tdsPct = d?.tdsPercentage ? Number(d.tdsPercentage) : null;
-
                 return (
                     <TooltipProvider>
                         <Tooltip>
@@ -190,31 +185,76 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
                             </TooltipTrigger>
                             <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
                                 <div className="space-y-1 text-xs">
-                                    <p><strong>Total (Pre-GST):</strong> {formatINR(d?.totalAmount || 0)}</p>
-                                    <p><strong>GST Amount:</strong> {formatINR(d?.totalGstAmt || 0)}</p>
+                                    <p><strong>Pre GST:</strong> {formatINR(d?.totalAmount || 0)}</p>
+                                    <p><strong>GST:</strong> {formatINR(d?.totalGstAmt || 0)}</p>
                                     <p><strong>Grand Total:</strong> {formatINR(d?.grandTotal || 0)}</p>
-                                    {tdsPct !== null && (
-                                        <>
-                                            <div className="border-t my-1.5" />
-                                            <p className="text-destructive">
-                                                <strong>TDS @ {tdsPct}%:</strong> -{formatINR(d?.tdsAmount || 0)}
-                                            </p>
-                                            <p className="font-semibold">
-                                                <strong>After TDS:</strong> {formatINR(d?.amountAfterTds || 0)}
-                                            </p>
-                                            <div className="border-t my-1.5" />
-                                            <p><strong>Payment Requested:</strong> {formatINR(d?.totalPaymentRequested || 0)}</p>
-                                            <p className="pl-2 text-muted-foreground">
-                                                Maker Done: {formatINR(d?.totalMakerDone || 0)}
-                                            </p>
-                                            <p className="pl-2 text-muted-foreground">
-                                                Payment Done: {formatINR(d?.totalPaymentDone || 0)}
-                                            </p>
-                                            <p className={remaining !== null && remaining < 0 ? "text-destructive font-semibold" : "font-semibold"}>
-                                                <strong>Remaining:</strong> {formatINR(remaining ?? 0)}
-                                            </p>
-                                        </>
-                                    )}
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                );
+            },
+        },
+        {
+            field: "totalPaymentDone",
+            headerName: "Payment Done",
+            sortable: true,
+            valueFormatter: (p: ValueFormatterParams<PurchaseOrderRow>) => formatINR(p.value || 0),
+            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => {
+                const d = p.data;
+                const amountAfterTds = d?.amountAfterTds ? Number(d.amountAfterTds) : Number(d?.grandTotal || 0);
+                const remaining = amountAfterTds - Number(d?.totalPaymentRequested || 0);
+
+                return (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="truncate block">{formatINR(p.value || 0)}</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
+                                <div className="space-y-1 text-xs">
+                                    <p><strong>Amount After TDS:</strong> {formatINR(amountAfterTds)}</p>
+                                    <p><strong>Payment Requested:</strong> {formatINR(d?.totalPaymentRequested || 0)}</p>
+                                    <p><strong>Maker Done:</strong> {formatINR(d?.totalMakerDone || 0)}</p>
+                                    <p><strong>Payment Done:</strong> {formatINR(d?.totalPaymentDone || 0)}</p>
+                                    <p><strong>Remaining:</strong> {formatINR(remaining)}</p>
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                );
+            },
+        },
+        {
+            field: "totalPiAmount",
+            headerName: "Invoiced",
+            sortable: true,
+            valueFormatter: (p: ValueFormatterParams<PurchaseOrderRow>) => formatINR(p.value || 0),
+            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => {
+                const d = p.data;
+                const totalAmount = d?.totalAmount || 0;
+                const invoiceTotal = d?.totalPiAmount || 0;
+                const remainingInvoice = totalAmount - invoiceTotal;
+
+                const invoiceItems = d?.purchaseInvoices || [];
+                const invoiceList = invoiceItems.map((inv, index) => {
+                    const ordinal = index === 0 ? '1st' : index === 1 ? '2nd' : index === 2 ? '3rd' : `${index + 1}th`;
+                    return `${ordinal} invoice of ${formatINR(inv.totalAmount)}`;
+                });
+
+                return (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="truncate block">{formatINR(p.value || 0)}</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
+                                <div className="space-y-1 text-xs">
+                                    {invoiceList.map((item, index) => (
+                                        <p key={index}>{item}</p>
+                                    ))}
+                                    <p><strong>Total Invoiced:</strong> {formatINR(invoiceTotal)}</p>
+                                    <p><strong>Remaining Invoice:</strong> {formatINR(remainingInvoice)}</p>
                                 </div>
                             </TooltipContent>
                         </Tooltip>
