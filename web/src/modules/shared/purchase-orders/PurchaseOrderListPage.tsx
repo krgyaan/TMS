@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { CheckCircle, Eye, History, Search } from "lucide-react";
+import { CheckCircle, Eye, FileUp, History, Search } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import DataTable from "@/components/ui/data-table";
@@ -55,6 +55,11 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
 
     const poActions: ActionItem<PurchaseOrderRow>[] = useMemo(() => {
         const actions: ActionItem<PurchaseOrderRow>[] = [
+            {
+                label: "Upload Invoice",
+                icon: <FileUp className="h-4 w-4" />,
+                onClick: (row) => navigate(paths.operations.raiseProjectPurchaseInvoiceForm(row.projectId, row.id)),
+            },
             {
                 label: "View Details",
                 icon: <Eye className="h-4 w-4" />,
