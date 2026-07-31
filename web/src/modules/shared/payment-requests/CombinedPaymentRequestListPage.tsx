@@ -15,7 +15,7 @@ import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
-import { useAllPaymentRequests, useUpdatePaymentRequestStatus, useUploadPaymentInvoiceAfterPayment } from "@/hooks/api/useProjectPaymentRequests";
+import { useAllPaymentRequests, usePaymentRequestDetails, useUpdatePaymentRequestStatus, useUploadPaymentInvoiceAfterPayment } from "@/hooks/api/useProjectPaymentRequests";
 import { useTeamFilter } from "@/hooks/useTeamFilter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "react-router-dom";
@@ -24,6 +24,8 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import { tenderFilesService } from "@/services/api/tender-files.service";
+import { purchaseOrderApi } from "@/services/api/purchase-order.api";
+import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
@@ -300,7 +302,8 @@ const CombinedPaymentRequestListPage: React.FC = () => {
         },
     ], [actions]);
 
-    const detail = viewingId ? visibleRows.find((r) => r.id === viewingId) : undefined;
+    const { data: detailData, isLoading: isDetailLoading } = usePaymentRequestDetails(viewingId ?? 0);
+    const detail = detailData as PaymentRequestRow | undefined;
 
     return (
         <>
@@ -353,7 +356,9 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                         <DialogTitle>Payment Request Details</DialogTitle>
                         <DialogDescription>Full details of the selected request</DialogDescription>
                     </DialogHeader>
-                    {detail ? (
+                    {isDetailLoading ? (
+                        <div className="space-y-4 py-4">{ [1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-8 w-full" />) }</div>
+                    ) : detail ? (
                         <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-4">
                             <div className="col-span-2">
                                 <Label className="text-muted-foreground text-xs">Request No</Label>
@@ -484,8 +489,24 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                                             <span className="text-muted-foreground">PO Number:</span>
                                             <span className="font-medium">{detail.poNumber || `#${detail.purchaseOrderId}`}</span>
                                         </div>
+                                        {detail.poFile && (
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">PO File:</span>
+                                                <a href={tenderFilesService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download PO</a>
+                                            </div>
+                                        )}
                                         <div className="flex justify-between"><span className="text-muted-foreground">Grand Total:</span><span>{formatINR(detail.poGrandTotal || 0)}</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">TDS %:</span><span>{detail.poTdsPercentage || "0"}%</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">TDS Amount:</span><span>{formatINR(detail.poTdsAmount || 0)}</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">Amount After TDS:</span><span>{formatINR(detail.poAmountAfterTds || 0)}</span></div>
                                         <div className="flex justify-between"><span className="text-muted-foreground">Payment Requested:</span><span>{formatINR(detail.poTotalPaymentRequested || 0)}</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">Maker Done:</span><span>{formatINR(detail.poTotalMakerDone || 0)}</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">Payment Done:</span><span>{formatINR(detail.poTotalPaymentDone || 0)}</span></div>
+                                        <div className="pt-2">
+                                            <a href={purchaseOrderApi.getPurchaseOrderPdfUrl(detail.purchaseOrderId)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-xs">
+                                                View Latest PO PDF
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -497,8 +518,17 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                                             <span className="text-muted-foreground">VWO Number:</span>
                                             <span className="font-medium">{detail.vwoNumber || `#${detail.vendorWorkOrderId}`}</span>
                                         </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">VWO File:</span>
+                                            <a href={vendorWorkOrderApi.getPdfDownloadUrl(detail.vendorWorkOrderId)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download VWO</a>
+                                        </div>
                                         <div className="flex justify-between"><span className="text-muted-foreground">Grand Total:</span><span>{formatINR(detail.vwoGrandTotal || 0)}</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">TDS %:</span><span>{detail.vwoTdsPercentage || "0"}%</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">TDS Amount:</span><span>{formatINR(detail.vwoTdsAmount || 0)}</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">Amount After TDS:</span><span>{formatINR(detail.vwoAmountAfterTds || 0)}</span></div>
                                         <div className="flex justify-between"><span className="text-muted-foreground">Payment Requested:</span><span>{formatINR(detail.vwoTotalPaymentRequested || 0)}</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">Maker Done:</span><span>{formatINR(detail.vwoTotalMakerDone || 0)}</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">Payment Done:</span><span>{formatINR(detail.vwoTotalPaymentDone || 0)}</span></div>
                                     </div>
                                 </div>
                             )}

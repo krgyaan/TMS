@@ -19,6 +19,7 @@ import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { getShortId } from "@/lib/id-utils";
 import type { MakerRequestRow } from "@/modules/shared/maker-requests/helpers/makerRequest.types";
 import { tenderFilesService } from "@/services/api/tender-files.service";
+import { purchaseOrderApi } from "@/services/api/purchase-order.api";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 import { TenderFileUploader } from "@/components/tender-file-upload";
 import { useUploadMakerInvoiceAfterPayment } from "@/hooks/api/useMakerRequests";
@@ -406,6 +407,11 @@ const MyMakerRequests: React.FC = () => {
                                                 <a href={tenderFilesService.getFileUrl(detail.uploadedInvoiceFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download Invoice</a>
                                             </div>
                                         )}
+                                        <div className="pt-2">
+                                            <a href={purchaseOrderApi.getPurchaseOrderPdfUrl(detail.purchaseOrderId)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-xs">
+                                                View Latest PO PDF
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             )}
