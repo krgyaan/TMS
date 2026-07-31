@@ -560,12 +560,14 @@ export class VendorWorkOrderService {
                 .values({
                     name: body.name,
                     alias: body.alias || null,
-                    email: body.email,
-                    address: body.address,
-                    gstNo: body.gstNo,
-                    pan: body.pan,
-                    msme: body.msme,
+                    email: body.email || null,
+                    address: body.address || null,
+                    gstNo: body.gstNo || null,
+                    pan: body.pan || null,
+                    msme: body.msme || null,
                     type: body.type || "seller",
+                    contactPerson: body.contact_person || null,
+                    mobileNumber: body.mobile_number || null,
                 })
                 .returning()
         )[0];
