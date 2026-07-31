@@ -56,6 +56,8 @@ export interface CreatePartyDTO {
     pan?: string;
     msme?: string;
     type?: string;
+    contact_person?: string;
+    mobile_number?: string;
 }
 
 export interface PurchaseOrderRow {
