@@ -308,12 +308,28 @@ export class VendorWorkOrderService {
             .where(eq(paymentRequests.vendorWorkOrderId, id))
             .orderBy(desc(paymentRequests.createdAt));
 
+        const purchaseInvoicesData = await this.db
+            .select({
+                id: purchaseInvoices.id,
+                invoiceNo: purchaseInvoices.invoiceNo,
+                valuePreGst: purchaseInvoices.valuePreGst,
+                gstAmount: purchaseInvoices.gstAmount,
+                invoiceDate: purchaseInvoices.invoiceDate,
+                invoiceFile: purchaseInvoices.invoiceFile,
+                uploadedByName: users.name,
+            })
+            .from(purchaseInvoices)
+            .leftJoin(users, eq(purchaseInvoices.uploadedBy, users.id))
+            .where(eq(purchaseInvoices.vendorWorkOrderId, id))
+            .orderBy(desc(purchaseInvoices.createdAt));
+
         return {
             ...wo,
             products: enrichedProducts,
             total,
             raisedByName,
             paymentRequests: paymentRequestsData,
+            purchaseInvoices: purchaseInvoicesData,
         };
     }
 
