@@ -11,6 +11,7 @@ import { ClientDirectorySyncService } from "@/modules/shared/client-directory/cl
 
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
 import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-items.schema";
+import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
 import { paymentRequests } from "@/db/schemas/operations";
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
 import { woBasicDetails } from "@/db/schemas/operations/work-order.schema";
@@ -360,6 +361,8 @@ export class VendorWorkOrderService {
                 totalAmount: sql<number>`COALESCE((SELECT SUM(CAST(taxable_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 totalGstAmt: sql<number>`COALESCE((SELECT SUM(CAST(gst_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 grandTotal: sql<number>`COALESCE((SELECT SUM(CAST(total_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                totalVwiAmount: sql<number>`COALESCE((SELECT SUM(value_pre_gst::numeric + gst_amount::numeric) FROM project_purchase_invoices WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                totalVwiCount: sql<number>`COALESCE((SELECT COUNT(*) FROM project_purchase_invoices WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 generatedPdfVersions: vendorWorkOrders.generatedPdfVersions,
             })
             .from(vendorWorkOrders)
@@ -492,6 +495,14 @@ export class VendorWorkOrderService {
                     { totalAmount: 0, totalGstAmt: 0, grandTotal: 0 }
                 );
 
+                const [invoiceTotals] = await this.db
+                    .select({
+                        totalVwiAmount: sql<number>`COALESCE(SUM(value_pre_gst::numeric + gst_amount::numeric), 0)`,
+                        totalVwiCount: sql<number>`COUNT(*)`,
+                    })
+                    .from(purchaseInvoices)
+                    .where(eq(purchaseInvoices.vendorWorkOrderId, wo.id));
+
                 const [raisedByUser] = wo.woRaisedBy
                     ? await this.db
                         .select({ name: users.name })
@@ -499,7 +510,14 @@ export class VendorWorkOrderService {
                         .where(eq(users.id, wo.woRaisedBy))
                     : [];
 
-                return { ...wo, products: items, ...totals, woRaisedBy: raisedByUser?.name || "—" };
+                return {
+                    ...wo,
+                    products: items,
+                    ...totals,
+                    totalVwiAmount: invoiceTotals?.totalVwiAmount || 0,
+                    totalVwiCount: invoiceTotals?.totalVwiCount || 0,
+                    woRaisedBy: raisedByUser?.name || "—",
+                };
             })
         );
 

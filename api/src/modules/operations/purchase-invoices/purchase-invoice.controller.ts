@@ -23,8 +23,11 @@ export class PurchaseInvoiceController {
     }
 
     @Get("next-number")
-    getNextNumber(@Query("projectName") projectName: string) {
-        return this.service.generateNumber(projectName);
+    getNextNumber(
+        @Query("projectName") projectName: string,
+        @Query("type") type?: string,
+    ) {
+        return this.service.generateNumber(projectName, type === "vwo" ? "WOI" : "PI");
     }
 
     @Get("project/:projectId")
