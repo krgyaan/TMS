@@ -47,6 +47,9 @@ export interface PaymentRequestRow {
     vwoTotalAmount?: number | string;
     vwoTotalGstAmt?: number | string;
     vwoGrandTotal?: number | string;
+    vwoTdsPercentage?: number | string;
+    vwoTdsAmount?: number | string;
+    vwoAmountAfterTds?: number | string;
     vwoTotalPaymentRequested?: number | string;
     vwoTotalMakerDone?: number | string;
     vwoTotalPaymentDone?: number | string;

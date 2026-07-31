@@ -89,15 +89,14 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                         <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">PO Number:</span>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <span className="font-medium">{getShortId(detail.poNumber) || `#${detail.purchaseOrderId}`}</span>
-                                        </TooltipTrigger>
-                                        <TooltipContent>{detail.poNumber}</TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
+                                <span className="font-medium break-all">{detail.poNumber || `#${detail.purchaseOrderId}`}</span>
                             </div>
+                            {detail.poFile && (
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">PO File:</span>
+                                    <a href={tenderFilesService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download PO</a>
+                                </div>
+                            )}
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Total (Pre-GST):</span>
                                 <span>{formatINR(detail.poTotalAmount || 0)}</span>
@@ -165,14 +164,7 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                         <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">VWO Number:</span>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <span className="font-medium">{getShortId(detail.vwoNumber) || `#${detail.vendorWorkOrderId}`}</span>
-                                        </TooltipTrigger>
-                                        <TooltipContent>{detail.vwoNumber}</TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
+                                <span className="font-medium break-all">{detail.vwoNumber || `#${detail.vendorWorkOrderId}`}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Total (Pre-GST):</span>
@@ -186,6 +178,19 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                                 <span>Grand Total:</span>
                                 <span>{formatINR(detail.vwoGrandTotal || 0)}</span>
                             </div>
+                            {detail.vwoTdsPercentage && Number(detail.vwoTdsPercentage) > 0 && (
+                                <>
+                                    <div className="border-t my-1.5" />
+                                    <div className="flex justify-between text-destructive">
+                                        <span>TDS @ {Number(detail.vwoTdsPercentage)}%:</span>
+                                        <span>-{formatINR(detail.vwoTdsAmount || 0)}</span>
+                                    </div>
+                                    <div className="flex justify-between font-semibold">
+                                        <span>Amount After TDS:</span>
+                                        <span>{formatINR(detail.vwoAmountAfterTds || 0)}</span>
+                                    </div>
+                                </>
+                            )}
                             <div className="border-t my-1.5" />
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Payment Requested:</span>

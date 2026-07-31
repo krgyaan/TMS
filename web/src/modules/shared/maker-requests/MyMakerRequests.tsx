@@ -19,6 +19,7 @@ import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { getShortId } from "@/lib/id-utils";
 import type { MakerRequestRow } from "@/modules/shared/maker-requests/helpers/makerRequest.types";
 import { tenderFilesService } from "@/services/api/tender-files.service";
+import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 import { TenderFileUploader } from "@/components/tender-file-upload";
 import { useUploadMakerInvoiceAfterPayment } from "@/hooks/api/useMakerRequests";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
@@ -354,6 +355,100 @@ const MyMakerRequests: React.FC = () => {
                                         {detail.uploadInvoiceAfterPayment.map((f, i) => (
                                             <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
                                         ))}
+                                    </div>
+                                </div>
+                            )}
+                            {detail.purchaseOrderId && (
+                                <div className="col-span-2 space-y-2">
+                                    <Label className="text-muted-foreground text-xs">PO Details</Label>
+                                    <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">PO Number:</span>
+                                            <span className="font-medium">{detail.poNumber || `#${detail.purchaseOrderId}`}</span>
+                                        </div>
+                                        {detail.poFile && (
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">PO File:</span>
+                                                <a href={tenderFilesService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download PO</a>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Grand Total:</span>
+                                            <span>{formatINR(detail.poGrandTotal || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">TDS %:</span>
+                                            <span>{detail.poTdsPercentage || "0"}%</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">TDS Amount:</span>
+                                            <span>{formatINR(detail.poTdsAmount || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Amount After TDS:</span>
+                                            <span>{formatINR(detail.poAmountAfterTds || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Payment Requested:</span>
+                                            <span>{formatINR(detail.poTotalPaymentRequested || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Maker Done:</span>
+                                            <span>{formatINR(detail.poTotalMakerDone || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Payment Done:</span>
+                                            <span>{formatINR(detail.poTotalPaymentDone || 0)}</span>
+                                        </div>
+                                        {detail.uploadedInvoiceFile && (
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Uploaded Invoice:</span>
+                                                <a href={tenderFilesService.getFileUrl(detail.uploadedInvoiceFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download Invoice</a>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            {detail.vendorWorkOrderId && (
+                                <div className="col-span-2 space-y-2">
+                                    <Label className="text-muted-foreground text-xs">VWO Details</Label>
+                                    <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">VWO Number:</span>
+                                            <span className="font-medium">{detail.vwoNumber || `#${detail.vendorWorkOrderId}`}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">VWO File:</span>
+                                            <a href={vendorWorkOrderApi.getPdfDownloadUrl(detail.vendorWorkOrderId)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download VWO</a>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Grand Total:</span>
+                                            <span>{formatINR(detail.vwoGrandTotal || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">TDS %:</span>
+                                            <span>{detail.vwoTdsPercentage || "0"}%</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">TDS Amount:</span>
+                                            <span>{formatINR(detail.vwoTdsAmount || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Amount After TDS:</span>
+                                            <span>{formatINR(detail.vwoAmountAfterTds || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Payment Requested:</span>
+                                            <span>{formatINR(detail.vwoTotalPaymentRequested || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Maker Done:</span>
+                                            <span>{formatINR(detail.vwoTotalMakerDone || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Payment Done:</span>
+                                            <span>{formatINR(detail.vwoTotalPaymentDone || 0)}</span>
+                                        </div>
                                     </div>
                                 </div>
                             )}

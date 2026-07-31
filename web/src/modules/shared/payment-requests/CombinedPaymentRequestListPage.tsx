@@ -476,7 +476,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                                     </div>
                                 </div>
                             )}
-                            {detail.projectId != null && detail.purchaseOrderId && (
+                            {detail.purchaseOrderId && (
                                 <div className="col-span-2 space-y-2">
                                     <Label className="text-muted-foreground text-xs">PO Details</Label>
                                     <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
@@ -489,7 +489,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                                     </div>
                                 </div>
                             )}
-                            {detail.projectId != null && detail.vendorWorkOrderId && (
+                            {detail.vendorWorkOrderId && (
                                 <div className="col-span-2 space-y-2">
                                     <Label className="text-muted-foreground text-xs">VWO Details</Label>
                                     <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
