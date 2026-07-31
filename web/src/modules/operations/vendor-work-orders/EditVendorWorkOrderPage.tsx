@@ -7,13 +7,11 @@ import { TenderFileUploader } from "@/components/tender-file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useCreatePoParty, usePoParties } from "@/hooks/api/usePurchaseOrders";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
@@ -24,23 +22,14 @@ import { VWOTermsField } from "./components/VWOTermsField";
 import { DEFAULT_VWO_TERMS_ROWS } from "./helpers/vwoForm.constants";
 import { VWOFormPreview } from "./components/VWOFormPreview";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Building2, Calendar, Eye, FileText, Hash, Info, Loader2, Mail, MapPin, Phone, UserCheck, UserPlus } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Building2, Calendar, Eye, FileText, Hash, Mail, MapPin, Phone, UserCheck, UserPlus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { formatDateForInput, mapVwoFormToUpdateDTO } from "./helpers/vwoForm.mapper";
 import { vendorWorkOrderFormSchema, type VendorWorkOrderFormValues } from "./helpers/vwoForm.schema";
-
-interface NewPartyForm {
-  name: string;
-  alias: string;
-  email: string;
-  address: string;
-  gstNo: string;
-  pan: string;
-  msme: string;
-}
+import { PartyFormDialog, type CreatePartyPayload } from "@/modules/operations/parties/components/PartyFormDialog";
 
 const defaultFormValues: VendorWorkOrderFormValues = {
   woDate: formatDateForInput(new Date()),
@@ -165,7 +154,6 @@ export default function EditVendorWorkOrderPage() {
   const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
   const [isShipToPartyOpen, setIsShipToPartyOpen] = useState(false);
   const [partyCreationType, setPartyCreationType] = useState<"seller" | "ship_to">("seller");
-  const [newParty, setNewParty] = useState<NewPartyForm>({ name: "", alias: "", email: "", address: "", gstNo: "", pan: "", msme: "" });
   const [vwoNumber, setVwoNumber] = useState<string>("");
 
   const { data: vwoData, isLoading: isVwoLoading } = useVendorWorkOrderDetails(vwoId);
@@ -219,6 +207,9 @@ export default function EditVendorWorkOrderPage() {
     form.setValue("sellerGstNo", party.gstNo || "");
     form.setValue("sellerPanNo", party.pan || "");
     form.setValue("sellerMsmeNo", party.msme || "");
+    form.setValue("contactPersonName", party.contactPerson || "");
+    form.setValue("contactPersonEmail", party.email || "");
+    form.setValue("contactPersonPhone", party.mobileNumber || "");
   }, [selectedSellerId, parties, form]);
 
   useEffect(() => {
@@ -240,25 +231,26 @@ export default function EditVendorWorkOrderPage() {
     form.setValue("contactPersonPhone", user.mobile || "");
   }, [selectedUserId, teamMembers, form]);
 
-  const handleAddNewParty = async () => {
-    if (!newParty.name.trim()) {
+  const handleAddNewParty = async (partyData: CreatePartyPayload) => {
+    if (!partyData.name.trim()) {
       toast.error("Party name is required");
       return;
     }
     try {
-      const partyData = {
-        name: newParty.name,
-        alias: newParty.alias || undefined,
-        email: newParty.email || undefined,
-        address: newParty.address || undefined,
-        gstNo: newParty.gstNo || undefined,
-        pan: newParty.pan || undefined,
-        msme: newParty.msme || undefined,
+      const dto = {
+        name: partyData.name,
+        alias: partyData.alias || undefined,
+        email: partyData.email || undefined,
+        address: partyData.address || undefined,
+        gstNo: partyData.gstNo || undefined,
+        pan: partyData.pan || undefined,
+        msme: partyData.msme || undefined,
         type: partyCreationType,
+        contact_person: partyData.contact_person || undefined,
+        mobile_number: partyData.mobile_number || undefined,
       };
-      await createPartyMutation.mutateAsync(partyData);
-      toast.success(`Party "${newParty.name}" has been added successfully.`);
-      setNewParty({ name: "", alias: "", email: "", address: "", gstNo: "", pan: "", msme: "" });
+      await createPartyMutation.mutateAsync(dto);
+      toast.success(`Party "${partyData.name}" has been added successfully.`);
       setIsAddPartyOpen(false);
       setIsShipToPartyOpen(false);
     } catch (error: any) {
@@ -399,22 +391,19 @@ export default function EditVendorWorkOrderPage() {
                     <Building2 className="h-5 w-5" />
                     Vendor Information
                   </h3>
-                  <Dialog open={isAddPartyOpen} onOpenChange={(open) => { setIsAddPartyOpen(open); if (open) setPartyCreationType("seller"); }}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm" type="button" onClick={() => setPartyCreationType("seller")}>
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Add New Vendor
-                      </Button>
-                    </DialogTrigger>
-                    <AddPartyDialog
-                      newParty={newParty}
-                      setNewParty={setNewParty}
-                      onSubmit={handleAddNewParty}
-                      onClose={() => setIsAddPartyOpen(false)}
-                      isLoading={createPartyMutation.isPending}
-                    />
-                  </Dialog>
+                  <Button variant="outline" size="sm" type="button" onClick={() => { setPartyCreationType("seller"); setIsAddPartyOpen(true); }}>
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Add New Vendor
+                  </Button>
                 </div>
+                <PartyFormDialog
+                  title="Add New Vendor"
+                  description="Add a new party to use as a vendor."
+                  open={isAddPartyOpen}
+                  onOpenChange={(open) => { setIsAddPartyOpen(open); if (open) setPartyCreationType("seller"); }}
+                  onSubmit={handleAddNewParty}
+                  isLoading={createPartyMutation.isPending}
+                />
                 <p className="text-sm text-muted-foreground mb-4">Select or enter vendor details</p>
                 <div className="mb-6 max-w-md">
                   <SelectField
@@ -482,27 +471,24 @@ export default function EditVendorWorkOrderPage() {
               {/* ── Ship To Details ── */}
               <div className="border rounded-lg border-sidebar-primary-foreground border-dashed p-2 my-3 w-full md:w-1/2">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <MapPin className="h-5 w-5" />
-                    Ship To Details
-                  </h3>
-                  <Dialog open={isShipToPartyOpen} onOpenChange={(open) => { setIsShipToPartyOpen(open); if (open) setPartyCreationType("ship_to"); }}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm" type="button" onClick={() => setPartyCreationType("ship_to")}>
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Add New Ship To
-                      </Button>
-                    </DialogTrigger>
-                    <AddPartyDialog
-                      newParty={newParty}
-                      setNewParty={setNewParty}
-                      onSubmit={handleAddNewParty}
-                      onClose={() => setIsShipToPartyOpen(false)}
-                      isLoading={createPartyMutation.isPending}
-                    />
-                  </Dialog>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4">Delivery destination information</p>
+                   <h3 className="text-lg font-semibold flex items-center gap-2">
+                     <MapPin className="h-5 w-5" />
+                     Ship To Details
+                   </h3>
+                   <Button variant="outline" size="sm" type="button" onClick={() => { setPartyCreationType("ship_to"); setIsShipToPartyOpen(true); }}>
+                     <UserPlus className="mr-2 h-4 w-4" />
+                     Add New Ship To
+                   </Button>
+                 </div>
+                 <PartyFormDialog
+                   title="Add New Ship To"
+                   description="Add a new party to use as a shipping destination."
+                   open={isShipToPartyOpen}
+                   onOpenChange={(open) => { setIsShipToPartyOpen(open); if (open) setPartyCreationType("ship_to"); }}
+                   onSubmit={handleAddNewParty}
+                   isLoading={createPartyMutation.isPending}
+                 />
+                 <p className="text-sm text-muted-foreground mb-4">Delivery destination information</p>
                 <div className="mb-6 max-w-md">
                   <SelectField
                     control={form.control}
@@ -624,89 +610,3 @@ export default function EditVendorWorkOrderPage() {
     </Card>
   );
 }
-
-interface AddPartyDialogProps {
-  newParty: NewPartyForm;
-  setNewParty: React.Dispatch<React.SetStateAction<NewPartyForm>>;
-  onSubmit: () => void;
-  onClose: () => void;
-  isLoading?: boolean;
-}
-
-const AddPartyDialog: React.FC<AddPartyDialogProps> = ({ newParty, setNewParty, onSubmit, onClose, isLoading = false }) => {
-  return (
-    <DialogContent className="sm:max-w-[600px]">
-      <DialogHeader>
-        <DialogTitle className="flex items-center gap-2">
-          <UserPlus className="h-5 w-5" />
-          Add New Party
-        </DialogTitle>
-        <DialogDescription>Add a new party to use as vendor or shipping destination.</DialogDescription>
-      </DialogHeader>
-      <div className="grid gap-4 py-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Party Name <span className="text-destructive">*</span></Label>
-            <Input value={newParty.name} onChange={(e) => setNewParty({ ...newParty, name: e.target.value })} placeholder="Enter party name" />
-          </div>
-          <div className="space-y-2">
-            <Label>Alias</Label>
-            <Input value={newParty.alias} onChange={(e) => setNewParty({ ...newParty, alias: e.target.value })} placeholder="e.g. Factory, HO, Branch" />
-          </div>
-          <div className="space-y-2">
-            <Label>Email</Label>
-            <Input type="email" value={newParty.email} onChange={(e) => setNewParty({ ...newParty, email: e.target.value })} placeholder="example@email.com" />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label>Address</Label>
-          <Textarea value={newParty.address} onChange={(e) => setNewParty({ ...newParty, address: e.target.value })} placeholder="Enter complete address" rows={2} />
-        </div>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              GST Number
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger><Info className="h-3.5 w-3.5 text-muted-foreground" /></TooltipTrigger>
-                  <TooltipContent>15-character GST identification number</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </Label>
-            <Input value={newParty.gstNo} onChange={(e) => setNewParty({ ...newParty, gstNo: e.target.value.toUpperCase() })} placeholder="27ABCDE1234F1Z5" className="font-mono" maxLength={15} />
-          </div>
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              PAN Number
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger><Info className="h-3.5 w-3.5 text-muted-foreground" /></TooltipTrigger>
-                  <TooltipContent>10-character Permanent Account Number</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </Label>
-            <Input value={newParty.pan} onChange={(e) => setNewParty({ ...newParty, pan: e.target.value.toUpperCase() })} placeholder="ABCDE1234F" className="font-mono" maxLength={10} />
-          </div>
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              MSME Number
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger><Info className="h-3.5 w-3.5 text-muted-foreground" /></TooltipTrigger>
-                  <TooltipContent>Udyam Registration Number</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </Label>
-            <Input value={newParty.msme} onChange={(e) => setNewParty({ ...newParty, msme: e.target.value.toUpperCase() })} placeholder="UDYAM-XX-00-0000000" className="font-mono" />
-          </div>
-        </div>
-      </div>
-      <DialogFooter className="gap-2">
-        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-        <Button type="button" onClick={onSubmit} disabled={!newParty.name.trim() || isLoading} className="min-w-[100px]">
-          {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding...</> : <><UserPlus className="mr-2 h-4 w-4" />Add Party</>}
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  );
-};
