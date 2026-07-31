@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ColDef } from "ag-grid-community";
-import { useEnquiryResults } from "@/hooks/api/useEnquiryResult";
+import { useEnquiryResults, useUpdateEnquiryResult } from "@/hooks/api/useEnquiryResult";
 import DataTable from "@/components/ui/data-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,8 @@ import type { EnquiryResultWithDetails } from "./helpers/enquiry-result.type";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
+import { UploadResultModal } from "./components/UploadResultModal";
+import { toast } from "sonner";
 
 function formatDateTime(dateStr?: string | null) {
     if (!dateStr) return "—";
@@ -51,6 +53,15 @@ export default function EnquiryResultListPage() {
         search: debouncedSearch || undefined,
     });
 
+    const [uploadResultRow, setUploadResultRow] = useState<EnquiryResultWithDetails | null>(null);
+    const updateResult = useUpdateEnquiryResult();
+
+    const handleUploadResult = async (data: Parameters<typeof updateResult.mutateAsync>[0]['data']) => {
+        if (!uploadResultRow) return;
+        await updateResult.mutateAsync({ id: uploadResultRow.id, data });
+        toast.success("Result saved successfully");
+    };
+
     const actions = useMemo<ActionItem<EnquiryResultWithDetails>[]>(() => [
         {
             label: "View",
@@ -62,7 +73,7 @@ export default function EnquiryResultListPage() {
         },
         {
             label: "Upload Result",
-            onClick: () => { /* Placeholder */ },
+            onClick: (row) => setUploadResultRow(row),
         },
     ], [navigate]);
 
@@ -147,6 +158,13 @@ export default function EnquiryResultListPage() {
                     showLengthChange
                 />
             </CardContent>
+
+            <UploadResultModal
+                open={!!uploadResultRow}
+                onOpenChange={(open) => !open && setUploadResultRow(null)}
+                result={uploadResultRow}
+                onSubmit={handleUploadResult}
+            />
         </Card>
     );
 }

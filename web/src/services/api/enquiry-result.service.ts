@@ -35,6 +35,20 @@ class EnquiryResultService extends BaseApiService {
         return this.delete<void>(`/${id}`);
     }
 
+    async uploadScreenshots(id: number, files: File[]): Promise<string[]> {
+        const formData = new FormData();
+        files.forEach(f => formData.append('files', f));
+        const res = await this.post<{ filenames: string[] }>(`/${id}/upload-screenshots`, formData);
+        return res.filenames;
+    }
+
+    async uploadDocuments(id: number, files: File[]): Promise<string[]> {
+        const formData = new FormData();
+        files.forEach(f => formData.append('files', f));
+        const res = await this.post<{ filenames: string[] }>(`/${id}/upload-documents`, formData);
+        return res.filenames;
+    }
+
     async createFollowup(id: number, data: CreateEnquiryFollowupRequest): Promise<unknown> {
         return this.post<unknown>(`/${id}/followup`, data);
     }

@@ -114,7 +114,7 @@ export function EnquiryResultView({ result, className }: { result: EnquiryResult
                         <p className="font-medium">{result.uploadScreenshot || "—"}</p>
                     </div>
                     <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Upload Documents</Label>
+                        <Label className="text-xs text-muted-foreground">Final Result</Label>
                         <p className="font-medium">{result.uploadDocuments || "—"}</p>
                     </div>
                 </div>

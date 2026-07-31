@@ -4,7 +4,7 @@ export const CreateEnquiryResultSchema = z.object({
     enquiryId: z.number().int().positive(),
     technicallyQualified: z.boolean().optional().nullable(),
     disqualificationReason: z.string().optional().nullable(),
-    qualifiedCount: z.number().int().positive().optional().nullable(),
+    qualifiedCount: z.number().int().min(0).optional().nullable(),
     qualifiedParties: z.array(z.string()).optional().nullable(),
     result: z.enum(['won', 'lost']).optional().nullable(),
     l1Price: z.number().positive().optional().nullable(),
@@ -20,7 +20,7 @@ export type CreateEnquiryResultDto = z.infer<typeof CreateEnquiryResultSchema>;
 export const UpdateEnquiryResultSchema = z.object({
     technicallyQualified: z.boolean().optional().nullable(),
     disqualificationReason: z.string().optional().nullable(),
-    qualifiedCount: z.number().int().positive().optional().nullable(),
+    qualifiedCount: z.number().int().min(0).optional().nullable(),
     qualifiedParties: z.array(z.string()).optional().nullable(),
     result: z.enum(['won', 'lost']).optional().nullable(),
     l1Price: z.number().positive().optional().nullable(),
