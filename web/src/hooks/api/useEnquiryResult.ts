@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { enquiryResultService } from "@/services/api/enquiry-result.service";
-import type { EnquiryResultListParams, CreateEnquiryResultRequest, UpdateEnquiryResultRequest } from "@/modules/crm/enquiry-result/helpers/enquiry-result.type";
+import type { EnquiryResultListParams, CreateEnquiryResultRequest, UpdateEnquiryResultRequest, CreateEnquiryFollowupRequest } from "@/modules/crm/enquiry-result/helpers/enquiry-result.type";
 
 const enquiryResultKey = {
     all: ['enquiry-results'],
@@ -53,6 +53,18 @@ export function useDeleteEnquiryResult() {
         mutationFn: (id: number) => enquiryResultService.remove(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: enquiryResultKey.lists() });
+        },
+    });
+}
+
+export function useCreateEnquiryResultFollowup() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: CreateEnquiryFollowupRequest }) =>
+            enquiryResultService.createFollowup(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: enquiryResultKey.lists() });
+            queryClient.invalidateQueries({ queryKey: enquiryResultKey.details() });
         },
     });
 }

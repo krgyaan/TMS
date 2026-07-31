@@ -3,13 +3,17 @@ import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { enquiryResults } from '@db/schemas/crm/enquiry-result.schema';
 import { leadEnquiries } from '@db/schemas/crm/lead-enquiries.schema';
+import { leadContacts } from '@db/schemas/crm/lead-contacts.schema';
 import { items } from '@db/schemas/master/items.schema';
+import { teams } from '@db/schemas/master/teams.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { privateQuotes } from '@db/schemas/crm/private-quotes.schema';
 import { privateCostingSheets } from '@db/schemas/crm/private-costing-sheets.schema';
-import { eq, desc, and, sql, type SQL } from 'drizzle-orm';
+import { eq, desc, and, inArray, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import type { CreateEnquiryResultDto, UpdateEnquiryResultDto, EnquiryResultListDto } from './dto/enquiry-result.dto';
+import { followUps } from '@db/schemas/shared/follow-ups.schema';
+import { followUpPersons } from '@db/schemas/shared/follow-up-persons.schema';
+import type { CreateEnquiryResultDto, UpdateEnquiryResultDto, EnquiryResultListDto, CreateFollowupDto } from './dto/enquiry-result.dto';
 
 const createdByUser = alias(users, 'created_by_user');
 
@@ -31,6 +35,9 @@ const resultSelect = {
     updatedAt: enquiryResults.updatedAt,
     enquiryNumber: leadEnquiries.enquiryNumber,
     enqName: leadEnquiries.enqName,
+    organizationName: leadEnquiries.organizationName,
+    team: leadEnquiries.team,
+    teamName: teams.name,
     createdByName: createdByUser.name,
     itemName: items.name,
     quoteSubmissionDatetime: sql<string>`(
@@ -61,6 +68,7 @@ const resultBaseQuery = (db: DbInstance) =>
         .select(resultSelect)
         .from(enquiryResults)
         .leftJoin(leadEnquiries, eq(enquiryResults.enquiryId, leadEnquiries.id))
+        .leftJoin(teams, eq(teams.id, sql`NULLIF(${leadEnquiries.team}, '')::BIGINT`))
         .leftJoin(items, eq(leadEnquiries.itemId, items.id))
         .leftJoin(createdByUser, eq(createdByUser.id, leadEnquiries.createdBy));
 
@@ -123,7 +131,41 @@ export class EnquiryResultService {
             .limit(1);
 
         if (!row) throw new NotFoundException(`Enquiry result with ID ${id} not found`);
-        return row;
+
+        const quotation = await this.getQuotationForEnquiry(row.enquiryId);
+        return { ...row, ...quotation };
+    }
+
+    private async getQuotationForEnquiry(enquiryId: number) {
+        const [quote] = await this.db
+            .select({ id: privateQuotes.id, contacts: privateQuotes.contacts })
+            .from(privateQuotes)
+            .where(eq(privateQuotes.enquiryId, enquiryId))
+            .orderBy(desc(privateQuotes.createdAt))
+            .limit(1);
+
+        if (!quote) return { quotationId: null, contacts: [] as { name: string; designation: string | null; phone: string | null; email: string | null }[] };
+
+        const contactIds = (quote.contacts || '')
+            .split(',')
+            .map(s => s.trim())
+            .filter(s => s.length > 0)
+            .map(Number)
+            .filter(n => !isNaN(n) && n > 0);
+
+        const contacts = contactIds.length > 0
+            ? await this.db
+                .select({
+                    name: leadContacts.name,
+                    designation: leadContacts.designation,
+                    phone: leadContacts.phone,
+                    email: leadContacts.email,
+                })
+                .from(leadContacts)
+                .where(inArray(leadContacts.id, contactIds))
+            : [];
+
+        return { quotationId: quote.id, contacts };
     }
 
     async create(data: CreateEnquiryResultDto) {
@@ -185,5 +227,69 @@ export class EnquiryResultService {
         await this.db
             .delete(enquiryResults)
             .where(eq(enquiryResults.id, id));
+    }
+
+    async createFollowup(id: number, body: CreateFollowupDto, currentUserId: number) {
+        const result = await this.findOne(id);
+
+        const contacts = body.contacts.map(c => ({
+            name: c.name,
+            designation: c.designation ?? null,
+            email: c.email ?? null,
+            phone: c.phone ?? null,
+            org: body.organisation_name ?? null,
+            addedAt: new Date().toISOString(),
+        }));
+
+        const normalizeDateToISODate = (v?: string | null) => {
+            if (!v) return null;
+            const d = new Date(v);
+            if (isNaN(d.getTime())) return null;
+            return d.toISOString().split('T')[0];
+        };
+
+        const startFrom = normalizeDateToISODate(body.followup_start_date) ?? new Date().toISOString().split('T')[0];
+        const frequency = body.frequency != null ? Number(body.frequency) : null;
+
+        return this.db.transaction(async tx => {
+            const [followUp] = await tx
+                .insert(followUps)
+                .values({
+                    area: result.teamName || result.team || 'CRM',
+                    partyName: body.organisation_name,
+                    amount: result.finalPrice ? String(Number(result.finalPrice) || 0) : '0',
+                    followupFor: 'Quotation',
+                    assignedToId: currentUserId,
+                    createdById: currentUserId,
+                    assignmentStatus: 'initiated',
+                    details: body.emailBody ?? null,
+                    contacts,
+                    frequency,
+                    startFrom,
+                    attachments: body.attachments ?? [],
+                    followUpHistory: [],
+                    reminderCount: 1,
+                    emdId: null,
+                    quotationId: result.quotationId ?? null,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    deletedAt: null,
+                })
+                .returning();
+
+            if (contacts.length > 0) {
+                await tx.insert(followUpPersons).values(
+                    contacts.map(c => ({
+                        followUpId: followUp.id,
+                        name: c.name,
+                        email: c.email,
+                        phone: c.phone,
+                        organization: c.org || body.organisation_name,
+                    }))
+                );
+            }
+
+            return followUp;
+        });
     }
 }

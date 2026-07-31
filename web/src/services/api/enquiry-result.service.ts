@@ -1,6 +1,6 @@
 import { BaseApiService } from "./base.service";
 import type { PaginatedResult } from "@/types/api.types";
-import type { EnquiryResultWithDetails, EnquiryResult, EnquiryResultListParams, CreateEnquiryResultRequest, UpdateEnquiryResultRequest } from "@/modules/crm/enquiry-result/helpers/enquiry-result.type";
+import type { EnquiryResultWithDetails, EnquiryResult, EnquiryResultListParams, CreateEnquiryResultRequest, UpdateEnquiryResultRequest, CreateEnquiryFollowupRequest } from "@/modules/crm/enquiry-result/helpers/enquiry-result.type";
 
 class EnquiryResultService extends BaseApiService {
     constructor() {
@@ -33,6 +33,10 @@ class EnquiryResultService extends BaseApiService {
 
     async remove(id: number): Promise<void> {
         return this.delete<void>(`/${id}`);
+    }
+
+    async createFollowup(id: number, data: CreateEnquiryFollowupRequest): Promise<unknown> {
+        return this.post<unknown>(`/${id}/followup`, data);
     }
 }
 

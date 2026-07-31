@@ -252,6 +252,7 @@ export const paths = {
         leadsQuotationView: (id: number | string) => `/crm/leads-quotations/${id}`,
         enquiryResults: "/crm/enquiry-results",
         enquiryResultView: (id: number | string) => `/crm/enquiry-results/${id}`,
+        enquiryResultFollowup: (id: number | string) => `/crm/enquiry-results/followup/${id}`,
     },
 
     // ==================== PERFORMANCE ====================

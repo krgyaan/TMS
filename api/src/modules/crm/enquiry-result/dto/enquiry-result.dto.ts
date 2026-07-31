@@ -44,3 +44,21 @@ export const EnquiryResultListSchema = z.object({
 });
 
 export type EnquiryResultListDto = z.infer<typeof EnquiryResultListSchema>;
+
+export const CreateFollowupContactSchema = z.object({
+    name: z.string().min(1, 'Name is required'),
+    designation: z.string().optional().nullable(),
+    phone: z.string().optional().nullable(),
+    email: z.string().email().optional().nullable(),
+});
+
+export const CreateFollowupSchema = z.object({
+    organisation_name: z.string().min(1, 'Organisation name is required'),
+    contacts: z.array(CreateFollowupContactSchema).min(1, 'At least one contact is required'),
+    followup_start_date: z.string().optional(),
+    frequency: z.coerce.number().int().min(1).max(8).optional(),
+    emailBody: z.string().optional(),
+    attachments: z.array(z.string()).optional().default([]),
+});
+
+export type CreateFollowupDto = z.infer<typeof CreateFollowupSchema>;

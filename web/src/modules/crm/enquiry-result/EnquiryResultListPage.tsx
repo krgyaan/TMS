@@ -58,7 +58,7 @@ export default function EnquiryResultListPage() {
         },
         {
             label: "Initiate Followup",
-            onClick: () => { /* Placeholder */ },
+            onClick: (row) => navigate(`/crm/enquiry-results/followup/${row.id}`),
         },
         {
             label: "Upload Result",

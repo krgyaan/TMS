@@ -28,6 +28,7 @@ export function FollowUpFrequencySelect<TFieldValues extends Record<string, any>
             control={control}
             name={name as any}
             label={label}
+            valueType="number"
             options={Object.entries(FREQUENCY_LABELS)
                 .sort(([a], [b]) => {
                     if (Number(a) === 6) return 1;

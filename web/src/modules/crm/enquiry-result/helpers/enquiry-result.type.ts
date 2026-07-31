@@ -19,11 +19,22 @@ export interface EnquiryResult {
 export interface EnquiryResultWithDetails extends EnquiryResult {
     enquiryNumber?: string | null;
     enqName?: string | null;
+    organizationName?: string | null;
+    team?: string | null;
     createdByName?: string | null;
     itemName?: string | null;
     quoteSubmissionDatetime?: string | null;
     finalPrice?: string | null;
     approvedFinalPrice?: string | null;
+    quotationId?: number | null;
+    contacts?: QuotationContact[];
+}
+
+export interface QuotationContact {
+    name: string;
+    designation?: string | null;
+    phone?: string | null;
+    email?: string | null;
 }
 
 export interface EnquiryResultListParams {
@@ -63,4 +74,20 @@ export interface UpdateEnquiryResultRequest {
     uploadScreenshot?: string | null;
     uploadDocuments?: string | null;
     status?: string | null;
+}
+
+export interface CreateEnquiryFollowupContact {
+    name: string;
+    designation?: string | null;
+    phone?: string | null;
+    email?: string | null;
+}
+
+export interface CreateEnquiryFollowupRequest {
+    organisation_name: string;
+    contacts: CreateEnquiryFollowupContact[];
+    followup_start_date?: string;
+    frequency?: number;
+    emailBody?: string;
+    attachments?: string[];
 }

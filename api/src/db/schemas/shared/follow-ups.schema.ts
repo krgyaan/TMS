@@ -6,6 +6,7 @@ import { users } from "../auth/users.schema";
 // JSONB Type Definitions
 export interface FollowUpContact {
     name: string;
+    designation: string | null;
     email: string | null;
     phone: string | null;
     org: string | null;
@@ -28,6 +29,8 @@ export const followUps = pgTable(
             .default(sql`nextval('follow_ups_id_seq')`),
 
         emdId: bigint("emd_id", { mode: "number" }),
+
+        quotationId: bigint("quotation_id", { mode: "number" }),
 
         area: varchar("area", { length: 255 }).notNull(),
         partyName: varchar("party_name", { length: 255 }).notNull(),

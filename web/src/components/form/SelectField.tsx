@@ -15,6 +15,7 @@ type SelectFieldProps<TFieldValues extends FieldValues, TName extends FieldPath<
     options: Array<SelectOption | { value: string; label: string }>;
     placeholder: string;
     disabled?: boolean;
+    valueType?: 'auto' | 'string' | 'number';
 };
 
 export function SelectField<TFieldValues extends FieldValues, TName extends FieldPath<TFieldValues>>({
@@ -24,6 +25,7 @@ export function SelectField<TFieldValues extends FieldValues, TName extends Fiel
     options,
     placeholder,
     disabled,
+    valueType = 'auto',
 }: SelectFieldProps<TFieldValues, TName>) {
     const normalizedOptions = React.useMemo<SelectOption[]>(() => (options || []).map(option => ("id" in option ? option : { id: option.value, name: option.label })), [options]);
 
@@ -35,6 +37,11 @@ export function SelectField<TFieldValues extends FieldValues, TName extends Fiel
                     onChange={v => {
                         if (v === "") {
                             field.onChange(undefined);
+                        } else if (valueType === 'number') {
+                            const numValue = Number(v);
+                            field.onChange(isNaN(numValue) ? v : numValue);
+                        } else if (valueType === 'string') {
+                            field.onChange(v);
                         } else {
                             // Preserve string values for enum types (like '0', '1', '2', '3')
                             // Check if the current field value is a string enum (single char) or if the value itself is a single char

@@ -18,6 +18,7 @@ const CRM_LeadsQuotations     = lazy(() => import('@/modules/crm/leads-quotation
 const CRM_LeadsQuotationView  = lazy(() => import('@/modules/crm/leads-quotation/LeadsQuotationShowPage'));
 const CRM_EnquiryResults      = lazy(() => import('@/modules/crm/enquiry-result/EnquiryResultListPage'));
 const CRM_EnquiryResultView   = lazy(() => import('@/modules/crm/enquiry-result/EnquiryResultShowPage'));
+const CRM_EnquiryResultFollowup = lazy(() => import('@/modules/crm/enquiry-result/QuotationFollowupPage'));
 
 export default function CRMRoutes() {
     return (
@@ -39,6 +40,7 @@ export default function CRMRoutes() {
             <Route path="leads-quotations"         element={<RouteWrapper><CRM_LeadsQuotations /></RouteWrapper>} />
             <Route path="leads-quotations/:id"     element={<RouteWrapper><CRM_LeadsQuotationView /></RouteWrapper>} />
             <Route path="enquiry-results"          element={<RouteWrapper><CRM_EnquiryResults /></RouteWrapper>} />
+            <Route path="enquiry-results/followup/:id" element={<RouteWrapper><CRM_EnquiryResultFollowup /></RouteWrapper>} />
             <Route path="enquiry-results/:id"      element={<RouteWrapper><CRM_EnquiryResultView /></RouteWrapper>} />
         </Routes>
     );

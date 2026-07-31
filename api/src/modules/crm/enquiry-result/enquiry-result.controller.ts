@@ -1,13 +1,15 @@
-import { Controller, Get, Post, Patch, Delete, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, ParseIntPipe, Query, Req } from '@nestjs/common';
 import { ValidatedBody } from '@/decorators/validated-body.decorator';
 import { EnquiryResultService } from './enquiry-result.service';
 import {
     CreateEnquiryResultSchema,
     UpdateEnquiryResultSchema,
     EnquiryResultListSchema,
+    CreateFollowupSchema,
     type CreateEnquiryResultDto,
     type UpdateEnquiryResultDto,
     type EnquiryResultListDto,
+    type CreateFollowupDto,
 } from './dto/enquiry-result.dto';
 
 @Controller('enquiry-results')
@@ -42,5 +44,15 @@ export class EnquiryResultController {
     async remove(@Param('id', ParseIntPipe) id: number) {
         await this.service.remove(id);
         return null;
+    }
+
+    @Post(':id/followup')
+    async createFollowup(
+        @Param('id', ParseIntPipe) id: number,
+        @ValidatedBody(CreateFollowupSchema) body: CreateFollowupDto,
+        @Req() req: any,
+    ) {
+        const userId = req.user?.id ?? req.user?.sub;
+        return this.service.createFollowup(id, body, userId);
     }
 }
