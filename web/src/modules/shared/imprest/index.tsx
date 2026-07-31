@@ -628,11 +628,22 @@ const ImprestEmployeeDashboard: React.FC = () => {
                                     }}
                                     className="w-64"
                                 />
-
-                                <Button size="sm" onClick={() => navigate(paths.shared.imprestCreate)}>
+                                {/* onClick={() => navigate(paths.shared.imprestCreate)} */}
+                                {/* <Button size="sm" title="Add Imprest" onClick={() => navigate(paths.shared.imprestCreate)}>
                                     <Plus className="h-4 w-4 mr-2" />
                                     Add Imprest
-                                </Button>
+                                </Button> */}
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger>
+                                            <Button variant="default">
+                                                <Plus className="h-4 w-4 mr-2" />
+                                                <span>Add Imprest</span>
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>As per the admin, the Add Imprest functionality will be unavailable until Monday.</TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
 
                                 <Button size="sm" onClick={() => navigate(paths.shared.imprestVoucherByUser(numericUserId))}>
                                     <Plus className="h-4 w-4 mr-2" />
