@@ -221,7 +221,7 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Address</TableCell>
-                                    <TableCell className="text-sm">{data.sellerAddress || '—'}</TableCell>
+                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{data.sellerAddress || '—'}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">GST</TableCell>
                                     <TableCell className="text-sm">{data.sellerGstNo || '—'}</TableCell>
                                 </TableRow>
@@ -249,7 +249,7 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                     <TableCell className="text-sm font-medium text-muted-foreground">Name</TableCell>
                                     <TableCell className="text-sm">{data.shipToName || '—'}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Address</TableCell>
-                                    <TableCell className="text-sm">{data.shippingAddress || '—'}</TableCell>
+                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{data.shippingAddress || '—'}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">GST</TableCell>
