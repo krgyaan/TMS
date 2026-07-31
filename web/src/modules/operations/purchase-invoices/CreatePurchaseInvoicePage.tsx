@@ -12,13 +12,16 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useProjectPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
+import { useProjectVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
 import { useCreatePurchaseInvoice, useNextPINumber } from "@/hooks/api/usePurchaseInvoices";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PoDetailsCard } from "@/modules/operations/payment-requests/components/PoDetailsCard";
 import { ArrowLeft, Calendar, Hash, Loader2, ShoppingCart } from "lucide-react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateForInput, mapPurchaseInvoiceFormToCreateDTO } from "./helpers/purchaseInvoice.mapper";
 import { purchaseInvoiceFormSchema, type PurchaseInvoiceFormValues } from "./helpers/purchaseInvoice.schema";
 
@@ -33,6 +36,7 @@ const BUDGET_CATEGORIES = [
 
 const defaultFormValues: PurchaseInvoiceFormValues = {
     selectedPoId: '',
+    selectedVwoId: '',
     category: "",
     partyName: "",
     valuePreGst: null,
@@ -47,15 +51,21 @@ export default function CreatePurchaseInvoicePage() {
     const projectId = Number(projectIdParam);
     const [searchParams] = useSearchParams();
     const poIdParam = searchParams.get("poId");
+    const vwoIdParam = searchParams.get("vwoId");
 
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
     const projectName = overview?.project?.projectName;
-    const { data: nextPINumber, isLoading: isLoadingPINumber } = useNextPINumber(projectName);
     const { data: poData } = useProjectPurchaseOrders(projectId);
+    const { data: vwoData } = useProjectVendorWorkOrders(projectId);
 
     const poOptions = (poData?.purchaseOrders || []).map((po: any) => ({
         id: String(po.id),
         name: `${po.poNumber} - ${po.sellerName}`,
+    }));
+
+    const vwoOptions = (vwoData || []).map((vwo: any) => ({
+        id: String(vwo.id),
+        name: `${vwo.woNumber} - ${vwo.sellerName}`,
     }));
 
     const form = useForm<PurchaseInvoiceFormValues>({
@@ -63,13 +73,29 @@ export default function CreatePurchaseInvoicePage() {
         defaultValues: {
             ...defaultFormValues,
             selectedPoId: poIdParam || "",
+            selectedVwoId: vwoIdParam || "",
         },
     });
 
     const selectedPoId = form.watch("selectedPoId");
+    const selectedVwoId = form.watch("selectedVwoId");
     const selectedPo = (poData?.purchaseOrders || []).find((po: any) => String(po.id) === selectedPoId);
+    const selectedVwo = (vwoData || []).find((vwo: any) => String(vwo.id) === selectedVwoId);
+
+    const { data: nextPINumber, isLoading: isLoadingPINumber } = useNextPINumber(
+        projectName,
+        selectedVwoId ? "vwo" : "po"
+    );
 
     const createPIMutation = useCreatePurchaseInvoice();
+
+    useEffect(() => {
+        if (selectedVwoId) form.setValue("selectedPoId", "");
+    }, [selectedVwoId, form]);
+
+    useEffect(() => {
+        if (selectedPoId) form.setValue("selectedVwoId", "");
+    }, [selectedPoId, form]);
 
     const handleSubmit = async (values: PurchaseInvoiceFormValues) => {
         try {
@@ -153,19 +179,37 @@ export default function CreatePurchaseInvoicePage() {
                         <div className="border rounded-lg border-dashed p-4 space-y-4">
                             <h3 className="text-sm font-semibold flex items-center gap-2">
                                 <ShoppingCart className="h-4 w-4" />
-                                Link to Purchase Order (Optional)
+                                Link to Purchase Order / Vendor Work Order (Optional)
                             </h3>
-                            <div className="max-w-md">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <SelectField
                                     control={form.control}
                                     name="selectedPoId"
                                     label="Select PO"
                                     options={poOptions}
                                     placeholder="Choose a PO..."
+                                    disabled={!!selectedVwoId}
+                                />
+                                <SelectField
+                                    control={form.control}
+                                    name="selectedVwoId"
+                                    label="Select Vendor Work Order"
+                                    options={vwoOptions}
+                                    placeholder="Choose a VWO..."
+                                    disabled={!!selectedPoId}
                                 />
                             </div>
                             {selectedPo && (
                                 <PoDetailsCard po={selectedPo} />
+                            )}
+                            {selectedVwo && (
+                                <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
+                                    <p>
+                                        <strong>WO:</strong> {selectedVwo.woNumber}
+                                        <span className="text-muted-foreground"> - {selectedVwo.sellerName}</span>
+                                    </p>
+                                    <p><strong>Grand Total:</strong> {formatINR(selectedVwo.grandTotal || 0)}</p>
+                                </div>
                             )}
                         </div>
 

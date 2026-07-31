@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useProjectPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
+import { useProjectVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
 import { usePurchaseInvoiceDetails, useUpdatePurchaseInvoice } from "@/hooks/api/usePurchaseInvoices";
 import { PoDetailsCard } from "@/modules/operations/payment-requests/components/PoDetailsCard";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,6 +21,7 @@ import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { formatINR } from "@/hooks/useINRFormatter";
 import { mapPurchaseInvoiceFormToUpdateDTO } from "./helpers/purchaseInvoice.mapper";
 import { purchaseInvoiceFormSchema, type PurchaseInvoiceFormValues } from "./helpers/purchaseInvoice.schema";
 
@@ -41,6 +43,7 @@ export default function EditPurchaseInvoicePage() {
     const { data: overview } = useProjectOverview(projectId);
     const { data: invoice, isLoading } = usePurchaseInvoiceDetails(piId);
     const { data: poData } = useProjectPurchaseOrders(projectId);
+    const { data: vwoData } = useProjectVendorWorkOrders(projectId);
     const updateMutation = useUpdatePurchaseInvoice();
 
     const poOptions = (poData?.purchaseOrders || []).map((po: any) => ({
@@ -48,8 +51,10 @@ export default function EditPurchaseInvoicePage() {
         name: `${po.poNumber} - ${po.sellerName}`,
     }));
 
-    const selectedPoId = form.watch("selectedPoId");
-    const selectedPo = (poData?.purchaseOrders || []).find((po: any) => String(po.id) === selectedPoId);
+    const vwoOptions = (vwoData || []).map((vwo: any) => ({
+        id: String(vwo.id),
+        name: `${vwo.woNumber} - ${vwo.sellerName}`,
+    }));
 
     const form = useForm<PurchaseInvoiceFormValues>({
         resolver: zodResolver(purchaseInvoiceFormSchema) as any,
@@ -61,8 +66,14 @@ export default function EditPurchaseInvoicePage() {
             invoiceDate: "",
             invoiceFile: [],
             selectedPoId: "",
+            selectedVwoId: "",
         },
     });
+
+    const selectedPoId = form.watch("selectedPoId");
+    const selectedVwoId = form.watch("selectedVwoId");
+    const selectedPo = (poData?.purchaseOrders || []).find((po: any) => String(po.id) === selectedPoId);
+    const selectedVwo = (vwoData || []).find((vwo: any) => String(vwo.id) === selectedVwoId);
 
     useEffect(() => {
         if (invoice) {
@@ -74,9 +85,18 @@ export default function EditPurchaseInvoicePage() {
                 invoiceDate: invoice.invoiceDate || "",
                 invoiceFile: invoice.invoiceFile ? [invoice.invoiceFile] : [],
                 selectedPoId: invoice.purchaseOrderId ? String(invoice.purchaseOrderId) : "",
+                selectedVwoId: invoice.vendorWorkOrderId ? String(invoice.vendorWorkOrderId) : "",
             });
         }
     }, [invoice, form]);
+
+    useEffect(() => {
+        if (selectedVwoId) form.setValue("selectedPoId", "");
+    }, [selectedVwoId, form]);
+
+    useEffect(() => {
+        if (selectedPoId) form.setValue("selectedVwoId", "");
+    }, [selectedPoId, form]);
 
     const handleSubmit = async (values: PurchaseInvoiceFormValues) => {
         try {
@@ -137,19 +157,37 @@ export default function EditPurchaseInvoicePage() {
                         <div className="border rounded-lg border-dashed p-4 space-y-4">
                             <h3 className="text-sm font-semibold flex items-center gap-2">
                                 <ShoppingCart className="h-4 w-4" />
-                                Link to Purchase Order (Optional)
+                                Link to Purchase Order / Vendor Work Order (Optional)
                             </h3>
-                            <div className="max-w-md">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <SelectField
                                     control={form.control}
                                     name="selectedPoId"
                                     label="Select PO"
                                     options={poOptions}
                                     placeholder="Choose a PO..."
+                                    disabled={!!selectedVwoId}
+                                />
+                                <SelectField
+                                    control={form.control}
+                                    name="selectedVwoId"
+                                    label="Select Vendor Work Order"
+                                    options={vwoOptions}
+                                    placeholder="Choose a VWO..."
+                                    disabled={!!selectedPoId}
                                 />
                             </div>
                             {selectedPo && (
                                 <PoDetailsCard po={selectedPo} />
+                            )}
+                            {selectedVwo && (
+                                <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
+                                    <p>
+                                        <strong>WO:</strong> {selectedVwo.woNumber}
+                                        <span className="text-muted-foreground"> - {selectedVwo.sellerName}</span>
+                                    </p>
+                                    <p><strong>Grand Total:</strong> {formatINR(selectedVwo.grandTotal || 0)}</p>
+                                </div>
                             )}
                         </div>
 

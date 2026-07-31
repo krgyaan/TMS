@@ -8,6 +8,7 @@ export const purchaseInvoiceFormSchema = z.object({
     invoiceDate: z.string().min(1, "Invoice date is required"),
     invoiceFile: z.array(z.string()).default([]),
     selectedPoId: z.string().default(""),
+    selectedVwoId: z.string().default(""),
 });
 
 export type PurchaseInvoiceFormValues = z.infer<typeof purchaseInvoiceFormSchema>;

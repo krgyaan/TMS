@@ -11,6 +11,8 @@ export interface PurchaseInvoiceRow {
     invoiceFile?: string;
     purchaseOrderId?: number;
     poNumber?: string;
+    vendorWorkOrderId?: number;
+    woNumber?: string;
     total: number;
     createdAt: string;
 }
@@ -25,6 +27,7 @@ export interface CreatePurchaseInvoiceDTO {
     invoiceDate: string;
     invoiceFile?: string;
     purchaseOrderId?: number;
+    vendorWorkOrderId?: number;
 }
 
 export interface UpdatePurchaseInvoiceDTO {
@@ -35,4 +38,5 @@ export interface UpdatePurchaseInvoiceDTO {
     invoiceDate: string;
     invoiceFile?: string;
     purchaseOrderId?: number;
+    vendorWorkOrderId?: number;
 }
