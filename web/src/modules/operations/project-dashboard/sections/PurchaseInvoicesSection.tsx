@@ -64,21 +64,25 @@ export const PurchaseInvoicesSection: React.FC<PurchaseInvoicesSectionProps> = (
             ),
         },
         {
-            field: "poNumber",
-            headerName: "PO Number",
-            sortable: true,
-            filter: true,
-            width: 200,
+            headerName: "PO / WO",
+            filter: false,
+            width: 250,
             flex: 1,
             cellRenderer: (p: CustomCellRendererProps<PurchaseInvoiceRow>) => (
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span className="text-sm">{getShortId(p.value)}</span>
-                        </TooltipTrigger>
-                        <TooltipContent>{p.value}</TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
+                <div className="flex flex-col gap-1">
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="text-sm">
+                                    {
+                                        p.data?.poNumber ? (getShortId(p.data?.poNumber) ? getShortId(p.data?.poNumber) : "Direct") : (p.data?.woNumber ? getShortId(p.data?.woNumber) : "Direct")
+                                    }
+                                </span>
+                            </TooltipTrigger>
+                            <TooltipContent>{p.data?.poNumber ? p.data?.poNumber : p.data?.woNumber }</TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
             ),
         },
         {

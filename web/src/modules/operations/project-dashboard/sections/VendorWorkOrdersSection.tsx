@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Edit, Eye, History, Plus } from "lucide-react";
+import { Edit, Eye, FileUp, History, Plus } from "lucide-react";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import DataTable from "@/components/ui/data-table";
@@ -31,6 +31,11 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
     const vendorWorkOrders = data ?? [];
 
     const vwoActions: ActionItem<VendorWorkOrderRow>[] = useMemo(() => [
+        {
+            label: "Upload Invoice",
+            icon: <FileUp className="h-4 w-4" />,
+            onClick: (row) => navigate(paths.operations.raiseVendorWoInvoiceForm(projectId!, row.id)),
+        },
         {
             label: "View Details",
             icon: <Eye className="h-4 w-4" />,
@@ -144,6 +149,35 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
                     </Tooltip>
                 </TooltipProvider>
             ),
+        },
+        {
+            field: "totalVwiAmount",
+            headerName: "Invoiced",
+            sortable: true,
+            valueFormatter: (p: ValueFormatterParams<VendorWorkOrderRow>) => formatINR(p.value || 0),
+            cellRenderer: (p: CustomCellRendererProps<VendorWorkOrderRow>) => {
+                const d = p.data;
+                const invoiceTotal = d?.totalVwiAmount || 0;
+                const remainingInvoice = (d?.grandTotal || 0) - invoiceTotal;
+                const invoiceCount = d?.totalVwiCount || 0;
+
+                return (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="truncate block">{formatINR(p.value || 0)}</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
+                                <div className="space-y-1 text-xs">
+                                    <p><strong>Invoices Uploaded:</strong> {invoiceCount}</p>
+                                    <p><strong>Total Invoiced:</strong> {formatINR(invoiceTotal)}</p>
+                                    <p><strong>Remaining Invoice:</strong> {formatINR(remainingInvoice)}</p>
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                );
+            },
         },
         {
             field: "woRaisedBy",
