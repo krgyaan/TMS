@@ -3,6 +3,7 @@ import { Edit, Eye, FileUp, History, Plus } from "lucide-react";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import DataTable from "@/components/ui/data-table";
+import { Badge } from "@/components/ui/badge";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -39,7 +40,7 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
         {
             label: "View Details",
             icon: <Eye className="h-4 w-4" />,
-            onClick: (row) => navigate(paths.operations.editVendorWoPage(row.id, projectId!)),
+            onClick: (row) => navigate(paths.operations.viewVendorWoPage(row.id, projectId!)),
         },
         {
             label: "Edit WO",
@@ -184,6 +185,60 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
             headerName: "Raised By",
             sortable: true,
             filter: true,
+        },
+        {
+            field: "woApproved",
+            headerName: "Status",
+            sortable: true,
+            filter: true,
+            width: 110,
+            cellRenderer: (p: CustomCellRendererProps<VendorWorkOrderRow>) => {
+                const d = p.data;
+                const isApproved = d?.woApproved === true;
+                const isRejected = d?.woApproved === false;
+                const tdsPct = d?.tdsPercentage ? Number(d.tdsPercentage) : null;
+
+                let label: string;
+                let variant: "default" | "secondary" | "destructive" | "outline" = "secondary";
+                if (isApproved) {
+                    label = "Approved";
+                    variant = "default";
+                } else if (isRejected) {
+                    label = "Rejected";
+                    variant = "destructive";
+                } else {
+                    label = "Pending";
+                    variant = "outline";
+                }
+
+                return (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Badge variant={variant} className="gap-1 cursor-pointer">
+                                    {label}
+                                </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
+                                <div className="space-y-1 text-xs">
+                                    {tdsPct !== null && isApproved && (
+                                        <>
+                                            <p><strong>TDS:</strong> {tdsPct}% (-{formatINR(d?.tdsAmount || 0)})</p>
+                                            <p><strong>After TDS:</strong> {formatINR(d?.amountAfterTds || 0)}</p>
+                                        </>
+                                    )}
+                                    {d?.woApprovalRemark && (
+                                        <p><strong>Remark:</strong> {d.woApprovalRemark}</p>
+                                    )}
+                                    {!d?.woApprovalRemark && !tdsPct && (
+                                        <p className="text-muted-foreground">Awaiting approval</p>
+                                    )}
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                );
+            },
         },
         {
             headerName: "Actions",
