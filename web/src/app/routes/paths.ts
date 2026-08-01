@@ -231,6 +231,7 @@ export const paths = {
         saleInvoices: "/accounts/sale-invoices",
         vendorWorkOrders: "/accounts/vendor-work-orders",
         paymentRequests: "/accounts/payment-requests",
+        vendorMaster: "/accounts/vendor-master",
 
     },
 
