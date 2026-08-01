@@ -243,7 +243,7 @@ const Dashboard = () => {
             icon: Wallet,
             color: "text-blue-600",
             bgColor: "bg-blue-50 dark:bg-blue-950/30",
-            path: paths.shared.imprestCreate
+            // path: paths.shared.imprestCreate
         },
         {
             title: "Add Courier",
@@ -387,7 +387,7 @@ const Dashboard = () => {
                     <QuickActionCard 
                         key={action.title}
                         {...action}
-                        onClick={() => navigate(action.path)}
+                        onClick={() => action?.path && navigate(action.path)}
                     />
                 ))}
             </div>
