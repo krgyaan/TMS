@@ -34,6 +34,7 @@ function formatPrice(price?: string | null) {
 function getStatusVariant(status?: string | null): "default" | "secondary" | "outline" | "destructive" {
     switch (status) {
         case "Quotation Submitted": return "default";
+        case "Followup Initiated": return "secondary";
         case "Won": return "default";
         case "Lost": return "destructive";
         default: return "outline";

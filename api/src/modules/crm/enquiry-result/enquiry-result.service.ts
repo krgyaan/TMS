@@ -9,7 +9,7 @@ import { teams } from '@db/schemas/master/teams.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { privateQuotes } from '@db/schemas/crm/private-quotes.schema';
 import { privateCostingSheets } from '@db/schemas/crm/private-costing-sheets.schema';
-import { eq, desc, and, inArray, sql, type SQL } from 'drizzle-orm';
+import { eq, desc, and, inArray, notInArray, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { followUps } from '@db/schemas/shared/follow-ups.schema';
 import { followUpPersons } from '@db/schemas/shared/follow-up-persons.schema';
@@ -40,6 +40,13 @@ const resultSelect = {
     teamName: teams.name,
     createdByName: createdByUser.name,
     itemName: items.name,
+    quotationId: sql<number>`(
+        SELECT pq.id
+        FROM ${privateQuotes} pq
+        WHERE pq.enquiry_id = ${leadEnquiries.id}
+        ORDER BY pq.created_at DESC
+        LIMIT 1
+    )`.as('quotation_id'),
     quoteSubmissionDatetime: sql<string>`(
         SELECT pq.quote_submission_datetime
         FROM ${privateQuotes} pq
@@ -134,6 +141,37 @@ export class EnquiryResultService {
 
         const quotation = await this.getQuotationForEnquiry(row.enquiryId);
         return { ...row, ...quotation };
+    }
+
+    async findByLeadId(leadId: number) {
+        const [data] = await Promise.all([
+            resultBaseQuery(this.db)
+                .where(eq(leadEnquiries.leadId, leadId))
+                .orderBy(desc(enquiryResults.createdAt)),
+        ]);
+        return data;
+    }
+
+    async findByEnquiryId(enquiryId: number) {
+        const [data] = await Promise.all([
+            resultBaseQuery(this.db)
+                .where(eq(enquiryResults.enquiryId, enquiryId))
+                .orderBy(desc(enquiryResults.createdAt)),
+        ]);
+        return data;
+    }
+
+    async findFollowupsByQuotationId(quotationId: number) {
+        const follows = await this.db
+            .select()
+            .from(followUps)
+            .where(and(
+                eq(followUps.quotationId, quotationId),
+                eq(followUps.followupFor, 'Quotation'),
+                sql`${followUps.deletedAt} IS NULL`
+            ))
+            .orderBy(desc(followUps.createdAt));
+        return follows;
     }
 
     private async getQuotationForEnquiry(enquiryId: number) {
@@ -288,6 +326,14 @@ export class EnquiryResultService {
                     }))
                 );
             }
+
+            await tx
+                .update(enquiryResults)
+                .set({ status: 'Followup Initiated', updatedAt: new Date() })
+                .where(and(
+                    eq(enquiryResults.id, id),
+                    notInArray(enquiryResults.status, ['Won', 'Lost', 'Disqualified']),
+                ));
 
             return followUp;
         });

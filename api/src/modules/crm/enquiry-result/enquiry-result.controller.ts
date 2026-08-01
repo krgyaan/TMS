@@ -35,6 +35,21 @@ export class EnquiryResultController {
         return this.service.findOne(id);
     }
 
+    @Get('by-lead/:leadId')
+    async findByLeadId(@Param('leadId', ParseIntPipe) leadId: number) {
+        return this.service.findByLeadId(leadId);
+    }
+
+    @Get('by-enquiry/:enquiryId')
+    async findByEnquiryId(@Param('enquiryId', ParseIntPipe) enquiryId: number) {
+        return this.service.findByEnquiryId(enquiryId);
+    }
+
+    @Get('followups-by-quotation/:quotationId')
+    async findFollowupsByQuotationId(@Param('quotationId', ParseIntPipe) quotationId: number) {
+        return this.service.findFollowupsByQuotationId(quotationId);
+    }
+
     @Post()
     async create(@ValidatedBody(CreateEnquiryResultSchema) body: CreateEnquiryResultDto) {
         return this.service.create(body);

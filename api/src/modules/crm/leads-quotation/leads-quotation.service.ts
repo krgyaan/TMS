@@ -6,7 +6,7 @@ import { leadEnquiries } from '@db/schemas/crm/lead-enquiries.schema';
 import { privateCostingSheets } from '@db/schemas/crm/private-costing-sheets.schema';
 import { leadContacts } from '@db/schemas/crm/lead-contacts.schema';
 import { enquiryResults } from '@db/schemas/crm/enquiry-result.schema';
-import { eq, desc, like, or, and, sql, type SQL } from 'drizzle-orm';
+import { eq, desc, like, or, and, sql, inArray, type SQL } from 'drizzle-orm';
 import type { CreatePrivateQuoteDto, UpdatePrivateQuoteDto, PrivateQuoteListDto, ContactEntryDto } from './dto/leads-quotation.dto';
 
 export type PrivateQuoteListFilters = {
@@ -156,7 +156,7 @@ export class LeadsQuotationService {
             .limit(1);
 
         if (!quote) throw new NotFoundException(`Private quote with ID ${id} not found`);
-        return quote;
+        return this.resolveContacts(quote);
     }
 
     async findByLeadId(leadId: number) {
@@ -167,7 +167,30 @@ export class LeadsQuotationService {
             .where(eq(leadEnquiries.leadId, leadId))
             .orderBy(desc(privateQuotes.createdAt));
 
-        return rows;
+        return Promise.all(rows.map(r => this.resolveContacts(r)));
+    }
+
+    private async resolveContacts(quote: any) {
+        const contactIds = (quote.contacts || '')
+            .split(',')
+            .map(s => s.trim())
+            .filter(s => s.length > 0)
+            .map(Number)
+            .filter(n => !isNaN(n) && n > 0);
+
+        const contacts = contactIds.length > 0
+            ? await this.db
+                .select({
+                    name: leadContacts.name,
+                    designation: leadContacts.designation,
+                    phone: leadContacts.phone,
+                    email: leadContacts.email,
+                })
+                .from(leadContacts)
+                .where(inArray(leadContacts.id, contactIds))
+            : [];
+
+        return { ...quote, contacts };
     }
 
     async create(data: CreatePrivateQuoteDto) {

@@ -14,6 +14,7 @@ import { FollowupViewPage } from "../followups/FollowupViewPage";
 import { LeadSiteVisitsSection } from "./components/LeadSiteVisitView";
 import { LeadCostingsSection } from "../enquirycosting/EnquiryCostingViewPage";
 import { LeadQuotationsSection } from "../leads-quotation/LeadsQuotationViewPage";
+import { EnquiryResultSection } from "../enquiry-result/EnquiryResultViewPage";
 
 interface LeadEnquiryViewProps {
     enquiry?: LeadEnquiryWithNames | null;
@@ -224,6 +225,8 @@ export function LeadEnquiryViewPage({ enquiryId, onBack, backLabel }: LeadEnquir
                 return <LeadCostingsSection leadId={leadId} />;
             case "quotations":
                 return <LeadQuotationsSection leadId={leadId} />;
+            case "enquiry-result":
+                return <EnquiryResultSection leadId={leadId} />;
             default:
                 return null;
         }

@@ -23,6 +23,14 @@ class EnquiryResultService extends BaseApiService {
         return this.get<EnquiryResultWithDetails>(`/${id}`);
     }
 
+    async getByLeadId(leadId: number): Promise<EnquiryResultWithDetails[]> {
+        return this.get<EnquiryResultWithDetails[]>(`/by-lead/${leadId}`);
+    }
+
+    async getFollowupsByQuotation(quotationId: number): Promise<any[]> {
+        return this.get<any[]>(`/followups-by-quotation/${quotationId}`);
+    }
+
     async create(data: CreateEnquiryResultRequest): Promise<EnquiryResult> {
         return this.post<EnquiryResult>('/', data);
     }

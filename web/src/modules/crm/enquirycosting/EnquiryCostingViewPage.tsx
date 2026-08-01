@@ -18,7 +18,9 @@ import { LeadEnquiriesSection } from "../lead-enquiry/LeadEnquiryViewPage";
 import { LeadSiteVisitsSection } from "../lead-enquiry/components/LeadSiteVisitView";
 import { enquiryCostingService } from "@/services/api/enquirycosting.service";
 import { LeadQuotationsSection } from "../leads-quotation/LeadsQuotationViewPage";
+import { EnquiryResultSection } from "../enquiry-result/EnquiryResultViewPage";
 import { paths } from "@/app/routes/paths";
+
 
 interface EnquiryCostingViewProps {
     costing?: EnquiryCosting | null;
@@ -252,6 +254,8 @@ export function EnquiryCostingViewPage({ costingId, onBack, backLabel }: Enquiry
                 return <EnquiryCostingDetailsSection costingId={costingId} />;
             case "quotations":
                 return <LeadQuotationsSection leadId={leadId} />;
+            case "enquiry-result":
+                return <EnquiryResultSection leadId={leadId} />;
             default:
                 return null;
         }

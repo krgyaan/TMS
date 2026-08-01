@@ -19,6 +19,10 @@ import { LeadSiteVisitsSection } from "../lead-enquiry/components/LeadSiteVisitV
 import { LeadCostingsSection } from "../enquirycosting/EnquiryCostingViewPage";
 import { QuoteSubmissionModal } from "./components/QuoteSubmissionModal";
 import { QuotationDroppedModal } from "./components/QuotationDroppedModal";
+import { EnquiryResultSection } from "../enquiry-result/EnquiryResultViewPage";
+import { User, Mail, Phone, Briefcase } from "lucide-react";
+import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
+
 
 function getStatusVariant(status?: string | null): "default" | "secondary" | "outline" | "destructive" {
     switch (status) {
@@ -116,15 +120,61 @@ export function QuotationView({ quote, className }: { quote: PrivateQuote; class
                             </div>
                         </div>
                         {quote.submittedDocuments && (
-                            <div className="space-y-1 pt-4 border-t">
+                            <div className="space-y-2 pt-4 border-t">
                                 <Label className="text-xs text-muted-foreground">Submitted Documents</Label>
-                                <p className="text-sm">{quote.submittedDocuments}</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {quote.submittedDocuments.split(",").map(d => d.trim()).filter(Boolean).map((doc, i) => (
+                                        <a
+                                            key={i}
+                                            href={`/uploads/leads-quotations/${doc}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-muted text-blue-600 hover:text-blue-800 hover:underline"
+                                        >
+                                            <ExternalLink className="h-3 w-3" />
+                                            {doc}
+                                        </a>
+                                    ))}
+                                </div>
                             </div>
                         )}
-                        {quote.contacts && (
-                            <div className="space-y-1 pt-4 border-t">
-                                <Label className="text-xs text-muted-foreground">Contacts</Label>
-                                <p className="text-sm">{quote.contacts}</p>
+                        {quote.contacts && quote.contacts.length > 0 && (
+                            <div className="space-y-3 pt-4 border-t">
+                                <div className="space-y-3">
+                                    {quote.contacts.map((contact, idx) => (
+                                        <div key={idx}>
+                                            <Table>
+                                                <TableBody>
+                                                    <TableRow className="bg-muted/50">
+                                                        <TableCell colSpan={4} className="font-semibold text-sm">
+                                                            <User className="h-4 w-4 inline mr-2" /> Contact {idx + 1}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                                            <User className="h-4 w-4 inline mr-2" />Person Name
+                                                        </TableCell>
+                                                        <TableCell className="text-sm w-1/4">{contact.name || "—"}</TableCell>
+                                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                                            <Briefcase className="h-4 w-4 inline mr-2" />Designation
+                                                        </TableCell>
+                                                        <TableCell className="text-sm w-1/4">{contact.designation || "—"}</TableCell>
+                                                    </TableRow>
+                                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                                            <Phone className="h-4 w-4 inline mr-2" />Phone
+                                                        </TableCell>
+                                                        <TableCell className="text-sm">{contact.phone || "—"}</TableCell>
+                                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                                            <Mail className="h-4 w-4 inline mr-2" />Email
+                                                        </TableCell>
+                                                        <TableCell className="text-sm">{contact.email || "—"}</TableCell>
+                                                    </TableRow>
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </>
@@ -306,6 +356,8 @@ export function LeadsQuotationViewPage({ quoteId, onBack, backLabel }: LeadsQuot
                 return <LeadCostingsSection leadId={leadId} />;
             case "quotations":
                 return <QuotationDetailsSection quoteId={quoteId} />;
+            case "enquiry-result":
+                return <EnquiryResultSection leadId={leadId} />;
             default:
                 return null;
         }

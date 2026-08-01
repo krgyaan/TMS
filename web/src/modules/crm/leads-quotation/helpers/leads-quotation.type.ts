@@ -3,7 +3,7 @@ export interface PrivateQuote {
     enquiryId: number;
     quoteSubmissionDatetime: string | null;
     submittedDocuments: string | null;
-    contacts: string | null;
+    contacts: ContactEntry[] | null;
     missedReason: string | null;
     oemName: string | null;
     oemVendorId: number | null;

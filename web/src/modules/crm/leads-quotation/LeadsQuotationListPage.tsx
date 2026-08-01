@@ -19,14 +19,19 @@ import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { QuoteSubmissionModal } from "./components/QuoteSubmissionModal";
 import { QuotationDroppedModal } from "./components/QuotationDroppedModal";
 
-const STATUS_TABS = [
+type TabKey = "pending" | "submitted" | "dropped";
+
+const STATUS_TABS: { key: TabKey; label: string; status: string }[] = [
     { key: 'pending', label: 'Pending', status: 'Submission Pending' },
     { key: 'submitted', label: 'Submitted', status: 'Quotation Submitted' },
     { key: 'dropped', label: 'Dropped', status: 'Quotation Dropped' },
 ];
 
-const TAB_TO_STATUS: Record<string, string> = {};
-STATUS_TABS.forEach(t => { TAB_TO_STATUS[t.key] = t.status; });
+const TAB_TO_STATUS: Record<TabKey, string> = {
+    pending: 'Submission Pending',
+    submitted: 'Quotation Submitted',
+    dropped: 'Quotation Dropped',
+};
 
 const HOURS_24_MS = 24 * 60 * 60 * 1000;
 
@@ -51,12 +56,12 @@ const LeadsQuotationListPage = () => {
         search, setSearch, debouncedSearch,
         pagination, setPagination,
         sortModel, handleSortChanged, handlePageSizeChange,
-    } = usePersistentTableState({
+    } = usePersistentTableState<TabKey>({
         storageKey: 'leads-quotations',
         defaultTab: 'pending',
     });
 
-    const statusParam = TAB_TO_STATUS[activeTab] || activeTab;
+    const statusParam = TAB_TO_STATUS[activeTab];
 
     const { data: pendingResponse } = useLeadsQuotations(
         { page: 1, limit: 1, status: 'Submission Pending' },
@@ -72,7 +77,7 @@ const LeadsQuotationListPage = () => {
     const submittedCount = submittedResponse?.meta?.total ?? 0;
     const droppedCount = droppedResponse?.meta?.total ?? 0;
 
-    const getCount = (key: string) => {
+    const getCount = (key: TabKey) => {
         if (key === 'pending') return pendingCount;
         if (key === 'submitted') return submittedCount;
         return droppedCount;

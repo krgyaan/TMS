@@ -8,6 +8,8 @@ const enquiryResultKey = {
     list: (filters: EnquiryResultListParams) => [...enquiryResultKey.lists(), { filters }],
     details: () => [...enquiryResultKey.all, 'detail'],
     detail: (id: number) => [...enquiryResultKey.details(), id],
+    byLead: (leadId: number) => [...enquiryResultKey.all, 'by-lead', leadId],
+    followupsByQuotation: (quotationId: number) => [...enquiryResultKey.all, 'followups-by-quotation', quotationId],
 };
 
 export function useEnquiryResults(params: EnquiryResultListParams) {
@@ -22,6 +24,22 @@ export function useEnquiryResult(id: number | null) {
         queryKey: enquiryResultKey.detail(id!),
         queryFn: () => enquiryResultService.getById(id!),
         enabled: !!id,
+    });
+}
+
+export function useEnquiryResultsByLead(leadId: number | null) {
+    return useQuery({
+        queryKey: enquiryResultKey.byLead(leadId!),
+        queryFn: () => enquiryResultService.getByLeadId(leadId!),
+        enabled: !!leadId,
+    });
+}
+
+export function useFollowupsByQuotation(quotationId: number | null) {
+    return useQuery({
+        queryKey: enquiryResultKey.followupsByQuotation(quotationId!),
+        queryFn: () => enquiryResultService.getFollowupsByQuotation(quotationId!),
+        enabled: !!quotationId,
     });
 }
 

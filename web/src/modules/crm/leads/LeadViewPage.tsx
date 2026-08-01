@@ -7,6 +7,7 @@ import { LeadEnquiriesSection } from "../lead-enquiry/LeadEnquiryViewPage";
 import { LeadSiteVisitsSection } from "../lead-enquiry/components/LeadSiteVisitView";
 import { LeadCostingsSection } from "../enquirycosting/EnquiryCostingViewPage";
 import { LeadQuotationsSection } from "../leads-quotation/LeadsQuotationViewPage";
+import { EnquiryResultSection } from "../enquiry-result/EnquiryResultViewPage";
 
 interface LeadViewPageProps {
     leadId: number;
@@ -62,6 +63,8 @@ export function LeadViewPage({ leadId, onBack, backLabel }: LeadViewPageProps) {
                     return <LeadCostingsSection leadId={leadId} />;
                 case "quotations":
                     return <LeadQuotationsSection leadId={leadId} />;
+                case "enquiry-result":
+                    return <EnquiryResultSection leadId={leadId} />;
                 default:
                     return null;
             }
