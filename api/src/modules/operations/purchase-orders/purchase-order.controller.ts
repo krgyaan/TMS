@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Post, Put, Query, Res } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Post, Put, Query, Res, Patch } from "@nestjs/common";
 import type { Response } from "express";
 import { createReadStream, existsSync } from "fs";
 import { join } from "path";
@@ -101,6 +101,24 @@ export class PurchaseOrderController {
       "Content-Disposition": `inline; filename="${filename}"`,
     });
     fileStream.pipe(res);
+  }
+
+  @Patch("parties/:id")
+  @HttpCode(HttpStatus.OK)
+  updateParty(@Param("id", ParseIntPipe) id: number, @Body() body: any) {
+    return this.service.updateParty(id, body);
+  }
+
+  @Patch("parties/:id/activate")
+  @HttpCode(HttpStatus.OK)
+  activateParty(@Param("id", ParseIntPipe) id: number) {
+    return this.service.activateParty(id);
+  }
+
+  @Patch("parties/:id/deactivate")
+  @HttpCode(HttpStatus.OK)
+  deactivateParty(@Param("id", ParseIntPipe) id: number) {
+    return this.service.deactivateParty(id);
   }
 
   @Get(":id")
