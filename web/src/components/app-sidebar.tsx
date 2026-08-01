@@ -105,10 +105,10 @@ const navMain: NavGroup[] = [
             { title: "Fixed Expenses", url: paths.accounts.fixedExpenses, permission: "accounts.fixed-expenses" },
             { title: "Delegation Dashboard", url: paths.accounts.delegation, permission: "accounts.delegation" },
             { title: "Purchase Orders", url: paths.accounts.purchaseOrders, permission: "accounts.purchase-orders" },
-            { title: "Vendor Master", url: paths.accounts.vendorMaster, permission: "accounts.purchase-orders" },
-            { title: "Sale Invoices", url: paths.accounts.saleInvoices, permission: "accounts.sale-invoices" },
             { title: "Vendor Work Orders", url: paths.accounts.vendorWorkOrders, permission: "accounts.vendor-work-orders" },
             { title: "Payment Requests", url: paths.accounts.paymentRequests, permission: "accounts.payment-requests" },
+            { title: "Sale Invoices", url: paths.accounts.saleInvoices, permission: "accounts.sale-invoices" },
+            { title: "Vendor Master", url: paths.accounts.vendorMaster, permission: "accounts.vendor-master" },
         ],
     },
     {

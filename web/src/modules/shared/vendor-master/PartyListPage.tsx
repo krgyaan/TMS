@@ -271,27 +271,11 @@ const VendorMasterListPage: React.FC = () => {
             ),
         },
         {
-            field: "type",
-            headerName: "Type",
-            sortable: true,
-            filter: true,
-            width: 100,
-            cellRenderer: (p: CustomCellRendererProps<VendorMasterRow>) => {
-                const val = p.value as string;
-                const isSeller = val === "seller";
-                return (
-                    <Badge variant={isSeller ? "default" : "secondary"} className="capitalize">
-                        {val || "—"}
-                    </Badge>
-                );
-            },
-        },
-        {
             field: "gstNo",
             headerName: "GST",
             sortable: true,
             filter: true,
-            width: 140,
+            width: 150,
             cellRenderer: (p: CustomCellRendererProps<VendorMasterRow>) => (
                 <span className="text-muted-foreground font-mono text-xs">{p.value || "—"}</span>
             ),
@@ -367,12 +351,9 @@ const VendorMasterListPage: React.FC = () => {
 
     return (
         <Card>
-            <CardHeader className="pb-4">
-                <div className="flex justify-between items-center gap-2">
-                    <CardTitle className="text-base font-semibold">Vendor Master</CardTitle>
-                    <Badge variant="secondary">{parties.length} party{parties.length !== 1 ? "ies" : "y"}</Badge>
-                </div>
-                <CardDescription>List of all vendor/seller and shipping parties</CardDescription>
+            <CardHeader>
+                <CardTitle className="text-base font-semibold">Vendor Master</CardTitle>
+                <CardDescription>List of all vendor/seller and shipping parties for PO and WO.</CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
                 <div className="flex justify-end mb-4">
