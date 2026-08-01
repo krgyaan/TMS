@@ -33,6 +33,8 @@ export interface VendorWorkOrderView {
     woApproved?: boolean;
     woApprovalRemark?: string;
     category?: string;
+    accessoriesPackagingListAttachments?: string;
+    purchaseInvoices: VwoPurchaseInvoice[];
     generatedPdfVersions: Record<string, { path: string; hash: string }> | null;
 }
 
@@ -59,6 +61,16 @@ export interface VwoPaymentRequest {
     status: string;
     requestedByName: string;
     createdAt: string;
+}
+
+export interface VwoPurchaseInvoice {
+    id: number;
+    invoiceNo: string;
+    valuePreGst: string;
+    gstAmount: string;
+    invoiceDate: string;
+    invoiceFile: string;
+    uploadedByName: string;
 }
 
 export interface VwoTotal {

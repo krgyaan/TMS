@@ -10,6 +10,7 @@ export const createPurchaseInvoiceSchema = z.object({
     uploadedBy: z.number().optional(),
     invoiceFile: z.string().optional(),
     purchaseOrderId: z.number().optional(),
+    vendorWorkOrderId: z.number().optional(),
 });
 
 export type CreatePurchaseInvoiceDto = z.infer<typeof createPurchaseInvoiceSchema>;

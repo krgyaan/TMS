@@ -3,12 +3,16 @@ export interface MakerRequestRow {
     requestNo: string;
     partyName?: string;
     accountNumber?: string;
+    bankName?: string;
     ifsc?: string;
     amount: number;
     category?: string;
     paymentMode: string;
     portalLink?: string;
     billFiles: string[];
+    uploadInvoice: string[];
+    uploadPI: string[];
+    uploadInvoiceAfterPayment: string[];
     remark?: string;
     status: string;
     utrNumber?: string;
@@ -16,6 +20,30 @@ export interface MakerRequestRow {
     requestedBy: string;
     requestedByName?: string;
     createdAt: string;
+    poFile?: string;
+    uploadedInvoiceFile?: string;
+    purchaseOrderId?: number;
+    poNumber?: string;
+    vendorWorkOrderId?: number;
+    vwoNumber?: string;
+    poTotalAmount?: number;
+    poTotalGstAmt?: number;
+    poGrandTotal?: number;
+    poTdsPercentage?: number | string;
+    poTdsAmount?: number | string;
+    poAmountAfterTds?: number | string;
+    poTotalPaymentRequested?: number;
+    poTotalMakerDone?: number;
+    poTotalPaymentDone?: number;
+    vwoTotalAmount?: number;
+    vwoTotalGstAmt?: number;
+    vwoGrandTotal?: number;
+    vwoTdsPercentage?: number | string;
+    vwoTdsAmount?: number | string;
+    vwoAmountAfterTds?: number | string;
+    vwoTotalPaymentRequested?: number;
+    vwoTotalMakerDone?: number;
+    vwoTotalPaymentDone?: number;
 }
 
 export interface CreateMakerRequestDTO {
@@ -27,5 +55,7 @@ export interface CreateMakerRequestDTO {
     ifsc?: string;
     portalLink?: string;
     billFiles?: string[];
+    uploadInvoice?: string[];
+    uploadPI?: string[];
     remark?: string;
 }

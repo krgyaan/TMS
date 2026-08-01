@@ -4,6 +4,8 @@ import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
 import { users } from "@/db/schemas/";
+import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
+import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -55,7 +57,9 @@ export class MakerRequestService {
                     paymentMode: body.paymentMode || "BANK_TRANSFER",
                     portalLink: body.portalLink || null,
                     billFiles: body.billFiles || [],
-                    remark: body.remark,
+                    uploadInvoice: body.uploadInvoice || [],
+                    uploadPI: body.uploadPI || [],
+                    uploadInvoiceAfterPayment: body.uploadInvoiceAfterPayment || [],
                     requestedBy: userId,
                 })
                 .returning()
@@ -101,6 +105,29 @@ export class MakerRequestService {
         return updated;
     }
 
+    async uploadInvoiceAfterPayment(id: number, files: string[]) {
+        const existing = await this.db
+            .select({ id: paymentRequests.id })
+            .from(paymentRequests)
+            .where(and(eq(paymentRequests.id, id), sql`${paymentRequests.projectId} IS NULL`))
+            .then(rows => rows[0]);
+        if (!existing) throw new NotFoundException("Maker Request not found");
+
+        const updated = (
+            await this.db
+                .update(paymentRequests)
+                .set({
+                    uploadInvoiceAfterPayment: files,
+                    updatedAt: new Date(),
+                })
+                .where(and(eq(paymentRequests.id, id), sql`${paymentRequests.projectId} IS NULL`))
+                .returning()
+        )[0];
+
+        this.logger.info(`Invoice after payment uploaded for Maker Request #${id}`);
+        return updated;
+    }
+
     private readonly mrFields = {
         id: paymentRequests.id,
         requestNo: paymentRequests.requestNo,
@@ -113,6 +140,9 @@ export class MakerRequestService {
         paymentMode: paymentRequests.paymentMode,
         portalLink: paymentRequests.portalLink,
         billFiles: paymentRequests.billFiles,
+        uploadInvoice: paymentRequests.uploadInvoice,
+        uploadPI: paymentRequests.uploadPI,
+        uploadInvoiceAfterPayment: paymentRequests.uploadInvoiceAfterPayment,
         remark: paymentRequests.remark,
         status: paymentRequests.status,
         utrNumber: paymentRequests.utrNumber,
@@ -120,6 +150,9 @@ export class MakerRequestService {
         requestedBy: paymentRequests.requestedBy,
         createdAt: paymentRequests.createdAt,
         updatedAt: paymentRequests.updatedAt,
+        purchaseOrderId: paymentRequests.purchaseOrderId,
+        poFile: paymentRequests.poFile,
+        vendorWorkOrderId: paymentRequests.vendorWorkOrderId,
     };
 
     async getById(id: number) {
@@ -127,9 +160,31 @@ export class MakerRequestService {
             .select({
                 ...this.mrFields,
                 requestedByName: users.name,
+                poNumber: purchaseOrders.poNumber,
+                vwoNumber: vendorWorkOrders.woNumber,
+                poGrandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                poTotalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                poTotalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                poTdsPercentage: purchaseOrders.tdsPercentage,
+                poTdsAmount: purchaseOrders.tdsAmount,
+                poAmountAfterTds: purchaseOrders.amountAfterTds,
+                poTotalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status != 'rejected'), 0)`,
+                poTotalMakerDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'maker_done'), 0)`,
+                poTotalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done'), 0)`,
+                vwoGrandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                vwoTotalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                vwoTotalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                vwoTdsPercentage: vendorWorkOrders.tdsPercentage,
+                vwoTdsAmount: vendorWorkOrders.tdsAmount,
+                vwoAmountAfterTds: vendorWorkOrders.amountAfterTds,
+                vwoTotalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status != 'rejected'), 0)`,
+                vwoTotalMakerDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status = 'maker_done'), 0)`,
+                vwoTotalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status = 'payment_done'), 0)`,
             })
             .from(paymentRequests)
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
+            .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
+            .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
             .where(and(eq(paymentRequests.id, id), sql`${paymentRequests.projectId} IS NULL`));
 
         const mr = rows[0];
@@ -142,10 +197,14 @@ export class MakerRequestService {
             .select({
                 ...this.mrFields,
                 requestedByName: users.name,
+                poNumber: purchaseOrders.poNumber,
+                vwoNumber: vendorWorkOrders.woNumber,
             })
             .from(paymentRequests)
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
-            .where(eq(paymentRequests.requestedBy, userId))
+            .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
+            .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
+            .where(and(eq(paymentRequests.requestedBy, userId), sql`${paymentRequests.projectId} IS NULL`))
             .orderBy(desc(paymentRequests.id));
     }
 
@@ -154,9 +213,13 @@ export class MakerRequestService {
             .select({
                 ...this.mrFields,
                 requestedByName: users.name,
+                poNumber: purchaseOrders.poNumber,
+                vwoNumber: vendorWorkOrders.woNumber,
             })
             .from(paymentRequests)
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
+            .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
+            .leftJoin(vendorWorkOrders, eq(paymentRequests.vendorWorkOrderId, vendorWorkOrders.id))
             .where(sql`${paymentRequests.projectId} IS NULL`)
             .orderBy(desc(paymentRequests.id));
     }

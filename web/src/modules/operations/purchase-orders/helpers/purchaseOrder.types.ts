@@ -56,6 +56,8 @@ export interface CreatePartyDTO {
     pan?: string;
     msme?: string;
     type?: string;
+    contact_person?: string;
+    mobile_number?: string;
 }
 
 export interface PurchaseOrderRow {
@@ -89,6 +91,7 @@ export interface PurchaseOrderRow {
     totalPaymentDone?: number;
     totalPiAmount?: number;
     totalPiCount?: number;
+    purchaseInvoices?: Array<{ invoiceNo: string; totalAmount: number }>
     poPdfVersions?: Record<string, { path: string; hash: string }>;
 }
 

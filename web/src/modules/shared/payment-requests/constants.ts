@@ -28,6 +28,7 @@ export const PAYMENT_AGAINST_LABELS: Record<string, string> = {
     AU_8316: 'AU Outflow Account (AU_8316)',
     AU_9589: 'AU EMD Account (AU_9589)',
     AU_9284: 'AU Cash Reserve Account (AU_9284)',
+    amex_cc: 'Amex Company Credit Card',
     investment: 'Investment',
     asset_purchase: 'Asset Purchase',
     portal_renewal_charges: 'Portal Renewal Charges',

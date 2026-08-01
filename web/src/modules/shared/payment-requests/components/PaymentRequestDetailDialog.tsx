@@ -73,21 +73,30 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                     <Label className="text-muted-foreground text-xs">Payment Against</Label>
                     <p>{PAYMENT_AGAINST_LABELS[detail.paymentAgainst] || detail.paymentAgainst}</p>
                 </div>
+                <div>
+                    <Label className="text-muted-foreground text-xs">Payment Mode</Label>
+                    <p className="capitalize">{detail.paymentMode?.replaceAll('_', ' ').toLowerCase() || "—"}</p>
+                </div>
+                {detail.portalLink && (
+                    <div className="col-span-2">
+                        <Label className="text-muted-foreground text-xs">Portal Link</Label>
+                        <p className="text-blue-600 underline break-all">{detail.portalLink}</p>
+                    </div>
+                )}
                 {detail.purchaseOrderId && (
                     <div className="col-span-2 space-y-2">
                         <Label className="text-muted-foreground text-xs">PO Details</Label>
                         <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">PO Number:</span>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <span className="font-medium">{getShortId(detail.poNumber) || `#${detail.purchaseOrderId}`}</span>
-                                        </TooltipTrigger>
-                                        <TooltipContent>{detail.poNumber}</TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
+                                <span className="font-medium break-all">{detail.poNumber || `#${detail.purchaseOrderId}`}</span>
                             </div>
+                            {detail.poFile && (
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">PO File:</span>
+                                    <a href={tenderFilesService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download PO</a>
+                                </div>
+                            )}
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Total (Pre-GST):</span>
                                 <span>{formatINR(detail.poTotalAmount || 0)}</span>
@@ -155,14 +164,7 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                         <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">VWO Number:</span>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <span className="font-medium">{getShortId(detail.vwoNumber) || `#${detail.vendorWorkOrderId}`}</span>
-                                        </TooltipTrigger>
-                                        <TooltipContent>{detail.vwoNumber}</TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
+                                <span className="font-medium break-all">{detail.vwoNumber || `#${detail.vendorWorkOrderId}`}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Total (Pre-GST):</span>
@@ -176,6 +178,19 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                                 <span>Grand Total:</span>
                                 <span>{formatINR(detail.vwoGrandTotal || 0)}</span>
                             </div>
+                            {detail.vwoTdsPercentage && Number(detail.vwoTdsPercentage) > 0 && (
+                                <>
+                                    <div className="border-t my-1.5" />
+                                    <div className="flex justify-between text-destructive">
+                                        <span>TDS @ {Number(detail.vwoTdsPercentage)}%:</span>
+                                        <span>-{formatINR(detail.vwoTdsAmount || 0)}</span>
+                                    </div>
+                                    <div className="flex justify-between font-semibold">
+                                        <span>Amount After TDS:</span>
+                                        <span>{formatINR(detail.vwoAmountAfterTds || 0)}</span>
+                                    </div>
+                                </>
+                            )}
                             <div className="border-t my-1.5" />
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Payment Requested:</span>
@@ -293,6 +308,46 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                                     Invoice File
                                 </a>
                             )}
+                        </div>
+                    </div>
+                )}
+                {detail.billFiles && detail.billFiles.length > 0 && (
+                    <div className="col-span-2">
+                        <Label className="text-muted-foreground text-xs">Bill / Proof Files</Label>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                            {detail.billFiles.map((f, i) => (
+                                <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                {detail.uploadInvoice?.length > 0 && (
+                    <div className="col-span-2">
+                        <Label className="text-muted-foreground text-xs">Upload Invoice</Label>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                            {detail.uploadInvoice.map((f, i) => (
+                                <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                {detail.uploadPI?.length > 0 && (
+                    <div className="col-span-2">
+                        <Label className="text-muted-foreground text-xs">Upload PI</Label>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                            {detail.uploadPI.map((f, i) => (
+                                <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                {detail.uploadInvoiceAfterPayment?.length > 0 && (
+                    <div className="col-span-2">
+                        <Label className="text-muted-foreground text-xs">Upload Invoice after Payment</Label>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                            {detail.uploadInvoiceAfterPayment.map((f, i) => (
+                                <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                            ))}
                         </div>
                     </div>
                 )}

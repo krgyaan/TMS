@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { CheckCircle, Eye, History, Search } from "lucide-react";
+import { CheckCircle, Eye, FileUp, History, Search } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import DataTable from "@/components/ui/data-table";
@@ -53,6 +53,11 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
 
     const woActions: ActionItem<VendorWorkOrderRow>[] = useMemo(() => {
         const actions: ActionItem<VendorWorkOrderRow>[] = [
+            {
+                label: "Upload Invoice",
+                icon: <FileUp className="h-4 w-4" />,
+                onClick: (row) => navigate(paths.operations.raiseVendorWoInvoiceForm(row.projectId, row.id)),
+            },
             {
                 label: "View Details",
                 icon: <Eye className="h-4 w-4" />,
@@ -194,6 +199,39 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
                                             </p>
                                         </>
                                     )}
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                );
+            },
+        },
+        {
+            field: "totalVwiAmount",
+            headerName: "Invoiced",
+            sortable: true,
+            valueFormatter: (p: ValueFormatterParams<VendorWorkOrderRow>) => formatINR(p.value || 0),
+            getQuickFilterText: (params) => {
+                const d = params.data;
+                return `${d?.totalVwiAmount || 0} ${d?.totalVwiCount || 0}`;
+            },
+            cellRenderer: (p: CustomCellRendererProps<VendorWorkOrderRow>) => {
+                const d = p.data;
+                const invoiceTotal = d?.totalVwiAmount || 0;
+                const remainingInvoice = (d?.grandTotal || 0) - invoiceTotal;
+                const invoiceCount = d?.totalVwiCount || 0;
+
+                return (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="truncate block">{formatINR(p.value || 0)}</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
+                                <div className="space-y-1 text-xs">
+                                    <p><strong>Invoices Uploaded:</strong> {invoiceCount}</p>
+                                    <p><strong>Total Invoiced:</strong> {formatINR(invoiceTotal)}</p>
+                                    <p><strong>Remaining Invoice:</strong> {formatINR(remainingInvoice)}</p>
                                 </div>
                             </TooltipContent>
                         </Tooltip>

@@ -16,6 +16,9 @@ export interface PaymentRequestRow {
     paymentMode: string;
     portalLink?: string;
     billFiles: string[];
+    uploadInvoice: string[];
+    uploadPI: string[];
+    uploadInvoiceAfterPayment: string[];
     remark?: string;
     status: string;
     requestedBy: string;
@@ -44,6 +47,9 @@ export interface PaymentRequestRow {
     vwoTotalAmount?: number | string;
     vwoTotalGstAmt?: number | string;
     vwoGrandTotal?: number | string;
+    vwoTdsPercentage?: number | string;
+    vwoTdsAmount?: number | string;
+    vwoAmountAfterTds?: number | string;
     vwoTotalPaymentRequested?: number | string;
     vwoTotalMakerDone?: number | string;
     vwoTotalPaymentDone?: number | string;

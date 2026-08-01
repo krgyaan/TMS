@@ -38,6 +38,7 @@ export interface SaleInvoiceRow {
     raisedBy: string;
     createdAt: string;
     remarks?: string;
+    invoiceDocPaths?: string[];
 }
 
 export interface SaleInvoiceListRow {

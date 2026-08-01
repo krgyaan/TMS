@@ -52,6 +52,10 @@ class PaymentRequestApiService extends BaseApiService {
     async updateStatus(id: number, data: { status: string; utrNumber?: string; rejectionReason?: string }) {
         return this.patch<any>(`/${id}/status`, data);
     }
+
+    async uploadInvoiceAfterPayment(id: number, files: string[]) {
+        return this.patch<any>(`/${id}/upload-invoice-after-payment`, { files });
+    }
 }
 
 export const paymentRequestApi = new PaymentRequestApiService();

@@ -658,6 +658,8 @@ export class PurchaseOrderService {
                 pan: body.pan || null,
                 msme: body.msme || null,
                 type: body.type || "seller",
+                contactPerson: body.contact_person || null,
+                mobileNumber: body.mobile_number || null,
             })
             .returning()
         )[0];
@@ -666,7 +668,7 @@ export class PurchaseOrderService {
             await this.clientDirectorySyncService.syncToClientDirectory([{
                 name: party.name,
                 email: party.email,
-                phone: null,
+                phone: party.mobileNumber || null,
                 org: null,
             }]);
         }
@@ -684,9 +686,9 @@ export class PurchaseOrderService {
             throw new NotFoundException("Purchase Order not found");
         }
 
-        if (existingPO.poApproved === true) {
-            throw new BadRequestException("Cannot edit an approved Purchase Order. Only rejected or pending POs can be updated.");
-        }
+        // if (existingPO.poApproved === true) {
+        //     throw new BadRequestException("Cannot edit an approved Purchase Order. Only rejected or pending POs can be updated.");
+        // }
 
         const wasRejected = existingPO.poApproved === false;
         const [woBasic] = await this.db

@@ -3,6 +3,7 @@ import { Edit, Eye, FileText, History, Plus } from "lucide-react";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import DataTable from "@/components/ui/data-table";
+import { Badge } from "@/components/ui/badge";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -49,7 +50,7 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
         {
             label: "Edit PO",
             icon: <Edit className="h-4 w-4" />,
-            visible: (row) => row.poApproved !== true,
+            // visible: (row) => row.poApproved !== true,
             onClick: (row) => navigate(paths.operations.editPoPage(row.id, projectId!)),
         },
         {
@@ -136,7 +137,7 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
         },
         {
             field: "grandTotal",
-            headerName: "Amount",
+            headerName: "PO Amount",
             sortable: true,
             valueFormatter: (p: ValueFormatterParams<PurchaseOrderRow>) => formatINR(p.value),
             cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => (
@@ -147,7 +148,7 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
                         </TooltipTrigger>
                         <TooltipContent side="top" align="start">
                             <div className="space-y-1 text-xs">
-                                <p><strong>Total:</strong> {formatINR(p.data?.totalAmount || 0)}</p>
+                                <p><strong>Pre GST:</strong> {formatINR(p.data?.totalAmount || 0)}</p>
                                 <p><strong>GST:</strong> {formatINR(p.data?.totalGstAmt || 0)}</p>
                                 <p><strong>Grand Total:</strong> {formatINR(p.data?.grandTotal || 0)}</p>
                             </div>
@@ -157,39 +158,131 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
             ),
         },
         {
+            field: "totalPaymentDone",
+            headerName: "Payment Done",
+            sortable: true,
+            valueFormatter: (p: ValueFormatterParams<PurchaseOrderRow>) => formatINR(p.value || 0),
+            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => {
+                const d = p.data;
+                const amountAfterTds = d?.amountAfterTds ? Number(d.amountAfterTds) : Number(d?.grandTotal || 0);
+                const remaining = amountAfterTds - Number(d?.totalPaymentRequested || 0);
+
+                return (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="truncate block">{formatINR(p.value || 0)}</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
+                                <div className="space-y-1 text-xs">
+                                    <p><strong>Amount After TDS:</strong> {formatINR(amountAfterTds)}</p>
+                                    <p><strong>Payment Requested:</strong> {formatINR(d?.totalPaymentRequested || 0)}</p>
+                                    <p><strong>Maker Done:</strong> {formatINR(d?.totalMakerDone || 0)}</p>
+                                    <p><strong>Payment Done:</strong> {formatINR(d?.totalPaymentDone || 0)}</p>
+                                    <p><strong>Remaining:</strong> {formatINR(remaining)}</p>
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                );
+            },
+        },
+        {
             field: "totalPiAmount",
             headerName: "Invoiced",
             sortable: true,
             valueFormatter: (p: ValueFormatterParams<PurchaseOrderRow>) => formatINR(p.value || 0),
-            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => (
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span className="truncate block">{formatINR(p.value || 0)}</span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" align="start">
-                            <p className="text-xs">{p.data?.totalPiCount || 0} invoice(s)</p>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            ),
-        },
-        {
-            headerName: "Bal to Inv",
-            sortable: false,
-            valueGetter: (p: any) => {
-                const po = p.data as PurchaseOrderRow;
-                const cap = po.amountAfterTds ? Number(po.amountAfterTds) : Number(po.grandTotal || 0);
-                return cap - Number(po.totalPiAmount || 0);
+            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => {
+                const d = p.data;
+                const totalAmount = d?.totalAmount || 0;
+                const invoiceTotal = d?.totalPiAmount || 0;
+                const remainingInvoice = totalAmount - invoiceTotal;
+
+                const invoiceItems = d?.purchaseInvoices || [];
+                const invoiceList = invoiceItems.map((inv, index) => {
+                    const ordinal = index === 0 ? '1st' : index === 1 ? '2nd' : index === 2 ? '3rd' : `${index + 1}th`;
+                    return `${ordinal} invoice of ${formatINR(inv.totalAmount)}`;
+                });
+
+                return (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="truncate block">{formatINR(p.value || 0)}</span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
+                                <div className="space-y-1 text-xs">
+                                    {invoiceList.map((item, index) => (
+                                        <p key={index}>{item}</p>
+                                    ))}
+                                    <p><strong>Total Invoiced:</strong> {formatINR(invoiceTotal)}</p>
+                                    <p><strong>Remaining Invoice:</strong> {formatINR(remainingInvoice)}</p>
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                );
             },
-            valueFormatter: (p: ValueFormatterParams) => formatINR(p.value),
-            cellStyle: (p: any) => p.value <= 0 ? { color: "var(--color-destructive)" } : undefined,
         },
         {
             field: "poRaisedBy",
             headerName: "PO Raised By",
             sortable: true,
             filter: true,
+        },
+        {
+            field: "poApproved",
+            headerName: "Status",
+            sortable: true,
+            filter: true,
+            width: 110,
+            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => {
+                const d = p.data;
+                const isApproved = d?.poApproved === true;
+                const isRejected = d?.poApproved === false;
+                const tdsPct = d?.tdsPercentage ? Number(d.tdsPercentage) : null;
+
+                let label: string;
+                let variant: "default" | "secondary" | "destructive" | "outline" = "secondary";
+                if (isApproved) {
+                    label = "Approved";
+                    variant = "default";
+                } else if (isRejected) {
+                    label = "Rejected";
+                    variant = "destructive";
+                } else {
+                    label = "Pending";
+                    variant = "outline";
+                }
+
+                return (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Badge variant={variant} className="gap-1 cursor-pointer">
+                                    {label}
+                                </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
+                                <div className="space-y-1 text-xs">
+                                    {tdsPct !== null && isApproved && (
+                                        <>
+                                            <p><strong>TDS:</strong> {tdsPct}% (-{formatINR(d?.tdsAmount || 0)})</p>
+                                            <p><strong>After TDS:</strong> {formatINR(d?.amountAfterTds || 0)}</p>
+                                        </>
+                                    )}
+                                    {d?.poApprovalRemark && (
+                                        <p><strong>Remark:</strong> {d.poApprovalRemark}</p>
+                                    )}
+                                    {!d?.poApprovalRemark && !tdsPct && (
+                                        <p className="text-muted-foreground">Awaiting approval</p>
+                                    )}
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                );
+            },
         },
         {
             headerName: "Actions",

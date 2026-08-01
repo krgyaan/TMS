@@ -191,6 +191,29 @@ export class PaymentRequestService {
         return updated;
     }
 
+    async uploadInvoiceAfterPayment(id: number, files: string[]) {
+        const existing = await this.db
+            .select({ id: paymentRequests.id })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, id))
+            .then(rows => rows[0]);
+        if (!existing) throw new NotFoundException("Payment Request not found");
+
+        const updated = (
+            await this.db
+                .update(paymentRequests)
+                .set({
+                    uploadInvoiceAfterPayment: files,
+                    updatedAt: new Date(),
+                })
+                .where(eq(paymentRequests.id, id))
+                .returning()
+        )[0];
+
+        this.logger.info(`Invoice after payment uploaded for Request #${id}`);
+        return updated;
+    }
+
     private readonly prFields = {
         id: paymentRequests.id,
         projectId: paymentRequests.projectId,
@@ -244,6 +267,9 @@ export class PaymentRequestService {
                 vwoTotalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 vwoTotalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 vwoGrandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                vwoTdsPercentage: vendorWorkOrders.tdsPercentage,
+                vwoTdsAmount: vendorWorkOrders.tdsAmount,
+                vwoAmountAfterTds: vendorWorkOrders.amountAfterTds,
                 vwoTotalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status != 'rejected'), 0)`,
                 vwoTotalMakerDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status = 'maker_done'), 0)`,
                 vwoTotalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status = 'payment_done'), 0)`,

@@ -46,6 +46,15 @@ export class PaymentRequestController {
         return this.service.updateStatus(id, body);
     }
 
+    @Patch(":id/upload-invoice-after-payment")
+    @HttpCode(HttpStatus.OK)
+    uploadInvoiceAfterPayment(
+        @Param("id", ParseIntPipe) id: number,
+        @Body() body: { files: string[] },
+    ) {
+        return this.service.uploadInvoiceAfterPayment(id, body.files);
+    }
+
     // ── Beneficiary routes (must be before :id routes) ──
 
     @Post("beneficiaries")

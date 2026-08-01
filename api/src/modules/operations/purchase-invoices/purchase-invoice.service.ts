@@ -14,7 +14,7 @@ export class PurchaseInvoiceService {
         @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
     ) {}
 
-    async generateNumber(projectName?: string) {
+    async generateNumber(projectName?: string, series = "PI") {
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth() + 1;
@@ -28,20 +28,21 @@ export class PurchaseInvoiceService {
         const last = await this.db
             .select({ id: purchaseInvoices.id, invoiceNo: purchaseInvoices.invoiceNo })
             .from(purchaseInvoices)
-            .where(like(purchaseInvoices.invoiceNo, `VE/%/${fy}/PI%`))
+            .where(like(purchaseInvoices.invoiceNo, `VE/%/${fy}/${series}%`))
             .orderBy(desc(purchaseInvoices.id));
 
         let next = 1;
         if (last[0]?.invoiceNo) {
-            const match = last[0].invoiceNo.match(/PI(\d{4})$/);
+            const match = last[0].invoiceNo.match(new RegExp(`${series}(\\d{4})$`));
             if (match) next = parseInt(match[1]) + 1;
         }
 
-        return `${prefix}/PI${next.toString().padStart(4, "0")}`;
+        return `${prefix}/${series}${next.toString().padStart(4, "0")}`;
     }
 
     async create(body: any, userId: number) {
-        const invoiceNo = await this.generateNumber(body.projectName);
+        const series = body.vendorWorkOrderId ? "WOI" : "PI";
+        const invoiceNo = await this.generateNumber(body.projectName, series);
 
         const pi = (
             await this.db
@@ -57,6 +58,7 @@ export class PurchaseInvoiceService {
                     uploadedBy: userId,
                     invoiceFile: body.invoiceFile,
                     purchaseOrderId: body.purchaseOrderId || null,
+                    vendorWorkOrderId: body.vendorWorkOrderId || null,
                 })
                 .returning()
         )[0];
@@ -84,6 +86,7 @@ export class PurchaseInvoiceService {
                     invoiceDate: body.invoiceDate,
                     invoiceFile: body.invoiceFile,
                     purchaseOrderId: body.purchaseOrderId || null,
+                    vendorWorkOrderId: body.vendorWorkOrderId || null,
                     updatedAt: new Date(),
                 })
                 .where(eq(purchaseInvoices.id, id))
@@ -118,6 +121,8 @@ export class PurchaseInvoiceService {
                 invoiceFile: purchaseInvoices.invoiceFile,
                 purchaseOrderId: purchaseInvoices.purchaseOrderId,
                 poNumber: sql<string>`COALESCE((SELECT po_number FROM purchase_orders WHERE id = ${purchaseInvoices.purchaseOrderId}), '')`,
+                vendorWorkOrderId: purchaseInvoices.vendorWorkOrderId,
+                woNumber: sql<string>`COALESCE((SELECT wo_number FROM vendor_work_orders WHERE id = ${purchaseInvoices.vendorWorkOrderId}), '')`,
                 createdAt: purchaseInvoices.createdAt,
                 updatedAt: purchaseInvoices.updatedAt,
             })
@@ -140,6 +145,8 @@ export class PurchaseInvoiceService {
                 invoiceFile: purchaseInvoices.invoiceFile,
                 purchaseOrderId: purchaseInvoices.purchaseOrderId,
                 poNumber: sql<string>`COALESCE((SELECT po_number FROM purchase_orders WHERE id = ${purchaseInvoices.purchaseOrderId}), '')`,
+                vendorWorkOrderId: purchaseInvoices.vendorWorkOrderId,
+                woNumber: sql<string>`COALESCE((SELECT wo_number FROM vendor_work_orders WHERE id = ${purchaseInvoices.vendorWorkOrderId}), '')`,
                 createdAt: purchaseInvoices.createdAt,
                 updatedAt: purchaseInvoices.updatedAt,
             })

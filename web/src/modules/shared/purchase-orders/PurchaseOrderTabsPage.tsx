@@ -27,8 +27,8 @@ const PurchaseOrderTabsPage: React.FC = () => {
     const tabsConfig: TabConfig[] = isAccounts
         ? [
             { key: "pending", label: "Pending", icon: <Clock className="h-4 w-4" />, status: "pending", showApproval: true },
-            { key: "approved", label: "Approved", icon: <CheckCircle className="h-4 w-4" />, status: "approved", showApproval: false },
-            { key: "rejected", label: "Rejected", icon: <XCircle className="h-4 w-4" />, status: "rejected", showApproval: false },
+            { key: "approved", label: "Approved", icon: <CheckCircle className="h-4 w-4" />, status: "approved", showApproval: true },
+            { key: "rejected", label: "Rejected", icon: <XCircle className="h-4 w-4" />, status: "rejected", showApproval: true },
           ]
         : [
             { key: "new", label: "New", icon: <Sparkles className="h-4 w-4" />, status: "new", showApproval: false },

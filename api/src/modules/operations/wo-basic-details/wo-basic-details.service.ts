@@ -138,7 +138,7 @@ export class WoBasicDetailsService {
             woDetailId: row.woDetails?.id ?? null,
             woNumber: row.woBasicDetails.woNumber,
             woDate: row.woBasicDetails.woDate,
-            projectName: row.woBasicDetails.projectName,
+            projectName: row.woBasicDetails.projectName ?? row.tenderInfos?.tenderName ?? null,
             currentStage: row.woBasicDetails.currentStage,
             woValuePreGst: row.woBasicDetails.woValuePreGst,
             woValueGstAmt: row.woBasicDetails.woValueGstAmt,
@@ -185,26 +185,19 @@ export class WoBasicDetailsService {
             oeDocsPrepUser: {
                 name: oeDocsPrepUser.name,
             },
+            tenderInfos: {
+                tenderName: tenderInfos.tenderName,
+            }
         };
     }
 
     private getBaseQueryBuilder() {
-        return this.db
-            .select(this.getWoBaseSelect())
-            .from(woBasicDetails)
+        return this.db.select(this.getWoBaseSelect()).from(woBasicDetails)
             .leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
             .leftJoin(oeFirstUser, eq(oeFirstUser.id, woBasicDetails.oeFirst))
             .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
-            .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep));
-    }
-
-    private async getProjectId(tenderId: number){
-        const [project] = await this.db.select({id : projects.id})
-        .from(projects)
-        .where(eq(projects.tenderId, tenderId))
-        .limit(1);
-
-        return project?.id ?? null;
+            .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, woBasicDetails.tenderId));
     }
 
     async findAll(filters?: WoBasicDetailsQueryDto) {
@@ -254,6 +247,7 @@ export class WoBasicDetailsService {
                     ilike(oeFirstUser.name, searchStr),
                     ilike(oeSiteVisitUser.name, searchStr),
                     ilike(oeDocsPrepUser.name, searchStr),
+                    ilike(tenderInfos.tenderName, searchStr),
                 ),
             );
         }
@@ -274,7 +268,8 @@ export class WoBasicDetailsService {
             countQuery = countQuery
                 .leftJoin(oeFirstUser, eq(oeFirstUser.id, woBasicDetails.oeFirst))
                 .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
-                .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep));
+                .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
+                .leftJoin(tenderInfos, eq(tenderInfos.id, woBasicDetails.tenderId));
         }
 
         const [countResult] = await countQuery.where(whereClause);

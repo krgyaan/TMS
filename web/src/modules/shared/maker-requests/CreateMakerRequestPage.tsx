@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import { paths } from "@/app/routes/paths";
 import { makerRequestFormSchema, type MakerRequestFormValues } from "./helpers/makerRequest.schema";
 import { mapMakerRequestFormToCreateDTO } from "./helpers/makerRequest.mapper";
@@ -31,6 +32,8 @@ const defaultFormValues: MakerRequestFormValues = {
     ifsc: "",
     portalLink: "",
     billFiles: [],
+    uploadInvoice: [],
+    uploadPI: [],
     remark: "",
 };
 
@@ -70,6 +73,7 @@ const ownBankCategory = [
     {label: 'AU_8316', value: 'AU Outflow Account (AU_8316)'},
     {label: 'AU_9589', value: 'AU EMD Account (AU_9589)'},
     {label: 'AU_9284', value: 'AU Cash Reserve Account (AU_9284)'},
+    {label: 'amex_cc', value: 'Amex Company Credit Card'},
 ];
 
 const capitalAssetPurchaseCategory = [
@@ -77,8 +81,37 @@ const capitalAssetPurchaseCategory = [
     {label: 'asset_purchase', value: 'Asset Purchase'},
 ];
 
+const CATEGORY_UPLOAD_CONFIG: Record<string, { allowedUserIds?: number[]; uploadInvoice: boolean; uploadPI: boolean; uploadInvoiceAfterPayment: boolean }> = {
+    imprest: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
+    communication: { uploadInvoice: true, uploadPI: false, uploadInvoiceAfterPayment: false },
+    courier: { uploadInvoice: true, uploadPI: false, uploadInvoiceAfterPayment: false },
+    electricity: { uploadInvoice: true, uploadPI: false, uploadInvoiceAfterPayment: false },
+    rent: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: true },
+    emi: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
+    salary: { allowedUserIds: [13, 7, 21, 42, 26], uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
+    software: { uploadInvoice: true, uploadPI: true, uploadInvoiceAfterPayment: true },
+    office_expenses: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
+    printing_stationary: { uploadInvoice: true, uploadPI: true, uploadInvoiceAfterPayment: true },
+    office_maintenance: { uploadInvoice: true, uploadPI: true, uploadInvoiceAfterPayment: true },
+    portal_renewal_charges: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: true },
+    professional_charges: { uploadInvoice: true, uploadPI: true, uploadInvoiceAfterPayment: true },
+    related_party: { allowedUserIds: [13, 7, 21, 26], uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
+    nbfc_oc_acc: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
+    loan_principal_return: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
+    AU_5242: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
+    AU_5180: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
+    AU_5190: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
+    AU_8316: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
+    AU_9589: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
+    AU_9284: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
+    amex_cc: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
+    investment: { allowedUserIds: [13, 7, 21, 26], uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
+    asset_purchase: { uploadInvoice: false, uploadPI: true, uploadInvoiceAfterPayment: false },
+};
+
 export default function CreateMakerRequestPage() {
     const navigate = useNavigate();
+    const { user } = useAuth();
 
     const { data: beneficiaries } = useBeneficiaries();
     const createMakerMutation = useCreateMakerRequest();
@@ -95,6 +128,7 @@ export default function CreateMakerRequestPage() {
     const selectedBeneficiaryId = form.watch("selectedBeneficiaryId");
     const paymentMode = form.watch("paymentMode");
     const selectedHeading = form.watch("selectedHeading");
+    const categoryId = form.watch("categoryId");
 
     const headingOptions = useMemo(() => headings.map(h => ({ id: h.label, name: h.value })), []);
 
@@ -106,8 +140,17 @@ export default function CreateMakerRequestPage() {
             own_bank: ownBankCategory,
             capital_asset_purchase: capitalAssetPurchaseCategory,
         };
-        return (map[selectedHeading] || []).map(c => ({ id: c.label, name: c.value }));
-    }, [selectedHeading]);
+        const cats = map[selectedHeading] || [];
+        return cats.filter(c => {
+            const config = CATEGORY_UPLOAD_CONFIG[c.label];
+            if (config?.allowedUserIds && user?.id) {
+                return config.allowedUserIds.includes(user.id);
+            }
+            return true;
+        }).map(c => ({ id: c.label, name: c.value }));
+    }, [selectedHeading, user?.id]);
+
+    const selectedCategoryConfig = categoryId ? CATEGORY_UPLOAD_CONFIG[categoryId] : null;
 
     useEffect(() => {
         if (selectedHeading) {
@@ -143,6 +186,32 @@ export default function CreateMakerRequestPage() {
 
     const handleSubmit = async (values: MakerRequestFormValues) => {
         try {
+            const config = values.categoryId ? CATEGORY_UPLOAD_CONFIG[values.categoryId] : null;
+
+            form.clearErrors("uploadInvoice");
+            form.clearErrors("uploadPI");
+
+            if (config) {
+                const showInvoice = config.uploadInvoice;
+                const showPI = config.uploadPI;
+                const hasInvoice = (values.uploadInvoice?.length ?? 0) > 0;
+                const hasPI = (values.uploadPI?.length ?? 0) > 0;
+
+                if (showInvoice && showPI && !hasInvoice && !hasPI) {
+                    form.setError("uploadInvoice", { message: "At least one of Upload Invoice or Upload PI is required" });
+                    form.setError("uploadPI", { message: "At least one of Upload Invoice or Upload PI is required" });
+                    return;
+                }
+                if (showInvoice && !hasInvoice) {
+                    form.setError("uploadInvoice", { message: "Upload Invoice is required" });
+                    return;
+                }
+                if (showPI && !hasPI) {
+                    form.setError("uploadPI", { message: "Upload PI is required" });
+                    return;
+                }
+            }
+
             const dto = mapMakerRequestFormToCreateDTO(values);
             await createMakerMutation.mutateAsync(dto);
             toast.success("Maker Request created successfully.");
@@ -303,13 +372,33 @@ export default function CreateMakerRequestPage() {
                             )}
                             
                             <h3 className="text-lg font-semibold">Proof & Remark</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                                <TenderFileUploader
-                                    label="Upload Proof"
-                                    context="tender-documents"
-                                    value={form.watch("billFiles")}
-                                    onChange={(paths) => form.setValue("billFiles", paths)}
-                                />
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+                                {selectedCategoryConfig?.uploadInvoice && (
+                                    <div>
+                                        <TenderFileUploader
+                                            label="Upload Invoice"
+                                            context="tender-documents"
+                                            value={form.watch("uploadInvoice")}
+                                            onChange={(paths) => form.setValue("uploadInvoice", paths)}
+                                        />
+                                        {form.formState.errors.uploadInvoice && (
+                                            <p className="text-sm text-destructive mt-1">{form.formState.errors.uploadInvoice.message}</p>
+                                        )}
+                                    </div>
+                                )}
+                                {selectedCategoryConfig?.uploadPI && (
+                                    <div>
+                                        <TenderFileUploader
+                                            label="Upload PI"
+                                            context="tender-documents"
+                                            value={form.watch("uploadPI")}
+                                            onChange={(paths) => form.setValue("uploadPI", paths)}
+                                        />
+                                        {form.formState.errors.uploadPI && (
+                                            <p className="text-sm text-destructive mt-1">{form.formState.errors.uploadPI.message}</p>
+                                        )}
+                                    </div>
+                                )}
                                 <FieldWrapper control={form.control} name="remark" label="Remark (if any)">
                                     {(field) => <Input {...field} placeholder="Optional remarks" />}
                                 </FieldWrapper>

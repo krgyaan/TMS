@@ -19,9 +19,13 @@ import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { getShortId } from "@/lib/id-utils";
 import type { MakerRequestRow } from "@/modules/shared/maker-requests/helpers/makerRequest.types";
 import { tenderFilesService } from "@/services/api/tender-files.service";
+import { purchaseOrderApi } from "@/services/api/purchase-order.api";
+import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
+import { TenderFileUploader } from "@/components/tender-file-upload";
+import { useUploadMakerInvoiceAfterPayment } from "@/hooks/api/useMakerRequests";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { Copy, Eye, Plus, Search } from "lucide-react";
+import { Copy, Eye, Plus, Search, Upload } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PAYMENT_AGAINST_LABELS, STATUS_CONFIG } from "../payment-requests/constants";
@@ -36,6 +40,10 @@ const MyMakerRequests: React.FC = () => {
 
     const [viewingId, setViewingId] = useState<number | null>(null);
     const { data: detailData, isLoading: isDetailLoading } = useMakerRequestDetails(viewingId ?? 0);
+    const [uploadInvoiceRow, setUploadInvoiceRow] = useState<MakerRequestRow | null>(null);
+    const [uploadInvoiceFiles, setUploadInvoiceFiles] = useState<string[]>([]);
+    const [uploadInvoiceError, setUploadInvoiceError] = useState("");
+    const uploadInvoiceMutation = useUploadMakerInvoiceAfterPayment();
 
     const rows = useMemo(() => (data ?? []) as MakerRequestRow[], [data]);
 
@@ -67,9 +75,42 @@ const MyMakerRequests: React.FC = () => {
 
     const handleView = useCallback((row: MakerRequestRow) => setViewingId(row.id), []);
 
+    const handleUploadInvoice = useCallback((row: MakerRequestRow) => {
+        setUploadInvoiceRow(row);
+        setUploadInvoiceFiles([]);
+        setUploadInvoiceError("");
+    }, []);
+
+    const CATEGORIES_NEED_INVOICE_AFTER_PAYMENT = useMemo(() => new Set([
+        'rent', 'software', 'printing_stationary', 'office_maintenance', 'portal_renewal_charges', 'professional_charges',
+    ]), []);
+
+    const confirmUploadInvoice = useCallback(async () => {
+        if (!uploadInvoiceRow) return;
+        if (uploadInvoiceFiles.length === 0) {
+            setUploadInvoiceError("Please upload at least one file");
+            return;
+        }
+        try {
+            await uploadInvoiceMutation.mutateAsync({ id: uploadInvoiceRow.id, files: uploadInvoiceFiles });
+            toast.success("Invoice uploaded successfully.");
+            setUploadInvoiceRow(null);
+            setUploadInvoiceFiles([]);
+            setUploadInvoiceError("");
+        } catch {
+            toast.error("Failed to upload invoice.");
+        }
+    }, [uploadInvoiceRow, uploadInvoiceFiles, uploadInvoiceMutation]);
+
     const mrActions: ActionItem<MakerRequestRow>[] = useMemo(() => [
         { label: "View Details", icon: <Eye className="h-4 w-4" />, onClick: handleView },
-    ], [handleView]);
+        {
+            label: "Upload Invoice",
+            icon: <Upload className="h-4 w-4" />,
+            onClick: handleUploadInvoice,
+            visible: (row) => row.status !== "rejected" && !!row.category && CATEGORIES_NEED_INVOICE_AFTER_PAYMENT.has(row.category),
+        },
+    ], [handleView, handleUploadInvoice, CATEGORIES_NEED_INVOICE_AFTER_PAYMENT]);
 
     const mrColumns = useMemo<ColDef<MakerRequestRow>[]>(() => [
         { field: "requestNo", headerName: "Request No", sortable: true, filter: true, width: 260, flex: 1, cellRenderer: (p: CustomCellRendererProps<MakerRequestRow>) => (
@@ -234,10 +275,20 @@ const MyMakerRequests: React.FC = () => {
                                 <Label className="text-muted-foreground text-xs">Category</Label><p>{detail.category || "—"}</p>
                             </div>
                             <div>
+                                <Label className="text-muted-foreground text-xs">Payment Mode</Label>
+                                <p className="capitalize">{detail.paymentMode?.replaceAll('_', ' ').toLowerCase() || "—"}</p>
+                            </div>
+                            <div>
                                 <Label className="text-muted-foreground text-xs">Account Number</Label><p className="font-mono">{detail.accountNumber}</p>
                             </div>
                             <div>
+                                <Label className="text-muted-foreground text-xs">Bank Name</Label><p>{detail.bankName || "—"}</p>
+                            </div>
+                            <div>
                                 <Label className="text-muted-foreground text-xs">IFSC</Label><p className="font-mono">{detail.ifsc}</p>
+                            </div>
+                            <div>
+                                <Label className="text-muted-foreground text-xs">Requested By</Label><p>{detail.requestedByName || "—"}</p>
                             </div>
                             <div>
                                 <Label className="text-muted-foreground text-xs">Status</Label><Badge variant="outline" className={STATUS_CONFIG[detail.status]?.color || ""}>{STATUS_CONFIG[detail.status]?.label || detail.status}</Badge>
@@ -245,6 +296,12 @@ const MyMakerRequests: React.FC = () => {
                             <div>
                                 <Label className="text-muted-foreground text-xs">Created At</Label><p>{formatDate(detail.createdAt)}</p>
                             </div>
+                            {detail.portalLink && 
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs">Portal Link</Label>
+                                    <p className="font-mono text-sm truncate">{detail.portalLink}</p>
+                                </div>
+                            }
                             {detail.utrNumber && 
                                 <div>
                                     <Label className="text-muted-foreground text-xs">UTR Number</Label><p className="font-mono">{detail.utrNumber}</p>
@@ -272,10 +329,175 @@ const MyMakerRequests: React.FC = () => {
                                     </div>
                                 </div>
                             )}
+                            {detail.uploadInvoice?.length > 0 && (
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs">Upload Invoice</Label>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        {detail.uploadInvoice.map((f, i) => (
+                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {detail.uploadPI?.length > 0 && (
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs">Upload PI</Label>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        {detail.uploadPI.map((f, i) => (
+                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {detail.uploadInvoiceAfterPayment?.length > 0 && (
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs">Upload Invoice after Payment</Label>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        {detail.uploadInvoiceAfterPayment.map((f, i) => (
+                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {detail.purchaseOrderId && (
+                                <div className="col-span-2 space-y-2">
+                                    <Label className="text-muted-foreground text-xs">PO Details</Label>
+                                    <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">PO Number:</span>
+                                            <span className="font-medium">{detail.poNumber || `#${detail.purchaseOrderId}`}</span>
+                                        </div>
+                                        {detail.poFile && (
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">PO File:</span>
+                                                <a href={tenderFilesService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download PO</a>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Grand Total:</span>
+                                            <span>{formatINR(detail.poGrandTotal || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">TDS %:</span>
+                                            <span>{detail.poTdsPercentage || "0"}%</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">TDS Amount:</span>
+                                            <span>{formatINR(detail.poTdsAmount || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Amount After TDS:</span>
+                                            <span>{formatINR(detail.poAmountAfterTds || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Payment Requested:</span>
+                                            <span>{formatINR(detail.poTotalPaymentRequested || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Maker Done:</span>
+                                            <span>{formatINR(detail.poTotalMakerDone || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Payment Done:</span>
+                                            <span>{formatINR(detail.poTotalPaymentDone || 0)}</span>
+                                        </div>
+                                        {detail.uploadedInvoiceFile && (
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Uploaded Invoice:</span>
+                                                <a href={tenderFilesService.getFileUrl(detail.uploadedInvoiceFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download Invoice</a>
+                                            </div>
+                                        )}
+                                        <div className="pt-2">
+                                            <a href={purchaseOrderApi.getPurchaseOrderPdfUrl(detail.purchaseOrderId)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-xs">
+                                                View Latest PO PDF
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            {detail.vendorWorkOrderId && (
+                                <div className="col-span-2 space-y-2">
+                                    <Label className="text-muted-foreground text-xs">VWO Details</Label>
+                                    <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">VWO Number:</span>
+                                            <span className="font-medium">{detail.vwoNumber || `#${detail.vendorWorkOrderId}`}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">VWO File:</span>
+                                            <a href={vendorWorkOrderApi.getPdfDownloadUrl(detail.vendorWorkOrderId)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download VWO</a>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Grand Total:</span>
+                                            <span>{formatINR(detail.vwoGrandTotal || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">TDS %:</span>
+                                            <span>{detail.vwoTdsPercentage || "0"}%</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">TDS Amount:</span>
+                                            <span>{formatINR(detail.vwoTdsAmount || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Amount After TDS:</span>
+                                            <span>{formatINR(detail.vwoAmountAfterTds || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Payment Requested:</span>
+                                            <span>{formatINR(detail.vwoTotalPaymentRequested || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Maker Done:</span>
+                                            <span>{formatINR(detail.vwoTotalMakerDone || 0)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Payment Done:</span>
+                                            <span>{formatINR(detail.vwoTotalPaymentDone || 0)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ) : <p className="text-muted-foreground py-4 text-center">No details found.</p>}
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setViewingId(null)}>Close</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Upload Invoice after Payment Dialog */}
+            <Dialog open={uploadInvoiceRow !== null} onOpenChange={(open) => { if (!open) { setUploadInvoiceRow(null); setUploadInvoiceFiles([]); setUploadInvoiceError(""); } }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Upload Invoice after Payment</DialogTitle>
+                        <DialogDescription>Upload the invoice for this request after payment has been made</DialogDescription>
+                    </DialogHeader>
+                    {uploadInvoiceRow &&
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-1">
+                                <p className="text-sm"><strong>Request No:</strong> {uploadInvoiceRow.requestNo}</p>
+                                <p className="text-sm"><strong>Party:</strong> {uploadInvoiceRow.partyName}</p>
+                                <p className="text-sm"><strong>Amount:</strong> {formatINR(uploadInvoiceRow.amount)}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <TenderFileUploader
+                                    label="Upload Invoice"
+                                    context="tender-documents"
+                                    value={uploadInvoiceFiles}
+                                    onChange={(files) => { setUploadInvoiceFiles(files); setUploadInvoiceError(""); }}
+                                />
+                                {uploadInvoiceError && (
+                                    <p className="text-sm text-destructive">{uploadInvoiceError}</p>
+                                )}
+                            </div>
+                        </div>
+                    }
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => { setUploadInvoiceRow(null); setUploadInvoiceFiles([]); setUploadInvoiceError(""); }}>Cancel</Button>
+                        <Button onClick={confirmUploadInvoice} disabled={uploadInvoiceMutation.isPending}>
+                            {uploadInvoiceMutation.isPending ? "Uploading..." : "Submit"}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

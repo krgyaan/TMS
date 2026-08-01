@@ -72,6 +72,17 @@ export function useUpdatePaymentRequestStatus() {
     });
 }
 
+export function useUploadPaymentInvoiceAfterPayment() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, files }: { id: number; files: string[] }) =>
+            paymentRequestApi.uploadInvoiceAfterPayment(id, files),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["payment-requests"] });
+        },
+    });
+}
+
 export function useUpdatePaymentRequest() {
     const queryClient = useQueryClient();
     return useMutation({

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { Search, Eye, CheckCircle2, Ban, Banknote, Copy } from "lucide-react";
+import { Search, Eye, CheckCircle2, Ban, Banknote, Copy, Upload } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,14 +15,17 @@ import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
-import { useAllPaymentRequests, useUpdatePaymentRequestStatus } from "@/hooks/api/useProjectPaymentRequests";
+import { useAllPaymentRequests, usePaymentRequestDetails, useUpdatePaymentRequestStatus, useUploadPaymentInvoiceAfterPayment } from "@/hooks/api/useProjectPaymentRequests";
 import { useTeamFilter } from "@/hooks/useTeamFilter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "react-router-dom";
+import { TenderFileUploader } from "@/components/tender-file-upload";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import { tenderFilesService } from "@/services/api/tender-files.service";
+import { purchaseOrderApi } from "@/services/api/purchase-order.api";
+import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
@@ -51,6 +54,11 @@ const CombinedPaymentRequestListPage: React.FC = () => {
     const [rejectRow, setRejectRow] = useState<PaymentRequestRow | null>(null);
     const [rejectionReason, setRejectionReason] = useState("");
 
+    const [uploadInvoiceRow, setUploadInvoiceRow] = useState<PaymentRequestRow | null>(null);
+    const [uploadInvoiceFiles, setUploadInvoiceFiles] = useState<string[]>([]);
+    const [uploadInvoiceError, setUploadInvoiceError] = useState("");
+    const uploadInvoiceMutation = useUploadPaymentInvoiceAfterPayment();
+
     const rows = useMemo(() => (data ?? []) as PaymentRequestRow[], [data]);
 
     const visibleRows = useMemo(() => {
@@ -63,7 +71,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             'office_maintenance', 'portal_renewal_charges', 'professional_charges',
             'nbfc_oc_acc', 'loan_principal_return',
             'AU_5242', 'AU_5180', 'AU_5190', 'AU_8316', 'AU_9589', 'AU_9284',
-            'asset_purchase',
+            'amex_cc', 'asset_purchase',
         ]);
 
         const userAllowedCategories: Record<string, number[]> = {
@@ -118,6 +126,33 @@ const CombinedPaymentRequestListPage: React.FC = () => {
     const handlePaymentDone = useCallback((row: PaymentRequestRow) => { setPaymentDoneRow(row); setUtrNumber(""); }, []);
     const handleReject = useCallback((row: PaymentRequestRow) => { setRejectRow(row); setRejectionReason(""); }, []);
 
+    const handleUploadInvoice = useCallback((row: PaymentRequestRow) => {
+        setUploadInvoiceRow(row);
+        setUploadInvoiceFiles([]);
+        setUploadInvoiceError("");
+    }, []);
+
+    const CATEGORIES_NEED_INVOICE_AFTER_PAYMENT = useMemo(() => new Set([
+        'rent', 'software', 'printing_stationary', 'office_maintenance', 'portal_renewal_charges', 'professional_charges',
+    ]), []);
+
+    const confirmUploadInvoice = useCallback(async () => {
+        if (!uploadInvoiceRow) return;
+        if (uploadInvoiceFiles.length === 0) {
+            setUploadInvoiceError("Please upload at least one file");
+            return;
+        }
+        try {
+            await uploadInvoiceMutation.mutateAsync({ id: uploadInvoiceRow.id, files: uploadInvoiceFiles });
+            toast.success("Invoice uploaded successfully.");
+            setUploadInvoiceRow(null);
+            setUploadInvoiceFiles([]);
+            setUploadInvoiceError("");
+        } catch {
+            toast.error("Failed to upload invoice.");
+        }
+    }, [uploadInvoiceRow, uploadInvoiceFiles, uploadInvoiceMutation]);
+
     const confirmMakerDone = useCallback(async () => {
         if (!makerDoneRow) return;
         try { await updateStatusMutation.mutateAsync({ id: makerDoneRow.id, data: { status: "maker_done" } }); setMakerDoneRow(null); } catch {}
@@ -125,20 +160,37 @@ const CombinedPaymentRequestListPage: React.FC = () => {
 
     const confirmPaymentDone = useCallback(async () => {
         if (!paymentDoneRow || !utrNumber.trim()) return;
-        try { await updateStatusMutation.mutateAsync({ id: paymentDoneRow.id, data: { status: "payment_done", utrNumber: utrNumber.trim() } }); setPaymentDoneRow(null); setUtrNumber(""); } catch {}
+        try {
+            await updateStatusMutation.mutateAsync({ id: paymentDoneRow.id, data: { status: "payment_done", utrNumber: utrNumber.trim() } });
+            setPaymentDoneRow(null);
+            setUtrNumber("");
+        } catch {}
     }, [paymentDoneRow, utrNumber, updateStatusMutation]);
 
     const confirmReject = useCallback(async () => {
         if (!rejectRow || !rejectionReason.trim()) return;
-        try { await updateStatusMutation.mutateAsync({ id: rejectRow.id, data: { status: "rejected", rejectionReason: rejectionReason.trim() } }); setRejectRow(null); setRejectionReason(""); } catch {}
+        try { 
+            await updateStatusMutation.mutateAsync(
+                { 
+                    id: rejectRow.id, 
+                    data: { status: "rejected", rejectionReason: rejectionReason.trim() } 
+                }
+            ); 
+            setRejectRow(null); setRejectionReason(""); } catch {}
     }, [rejectRow, rejectionReason, updateStatusMutation]);
 
     const actions: ActionItem<PaymentRequestRow>[] = useMemo(() => [
         { label: "View Details", icon: <Eye className="h-4 w-4" />, onClick: handleView },
         { label: "Maker Done", icon: <CheckCircle2 className="h-4 w-4" />, onClick: handleMakerDone, visible: (row) => row.status === "pending" },
         { label: "Payment Done", icon: <Banknote className="h-4 w-4" />, onClick: handlePaymentDone, visible: (row) => row.status === "maker_done" },
+        {
+            label: "Upload Invoice",
+            icon: <Upload className="h-4 w-4" />,
+            onClick: handleUploadInvoice,
+            visible: (row) => row.status !== "rejected" && CATEGORIES_NEED_INVOICE_AFTER_PAYMENT.has(row.paymentAgainst),
+        },
         { label: "Reject", icon: <Ban className="h-4 w-4" />, onClick: handleReject, className: "text-red-600", visible: (row) => row.status === "pending" || row.status === "maker_done" },
-    ], [handleView, handleMakerDone, handlePaymentDone, handleReject]);
+    ], [handleView, handleMakerDone, handlePaymentDone, handleUploadInvoice, handleReject, CATEGORIES_NEED_INVOICE_AFTER_PAYMENT]);
 
     const columns = useMemo<ColDef<PaymentRequestRow>[]>(() => [
         {
@@ -250,7 +302,8 @@ const CombinedPaymentRequestListPage: React.FC = () => {
         },
     ], [actions]);
 
-    const detail = viewingId ? visibleRows.find((r) => r.id === viewingId) : undefined;
+    const { data: detailData, isLoading: isDetailLoading } = usePaymentRequestDetails(viewingId ?? 0);
+    const detail = detailData as PaymentRequestRow | undefined;
 
     return (
         <>
@@ -303,7 +356,9 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                         <DialogTitle>Payment Request Details</DialogTitle>
                         <DialogDescription>Full details of the selected request</DialogDescription>
                     </DialogHeader>
-                    {detail ? (
+                    {isDetailLoading ? (
+                        <div className="space-y-4 py-4">{ [1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-8 w-full" />) }</div>
+                    ) : detail ? (
                         <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-4">
                             <div className="col-span-2">
                                 <Label className="text-muted-foreground text-xs">Request No</Label>
@@ -396,7 +451,37 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                                     </div>
                                 </div>
                             )}
-                            {detail.projectId != null && detail.purchaseOrderId && (
+                            {detail.uploadInvoice?.length > 0 && (
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs">Upload Invoice</Label>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        {detail.uploadInvoice.map((f: string, i: number) => (
+                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {detail.uploadPI?.length > 0 && (
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs">Upload PI</Label>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        {detail.uploadPI.map((f: string, i: number) => (
+                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {detail.uploadInvoiceAfterPayment?.length > 0 && (
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs">Upload Invoice after Payment</Label>
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                        {detail.uploadInvoiceAfterPayment.map((f: string, i: number) => (
+                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {detail.purchaseOrderId && (
                                 <div className="col-span-2 space-y-2">
                                     <Label className="text-muted-foreground text-xs">PO Details</Label>
                                     <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
@@ -404,12 +489,28 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                                             <span className="text-muted-foreground">PO Number:</span>
                                             <span className="font-medium">{detail.poNumber || `#${detail.purchaseOrderId}`}</span>
                                         </div>
+                                        {detail.poFile && (
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">PO File:</span>
+                                                <a href={tenderFilesService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download PO</a>
+                                            </div>
+                                        )}
                                         <div className="flex justify-between"><span className="text-muted-foreground">Grand Total:</span><span>{formatINR(detail.poGrandTotal || 0)}</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">TDS %:</span><span>{detail.poTdsPercentage || "0"}%</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">TDS Amount:</span><span>{formatINR(detail.poTdsAmount || 0)}</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">Amount After TDS:</span><span>{formatINR(detail.poAmountAfterTds || 0)}</span></div>
                                         <div className="flex justify-between"><span className="text-muted-foreground">Payment Requested:</span><span>{formatINR(detail.poTotalPaymentRequested || 0)}</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">Maker Done:</span><span>{formatINR(detail.poTotalMakerDone || 0)}</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">Payment Done:</span><span>{formatINR(detail.poTotalPaymentDone || 0)}</span></div>
+                                        <div className="pt-2">
+                                            <a href={purchaseOrderApi.getPurchaseOrderPdfUrl(detail.purchaseOrderId)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-xs">
+                                                View Latest PO PDF
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             )}
-                            {detail.projectId != null && detail.vendorWorkOrderId && (
+                            {detail.vendorWorkOrderId && (
                                 <div className="col-span-2 space-y-2">
                                     <Label className="text-muted-foreground text-xs">VWO Details</Label>
                                     <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
@@ -417,8 +518,17 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                                             <span className="text-muted-foreground">VWO Number:</span>
                                             <span className="font-medium">{detail.vwoNumber || `#${detail.vendorWorkOrderId}`}</span>
                                         </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">VWO File:</span>
+                                            <a href={vendorWorkOrderApi.getPdfDownloadUrl(detail.vendorWorkOrderId)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download VWO</a>
+                                        </div>
                                         <div className="flex justify-between"><span className="text-muted-foreground">Grand Total:</span><span>{formatINR(detail.vwoGrandTotal || 0)}</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">TDS %:</span><span>{detail.vwoTdsPercentage || "0"}%</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">TDS Amount:</span><span>{formatINR(detail.vwoTdsAmount || 0)}</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">Amount After TDS:</span><span>{formatINR(detail.vwoAmountAfterTds || 0)}</span></div>
                                         <div className="flex justify-between"><span className="text-muted-foreground">Payment Requested:</span><span>{formatINR(detail.vwoTotalPaymentRequested || 0)}</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">Maker Done:</span><span>{formatINR(detail.vwoTotalMakerDone || 0)}</span></div>
+                                        <div className="flex justify-between"><span className="text-muted-foreground">Payment Done:</span><span>{formatINR(detail.vwoTotalPaymentDone || 0)}</span></div>
                                     </div>
                                 </div>
                             )}
@@ -503,6 +613,42 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => { setRejectRow(null); setRejectionReason(""); }}>Cancel</Button>
                         <Button variant="destructive" onClick={confirmReject} disabled={!rejectionReason.trim() || updateStatusMutation.isPending}>{updateStatusMutation.isPending ? "Rejecting..." : "Reject"}</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Upload Invoice after Payment Dialog */}
+            <Dialog open={uploadInvoiceRow !== null} onOpenChange={(open) => { if (!open) { setUploadInvoiceRow(null); setUploadInvoiceFiles([]); setUploadInvoiceError(""); } }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Upload Invoice after Payment</DialogTitle>
+                        <DialogDescription>Upload the invoice for this request after payment has been made</DialogDescription>
+                    </DialogHeader>
+                    {uploadInvoiceRow &&
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-1">
+                                <p className="text-sm"><strong>Request No:</strong> {uploadInvoiceRow.requestNo}</p>
+                                <p className="text-sm"><strong>Party:</strong> {uploadInvoiceRow.partyName}</p>
+                                <p className="text-sm"><strong>Amount:</strong> {formatINR(uploadInvoiceRow.amount)}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <TenderFileUploader
+                                    label="Upload Invoice"
+                                    context="tender-documents"
+                                    value={uploadInvoiceFiles}
+                                    onChange={(files) => { setUploadInvoiceFiles(files); setUploadInvoiceError(""); }}
+                                />
+                                {uploadInvoiceError && (
+                                    <p className="text-sm text-destructive">{uploadInvoiceError}</p>
+                                )}
+                            </div>
+                        </div>
+                    }
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => { setUploadInvoiceRow(null); setUploadInvoiceFiles([]); setUploadInvoiceError(""); }}>Cancel</Button>
+                        <Button onClick={confirmUploadInvoice} disabled={uploadInvoiceMutation.isPending}>
+                            {uploadInvoiceMutation.isPending ? "Uploading..." : "Submit"}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

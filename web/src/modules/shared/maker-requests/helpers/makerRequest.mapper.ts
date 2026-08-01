@@ -9,6 +9,8 @@ export function mapMakerRequestFormToCreateDTO(
         amount: values.amount!,
         category: values.categoryId || undefined,
         billFiles: values.billFiles?.length ? values.billFiles : undefined,
+        uploadInvoice: values.uploadInvoice?.length ? values.uploadInvoice : undefined,
+        uploadPI: values.uploadPI?.length ? values.uploadPI : undefined,
         remark: values.remark || undefined,
     };
 

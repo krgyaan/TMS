@@ -35,6 +35,10 @@ export interface PurchaseOrderView {
     poApproved?: boolean;
     poApprovalRemark?: string;
     category?: string;
+    poType?: string;
+    piAttachments?: string;
+    technicalSpecsAttachments?: string;
+    accessoriesPackagingListAttachments?: string;
     generatedPdfVersions: Record<string, { path: string; hash: string }> | null;
 }
 

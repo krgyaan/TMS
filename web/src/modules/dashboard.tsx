@@ -243,7 +243,7 @@ const Dashboard = () => {
             icon: Wallet,
             color: "text-blue-600",
             bgColor: "bg-blue-50 dark:bg-blue-950/30",
-            path: paths.shared.imprestCreate
+            // path: paths.shared.imprestCreate
         },
         {
             title: "Add Courier",
@@ -377,19 +377,6 @@ const Dashboard = () => {
         return events.filter(event => selectedUser === "all" || event.user === selectedUser);
     }, [dashboardData, teamColors, selectedUser]);
 
-    const getEventBadge = (type: string) => {
-        switch (type) {
-            case "tender_due":
-                return <Badge variant="destructive">Due</Badge>;
-            case "tq_date":
-                return <Badge variant="secondary">TQ</Badge>;
-            case "followup":
-                return <Badge variant="default">Follow-up</Badge>;
-            default:
-                return null;
-        }
-    };
-
     return (
         <div className="space-y-6 p-8">
             {/* Quick Actions */}            
@@ -400,7 +387,7 @@ const Dashboard = () => {
                     <QuickActionCard 
                         key={action.title}
                         {...action}
-                        onClick={() => navigate(action.path)}
+                        onClick={() => action?.path && navigate(action.path)}
                     />
                 ))}
             </div>

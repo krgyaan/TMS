@@ -224,14 +224,18 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
         deleteAllContacts.isPending;
 
     const handleSubmit: SubmitHandler<WoBasicDetailFormValues> = async values => {
+        if (isNonTender && !values.teamId) {
+            form.setError("teamId", { message: "Team is required" });
+            return;
+        }
         try {
             if (mode === "create") {
                 const payload = mapFormToCreatePayload(values) as Record<string, unknown>;
                 if (isNonTender) {
-                    if (values.teamId != null) payload.teamId = Number(values.teamId);
-                    if (values.organizationId != null) payload.organizationId = Number(values.organizationId);
-                    if (values.itemId != null) payload.itemId = Number(values.itemId);
-                    if (values.locationId != null) payload.locationId = Number(values.locationId);
+                    payload.teamId = values.teamId;
+                    if (values.organizationId != null) payload.organizationId = values.organizationId;
+                    if (values.itemId != null) payload.itemId = values.itemId;
+                    if (values.locationId != null) payload.locationId = values.locationId;
                 }
                 const result = await createMutation.mutateAsync(payload as CreateWoBasicDetailDto);
 
