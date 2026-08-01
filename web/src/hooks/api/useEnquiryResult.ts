@@ -10,6 +10,7 @@ const enquiryResultKey = {
     detail: (id: number) => [...enquiryResultKey.details(), id],
     byLead: (leadId: number) => [...enquiryResultKey.all, 'by-lead', leadId],
     followupsByQuotation: (quotationId: number) => [...enquiryResultKey.all, 'followups-by-quotation', quotationId],
+    statusSummary: () => [...enquiryResultKey.all, 'status-summary'],
 };
 
 export function useEnquiryResults(params: EnquiryResultListParams) {
@@ -32,6 +33,13 @@ export function useEnquiryResultsByLead(leadId: number | null) {
         queryKey: enquiryResultKey.byLead(leadId!),
         queryFn: () => enquiryResultService.getByLeadId(leadId!),
         enabled: !!leadId,
+    });
+}
+
+export function useEnquiryResultStatusSummary() {
+    return useQuery({
+        queryKey: enquiryResultKey.statusSummary(),
+        queryFn: () => enquiryResultService.getStatusSummary(),
     });
 }
 
@@ -61,6 +69,7 @@ export function useUpdateEnquiryResult() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: enquiryResultKey.lists() });
             queryClient.invalidateQueries({ queryKey: enquiryResultKey.details() });
+            queryClient.invalidateQueries({ queryKey: enquiryResultKey.statusSummary() });
         },
     });
 }
@@ -83,6 +92,7 @@ export function useCreateEnquiryResultFollowup() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: enquiryResultKey.lists() });
             queryClient.invalidateQueries({ queryKey: enquiryResultKey.details() });
+            queryClient.invalidateQueries({ queryKey: enquiryResultKey.statusSummary() });
         },
     });
 }

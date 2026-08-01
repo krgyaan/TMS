@@ -132,6 +132,23 @@ export class EnquiryResultService {
         };
     }
 
+    async getStatusSummary(): Promise<Record<string, number>> {
+        const rows = await this.db
+            .select({
+                status: enquiryResults.status,
+                count: sql<number>`count(*)::int`,
+            })
+            .from(enquiryResults)
+            .where(sql`${enquiryResults.status} IS NOT NULL`)
+            .groupBy(enquiryResults.status);
+
+        const summary: Record<string, number> = {};
+        rows.forEach(r => {
+            if (r.status) summary[r.status] = Number(r.count);
+        });
+        return summary;
+    }
+
     async findOne(id: number) {
         const [row] = await resultBaseQuery(this.db)
             .where(eq(enquiryResults.id, id))

@@ -30,6 +30,11 @@ export class EnquiryResultController {
         return this.service.findAll(parsed);
     }
 
+    @Get('status-summary')
+    async getStatusSummary() {
+        return this.service.getStatusSummary();
+    }
+
     @Get(':id')
     async findOne(@Param('id', ParseIntPipe) id: number) {
         return this.service.findOne(id);

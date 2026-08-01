@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ColDef } from "ag-grid-community";
-import { useEnquiryResults, useUpdateEnquiryResult } from "@/hooks/api/useEnquiryResult";
+import { useEnquiryResults, useEnquiryResultStatusSummary, useUpdateEnquiryResult } from "@/hooks/api/useEnquiryResult";
 import DataTable from "@/components/ui/data-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, Eye, Send, Upload } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { EnquiryResultWithDetails } from "./helpers/enquiry-result.type";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
@@ -22,7 +23,7 @@ function formatDateTime(dateStr?: string | null) {
         month: "short",
         year: "numeric",
         hour: "2-digit",
-        minute: "2-digit",
+        minute: "2-digit",  
     });
 }
 
@@ -41,18 +42,25 @@ function getStatusVariant(status?: string | null): "default" | "secondary" | "ou
     }
 }
 
+type StatusTab = 'Quotation Submitted' | 'Followup Initiated' | 'Won' | 'Lost';
+
+const STATUS_TABS: StatusTab[] = ['Quotation Submitted', 'Followup Initiated', 'Won', 'Lost'];
+
 export default function EnquiryResultListPage() {
     const navigate = useNavigate();
-    const { search, debouncedSearch, pagination, setPagination, handlePageSizeChange, setSearch } = usePersistentTableState({
+    const { activeTab, setActiveTab, search, debouncedSearch, pagination, setPagination, handlePageSizeChange, setSearch } = usePersistentTableState({
         storageKey: 'enquiry-result-list',
-        defaultTab: 'all',
+        defaultTab: 'Quotation Submitted' as StatusTab,
     });
 
     const { data, isLoading } = useEnquiryResults({
         page: pagination.pageIndex + 1,
         limit: pagination.pageSize,
         search: debouncedSearch || undefined,
+        status: activeTab,
     });
+
+    const { data: statusSummary } = useEnquiryResultStatusSummary();
 
     const [uploadResultRow, setUploadResultRow] = useState<EnquiryResultWithDetails | null>(null);
     const updateResult = useUpdateEnquiryResult();
@@ -66,14 +74,17 @@ export default function EnquiryResultListPage() {
     const actions = useMemo<ActionItem<EnquiryResultWithDetails>[]>(() => [
         {
             label: "View",
+            icon: <Eye className="h-4 w-4" />,
             onClick: (row) => navigate(`/crm/enquiry-results/${row.id}`),
         },
         {
             label: "Initiate Followup",
+            icon: <Send className="h-4 w-4" />,
             onClick: (row) => navigate(`/crm/enquiry-results/followup/${row.id}`),
         },
         {
             label: "Upload Result",
+            icon: <Upload className="h-4 w-4" />,
             onClick: (row) => setUploadResultRow(row),
         },
     ], [navigate]);
@@ -132,7 +143,23 @@ export default function EnquiryResultListPage() {
     return (
         <Card className="min-h-[calc(100vh-2rem)] flex flex-col border-0 shadow-none">
             <CardHeader className="flex-none pb-4">
-                <CardTitle>Enquiry Results</CardTitle>
+                <div className="relative flex items-center">
+                    <CardTitle>Enquiry Results</CardTitle>
+                    <div className="absolute left-1/2 -translate-x-1/2">
+                        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as StatusTab)}>
+                            <TabsList>
+                                {STATUS_TABS.map((tab) => (
+                                    <TabsTrigger key={tab} value={tab} className="data-[state=active]:shadow-md flex items-center gap-1">
+                                        {tab}
+                                        <Badge variant="secondary" className="text-xs">
+                                            {statusSummary?.[tab] ?? 0}
+                                        </Badge>
+                                    </TabsTrigger>
+                                ))}
+                            </TabsList>
+                        </Tabs>
+                    </div>
+                </div>
             </CardHeader>
             <CardContent className="flex-1 px-0">
                 <div className="flex items-center px-6 pb-4">
