@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Param, Body, Query, ParseIntPipe, HttpCode, HttpStatus, Delete, Res, NotFoundException } from "@nestjs/common";
+import { Controller, Get, Post, Put, Param, Body, Query, ParseIntPipe, HttpCode, HttpStatus, Delete, Res, NotFoundException, Patch } from "@nestjs/common";
 import { createReadStream, existsSync } from "fs";
 import { join } from "path";
 import type { Response } from "express";
@@ -31,6 +31,24 @@ export class VendorWorkOrderController {
   @HttpCode(HttpStatus.CREATED)
   createParty(@Body() body: any) {
     return this.service.createParty(body);
+  }
+
+  @Patch("parties/:id")
+  @HttpCode(HttpStatus.OK)
+  updateParty(@Param("id", ParseIntPipe) id: number, @Body() body: any) {
+    return this.service.updateParty(id, body);
+  }
+
+  @Patch("parties/:id/activate")
+  @HttpCode(HttpStatus.OK)
+  activateParty(@Param("id", ParseIntPipe) id: number) {
+    return this.service.activateParty(id);
+  }
+
+  @Patch("parties/:id/deactivate")
+  @HttpCode(HttpStatus.OK)
+  deactivateParty(@Param("id", ParseIntPipe) id: number) {
+    return this.service.deactivateParty(id);
   }
 
   @Get("parties")
