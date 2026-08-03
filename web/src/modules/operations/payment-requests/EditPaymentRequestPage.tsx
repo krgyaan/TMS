@@ -302,7 +302,7 @@ export default function EditPaymentRequestPage() {
                         <div className="flex items-end justify-end">
                             <div className="flex items-center gap-4">
                                 <Button type="button" variant="outline" onClick={() => navigate(-1)}>Cancel</Button>
-                                <Button type="submit" className="min-w-[160px]" disabled={updateMutation.isPending}>
+                                <Button type="submit" className="min-w-40" disabled={updateMutation.isPending}>
                                     {updateMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Updating...</> : "Update Request"}
                                 </Button>
                             </div>

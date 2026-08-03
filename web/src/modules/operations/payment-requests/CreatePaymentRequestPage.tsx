@@ -330,7 +330,7 @@ export default function CreatePaymentRequestPage() {
                                 <Button type="button" variant="outline" onClick={() => navigate(-1)}>
                                     Cancel
                                 </Button>
-                                <Button type="submit" className="min-w-[160px]" disabled={createPRMutation.isPending || (remainingAmount <= 0 && !!poIdParam)}>
+                                <Button type="submit" className="min-w-40" disabled={createPRMutation.isPending || (remainingAmount <= 0 && !!poIdParam)}>
                                     {createPRMutation.isPending ? (
                                         <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating...</>
                                     ) : (

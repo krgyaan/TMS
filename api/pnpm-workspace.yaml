@@ -1,0 +1,11 @@
+allowBuilds:
+  '@ffmpeg-installer/linux-x64': true
+  '@ffprobe-installer/linux-x64': true
+  '@nestjs/core': true
+  '@sentry/node-cpu-profiler': true
+  argon2: true
+  esbuild: true
+  msgpackr-extract: true
+  puppeteer: true
+  sharp: true
+  unrs-resolver: true
