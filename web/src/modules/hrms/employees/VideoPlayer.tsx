@@ -69,7 +69,9 @@ export const VideoPlayerView = ({ activeVideo, onBack, isAdmin = false }: VideoP
     const handleTimeUpdate = () => {
         if (!videoRef.current || !currentVideo) return;
         const video = videoRef.current;
-        lastGoodTimeRef.current = video.currentTime;
+        if (!video.seeking) {
+            lastGoodTimeRef.current = video.currentTime;
+        }
         if (video.duration) {
             const currentPct = Math.min(100, Math.round((video.currentTime / video.duration) * 100));
             
@@ -121,7 +123,15 @@ export const VideoPlayerView = ({ activeVideo, onBack, isAdmin = false }: VideoP
     };
 
     const handleSeeked = () => {
-        pendingResumeSeekRef.current = false;
+        if (!videoRef.current) return;
+        if (pendingResumeSeekRef.current) {
+            pendingResumeSeekRef.current = false;
+            return;
+        }
+        const video = videoRef.current;
+        if (Math.abs(video.currentTime - lastGoodTimeRef.current) > 0.5) {
+            video.currentTime = lastGoodTimeRef.current;
+        }
     };
 
     const handleAddComment = (e: React.FormEvent) => {
