@@ -178,7 +178,7 @@ export class PaymentRequestService {
                     uploadedInvoiceFile: body.uploadedInvoiceFile,
                     poFile: body.poFile,
                     paymentMode: body.paymentMode,
-                    portalLink: body.portalLink,
+                    portalLink: body.portalLink || null,
                     billFiles: body.billFiles,
                     remark: body.remark,
                     updatedAt: new Date(),
