@@ -17,6 +17,7 @@ import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import type { PurchaseOrderRow } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
 import { SetTdsDialog } from "./components/SetTdsDialog";
+import { PoProgressCell } from "./components/PoProgressCell";
 
 interface PurchaseOrderListPageProps {
     purchaseOrders?: PurchaseOrderRow[];
@@ -233,8 +234,8 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
             valueFormatter: (p: ValueFormatterParams<PurchaseOrderRow>) => formatINR(p.value || 0),
             cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => {
                 const d = p.data;
-                const totalAmount = d?.totalAmount || 0;
-                const invoiceTotal = d?.totalPiAmount || 0;
+                const totalAmount = Number(d?.amountAfterTds) || 0;
+                const invoiceTotal = Number(d?.totalPiAmount) || 0;
                 const remainingInvoice = totalAmount - invoiceTotal;
 
                 const invoiceItems = d?.purchaseInvoices || [];
@@ -262,6 +263,15 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
                     </TooltipProvider>
                 );
             },
+        },
+        {
+            headerName: "Progress",
+            filter: false,
+            sortable: false,
+            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => (
+                p.data ? <PoProgressCell row={p.data} /> : null
+            ),
+            width: 130,
         },
         {
             field: "tdsPercentage",

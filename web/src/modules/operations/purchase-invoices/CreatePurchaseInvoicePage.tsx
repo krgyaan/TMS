@@ -11,17 +11,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
+import { useCreatePurchaseInvoice, useNextPINumber } from "@/hooks/api/usePurchaseInvoices";
 import { useProjectPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
 import { useProjectVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
-import { useCreatePurchaseInvoice, useNextPINumber } from "@/hooks/api/usePurchaseInvoices";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { PoDetailsCard } from "@/modules/operations/payment-requests/components/PoDetailsCard";
-import { ArrowLeft, Calendar, Hash, Loader2, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Calendar, Hash, Loader2 } from "lucide-react";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDateForInput, mapPurchaseInvoiceFormToCreateDTO } from "./helpers/purchaseInvoice.mapper";
 import { purchaseInvoiceFormSchema, type PurchaseInvoiceFormValues } from "./helpers/purchaseInvoice.schema";
 
@@ -79,8 +77,6 @@ export default function CreatePurchaseInvoicePage() {
 
     const selectedPoId = form.watch("selectedPoId");
     const selectedVwoId = form.watch("selectedVwoId");
-    const selectedPo = (poData?.purchaseOrders || []).find((po: any) => String(po.id) === selectedPoId);
-    const selectedVwo = (vwoData || []).find((vwo: any) => String(vwo.id) === selectedVwoId);
 
     const { data: nextPINumber, isLoading: isLoadingPINumber } = useNextPINumber(
         projectName,
@@ -148,7 +144,7 @@ export default function CreatePurchaseInvoicePage() {
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                             <div className="space-y-2">
                                 <Label className="flex items-center gap-2">
                                     <Hash className="h-3.5 w-3.5 text-muted-foreground" />
@@ -166,7 +162,7 @@ export default function CreatePurchaseInvoicePage() {
                             </FieldWrapper>
                         </div>
 
-                        <div className="max-w-md">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
                             <SelectField
                                 control={form.control}
                                 name="category"
@@ -174,14 +170,8 @@ export default function CreatePurchaseInvoicePage() {
                                 options={BUDGET_CATEGORIES}
                                 placeholder="Select category..."
                             />
-                        </div>
-
-                        <div className="border rounded-lg border-dashed p-4 space-y-4">
-                            <h3 className="text-sm font-semibold flex items-center gap-2">
-                                <ShoppingCart className="h-4 w-4" />
-                                Link to Purchase Order / Vendor Work Order (Optional)
-                            </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {
+                                poIdParam && 
                                 <SelectField
                                     control={form.control}
                                     name="selectedPoId"
@@ -190,6 +180,9 @@ export default function CreatePurchaseInvoicePage() {
                                     placeholder="Choose a PO..."
                                     disabled={!!selectedVwoId}
                                 />
+                            }
+                            {
+                                vwoIdParam &&
                                 <SelectField
                                     control={form.control}
                                     name="selectedVwoId"
@@ -198,22 +191,10 @@ export default function CreatePurchaseInvoicePage() {
                                     placeholder="Choose a VWO..."
                                     disabled={!!selectedPoId}
                                 />
-                            </div>
-                            {selectedPo && (
-                                <PoDetailsCard po={selectedPo} />
-                            )}
-                            {selectedVwo && (
-                                <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
-                                    <p>
-                                        <strong>WO:</strong> {selectedVwo.woNumber}
-                                        <span className="text-muted-foreground"> - {selectedVwo.sellerName}</span>
-                                    </p>
-                                    <p><strong>Grand Total:</strong> {formatINR(selectedVwo.grandTotal || 0)}</p>
-                                </div>
-                            )}
+                            }
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                             <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
                                 {(field) => <Input {...field} placeholder="Enter party name" />}
                             </FieldWrapper>
@@ -241,7 +222,7 @@ export default function CreatePurchaseInvoicePage() {
                             </FieldWrapper>
                         </div>
 
-                        <div>
+                        <div className="max-w-xl">
                             <TenderFileUploader
                                 label="Upload Invoice"
                                 context="tender-documents"

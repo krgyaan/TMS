@@ -17,6 +17,7 @@ import { getShortId } from "@/lib/id-utils";
 import { useProjectPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
 import { Button } from "@/components/ui/button";
 import type { PurchaseOrderRow } from "../helpers/purchaseOrder.types";
+import { PoProgressCell } from "@/modules/shared/purchase-orders/components/PoProgressCell";
 
 interface PurchaseOrdersSectionProps {
     projectId: number | null;
@@ -225,6 +226,15 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
                     </TooltipProvider>
                 );
             },
+        },
+        {
+            headerName: "Progress",
+            filter: false,
+            sortable: false,
+            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => (
+                p.data ? <PoProgressCell row={p.data} /> : null
+            ),
+            width: 130,
         },
         {
             field: "poRaisedBy",
