@@ -1,10 +1,14 @@
 import React, { useMemo } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatINR } from "@/hooks/useINRFormatter";
-import type { PurchaseOrderRow } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
 
-interface PoProgressCellProps {
-    row: PurchaseOrderRow;
+interface OrderProgressCellProps {
+    /** Amount actually paid (sum of 'payment_done' payment requests). */
+    paid?: number;
+    /** Total amount invoiced against the order. */
+    invoiced?: number;
+    /** Base used for percentages (amount after TDS); percentages are 0 when <= 0. */
+    paymentBase?: number;
 }
 
 /**
@@ -15,29 +19,33 @@ function calcPct(value: number, base: number): number {
     return Math.min(100, Math.max(0, (value / base) * 100));
 }
 
-export const PoProgressCell: React.FC<PoProgressCellProps> = ({ row }) => {
+export const OrderProgressCell: React.FC<OrderProgressCellProps> = ({
+    paid = 0,
+    invoiced = 0,
+    paymentBase = 0,
+}) => {
     const metrics = useMemo(() => {
-        const paymentBase = Number(row.amountAfterTds || 0);
-        const paid = Number(row.totalPaymentDone || 0);
-        const invoiced = Number(row.totalPiAmount || 0);
+        const base = Number(paymentBase || 0);
+        const paidAmount = Number(paid || 0);
+        const invoicedAmount = Number(invoiced || 0);
 
-        const paymentPct = calcPct(paid, paymentBase);
-        const invoicePct = calcPct(invoiced, paymentBase);
+        const paymentPct = calcPct(paidAmount, base);
+        const invoicePct = calcPct(invoicedAmount, base);
         const invoicedWidth = Math.max(0, invoicePct - paymentPct);
 
-        const leftToInvoice = Math.max(0, paymentBase - invoiced);
+        const leftToInvoice = Math.max(0, base - invoicedAmount);
 
         return {
-            paid,
-            invoiced,
+            paidAmount,
+            invoicedAmount,
             paymentPct,
             invoicePct,
             invoicedWidth,
             leftToInvoice,
         };
-    }, [row]);
+    }, [paid, invoiced, paymentBase]);
 
-    const { paid, invoiced, paymentPct, invoicePct, invoicedWidth, leftToInvoice } = metrics;
+    const { paidAmount, invoicedAmount, paymentPct, invoicePct, invoicedWidth, leftToInvoice } = metrics;
 
     return (
         <TooltipProvider>
@@ -74,7 +82,7 @@ export const PoProgressCell: React.FC<PoProgressCellProps> = ({ row }) => {
                             <span className="inline-block h-2 w-2 rounded-sm bg-emerald-500" />
                             <dt className="font-semibold">Payment Done:</dt>
                             <dd>
-                                {formatINR(paid)}{" "}
+                                {formatINR(paidAmount)}{" "}
                                 <span className="text-muted-foreground">
                                     ({Math.round(paymentPct)}%)
                                 </span>
@@ -85,7 +93,7 @@ export const PoProgressCell: React.FC<PoProgressCellProps> = ({ row }) => {
                             <span className="inline-block h-2 w-2 rounded-sm bg-sky-500" />
                             <dt className="font-semibold">Invoiced:</dt>
                             <dd>
-                                {formatINR(invoiced)}{" "}
+                                {formatINR(invoicedAmount)}{" "}
                                 <span className="text-muted-foreground">
                                     ({Math.round(invoicePct)}%)
                                 </span>
