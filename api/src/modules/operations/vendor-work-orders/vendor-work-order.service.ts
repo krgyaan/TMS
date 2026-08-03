@@ -380,6 +380,7 @@ export class VendorWorkOrderService {
                 totalVwiAmount: sql<number>`COALESCE((SELECT SUM(value_pre_gst::numeric + gst_amount::numeric) FROM project_purchase_invoices WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 totalVwiCount: sql<number>`COALESCE((SELECT COUNT(*) FROM project_purchase_invoices WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 totalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status != 'rejected'), 0)`,
+                totalPaymentDone: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status = 'payment_done'), 0)`,
                 generatedPdfVersions: vendorWorkOrders.generatedPdfVersions,
             })
             .from(vendorWorkOrders)
@@ -529,6 +530,7 @@ export class VendorWorkOrderService {
                 const [paymentTotals] = await this.db
                     .select({
                         totalPaymentRequested: sql<number>`COALESCE(SUM(amount::numeric), 0)`,
+                        totalPaymentDone: sql<number>`COALESCE(SUM(CASE WHEN status = 'payment_done' THEN amount::numeric END), 0)`,
                     })
                     .from(paymentRequests)
                     .where(and(eq(paymentRequests.vendorWorkOrderId, wo.id), ne(paymentRequests.status, "rejected")));
@@ -547,6 +549,7 @@ export class VendorWorkOrderService {
                     totalVwiAmount: invoiceTotals?.totalVwiAmount || 0,
                     totalVwiCount: invoiceTotals?.totalVwiCount || 0,
                     totalPaymentRequested: paymentTotals?.totalPaymentRequested || 0,
+                    totalPaymentDone: paymentTotals?.totalPaymentDone || 0,
                     woRaisedBy: raisedByUser?.name || "—",
                 };
             })
