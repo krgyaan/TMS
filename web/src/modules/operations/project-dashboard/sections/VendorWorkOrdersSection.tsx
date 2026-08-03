@@ -1,22 +1,23 @@
-import React, { useMemo, useState } from "react";
-import { Edit, Eye, FileUp, History, Plus } from "lucide-react";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import DataTable from "@/components/ui/data-table";
-import { Badge } from "@/components/ui/badge";
+import { paths } from "@/app/routes/paths";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { ColDef, GridApi, ValueFormatterParams } from "ag-grid-community";
-import type { CustomCellRendererProps } from "ag-grid-react";
-import { useNavigate } from "react-router-dom";
-import { paths } from "@/app/routes/paths";
+import { useProjectVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
-import { useProjectVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
-import { Button } from "@/components/ui/button";
 import type { VendorWorkOrderRow } from "@/modules/operations/vendor-work-orders/helpers/vwoForm.types";
+import { OrderProgressCell } from "@/components/OrderProgressCell";
+import type { ColDef, GridApi, ValueFormatterParams } from "ag-grid-community";
+import type { CustomCellRendererProps } from "ag-grid-react";
+import { Edit, Eye, FileUp, History, Plus } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface VendorWorkOrdersSectionProps {
     projectId: number | null;
@@ -187,6 +188,21 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
                     </TooltipProvider>
                 );
             },
+        },
+        {
+            headerName: "Progress",
+            filter: false,
+            sortable: false,
+            cellRenderer: (p: CustomCellRendererProps<VendorWorkOrderRow>) => (
+                p.data ? (
+                    <OrderProgressCell
+                        paid={Number(p.data.totalPaymentDone || 0)}
+                        invoiced={Number(p.data.totalVwiAmount || 0)}
+                        paymentBase={Number(p.data.amountAfterTds || 0)}
+                    />
+                ) : null
+            ),
+            width: 130,
         },
         {
             field: "woRaisedBy",

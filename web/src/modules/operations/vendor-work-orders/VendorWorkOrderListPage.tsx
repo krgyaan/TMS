@@ -17,6 +17,7 @@ import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import type { VendorWorkOrderRow } from "./helpers/vwoForm.types";
 import { SetVwoApprovalDialog } from "@/modules/shared/vendor-work-orders/components/SetVwoApprovalDialog";
+import { OrderProgressCell } from "@/components/OrderProgressCell";
 
 interface VendorWorkOrderListPageProps {
     workOrders?: VendorWorkOrderRow[];
@@ -239,6 +240,21 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
                     </TooltipProvider>
                 );
             },
+        },
+        {
+            headerName: "Progress",
+            filter: false,
+            sortable: false,
+            cellRenderer: (p: CustomCellRendererProps<VendorWorkOrderRow>) => (
+                p.data ? (
+                    <OrderProgressCell
+                        paid={Number(p.data.totalPaymentDone || 0)}
+                        invoiced={Number(p.data.totalVwiAmount || 0)}
+                        paymentBase={Number(p.data.amountAfterTds || 0)}
+                    />
+                ) : null
+            ),
+            width: 130,
         },
         {
             field: "tdsPercentage",

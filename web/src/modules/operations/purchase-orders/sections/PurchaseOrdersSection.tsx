@@ -17,7 +17,7 @@ import { getShortId } from "@/lib/id-utils";
 import { useProjectPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
 import { Button } from "@/components/ui/button";
 import type { PurchaseOrderRow } from "../helpers/purchaseOrder.types";
-import { PoProgressCell } from "@/modules/shared/purchase-orders/components/PoProgressCell";
+import { OrderProgressCell } from "@/components/OrderProgressCell";
 
 interface PurchaseOrdersSectionProps {
     projectId: number | null;
@@ -232,7 +232,13 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
             filter: false,
             sortable: false,
             cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => (
-                p.data ? <PoProgressCell row={p.data} /> : null
+                p.data ? (
+                    <OrderProgressCell
+                        paid={Number(p.data.totalPaymentDone || 0)}
+                        invoiced={Number(p.data.totalPiAmount || 0)}
+                        paymentBase={Number(p.data.amountAfterTds || 0)}
+                    />
+                ) : null
             ),
             width: 130,
         },
