@@ -58,6 +58,7 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
             {
                 label: "Upload Invoice",
                 icon: <FileUp className="h-4 w-4" />,
+                visible: (row) => Number(row.totalPiAmount || 0) < Number(row.grandTotal || 0),
                 onClick: (row) => navigate(paths.operations.raiseProjectPurchaseInvoiceForm(row.projectId, row.id)),
             },
             {

@@ -34,12 +34,14 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
     const poActions: ActionItem<PurchaseOrderRow>[] = useMemo(() => [
         {
             label: "Raise Payment",
-            visible: (row) => row.poApproved === true,
+            visible: (row) => row.poApproved === true
+                && Number(row.totalPaymentRequested || 0) < Number(row.amountAfterTds ?? row.grandTotal),
             onClick: (row) => navigate(paths.operations.raiseProjectPaymentRequestForm(projectId!, row.id)),
         },
         {
             label: "Upload Invoice",
             icon: <FileText className="h-4 w-4" />,
+            visible: (row) => Number(row.totalPiAmount || 0) < Number(row.grandTotal || 0),
             onClick: (row) => navigate(paths.operations.raiseProjectPurchaseInvoiceForm(projectId!, row.id)),
         },
         {
@@ -50,7 +52,7 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
         {
             label: "Edit PO",
             icon: <Edit className="h-4 w-4" />,
-            // visible: (row) => row.poApproved !== true,
+            visible: (row) => row.poApproved !== true,
             onClick: (row) => navigate(paths.operations.editPoPage(row.id, projectId!)),
         },
         {
@@ -194,9 +196,9 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
             valueFormatter: (p: ValueFormatterParams<PurchaseOrderRow>) => formatINR(p.value || 0),
             cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => {
                 const d = p.data;
-                const totalAmount = d?.totalAmount || 0;
+                const totalAmount = d?.amountAfterTds || 0;
                 const invoiceTotal = d?.totalPiAmount || 0;
-                const remainingInvoice = totalAmount - invoiceTotal;
+                const remainingInvoice = Number(totalAmount) - invoiceTotal;
 
                 const invoiceItems = d?.purchaseInvoices || [];
                 const invoiceList = invoiceItems.map((inv, index) => {

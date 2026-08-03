@@ -18,7 +18,7 @@ export const projectMasterKey = {
 };
 
 export const useProjectMasters = (
-    pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
+    pagination: { page: number; limit: number; search?: string; teamName?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: "asc" | "desc" },
 ) => {
     const params: ProjectMasterListParams = {
@@ -27,6 +27,7 @@ export const useProjectMasters = (
         ...(sort?.sortBy && { sortBy: sort.sortBy }),
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
         ...(pagination.search && { search: pagination.search }),
+        ...(pagination.teamName && { teamName: pagination.teamName }),
     };
 
     return useQuery<PaginatedResult<ProjectMasterListRow>>({
@@ -34,6 +35,7 @@ export const useProjectMasters = (
             page: pagination.page,
             limit: pagination.limit,
             search: pagination.search ?? undefined,
+            teamName: pagination.teamName ?? undefined,
             sortBy: sort?.sortBy,
             sortOrder: sort?.sortOrder,
         }),

@@ -22,6 +22,9 @@ export interface ProjectMasterResponse {
     sapPoNo: string | null;
     tenderId: number | null;
     enquiryId: number | null;
+    tenderName?: string | null;
+    tenderNo?: string | null;
+    teamMemberName?: string | null;
     createdAt?: string | null;
     updatedAt?: string | null;
 }
@@ -30,6 +33,9 @@ export interface ProjectMasterListRow extends ProjectMasterResponse {
     organizationName?: string | null;
     itemName?: string | null;
     locationName?: string | null;
+    tenderName?: string | null;
+    tenderNo?: string | null;
+    teamMemberName?: string | null;
 }
 
 export interface CreateProjectMasterDto {
@@ -62,4 +68,5 @@ export interface ProjectMasterListParams {
     sortBy?: string;
     sortOrder?: "asc" | "desc";
     search?: string;
+    teamName?: string;
 }

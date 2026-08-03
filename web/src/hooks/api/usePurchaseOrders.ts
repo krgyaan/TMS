@@ -99,3 +99,34 @@ export const useCreatePoParty = () => {
         },
     });
 };
+
+export const useActivateParty = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: number) => purchaseOrderApi.activateParty(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.poParties() });
+        },
+    });
+};
+
+export const useDeactivateParty = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: number) => purchaseOrderApi.deactivateParty(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.poParties() });
+        },
+    });
+};
+
+export const useUpdateParty = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: Partial<CreatePartyDTO> }) =>
+            purchaseOrderApi.updateParty(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.poParties() });
+        },
+    });
+};

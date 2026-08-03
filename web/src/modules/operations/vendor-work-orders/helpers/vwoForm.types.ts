@@ -32,6 +32,7 @@ export interface VendorWorkOrderRow {
     woApprovalRemark?: string;
     totalVwiAmount?: number;
     totalVwiCount?: number;
+    totalPaymentRequested?: number;
     generatedPdfVersions?: Record<string, { path: string; hash: string }>;
 }
 

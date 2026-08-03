@@ -21,6 +21,7 @@ class ProjectMasterService extends BaseApiService {
         if (params?.sortBy) search.set("sortBy", params.sortBy);
         if (params?.sortOrder) search.set("sortOrder", params.sortOrder);
         if (params?.search) search.set("search", params.search);
+        if (params?.teamName) search.set("teamName", params.teamName);
 
         const queryString = search.toString();
         return this.get<PaginatedResult<ProjectMasterListRow>>(queryString ? `?${queryString}` : "");

@@ -1,4 +1,4 @@
-import { pgTable, integer, varchar, text, timestamp, bigserial } from "drizzle-orm/pg-core";
+import { pgTable, integer, varchar, text, boolean, timestamp, bigserial } from "drizzle-orm/pg-core";
 
 export const projectParties = pgTable("project_parties", {
     id: bigserial("id", { mode: "number" }).primaryKey(), 
@@ -12,6 +12,7 @@ export const projectParties = pgTable("project_parties", {
     contactPerson: varchar("contact_person", { length: 255 }),
     mobileNumber: varchar("mobile_number", { length: 20 }),
     type: varchar("type", { length: 20 }).notNull().default("seller"),
+    isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

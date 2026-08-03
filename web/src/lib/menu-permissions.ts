@@ -103,6 +103,11 @@ function getPermissionModule(title: string, parentMenuTitle?: string): string | 
         'TDS Checklists': 'accounts.tds-checklists',
         'GST Checklists': 'accounts.gst-checklists',
         'Fixed Expenses': 'accounts.fixed-expenses',
+        'Vendor Master': 'accounts.vendor-master',
+        'Purchase Orders': 'accounts.purchase-orders',
+        'Vendor Work Orders': 'accounts.vendor-work-orders',
+        'Sale Invoices': 'accounts.sale-invoices',
+        'Payment Requests': 'accounts.payment-requests',
 
         // CRM sub-items
         'Leads': 'crm.leads',

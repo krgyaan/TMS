@@ -33,8 +33,15 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
 
     const vwoActions: ActionItem<VendorWorkOrderRow>[] = useMemo(() => [
         {
+            label: "Raise Payment",
+            visible: (row) => row.woApproved === true
+                && Number(row.totalPaymentRequested || 0) < Number(row.amountAfterTds ?? row.grandTotal),
+            onClick: () => navigate(paths.operations.raiseProjectPaymentRequestForm(projectId!)),
+        },
+        {
             label: "Upload Invoice",
             icon: <FileUp className="h-4 w-4" />,
+            visible: (row) => Number(row.totalVwiAmount || 0) < Number(row.grandTotal || 0),
             onClick: (row) => navigate(paths.operations.raiseVendorWoInvoiceForm(projectId!, row.id)),
         },
         {
@@ -45,6 +52,7 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
         {
             label: "Edit WO",
             icon: <Edit className="h-4 w-4" />,
+            visible: (row) => row.woApproved !== true,
             onClick: (row) => navigate(paths.operations.editVendorWoPage(row.id, projectId!)),
         },
         {

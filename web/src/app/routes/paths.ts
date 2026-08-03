@@ -129,6 +129,8 @@ export const paths = {
         contractAgreementListPage: "/operations/work-order/contract-agreement",
         contractAgreementShowPage: (id: number) => `/operations/work-order/contract-agreement/${id}`,
 
+        projectListPage: "/operations/project-dashboard",
+        projectListApi: "/projects/list",
         projectDashboard: (id?: number) => id ? `/operations/project-dashboard/${id}` : "/operations/project-dashboard",
         projectShowPage: (id: number) => `/operations/project-dashboard/show/${id}`,
         raisePoForm: (projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/create`,
@@ -231,6 +233,7 @@ export const paths = {
         saleInvoices: "/accounts/sale-invoices",
         vendorWorkOrders: "/accounts/vendor-work-orders",
         paymentRequests: "/accounts/payment-requests",
+        vendorMaster: "/accounts/vendor-master",
 
     },
 

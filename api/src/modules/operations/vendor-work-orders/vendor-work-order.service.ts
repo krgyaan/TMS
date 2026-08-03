@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, eq, like, desc, sql, inArray, isNull } from "drizzle-orm";
+import { and, eq, like, desc, sql, inArray, isNull, ne } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { rename, readFile } from "node:fs/promises";
@@ -379,6 +379,7 @@ export class VendorWorkOrderService {
                 grandTotal: sql<number>`COALESCE((SELECT SUM(CAST(total_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 totalVwiAmount: sql<number>`COALESCE((SELECT SUM(value_pre_gst::numeric + gst_amount::numeric) FROM project_purchase_invoices WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 totalVwiCount: sql<number>`COALESCE((SELECT COUNT(*) FROM project_purchase_invoices WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
+                totalPaymentRequested: sql<number>`COALESCE((SELECT SUM(amount::numeric) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status != 'rejected'), 0)`,
                 generatedPdfVersions: vendorWorkOrders.generatedPdfVersions,
             })
             .from(vendorWorkOrders)
@@ -490,6 +491,12 @@ export class VendorWorkOrderService {
                 shipToGst: vendorWorkOrders.shipToGst,
                 shipToPan: vendorWorkOrders.shipToPan,
                 woRaisedBy: vendorWorkOrders.woRaisedBy,
+                tdsPercentage: vendorWorkOrders.tdsPercentage,
+                tdsAmount: vendorWorkOrders.tdsAmount,
+                amountAfterTds: vendorWorkOrders.amountAfterTds,
+                woApproved: vendorWorkOrders.woApproved,
+                woApprovalRemark: vendorWorkOrders.woApprovalRemark,
+                generatedPdfVersions: vendorWorkOrders.generatedPdfVersions,
             })
             .from(vendorWorkOrders)
             .where(eq(vendorWorkOrders.projectId, projectId))
@@ -519,6 +526,13 @@ export class VendorWorkOrderService {
                     .from(purchaseInvoices)
                     .where(eq(purchaseInvoices.vendorWorkOrderId, wo.id));
 
+                const [paymentTotals] = await this.db
+                    .select({
+                        totalPaymentRequested: sql<number>`COALESCE(SUM(amount::numeric), 0)`,
+                    })
+                    .from(paymentRequests)
+                    .where(and(eq(paymentRequests.vendorWorkOrderId, wo.id), ne(paymentRequests.status, "rejected")));
+
                 const [raisedByUser] = wo.woRaisedBy
                     ? await this.db
                         .select({ name: users.name })
@@ -532,6 +546,7 @@ export class VendorWorkOrderService {
                     ...totals,
                     totalVwiAmount: invoiceTotals?.totalVwiAmount || 0,
                     totalVwiCount: invoiceTotals?.totalVwiCount || 0,
+                    totalPaymentRequested: paymentTotals?.totalPaymentRequested || 0,
                     woRaisedBy: raisedByUser?.name || "—",
                 };
             })
@@ -571,6 +586,57 @@ export class VendorWorkOrderService {
                 })
                 .returning()
         )[0];
+    }
+
+    async activateParty(id: number) {
+        const rows = await this.db
+            .update(projectParties)
+            .set({ isActive: true, updatedAt: new Date() })
+            .where(eq(projectParties.id, id))
+            .returning();
+
+        if (!rows[0]) {
+            throw new NotFoundException(`Party with ID ${id} not found`);
+        }
+        return rows[0];
+    }
+
+    async deactivateParty(id: number) {
+        const rows = await this.db
+            .update(projectParties)
+            .set({ isActive: false, updatedAt: new Date() })
+            .where(eq(projectParties.id, id))
+            .returning();
+
+        if (!rows[0]) {
+            throw new NotFoundException(`Party with ID ${id} not found`);
+        }
+        return rows[0];
+    }
+
+    async updateParty(id: number, body: any) {
+        const rows = await this.db
+            .update(projectParties)
+            .set({
+                name: body.name ?? undefined,
+                alias: body.alias ?? undefined,
+                email: body.email ?? undefined,
+                address: body.address ?? undefined,
+                gstNo: body.gstNo ?? undefined,
+                pan: body.pan ?? undefined,
+                msme: body.msme ?? undefined,
+                type: body.type ?? undefined,
+                contactPerson: body.contact_person ?? undefined,
+                mobileNumber: body.mobile_number ?? undefined,
+                updatedAt: new Date(),
+            })
+            .where(eq(projectParties.id, id))
+            .returning();
+
+        if (!rows[0]) {
+            throw new NotFoundException(`Party with ID ${id} not found`);
+        }
+        return rows[0];
     }
 
     async getPdf(id: number, version?: string) {

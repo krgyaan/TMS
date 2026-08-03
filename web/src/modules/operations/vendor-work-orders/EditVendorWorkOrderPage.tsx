@@ -29,7 +29,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { formatDateForInput, mapVwoFormToUpdateDTO } from "./helpers/vwoForm.mapper";
 import { vendorWorkOrderFormSchema, type VendorWorkOrderFormValues } from "./helpers/vwoForm.schema";
-import { PartyFormDialog, type CreatePartyPayload } from "@/modules/operations/parties/components/PartyFormDialog";
+import { PartyFormDialog, type CreatePartyPayload } from "@/modules/shared/vendor-master/PartyFormDialog";
 
 const defaultFormValues: VendorWorkOrderFormValues = {
   woDate: formatDateForInput(new Date()),

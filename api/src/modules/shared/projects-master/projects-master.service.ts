@@ -8,6 +8,8 @@ import { projects } from "@/db/schemas/master/projects.schema";
 import { organizations } from "@/db/schemas/master/organizations.schema";
 import { items } from "@/db/schemas/master/items.schema";
 import { locations } from "@/db/schemas/master/locations.schema";
+import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
+import { users } from "@/db/schemas/auth/users.schema";
 
 import type {
     CreateProjectDto,
@@ -21,6 +23,9 @@ type ProjectListRow = ProjectRow & {
     organizationName?: string | null;
     itemName?: string | null;
     locationName?: string | null;
+    tenderName?: string | null;
+    tenderNo?: string | null;
+    teamMemberName?: string | null;
 };
 
 @Injectable()
@@ -111,6 +116,19 @@ export class ProjectsMasterService {
         return normalized.length > 0 ? normalized : null;
     }
 
+    private mapSortField(field: string): string {
+        const mapping: Record<string, string> = {
+            poDate: "po_date",
+            sapPoDate: "sap_po_date",
+            performanceDate: "performance_date",
+            completionDate: "completion_date",
+            createdAt: "created_at",
+            updatedAt: "updated_at",
+            id: "id",
+        };
+        return mapping[field] ?? field;
+    }
+
     async findAll(filters: ListProjectsFilters) {
         const page = filters.page && filters.page > 0 ? filters.page : 1;
         const limit = filters.limit && filters.limit > 0 ? filters.limit : 50;
@@ -191,13 +209,24 @@ export class ProjectsMasterService {
                     organizationName: organizations.name,
                     itemName: items.name,
                     locationName: locations.name,
+                    tenderName: tenderInfos.tenderName,
+                    tenderNo: tenderInfos.tenderNo,
+                    teamMemberName: users.name,
                 })
                 .from(projects)
                 .leftJoin(organizations, eq(organizations.id, projects.organisationId as any))
                 .leftJoin(items, eq(items.id, projects.itemId))
                 .leftJoin(locations, eq(locations.id, projects.locationId as any))
+                .leftJoin(tenderInfos, eq(tenderInfos.id, projects.tenderId as any))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember as any))
                 .where(where as any)
-                .orderBy(desc(projects.createdAt))
+                .orderBy(
+                    filters.sortBy
+                        ? filters.sortOrder === "desc"
+                            ? desc(sql`${sql.identifier(this.mapSortField(filters.sortBy))}`)
+                            : sql`${sql.identifier(this.mapSortField(filters.sortBy))}`
+                        : desc(projects.createdAt)
+                )
                 .limit(limit)
                 .offset(offset),
             this.db
@@ -230,6 +259,9 @@ export class ProjectsMasterService {
             organizationName: row.organizationName,
             itemName: row.itemName,
             locationName: row.locationName,
+            tenderName: row.tenderName,
+            tenderNo: row.tenderNo,
+            teamMemberName: row.teamMemberName,
         }));
 
         return {

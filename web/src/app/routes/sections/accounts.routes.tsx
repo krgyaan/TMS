@@ -31,6 +31,7 @@ const Accounts_PurchaseOrderTabs = lazy(() => import("@/modules/shared/purchase-
 const Accounts_PaymentRequestTabs = lazy(() => import("@/modules/shared/payment-requests/PaymentRequestTabsPage"));
 const Accounts_SaleInvoiceTabs = lazy(() => import("@/modules/shared/sale-invoices/SaleInvoiceTabsPage"));
 const Accounts_VendorWorkOrderTabs = lazy(() => import("@/modules/shared/vendor-work-orders/VendorWorkOrderTabsPage"));
+const Accounts_VendorMaster = lazy(() => import("@/modules/shared/vendor-master/PartyListPage"));
 
 export default function AccountsRoutes() {
     return (
@@ -59,6 +60,7 @@ export default function AccountsRoutes() {
 
             <Route path="delegation" element={<RouteWrapper><TaskDashboard /></RouteWrapper>} />
             <Route path="purchase-orders" element={<RouteWrapper><Accounts_PurchaseOrderTabs /></RouteWrapper>} />
+            <Route path="vendor-master" element={<RouteWrapper><Accounts_VendorMaster /></RouteWrapper>} />
             <Route path="sale-invoices" element={<RouteWrapper><Accounts_SaleInvoiceTabs /></RouteWrapper>} />
             <Route path="vendor-work-orders" element={<RouteWrapper><Accounts_VendorWorkOrderTabs /></RouteWrapper>} />
             <Route path="payment-requests" element={<RouteWrapper><Accounts_PaymentRequestTabs /></RouteWrapper>} />

@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Info, Loader2, Phone, UserPlus, User } from "lucide-react";
-import { type NewPartyForm } from "../types";
+import { type NewPartyForm } from "./vendor-master.types";
 
 interface PartyFormDialogProps {
     open: boolean;

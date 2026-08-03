@@ -27,7 +27,7 @@ import { DEFAULT_TERMS_ROWS, TermsField } from "../components/TermsField";
 import { formatDateForInput, mapFormToCreateDTO } from "../helpers/purchaseOrder.mapper";
 import type { CreatePartyDTO } from "../helpers/purchaseOrder.types";
 import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "../helpers/purchaseOrder.schema";
-import { PartyFormDialog, type CreatePartyPayload } from "@/modules/operations/parties/components/PartyFormDialog";
+import { PartyFormDialog, type CreatePartyPayload } from "@/modules/shared/vendor-master/PartyFormDialog";
 import { Label } from "@/components/ui/label";
 
 const defaultFormValues: PurchaseOrderFormValues = {
