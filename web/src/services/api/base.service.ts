@@ -33,7 +33,7 @@ export class BaseApiService {
         return response.data
     }
 
-    protected async patch<T, D = any>(endpoint: string, data: D): Promise<T> {
+    protected async patch<T, D = any>(endpoint: string, data?: D): Promise<T> {
         const isFormData = data instanceof FormData;
         const config = isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined;
 
