@@ -14,8 +14,6 @@ class ProjectDashboardApiService extends BaseApiService {
         super('/projects');
     }
 
-    // ── Parallel dashboard endpoints ──
-
     async getOverview(id: number): Promise<{ project: any; tender: any; woBasicDetail: any; woDetail: any; tenderInfoSheet: any }> {
         return this.get(`/${id}/overview`);
     }
@@ -27,8 +25,6 @@ class ProjectDashboardApiService extends BaseApiService {
     async getImprests(id: number): Promise<{ imprests: any[]; imprestSum: number }> {
         return this.get(`/${id}/imprests`);
     }
-
-    // ── Project list endpoint ──
 
     async getList(params?: ProjectListFilters): Promise<PaginatedResult<ProjectMasterListRow>> {
         const searchParams = new URLSearchParams();

@@ -153,7 +153,7 @@ export class ProjectDashboardService {
 
     async getProjectList(filters: ProjectListFilters = {}) {
         const page = filters.page && filters.page > 0 ? filters.page : 1;
-        const limit = filters.limit && filters.limit > 0 ? filters.limit : 50;
+        const limit = filters.limit && filters.limit > 0 ? filters.limit : 100;
         const offset = (page - 1) * limit;
 
         const whereConditions: any[] = [];
