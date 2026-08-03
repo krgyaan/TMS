@@ -100,7 +100,7 @@ export class TrainingApiService extends BaseApiService {
     }
 
 
-    async uploadInit(params: { fileSize: number; originalName: string }): Promise<UploadSessionResult> {
+    async uploadInit(params: { fileSize: number; originalName: string; totalChunks?: number }): Promise<UploadSessionResult> {
         return this.post<UploadSessionResult>(`/upload/init`, params);
     }
 

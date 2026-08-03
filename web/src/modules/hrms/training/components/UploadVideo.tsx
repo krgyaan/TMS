@@ -12,7 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAssignTrainingVideo, useTrainingEmployees, useUploadTrainingVideo } from "@/hooks/api/useTraining";
 import { cn } from "@/lib/utils";
 import { trainingApiService } from "@/services/api/training.service";
-import { AnimatePresence, motion } from "framer-motion";
 import {
     AlertCircle, ArrowLeft, BarChart3, CheckCircle2, Clock, CloudUpload, Eye, FileText, FileVideo, Film,
     HardDrive, Info, Layers, Loader2, Monitor, Play, Settings2, Shield, Sparkles, Tag, Upload, Users, X, Zap
@@ -21,18 +20,8 @@ import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-const fadeInUp = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] } }
-};
-
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500 MB
 const CHUNK_SIZE = parseInt(import.meta.env.VITE_UPLOAD_CHUNK_SIZE || '10485760', 10); // 10 MB default
-
-const staggerContainer = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.08 } }
-};
 
 const CATEGORIES = [
     { value: "Tendering", label: "Tendering", icon: "📋", color: "bg-orange-500/10 text-orange-600 border-orange-500/20" },
@@ -202,7 +191,7 @@ const UploadVideo = () => {
             return;
         }
 
-        let uploadId: string | null = null;
+        let sessionUploadId: string | null = null;
         try {
             setUploadPhase("uploading");
             setUploadProgress(0);
@@ -215,8 +204,10 @@ const UploadVideo = () => {
             const session = await trainingApiService.uploadInit({
                 fileSize: file.size,
                 originalName: file.name,
+                totalChunks,
             });
-            uploadId = session.uploadId;
+            sessionUploadId = session.uploadId;
+            const uploadId = session.uploadId;
 
             // 2. Upload chunks sequentially (each request stays small, below proxy limits)
             for (let i = 0; i < totalChunks; i += 1) {
@@ -252,7 +243,6 @@ const UploadVideo = () => {
                     completionThreshold,
                 }),
             );
-            uploadId = null; // session consumed by create()
 
             if (assignOnUpload && selectedEmployeeIds.length > 0) {
                 setProcessingStep("Assigning course to team members...");
@@ -272,9 +262,9 @@ const UploadVideo = () => {
 
         } catch (error: any) {
             // Clean up the server-side upload session if one was started
-            if (uploadId) {
+            if (sessionUploadId) {
                 try {
-                    await trainingApiService.abortUpload(uploadId);
+                    await trainingApiService.abortUpload(sessionUploadId);
                 } catch { /* ignore cleanup errors */ }
             }
             setUploadPhase("idle");
@@ -319,12 +309,7 @@ const UploadVideo = () => {
 
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative">
                 {/* Header */}
-                <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="flex items-center justify-between mb-8"
-                >
+                <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-4">
                         <Button
                             variant="ghost"
@@ -371,18 +356,11 @@ const UploadVideo = () => {
                             </Button>
                         )}
                     </div>
-                </motion.div>
+                </div>
 
                 {/* Upload Progress Overlay */}
-                <AnimatePresence>
-                    {(uploadPhase === "uploading" || uploadPhase === "processing" || uploadPhase === "complete") && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 20, height: 0 }}
-                            animate={{ opacity: 1, y: 0, height: "auto" }}
-                            exit={{ opacity: 0, y: -10, height: 0 }}
-                            transition={{ duration: 0.4 }}
-                            className="mb-6 overflow-hidden"
-                        >
+                {(uploadPhase === "uploading" || uploadPhase === "processing" || uploadPhase === "complete") && (
+                    <div className="mb-6 overflow-hidden">
                             <Card className={cn(
                                 "border rounded-2xl backdrop-blur-xl shadow-lg overflow-hidden",
                                 uploadPhase === "complete"
@@ -396,9 +374,9 @@ const UploadVideo = () => {
                                             uploadPhase === "complete" ? "bg-emerald-500/10" : "bg-primary/10"
                                         )}>
                                             {uploadPhase === "complete" ? (
-                                                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 300 }}>
+                                                <div>
                                                     <CheckCircle2 className="h-6 w-6 text-emerald-500" />
-                                                </motion.div>
+                                                </div>
                                             ) : uploadPhase === "processing" ? (
                                                 <Settings2 className="h-6 w-6 text-primary animate-spin" style={{ animationDuration: "3s" }} />
                                             ) : (
@@ -434,10 +412,8 @@ const UploadVideo = () => {
                                             {uploadPhase === "processing" && (
                                                 <div className="flex items-center gap-2">
                                                     <div className="flex-1 h-2 rounded-full bg-primary/10 overflow-hidden">
-                                                        <motion.div
-                                                            className="h-full bg-linear-to-r from-primary to-primary/60 rounded-full"
-                                                            animate={{ x: ["-100%", "100%"] }}
-                                                            transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                                                        <div
+                                                            className="h-full bg-linear-to-r from-primary to-primary/60 rounded-full animate-pulse"
                                                             style={{ width: "40%" }}
                                                         />
                                                     </div>
@@ -460,19 +436,15 @@ const UploadVideo = () => {
                                     </div>
                                 </CardContent>
                             </Card>
-                        </motion.div>
+                        </div>
                     )}
-                </AnimatePresence>
 
                 {/* Main Content Grid */}
-                <motion.div
-                    variants={staggerContainer}
-                    initial="hidden"
-                    animate="visible"
+                <div
                     className="grid grid-cols-1 lg:grid-cols-5 gap-6"
                 >
                     {/* Left Column — File Upload + Metadata */}
-                    <motion.div variants={fadeInUp} className="lg:col-span-2 space-y-5">
+                    <div className="lg:col-span-2 space-y-5">
                         {/* File Upload Zone */}
                         <Card className="border border-border/25 bg-card/40 backdrop-blur-xl rounded-2xl shadow-sm overflow-hidden">
                             <div className="px-5 py-3.5 border-b border-border/15 flex items-center gap-2.5">
@@ -502,12 +474,14 @@ const UploadVideo = () => {
                                             className="hidden"
                                             onChange={handleFileInputChange}
                                         />
-                                        <motion.div
-                                            animate={isDragging ? { scale: 1.1, y: -5 } : { scale: 1, y: 0 }}
-                                            className="h-16 w-16 rounded-2xl bg-muted/15 border border-border/25 flex items-center justify-center mb-4 group-hover:bg-primary/10 group-hover:border-primary/15 transition-colors"
+                                        <div
+                                            className={cn(
+                                                "h-16 w-16 rounded-2xl bg-muted/15 border border-border/25 flex items-center justify-center mb-4 group-hover:bg-primary/10 group-hover:border-primary/15 transition-all",
+                                                isDragging && "scale-110 -translate-y-1"
+                                            )}
                                         >
                                             <Upload className="h-7 w-7 text-muted-foreground/50 group-hover:text-primary transition-colors" />
-                                        </motion.div>
+                                        </div>
                                         <p className="text-sm font-semibold group-hover:text-primary transition-colors">
                                             {isDragging ? "Drop your file here" : "Drag & drop video file"}
                                         </p>
@@ -524,11 +498,7 @@ const UploadVideo = () => {
                                         <p className="text-[9px] text-muted-foreground/60 mt-2">Maximum file size: 500 MB</p>
                                     </div>
                                 ) : (
-                                    <motion.div
-                                        initial={{ opacity: 0, scale: 0.95 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        className="space-y-4"
-                                    >
+                                    <div className="space-y-4">
                                         {/* File Preview Card */}
                                         <div className="relative bg-linear-to-br from-primary/5 to-transparent border border-primary/10 rounded-xl p-4">
                                             <div className="flex items-start gap-3">
@@ -568,21 +538,15 @@ const UploadVideo = () => {
                                                 {metadata?.duration || "..."}
                                             </div>
                                         </div>
-                                    </motion.div>
+                                    </div>
                                 )}
                             </CardContent>
                         </Card>
 
                         {/* Extracted Metadata */}
-                        <AnimatePresence>
-                            {metadata && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 15 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10 }}
-                                    transition={{ duration: 0.4 }}
-                                >
-                                    <Card className="border border-border/25 bg-card/40 backdrop-blur-xl rounded-2xl shadow-sm overflow-hidden">
+                        {metadata && (
+                            <div>
+                                <Card className="border border-border/25 bg-card/40 backdrop-blur-xl rounded-2xl shadow-sm overflow-hidden">
                                         <div className="px-5 py-3.5 border-b border-border/15 flex items-center gap-2.5">
                                             <div className="h-7 w-7 rounded-lg bg-violet-500/10 flex items-center justify-center">
                                                 <Monitor className="h-3.5 w-3.5 text-violet-500" />
@@ -613,13 +577,12 @@ const UploadVideo = () => {
                                             </div>
                                         </CardContent>
                                     </Card>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </motion.div>
+                            </div>
+                        )}
+                    </div>
 
                     {/* Right Column — Course Details + Settings */}
-                    <motion.div variants={fadeInUp} className="lg:col-span-3 space-y-5">
+                    <div className="lg:col-span-3 space-y-5">
                         {/* Course Information */}
                         <Card className="border border-border/25 bg-card/40 backdrop-blur-xl rounded-2xl shadow-sm overflow-hidden">
                             <div className="px-5 py-3.5 border-b border-border/15 flex items-center gap-2.5">
@@ -707,32 +670,24 @@ const UploadVideo = () => {
                                         Tags
                                     </Label>
                                     <div className="bg-background/50 border border-border/30 rounded-xl p-2 min-h-11 flex flex-wrap items-center gap-1.5">
-                                        <AnimatePresence>
-                                            {tags.map(tag => (
-                                                <motion.div
-                                                    key={tag}
-                                                    initial={{ opacity: 0, scale: 0.8 }}
-                                                    animate={{ opacity: 1, scale: 1 }}
-                                                    exit={{ opacity: 0, scale: 0.8 }}
-                                                    layout
+                                        {tags.map(tag => (
+                                            <div key={tag}>
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="text-[10px] font-semibold px-2 py-0.5 rounded-lg flex items-center gap-1 bg-primary/10 text-primary border border-primary/15 cursor-default"
                                                 >
-                                                    <Badge
-                                                        variant="secondary"
-                                                        className="text-[10px] font-semibold px-2 py-0.5 rounded-lg flex items-center gap-1 bg-primary/10 text-primary border border-primary/15 cursor-default"
+                                                    {tag}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeTag(tag)}
+                                                        className="hover:text-destructive transition-colors"
+                                                        disabled={isUploading || uploadPhase === "complete"}
                                                     >
-                                                        {tag}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeTag(tag)}
-                                                            className="hover:text-destructive transition-colors"
-                                                            disabled={isUploading || uploadPhase === "complete"}
-                                                        >
-                                                            <X className="h-2.5 w-2.5" />
-                                                        </button>
-                                                    </Badge>
-                                                </motion.div>
-                                            ))}
-                                        </AnimatePresence>
+                                                        <X className="h-2.5 w-2.5" />
+                                                    </button>
+                                                </Badge>
+                                            </div>
+                                        ))}
                                         <Input
                                             placeholder={tags.length === 0 ? "Type a tag and press Enter..." : "Add more..."}
                                             value={tagInput}
@@ -829,16 +784,9 @@ const UploadVideo = () => {
                                 />
                             </div>
 
-                            <AnimatePresence>
-                                {assignOnUpload && (
-                                    <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: "auto", opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-                                        className="overflow-hidden"
-                                    >
-                                        <CardContent className="p-5 pt-3 space-y-3">
+                            {assignOnUpload && (
+                                <div className="overflow-hidden">
+                                    <CardContent className="p-5 pt-3 space-y-3">
                                             <div className="flex items-center gap-2">
                                                 <div className="relative flex-1">
                                                     <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
@@ -879,11 +827,10 @@ const UploadVideo = () => {
                                                 {filteredEmployees.map((employee) => {
                                                     const isSelected = selectedEmployeeIds.includes(employee.id);
                                                     return (
-                                                        <motion.div
+                                                        <div
                                                             key={employee.id}
-                                                            whileTap={{ scale: 0.98 }}
                                                             className={cn(
-                                                                "flex items-center gap-3 p-2.5 rounded-xl transition-all cursor-pointer border",
+                                                                "flex items-center gap-3 p-2.5 rounded-xl transition-all cursor-pointer border active:scale-[0.98]",
                                                                 isSelected ? "bg-primary/5 border-primary/12" : "border-transparent hover:bg-muted/8"
                                                             )}
                                                             onClick={() => handleToggleEmployee(employee.id)}
@@ -903,11 +850,11 @@ const UploadVideo = () => {
                                                                 <p className="text-[9px] text-muted-foreground mt-0.5">{employee.dept} • {employee.designation}</p>
                                                             </div>
                                                             {isSelected && (
-                                                                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                                                                <div>
                                                                     <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
-                                                                </motion.div>
+                                                                </div>
                                                             )}
-                                                        </motion.div>
+                                                        </div>
                                                     );
                                                 })}
                                                 {filteredEmployees.length === 0 && (
@@ -915,34 +862,27 @@ const UploadVideo = () => {
                                                 )}
                                             </div>
                                         </CardContent>
-                                    </motion.div>
+                                    </div>
                                 )}
-                            </AnimatePresence>
                         </Card>
 
                         {/* Validation Hints */}
-                        <AnimatePresence>
-                            {selectedFile && (!title.trim() || !category) && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -5 }}
-                                >
-                                    <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-500/20 bg-amber-500/3">
-                                        <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                                        <div className="space-y-1">
-                                            <p className="text-xs font-bold text-amber-600">Required fields missing</p>
-                                            <ul className="text-[10px] text-muted-foreground space-y-0.5">
-                                                {!title.trim() && <li>• Course title is required</li>}
-                                                {!category && <li>• Please select a category</li>}
-                                            </ul>
-                                        </div>
+                        {selectedFile && (!title.trim() || !category) && (
+                            <div>
+                                <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-500/20 bg-amber-500/3">
+                                    <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-bold text-amber-600">Required fields missing</p>
+                                        <ul className="text-[10px] text-muted-foreground space-y-0.5">
+                                            {!title.trim() && <li>• Course title is required</li>}
+                                            {!category && <li>• Please select a category</li>}
+                                        </ul>
                                     </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </motion.div>
-                </motion.div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
     );
