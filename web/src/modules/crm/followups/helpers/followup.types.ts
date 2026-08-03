@@ -21,8 +21,27 @@ export interface BaseFollowup {
     createdBy: number | null;
     createdByName: string | null;
     contacts: ContactPerson[];
+    courier?: CourierFollowup | null;
     createdAt: string;
     updatedAt: string;
+}
+
+export interface CourierFollowup {
+    id: number;
+    userId: number;
+    toOrg: string | null;
+    toName: string | null;
+    toAddr: string | null;
+    toPin: string | null;
+    toMobile: string | null;
+    empFrom: number | null;
+    delDate: string | null;
+    urgency: number | null;
+    courierProvider: string | null;
+    docketNo: string | null;
+    courierDocs: string[] | null;
+    status: number | null;
+    createdAt: string | null;
 }
 
 // ── Request Types ─────────────────────────────────────────────────────────────

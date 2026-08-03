@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Loader2, FileText, Edit, Save, X, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { Loader2, FileText, Edit, Save, X, ChevronDown, ChevronUp, Mail, User, MapPin, Phone, Briefcase, Eye } from "lucide-react";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { TenderFileUploader } from "@/components/tender-file-upload";
 import { useUsers } from "@/hooks/api/useUsers";
-import { tenderFilesService } from "@/services/api/tender-files.service";
 import { format } from "date-fns";
 import { paths } from "@/app/routes/paths";
 import {
@@ -220,6 +220,14 @@ function LetterFollowupList({ leadId }: { leadId: number }) {
 function LetterFollowupCard({ followup, leadId }: { followup: BaseFollowup; leadId: number }) {
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
+    const { data: allUsers = [] } = useUsers();
+
+    const courier = followup.courier;
+    const senderName = allUsers.find(u => String(u.id) === String(courier?.empFrom))?.name || null;
+    const urgencyLabel = courier?.urgency != null
+        ? (URGENCY_OPTIONS.find(o => o.value === String(courier.urgency))?.label ?? String(courier.urgency))
+        : null;
+    const courierDocs = courier?.courierDocs?.filter(Boolean) ?? [];
 
     return (
         <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border rounded-lg">
@@ -243,28 +251,69 @@ function LetterFollowupCard({ followup, leadId }: { followup: BaseFollowup; lead
             </CollapsibleTrigger>
 
             <CollapsibleContent className="p-4 pt-0 space-y-4">
-                <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Courier ID</p>
-                    <p className="text-sm">{followup.courierId || "—"}</p>
-                </div>
-
-                {followup.attachments && followup.attachments.length > 0 && (
+                {courier ? (
+                    <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                            <TableBody>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        <Briefcase className="h-4 w-4 inline mr-2" /> Courier Details
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Courier ID</TableCell>
+                                    <TableCell className="text-sm">{courier.id ?? followup.courierId ?? "—"}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Organization Name</TableCell>
+                                    <TableCell className="text-sm">{courier.toOrg || "—"}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground"><User className="h-3.5 w-3.5 inline mr-1" /> Person Name</TableCell>
+                                    <TableCell className="text-sm">{courier.toName || "—"}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground"><MapPin className="h-3 w-3.5 inline mr-1" /> Address</TableCell>
+                                    <TableCell className="text-sm">{courier.toAddr || "—"}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Pin Code</TableCell>
+                                    <TableCell className="text-sm">{courier.toPin || "—"}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground"><Phone className="h-3 w-3.5 inline mr-1" /> Mobile Number</TableCell>
+                                    <TableCell className="text-sm">{courier.toMobile || "—"}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground"><Mail className="h-3 w-3.5 inline mr-1" /> Courier From</TableCell>
+                                    <TableCell className="text-sm">{senderName || "—"}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Expected Delivery Date</TableCell>
+                                    <TableCell className="text-sm">{courier.delDate ? format(new Date(courier.delDate), "PP") : "—"}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Dispatch Urgency</TableCell>
+                                    <TableCell className="text-sm">{urgencyLabel ? <Badge variant="outline">{urgencyLabel}</Badge> : "—"}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Documents</TableCell>
+                                    <TableCell className="text-sm">
+                                        {courierDocs.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {courierDocs.map((doc, idx) => (
+                                                    <a
+                                                        key={idx}
+                                                        href={`/uploads/courier/${doc}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-muted text-blue-600 hover:text-blue-800 hover:underline"
+                                                    >
+                                                        <Eye className="h-3 w-3" />
+                                                        {doc.split('/').pop()}
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        ) : "—"}
+                                    </TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+                ) : (
                     <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-2">Attachments</p>
-                        <div className="space-y-2">
-                            {followup.attachments.map((path, idx) => (
-                                <a
-                                    key={idx}
-                                    href={tenderFilesService.getFileUrl(path)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
-                                >
-                                    <ExternalLink className="h-3 w-3" />
-                                    {path.split('/').pop()}
-                                </a>
-                            ))}
-                        </div>
+                        <p className="text-sm font-medium text-muted-foreground mb-1">Courier ID</p>
+                        <p className="text-sm">{followup.courierId || "—"}</p>
                     </div>
                 )}
 
