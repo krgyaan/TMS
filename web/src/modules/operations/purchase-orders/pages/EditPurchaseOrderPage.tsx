@@ -26,7 +26,7 @@ import { TermsField } from "../components/TermsField";
 import { formatDateForInput, mapFormToUpdateDTO } from "../helpers/purchaseOrder.mapper";
 import type { CreatePartyDTO } from "../helpers/purchaseOrder.types";
 import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "../helpers/purchaseOrder.schema";
-import { PartyFormDialog, type CreatePartyPayload } from "@/modules/operations/parties/components/PartyFormDialog";
+import { PartyFormDialog, type CreatePartyPayload } from "@/modules/shared/vendor-master/PartyFormDialog";
 
 const defaultFormValues: PurchaseOrderFormValues = {
     poType: "new",

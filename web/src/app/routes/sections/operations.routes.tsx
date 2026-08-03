@@ -27,6 +27,7 @@ const Operations_ContractAgreement = lazy(() => import("@/modules/operations/con
 const Operations_ContractAgreementShow = lazy(() => import("@/modules/operations/contract-agreement/ContractAgreementShowPage"));
 
 const Operations_ProjectDashboard = lazy(() => import("@/modules/operations/project-dashboard/ProjectDashboardPage"));
+const Operations_ProjectListPage = lazy(() => import("@/modules/operations/project-dashboard/ProjectListPage"));
 const Operations_ProjectShowPage = lazy(() => import("@/modules/operations/project-dashboard/ProjectShowPage"));
 const Operations_RaisePoFormPage = lazy(() => import("@/modules/operations/purchase-orders/pages/CreatePurchaseOrderPage"));
 const Operations_ViewPoPage = lazy(() => import("@/modules/operations/purchase-orders/pages/ViewPurchaseOrderPage"));
@@ -75,7 +76,7 @@ export default function OperationsRoutes() {
             <Route path="work-order/contract-agreement" element={<RouteWrapper><Operations_ContractAgreement /></RouteWrapper>} />
             <Route path="work-order/contract-agreement/:id" element={<RouteWrapper><Operations_ContractAgreementShow /></RouteWrapper>} />
 
-            <Route path="project-dashboard" element={<RouteWrapper><Operations_ProjectDashboard /></RouteWrapper>} />
+            <Route path="project-dashboard" element={<RouteWrapper><Operations_ProjectListPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId" element={<RouteWrapper><Operations_ProjectDashboard /></RouteWrapper>} />
             <Route path="project-dashboard/show/:id" element={<RouteWrapper><Operations_ProjectShowPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/purchase-order/create" element={<RouteWrapper><Operations_RaisePoFormPage /></RouteWrapper>} />

@@ -9,6 +9,8 @@ export interface PersistentTableStateOptions<Tab extends string> {
     defaultTab: Tab;
     tabParam?: string;
     defaultPageSize?: number;
+    defaultSortBy?: string;
+    defaultSortOrder?: "asc" | "desc";
 }
 
 const RELEVANT_PARAMS = ['tab', 'subtab', 'q', 'page', 'size', 'sortBy', 'sortOrder'];
@@ -18,6 +20,8 @@ export function usePersistentTableState<Tab extends string>({
     defaultTab,
     tabParam = 'tab',
     defaultPageSize = 50,
+    defaultSortBy,
+    defaultSortOrder,
 }: PersistentTableStateOptions<Tab>) {
     const [searchParams, setSearchParams] = useSearchParams();
 
@@ -49,8 +53,8 @@ export function usePersistentTableState<Tab extends string>({
     const initialSearch = readInitial<string>('search', 'q', '');
     const initialPage = readInitial<number>('pageIndex', 'page', 0, (s) => Math.max(0, parseInt(s) - 1));
     const initialPageSize = readInitial<number>('pageSize', 'size', defaultPageSize, parseInt);
-    const initialSortBy = readInitial<string | undefined>('sortBy', 'sortBy', undefined);
-    const initialSortOrder = readInitial<'asc' | 'desc' | undefined>('sortOrder', 'sortOrder', undefined);
+    const initialSortBy = readInitial<string | undefined>('sortBy', 'sortBy', defaultSortBy);
+    const initialSortOrder = readInitial<'asc' | 'desc' | undefined>('sortOrder', 'sortOrder', defaultSortOrder);
 
     const [activeTab, setActiveTabState] = useState<Tab>(initialTab);
     const [search, setSearch] = useState<string>(initialSearch);

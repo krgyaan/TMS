@@ -841,4 +841,65 @@ export class PurchaseOrderService {
         const res = await query.orderBy(desc(projectParties.createdAt));
         return res;
     }
+
+    async activateParty(id: number) {
+        const rows = await this.db
+            .update(projectParties)
+            .set({ isActive: true, updatedAt: new Date() })
+            .where(eq(projectParties.id, id))
+            .returning();
+
+        if (!rows[0]) {
+            throw new NotFoundException(`Party with ID ${id} not found`);
+        }
+        return rows[0];
+    }
+
+    async deactivateParty(id: number) {
+        const rows = await this.db
+            .update(projectParties)
+            .set({ isActive: false, updatedAt: new Date() })
+            .where(eq(projectParties.id, id))
+            .returning();
+
+        if (!rows[0]) {
+            throw new NotFoundException(`Party with ID ${id} not found`);
+        }
+        return rows[0];
+    }
+
+    async updateParty(id: number, body: any) {
+        const rows = await this.db
+            .update(projectParties)
+            .set({
+                name: body.name ?? undefined,
+                alias: body.alias ?? undefined,
+                email: body.email ?? undefined,
+                address: body.address ?? undefined,
+                gstNo: body.gstNo ?? undefined,
+                pan: body.pan ?? undefined,
+                msme: body.msme ?? undefined,
+                type: body.type ?? undefined,
+                contactPerson: body.contact_person ?? undefined,
+                mobileNumber: body.mobile_number ?? undefined,
+                updatedAt: new Date(),
+            })
+            .where(eq(projectParties.id, id))
+            .returning();
+
+        if (!rows[0]) {
+            throw new NotFoundException(`Party with ID ${id} not found`);
+        }
+
+        if (rows[0].name) {
+            await this.clientDirectorySyncService.syncToClientDirectory([{
+                name: rows[0].name,
+                email: rows[0].email,
+                phone: rows[0].mobileNumber || null,
+                org: null,
+            }]);
+        }
+
+        return rows[0];
+    }
 }
