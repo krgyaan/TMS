@@ -56,6 +56,7 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
             {
                 label: "Upload Invoice",
                 icon: <FileUp className="h-4 w-4" />,
+                visible: (row) => Number(row.totalVwiAmount || 0) < Number(row.grandTotal || 0),
                 onClick: (row) => navigate(paths.operations.raiseVendorWoInvoiceForm(row.projectId, row.id)),
             },
             {
