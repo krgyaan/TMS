@@ -1,4 +1,24 @@
 import { BaseApiService } from './base.service';
+import axiosInstance from '@/lib/axios';
+
+export interface UploadSessionResult {
+    uploadId: string;
+}
+
+export interface FinalizedUpload {
+    uploadId: string;
+    filename: string;
+    filepath: string;
+    filesize: number;
+}
+
+export interface CreateVideoParams {
+    uploadId: string;
+    title: string;
+    description?: string;
+    category: string;
+    completionThreshold?: string;
+}
 
 export interface VideoCourse {
     id: number;
@@ -80,8 +100,41 @@ export class TrainingApiService extends BaseApiService {
     }
 
 
-    async upload(formData: FormData, extraConfig?: Record<string, any>): Promise<VideoCourse> {
-        return this.post<VideoCourse, FormData>('/upload', formData, extraConfig);
+    async uploadInit(params: { fileSize: number; originalName: string }): Promise<UploadSessionResult> {
+        return this.post<UploadSessionResult>(`/upload/init`, params);
+    }
+
+    async uploadChunk(
+        uploadId: string,
+        chunk: Blob,
+        index: number,
+        onUploadProgress?: (loaded: number, total?: number) => void,
+    ): Promise<{ receivedBytes: number; expectedSize: number }> {
+        const { data } = await axiosInstance.post(
+            `${this.basePath}/upload/chunk/${uploadId}`,
+            chunk,
+            {
+                headers: {
+                    'Content-Type': 'application/octet-stream',
+                    'x-chunk-index': String(index),
+                },
+                timeout: 600000,
+                onUploadProgress: (e) => onUploadProgress?.(e.loaded, e.total),
+            },
+        );
+        return data;
+    }
+
+    async finalizeUpload(uploadId: string): Promise<FinalizedUpload> {
+        return this.post<FinalizedUpload>(`/upload/finalize/${uploadId}`, {});
+    }
+
+    async abortUpload(uploadId: string): Promise<void> {
+        await axiosInstance.delete(`${this.basePath}/upload/${uploadId}`);
+    }
+
+    async createVideo(params: CreateVideoParams): Promise<VideoCourse> {
+        return this.post<VideoCourse>(`/videos`, params);
     }
 
     async remove(id: number): Promise<{ success: boolean; message: string }> {

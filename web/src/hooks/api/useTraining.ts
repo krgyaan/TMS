@@ -30,8 +30,7 @@ export const useUploadTrainingVideo = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (params: { formData: FormData; onUploadProgress?: (progressEvent: any) => void }) =>
-            trainingApiService.upload(params.formData, params.onUploadProgress ? { onUploadProgress: params.onUploadProgress } : undefined),
+        mutationFn: (execute: () => Promise<VideoCourse>) => execute(),
         onSuccess: (newVideo) => {
             queryClient.invalidateQueries({ queryKey: trainingKey.lists() });
             toast.success(`Video "${newVideo.title}" uploaded and queued for processing.`);

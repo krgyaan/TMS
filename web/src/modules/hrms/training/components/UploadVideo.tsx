@@ -11,9 +11,10 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useAssignTrainingVideo, useTrainingEmployees, useUploadTrainingVideo } from "@/hooks/api/useTraining";
 import { cn } from "@/lib/utils";
+import { trainingApiService } from "@/services/api/training.service";
 import { AnimatePresence, motion } from "framer-motion";
-import { 
-    AlertCircle, ArrowLeft, BarChart3, CheckCircle2, Clock, CloudUpload, Eye, FileText, FileVideo, Film, 
+import {
+    AlertCircle, ArrowLeft, BarChart3, CheckCircle2, Clock, CloudUpload, Eye, FileText, FileVideo, Film,
     HardDrive, Info, Layers, Loader2, Monitor, Play, Settings2, Shield, Sparkles, Tag, Upload, Users, X, Zap
 } from "lucide-react";
 import React, { useCallback, useMemo, useRef, useState } from "react";
@@ -24,6 +25,9 @@ const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] } }
 };
+
+const MAX_VIDEO_SIZE = 500 * 1024 * 1024; // 500 MB
+const CHUNK_SIZE = parseInt(import.meta.env.VITE_UPLOAD_CHUNK_SIZE || '10485760', 10); // 10 MB default
 
 const staggerContainer = {
     hidden: { opacity: 0 },
@@ -100,6 +104,10 @@ const UploadVideo = () => {
         setIsDragging(false);
         const file = e.dataTransfer.files?.[0];
         if (file) {
+            if (file.size > MAX_VIDEO_SIZE) {
+                toast.error("Video exceeds the maximum allowed size of 500 MB.");
+                return;
+            }
             const sizeStr = (file.size / (1024 * 1024)).toFixed(1) + " MB";
             setFileObject(file);
             setSelectedFile({ name: file.name, size: sizeStr, type: file.type });
@@ -119,6 +127,11 @@ const UploadVideo = () => {
     const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            if (file.size > MAX_VIDEO_SIZE) {
+                toast.error("Video exceeds the maximum allowed size of 500 MB.");
+                e.target.value = "";
+                return;
+            }
             const sizeStr = (file.size / (1024 * 1024)).toFixed(1) + " MB";
             setFileObject(file);
             setSelectedFile({ name: file.name, size: sizeStr, type: file.type });
@@ -184,30 +197,62 @@ const UploadVideo = () => {
             toast.error("Please select a category.");
             return;
         }
+        if (fileObject.size > MAX_VIDEO_SIZE) {
+            toast.error("Video exceeds the maximum allowed size of 500 MB.");
+            return;
+        }
 
+        let uploadId: string | null = null;
         try {
             setUploadPhase("uploading");
             setUploadProgress(0);
 
-            const formData = new FormData();
-            formData.append("file", fileObject);
-            formData.append("title", title);
-            formData.append("description", description);
-            formData.append("category", category);
-            formData.append("completionThreshold", completionThreshold);
+            const file = fileObject;
+            const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+            let completedBytes = 0;
 
-            const newVideo = await uploadMutation.mutateAsync({
-                formData,
-                onUploadProgress: (progressEvent) => {
-                    if (progressEvent.total) {
-                        const pct = Math.round((progressEvent.loaded / progressEvent.total) * 100);
-                        setUploadProgress(pct);
-                    }
-                }
+            // 1. Start chunked upload session
+            const session = await trainingApiService.uploadInit({
+                fileSize: file.size,
+                originalName: file.name,
             });
+            uploadId = session.uploadId;
 
-            setUploadPhase("processing");
+            // 2. Upload chunks sequentially (each request stays small, below proxy limits)
+            for (let i = 0; i < totalChunks; i += 1) {
+                const start = i * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, file.size);
+                const chunk = file.slice(start, end);
+
+                await trainingApiService.uploadChunk(
+                    uploadId,
+                    chunk,
+                    i,
+                    (loaded, total) => {
+                        const chunkBytes = total ? Math.min(loaded, total) : chunk.size;
+                        const pct = Math.round(((completedBytes + chunkBytes) / file.size) * 100);
+                        setUploadProgress(pct);
+                    },
+                );
+                completedBytes = Math.min(completedBytes + chunk.size, file.size);
+            }
+
+            // 3. Finalize — server assembles the file
+            setProcessingStep("Assembling video file...");
+            await trainingApiService.finalizeUpload(uploadId);
+
+            // 4. Create the course record referencing the uploaded file
             setProcessingStep("Finalizing course metadata...");
+            const newVideo = await uploadMutation.mutateAsync(() =>
+                trainingApiService.createVideo({
+                    uploadId,
+                    title,
+                    description,
+                    category,
+                    completionThreshold,
+                }),
+            );
+            uploadId = null; // session consumed by create()
 
             if (assignOnUpload && selectedEmployeeIds.length > 0) {
                 setProcessingStep("Assigning course to team members...");
@@ -226,9 +271,17 @@ const UploadVideo = () => {
             }, 1200);
 
         } catch (error: any) {
+            // Clean up the server-side upload session if one was started
+            if (uploadId) {
+                try {
+                    await trainingApiService.abortUpload(uploadId);
+                } catch { /* ignore cleanup errors */ }
+            }
             setUploadPhase("idle");
             console.error("Upload failed:", error);
-            const msg = error?.response?.data?.message || "Failed to upload video course";
+            const msg = error?.response?.status === 413
+                ? "Upload rejected — the file or server limit was exceeded. Try a smaller file."
+                : (error?.response?.data?.message || "Failed to upload video course");
             toast.error(msg);
         }
     };
@@ -254,13 +307,14 @@ const UploadVideo = () => {
 
     const isUploading = uploadPhase === "uploading" || uploadPhase === "processing";
 
+    const newLocal = "h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0";
     return (
-        <div className="min-h-screen bg-gradient-to-br from-background via-background to-background text-foreground relative selection:bg-primary/15">
+        <div className="min-h-screen bg-linear-to-br from-background via-background to-background text-foreground relative selection:bg-primary/15">
             {/* Background Effects */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-                <div className="absolute -top-[20%] -right-[10%] w-[55%] h-[55%] rounded-full bg-gradient-to-br from-primary/[0.04] to-transparent blur-[140px]" />
-                <div className="absolute bottom-[5%] -left-[15%] w-[45%] h-[45%] rounded-full bg-gradient-to-tr from-primary/[0.03] to-transparent blur-[120px]" />
-                <div className="absolute top-[50%] right-[30%] w-[20%] h-[20%] rounded-full bg-violet-500/[0.02] blur-[80px]" />
+                <div className="absolute -top-[20%] -right-[10%] w-[55%] h-[55%] rounded-full bg-linear-to-br from-primary/4 to-transparent blur-[140px]" />
+                <div className="absolute bottom-[5%] -left-[15%] w-[45%] h-[45%] rounded-full bg-linear-to-br from-primary/3 to-transparent blur-[120px]" />
+                <div className="absolute top-[50%] right-[30%] w-[20%] h-[20%] rounded-full bg-linear-to-br from-violet-500/2 to-transparent blur-[80px]" />
             </div>
 
             <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative">
@@ -282,7 +336,7 @@ const UploadVideo = () => {
                         </Button>
                         <div className="hidden sm:block h-6 w-px bg-border/30" />
                         <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/15 flex items-center justify-center shadow-lg shadow-primary/10">
+                            <div className="h-10 w-10 rounded-2xl bg-linear-to-br from-primary/20 to-primary/5 border border-primary/15 flex items-center justify-center shadow-lg shadow-primary/10">
                                 <CloudUpload className="h-5 w-5 text-primary" />
                             </div>
                             <div>
@@ -332,13 +386,13 @@ const UploadVideo = () => {
                             <Card className={cn(
                                 "border rounded-2xl backdrop-blur-xl shadow-lg overflow-hidden",
                                 uploadPhase === "complete"
-                                    ? "border-emerald-500/20 bg-emerald-500/[0.03]"
-                                    : "border-primary/20 bg-primary/[0.02]"
+                                    ? "border-emerald-500/20 bg-emerald-500/3"
+                                    : "border-primary/20 bg-primary/2"
                             )}>
                                 <CardContent className="p-5">
                                     <div className="flex items-center gap-4">
                                         <div className={cn(
-                                            "h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors",
+                                            "h-12 w-12 rounded-xl flex items-center justify-center shrink-0 transition-colors",
                                             uploadPhase === "complete" ? "bg-emerald-500/10" : "bg-primary/10"
                                         )}>
                                             {uploadPhase === "complete" ? (
@@ -373,7 +427,7 @@ const UploadVideo = () => {
                                             {uploadPhase === "uploading" && (
                                                 <Progress
                                                     value={Math.min(100, uploadProgress)}
-                                                    className="h-2 rounded-full [&>div]:bg-gradient-to-r [&>div]:from-primary [&>div]:to-primary/80 [&>div]:transition-all"
+                                                    className="h-2 rounded-full [&>div]:bg-linear-to-r [&>div]:from-primary [&>div]:to-primary/80 [&>div]:transition-all"
                                                 />
                                             )}
 
@@ -381,7 +435,7 @@ const UploadVideo = () => {
                                                 <div className="flex items-center gap-2">
                                                     <div className="flex-1 h-2 rounded-full bg-primary/10 overflow-hidden">
                                                         <motion.div
-                                                            className="h-full bg-gradient-to-r from-primary to-primary/60 rounded-full"
+                                                            className="h-full bg-linear-to-r from-primary to-primary/60 rounded-full"
                                                             animate={{ x: ["-100%", "100%"] }}
                                                             transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
                                                             style={{ width: "40%" }}
@@ -391,7 +445,7 @@ const UploadVideo = () => {
                                             )}
 
                                             {uploadPhase === "complete" && (
-                                                <Progress value={100} className="h-2 rounded-full [&>div]:bg-gradient-to-r [&>div]:from-emerald-500 [&>div]:to-emerald-400" />
+                                                <Progress value={100} className="h-2 rounded-full [&>div]:bg-linear-to-r [&>div]:from-emerald-500 [&>div]:to-emerald-400" />
                                             )}
 
                                             <p className="text-[10px] text-muted-foreground mt-1.5">
@@ -438,7 +492,7 @@ const UploadVideo = () => {
                                             "relative border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 group",
                                             isDragging
                                                 ? "border-primary bg-primary/5 scale-[1.01]"
-                                                : "border-border/50 bg-background/30 hover:border-primary/30 hover:bg-primary/[0.02]"
+                                                : "border-border/50 bg-background/30 hover:border-primary/30 hover:bg-primary/2"
                                         )}
                                     >
                                         <input
@@ -476,9 +530,9 @@ const UploadVideo = () => {
                                         className="space-y-4"
                                     >
                                         {/* File Preview Card */}
-                                        <div className="relative bg-gradient-to-br from-primary/5 to-transparent border border-primary/10 rounded-xl p-4">
+                                        <div className="relative bg-linear-to-br from-primary/5 to-transparent border border-primary/10 rounded-xl p-4">
                                             <div className="flex items-start gap-3">
-                                                <div className="h-12 w-12 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center flex-shrink-0">
+                                                <div className="h-12 w-12 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center shrink-0">
                                                     <FileVideo className="h-6 w-6 text-primary" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
@@ -505,8 +559,8 @@ const UploadVideo = () => {
                                         </div>
 
                                         {/* Video Preview Placeholder */}
-                                        <div className="aspect-video rounded-xl bg-gradient-to-br from-muted/20 to-muted/5 border border-border/20 flex items-center justify-center overflow-hidden relative group">
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+                                        <div className="aspect-video rounded-xl bg-linear-to-br from-muted/20 to-muted/5 border border-border/20 flex items-center justify-center overflow-hidden relative group">
+                                            <div className="absolute inset-0 bg-linear-to-t from-black/30 via-transparent to-transparent" />
                                             <div className="relative h-12 w-12 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                                                 <Play className="h-5 w-5 text-white/80 ml-0.5" fill="currentColor" />
                                             </div>
@@ -598,7 +652,7 @@ const UploadVideo = () => {
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
                                         disabled={isUploading || uploadPhase === "complete"}
-                                        className="bg-background/50 border-border/30 rounded-xl min-h-[100px] text-sm resize-none"
+                                        className="bg-background/50 border-border/30 rounded-xl min-h-25 text-sm resize-none"
                                     />
                                     <p className="text-[9px] text-muted-foreground/60">{description.length}/500 characters</p>
                                 </div>
@@ -652,7 +706,7 @@ const UploadVideo = () => {
                                         <Tag className="h-2.5 w-2.5" />
                                         Tags
                                     </Label>
-                                    <div className="bg-background/50 border border-border/30 rounded-xl p-2 min-h-[44px] flex flex-wrap items-center gap-1.5">
+                                    <div className="bg-background/50 border border-border/30 rounded-xl p-2 min-h-11 flex flex-wrap items-center gap-1.5">
                                         <AnimatePresence>
                                             {tags.map(tag => (
                                                 <motion.div
@@ -685,7 +739,7 @@ const UploadVideo = () => {
                                             onChange={(e) => setTagInput(e.target.value)}
                                             onKeyDown={handleAddTag}
                                             disabled={isUploading || uploadPhase === "complete"}
-                                            className="border-0 bg-transparent h-7 text-xs shadow-none focus-visible:ring-0 flex-1 min-w-[120px] p-0 px-1"
+                                            className="border-0 bg-transparent h-7 text-xs shadow-none focus-visible:ring-0 flex-1 min-w-30 p-0 px-1"
                                         />
                                     </div>
                                 </div>
@@ -738,7 +792,7 @@ const UploadVideo = () => {
                                         className="flex items-center justify-between p-3.5 rounded-xl border border-border/15 bg-background/30 hover:border-border/30 transition-colors"
                                     >
                                         <div className="flex items-center gap-3">
-                                            <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0", setting.iconBg)}>
+                                            <div className={cn(newLocal, setting.iconBg)}>
                                                 <setting.icon className={cn("h-4 w-4", setting.iconColor)} />
                                             </div>
                                             <div>
@@ -821,7 +875,7 @@ const UploadVideo = () => {
                                                 </div>
                                             )}
 
-                                            <div className="border border-border/20 rounded-xl max-h-[240px] overflow-y-auto p-1.5 space-y-0.5 bg-background/20">
+                                            <div className="border border-border/20 rounded-xl max-h-60 overflow-y-auto p-1.5 space-y-0.5 bg-background/20">
                                                 {filteredEmployees.map((employee) => {
                                                     const isSelected = selectedEmployeeIds.includes(employee.id);
                                                     return (
@@ -839,7 +893,7 @@ const UploadVideo = () => {
                                                                 className="pointer-events-none"
                                                             />
                                                             <div className={cn(
-                                                                "h-7 w-7 rounded-lg flex items-center justify-center text-[9px] font-bold flex-shrink-0",
+                                                                "h-7 w-7 rounded-lg flex items-center justify-center text-[9px] font-bold shrink-0",
                                                                 isSelected ? "bg-primary/15 text-primary" : "bg-muted/25 text-muted-foreground"
                                                             )}>
                                                                 {employee.avatar}
@@ -874,8 +928,8 @@ const UploadVideo = () => {
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -5 }}
                                 >
-                                    <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.03]">
-                                        <AlertCircle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                                    <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-500/20 bg-amber-500/3">
+                                        <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                                         <div className="space-y-1">
                                             <p className="text-xs font-bold text-amber-600">Required fields missing</p>
                                             <ul className="text-[10px] text-muted-foreground space-y-0.5">
