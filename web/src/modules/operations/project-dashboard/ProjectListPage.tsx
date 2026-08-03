@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { paths } from "@/app/routes/paths";
 import { useProjectList } from "@/hooks/api/useProjectDashboard";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
-import { useAuth } from "@/contexts/AuthContext";
+import { useTeamFilter } from "@/hooks/useTeamFilter";
 import type { ProjectMasterListRow } from "@/modules/shared/master-project/helpers/projectMaster.types";
 import { dateCol } from "@/components/data-grid";
 import { Badge } from "@/components/ui/badge";
@@ -106,19 +106,14 @@ export default function ProjectListPage() {
         defaultTab: "default",
     });
 
-    const { isAdmin, isSuperUser, teamName: userTeamName } = useAuth();
+    const { teamId } = useTeamFilter();
     const navigate = useNavigate();
-
-    const teamFilter = useMemo(() => {
-        if (isAdmin || isSuperUser) return undefined;
-        return userTeamName ?? undefined;
-    }, [isAdmin, isSuperUser, userTeamName]);
 
     const { data: apiResponse, isLoading, error } = useProjectList({
         page: pagination.pageIndex + 1,
         limit: pagination.pageSize,
         search: debouncedSearch || undefined,
-        teamName: teamFilter,
+        teamId: teamId ?? undefined,
     });
 
     const rows = apiResponse?.data ?? [];
@@ -133,7 +128,7 @@ export default function ProjectListPage() {
                 minWidth: 100,
                 width: 80,
                 valueGetter: params => params.data?.teamName ?? "—",
-                sortable: false,
+                sortable: true,
                 filter: true,
             },
             {
@@ -142,7 +137,7 @@ export default function ProjectListPage() {
                 headerName: "PO/WO No",
                 minWidth: 200,
                 valueGetter: params => params.data?.poNo ?? "—",
-                sortable: false,
+                sortable: true,
                 filter: true,
             },
             {
@@ -151,7 +146,7 @@ export default function ProjectListPage() {
                 headerName: "Project Code",
                 minWidth: 250,
                 valueGetter: params => params.data?.projectCode ?? "—",
-                sortable: false,
+                sortable: true,
                 filter: true,
             },
             {
@@ -160,7 +155,7 @@ export default function ProjectListPage() {
                 headerName: "Project Name",
                 minWidth: 180,
                 valueGetter: params => params.data?.projectName ?? "—",
-                sortable: false,
+                sortable: true,
                 filter: true,
             },
             dateCol<ProjectMasterListRow>("poDate", { includeTime: false }, {
@@ -168,7 +163,7 @@ export default function ProjectListPage() {
                 colId: "poDate",
                 headerName: "PO Date",
                 filter: true,
-                sortable: false,
+                sortable: true,
                 width: 120,
             }),
             {
@@ -179,7 +174,7 @@ export default function ProjectListPage() {
                     if (!row) return null;
                     return <SourceCell row={row} />;
                 },
-                sortable: false,
+                sortable: true,
                 filter: true,
             },
             {

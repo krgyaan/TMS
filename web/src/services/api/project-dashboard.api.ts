@@ -7,6 +7,7 @@ export interface ProjectListFilters {
     limit?: number;
     search?: string;
     teamName?: string;
+    teamId?: number;
 }
 
 class ProjectDashboardApiService extends BaseApiService {
@@ -32,6 +33,7 @@ class ProjectDashboardApiService extends BaseApiService {
         if (params?.limit) searchParams.set("limit", String(params.limit));
         if (params?.search) searchParams.set("search", params.search);
         if (params?.teamName) searchParams.set("teamName", params.teamName);
+        if (params?.teamId) searchParams.set("teamId", String(params.teamId));
 
         const queryString = searchParams.toString();
         return this.get<PaginatedResult<ProjectMasterListRow>>(`/list${queryString ? `?${queryString}` : ""}`);
