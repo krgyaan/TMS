@@ -15,6 +15,12 @@ import { trainingVideos } from '@/db/schemas/hrms/training-videos.schema';
 import { trainingWatchHistory } from '@/db/schemas/hrms/training-watch-history.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
 
+export interface VideoFileInput {
+    filename: string;
+    filepath: string;
+    filesize: number;
+}
+
 @Injectable()
 export class TrainingService {
     constructor(
@@ -27,7 +33,7 @@ export class TrainingService {
         description: string | undefined,
         category: string,
         completionThreshold: number,
-        file: Express.Multer.File,
+        file: VideoFileInput,
         userId: number,
     ) {
         const videoCode = `TRN-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -41,8 +47,8 @@ export class TrainingService {
                     title,
                     description,
                     filename: file.filename,
-                    filepath: file.path,
-                    filesize: file.size,
+                    filepath: file.filepath,
+                    filesize: file.filesize,
                     status: 'processing',
                     storageProvider: 'VPS',
                     storageKey: file.filename,
@@ -55,7 +61,7 @@ export class TrainingService {
             // Add job to video processing queue
             await this.videoQueue.add(
                 'process-video',
-                { videoId: newVideo.id, filepath: file.path },
+                { videoId: newVideo.id, filepath: file.filepath },
                 {
                     attempts: 3,
                     backoff: { type: 'exponential', delay: 10000 },
@@ -64,7 +70,7 @@ export class TrainingService {
         } catch (error) {
             // Clean up uploaded file if DB insert or queue add fails
             try {
-                await unlink(file.path);
+                await unlink(file.filepath);
             } catch { /* ignore if file already gone */ }
             throw error;
         }

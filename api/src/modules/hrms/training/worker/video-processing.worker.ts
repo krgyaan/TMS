@@ -55,6 +55,45 @@ export class VideoProcessingWorker implements OnModuleInit {
                         resolution = `${videoStream.width}x${videoStream.height}`;
                     }
 
+                    // ── Normalize to faststart H.264/AAC MP4 ────────────────────
+                    // Ensures the video starts streaming quickly (moov at front)
+                    // and plays in every browser. Falls back to the original file.
+                    const processedDir = path.join(process.cwd(), "uploads", "hrms", "training", "processed");
+                    if (!fs.existsSync(processedDir)) {
+                        fs.mkdirSync(processedDir, { recursive: true });
+                    }
+
+                    const processedFilename = `trn-${videoId}.mp4`;
+                    const processedPath = path.join(processedDir, processedFilename);
+                    let normalizedPath: string | null = null;
+
+                    try {
+                        await new Promise<void>((resolveTranscode, rejectTranscode) => {
+                            ffmpeg(filepath)
+                                .videoCodec("libx264")
+                                .audioCodec("aac")
+                                .videoFilters("scale='min(1080,ih)':-2")
+                                .outputOptions(["-movflags", "+faststart", "-preset", "veryfast", "-crf", "23"])
+                                .output(processedPath)
+                                .on("end", () => resolveTranscode())
+                                .on("error", (err: Error) => rejectTranscode(err))
+                                .run();
+                        });
+                        normalizedPath = processedPath;
+                        this.logger.info("Training video normalized to faststart MP4", {
+                            videoId,
+                            normalizedPath,
+                        });
+                    } catch (err: any) {
+                        this.logger.warn("Video normalization failed, keeping original file", {
+                            videoId,
+                            error: err.message,
+                        });
+                        try {
+                            fs.unlinkSync(processedPath);
+                        } catch { /* ignore */ }
+                    }
+
                     // ── Generate thumbnail ─────────────────────────────────────────
                     const thumbnailDir = path.join(process.cwd(), "uploads", "hrms", "training", "thumbnails");
                     if (!fs.existsSync(thumbnailDir)) {
@@ -62,11 +101,15 @@ export class VideoProcessingWorker implements OnModuleInit {
                     }
 
                     const thumbnailFilename = `thumb-${videoId}-${Date.now()}.jpg`;
-                    // Capture frame at 10% of video duration (min 2s)
-                    const seekTime = Math.max(2, Math.floor(durationSeconds * 0.1));
+                    // Capture frame at 10% of video duration (min 2s), but never past the end
+                    const seekTime = Math.min(
+                        Math.max(2, Math.floor(durationSeconds * 0.1)),
+                        Math.max(0, durationSeconds - 1),
+                    );
+                    const sourcePath = normalizedPath || filepath;
 
                     await new Promise<void>((resolveThumb, rejectThumb) => {
-                        ffmpeg(filepath)
+                        ffmpeg(sourcePath)
                             .seekInput(seekTime)
                             .frames(1)
                             .size("640x?")      // 640px wide, keep aspect ratio
@@ -80,6 +123,7 @@ export class VideoProcessingWorker implements OnModuleInit {
                     const thumbnailPath = `uploads/hrms/training/thumbnails/${thumbnailFilename}`;
 
                     // Update video record in DB
+                    const normalizedSize = normalizedPath ? fs.statSync(normalizedPath).size : undefined;
                     await this.db
                         .update(trainingVideos)
                         .set({
@@ -88,14 +132,31 @@ export class VideoProcessingWorker implements OnModuleInit {
                             thumbnailPath,
                             status: "ready",
                             updatedAt: new Date(),
+                            ...(normalizedPath && normalizedSize !== undefined
+                                ? { filepath: normalizedPath, filename: processedFilename, filesize: normalizedSize }
+                                : {}),
                         })
                         .where(eq(trainingVideos.id, videoId));
+
+                    // Remove the original upload now that the DB points to the normalized file
+                    if (normalizedPath) {
+                        try {
+                            fs.unlinkSync(filepath);
+                        } catch (err: any) {
+                            this.logger.warn("Failed to remove original upload after normalization", {
+                                videoId,
+                                filepath,
+                                error: err?.message,
+                            });
+                        }
+                    }
 
                     this.logger.info("Video processing completed successfully", {
                         videoId,
                         durationSeconds,
                         resolution,
                         thumbnailPath,
+                        normalized: Boolean(normalizedPath),
                     });
                 } catch (err: any) {
                     this.logger.error("Video processing job failed", {

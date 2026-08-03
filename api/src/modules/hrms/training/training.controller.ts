@@ -1,41 +1,78 @@
-import { Body, Controller, Delete, Get, Headers, NotFoundException, Param, ParseIntPipe, Post, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { BadRequestException, Body, Controller, Delete, Get, Headers, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Post, Req, Res } from '@nestjs/common';
+import type { Request } from 'express';
 import * as fs from 'fs';
 import { access, stat } from 'fs/promises';
-import { diskStorage } from 'multer';
 import { extname, resolve } from 'path';
 
 import { CurrentUser } from '@/decorators/current-user.decorator';
 import { Public } from '@/modules/auth/decorators/public.decorator';
 import { TrainingService } from './training.service';
-
-const VIDEO_MAX_SIZE = 500 * 1024 * 1024; // 500 MB
-
-const videoMulterConfig = {
-    storage: diskStorage({
-        destination: './uploads/hrms/training',
-        filename: (req, file, callback) => {
-            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-            const ext = extname(file.originalname);
-            callback(null, `trn-video-${uniqueSuffix}${ext}`);
-        },
-    }),
-    limits: { fileSize: VIDEO_MAX_SIZE },
-};
+import { TrainingUploadService } from './training-upload.service';
 
 @Controller('hrms/training')
 export class TrainingController {
-    constructor(private readonly service: TrainingService) {}
+    constructor(
+        private readonly service: TrainingService,
+        private readonly uploadService: TrainingUploadService,
+    ) {}
 
-    @Post('upload')
-    @UseInterceptors(FileInterceptor('file', videoMulterConfig))
-    async upload(
-        @UploadedFile() file: Express.Multer.File,
-        @Body() body: { title: string; description?: string; category: string; completionThreshold?: string },
+    // ─────────────────────────────────────────────────────────────────────────
+    // Chunked video upload (raw binary chunks, no multipart/multer)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Post('upload/init')
+    @HttpCode(HttpStatus.CREATED)
+    async initUpload(@Body() body: { fileSize: string; originalName: string }) {
+        return this.uploadService.init({
+            fileSize: Number(body.fileSize),
+            originalName: body.originalName,
+        });
+    }
+
+    @Post('upload/chunk/:uploadId')
+    async uploadChunk(
+        @Param('uploadId') uploadId: string,
+        @Headers('x-chunk-index') chunkIndex: string,
+        @Req() req: Request,
+    ) {
+        const index = Number(chunkIndex);
+        if (!Number.isInteger(index) || index < 0) {
+            throw new BadRequestException('Invalid x-chunk-index header');
+        }
+        return this.uploadService.appendChunk(uploadId, index, req);
+    }
+
+    @Post('upload/finalize/:uploadId')
+    async uploadFinalize(@Param('uploadId') uploadId: string) {
+        return this.uploadService.finalize(uploadId);
+    }
+
+    @Delete('upload/:uploadId')
+    async abortUpload(@Param('uploadId') uploadId: string) {
+        await this.uploadService.abort(uploadId);
+        return { success: true };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Data storing — create() references an already-uploaded file
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Post('videos')
+    @HttpCode(HttpStatus.CREATED)
+    async create(
+        @Body() body: {
+            uploadId: string;
+            title: string;
+            description?: string;
+            category: string;
+            completionThreshold?: string;
+        },
         @CurrentUser() user: any,
     ) {
+        const file = await this.uploadService.resolveUploadedFile(body.uploadId);
         const threshold = body.completionThreshold ? parseInt(body.completionThreshold, 10) : 90;
-        return this.service.create(
+
+        const video = await this.service.create(
             body.title,
             body.description,
             body.category,
@@ -43,6 +80,11 @@ export class TrainingController {
             file,
             user.sub,
         );
+
+        // Session record no longer needed once the DB row exists.
+        await this.uploadService.complete(body.uploadId).catch(() => undefined);
+
+        return video;
     }
 
     @Get()
