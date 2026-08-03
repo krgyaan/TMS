@@ -6,13 +6,10 @@ export function mapPaymentRequestFormToCreateDTO(
     projectId: number,
     projectName?: string,
 ): CreatePaymentRequestDTO {
-    return {
+    const dto: CreatePaymentRequestDTO = {
         projectId,
         projectName: projectName || undefined,
-        partyName: values.partyName,
-        accountNumber: values.accountNumber,
-        bankName: values.bankName || undefined,
-        ifsc: values.ifsc,
+        paymentMode: values.paymentMode,
         amount: values.amount!,
         paymentAgainst: values.paymentAgainst,
         purchaseOrderId: values.selectedPoId ? Number(values.selectedPoId) : undefined,
@@ -20,16 +17,24 @@ export function mapPaymentRequestFormToCreateDTO(
         poFile: values.poFile?.length ? values.poFile[0] : undefined,
         remark: values.remark || undefined,
     };
+
+    if (values.paymentMode === "BANK_TRANSFER") {
+        dto.partyName = values.partyName;
+        dto.accountNumber = values.accountNumber;
+        dto.bankName = values.bankName || undefined;
+        dto.ifsc = values.ifsc;
+    } else {
+        dto.portalLink = values.portalLink || undefined;
+    }
+
+    return dto;
 }
 
 export function mapPaymentRequestFormToUpdateDTO(
     values: PaymentRequestFormValues,
 ): UpdatePaymentRequestDTO {
-    return {
-        partyName: values.partyName,
-        accountNumber: values.accountNumber,
-        bankName: values.bankName || undefined,
-        ifsc: values.ifsc,
+    const dto: UpdatePaymentRequestDTO = {
+        paymentMode: values.paymentMode,
         amount: values.amount!,
         paymentAgainst: values.paymentAgainst,
         purchaseOrderId: values.selectedPoId ? Number(values.selectedPoId) : undefined,
@@ -37,4 +42,15 @@ export function mapPaymentRequestFormToUpdateDTO(
         poFile: values.poFile?.length ? values.poFile[0] : undefined,
         remark: values.remark || undefined,
     };
+
+    if (values.paymentMode === "BANK_TRANSFER") {
+        dto.partyName = values.partyName;
+        dto.accountNumber = values.accountNumber;
+        dto.bankName = values.bankName || undefined;
+        dto.ifsc = values.ifsc;
+    } else {
+        dto.portalLink = values.portalLink || undefined;
+    }
+
+    return dto;
 }

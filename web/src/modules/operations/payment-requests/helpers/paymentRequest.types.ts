@@ -58,10 +58,10 @@ export interface PaymentRequestRow {
 export interface CreatePaymentRequestDTO {
     projectId?: number | null;
     projectName?: string;
-    partyName: string;
-    accountNumber: string;
+    partyName?: string;
+    accountNumber?: string;
     bankName?: string;
-    ifsc: string;
+    ifsc?: string;
     amount: number;
     paymentAgainst: string;
     purchaseInvoiceId?: number;
@@ -76,10 +76,10 @@ export interface CreatePaymentRequestDTO {
 }
 
 export interface UpdatePaymentRequestDTO {
-    partyName: string;
-    accountNumber: string;
+    partyName?: string;
+    accountNumber?: string;
     bankName?: string;
-    ifsc: string;
+    ifsc?: string;
     amount: number;
     paymentAgainst: string;
     purchaseInvoiceId?: number;

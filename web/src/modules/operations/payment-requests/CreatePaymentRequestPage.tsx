@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBeneficiaries, useCreateBeneficiary, useCreatePaymentRequest, useNextPRNumber } from "@/hooks/api/useProjectPaymentRequests";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
@@ -24,6 +25,8 @@ import { paymentRequestFormSchema, type PaymentRequestFormValues } from "./helpe
 
 const defaultFormValues: PaymentRequestFormValues = {
     selectedBeneficiaryId: "",
+    paymentMode: "BANK_TRANSFER",
+    portalLink: "",
     partyName: "",
     accountNumber: "",
     bankName: "",
@@ -69,6 +72,7 @@ export default function CreatePaymentRequestPage() {
     });
 
     const selectedBeneficiaryId = form.watch("selectedBeneficiaryId");
+    const paymentMode = form.watch("paymentMode");
 
     useEffect(() => {
         if (!selectedBeneficiaryId || !beneficiaries) return;
@@ -176,11 +180,29 @@ export default function CreatePaymentRequestPage() {
 
 
                         <div className="border rounded-lg border-dashed p-4 space-y-4">
-                            <h3 className="text-lg font-semibold flex items-center gap-2">
-                                <Landmark className="h-5 w-5" />
-                                Bank Details
-                            </h3>
-                            <div className="flex items-end gap-4">
+                            <h3 className="text-lg font-semibold">Payment Mode</h3>
+                            <RadioGroup
+                                value={paymentMode}
+                                onValueChange={(v) => form.setValue("paymentMode", v as "BANK_TRANSFER" | "PORTAL")}
+                                className="flex gap-6"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <RadioGroupItem value="BANK_TRANSFER" id="bank-transfer" />
+                                    <Label htmlFor="bank-transfer" className="cursor-pointer">Bank Transfer</Label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <RadioGroupItem value="PORTAL" id="pay-on-portal" />
+                                    <Label htmlFor="pay-on-portal" className="cursor-pointer">Pay on Portal</Label>
+                                </div>
+                            </RadioGroup>
+
+                            {paymentMode === "BANK_TRANSFER" && (
+                                <>
+                                    <h4 className="text-md font-semibold flex items-center gap-2">
+                                        <Landmark className="h-4 w-4" />
+                                        Beneficiary Details
+                                    </h4>
+                                    <div className="flex items-end gap-4">
                                 <SelectField
                                     control={form.control}
                                     name="selectedBeneficiaryId"
@@ -265,6 +287,19 @@ export default function CreatePaymentRequestPage() {
                                         />
                                     )}
                                 </FieldWrapper>
+                            </div>
+                                </>
+                            )}
+
+                            {paymentMode === "PORTAL" && (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <FieldWrapper control={form.control} name="portalLink" label="Portal URL">
+                                        {(field) => <Input {...field} placeholder="Enter portal payment link..." />}
+                                    </FieldWrapper>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <FieldWrapper control={form.control} name="amount" label={<>Amount <span className="text-destructive">*</span></>}>
                                     {(field) => (
                                         <Input
