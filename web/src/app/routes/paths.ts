@@ -130,6 +130,7 @@ export const paths = {
         contractAgreementShowPage: (id: number) => `/operations/work-order/contract-agreement/${id}`,
 
         projectListPage: "/operations/project-dashboard",
+        projectListApi: "/projects/list",
         projectDashboard: (id?: number) => id ? `/operations/project-dashboard/${id}` : "/operations/project-dashboard",
         projectShowPage: (id: number) => `/operations/project-dashboard/show/${id}`,
         raisePoForm: (projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/create`,

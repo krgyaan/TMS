@@ -7,15 +7,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, FileText, Search, LayoutDashboard, Eye } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { AlertCircle, FileText, Search, LayoutDashboard, Eye, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { paths } from "@/app/routes/paths";
-import { useProjectMasters } from "@/hooks/api/useProjectMaster";
+import { useProjectList } from "@/hooks/api/useProjectDashboard";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
-import { formatDate } from "@/hooks/useFormatedDate";
+import { useAuth } from "@/contexts/AuthContext";
 import type { ProjectMasterListRow } from "@/modules/shared/master-project/helpers/projectMaster.types";
+import { dateCol } from "@/components/data-grid";
+import { Badge } from "@/components/ui/badge";
 
 const IconAction: React.FC<{
     icon: React.ElementType;
@@ -50,6 +52,47 @@ const IconAction: React.FC<{
     </TooltipProvider>
 );
 
+const SourceCell: React.FC<{ row: ProjectMasterListRow }> = ({ row }) => {
+    const hasTender = row.tenderId != null;
+    if (hasTender) {
+        return (
+            <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Badge variant="secondary">
+                            <Info /> Tender
+                        </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                        <div className="flex flex-col gap-1">
+                            <span>- {row.tenderName || "Tender"}</span>
+                            <span>- {row.tenderNo || "—"}</span>
+                            <span>- {row.teamMemberName}</span>
+                        </div>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        );
+    }
+    if (row.enquiryId != null) {
+        return (
+            <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Badge variant="secondary">
+                            <Info /> Enquiry
+                        </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                        <span>Enquiry ID: {row.enquiryId}</span>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        );
+    }
+    return <span className="text-sm text-muted-foreground">—</span>;
+};
+
 export default function ProjectListPage() {
     const {
         search,
@@ -57,24 +100,26 @@ export default function ProjectListPage() {
         debouncedSearch,
         pagination,
         setPagination,
-        sortModel,
-        handleSortChanged,
         handlePageSizeChange,
     } = usePersistentTableState({
         storageKey: "project-list",
         defaultTab: "default",
     });
 
+    const { isAdmin, isSuperUser, teamName: userTeamName } = useAuth();
     const navigate = useNavigate();
 
-    const { data: apiResponse, isLoading, error } = useProjectMasters(
-        {
-            page: pagination.pageIndex + 1,
-            limit: pagination.pageSize,
-            search: debouncedSearch || undefined,
-        },
-        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort },
-    );
+    const teamFilter = useMemo(() => {
+        if (isAdmin || isSuperUser) return undefined;
+        return userTeamName ?? undefined;
+    }, [isAdmin, isSuperUser, userTeamName]);
+
+    const { data: apiResponse, isLoading, error } = useProjectList({
+        page: pagination.pageIndex + 1,
+        limit: pagination.pageSize,
+        search: debouncedSearch || undefined,
+        teamName: teamFilter,
+    });
 
     const rows = apiResponse?.data ?? [];
     const totalRows = apiResponse?.meta?.total ?? 0;
@@ -82,63 +127,70 @@ export default function ProjectListPage() {
     const colDefs = useMemo<ColDef<ProjectMasterListRow>[]>(
         () => [
             {
-                field: "projectName",
-                colId: "projectName",
-                headerName: "Project Name",
-                flex: 1.5,
-                minWidth: 160,
-                valueGetter: params => params.data?.projectName ?? "—",
-                sortable: true,
+                field: "teamName",
+                colId: "teamName",
+                headerName: "Team",
+                minWidth: 100,
+                width: 80,
+                valueGetter: params => params.data?.teamName ?? "—",
+                sortable: false,
+                filter: true,
+            },
+            {
+                field: "poNo",
+                colId: "poNo",
+                headerName: "PO/WO No",
+                minWidth: 200,
+                valueGetter: params => params.data?.poNo ?? "—",
+                sortable: false,
                 filter: true,
             },
             {
                 field: "projectCode",
                 colId: "projectCode",
                 headerName: "Project Code",
-                flex: 1,
-                minWidth: 120,
+                minWidth: 250,
                 valueGetter: params => params.data?.projectCode ?? "—",
-                sortable: true,
+                sortable: false,
                 filter: true,
             },
             {
-                field: "poNo",
-                colId: "poNo",
-                headerName: "PO No",
-                flex: 1,
-                minWidth: 100,
-                valueGetter: params => params.data?.poNo ?? "—",
-                sortable: true,
+                field: "projectName",
+                colId: "projectName",
+                headerName: "Project Name",
+                minWidth: 180,
+                valueGetter: params => params.data?.projectName ?? "—",
+                sortable: false,
                 filter: true,
             },
-            {
+            dateCol<ProjectMasterListRow>("poDate", { includeTime: false }, {
                 field: "poDate",
                 colId: "poDate",
                 headerName: "PO Date",
-                flex: 1,
-                minWidth: 120,
-                valueGetter: params => params.data?.poDate ? formatDate(params.data.poDate) : "—",
-                sortable: true,
                 filter: true,
-            },
+                sortable: false,
+                width: 120,
+            }),
             {
-                field: "teamName",
-                colId: "teamName",
-                headerName: "Team",
-                flex: 1,
-                minWidth: 100,
-                valueGetter: params => params.data?.teamName ?? "—",
-                sortable: true,
+                headerName: "Source",
+                minWidth: 120,
+                cellRenderer: (params: CustomCellRendererProps<ProjectMasterListRow>) => {
+                    const row = params.data as ProjectMasterListRow | undefined;
+                    if (!row) return null;
+                    return <SourceCell row={row} />;
+                },
+                sortable: false,
                 filter: true,
             },
             {
                 headerName: "",
-                width: 110,
+                width: 120,
                 sortable: false,
                 filter: false,
                 pinned: "right",
                 cellRenderer: (params: CustomCellRendererProps<ProjectMasterListRow>) => {
-                    const row = params.data as ProjectMasterListRow | undefined; if (!row) return null;
+                    const row = params.data as ProjectMasterListRow | undefined;
+                    if (!row) return null;
                     return (
                         <div className="flex items-center justify-end gap-1">
                             <IconAction
@@ -231,10 +283,9 @@ export default function ProjectListPage() {
                                 defaultColDef: {
                                     editable: false,
                                     filter: true,
-                                    sortable: true,
+                                    sortable: false,
                                     resizable: true,
                                 },
-                                onSortChanged: handleSortChanged,
                                 overlayNoRowsTemplate:
                                     '<span style="padding: 10px; text-align: center;">No projects found</span>',
                             }}
