@@ -89,6 +89,41 @@ export class PaymentRequestService {
             }
         }
 
+        if (body.vendorWorkOrderId) {
+            const wo = await this.db
+                .select()
+                .from(vendorWorkOrders)
+                .where(eq(vendorWorkOrders.id, body.vendorWorkOrderId))
+                .then(rows => rows[0]);
+
+            if (!wo) {
+                throw new NotFoundException("Vendor Work Order not found");
+            }
+
+            if (wo.woApproved !== true) {
+                throw new BadRequestException("Cannot create payment request against an unapproved WO. Only approved WOs are eligible.");
+            }
+
+            if (wo?.amountAfterTds) {
+                const amountAfterTds = Number(wo.amountAfterTds);
+                const existingSumResult = await this.db
+                    .select({
+                        total: sql<number>`COALESCE(SUM(amount::numeric), 0)`,
+                    })
+                    .from(paymentRequests)
+                    .where(and(eq(paymentRequests.vendorWorkOrderId, body.vendorWorkOrderId), ne(paymentRequests.status, "rejected")));
+                const existingSum = Number(existingSumResult[0]?.total ?? 0);
+                const requestedAmount = Number(body.amount ?? 0);
+
+                if (existingSum + requestedAmount > amountAfterTds) {
+                    throw new BadRequestException(
+                        `Payment request amount (${requestedAmount}) exceeds remaining WO limit. ` +
+                        `Available: ${amountAfterTds - existingSum}, Already used: ${existingSum}`,
+                    );
+                }
+            }
+        }
+
         const pr = (
             await this.db
                 .insert(paymentRequests)
