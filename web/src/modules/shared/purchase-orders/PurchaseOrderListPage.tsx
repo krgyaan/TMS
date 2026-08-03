@@ -17,7 +17,7 @@ import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import type { PurchaseOrderRow } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
 import { SetTdsDialog } from "./components/SetTdsDialog";
-import { PoProgressCell } from "./components/PoProgressCell";
+import { OrderProgressCell } from "@/components/OrderProgressCell";
 
 interface PurchaseOrderListPageProps {
     purchaseOrders?: PurchaseOrderRow[];
@@ -269,7 +269,13 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
             filter: false,
             sortable: false,
             cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => (
-                p.data ? <PoProgressCell row={p.data} /> : null
+                p.data ? (
+                    <OrderProgressCell
+                        paid={Number(p.data.totalPaymentDone || 0)}
+                        invoiced={Number(p.data.totalPiAmount || 0)}
+                        paymentBase={Number(p.data.amountAfterTds || 0)}
+                    />
+                ) : null
             ),
             width: 130,
         },
