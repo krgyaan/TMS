@@ -29,6 +29,7 @@ export interface UploadedVideoFile {
 export interface InitUploadParams {
     fileSize: number;
     originalName: string;
+    totalChunks?: number;
 }
 
 export interface ChunkResult {
@@ -84,6 +85,7 @@ export class TrainingUploadService implements OnModuleInit {
         }
 
         const uploadId = randomUUID();
+        const totalChunks = params.totalChunks && params.totalChunks > 0 ? params.totalChunks : undefined;
         const session: UploadSession = {
             uploadId,
             expectedSize: params.fileSize,
@@ -94,7 +96,12 @@ export class TrainingUploadService implements OnModuleInit {
         };
 
         await this.saveSession(session);
-        this.logger.log(`Upload session created: ${uploadId} (${params.fileSize} bytes)`);
+        this.logger.log("Upload session created", {
+            uploadId,
+            originalName: params.originalName,
+            fileSize: params.fileSize,
+            totalChunks,
+        });
         return { uploadId };
     }
 
@@ -105,9 +112,19 @@ export class TrainingUploadService implements OnModuleInit {
     async appendChunk(uploadId: string, index: number, body: Readable | NodeJS.ReadableStream): Promise<ChunkResult> {
         const session = await this.loadSession(uploadId);
         if (session.status !== "in-progress") {
+            this.logger.warn("Chunk rejected: session not active", {
+                uploadId,
+                index,
+                status: session.status,
+            });
             throw new BadRequestException("Upload session is not active (already finalized or aborted)");
         }
         if (index !== session.nextChunkIndex) {
+            this.logger.warn("Chunk rejected: out of order", {
+                uploadId,
+                index,
+                expectedIndex: session.nextChunkIndex,
+            });
             throw new BadRequestException(`Unexpected chunk index ${index}; expected ${session.nextChunkIndex}`);
         }
 
@@ -130,6 +147,15 @@ export class TrainingUploadService implements OnModuleInit {
         session.nextChunkIndex += 1;
         await this.saveSession(session);
 
+        this.logger.log("Chunk appended", {
+            uploadId,
+            index,
+            chunkBytes: bytes,
+            receivedBytes: session.receivedBytes,
+            expectedSize: session.expectedSize,
+            progressPct: session.expectedSize > 0 ? Math.round((session.receivedBytes / session.expectedSize) * 100) : 0,
+        });
+
         return { receivedBytes: session.receivedBytes, expectedSize: session.expectedSize };
     }
 
@@ -140,6 +166,10 @@ export class TrainingUploadService implements OnModuleInit {
     async finalize(uploadId: string): Promise<UploadedVideoFile> {
         const session = await this.loadSession(uploadId);
         if (session.status !== "in-progress") {
+            this.logger.warn("Finalize rejected: session not in-progress", {
+                uploadId,
+                status: session.status,
+            });
             throw new BadRequestException("Session is not in-progress");
         }
 
@@ -147,6 +177,11 @@ export class TrainingUploadService implements OnModuleInit {
         const { size: partSize } = await stat(partPath);
 
         if (partSize !== session.expectedSize) {
+            this.logger.warn("Finalize rejected: incomplete upload", {
+                uploadId,
+                expectedSize: session.expectedSize,
+                receivedBytes: partSize,
+            });
             throw new BadRequestException(`Incomplete upload: expected ${session.expectedSize} bytes, received ${partSize}`);
         }
 
@@ -164,6 +199,8 @@ export class TrainingUploadService implements OnModuleInit {
 
         this.logger.log("Upload finalized", {
             uploadId,
+            originalName: session.originalName,
+            filename,
             filepath,
             filesize: partSize,
         });
@@ -182,8 +219,18 @@ export class TrainingUploadService implements OnModuleInit {
     async resolveUploadedFile(uploadId: string): Promise<UploadedVideoFile> {
         const session = await this.loadSession(uploadId);
         if (session.status !== "uploaded" || !session.filepath || !session.filesize) {
+            this.logger.warn("Upload resolve failed: no finalized file", {
+                uploadId,
+                status: session.status,
+            });
             throw new NotFoundException(`No finalized upload found for ${uploadId}`);
         }
+        this.logger.log("Upload resolved for create", {
+            uploadId,
+            filename: session.filename,
+            filepath: session.filepath,
+            filesize: session.filesize,
+        });
         return {
             uploadId,
             filename: session.filename!,
@@ -198,7 +245,7 @@ export class TrainingUploadService implements OnModuleInit {
     async complete(uploadId: string): Promise<void> {
         try {
             await rm(this.sessionDir(uploadId), { recursive: true, force: true });
-            this.logger.log(`Upload session cleaned up: ${uploadId}`);
+            this.logger.log("Upload session cleaned up after create", { uploadId });
         } catch (err) {
             this.logger.warn(`Failed to clean up upload session ${uploadId}`, {
                 error: (err as Error).message,

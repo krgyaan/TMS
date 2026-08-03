@@ -1,19 +1,20 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { Queue } from 'bullmq';
-import { and, eq, inArray } from 'drizzle-orm';
-import { unlink } from 'fs/promises';
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Queue } from "bullmq";
+import { and, eq, inArray } from "drizzle-orm";
+import { unlink } from "fs/promises";
 
-import type { DbInstance } from '@/db';
-import { DRIZZLE } from '@/db/database.module';
-import { oauthAccounts } from '@/db/schemas/auth/oauth-accounts.schema';
-import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
-import { users } from '@/db/schemas/auth/users.schema';
-import { trainingAssignments } from '@/db/schemas/hrms/training-assignments.schema';
-import { trainingComments } from '@/db/schemas/hrms/training-comments.schema';
-import { trainingVideoReactions } from '@/db/schemas/hrms/training-video-reactions.schema';
-import { trainingVideos } from '@/db/schemas/hrms/training-videos.schema';
-import { trainingWatchHistory } from '@/db/schemas/hrms/training-watch-history.schema';
-import { teams } from '@/db/schemas/master/teams.schema';
+import type { DbInstance } from "@/db";
+import { DRIZZLE } from "@/db/database.module";
+import { AppLogger } from "@/logger/app-logger.service";
+import { oauthAccounts } from "@/db/schemas/auth/oauth-accounts.schema";
+import { userProfiles } from "@/db/schemas/auth/user-profiles.schema";
+import { users } from "@/db/schemas/auth/users.schema";
+import { trainingAssignments } from "@/db/schemas/hrms/training-assignments.schema";
+import { trainingComments } from "@/db/schemas/hrms/training-comments.schema";
+import { trainingVideoReactions } from "@/db/schemas/hrms/training-video-reactions.schema";
+import { trainingVideos } from "@/db/schemas/hrms/training-videos.schema";
+import { trainingWatchHistory } from "@/db/schemas/hrms/training-watch-history.schema";
+import { teams } from "@/db/schemas/master/teams.schema";
 
 export interface VideoFileInput {
     filename: string;
@@ -23,20 +24,28 @@ export interface VideoFileInput {
 
 @Injectable()
 export class TrainingService {
+    private readonly logger: ReturnType<AppLogger["withContext"]>;
+
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-        @Inject('VIDEO_PROCESSING_QUEUE') private readonly videoQueue: Queue,
-    ) {}
-
-    async create(
-        title: string,
-        description: string | undefined,
-        category: string,
-        completionThreshold: number,
-        file: VideoFileInput,
-        userId: number,
+        @Inject("VIDEO_PROCESSING_QUEUE") private readonly videoQueue: Queue,
+        private readonly appLogger: AppLogger
     ) {
+        this.logger = this.appLogger.withContext(TrainingService.name);
+    }
+
+    async create(title: string, description: string | undefined, category: string, completionThreshold: number, file: VideoFileInput, userId: number) {
         const videoCode = `TRN-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        this.logger.log("Creating training video record", {
+            title,
+            category,
+            completionThreshold,
+            filename: file.filename,
+            filepath: file.filepath,
+            filesize: file.filesize,
+            uploadedBy: userId,
+        });
 
         let newVideo;
         try {
@@ -49,8 +58,8 @@ export class TrainingService {
                     filename: file.filename,
                     filepath: file.filepath,
                     filesize: file.filesize,
-                    status: 'processing',
-                    storageProvider: 'VPS',
+                    status: "processing",
+                    storageProvider: "VPS",
                     storageKey: file.filename,
                     completionThreshold,
                     category,
@@ -58,20 +67,40 @@ export class TrainingService {
                 })
                 .returning();
 
+            this.logger.log("Training video record created", {
+                videoId: newVideo.id,
+                videoCode,
+                title,
+                status: "processing",
+            });
+
             // Add job to video processing queue
             await this.videoQueue.add(
-                'process-video',
+                "process-video",
                 { videoId: newVideo.id, filepath: file.filepath },
                 {
                     attempts: 3,
-                    backoff: { type: 'exponential', delay: 10000 },
-                },
+                    backoff: { type: "exponential", delay: 10000 },
+                }
             );
+
+            this.logger.log("Video processing job enqueued", {
+                videoId: newVideo.id,
+                queue: "video-processing-queue",
+                filepath: file.filepath,
+            });
         } catch (error) {
+            this.logger.error("Failed to create training video record", {
+                title,
+                filename: file.filename,
+                error: (error as Error).message,
+            });
             // Clean up uploaded file if DB insert or queue add fails
             try {
                 await unlink(file.filepath);
-            } catch { /* ignore if file already gone */ }
+            } catch {
+                /* ignore if file already gone */
+            }
             throw error;
         }
 
@@ -79,46 +108,32 @@ export class TrainingService {
     }
 
     async findAll() {
-        const videosList = await this.db
-            .select()
-            .from(trainingVideos)
-            .orderBy(trainingVideos.createdAt);
+        const videosList = await this.db.select().from(trainingVideos).orderBy(trainingVideos.createdAt);
 
         // Fetch all reactions to group them in-memory
-        const reactions = await this.db
-            .select()
-            .from(trainingVideoReactions);
+        const reactions = await this.db.select().from(trainingVideoReactions);
 
         return videosList.map(video => {
             const videoReactions = reactions.filter(r => r.videoId === video.id);
-            const helpful = videoReactions.filter(r => r.reaction.toLowerCase() === 'helpful').length;
-            const important = videoReactions.filter(r => r.reaction.toLowerCase() === 'important').length;
-            const confusing = videoReactions.filter(r => r.reaction.toLowerCase() === 'confusing').length;
+            const helpful = videoReactions.filter(r => r.reaction.toLowerCase() === "helpful").length;
+            const important = videoReactions.filter(r => r.reaction.toLowerCase() === "important").length;
+            const confusing = videoReactions.filter(r => r.reaction.toLowerCase() === "confusing").length;
 
             return {
                 ...video,
-                reactions: { helpful, important, confusing }
+                reactions: { helpful, important, confusing },
             };
         });
     }
 
     async togglePublish(id: number) {
         const video = await this.findOne(id);
-        const [updated] = await this.db
-            .update(trainingVideos)
-            .set({ isPublished: !video.isPublished, updatedAt: new Date() })
-            .where(eq(trainingVideos.id, id))
-            .returning();
+        const [updated] = await this.db.update(trainingVideos).set({ isPublished: !video.isPublished, updatedAt: new Date() }).where(eq(trainingVideos.id, id)).returning();
         return updated;
     }
 
-
     async findOne(id: number) {
-        const [video] = await this.db
-            .select()
-            .from(trainingVideos)
-            .where(eq(trainingVideos.id, id))
-            .limit(1);
+        const [video] = await this.db.select().from(trainingVideos).where(eq(trainingVideos.id, id)).limit(1);
 
         if (!video) {
             throw new NotFoundException(`Training video with ID ${id} not found`);
@@ -134,7 +149,7 @@ export class TrainingService {
         try {
             await unlink(video.filepath);
         } catch (err: any) {
-            if (err.code !== 'ENOENT') {
+            if (err.code !== "ENOENT") {
                 console.error(`Failed to delete video file at ${video.filepath}:`, err);
             }
         }
@@ -144,36 +159,26 @@ export class TrainingService {
             try {
                 await unlink(video.thumbnailPath);
             } catch (err: any) {
-                if (err.code !== 'ENOENT') {
+                if (err.code !== "ENOENT") {
                     console.error(`Failed to delete thumbnail file at ${video.thumbnailPath}:`, err);
                 }
             }
         }
 
         // Delete assignments
-        await this.db
-            .delete(trainingAssignments)
-            .where(eq(trainingAssignments.videoId, id));
+        await this.db.delete(trainingAssignments).where(eq(trainingAssignments.videoId, id));
 
         // Delete watch history
-        await this.db
-            .delete(trainingWatchHistory)
-            .where(eq(trainingWatchHistory.videoId, id));
+        await this.db.delete(trainingWatchHistory).where(eq(trainingWatchHistory.videoId, id));
 
         // Delete comments
-        await this.db
-            .delete(trainingComments)
-            .where(eq(trainingComments.videoId, id));
+        await this.db.delete(trainingComments).where(eq(trainingComments.videoId, id));
 
         // Delete reactions
-        await this.db
-            .delete(trainingVideoReactions)
-            .where(eq(trainingVideoReactions.videoId, id));
+        await this.db.delete(trainingVideoReactions).where(eq(trainingVideoReactions.videoId, id));
 
         // Delete DB record
-        await this.db
-            .delete(trainingVideos)
-            .where(eq(trainingVideos.id, id));
+        await this.db.delete(trainingVideos).where(eq(trainingVideos.id, id));
 
         return { success: true, message: `Video ${id} deleted successfully` };
     }
@@ -196,8 +201,8 @@ export class TrainingService {
         return employeesList.map(e => ({
             id: e.id,
             name: e.name,
-            dept: e.dept || 'General',
-            designation: 'Staff',
+            dept: e.dept || "General",
+            designation: "Staff",
         }));
     }
 
@@ -205,25 +210,20 @@ export class TrainingService {
     // Assignments Management
     // ─────────────────────────────────────────────────────────────────────────
     async assignVideo(videoId: number, userIds: number[], assignedByUserId: number) {
-        if (!userIds || userIds.length === 0) return { success: true, message: 'No users provided' };
+        if (!userIds || userIds.length === 0) return { success: true, message: "No users provided" };
 
         const values = userIds.map(userId => ({
             videoId,
             userId,
             assignedBy: assignedByUserId,
-            status: 'Assigned' as const,
+            status: "Assigned" as const,
         }));
 
         // Find existing assignments to filter out duplicates
         const existing = await this.db
             .select()
             .from(trainingAssignments)
-            .where(
-                and(
-                    eq(trainingAssignments.videoId, videoId),
-                    inArray(trainingAssignments.userId, userIds)
-                )
-            );
+            .where(and(eq(trainingAssignments.videoId, videoId), inArray(trainingAssignments.userId, userIds)));
 
         const existingUserIds = existing.map(e => e.userId);
         const toInsert = values.filter(v => !existingUserIds.includes(v.userId));
@@ -251,23 +251,17 @@ export class TrainingService {
             .innerJoin(users, eq(trainingAssignments.userId, users.id))
             .innerJoin(trainingVideos, eq(trainingAssignments.videoId, trainingVideos.id))
             .leftJoin(teams, eq(users.team, teams.id))
-            .leftJoin(
-                trainingWatchHistory,
-                and(
-                    eq(trainingWatchHistory.userId, trainingAssignments.userId),
-                    eq(trainingWatchHistory.videoId, trainingAssignments.videoId)
-                )
-            )
+            .leftJoin(trainingWatchHistory, and(eq(trainingWatchHistory.userId, trainingAssignments.userId), eq(trainingWatchHistory.videoId, trainingAssignments.videoId)))
             .orderBy(trainingAssignments.createdAt);
 
         return rows.map(r => ({
             id: r.id,
             userName: r.userName,
-            dept: r.dept || 'General',
+            dept: r.dept || "General",
             videoTitle: r.videoTitle,
             progress: r.progress ? Math.round(parseFloat(r.progress)) : 0,
-            status: r.status as 'Assigned' | 'In Progress' | 'Completed',
-            completedAt: r.completedAt ? r.completedAt.toISOString().split('T')[0] : null,
+            status: r.status as "Assigned" | "In Progress" | "Completed",
+            completedAt: r.completedAt ? r.completedAt.toISOString().split("T")[0] : null,
         }));
     }
 
@@ -287,23 +281,17 @@ export class TrainingService {
             })
             .from(trainingAssignments)
             .innerJoin(trainingVideos, eq(trainingAssignments.videoId, trainingVideos.id))
-            .leftJoin(
-                trainingWatchHistory,
-                and(
-                    eq(trainingWatchHistory.userId, userId),
-                    eq(trainingWatchHistory.videoId, trainingVideos.id)
-                )
-            )
+            .leftJoin(trainingWatchHistory, and(eq(trainingWatchHistory.userId, userId), eq(trainingWatchHistory.videoId, trainingVideos.id)))
             .where(eq(trainingAssignments.userId, userId));
 
         return rows.map(r => ({
             id: r.id,
             title: r.title,
-            description: r.description || '',
-            category: r.category || 'General',
-            duration: r.durationSeconds ? `${Math.floor(r.durationSeconds / 60)}m ${r.durationSeconds % 60}s` : '0m 0s',
+            description: r.description || "",
+            category: r.category || "General",
+            duration: r.durationSeconds ? `${Math.floor(r.durationSeconds / 60)}m ${r.durationSeconds % 60}s` : "0m 0s",
             progress: r.progress ? Math.round(parseFloat(r.progress)) : 0,
-            status: r.status as 'Assigned' | 'In Progress' | 'Completed',
+            status: r.status as "Assigned" | "In Progress" | "Completed",
             videoUrl: `/api/v1/hrms/training/${r.id}/stream`,
             thumbnailPath: r.thumbnailPath ?? null,
         }));
@@ -312,13 +300,7 @@ export class TrainingService {
     // ─────────────────────────────────────────────────────────────────────────
     // Watch History / Progress Logging
     // ─────────────────────────────────────────────────────────────────────────
-    async logProgress(
-        videoId: number,
-        userId: number,
-        lastPositionSecs: number,
-        totalWatchSecs: number,
-        completionPct: number,
-    ) {
+    async logProgress(videoId: number, userId: number, lastPositionSecs: number, totalWatchSecs: number, completionPct: number) {
         const video = await this.findOne(videoId);
         const threshold = video.completionThreshold || 90;
         const isNowCompleted = completionPct >= threshold;
@@ -326,12 +308,7 @@ export class TrainingService {
         const [history] = await this.db
             .select()
             .from(trainingWatchHistory)
-            .where(
-                and(
-                    eq(trainingWatchHistory.userId, userId),
-                    eq(trainingWatchHistory.videoId, videoId)
-                )
-            )
+            .where(and(eq(trainingWatchHistory.userId, userId), eq(trainingWatchHistory.videoId, videoId)))
             .limit(1);
 
         let record;
@@ -347,11 +324,7 @@ export class TrainingService {
                 updates.isCompleted = true;
                 updates.completedAt = new Date();
             }
-            [record] = await this.db
-                .update(trainingWatchHistory)
-                .set(updates)
-                .where(eq(trainingWatchHistory.id, history.id))
-                .returning();
+            [record] = await this.db.update(trainingWatchHistory).set(updates).where(eq(trainingWatchHistory.id, history.id)).returning();
         } else {
             const insertData: any = {
                 userId,
@@ -365,23 +338,15 @@ export class TrainingService {
                 isCompleted: isNowCompleted,
                 completedAt: isNowCompleted ? new Date() : null,
             };
-            [record] = await this.db
-                .insert(trainingWatchHistory)
-                .values(insertData)
-                .returning();
+            [record] = await this.db.insert(trainingWatchHistory).values(insertData).returning();
         }
 
         // Update the assignment status if it exists
-        const nextStatus = record.isCompleted ? 'Completed' : 'In Progress';
+        const nextStatus = record.isCompleted ? "Completed" : "In Progress";
         await this.db
             .update(trainingAssignments)
             .set({ status: nextStatus, updatedAt: new Date() })
-            .where(
-                and(
-                    eq(trainingAssignments.userId, userId),
-                    eq(trainingAssignments.videoId, videoId)
-                )
-            );
+            .where(and(eq(trainingAssignments.userId, userId), eq(trainingAssignments.videoId, videoId)));
 
         return record;
     }
@@ -391,14 +356,7 @@ export class TrainingService {
     // ─────────────────────────────────────────────────────────────────────────
     async addReaction(videoId: number, userId: number, reaction: string) {
         // Delete any existing reaction from this user for this video
-        await this.db
-            .delete(trainingVideoReactions)
-            .where(
-                and(
-                    eq(trainingVideoReactions.userId, userId),
-                    eq(trainingVideoReactions.videoId, videoId)
-                )
-            );
+        await this.db.delete(trainingVideoReactions).where(and(eq(trainingVideoReactions.userId, userId), eq(trainingVideoReactions.videoId, videoId)));
 
         return this.db
             .insert(trainingVideoReactions)
@@ -413,28 +371,19 @@ export class TrainingService {
     async removeReaction(videoId: number, userId: number, reaction: string) {
         await this.db
             .delete(trainingVideoReactions)
-            .where(
-                and(
-                    eq(trainingVideoReactions.userId, userId),
-                    eq(trainingVideoReactions.videoId, videoId),
-                    eq(trainingVideoReactions.reaction, reaction)
-                )
-            );
+            .where(and(eq(trainingVideoReactions.userId, userId), eq(trainingVideoReactions.videoId, videoId), eq(trainingVideoReactions.reaction, reaction)));
         return { success: true };
     }
 
     async getReactions(videoId: number, userId: number) {
-        const reactions = await this.db
-            .select()
-            .from(trainingVideoReactions)
-            .where(eq(trainingVideoReactions.videoId, videoId));
+        const reactions = await this.db.select().from(trainingVideoReactions).where(eq(trainingVideoReactions.videoId, videoId));
 
         const counts = { helpful: 0, important: 0, confusing: 0 };
         let myReaction: string | null = null;
 
         for (const r of reactions) {
-            const reactKey = r.reaction.toLowerCase() as 'helpful' | 'important' | 'confusing';
-            if (reactKey === 'helpful' || reactKey === 'important' || reactKey === 'confusing') {
+            const reactKey = r.reaction.toLowerCase() as "helpful" | "important" | "confusing";
+            if (reactKey === "helpful" || reactKey === "important" || reactKey === "confusing") {
                 counts[reactKey]++;
             }
             if (r.userId === userId) {
@@ -451,11 +400,7 @@ export class TrainingService {
     async addComment(videoId: number, userId: number, body: string, parentCommentId?: number) {
         let depthLevel = 0;
         if (parentCommentId) {
-            const [parent] = await this.db
-                .select()
-                .from(trainingComments)
-                .where(eq(trainingComments.id, parentCommentId))
-                .limit(1);
+            const [parent] = await this.db.select().from(trainingComments).where(eq(trainingComments.id, parentCommentId)).limit(1);
             if (parent) {
                 depthLevel = parent.depthLevel + 1;
             }
@@ -501,16 +446,16 @@ export class TrainingService {
         const timeAgo = (date: Date) => {
             const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
             let interval = Math.floor(seconds / 31536000);
-            if (interval >= 1) return interval === 1 ? '1 year ago' : `${interval} years ago`;
+            if (interval >= 1) return interval === 1 ? "1 year ago" : `${interval} years ago`;
             interval = Math.floor(seconds / 2592000);
-            if (interval >= 1) return interval === 1 ? '1 month ago' : `${interval} months ago`;
+            if (interval >= 1) return interval === 1 ? "1 month ago" : `${interval} months ago`;
             interval = Math.floor(seconds / 86400);
-            if (interval >= 1) return interval === 1 ? '1 day ago' : `${interval} days ago`;
+            if (interval >= 1) return interval === 1 ? "1 day ago" : `${interval} days ago`;
             interval = Math.floor(seconds / 3600);
-            if (interval >= 1) return interval === 1 ? '1 hour ago' : `${interval} hours ago`;
+            if (interval >= 1) return interval === 1 ? "1 hour ago" : `${interval} hours ago`;
             interval = Math.floor(seconds / 60);
-            if (interval >= 1) return interval === 1 ? '1 minute ago' : `${interval} minutes ago`;
-            return 'Just now';
+            if (interval >= 1) return interval === 1 ? "1 minute ago" : `${interval} minutes ago`;
+            return "Just now";
         };
 
         for (const r of rows) {
@@ -539,4 +484,3 @@ export class TrainingService {
         return comments;
     }
 }
-
