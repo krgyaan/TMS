@@ -12,3 +12,4 @@ export * from "./shared";
 export * from './email';
 export * from './workflow/timer.schema';
 export * from './hrms';
+export * from './services';

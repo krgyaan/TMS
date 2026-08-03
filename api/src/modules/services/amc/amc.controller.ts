@@ -1,0 +1,100 @@
+import {
+    BadRequestException,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Param,
+    ParseIntPipe,
+    Post,
+    Put,
+    Query,
+    UploadedFile,
+    UseInterceptors,
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { diskStorage } from "multer";
+import { extname } from "path";
+import { ZodValidationPipe } from "nestjs-zod";
+import { AmcService } from "./amc.service";
+import { CreateAmcSchema, UpdateAmcSchema } from "./dto/amc.dto";
+
+const amcMulterConfig = {
+    storage: diskStorage({
+        destination: "./uploads/amc",
+        filename: (req, file, callback) => {
+            const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+            const ext = extname(file.originalname);
+            callback(null, `${uniqueSuffix}${ext}`);
+        },
+    }),
+    limits: {
+        fileSize: 25 * 1024 * 1024,
+    },
+};
+
+const AMC_PATH_FIELDS: Record<string, "amcPoPath" | "serviceReportPath" | "signedServiceReportPath"> = {
+    "po": "amcPoPath",
+    "service-report": "serviceReportPath",
+    "signed-service-report": "signedServiceReportPath",
+};
+
+@Controller("amc")
+export class AmcController {
+    constructor(private readonly service: AmcService) {}
+
+    @Get()
+    list(@Query("projectId") projectId?: string) {
+        return this.service.list(projectId ? Number(projectId) : undefined);
+    }
+
+    @Get(":id")
+    getById(@Param("id", ParseIntPipe) id: number) {
+        return this.service.getById(id);
+    }
+
+    @Post()
+    @HttpCode(HttpStatus.CREATED)
+    create(@Body(new ZodValidationPipe(CreateAmcSchema)) body: any) {
+        return this.service.create(body);
+    }
+
+    @Put(":id")
+    @HttpCode(HttpStatus.OK)
+    update(
+        @Param("id", ParseIntPipe) id: number,
+        @Body(new ZodValidationPipe(UpdateAmcSchema)) body: any,
+    ) {
+        return this.service.update(id, body);
+    }
+
+    @Delete(":id")
+    @HttpCode(HttpStatus.OK)
+    remove(@Param("id", ParseIntPipe) id: number) {
+        return this.service.remove(id);
+    }
+
+    @Post(":id/upload/:field")
+    @UseInterceptors(FileInterceptor("file", amcMulterConfig))
+    async uploadFile(
+        @Param("id", ParseIntPipe) id: number,
+        @Param("field") field: string,
+        @UploadedFile() file: Express.Multer.File | undefined,
+    ) {
+        const dbField = AMC_PATH_FIELDS[field];
+
+        if (!dbField) {
+            throw new BadRequestException(
+                `Invalid upload field "${field}". Expected one of: ${Object.keys(AMC_PATH_FIELDS).join(", ")}`,
+            );
+        }
+
+        if (!file) {
+            throw new BadRequestException("File is required");
+        }
+
+        return this.service.setFilePath(id, dbField, file.filename);
+    }
+}

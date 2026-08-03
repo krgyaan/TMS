@@ -1,4 +1,4 @@
-{
+﻿{
     "version":  "7",
     "dialect":  "postgresql",
     "entries":  [
@@ -413,6 +413,13 @@
                         "version":  "7",
                         "when":  1785480136234,
                         "tag":  "0100_add_quotation_id_to_followups",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  83,
+                        "version":  "7",
+                        "when":  1785781402867,
+                        "tag":  "0103_add_amc_tables",
                         "breakpoints":  true
                     }
                 ]
