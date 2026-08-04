@@ -7,8 +7,10 @@ import { TimersService } from '@/modules/timers/timers.service';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentBgDetails, instrumentChequeDetails, instrumentDdDetails, instrumentFdrDetails, instrumentStatusHistory, instrumentTransferDetails, paymentInstruments, paymentRequestMom, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { paymentRequests as opsPaymentRequests } from '@db/schemas/operations/payment-requests.schema';
 import { ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, like, sql } from 'drizzle-orm';
+import { MakerRequestService } from '@/modules/operations/maker-requests/maker-request.service';
 import type { CreateMomRemarkDto } from '../dto/payment-mom.dto';
 import type { CreatePaymentRequestDto, PaymentPurpose, UpdatePaymentRequestDto, UpdateStatusDto } from '../dto/payment-requests.dto';
 import { PaymentRequestsNotificationService } from './payment-requests-notification.service';
@@ -25,6 +27,8 @@ export class PaymentRequestsCommandService {
         @Inject(forwardRef(() => PaymentRequestsNotificationService))
         private readonly notificationService: PaymentRequestsNotificationService,
         private readonly timersService: TimersService,
+        @Inject(forwardRef(() => MakerRequestService))
+        private readonly makerRequestService: MakerRequestService,
     ) {
         this.logger = this.appLogger.withContext(PaymentRequestsCommandService.name);
     }
@@ -122,6 +126,24 @@ export class PaymentRequestsCommandService {
                             results.push({ request, instrument: chequeResult, isAutoCreatedCheque: true });
                         }
                     }
+
+                    // Auto-create Maker Request for Pay on Portal / Bank Transfer
+                    if ((payload.EMD.mode === 'BANK_TRANSFER' || payload.EMD.mode === 'PORTAL') && instrument) {
+                        try {
+                            const makerRequest = await this.autoCreateMakerRequest(
+                                tx,
+                                request,
+                                instrument,
+                                payload.EMD.mode,
+                                userId
+                            );
+                            if (makerRequest) {
+                                results.push({ request, instrument, makerRequest, isAutoCreatedMakerRequest: true });
+                            }
+                        } catch (error) {
+                            this.logger.warn(`Failed to auto-create Maker Request for EMD payment request ${request.id}:`, error);
+                        }
+                    }
                 }
             }
 
@@ -173,6 +195,24 @@ export class PaymentRequestsCommandService {
                             results.push({ request, instrument: chequeResult, isAutoCreatedCheque: true });
                         }
                     }
+
+                    // Auto-create Maker Request for Pay on Portal / Bank Transfer
+                    if ((payload.TENDER_FEES.mode === 'BANK_TRANSFER' || payload.TENDER_FEES.mode === 'PORTAL') && instrument) {
+                        try {
+                            const makerRequest = await this.autoCreateMakerRequest(
+                                tx,
+                                request,
+                                instrument,
+                                payload.TENDER_FEES.mode,
+                                userId
+                            );
+                            if (makerRequest) {
+                                results.push({ request, instrument, makerRequest, isAutoCreatedMakerRequest: true });
+                            }
+                        } catch (error) {
+                            this.logger.warn(`Failed to auto-create Maker Request for Tender Fee payment request ${request.id}:`, error);
+                        }
+                    }
                 }
             }
 
@@ -222,6 +262,24 @@ export class PaymentRequestsCommandService {
                         );
                         if (chequeResult) {
                             results.push({ request, instrument: chequeResult, isAutoCreatedCheque: true });
+                        }
+                    }
+
+                    // Auto-create Maker Request for Pay on Portal / Bank Transfer
+                    if ((payload.PROCESSING_FEES.mode === 'BANK_TRANSFER' || payload.PROCESSING_FEES.mode === 'PORTAL') && instrument) {
+                        try {
+                            const makerRequest = await this.autoCreateMakerRequest(
+                                tx,
+                                request,
+                                instrument,
+                                payload.PROCESSING_FEES.mode,
+                                userId
+                            );
+                            if (makerRequest) {
+                                results.push({ request, instrument, makerRequest, isAutoCreatedMakerRequest: true });
+                            }
+                        } catch (error) {
+                            this.logger.warn(`Failed to auto-create Maker Request for Processing Fee payment request ${request.id}:`, error);
                         }
                     }
                 }
@@ -625,6 +683,112 @@ export class PaymentRequestsCommandService {
                 break;
         }
         this.logger.log(`Instrument details created successfully: ${mode} - Instrument ID: ${instrumentId}`);
+    }
+
+    /**
+     * Build Maker Request data from payment instrument for Pay on Portal / Bank Transfer
+     */
+    private buildMakerRequestData(
+        paymentRequest: any,
+        instrument: any,
+        mode: string,
+        userId: number
+    ): any {
+        const transferDetails = instrument.instrumentTransferDetails || {};
+        const purpose = paymentRequest.purpose || 'Other Payment';
+
+        return {
+            partyName: transferDetails.accountName || instrument.favouring || transferDetails.portalName || 'Unknown',
+            accountNumber: transferDetails.accountNumber || null,
+            bankName: transferDetails.bankName || null,
+            ifsc: transferDetails.ifsc || null,
+            amount: paymentRequest.amountRequired || '0',
+            category: purpose,
+            paymentMode: mode,
+            portalLink: transferDetails.portalName || null,
+            billFiles: [],
+            uploadInvoice: [],
+            uploadPI: [],
+            uploadInvoiceAfterPayment: [],
+            remark: paymentRequest.remarks || null,
+            requestedBy: userId,
+        };
+    }
+
+    /**
+     * Auto-create Maker Request for Pay on Portal / Bank Transfer
+     */
+    private async autoCreateMakerRequest(
+        tx: any,
+        paymentRequest: any,
+        instrument: any,
+        mode: string,
+        userId?: number
+    ): Promise<any> {
+        this.logger.log(`Auto-creating Maker Request from ${mode} payment request: ${paymentRequest.id}`);
+
+        const makerRequestData = this.buildMakerRequestData(
+            paymentRequest,
+            instrument,
+            mode,
+            userId || 0
+        );
+
+        const [makerRequest] = await tx
+            .insert(opsPaymentRequests)
+            .values({
+                projectId: null,
+                requestNo: await this.generateMakerRequestNo(tx),
+                partyName: makerRequestData.partyName,
+                accountNumber: makerRequestData.accountNumber,
+                bankName: makerRequestData.bankName,
+                ifsc: makerRequestData.ifsc,
+                amount: makerRequestData.amount,
+                paymentAgainst: makerRequestData.category,
+                paymentMode: makerRequestData.paymentMode,
+                portalLink: makerRequestData.portalLink,
+                billFiles: makerRequestData.billFiles,
+                uploadInvoice: makerRequestData.uploadInvoice,
+                uploadPI: makerRequestData.uploadPI,
+                uploadInvoiceAfterPayment: makerRequestData.uploadInvoiceAfterPayment,
+                remark: "Maker Request auto-created from EMD/Tender Fee/Processing Fee Module",
+                requestedBy: makerRequestData.requestedBy,
+                status: 'pending',
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            })
+            .returning()
+            .execute();
+
+        this.logger.log(`Auto-created Maker Request: ${makerRequest.requestNo} for payment request ${paymentRequest.id}`);
+        return makerRequest;
+    }
+
+    private async generateMakerRequestNo(tx: any): Promise<string> {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        const from = month >= 4 ? year.toString().slice(-2) : (year - 1).toString().slice(-2);
+        const to = ((parseInt(from) + 1) % 100).toString().padStart(2, '0');
+        const fy = `${from}${to}`;
+
+        const last = await tx
+            .select({ id: opsPaymentRequests.id, requestNo: opsPaymentRequests.requestNo })
+            .from(opsPaymentRequests)
+            .where(and(
+                like(opsPaymentRequests.requestNo, `MR/${fy}/%`),
+                sql`${opsPaymentRequests.projectId} IS NULL`
+            ))
+            .orderBy(desc(opsPaymentRequests.id))
+            .limit(1);
+
+        let next = 1;
+        if (last[0]?.requestNo) {
+            const match = last[0].requestNo.match(/(\d{4})$/);
+            if (match) next = parseInt(match[1]) + 1;
+        }
+
+        return `MR/${fy}/${next.toString().padStart(4, '0')}`;
     }
 
     /**
