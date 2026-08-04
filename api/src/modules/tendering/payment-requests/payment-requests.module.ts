@@ -8,9 +8,10 @@ import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-his
 import { EmailModule } from '@/modules/email/email.module';
 import { TimersModule } from '@/modules/timers/timers.module';
 import { PdfGeneratorModule } from '@/modules/pdf/pdf-generator.module';
+import { MakerRequestModule } from '@/modules/operations/maker-requests/maker-request.module';
 
 @Module({
-    imports: [TendersModule, TenderStatusHistoryModule, EmailModule, TimersModule, PdfGeneratorModule],
+    imports: [TendersModule, TenderStatusHistoryModule, EmailModule, TimersModule, PdfGeneratorModule, MakerRequestModule],
     controllers: [PaymentRequestsController],
     providers: [
         PaymentRequestsQueryService,
