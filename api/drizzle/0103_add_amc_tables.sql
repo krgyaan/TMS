@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS "amc" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"team_name" varchar(255) NOT NULL,
 	"project_id" bigint NOT NULL,
+	"created_by" bigint,
 	"service_frequency" varchar(255) NOT NULL,
 	"amc_start_date" date NOT NULL,
 	"next_service_due" date DEFAULT '2025-06-30' NOT NULL,

@@ -11,6 +11,7 @@ import {
     Post,
     Put,
     Query,
+    Req,
     UploadedFile,
     UseInterceptors,
 } from "@nestjs/common";
@@ -57,8 +58,8 @@ export class AmcController {
 
     @Post()
     @HttpCode(HttpStatus.CREATED)
-    create(@Body(new ZodValidationPipe(CreateAmcSchema)) body: any) {
-        return this.service.create(body);
+    create(@Body(new ZodValidationPipe(CreateAmcSchema)) body: any, @Req() req: any) {
+        return this.service.create(body, req.user?.id ?? req.user?.sub);
     }
 
     @Put(":id")

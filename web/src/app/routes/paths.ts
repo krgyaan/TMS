@@ -164,6 +164,10 @@ export const paths = {
         conference: "/services/conference",
         visit: "/services/visit",
         amc: "/services/amc",
+        amcCreate: "/services/amc/create",
+        amcEdit: (id: number | string) => `/services/amc/${id}/edit`,
+        amcShow: (id: number | string) => `/services/amc/${id}`,
+        amcView: (id: number | string) => `/services/amc/${id}/view`,
     },
 
     // ==================== BI DASHBOARD ====================
