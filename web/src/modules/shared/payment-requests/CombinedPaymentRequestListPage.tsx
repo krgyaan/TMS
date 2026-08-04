@@ -82,9 +82,9 @@ const CombinedPaymentRequestListPage: React.FC = () => {
 
         return rows.filter((row) => {
             const category = row.paymentAgainst;
-            if (team5Categories.has(category)) {
-                return currentTeamId === 5;
-            }
+            // if (team5Categories.has(category)) {
+            //     return currentTeamId === 5;
+            // }
             const allowedUsers = userAllowedCategories[category];
             if (allowedUsers) {
                 return currentUserId !== null && allowedUsers.includes(currentUserId);
