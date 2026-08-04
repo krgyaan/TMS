@@ -160,6 +160,19 @@ export class PaymentRequestsCommandService {
                         userId
                     );
                     results.push({ request, instrument });
+
+                    // Auto-create Cheque after DD creation
+                    if (payload.TENDER_FEES.mode === 'DD' && instrument) {
+                        const chequeResult = await this.autoCreateChequeFromDdFdr(
+                            tx,
+                            request,
+                            instrument,
+                            userId
+                        );
+                        if (chequeResult) {
+                            results.push({ request, instrument: chequeResult, isAutoCreatedCheque: true });
+                        }
+                    }
                 }
             }
 
@@ -198,6 +211,19 @@ export class PaymentRequestsCommandService {
                         userId
                     );
                     results.push({ request, instrument });
+
+                    // Auto-create Cheque after DD creation
+                    if (payload.PROCESSING_FEES.mode === 'DD' && instrument) {
+                        const chequeResult = await this.autoCreateChequeFromDdFdr(
+                            tx,
+                            request,
+                            instrument,
+                            userId
+                        );
+                        if (chequeResult) {
+                            results.push({ request, instrument: chequeResult, isAutoCreatedCheque: true });
+                        }
+                    }
                 }
             }
         });
