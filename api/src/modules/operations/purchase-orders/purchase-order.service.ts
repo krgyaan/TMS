@@ -837,6 +837,8 @@ export class PurchaseOrderService {
         let query = this.db.select().from(projectParties);
         if (type) {
             query = query.where(eq(projectParties.type, type)) as any;
+        } else {
+            query = query.where(eq(projectParties.type, "seller")) as any;
         }
         const res = await query.orderBy(desc(projectParties.createdAt));
         return res;
