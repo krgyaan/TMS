@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS "amc_sites" (
 	"name" varchar(255) NOT NULL,
 	"address" text NOT NULL,
 	"map_link" varchar(255),
+	"status" varchar(50) DEFAULT 'Pending' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );--> statement-breakpoint

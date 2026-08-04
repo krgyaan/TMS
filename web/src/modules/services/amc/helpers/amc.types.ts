@@ -19,6 +19,7 @@ export interface AmcSite {
     name: string;
     address: string;
     mapLink?: string | null;
+    status?: string;
     contacts: AmcSiteContact[];
 }
 

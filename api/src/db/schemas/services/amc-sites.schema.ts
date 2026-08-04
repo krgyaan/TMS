@@ -8,6 +8,7 @@ export const amcSites = pgTable(
         name: varchar("name", { length: 255 }).notNull(),
         address: text("address").notNull(),
         mapLink: varchar("map_link", { length: 255 }),
+        status: varchar("status", { length: 50 }).notNull().default("Pending"),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     },

@@ -420,6 +420,41 @@ const defaultEngineer: AmcServiceEngineer = { name: "", mobile: "" };
 const defaultProduct: AmcProduct = { itemId: 0, quantity: 1 };
 const defaultVariableBill = { label: "", amount: "" };
 
+const FREQUENCY_MONTHS: Record<string, number> = {
+    Monthly: 1,
+    Quarterly: 3,
+    "Half-Yearly": 6,
+    Yearly: 12,
+};
+
+const toDateInput = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+};
+
+const computeBillDates = (start: string, end: string, frequency: string) => {
+    const periodMonths = FREQUENCY_MONTHS[frequency] ?? 3;
+    const startDate = new Date(`${start}T00:00:00`);
+    const endDate = new Date(`${end}T00:00:00`);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return [];
+
+    const monthsBetween =
+        (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+        (endDate.getMonth() - startDate.getMonth());
+    const count = Math.floor(monthsBetween / periodMonths);
+    if (count < 1) return [];
+
+    const dates: string[] = [];
+    for (let i = 0; i < count; i++) {
+        const date = new Date(startDate);
+        date.setMonth(date.getMonth() + periodMonths * i);
+        dates.push(toDateInput(date));
+    }
+    return dates;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN FORM
 // ─────────────────────────────────────────────────────────────────────────────
@@ -450,6 +485,9 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
     });
 
     const billType = form.watch("billType") ?? "constant";
+    const amcStartDate = form.watch("amcStartDate");
+    const amcEndDate = form.watch("amcEndDate");
+    const billFrequency = form.watch("billFrequency");
 
     const [sites, setSites] = useState<AmcSite[]>([defaultSite]);
     const [products, setProducts] = useState<AmcProduct[]>([]);
@@ -459,6 +497,21 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
     >([defaultVariableBill]);
     const [serviceReportFile, setServiceReportFile] = useState<File | null>(null);
     const [amcPoFile, setAmcPoFile] = useState<File | null>(null);
+
+    useEffect(() => {
+        if (billType !== "variable") return;
+        if (!amcStartDate || !amcEndDate || !billFrequency) return;
+
+        const dates = computeBillDates(amcStartDate, amcEndDate, billFrequency);
+        if (!dates.length) return;
+
+        setVariableBills(prev => {
+            const matches =
+                prev.length === dates.length && prev.every((row, i) => row.label === dates[i]);
+            if (matches) return prev;
+            return dates.map((date, i) => ({ label: date, amount: prev[i]?.amount ?? "" }));
+        });
+    }, [billType, amcStartDate, amcEndDate, billFrequency]);
 
     useEffect(() => {
         if (!isEdit || !amc) return;
@@ -529,7 +582,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
             } else {
                 const created = await createAmc.mutateAsync(payload);
                 await uploadPendingFiles(created.id);
-                navigate(paths.services.amcShow(created.id));
+                navigate(paths.services.amc);
             }
         } catch {
             // handled by hooks
@@ -701,7 +754,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                             <div className="mt-5 space-y-3">
                                 <div className="flex items-center justify-between">
                                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                        Variable Bills (per quarter)
+                                        Variable Bills
                                     </p>
                                     <Button
                                         type="button"
@@ -721,7 +774,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Bill Date / Quarter</TableHead>
+                                            <TableHead>Bill Date</TableHead>
                                             <TableHead>Bill Value (Pre GST)</TableHead>
                                             <TableHead className="w-24" />
                                         </TableRow>
@@ -732,7 +785,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                                                 <TableCell>
                                                     <Input
                                                         className={inputCls}
-                                                        placeholder="e.g. Q1 Apr–Jun 2024"
+                                                        type="date"
                                                         value={row.label}
                                                         onChange={e =>
                                                             setVariableBills(vb =>

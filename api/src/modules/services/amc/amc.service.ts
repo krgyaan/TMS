@@ -288,6 +288,7 @@ export class AmcService {
                     name: site.name,
                     address: site.address,
                     mapLink: site.mapLink ?? null,
+                    status: "Pending",
                 })
                 .returning();
 

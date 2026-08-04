@@ -58,6 +58,7 @@ interface AmcSiteRow {
     siteMapLink: string | null;
     siteContacts: AmcSiteContact[];
     nextServiceDue: string | null;
+    status: string | null;
     serviceEngineers: AmcServiceEngineer[];
     amc: AmcDetail;
 }
@@ -122,32 +123,15 @@ export default function AmcListPage() {
         setEngineersModalOpen(true);
     };
 
-    const teamCounts = useMemo<Record<AmcTeamTab, number>>(() => {
-        const ac = amcs.filter(a => a.teamName === "AC").length;
-        const dc = amcs.filter(a => a.teamName === "DC").length;
-        return { AC: ac, DC: dc };
-    }, [amcs]);
-
-    const serviceCounts = useMemo<Record<AmcServiceTab, number>>(() => {
-        const teamAmcs = amcs.filter(a => a.teamName === activeTeam);
-        return {
-            due: teamAmcs.filter(a => isServiceDue(a.nextServiceDue)).length,
-            missed: teamAmcs.filter(a => isServiceMissed(a.nextServiceDue)).length,
-            done: 0,
-        };
-    }, [amcs, activeTeam]);
-
-    const rows = useMemo<AmcSiteRow[]>(() => {
-        const teamAmcs = amcs.filter(a => a.teamName === activeTeam);
-
-        const flattened: AmcSiteRow[] = [];
-        for (const amc of teamAmcs) {
+    const allRows = useMemo<AmcSiteRow[]>(() => {
+        const result: AmcSiteRow[] = [];
+        for (const amc of amcs) {
             const projectName = projectMap.get(amc.projectId) ?? `Project ${amc.projectId}`;
             const sites: AmcSite[] = amc.sites && amc.sites.length ? amc.sites : [];
             const serviceEngineers: AmcServiceEngineer[] = amc.serviceEngineers ?? [];
 
             if (!sites.length) {
-                flattened.push({
+                result.push({
                     key: `${amc.id}-0`,
                     amcId: amc.id,
                     projectName,
@@ -156,6 +140,7 @@ export default function AmcListPage() {
                     siteMapLink: null,
                     siteContacts: [],
                     nextServiceDue: amc.nextServiceDue,
+                    status: null,
                     serviceEngineers,
                     amc,
                 });
@@ -163,7 +148,7 @@ export default function AmcListPage() {
             }
 
             for (const site of sites) {
-                flattened.push({
+                result.push({
                     key: `${amc.id}-${site.id ?? 0}`,
                     amcId: amc.id,
                     projectName,
@@ -172,15 +157,38 @@ export default function AmcListPage() {
                     siteMapLink: site.mapLink ?? null,
                     siteContacts: site.contacts ?? [],
                     nextServiceDue: amc.nextServiceDue,
+                    status: site.status ?? "Pending",
                     serviceEngineers,
                     amc,
                 });
             }
         }
+        return result;
+    }, [amcs, projectMap]);
 
+    const teamCounts = useMemo<Record<AmcTeamTab, number>>(() => {
+        const ac = allRows.filter(row => row.amc.teamName === "AC").length;
+        const dc = allRows.filter(row => row.amc.teamName === "DC").length;
+        return { AC: ac, DC: dc };
+    }, [allRows]);
+
+    const teamRows = useMemo<AmcSiteRow[]>(
+        () => allRows.filter(row => row.amc.teamName === activeTeam),
+        [allRows, activeTeam],
+    );
+
+    const serviceCounts = useMemo<Record<AmcServiceTab, number>>(() => {
+        return {
+            due: teamRows.filter(row => isServiceDue(row.nextServiceDue)).length,
+            missed: teamRows.filter(row => isServiceMissed(row.nextServiceDue)).length,
+            done: 0,
+        };
+    }, [teamRows]);
+
+    const rows = useMemo<AmcSiteRow[]>(() => {
         const query = search.trim().toLowerCase();
 
-        return flattened.filter(row => {
+        return teamRows.filter(row => {
             let matchesTab: boolean;
             if (activeServiceTab === "due") {
                 matchesTab = isServiceDue(row.nextServiceDue);
@@ -206,7 +214,7 @@ export default function AmcListPage() {
                 .toLowerCase();
             return haystack.includes(query);
         });
-    }, [amcs, projectMap, activeTeam, activeServiceTab, search]);
+    }, [teamRows, activeServiceTab, search]);
 
     const amcActions: ActionItem<AmcSiteRow>[] = [
         {
@@ -260,7 +268,7 @@ export default function AmcListPage() {
         {
             colId: "contacts",
             headerName: "Contact Details",
-            width: 130,
+            width: 140,
             sortable: false,
             cellRenderer: (params: CustomCellRendererProps<AmcSiteRow>) => {
                 const count = params.data?.siteContacts?.length ?? 0;
@@ -288,10 +296,11 @@ export default function AmcListPage() {
                 );
             },
         },
-        { field: "nextServiceDue", headerName: "Next Service Due", width: 150, sort: "asc", cellRenderer: NextServiceDueCell },
+        { field: "nextServiceDue", headerName: "Next Service Due", width: 170, sort: "asc", cellRenderer: NextServiceDueCell },
+        
         {
             colId: "engineers",
-            headerName: "Service Engg Name",
+            headerName: "Service Engg",
             width: 140,
             sortable: false,
             cellRenderer: (params: CustomCellRendererProps<AmcSiteRow>) => {
@@ -320,10 +329,35 @@ export default function AmcListPage() {
                 );
             },
         },
+
+        {
+            colId: "status",
+            headerName: "Status",
+            width: 130,
+            sortable: false,
+            cellRenderer: (params: CustomCellRendererProps<AmcSiteRow>) => {
+                const value = params.data?.status ?? null;
+                if (!value) return <span className="text-muted-foreground">—</span>;
+                const statusStyles: Record<string, string> = {
+                    Pending: "bg-amber-100 text-amber-800 border-transparent",
+                };
+                return (
+                    <Badge
+                        className={cn(
+                            "capitalize",
+                            statusStyles[value] ?? "bg-muted text-muted-foreground border-transparent"
+                        )}
+                    >
+                        {value}
+                    </Badge>
+                );
+            },
+        },
+
         {
             colId: "actions",
             headerName: "Actions",
-            width: 80,
+            width: 120,
             pinned: "right",
             sortable: false,
             filter: false,
