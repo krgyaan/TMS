@@ -17,9 +17,7 @@ import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import type { VendorWorkOrderRow } from "./helpers/vwoForm.types";
 import { SetVwoApprovalDialog } from "@/modules/shared/vendor-work-orders/components/SetVwoApprovalDialog";
-import { ClosureDialog } from "@/modules/shared/purchase-orders/components/ClosureDialog";
 import { OrderProgressCell } from "@/components/OrderProgressCell";
-import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 
 interface VendorWorkOrderListPageProps {
     workOrders?: VendorWorkOrderRow[];
@@ -41,7 +39,6 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
     const setSearch = propOnSearchChange ?? setInternalSearch;
     const debouncedSearch = useDebouncedSearch(search, 300);
     const [vwoApproval, setVwoApproval] = useState<VendorWorkOrderRow | null>(null);
-    const [closureWo, setClosureWo] = useState<VendorWorkOrderRow | null>(null);
 
     const isApprovalEnabled = showApprovalAction ?? false;
     const location = useLocation();
@@ -90,7 +87,7 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
                 label: "Closure",
                 icon: <Lock className="h-4 w-4" />,
                 visible: (row) => row.woApproved === true,
-                onClick: (row) => setClosureWo(row),
+                onClick: (row) => navigate(paths.accounts.poClosure(row.id)),
             });
         }
 
@@ -402,22 +399,6 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
                     vwo={vwoApproval}
                     open={!!vwoApproval}
                     onClose={() => setVwoApproval(null)}
-                />
-            )}
-
-            {closureWo && (
-                <ClosureDialog
-                    rowId={closureWo.id}
-                    rowLabel={closureWo.woNumber}
-                    projectId={closureWo.projectId}
-                    sellerName={closureWo.sellerName}
-                    amountAfterTds={closureWo.amountAfterTds || closureWo.grandTotal}
-                    open={!!closureWo}
-                    onClose={() => setClosureWo(null)}
-                    fetchClosureStatus={async (id) => {
-                        const res = await vendorWorkOrderApi.getClosureStatus(id);
-                        return res;
-                    }}
                 />
             )}
         </Card>

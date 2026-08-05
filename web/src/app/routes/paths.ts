@@ -230,6 +230,7 @@ export const paths = {
         delegationView: (id: string) => `/accounts/delegation/${id}`,
         delegationUpdate: (id: string) => `/accounts/delegation/${id}/update`,
         purchaseOrders: "/accounts/purchase-orders",
+        poClosure: (poId: number) => `/accounts/purchase-orders/${poId}/closure`,
         saleInvoices: "/accounts/sale-invoices",
         vendorWorkOrders: "/accounts/vendor-work-orders",
         paymentRequests: "/accounts/payment-requests",
