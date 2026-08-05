@@ -136,14 +136,14 @@ const CircularsWidget = () => {
 
     return (
         <Card className="border border-border/50 shadow-xl bg-card/60 backdrop-blur-xl rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5">
-            <CardHeader className="pb-3 border-b border-border/40">
+            <CardHeader className="border-b border-border/40">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                         <div className="p-2 bg-primary/10 text-primary rounded-xl dark:bg-primary/20 dark:text-primary">
-                            <Megaphone className="h-5 w-5" />
+                            <Megaphone className="h-4 w-4" />
                         </div>
                         <div className="space-y-0.5">
-                            <CardTitle className="text-lg font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                            <CardTitle className="font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
                                 Notice Board & Circulars
                             </CardTitle>
                             <p className="text-xs text-muted-foreground">Latest official updates and company policies</p>
@@ -164,16 +164,16 @@ const CircularsWidget = () => {
                         <p className="text-xs text-muted-foreground max-w-xs mt-1">No active announcements or circular notices currently published.</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 p-5 max-h-[350px] overflow-y-auto">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 px-5 max-h-[350px] overflow-y-auto">
                         {notices.map((circular) => (
                             <div 
                                 key={circular.id}
                                 onClick={() => setSelectedCircular(circular)}
-                                className="group flex items-center justify-between p-4 bg-muted/10 hover:bg-muted/20 border border-border/10 hover:border-primary/20 rounded-xl cursor-pointer transition-all duration-300 shadow-sm hover:shadow-md hover:scale-[1.01]"
+                                className="group flex items-center justify-between p-2 bg-muted/10 hover:bg-muted/20 border border-border/10 hover:border-primary/20 rounded-xl cursor-pointer transition-all duration-300 shadow-sm hover:shadow-md hover:scale-[1.01]"
                             >
                                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-all duration-300">
-                                        <FileText className="h-4.5 w-4.5" />
+                                    <div className="flex p-2 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-all duration-300">
+                                        <FileText className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors truncate">
