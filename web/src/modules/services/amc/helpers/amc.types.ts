@@ -55,7 +55,7 @@ export interface Amc {
     billValue: string | null;
     variableBills: Array<{ label?: string; amount?: number }> | null;
     amcPoPath: string | null;
-    serviceReportPath: string | null;
+    serviceReportPath: string[] | null;
     signedServiceReportPath: string | null;
     createdAt: string;
     updatedAt: string;
@@ -79,7 +79,7 @@ export interface CreateAmcDto {
     billValue?: string;
     variableBills?: Array<{ label?: string; amount?: number }>;
     amcPoPath?: string | null;
-    serviceReportPath?: string | null;
+    serviceReportPath?: string[] | null;
     signedServiceReportPath?: string | null;
     sites: AmcSite[];
     products: AmcProduct[];
@@ -88,7 +88,13 @@ export interface CreateAmcDto {
 
 export type UpdateAmcDto = Partial<CreateAmcDto>;
 
-export type AmcPathField = "po" | "service-report" | "signed-service-report";
+export type AmcPathField = "po" | "service-report" | "filled-service-report" | "signed-service-report";
+
+export const sampleReport = (entries?: string[] | null): string | null =>
+    entries?.find(e => e.startsWith("sample:"))?.slice("sample:".length) ?? null;
+
+export const filledReport = (entries?: string[] | null): string | null =>
+    entries?.find(e => e.startsWith("filled:"))?.slice("filled:".length) ?? null;
 
 // ============================================================
 // FORM DEFAULTS

@@ -36,10 +36,11 @@ const amcMulterConfig = {
     },
 };
 
-const AMC_PATH_FIELDS: Record<string, "amcPoPath" | "serviceReportPath" | "signedServiceReportPath"> = {
-    "po": "amcPoPath",
-    "service-report": "serviceReportPath",
-    "signed-service-report": "signedServiceReportPath",
+const AMC_PATH_FIELDS: Record<string, { field: "amcPoPath" | "serviceReportPath" | "signedServiceReportPath"; subKey?: "sample" | "filled" }> = {
+    "po": { field: "amcPoPath" },
+    "service-report": { field: "serviceReportPath", subKey: "sample" },
+    "filled-service-report": { field: "serviceReportPath", subKey: "filled" },
+    "signed-service-report": { field: "signedServiceReportPath" },
 };
 
 @Controller("amc")
@@ -84,9 +85,9 @@ export class AmcController {
         @Param("field") field: string,
         @UploadedFile() file: Express.Multer.File | undefined,
     ) {
-        const dbField = AMC_PATH_FIELDS[field];
+        const config = AMC_PATH_FIELDS[field];
 
-        if (!dbField) {
+        if (!config) {
             throw new BadRequestException(
                 `Invalid upload field "${field}". Expected one of: ${Object.keys(AMC_PATH_FIELDS).join(", ")}`,
             );
@@ -96,6 +97,6 @@ export class AmcController {
             throw new BadRequestException("File is required");
         }
 
-        return this.service.setFilePath(id, dbField, file.filename);
+        return this.service.setFilePath(id, config.field, file.filename, config.subKey);
     }
 }

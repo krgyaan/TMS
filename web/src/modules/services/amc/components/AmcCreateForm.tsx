@@ -578,7 +578,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
             if (isEdit && amcId) {
                 const updated = await updateAmc.mutateAsync({ id: amcId, data: payload });
                 await uploadPendingFiles(updated.id);
-                navigate(paths.services.amcShow(updated.id));
+                navigate(paths.services.amc);
             } else {
                 const created = await createAmc.mutateAsync(payload);
                 await uploadPendingFiles(created.id);
@@ -975,13 +975,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={() =>
-                                navigate(
-                                    amcId
-                                        ? paths.services.amcShow(amcId)
-                                        : paths.services.amc,
-                                )
-                            }
+                            onClick={() => navigate(paths.services.amc)}
                         >
                             Cancel
                         </Button>

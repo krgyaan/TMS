@@ -14,7 +14,12 @@ import {
     Building2,
     ExternalLink,
     Search,
+    Download,
+    FileUp,
+    MapPin,
+    FileSignature,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +39,9 @@ import type {
     AmcSiteContact,
     AmcServiceEngineer,
 } from "./helpers/amc.types";
+import { sampleReport } from "./helpers/amc.types";
+import { UploadFilledServiceReportModal } from "./components/UploadFilledServiceReportModal";
+import { UploadSignedServiceReportModal } from "./components/UploadSignedServiceReportModal";
 
 type AmcTeamTab = "AC" | "DC";
 type AmcServiceTab = "due" | "missed" | "done";
@@ -79,14 +87,14 @@ function isServiceMissed(nextServiceDue: string | null) {
     return !isNaN(due.getTime()) && due.getTime() < today.getTime();
 }
 
-function NextServiceDueCell({ value }: CustomCellRendererProps<AmcSiteRow, string | null>) {
+function NextServiceDueCell({
+    value,
+}: CustomCellRendererProps<AmcSiteRow, string | null>) {
     if (!value) return <span>—</span>;
-
     const due = new Date(`${value}T00:00:00`);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const crossed = !isNaN(due.getTime()) && due.getTime() < today.getTime();
-
     return (
         <span className={crossed ? "font-medium text-red-600" : "font-medium text-green-600"}>
             {value}
@@ -107,6 +115,14 @@ export default function AmcListPage() {
     const [contactsList, setContactsList] = useState<AmcSiteContact[]>([]);
     const [engineersModalOpen, setEngineersModalOpen] = useState(false);
     const [engineersList, setEngineersList] = useState<AmcServiceEngineer[]>([]);
+    const [filledModal, setFilledModal] = useState<{ open: boolean; amcId: number | null }>({
+        open: false,
+        amcId: null,
+    });
+    const [signedModal, setSignedModal] = useState<{ open: boolean; amcId: number | null }>({
+        open: false,
+        amcId: null,
+    });
 
     const projectMap = useMemo(
         () => new Map(projects.map(p => [p.id, p.projectName || `Project ${p.id}`])),
@@ -121,6 +137,22 @@ export default function AmcListPage() {
     const handleOpenEngineers = (list: AmcServiceEngineer[]) => {
         setEngineersList(list ?? []);
         setEngineersModalOpen(true);
+    };
+
+    const handleSampleDownload = (row: AmcSiteRow) => {
+        const sample = sampleReport(row.amc.serviceReportPath);
+        if (!sample) {
+            toast.error("No sample service report uploaded for this AMC");
+            return;
+        }
+        const url = `/uploads/amc/${sample}`;
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = sample;
+        anchor.rel = "noopener noreferrer";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
     };
 
     const allRows = useMemo<AmcSiteRow[]>(() => {
@@ -187,7 +219,6 @@ export default function AmcListPage() {
 
     const rows = useMemo<AmcSiteRow[]>(() => {
         const query = search.trim().toLowerCase();
-
         return teamRows.filter(row => {
             let matchesTab: boolean;
             if (activeServiceTab === "due") {
@@ -198,7 +229,6 @@ export default function AmcListPage() {
                 matchesTab = false;
             }
             if (!matchesTab) return false;
-
             if (!query) return true;
 
             const contactNames = row.siteContacts.map(c => c.name).join(" ");
@@ -219,18 +249,35 @@ export default function AmcListPage() {
     const amcActions: ActionItem<AmcSiteRow>[] = [
         {
             label: "View",
-            onClick: (row) => navigate(paths.services.amcView(row.amcId)),
+            onClick: row => navigate(paths.services.amcView(row.amcId)),
             icon: <Eye className="h-4 w-4" />,
         },
         {
             label: "Edit",
-            onClick: (row) => navigate(paths.services.amcEdit(row.amcId)),
+            onClick: row => navigate(paths.services.amcEdit(row.amcId)),
             icon: <Pencil className="h-4 w-4" />,
+        },
+        {
+            label: "Sample Service Report Download",
+            onClick: handleSampleDownload,
+            icon: <Download className="h-4 w-4" />,
+        },
+        {
+            label: "Upload Filled Service Report",
+            onClick: row => setFilledModal({ open: true, amcId: row.amcId }),
+            icon: <FileUp className="h-4 w-4" />,
+        },
+        {
+            label: "Upload Signed Service Report",
+            onClick: row => setSignedModal({ open: true, amcId: row.amcId }),
+            icon: <FileSignature className="h-4 w-4" />,
         },
     ];
 
     const [colDefs] = useState<ColDef<AmcSiteRow>[]>([
         { field: "projectName", headerName: "Project Name", minWidth: 180 },
+
+        // ── Site Name column with structured tooltip ──────────────────────────
         {
             field: "siteName",
             headerName: "Site Name",
@@ -242,22 +289,39 @@ export default function AmcListPage() {
                     <TooltipProvider delayDuration={100}>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <span className="truncate block">{site.siteName}</span>
+                                <span className="cursor-help truncate block">
+                                    {site.siteName}
+                                </span>
                             </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-xs text-xs">
-                                <div className="space-y-1.5">
-                                    <p className="font-medium">{site.siteName}</p>
-                                    <p className="text-muted-foreground">{site.siteAddress}</p>
-                                    {site.siteMapLink && (
-                                        <a
-                                            href={site.siteMapLink}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-flex items-center gap-1 text-primary hover:underline"
-                                        >
-                                            <ExternalLink className="h-3 w-3" /> Open Location
-                                        </a>
-                                    )}
+                            <TooltipContent side="top" className="p-2 w-fit">
+                                <div className="flex flex-col gap-1 text-[10px]">
+                                    <div className="flex items-center gap-1 font-bold text-white border-b border-border/50 pb-0.5">
+                                        <MapPin className="h-3 w-3" /> Site Info
+                                    </div>
+                                    <p>
+                                        <span className="text-white">Name:</span>{" "}
+                                        {site.siteName || "-"}
+                                    </p>
+                                    <p>
+                                        <span className="text-white">Addr:</span>{" "}
+                                        {site.siteAddress || "-"}
+                                    </p>
+                                    <p>
+                                        <span className="text-white">Location:</span>{" "}
+                                        {site.siteMapLink ? (
+                                            <a
+                                                href={site.siteMapLink}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="inline-flex items-center gap-0.5 text-blue-400 hover:underline"
+                                            >
+                                                <ExternalLink className="h-2.5 w-2.5" />
+                                                Open Maps
+                                            </a>
+                                        ) : (
+                                            "-"
+                                        )}
+                                    </p>
                                 </div>
                             </TooltipContent>
                         </Tooltip>
@@ -265,6 +329,7 @@ export default function AmcListPage() {
                 );
             },
         },
+
         {
             colId: "contacts",
             headerName: "Contact Details",
@@ -272,9 +337,7 @@ export default function AmcListPage() {
             sortable: false,
             cellRenderer: (params: CustomCellRendererProps<AmcSiteRow>) => {
                 const count = params.data?.siteContacts?.length ?? 0;
-                if (count === 0) {
-                    return <span className="text-muted-foreground">—</span>;
-                }
+                if (count === 0) return <span className="text-muted-foreground">—</span>;
                 return (
                     <TooltipProvider delayDuration={100}>
                         <Tooltip>
@@ -282,7 +345,9 @@ export default function AmcListPage() {
                                 <button
                                     type="button"
                                     className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-                                    onClick={() => handleOpenContacts(params.data?.siteContacts ?? [])}
+                                    onClick={() =>
+                                        handleOpenContacts(params.data?.siteContacts ?? [])
+                                    }
                                 >
                                     <Users className="h-3.5 w-3.5" />
                                     {count}
@@ -296,8 +361,15 @@ export default function AmcListPage() {
                 );
             },
         },
-        { field: "nextServiceDue", headerName: "Next Service Due", width: 170, sort: "asc", cellRenderer: NextServiceDueCell },
-        
+
+        {
+            field: "nextServiceDue",
+            headerName: "Next Service Due",
+            width: 170,
+            sort: "asc",
+            cellRenderer: NextServiceDueCell,
+        },
+
         {
             colId: "engineers",
             headerName: "Service Engg",
@@ -305,9 +377,7 @@ export default function AmcListPage() {
             sortable: false,
             cellRenderer: (params: CustomCellRendererProps<AmcSiteRow>) => {
                 const count = params.data?.serviceEngineers?.length ?? 0;
-                if (count === 0) {
-                    return <span className="text-muted-foreground">—</span>;
-                }
+                if (count === 0) return <span className="text-muted-foreground">—</span>;
                 return (
                     <TooltipProvider delayDuration={100}>
                         <Tooltip>
@@ -315,7 +385,9 @@ export default function AmcListPage() {
                                 <button
                                     type="button"
                                     className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-                                    onClick={() => handleOpenEngineers(params.data?.serviceEngineers ?? [])}
+                                    onClick={() =>
+                                        handleOpenEngineers(params.data?.serviceEngineers ?? [])
+                                    }
                                 >
                                     <Wrench className="h-3.5 w-3.5" />
                                     {count}
@@ -345,7 +417,8 @@ export default function AmcListPage() {
                     <Badge
                         className={cn(
                             "capitalize",
-                            statusStyles[value] ?? "bg-muted text-muted-foreground border-transparent"
+                            statusStyles[value] ??
+                                "bg-muted text-muted-foreground border-transparent",
                         )}
                     >
                         {value}
@@ -383,7 +456,7 @@ export default function AmcListPage() {
                                     "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
                                     activeTeam === tab.key
                                         ? "bg-background text-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground"
+                                        : "text-muted-foreground hover:text-foreground",
                                 )}
                             >
                                 {tab.label}
@@ -391,7 +464,7 @@ export default function AmcListPage() {
                                     variant="secondary"
                                     className={cn(
                                         "text-xs h-4 min-w-4 px-1",
-                                        activeTeam === tab.key && "bg-primary/10 text-primary"
+                                        activeTeam === tab.key && "bg-primary/10 text-primary",
                                     )}
                                 >
                                     {teamCounts[tab.key]}
@@ -404,6 +477,7 @@ export default function AmcListPage() {
                     </Button>
                 </div>
             </CardHeader>
+
             <CardContent className="flex-1 px-0">
                 <div className="flex items-center gap-4 px-6 pb-4">
                     <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
@@ -416,7 +490,7 @@ export default function AmcListPage() {
                                     "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
                                     activeServiceTab === tab.key
                                         ? "bg-background text-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground"
+                                        : "text-muted-foreground hover:text-foreground",
                                 )}
                             >
                                 {tab.label}
@@ -424,7 +498,8 @@ export default function AmcListPage() {
                                     variant="secondary"
                                     className={cn(
                                         "text-xs h-4 min-w-4 px-1",
-                                        activeServiceTab === tab.key && "bg-primary/10 text-primary"
+                                        activeServiceTab === tab.key &&
+                                            "bg-primary/10 text-primary",
                                     )}
                                 >
                                     {serviceCounts[tab.key]}
@@ -434,17 +509,18 @@ export default function AmcListPage() {
                     </div>
                     <div className="flex-1 flex justify-end">
                         <div className="relative">
-                            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 type="text"
                                 placeholder="Search AMCs..."
                                 value={search}
-                                onChange={(e) => setSearch(e.target.value)}
+                                onChange={e => setSearch(e.target.value)}
                                 className="pl-8 w-64"
                             />
                         </div>
                     </div>
                 </div>
+
                 <DataTable
                     data={rows}
                     loading={isLoading}
@@ -457,20 +533,23 @@ export default function AmcListPage() {
                 />
             </CardContent>
 
-            {/* Contacts modal */}
+            {/* ── Contacts modal ───────────────────────────────────────────── */}
             <Dialog open={contactsModalOpen} onOpenChange={setContactsModalOpen}>
                 <DialogContent className="sm:max-w-sm">
                     <DialogHeader>
                         <DialogTitle>Contact Persons</DialogTitle>
                         <DialogDescription>
-                            {contactsList.length} {contactsList.length === 1 ? "contact" : "contacts"} for this site
+                            {contactsList.length}{" "}
+                            {contactsList.length === 1 ? "contact" : "contacts"} for this site
                         </DialogDescription>
                     </DialogHeader>
-
                     <div className="space-y-2 max-h-80 overflow-y-auto">
                         {contactsList.length ? (
                             contactsList.map((c, i) => (
-                                <div key={i} className="p-3 rounded-lg border bg-muted/30 space-y-2">
+                                <div
+                                    key={i}
+                                    className="p-3 rounded-lg border bg-muted/30 space-y-2"
+                                >
                                     <div className="flex items-center gap-2">
                                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                                             <User className="h-4 w-4 text-primary" />
@@ -509,20 +588,23 @@ export default function AmcListPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Engineers modal */}
+            {/* ── Engineers modal ──────────────────────────────────────────── */}
             <Dialog open={engineersModalOpen} onOpenChange={setEngineersModalOpen}>
                 <DialogContent className="sm:max-w-sm">
                     <DialogHeader>
                         <DialogTitle>Service Engineers</DialogTitle>
                         <DialogDescription>
-                            {engineersList.length} {engineersList.length === 1 ? "engineer" : "engineers"} assigned
+                            {engineersList.length}{" "}
+                            {engineersList.length === 1 ? "engineer" : "engineers"} assigned
                         </DialogDescription>
                     </DialogHeader>
-
                     <div className="space-y-2 max-h-80 overflow-y-auto">
                         {engineersList.length ? (
                             engineersList.map((e, i) => (
-                                <div key={i} className="p-3 rounded-lg border bg-muted/30 space-y-2">
+                                <div
+                                    key={i}
+                                    className="p-3 rounded-lg border bg-muted/30 space-y-2"
+                                >
                                     <div className="flex items-center gap-2">
                                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                                             <Wrench className="h-4 w-4 text-primary" />
@@ -554,12 +636,26 @@ export default function AmcListPage() {
                         ) : (
                             <div className="flex flex-col items-center justify-center py-8 text-center">
                                 <Wrench className="h-8 w-8 text-muted-foreground/50 mb-2" />
-                                <p className="text-sm text-muted-foreground">No engineers found</p>
+                                <p className="text-sm text-muted-foreground">
+                                    No engineers found
+                                </p>
                             </div>
                         )}
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {/* ── Upload modals ────────────────────────────────────────────── */}
+            <UploadFilledServiceReportModal
+                open={filledModal.open}
+                onOpenChange={open => setFilledModal(prev => ({ ...prev, open }))}
+                amcId={filledModal.amcId}
+            />
+            <UploadSignedServiceReportModal
+                open={signedModal.open}
+                onOpenChange={open => setSignedModal(prev => ({ ...prev, open }))}
+                amcId={signedModal.amcId}
+            />
         </Card>
     );
 }

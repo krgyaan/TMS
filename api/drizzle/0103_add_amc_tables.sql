@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS "amc" (
 	"bill_value" numeric(10, 2),
 	"variable_bills" jsonb,
 	"amc_po_path" varchar(255),
-	"service_report_path" varchar(255),
+	"service_report_path" jsonb DEFAULT '[]'::jsonb,
 	"signed_service_report_path" varchar(255),
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,

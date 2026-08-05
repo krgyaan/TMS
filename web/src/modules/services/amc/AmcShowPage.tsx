@@ -1,8 +1,8 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { Loader2, Pencil, Trash2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AmcView } from "./components/AmcView";
-import { useAmc, useDeleteAmc } from "@/hooks/api/useAmc";
+import { useAmc } from "@/hooks/api/useAmc";
 import { paths } from "@/app/routes/paths";
 
 export default function AmcShowPage() {
@@ -11,7 +11,6 @@ export default function AmcShowPage() {
     const amcId = Number(id);
 
     const { data: amc, isLoading } = useAmc(amcId);
-    const deleteAmc = useDeleteAmc();
 
     if (isLoading) {
         return (
@@ -35,27 +34,9 @@ export default function AmcShowPage() {
     return (
         <div className="max-w-7xl mx-auto space-y-8 relative">
             <div className="sticky top-[-1rem] z-30 bg-background py-4 -mt-4 border-b border-border shadow-md transition-all">
-                <div className="flex items-center justify-between">
-                    <Button variant="ghost" size="sm" onClick={() => navigate(paths.services.amc)} className="-ml-2">
-                        <ArrowLeft className="h-4 w-4 mr-2" /> Back to AMCs
-                    </Button>
-                    <div className="flex items-center gap-2 ml-auto">
-                        <Button variant="outline" size="sm" onClick={() => navigate(paths.services.amcEdit(amc.id))}>
-                            <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            size="sm"
-                            disabled={deleteAmc.isPending}
-                            onClick={async () => {
-                                await deleteAmc.mutateAsync(amc.id);
-                                navigate(paths.services.amc);
-                            }}
-                        >
-                            <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
-                        </Button>
-                    </div>
-                </div>
+                <Button variant="ghost" size="sm" onClick={() => navigate(paths.services.amc)} className="-ml-2">
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Back to AMCs
+                </Button>
             </div>
             <AmcView amc={amc} />
         </div>

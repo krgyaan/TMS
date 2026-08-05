@@ -51,7 +51,7 @@ export const CreateAmcSchema = z.object({
     billValue: z.coerce.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
     variableBills: z.array(VariableBillItemSchema).optional(),
     amcPoPath: z.string().nullable().optional(),
-    serviceReportPath: z.string().nullable().optional(),
+    serviceReportPath: z.array(z.string()).nullable().optional(),
     signedServiceReportPath: z.string().nullable().optional(),
     sites: z.array(AmcSiteSchema).default([]),
     products: z.array(AmcProductSchema).default([]),

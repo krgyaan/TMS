@@ -71,6 +71,8 @@ export const useAmcFileUpload = () => {
             amcService.uploadFile(id, field, file),
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: amcKeys.detail(variables.id) });
+            queryClient.invalidateQueries({ queryKey: amcKeys.lists() });
+            toast.success("File uploaded successfully");
         },
         onError: error => toast.error(handleQueryError(error)),
     });

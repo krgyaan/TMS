@@ -29,7 +29,7 @@ export const amcs = pgTable(
         billValue: numeric("bill_value", { precision: 10, scale: 2 }),
         variableBills: jsonb("variable_bills"),
         amcPoPath: varchar("amc_po_path", { length: 255 }),
-        serviceReportPath: varchar("service_report_path", { length: 255 }),
+        serviceReportPath: jsonb("service_report_path").$type<string[]>().default([]),
         signedServiceReportPath: varchar("signed_service_report_path", { length: 255 }),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

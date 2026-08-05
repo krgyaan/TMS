@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { useProjectsMaster } from "@/hooks/api/useProjects";
 import { useItems } from "@/hooks/api/useItems";
 import type { AmcDetail } from "../helpers/amc.types";
+import { sampleReport, filledReport } from "../helpers/amc.types";
 
 const fileUrl = (name?: string | null) => (name ? `/uploads/amc/${name}` : "");
 
@@ -362,9 +363,10 @@ export function AmcView({ amc }: { amc: AmcDetail }) {
                 <SectionTitle icon={<FileText className="h-4 w-4" />}>
                     Documents
                 </SectionTitle>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                        { label: "Service Report Format", path: fileUrl(amc.serviceReportPath) },
+                        { label: "Service Report Format (Sample)", path: fileUrl(sampleReport(amc.serviceReportPath)) },
+                        { label: "Filled Service Report", path: fileUrl(filledReport(amc.serviceReportPath)) },
                         { label: "AMC PO", path: fileUrl(amc.amcPoPath) },
                         { label: "Signed Service Report", path: fileUrl(amc.signedServiceReportPath) },
                     ].map(({ label, path }) => (
