@@ -46,7 +46,7 @@ export class PaymentRequestService {
     }
 
     async create(body: any, userId: number) {
-        const requestNo = await this.generateNumber(body.projectName);
+        const requestNo = body.requestNo || await this.generateNumber(body.projectName);
 
         // Validate against PO TDS cap
         if (body.purchaseOrderId) {
