@@ -77,6 +77,11 @@ export class PurchaseOrderService {
                 conditions.push(eq(purchaseOrders.team, user.teamId));
             }
         }
+
+        const effectiveAmount = sql`COALESCE(${purchaseOrders.amountAfterTds}::numeric, (SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}))`;
+        const paymentDoneTotal = sql`(SELECT COALESCE(SUM(amount::numeric), 0) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done')`;
+        const piTotal = sql`(SELECT COALESCE(SUM(value_pre_gst::numeric + gst_amount::numeric), 0) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id})`;
+
         if (status === "pending") {
             conditions.push(isNull(purchaseOrders.poApproved));
         } else if (status === "approved") {
@@ -85,6 +90,10 @@ export class PurchaseOrderService {
             conditions.push(eq(purchaseOrders.poApproved, false));
         } else if (status === "new") {
             conditions.push(sql`${purchaseOrders.poApproved} IS NOT FALSE`);
+        } else if (status === "closed") {
+            conditions.push(sql`${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`);
+        } else if (status === "invoice-pending") {
+            conditions.push(sql`${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`);
         }
 
         const purchaseOrdersData = await this.db
@@ -147,14 +156,20 @@ export class PurchaseOrderService {
             return rows.length;
         };
 
-        const [pending, approved, newCount, rejected] = await Promise.all([
+        const effectiveAmount = sql`COALESCE(${purchaseOrders.amountAfterTds}::numeric, (SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}))`;
+        const paymentDoneTotal = sql`(SELECT COALESCE(SUM(amount::numeric), 0) FROM project_payment_requests WHERE purchase_order_id = ${purchaseOrders.id} AND status = 'payment_done')`;
+        const piTotal = sql`(SELECT COALESCE(SUM(value_pre_gst::numeric + gst_amount::numeric), 0) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id})`;
+
+        const [pending, approved, newCount, rejected, closedCount, invoicePendingCount] = await Promise.all([
             buildCount(isNull(purchaseOrders.poApproved)),
             buildCount(eq(purchaseOrders.poApproved, true)),
             buildCount(sql`${purchaseOrders.poApproved} IS NOT FALSE`),
             buildCount(eq(purchaseOrders.poApproved, false)),
+            buildCount(sql`${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`),
+            buildCount(sql`${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`),
         ]);
 
-        return { pending, approved, rejected, new: newCount };
+        return { pending, approved, rejected, new: newCount, closed: closedCount, invoicePending: invoicePendingCount };
     }
 
     private sanitizeProjectName(name: string): string {

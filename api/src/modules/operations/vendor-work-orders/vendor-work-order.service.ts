@@ -340,6 +340,11 @@ export class VendorWorkOrderService {
                 conditions.push(eq(vendorWorkOrders.team, user.teamId));
             }
         }
+
+        const effectiveAmount = sql`COALESCE(${vendorWorkOrders.amountAfterTds}::numeric, (SELECT SUM(total_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}))`;
+        const paymentDoneTotal = sql`(SELECT COALESCE(SUM(amount::numeric), 0) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status = 'payment_done')`;
+        const piTotal = sql`(SELECT COALESCE(SUM(value_pre_gst::numeric + gst_amount::numeric), 0) FROM project_purchase_invoices WHERE vendor_work_order_id = ${vendorWorkOrders.id})`;
+
         if (status === "pending") {
             conditions.push(isNull(vendorWorkOrders.woApproved));
         } else if (status === "approved") {
@@ -348,6 +353,10 @@ export class VendorWorkOrderService {
             conditions.push(eq(vendorWorkOrders.woApproved, false));
         } else if (status === "new") {
             conditions.push(sql`${vendorWorkOrders.woApproved} IS NOT FALSE`);
+        } else if (status === "closed") {
+            conditions.push(sql`${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`);
+        } else if (status === "invoice-pending") {
+            conditions.push(sql`${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`);
         }
 
         const rows = await this.db
@@ -409,14 +418,20 @@ export class VendorWorkOrderService {
             return rows.length;
         };
 
-        const [pending, approved, newCount, rejected] = await Promise.all([
+        const effectiveAmount = sql`COALESCE(${vendorWorkOrders.amountAfterTds}::numeric, (SELECT SUM(total_amount::numeric) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}))`;
+        const paymentDoneTotal = sql`(SELECT COALESCE(SUM(amount::numeric), 0) FROM project_payment_requests WHERE vendor_work_order_id = ${vendorWorkOrders.id} AND status = 'payment_done')`;
+        const piTotal = sql`(SELECT COALESCE(SUM(value_pre_gst::numeric + gst_amount::numeric), 0) FROM project_purchase_invoices WHERE vendor_work_order_id = ${vendorWorkOrders.id})`;
+
+        const [pending, approved, newCount, rejected, closedCount, invoicePendingCount] = await Promise.all([
             buildCount(isNull(vendorWorkOrders.woApproved)),
             buildCount(eq(vendorWorkOrders.woApproved, true)),
             buildCount(sql`${vendorWorkOrders.woApproved} IS NOT FALSE`),
             buildCount(eq(vendorWorkOrders.woApproved, false)),
+            buildCount(sql`${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`),
+            buildCount(sql`${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`),
         ]);
 
-        return { pending, approved, rejected, new: newCount };
+        return { pending, approved, rejected, new: newCount, closed: closedCount, invoicePending: invoicePendingCount };
     }
 
     async setVwoApproval(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }) {

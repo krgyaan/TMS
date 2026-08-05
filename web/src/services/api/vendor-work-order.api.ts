@@ -19,7 +19,7 @@ class VendorWorkOrderApiService extends BaseApiService {
         return this.get<any[]>(`/${qs ? `?${qs}` : ''}`);
     }
 
-    async getApprovalCounts(section?: string): Promise<{ pending: number; approved: number; rejected: number; new: number }> {
+    async getApprovalCounts(section?: string): Promise<{ pending: number; approved: number; rejected: number; new: number; closed: number; invoicePending: number }> {
         const searchParams = new URLSearchParams();
         if (section) searchParams.set('section', section);
         const qs = searchParams.toString();

@@ -1,5 +1,5 @@
 import React from "react";
-import { CheckCircle, Clock, Sparkles, XCircle } from "lucide-react";
+import { CheckCircle, CheckCircle2, Clock, FileText, Sparkles, XCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
@@ -7,7 +7,7 @@ import { useAllVendorWorkOrders, useVendorWorkOrderApprovalCounts } from "@/hook
 import { useLocation } from "react-router-dom";
 import VendorWorkOrderListPage from "@/modules/operations/vendor-work-orders/VendorWorkOrderListPage";
 
-type VwoTab = "pending" | "approved" | "rejected" | "new";
+type VwoTab = "pending" | "approved" | "rejected" | "new" | "closed" | "invoicePending";
 
 interface TabConfig {
     key: VwoTab;
@@ -29,10 +29,14 @@ const VendorWorkOrderTabsPage: React.FC = () => {
             { key: "pending", label: "Pending", icon: <Clock className="h-4 w-4" />, status: "pending", showApproval: true },
             { key: "approved", label: "Approved", icon: <CheckCircle className="h-4 w-4" />, status: "approved", showApproval: true },
             { key: "rejected", label: "Rejected", icon: <XCircle className="h-4 w-4" />, status: "rejected", showApproval: true },
+            { key: "closed", label: "Closed", icon: <CheckCircle2 className="h-4 w-4" />, status: "closed", showApproval: false },
+            { key: "invoicePending", label: "Invoice Pending", icon: <FileText className="h-4 w-4" />, status: "invoice-pending", showApproval: false },
           ]
         : [
             { key: "new", label: "New", icon: <Sparkles className="h-4 w-4" />, status: undefined, showApproval: false },
             { key: "rejected", label: "Rejected", icon: <XCircle className="h-4 w-4" />, status: "rejected", showApproval: false },
+            { key: "closed", label: "Closed", icon: <CheckCircle2 className="h-4 w-4" />, status: "closed", showApproval: false },
+            { key: "invoicePending", label: "Invoice Pending", icon: <FileText className="h-4 w-4" />, status: "invoice-pending", showApproval: false },
           ];
 
     const defaultTab: VwoTab = isAccounts ? "pending" : "new";
