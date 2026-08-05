@@ -108,9 +108,10 @@ import type { Circular } from "@/types/api.types";
 const getCircularFileUrl = (path?: string | null) => {
     if (!path) return "";
     if (path.startsWith("http")) return path;
-    const baseUrl = import.meta.env.VITE_API_URL || "";
+    const baseUrl = (import.meta.env.VITE_UPLOADS_URL || "").replace(/\/+$/, "");
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-    return `${baseUrl}${normalizedPath}`;
+    const uploadPath = normalizedPath.startsWith("/uploads") ? normalizedPath : `/uploads${normalizedPath}`;
+    return `${baseUrl}${uploadPath}`;
 };
 
 const CircularsWidget = () => {
