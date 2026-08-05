@@ -79,6 +79,10 @@ class VendorWorkOrderApiService extends BaseApiService {
         const params = version ? `?version=${encodeURIComponent(version)}` : "";
         return this.get<{ path: string; filename: string }>(`/${id}/pdf${params}`);
     }
+
+    async getClosureStatus(id: number): Promise<any> {
+        return this.get(`/${id}/closure-status`);
+    }
 }
 
 export const vendorWorkOrderApi = new VendorWorkOrderApiService();

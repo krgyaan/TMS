@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, inArray, isNull, like, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, like, ne, sql } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rename } from "node:fs/promises";
 import { join } from "node:path";
@@ -831,6 +831,48 @@ export class PurchaseOrderService {
             .from(users)
             .where(inArray(users.id, ids));
         return users_data.map(u => u.email).filter(Boolean).join(", ");
+    }
+
+    async checkClosure(id: number) {
+        const paymentRequestsData = await this.db
+            .select({
+                id: paymentRequests.id,
+                requestNo: paymentRequests.requestNo,
+                amount: paymentRequests.amount,
+                status: paymentRequests.status,
+                paymentAgainst: paymentRequests.paymentAgainst,
+            })
+            .from(paymentRequests)
+            .where(and(
+                eq(paymentRequests.purchaseOrderId, id),
+                ne(paymentRequests.status, "payment_done"),
+            ))
+            .orderBy(desc(paymentRequests.createdAt));
+
+        const purchaseInvoicesData = await this.db
+            .select({
+                id: purchaseInvoices.id,
+                invoiceNo: purchaseInvoices.invoiceNo,
+                valuePreGst: purchaseInvoices.valuePreGst,
+                gstAmount: purchaseInvoices.gstAmount,
+                invoiceDate: purchaseInvoices.invoiceDate,
+            })
+            .from(purchaseInvoices)
+            .where(eq(purchaseInvoices.purchaseOrderId, id))
+            .orderBy(desc(purchaseInvoices.createdAt));
+
+        const advancePaid = paymentRequestsData.some(
+            (pr) => pr.paymentAgainst?.toLowerCase().includes("advance"),
+        );
+
+        const canClose = paymentRequestsData.length === 0 && purchaseInvoicesData.length === 0;
+
+        return {
+            canClose,
+            remainingPayments: paymentRequestsData,
+            remainingInvoices: purchaseInvoicesData,
+            advancePaid,
+        };
     }
 
     async listParties(type?: string) {

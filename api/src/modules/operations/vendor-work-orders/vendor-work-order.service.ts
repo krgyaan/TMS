@@ -114,19 +114,19 @@ export class VendorWorkOrderService {
                 const qty = Number(product.qty);
                 const rate = Number(product.rate);
                 const gstRate = Number(product.gstRate);
-                const taxableAmount = qty * rate;
-                const gstAmount = (taxableAmount * gstRate) / 100;
-                const totalAmount = taxableAmount + gstAmount;
+                const taxableAmount = Number((qty * rate).toFixed(2));
+                const gstAmount = Number(((taxableAmount * gstRate) / 100).toFixed(2));
+                const totalAmount = Number((taxableAmount + gstAmount).toFixed(2));
 
                 await this.db.insert(vendorWorkOrderItems).values({
                     vendorWorkOrderId: wo.id,
                     description: product.description,
-                    qty: product.qty,
-                    rate: product.rate.toString(),
-                    taxableAmount: taxableAmount.toString(),
-                    gstRate: product.gstRate.toString(),
-                    gstAmount: gstAmount.toString(),
-                    totalAmount: totalAmount.toString(),
+                    qty: qty.toFixed(2),
+                    rate: rate.toFixed(2),
+                    taxableAmount: taxableAmount.toFixed(2),
+                    gstRate: gstRate.toFixed(2),
+                    gstAmount: gstAmount.toFixed(2),
+                    totalAmount: totalAmount.toFixed(2),
                 });
             }
         }
@@ -218,19 +218,19 @@ export class VendorWorkOrderService {
                 const qty = Number(product.qty);
                 const rate = Number(product.rate);
                 const gstRate = Number(product.gstRate);
-                const taxableAmount = qty * rate;
-                const gstAmount = (taxableAmount * gstRate) / 100;
-                const totalAmount = taxableAmount + gstAmount;
+                const taxableAmount = Number((qty * rate).toFixed(2));
+                const gstAmount = Number(((taxableAmount * gstRate) / 100).toFixed(2));
+                const totalAmount = Number((taxableAmount + gstAmount).toFixed(2));
 
                 await this.db.insert(vendorWorkOrderItems).values({
                     vendorWorkOrderId: id,
                     description: product.description,
-                    qty: product.qty,
-                    rate: product.rate.toString(),
-                    taxableAmount: taxableAmount.toString(),
-                    gstRate: product.gstRate.toString(),
-                    gstAmount: gstAmount.toString(),
-                    totalAmount: totalAmount.toString(),
+                    qty: qty.toFixed(2),
+                    rate: rate.toFixed(2),
+                    taxableAmount: taxableAmount.toFixed(2),
+                    gstRate: gstRate.toFixed(2),
+                    gstAmount: gstAmount.toFixed(2),
+                    totalAmount: totalAmount.toFixed(2),
                 });
             }
         }
@@ -556,6 +556,48 @@ export class VendorWorkOrderService {
         );
 
         return enriched;
+    }
+
+    async checkClosure(id: number) {
+        const paymentRequestsData = await this.db
+            .select({
+                id: paymentRequests.id,
+                requestNo: paymentRequests.requestNo,
+                amount: paymentRequests.amount,
+                status: paymentRequests.status,
+                paymentAgainst: paymentRequests.paymentAgainst,
+            })
+            .from(paymentRequests)
+            .where(and(
+                eq(paymentRequests.vendorWorkOrderId, id),
+                ne(paymentRequests.status, "payment_done"),
+            ))
+            .orderBy(desc(paymentRequests.createdAt));
+
+        const purchaseInvoicesData = await this.db
+            .select({
+                id: purchaseInvoices.id,
+                invoiceNo: purchaseInvoices.invoiceNo,
+                valuePreGst: purchaseInvoices.valuePreGst,
+                gstAmount: purchaseInvoices.gstAmount,
+                invoiceDate: purchaseInvoices.invoiceDate,
+            })
+            .from(purchaseInvoices)
+            .where(eq(purchaseInvoices.vendorWorkOrderId, id))
+            .orderBy(desc(purchaseInvoices.createdAt));
+
+        const advancePaid = paymentRequestsData.some(
+            (pr) => pr.paymentAgainst?.toLowerCase().includes("advance"),
+        );
+
+        const canClose = paymentRequestsData.length === 0 && purchaseInvoicesData.length === 0;
+
+        return {
+            canClose,
+            remainingPayments: paymentRequestsData,
+            remainingInvoices: purchaseInvoicesData,
+            advancePaid,
+        };
     }
 
     async listParties(type?: string) {

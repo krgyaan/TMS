@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { CheckCircle, Eye, FileUp, History, Search } from "lucide-react";
+import { CheckCircle, Eye, FileUp, History, Search, Lock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import DataTable from "@/components/ui/data-table";
@@ -10,14 +10,16 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import type { VendorWorkOrderRow } from "./helpers/vwoForm.types";
 import { SetVwoApprovalDialog } from "@/modules/shared/vendor-work-orders/components/SetVwoApprovalDialog";
+import { ClosureDialog } from "@/modules/shared/purchase-orders/components/ClosureDialog";
 import { OrderProgressCell } from "@/components/OrderProgressCell";
+import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 
 interface VendorWorkOrderListPageProps {
     workOrders?: VendorWorkOrderRow[];
@@ -39,8 +41,11 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
     const setSearch = propOnSearchChange ?? setInternalSearch;
     const debouncedSearch = useDebouncedSearch(search, 300);
     const [vwoApproval, setVwoApproval] = useState<VendorWorkOrderRow | null>(null);
+    const [closureWo, setClosureWo] = useState<VendorWorkOrderRow | null>(null);
 
     const isApprovalEnabled = showApprovalAction ?? false;
+    const location = useLocation();
+    const isAccountsSection = location.pathname.includes("/accounts/");
 
     const workOrders = propWorkOrders ?? [];
 
@@ -80,8 +85,17 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
             });
         }
 
+        if (isAccountsSection) {
+            actions.push({
+                label: "Closure",
+                icon: <Lock className="h-4 w-4" />,
+                visible: (row) => row.woApproved === true,
+                onClick: (row) => setClosureWo(row),
+            });
+        }
+
         return actions;
-    }, [navigate, isApprovalEnabled]);
+    }, [navigate, isApprovalEnabled, isAccountsSection]);
 
     const woColumns = useMemo<ColDef<VendorWorkOrderRow>[]>(() => [
         {
@@ -388,6 +402,22 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
                     vwo={vwoApproval}
                     open={!!vwoApproval}
                     onClose={() => setVwoApproval(null)}
+                />
+            )}
+
+            {closureWo && (
+                <ClosureDialog
+                    rowId={closureWo.id}
+                    rowLabel={closureWo.woNumber}
+                    projectId={closureWo.projectId}
+                    sellerName={closureWo.sellerName}
+                    amountAfterTds={closureWo.amountAfterTds || closureWo.grandTotal}
+                    open={!!closureWo}
+                    onClose={() => setClosureWo(null)}
+                    fetchClosureStatus={async (id) => {
+                        const res = await vendorWorkOrderApi.getClosureStatus(id);
+                        return res;
+                    }}
                 />
             )}
         </Card>

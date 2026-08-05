@@ -92,6 +92,11 @@ export class VendorWorkOrderController {
     return this.service.getById(id);
   }
 
+  @Get(":id/closure-status")
+  getClosureStatus(@Param("id", ParseIntPipe) id: number) {
+    return this.service.checkClosure(id);
+  }
+
   @Get("project/:projectId")
   getByProject(@Param("projectId", ParseIntPipe) projectId: number) {
     return this.service.getByProject(projectId);
