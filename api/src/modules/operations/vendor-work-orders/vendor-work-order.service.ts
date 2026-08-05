@@ -558,6 +558,48 @@ export class VendorWorkOrderService {
         return enriched;
     }
 
+    async checkClosure(id: number) {
+        const paymentRequestsData = await this.db
+            .select({
+                id: paymentRequests.id,
+                requestNo: paymentRequests.requestNo,
+                amount: paymentRequests.amount,
+                status: paymentRequests.status,
+                paymentAgainst: paymentRequests.paymentAgainst,
+            })
+            .from(paymentRequests)
+            .where(and(
+                eq(paymentRequests.vendorWorkOrderId, id),
+                ne(paymentRequests.status, "payment_done"),
+            ))
+            .orderBy(desc(paymentRequests.createdAt));
+
+        const purchaseInvoicesData = await this.db
+            .select({
+                id: purchaseInvoices.id,
+                invoiceNo: purchaseInvoices.invoiceNo,
+                valuePreGst: purchaseInvoices.valuePreGst,
+                gstAmount: purchaseInvoices.gstAmount,
+                invoiceDate: purchaseInvoices.invoiceDate,
+            })
+            .from(purchaseInvoices)
+            .where(eq(purchaseInvoices.vendorWorkOrderId, id))
+            .orderBy(desc(purchaseInvoices.createdAt));
+
+        const advancePaid = paymentRequestsData.some(
+            (pr) => pr.paymentAgainst?.toLowerCase().includes("advance"),
+        );
+
+        const canClose = paymentRequestsData.length === 0 && purchaseInvoicesData.length === 0;
+
+        return {
+            canClose,
+            remainingPayments: paymentRequestsData,
+            remainingInvoices: purchaseInvoicesData,
+            advancePaid,
+        };
+    }
+
     async listParties(type?: string) {
         const query = this.db
             .select()

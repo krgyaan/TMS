@@ -126,6 +126,11 @@ export class PurchaseOrderController {
     return this.service.getPurchaseOrder(id);
   }
 
+  @Get(":id/closure-status")
+  getClosureStatus(@Param("id", ParseIntPipe) id: number) {
+    return this.service.checkClosure(id);
+  }
+
   @Put(":id/tds")
   @HttpCode(HttpStatus.OK)
   setTdsPercentage(
