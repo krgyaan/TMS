@@ -126,7 +126,9 @@ const VendorMasterListPage: React.FC = () => {
     const deactivateMutation = useDeactivateParty();
     const updateMutation = useUpdateParty();
 
-    const parties: VendorMasterRow[] = (partiesData as VendorMasterRow[] | undefined) ?? [];
+    // const parties: VendorMasterRow[] = (partiesData as VendorMasterRow[] | undefined) ?? [];
+    const parties: VendorMasterRow[] = (partiesData as VendorMasterRow[] | undefined)
+    ?.filter((p) => p.type === "seller") ?? [];
 
     const onGridReady = useCallback((event: GridReadyEvent<VendorMasterRow>) => {
         setGridApi(event.api);
