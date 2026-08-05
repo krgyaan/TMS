@@ -86,6 +86,10 @@ class PurchaseOrderApiService extends BaseApiService {
     async updatePurchaseOrder(id: number, data: UpdatePurchaseOrderDTO): Promise<any> {
         return this.put(`/${id}`, data);
     }
+
+    async getClosureStatus(id: number): Promise<any> {
+        return this.get(`/${id}/closure-status`);
+    }
 }
 
 export const purchaseOrderApi = new PurchaseOrderApiService();

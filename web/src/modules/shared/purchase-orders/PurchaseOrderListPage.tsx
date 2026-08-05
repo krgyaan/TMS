@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { CheckCircle, Eye, FileUp, History, Search } from "lucide-react";
+import { CheckCircle, Eye, FileUp, History, Search, Lock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import DataTable from "@/components/ui/data-table";
@@ -17,7 +17,9 @@ import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import type { PurchaseOrderRow } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
 import { SetTdsDialog } from "./components/SetTdsDialog";
+import { ClosureDialog } from "./components/ClosureDialog";
 import { OrderProgressCell } from "@/components/OrderProgressCell";
+import { purchaseOrderApi } from "@/services/api/purchase-order.api";
 
 interface PurchaseOrderListPageProps {
     purchaseOrders?: PurchaseOrderRow[];
@@ -40,6 +42,7 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
     const setSearch = propOnSearchChange ?? setInternalSearch;
     const debouncedSearch = useDebouncedSearch(search, 300);
     const [poApproval, setPoApproval] = useState<PurchaseOrderRow | null>(null);
+    const [closurePo, setClosurePo] = useState<PurchaseOrderRow | null>(null);
 
     const isAccountsSection = location.pathname.includes("/accounts/");
     const isApprovalEnabled = showApprovalAction ?? isAccountsSection;
@@ -79,6 +82,15 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
                 label: "PO Approval",
                 icon: <CheckCircle className="h-4 w-4" />,
                 onClick: (row) => setPoApproval(row),
+            });
+        }
+
+        if (isAccountsSection) {
+            actions.push({
+                label: "Closure",
+                icon: <Lock className="h-4 w-4" />,
+                visible: (row) => row.poApproved === true,
+                onClick: (row) => setClosurePo(row),
             });
         }
 
@@ -411,6 +423,22 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
                     po={poApproval}
                     open={!!poApproval}
                     onClose={() => setPoApproval(null)}
+                />
+            )}
+
+            {closurePo && (
+                <ClosureDialog
+                    rowId={closurePo.id}
+                    rowLabel={closurePo.poNumber}
+                    projectId={closurePo.projectId}
+                    sellerName={closurePo.sellerName}
+                    amountAfterTds={closurePo.amountAfterTds || closurePo.grandTotal}
+                    open={!!closurePo}
+                    onClose={() => setClosurePo(null)}
+                    fetchClosureStatus={async (id) => {
+                        const res = await purchaseOrderApi.getClosureStatus(id);
+                        return res;
+                    }}
                 />
             )}
         </Card>
