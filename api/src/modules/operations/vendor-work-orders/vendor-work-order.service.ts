@@ -114,19 +114,19 @@ export class VendorWorkOrderService {
                 const qty = Number(product.qty);
                 const rate = Number(product.rate);
                 const gstRate = Number(product.gstRate);
-                const taxableAmount = qty * rate;
-                const gstAmount = (taxableAmount * gstRate) / 100;
-                const totalAmount = taxableAmount + gstAmount;
+                const taxableAmount = Number((qty * rate).toFixed(2));
+                const gstAmount = Number(((taxableAmount * gstRate) / 100).toFixed(2));
+                const totalAmount = Number((taxableAmount + gstAmount).toFixed(2));
 
                 await this.db.insert(vendorWorkOrderItems).values({
                     vendorWorkOrderId: wo.id,
                     description: product.description,
-                    qty: product.qty,
-                    rate: product.rate.toString(),
-                    taxableAmount: taxableAmount.toString(),
-                    gstRate: product.gstRate.toString(),
-                    gstAmount: gstAmount.toString(),
-                    totalAmount: totalAmount.toString(),
+                    qty: qty.toFixed(2),
+                    rate: rate.toFixed(2),
+                    taxableAmount: taxableAmount.toFixed(2),
+                    gstRate: gstRate.toFixed(2),
+                    gstAmount: gstAmount.toFixed(2),
+                    totalAmount: totalAmount.toFixed(2),
                 });
             }
         }
@@ -218,19 +218,19 @@ export class VendorWorkOrderService {
                 const qty = Number(product.qty);
                 const rate = Number(product.rate);
                 const gstRate = Number(product.gstRate);
-                const taxableAmount = qty * rate;
-                const gstAmount = (taxableAmount * gstRate) / 100;
-                const totalAmount = taxableAmount + gstAmount;
+                const taxableAmount = Number((qty * rate).toFixed(2));
+                const gstAmount = Number(((taxableAmount * gstRate) / 100).toFixed(2));
+                const totalAmount = Number((taxableAmount + gstAmount).toFixed(2));
 
                 await this.db.insert(vendorWorkOrderItems).values({
                     vendorWorkOrderId: id,
                     description: product.description,
-                    qty: product.qty,
-                    rate: product.rate.toString(),
-                    taxableAmount: taxableAmount.toString(),
-                    gstRate: product.gstRate.toString(),
-                    gstAmount: gstAmount.toString(),
-                    totalAmount: totalAmount.toString(),
+                    qty: qty.toFixed(2),
+                    rate: rate.toFixed(2),
+                    taxableAmount: taxableAmount.toFixed(2),
+                    gstRate: gstRate.toFixed(2),
+                    gstAmount: gstAmount.toFixed(2),
+                    totalAmount: totalAmount.toFixed(2),
                 });
             }
         }
