@@ -34,6 +34,18 @@ class VendorWorkOrderApiService extends BaseApiService {
         return this.get<any>(`/${id}`);
     }
 
+    async getClosureData(id: number) {
+        return this.get<any>(`/${id}/closure`);
+    }
+
+    async bulkCreatePaymentRequests(id: number, items: any[]) {
+        return this.post<any>(`/${id}/bulk-payment-requests`, { items });
+    }
+
+    async bulkCreatePurchaseInvoices(id: number, items: any[]) {
+        return this.post<any>(`/${id}/bulk-purchase-invoices`, { items });
+    }
+
     async getByProject(projectId: number) {
         return this.get<any[]>(`/project/${projectId}`);
     }

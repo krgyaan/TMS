@@ -49,6 +49,18 @@ class PurchaseOrderApiService extends BaseApiService {
         return this.get(`/${id}`);
     }
 
+    async getClosureData(id: number): Promise<any> {
+        return this.get(`/${id}/closure`);
+    }
+
+    async bulkCreatePaymentRequests(id: number, items: any[]): Promise<any> {
+        return this.post(`/${id}/bulk-payment-requests`, { items });
+    }
+
+    async bulkCreatePurchaseInvoices(id: number, items: any[]): Promise<any> {
+        return this.post(`/${id}/bulk-purchase-invoices`, { items });
+    }
+
     getPurchaseOrderPdfUrl(id: number, version?: string): string {
         const baseUrl = axiosInstance.defaults.baseURL || '';
         let url = `${baseUrl}/purchase-orders/${id}/pdf`;

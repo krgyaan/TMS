@@ -97,6 +97,31 @@ export class VendorWorkOrderController {
     return this.service.checkClosure(id);
   }
 
+  @Get(":id/closure")
+  getClosure(@Param("id", ParseIntPipe) id: number) {
+    return this.service.getVendorWorkOrderClosure(id);
+  }
+
+  @Post(":id/bulk-payment-requests")
+  @HttpCode(HttpStatus.CREATED)
+  bulkCreatePaymentRequests(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() body: { items: any[] },
+    @CurrentUser() user: ValidatedUser,
+  ) {
+    return this.service.bulkCreatePaymentRequests(id, body?.items ?? [], user.id);
+  }
+
+  @Post(":id/bulk-purchase-invoices")
+  @HttpCode(HttpStatus.CREATED)
+  bulkCreatePurchaseInvoices(
+    @Param("id", ParseIntPipe) id: number,
+    @Body() body: { items: any[] },
+    @CurrentUser() user: ValidatedUser,
+  ) {
+    return this.service.bulkCreatePurchaseInvoices(id, body?.items ?? [], user.id);
+  }
+
   @Get("project/:projectId")
   getByProject(@Param("projectId", ParseIntPipe) projectId: number) {
     return this.service.getByProject(projectId);

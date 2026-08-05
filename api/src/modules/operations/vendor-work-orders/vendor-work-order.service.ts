@@ -600,6 +600,213 @@ export class VendorWorkOrderService {
         };
     }
 
+    async getVendorWorkOrderClosure(id: number) {
+        const wo = await this.db
+            .select()
+            .from(vendorWorkOrders)
+            .where(eq(vendorWorkOrders.id, id))
+            .then(rows => rows[0]);
+        if (!wo) throw new NotFoundException("Vendor Work Order not found");
+
+        const items = await this.db
+            .select({
+                taxableAmount: vendorWorkOrderItems.taxableAmount,
+                gstAmount: vendorWorkOrderItems.gstAmount,
+                totalAmount: vendorWorkOrderItems.totalAmount,
+            })
+            .from(vendorWorkOrderItems)
+            .where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
+
+        const grandTotal = items.reduce((sum, item) => sum + Number(item.totalAmount), 0);
+        const totalGst = items.reduce((sum, item) => sum + Number(item.gstAmount), 0);
+
+        const paymentRequestsData = await this.db
+            .select({
+                id: paymentRequests.id,
+                requestNo: paymentRequests.requestNo,
+                partyName: paymentRequests.partyName,
+                amount: paymentRequests.amount,
+                status: paymentRequests.status,
+                paymentMode: paymentRequests.paymentMode,
+                paymentAgainst: paymentRequests.paymentAgainst,
+                utrNumber: paymentRequests.utrNumber,
+                createdAt: paymentRequests.createdAt,
+            })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.vendorWorkOrderId, id))
+            .orderBy(desc(paymentRequests.createdAt));
+
+        const purchaseInvoicesData = await this.db
+            .select({
+                id: purchaseInvoices.id,
+                invoiceNo: purchaseInvoices.invoiceNo,
+                category: purchaseInvoices.category,
+                partyName: purchaseInvoices.partyName,
+                valuePreGst: purchaseInvoices.valuePreGst,
+                gstAmount: purchaseInvoices.gstAmount,
+                invoiceDate: purchaseInvoices.invoiceDate,
+                invoiceFile: purchaseInvoices.invoiceFile,
+            })
+            .from(purchaseInvoices)
+            .where(eq(purchaseInvoices.vendorWorkOrderId, id))
+            .orderBy(desc(purchaseInvoices.createdAt));
+
+        const totalPaymentDone = paymentRequestsData
+            .filter((pr) => pr.status === "payment_done")
+            .reduce((sum, pr) => sum + Number(pr.amount || 0), 0);
+
+        const totalPiAmount = purchaseInvoicesData.reduce(
+            (sum, inv) => sum + Number(inv.valuePreGst || 0) + Number(inv.gstAmount || 0),
+            0,
+        );
+
+        return {
+            id: wo.id,
+            projectId: wo.projectId,
+            woNumber: wo.woNumber,
+            sellerName: wo.sellerName,
+            projectName: wo.projectName,
+            woDate: wo.woDate,
+            woApproved: wo.woApproved,
+            amountAfterTds: wo.amountAfterTds,
+            grandTotal,
+            totalGst,
+            totalPaymentDone,
+            totalPiAmount,
+            paymentRequests: paymentRequestsData,
+            purchaseInvoices: purchaseInvoicesData,
+        };
+    }
+
+    async bulkCreatePaymentRequests(id: number, items: any[], userId: number) {
+        const wo = await this.db
+            .select()
+            .from(vendorWorkOrders)
+            .where(eq(vendorWorkOrders.id, id))
+            .then(rows => rows[0]);
+        if (!wo) throw new NotFoundException("Vendor Work Order not found");
+
+        const created: any[] = [];
+        for (const item of items) {
+            const requestNo = await this.generatePaymentRequestNumber(wo.projectName ?? undefined);
+            const pr = (
+                await this.db
+                    .insert(paymentRequests)
+                    .values({
+                        projectId: wo.projectId,
+                        vendorWorkOrderId: id,
+                        requestNo,
+                        partyName: item.accountName ?? wo.sellerName ?? null,
+                        accountNumber: item.accountNumber,
+                        ifsc: item.ifsc,
+                        amount: item.amount?.toString(),
+                        paymentAgainst: "vwo",
+                        paymentMode: "BANK_TRANSFER",
+                        utrNumber: item.utr,
+                        billFiles: [],
+                        uploadInvoice: [],
+                        uploadPI: [],
+                        status: "payment_done",
+                        requestedBy: userId,
+                        createdAt: item.paymentDate ? new Date(item.paymentDate) : undefined,
+                    })
+                    .returning()
+            )[0];
+            created.push(pr);
+        }
+
+        this.logger.info(`Bulk created ${created.length} payment requests against VWO #${id}`);
+        return created;
+    }
+
+    async bulkCreatePurchaseInvoices(id: number, items: any[], userId: number) {
+        const wo = await this.db
+            .select()
+            .from(vendorWorkOrders)
+            .where(eq(vendorWorkOrders.id, id))
+            .then(rows => rows[0]);
+        if (!wo) throw new NotFoundException("Vendor Work Order not found");
+
+        const created: any[] = [];
+        for (const item of items) {
+            const invoiceNo = await this.generatePurchaseInvoiceNumber(wo.projectName ?? undefined);
+            const pi = (
+                await this.db
+                    .insert(purchaseInvoices)
+                    .values({
+                        projectId: wo.projectId,
+                        vendorWorkOrderId: id,
+                        invoiceNo,
+                        category: item.category,
+                        partyName: item.partyName ?? wo.sellerName ?? null,
+                        valuePreGst: item.valuePreGst?.toString(),
+                        gstAmount: item.gstAmount?.toString(),
+                        invoiceDate: item.invoiceDate,
+                        invoiceFile: Array.isArray(item.invoiceFile) ? item.invoiceFile[0] : item.invoiceFile,
+                        uploadedBy: userId,
+                    })
+                    .returning()
+            )[0];
+            created.push(pi);
+        }
+
+        this.logger.info(`Bulk created ${created.length} purchase invoices for VWO #${id}`);
+        return created;
+    }
+
+    private async generatePaymentRequestNumber(projectName?: string) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        const from = month >= 4 ? year.toString().slice(-2) : (year - 1).toString().slice(-2);
+        const to = ((Number.parseInt(from) + 1) % 100).toString().padStart(2, "0");
+        const fy = `${from}${to}`;
+
+        const sanitizedName = projectName ? this.sanitizeProjectName(projectName) : "PROJECT";
+        const prefix = `VE/${sanitizedName}/${fy}`;
+
+        const last = await this.db
+            .select({ id: paymentRequests.id, requestNo: paymentRequests.requestNo })
+            .from(paymentRequests)
+            .where(like(paymentRequests.requestNo, `VE/%/${fy}/PR%`))
+            .orderBy(desc(paymentRequests.id));
+
+        let next = 1;
+        if (last[0]?.requestNo) {
+            const match = /PR(\d{4})$/.exec(last[0].requestNo);
+            if (match) next = parseInt(match[1]) + 1;
+        }
+
+        return `${prefix}/PR${next.toString().padStart(4, "0")}`;
+    }
+
+    private async generatePurchaseInvoiceNumber(projectName?: string) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        const from = month >= 4 ? year.toString().slice(-2) : (year - 1).toString().slice(-2);
+        const to = ((Number.parseInt(from) + 1) % 100).toString().padStart(2, "0");
+        const fy = `${from}${to}`;
+
+        const sanitizedName = projectName ? this.sanitizeProjectName(projectName) : "PROJECT";
+        const prefix = `VE/${sanitizedName}/${fy}`;
+        const series = "WOI";
+
+        const last = await this.db
+            .select({ id: purchaseInvoices.id, invoiceNo: purchaseInvoices.invoiceNo })
+            .from(purchaseInvoices)
+            .where(like(purchaseInvoices.invoiceNo, `VE/%/${fy}/${series}%`))
+            .orderBy(desc(purchaseInvoices.id));
+
+        let next = 1;
+        if (last[0]?.invoiceNo) {
+            const match = last[0].invoiceNo.match(new RegExp(`${series}(\\d{4})$`));
+            if (match) next = parseInt(match[1]) + 1;
+        }
+
+        return `${prefix}/${series}${next.toString().padStart(4, "0")}`;
+    }
+
     async listParties(type?: string) {
         const query = this.db
             .select()
