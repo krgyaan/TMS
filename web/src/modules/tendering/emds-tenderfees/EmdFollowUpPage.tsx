@@ -42,7 +42,7 @@ const EmdFollowupSchema = z.object({
     organization: z.string().min(1, "Organization is required"),
     contacts: z.array(ContactSchema).min(1, "At least one contact is required"),
     startFrom: z.string().min(1, "Start Date is required"),
-    frequency: z.number().int().min(1).max(6).optional(),
+    frequency: z.string().min(1, "Frequency is required"),
 });
 
 type EmdFollowupForm = z.infer<typeof EmdFollowupSchema>;
@@ -138,7 +138,7 @@ const EmdFollowUpPage = () => {
         defaultValues: {
             organization: '',
             startFrom: '',
-            frequency: 1,
+            frequency: '1',
             contacts: [],
         },
     });
@@ -181,7 +181,7 @@ const EmdFollowUpPage = () => {
             }
         }
         if (followupData.frequency) {
-            form.setValue('frequency', followupData.frequency);
+            form.setValue('frequency', String(followupData.frequency));
         }
     }, [followupData, form]);
 
