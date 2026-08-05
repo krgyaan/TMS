@@ -131,10 +131,7 @@ export class PaymentRequestsCommandService {
                     if ((payload.EMD.mode === 'BANK_TRANSFER' || payload.EMD.mode === 'PORTAL') && instrument) {
                         try {
                             const makerRequest = await this.autoCreateProjectPaymentRequest(
-                                request,
-                                instrument,
-                                payload.EMD.mode,
-                                userId
+                                tx, request, instrument, payload.EMD.mode, userId
                             );
                             if (makerRequest) {
                                 results.push({ request, instrument, makerRequest, isAutoCreatedMakerRequest: true });
@@ -199,6 +196,7 @@ export class PaymentRequestsCommandService {
                     if ((payload.TENDER_FEES.mode === 'BANK_TRANSFER' || payload.TENDER_FEES.mode === 'PORTAL') && instrument) {
                         try {
                             const makerRequest = await this.autoCreateProjectPaymentRequest(
+                                tx,
                                 request,
                                 instrument,
                                 payload.TENDER_FEES.mode,
@@ -267,6 +265,7 @@ export class PaymentRequestsCommandService {
                     if ((payload.PROCESSING_FEES.mode === 'BANK_TRANSFER' || payload.PROCESSING_FEES.mode === 'PORTAL') && instrument) {
                         try {
                             const makerRequest = await this.autoCreateProjectPaymentRequest(
+                                tx,
                                 request,
                                 instrument,
                                 payload.PROCESSING_FEES.mode,
@@ -749,6 +748,7 @@ export class PaymentRequestsCommandService {
      * for Pay on Portal / Bank Transfer modes
      */
     private async autoCreateProjectPaymentRequest(
+        tx: any,
         paymentRequest: any,
         instrument: any,
         mode: string,
@@ -756,7 +756,7 @@ export class PaymentRequestsCommandService {
     ): Promise<any> {
         this.logger.log(`Auto-creating project payment request from ${mode} payment request: ${paymentRequest.id}`);
 
-        const [transferDetail] = await this.db
+        const [transferDetail] = await tx
             .select()
             .from(instrumentTransferDetails)
             .where(eq(instrumentTransferDetails.instrumentId, instrument.id))
@@ -764,35 +764,45 @@ export class PaymentRequestsCommandService {
 
         const purpose = paymentRequest.purpose || 'Other Payment';
         const requestNo = await this.generateProjectPaymentRequestNo();
+        const projectName = paymentRequest.projectName || 'Tender';
 
-        const makerRequestBody: any = {
-            projectId: null,
-            requestNo,
-            partyName: transferDetail?.accountName || instrument.favouring || transferDetail?.portalName || 'Unknown',
-            amount: paymentRequest.amountRequired || '0',
-            paymentAgainst: purpose,
-            paymentMode: mode,
-            billFiles: [],
-            remark: `Auto-created from ${mode} Module, for ${paymentRequest.projectName || 'Tender'} - ${purpose}`,
-            requestedBy: userId || 0,
-        };
-
-        if (mode === 'BANK_TRANSFER' && transferDetail) {
-            makerRequestBody.accountNumber = transferDetail.accountNumber || null;
-            makerRequestBody.ifsc = transferDetail.ifsc || null;
+        if (mode === 'PORTAL') {
+            const makerRequestBody: any = {
+                projectId: null,
+                requestNo,
+                amount: paymentRequest.amountRequired || '0',
+                paymentAgainst: purpose,
+                paymentMode: mode,
+                portalLink: transferDetail?.portalName || null,
+                billFiles: [],
+                remark: `Auto-created from PORTAL Module, for ${projectName} - ${purpose}`,
+                requestedBy: userId || 0,
+            };
+            const makerRequest = await this.paymentRequestService.create(makerRequestBody, userId || 0);
+            this.logger.log(`Auto-created project payment request: ${makerRequest.requestNo} for payment request ${paymentRequest.id}`);
+            return makerRequest;
         }
 
-        if (mode === 'PORTAL' && transferDetail) {
-            makerRequestBody.portalLink = transferDetail.portalName || null;
+        if (mode === 'BANK_TRANSFER') {
+            const makerRequestBody: any = {
+                projectId: null,
+                requestNo,
+                partyName: transferDetail?.accountName || instrument.favouring || 'Unknown',
+                accountNumber: transferDetail?.accountNumber || null,
+                ifsc: transferDetail?.ifsc || null,
+                amount: paymentRequest.amountRequired || '0',
+                paymentAgainst: purpose,
+                paymentMode: mode,
+                billFiles: [],
+                remark: `Auto-created from BANK_TRANSFER Module, for ${projectName} - ${purpose}`,
+                requestedBy: userId || 0,
+            };
+            const makerRequest = await this.paymentRequestService.create(makerRequestBody, userId || 0);
+            this.logger.log(`Auto-created project payment request: ${makerRequest.requestNo} for payment request ${paymentRequest.id}`);
+            return makerRequest;
         }
 
-        const makerRequest = await this.paymentRequestService.create(
-            makerRequestBody,
-            userId || 0
-        );
-
-        this.logger.log(`Auto-created project payment request: ${makerRequest.requestNo} for payment request ${paymentRequest.id}`);
-        return makerRequest;
+        return null;
     }
 
     private async generateProjectPaymentRequestNo(): Promise<string> {
