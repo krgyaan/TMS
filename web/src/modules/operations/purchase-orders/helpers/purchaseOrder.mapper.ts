@@ -42,6 +42,7 @@ export function mapFormToCreateDTO(
             .map(p => ({
                 description: p.description,
                 qty: p.qty!,
+                unit: (p.unit || "NOS").trim(),
                 rate: p.rate!,
                 gstRate: p.gstRate,
             })),
@@ -84,6 +85,7 @@ export function mapFormToUpdateDTO(
             .map(p => ({
                 description: p.description,
                 qty: p.qty!,
+                unit: (p.unit || "NOS").trim(),
                 rate: p.rate!,
                 gstRate: p.gstRate,
             })),
@@ -96,7 +98,7 @@ export function mapFormToUpdateDTO(
     };
 }
 
-export function calculateTotals(products: Array<{ qty: number | null; rate: number | null; gstRate: number }>) {
+export function calculateTotals(products: Array<{ qty: number | null; rate: number | null; gstRate: number; unit?: string }>) {
     let subtotal = 0;
     let totalGst = 0;
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 const productItemSchema = z.object({
     description: z.string().min(1, "Description is required"),
     qty: z.number().nullable().refine(v => v !== null && v > 0, "Qty must be greater than 0"),
+    unit: z.string().default("NOS"),
     rate: z.number().nullable().refine(v => v !== null && v >= 0, "Rate is required"),
     gstRate: z.number().default(18),
 });

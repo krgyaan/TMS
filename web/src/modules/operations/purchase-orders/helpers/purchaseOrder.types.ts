@@ -40,6 +40,7 @@ export interface CreatePurchaseOrderDTO {
 export interface CreateProductDTO {
     description: string;
     qty: number;
+    unit?: string;
     rate: number;
     gstRate: number;
     taxableAmount?: number;
