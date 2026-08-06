@@ -789,6 +789,7 @@ export class PurchaseOrderService {
                     gstRate: product.gstRate.toString(),
                     gstAmount: gstAmount.toString(),
                     totalAmount: totalAmount.toString(),
+                    unit: (product.unit || "").trim().toUpperCase() || "NOS",
                 });
             }
         }
