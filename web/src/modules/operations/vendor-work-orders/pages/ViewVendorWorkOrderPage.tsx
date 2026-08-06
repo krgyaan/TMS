@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useVendorWorkOrderDetails } from "@/hooks/api/useVendorWorkOrders";
-import { OrderViewPage } from "@/modules/shared/order-view/OrderViewPage";
-import { parseAttachments, type OrderViewData } from "@/modules/shared/order-view/orderView.types";
+import { OrderViewPage } from "@/modules/operations/order-view/OrderViewPage";
+import { parseAttachments, type OrderViewData } from "@/modules/operations/order-view/orderView.types";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 import type { VendorWorkOrderView } from "../helpers/vwoView.types";
 

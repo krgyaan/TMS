@@ -16,7 +16,7 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import type { VendorWorkOrderRow } from "./helpers/vwoForm.types";
-import { SetVwoApprovalDialog } from "@/modules/shared/vendor-work-orders/components/SetVwoApprovalDialog";
+import { SetVwoApprovalDialog } from "./components/SetVwoApprovalDialog";
 import { OrderProgressCell } from "@/components/OrderProgressCell";
 
 interface VendorWorkOrderListPageProps {
