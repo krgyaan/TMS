@@ -144,7 +144,7 @@ export default function CreatePurchaseInvoicePage() {
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                        <div className="hidden">
                             <div className="space-y-2">
                                 <Label className="flex items-center gap-2">
                                     <Hash className="h-3.5 w-3.5 text-muted-foreground" />
@@ -157,12 +157,12 @@ export default function CreatePurchaseInvoicePage() {
                                 <Label>Project Name</Label>
                                 <Input value={overview?.project?.projectName || ""} readOnly className="bg-muted" />
                             </div>
-                            <FieldWrapper control={form.control} name="invoiceDate" label={<><Calendar className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Invoice Date <span className="text-destructive">*</span></>}>
-                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                            </FieldWrapper>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+                            <FieldWrapper control={form.control} name="invoiceDate" label={<><Calendar className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Invoice Date <span className="text-destructive">*</span></>}>
+                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
+                            </FieldWrapper>
                             <SelectField
                                 control={form.control}
                                 name="category"
@@ -194,7 +194,7 @@ export default function CreatePurchaseInvoicePage() {
                             }
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
                             <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
                                 {(field) => <Input {...field} placeholder="Enter party name" />}
                             </FieldWrapper>
