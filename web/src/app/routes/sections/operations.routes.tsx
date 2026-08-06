@@ -33,22 +33,22 @@ const Operations_RaisePoFormPage = lazy(() => import("@/modules/operations/purch
 const Operations_ViewPoPage = lazy(() => import("@/modules/operations/purchase-orders/pages/ViewPurchaseOrderPage"));
 const Operations_EditPOPage = lazy(() => import("@/modules/operations/purchase-orders/pages/EditPurchaseOrderPage"));
 const Operations_PoPdfVersions = lazy(() => import("@/modules/operations/purchase-orders/pages/PoPdfVersionsPage"));
-const Operations_PurchaseOrderTabs = lazy(() => import("@/modules/shared/purchase-orders/PurchaseOrderTabsPage"));
+const Operations_PurchaseOrderTabs = lazy(() => import("@/modules/operations/purchase-orders/pages/PurchaseOrderTabsPage"));
 const Operations_RaiseSaleInvoiceFormPage = lazy(() => import("@/modules/operations/sale-invoices/CreateSaleInvoicePage"));
-const Operations_SaleInvoiceTabs = lazy(() => import("@/modules/shared/sale-invoices/SaleInvoiceTabsPage"));
-const Operations_ViewSaleInvoice = lazy(() => import("@/modules/shared/sale-invoices/ViewSaleInvoicePage"));
+const Operations_SaleInvoiceTabs = lazy(() => import("@/modules/operations/sale-invoices/SaleInvoiceTabsPage"));
+const Operations_ViewSaleInvoice = lazy(() => import("@/modules/operations/sale-invoices/ViewSaleInvoicePage"));
 
 const Operations_RaiseVendorWoFormPage = lazy(() => import("@/modules/operations/vendor-work-orders/CreateVendorWorkOrderPage"));
 const Operations_ViewVendorWoPage = lazy(() => import("@/modules/operations/vendor-work-orders/pages/ViewVendorWorkOrderPage"));
 const Operations_EditVendorWoPage = lazy(() => import("@/modules/operations/vendor-work-orders/EditVendorWorkOrderPage"));
-const Operations_VendorWorkOrderTabs = lazy(() => import("@/modules/shared/vendor-work-orders/VendorWorkOrderTabsPage"));
+const Operations_VendorWorkOrderTabs = lazy(() => import("@/modules/operations/vendor-work-orders/VendorWorkOrderTabsPage"));
 const Operations_VendorWoPdfVersions = lazy(() => import("@/modules/operations/vendor-work-orders/VendorWoPdfVersionsPage"));
 
 const Operations_CreatePurchaseInvoice = lazy(() => import("@/modules/operations/purchase-invoices/CreatePurchaseInvoicePage"));
 const Operations_EditPurchaseInvoice = lazy(() => import("@/modules/operations/purchase-invoices/EditPurchaseInvoicePage"));
 const Operations_CreatePaymentRequest = lazy(() => import("@/modules/operations/payment-requests/CreatePaymentRequestPage"));
 const Operations_EditPaymentRequest = lazy(() => import("@/modules/operations/payment-requests/EditPaymentRequestPage"));
-const Operations_PaymentRequestTabs = lazy(() => import("@/modules/shared/payment-requests/PaymentRequestTabsPage"));
+const Operations_PaymentRequestTabs = lazy(() => import("@/modules/operations/payment-requests/PaymentRequestTabsPage"));
 
 export default function OperationsRoutes() {
     return (

@@ -27,12 +27,12 @@ const AddTask = lazy(() => import("@/modules/accounts/delegation/AddTask"));
 const TaskDetail = lazy(() => import("@/modules/accounts/delegation/TaskDetail"));
 const TaskStatusUpdate = lazy(() => import("@/modules/accounts/delegation/TaskStatusUpdate"));
 
-const Accounts_PurchaseOrderTabs = lazy(() => import("@/modules/shared/purchase-orders/PurchaseOrderTabsPage"));
-const Accounts_PoClosure = lazy(() => import("@/modules/shared/purchase-orders/PoClosurePage"));
-const Accounts_PaymentRequestTabs = lazy(() => import("@/modules/shared/payment-requests/PaymentRequestTabsPage"));
-const Accounts_SaleInvoiceTabs = lazy(() => import("@/modules/shared/sale-invoices/SaleInvoiceTabsPage"));
-const Accounts_VendorWorkOrderTabs = lazy(() => import("@/modules/shared/vendor-work-orders/VendorWorkOrderTabsPage"));
-const Accounts_VendorMaster = lazy(() => import("@/modules/shared/vendor-master/PartyListPage"));
+const Accounts_PurchaseOrderTabs = lazy(() => import("@/modules/operations/purchase-orders/pages/PurchaseOrderTabsPage"));
+const Accounts_PoClosure = lazy(() => import("@/modules/operations/purchase-orders/pages/PoClosurePage"));
+const Accounts_PaymentRequestTabs = lazy(() => import("@/modules/operations/payment-requests/PaymentRequestTabsPage"));
+const Accounts_SaleInvoiceTabs = lazy(() => import("@/modules/operations/sale-invoices/SaleInvoiceTabsPage"));
+const Accounts_VendorWorkOrderTabs = lazy(() => import("@/modules/operations/vendor-work-orders/VendorWorkOrderTabsPage"));
+const Accounts_VendorMaster = lazy(() => import("@/modules/operations/vendor-master/PartyListPage"));
 
 export default function AccountsRoutes() {
     return (
