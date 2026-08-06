@@ -17,6 +17,9 @@ import { useCreatePoParty, usePoParties } from "@/hooks/api/usePurchaseOrders";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNextVWONumber, useCreateVendorWorkOrder } from "@/hooks/api/useVendorWorkOrders";
+import { useCreatePurchaseInvoice } from "@/hooks/api/usePurchaseInvoices";
+import { InvoiceUploadField } from "@/modules/operations/purchase-invoices/components/InvoiceUploadField";
+import type { CreatePurchaseInvoiceDTO } from "@/modules/operations/purchase-invoices/helpers/purchaseInvoice.types";
 import { VWOProductsField } from "./components/VWOProductsField";
 import { VWOTermsField } from "./components/VWOTermsField";
 import { DEFAULT_VWO_TERMS_ROWS } from "./helpers/vwoForm.constants";
@@ -57,6 +60,11 @@ const defaultFormValues: VendorWorkOrderFormValues = {
   scopeOfWork: [],
   accessoriesPackagingListAttachments: [],
   remarks: "",
+  uploadInvoice: "no",
+  invoiceDate: "",
+  invoiceValue: null,
+  invoiceGst: null,
+  invoiceFile: [],
 };
 
 const FormSkeleton = () => (
@@ -193,6 +201,7 @@ export default function CreateVendorWorkOrderPage() {
   };
 
   const createVWOMutation = useCreateVendorWorkOrder();
+  const createPIMutation = useCreatePurchaseInvoice();
 
   const handlePreview = async () => {
     const isValid = await form.trigger();
@@ -205,7 +214,27 @@ export default function CreateVendorWorkOrderPage() {
     try {
       const vwoData = mapVwoFormToCreateDTO(values, overview?.tender?.id || 3613, projectId, overview?.project?.projectName);
       const result = await createVWOMutation.mutateAsync(vwoData);
-      toast.success(`WO #${result.woNumber} has been created successfully.`);
+      let invoiceMessage = "";
+      if (values.uploadInvoice === "yes") {
+        try {
+          const invoiceData: CreatePurchaseInvoiceDTO = {
+            projectId,
+            projectName: overview?.project?.projectName,
+            category: values.category,
+            partyName: values.sellerName,
+            valuePreGst: values.invoiceValue!,
+            gstAmount: values.invoiceGst!,
+            invoiceDate: values.invoiceDate,
+            invoiceFile: values.invoiceFile?.[0] || undefined,
+            vendorWorkOrderId: result.id,
+          };
+          const invoice = await createPIMutation.mutateAsync(invoiceData);
+          invoiceMessage = ` Purchase Invoice #${invoice.invoiceNo} created successfully.`;
+        } catch {
+          toast.error("WO created, but invoice upload failed. Upload the invoice later from the WO.");
+        }
+      }
+      toast.success(`WO #${result.woNumber} has been created successfully.${invoiceMessage}`);
       navigate(paths.operations.projectDashboard(projectId));
     } catch {
       toast.error("Failed to create vendor work order. Please try again.");
@@ -295,6 +324,11 @@ export default function CreateVendorWorkOrderPage() {
                 ]}
                 placeholder="Select category..."
               />
+            </div>
+
+            {/* ── Invoice Upload (optional) ── */}
+            <div className="my-4">
+              <InvoiceUploadField control={form.control} />
             </div>
 
             <div className="flex flex-col md:flex-row gap-6 mt-6">

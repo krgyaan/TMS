@@ -47,13 +47,30 @@ export const purchaseOrderFormSchema = z.object({
     technicalSpecsAttachments: z.array(z.string()).default([]),
     accessoriesPackagingListAttachments: z.array(z.string()).default([]),
     remarks: z.string().default(""),
-}).refine(
-    (data) => data.poType !== "pi" || data.piAttachments.length > 0,
-    {
-        message: "Invoice copy is required for PI-based PO",
-        path: ["piAttachments"],
+    uploadInvoice: z.enum(["no", "yes"]).default("no"),
+    invoiceDate: z.string().default(""),
+    invoiceValue: z.number().nullable().default(null),
+    invoiceGst: z.number().nullable().default(null),
+    invoiceFile: z.array(z.string()).default([]),
+}).superRefine((data, ctx) => {
+    if (data.poType === "pi" && data.piAttachments.length === 0) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["piAttachments"], message: "Invoice copy is required for PI-based PO" });
     }
-);
+    if (data.uploadInvoice === "yes") {
+        if (!data.invoiceDate) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["invoiceDate"], message: "Invoice date is required" });
+        }
+        if (data.invoiceValue == null) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["invoiceValue"], message: "Value is required" });
+        }
+        if (data.invoiceGst == null) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["invoiceGst"], message: "GST amount is required" });
+        }
+        if (data.invoiceFile.length === 0) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["invoiceFile"], message: "Upload an invoice file" });
+        }
+    }
+});
 
 export type PurchaseOrderFormValues = z.infer<typeof purchaseOrderFormSchema>;
 export type ProductFormItem = z.infer<typeof productItemSchema>;

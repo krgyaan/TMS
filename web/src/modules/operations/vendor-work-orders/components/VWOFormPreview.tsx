@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate } from "@/hooks/useFormatedDate";
-import { ArrowLeft, Loader2, Receipt } from "lucide-react";
+import { ArrowLeft, FileText, Loader2, Receipt } from "lucide-react";
 import { calculateTotals, formatINR } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.mapper";
 import type { VendorWorkOrderFormValues, ProductFormItem } from "../helpers/vwoForm.schema";
 
@@ -108,6 +108,35 @@ export function VWOFormPreview({
           Back to Edit
         </Button>
       </div>
+
+      {formValues.uploadInvoice === "yes" && (
+        <Card className="border-primary/30">
+          <CardContent className="p-4">
+            <div className="text-sm font-semibold mb-2 flex items-center gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              Invoice Upload Summary
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+              <div>
+                <p className="text-muted-foreground text-xs">Invoice Date</p>
+                <p className="font-medium">{formatDate(formValues.invoiceDate) || "—"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Value (Pre GST)</p>
+                <p className="font-medium">{formValues.invoiceValue != null ? formatINR(formValues.invoiceValue) : "—"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">GST Amount</p>
+                <p className="font-medium">{formValues.invoiceGst != null ? formatINR(formValues.invoiceGst) : "—"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Invoice File</p>
+                <p className="font-medium truncate">{formValues.invoiceFile?.[0] ? formValues.invoiceFile[0].split("/").pop() : "—"}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader className="py-3 border-b bg-muted/20">

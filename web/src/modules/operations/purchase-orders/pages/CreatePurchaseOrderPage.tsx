@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useCreatePoParty, useCreatePurchaseOrder, useNextPONumber, usePoParties } from "@/hooks/api/usePurchaseOrders";
+import { useCreatePurchaseInvoice } from "@/hooks/api/usePurchaseInvoices";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,8 +27,10 @@ import { ProductsField } from "../components/ProductsField";
 import { DEFAULT_TERMS_ROWS, TermsField } from "../components/TermsField";
 import { formatDateForInput, mapFormToCreateDTO } from "../helpers/purchaseOrder.mapper";
 import type { CreatePartyDTO } from "../helpers/purchaseOrder.types";
+import type { CreatePurchaseInvoiceDTO } from "@/modules/operations/purchase-invoices/helpers/purchaseInvoice.types";
 import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "../helpers/purchaseOrder.schema";
 import { PartyFormDialog, type CreatePartyPayload } from "@/modules/operations/vendor-master/PartyFormDialog";
+import { InvoiceUploadField } from "@/modules/operations/purchase-invoices/components/InvoiceUploadField";
 import { Label } from "@/components/ui/label";
 
 const defaultFormValues: PurchaseOrderFormValues = {
@@ -53,13 +56,20 @@ const defaultFormValues: PurchaseOrderFormValues = {
   shippingAddress: "",
   shipToGst: "",
   shipToPan: "",
-  products: [{ description: "", qty: null, rate: null, gstRate: 18 }],
+  products: [
+    { description: "", qty: null, unit: "", rate: null, gstRate: 0 }
+  ],
   quotationNo: "",
   quotationDate: "",
   technicalSpecsAttachments: [],
   accessoriesPackagingListAttachments: [],
   termsAndConditions: DEFAULT_TERMS_ROWS,
   remarks: "",
+  uploadInvoice: "no",
+  invoiceDate: "",
+  invoiceValue: null,
+  invoiceGst: null,
+  invoiceFile: [],
 };
 
 const FormSkeleton = () => (
@@ -98,6 +108,7 @@ export default function CreatePurchaseOrderPage() {
   const { data: partiesData } = usePoParties();
   const createPOMutation = useCreatePurchaseOrder();
   const createPartyMutation = useCreatePoParty();
+  const createPIMutation = useCreatePurchaseInvoice();
 
   const { data: nextPONumber } = useNextPONumber(overview?.project?.projectName);
 
@@ -207,7 +218,27 @@ export default function CreatePurchaseOrderPage() {
     try {
       const poData = mapFormToCreateDTO(values, overview?.tender?.id || 3613, projectId, overview?.project?.projectName);
       const result = await createPOMutation.mutateAsync(poData);
-      toast.success(`PO #${result.poNumber} has been created successfully.`);
+      let invoiceMessage = "";
+      if (values.uploadInvoice === "yes") {
+        try {
+          const invoiceData: CreatePurchaseInvoiceDTO = {
+            projectId,
+            projectName: overview?.project?.projectName,
+            category: values.category,
+            partyName: values.sellerName,
+            valuePreGst: values.invoiceValue!,
+            gstAmount: values.invoiceGst!,
+            invoiceDate: values.invoiceDate,
+            invoiceFile: values.invoiceFile?.[0] || undefined,
+            purchaseOrderId: result.id,
+          };
+          const invoice = await createPIMutation.mutateAsync(invoiceData);
+          invoiceMessage = ` Purchase Invoice #${invoice.invoiceNo} created successfully.`;
+        } catch {
+          toast.error("PO created, but invoice upload failed. Upload the invoice later from the PO.");
+        }
+      }
+      toast.success(`PO #${result.poNumber} has been created successfully.${invoiceMessage}`);
       navigate(paths.operations.projectDashboard(projectId));
     } catch (error: any) {
       toast.error(error?.message || "Failed to create purchase order. Please try again.");
@@ -305,6 +336,11 @@ export default function CreatePurchaseOrderPage() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* ── Invoice Upload (optional) ── */}
+            <div className="mb-4">
+              <InvoiceUploadField control={form.control} />
             </div>
 
             {/* ── PO Details ── */}
