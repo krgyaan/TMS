@@ -348,7 +348,7 @@ export class VendorWorkOrderService {
         if (status === "pending") {
             conditions.push(isNull(vendorWorkOrders.woApproved));
         } else if (status === "approved") {
-            conditions.push(eq(vendorWorkOrders.woApproved, true));
+            conditions.push(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} < ${effectiveAmount}`);
         } else if (status === "rejected") {
             conditions.push(eq(vendorWorkOrders.woApproved, false));
         } else if (status === "new") {
@@ -424,7 +424,7 @@ export class VendorWorkOrderService {
 
         const [pending, approved, newCount, rejected, closedCount, invoicePendingCount] = await Promise.all([
             buildCount(isNull(vendorWorkOrders.woApproved)),
-            buildCount(eq(vendorWorkOrders.woApproved, true)),
+            buildCount(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} < ${effectiveAmount}`),
             buildCount(sql`${vendorWorkOrders.woApproved} IS NOT FALSE`),
             buildCount(eq(vendorWorkOrders.woApproved, false)),
             buildCount(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`),

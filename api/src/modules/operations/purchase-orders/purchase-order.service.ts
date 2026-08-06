@@ -85,7 +85,7 @@ export class PurchaseOrderService {
         if (status === "pending") {
             conditions.push(isNull(purchaseOrders.poApproved));
         } else if (status === "approved") {
-            conditions.push(eq(purchaseOrders.poApproved, true));
+            conditions.push(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} < ${effectiveAmount}`);
         } else if (status === "rejected") {
             conditions.push(eq(purchaseOrders.poApproved, false));
         } else if (status === "new") {
@@ -162,7 +162,7 @@ export class PurchaseOrderService {
 
         const [pending, approved, newCount, rejected, closedCount, invoicePendingCount] = await Promise.all([
             buildCount(isNull(purchaseOrders.poApproved)),
-            buildCount(eq(purchaseOrders.poApproved, true)),
+            buildCount(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} < ${effectiveAmount}`),
             buildCount(sql`${purchaseOrders.poApproved} IS NOT FALSE`),
             buildCount(eq(purchaseOrders.poApproved, false)),
             buildCount(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`),
