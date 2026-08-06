@@ -6,6 +6,7 @@ import { amcSites } from "./amc-sites.schema";
 import { amcSiteContacts } from "./amc-site-contacts.schema";
 import { amcProducts } from "./amc-products.schema";
 import { amcServiceEngineers } from "./amc-service-engineers.schema";
+import { amcCompletedServices } from "./amc-completed.schema";
 
 export const amcRelations = relations(amcs, ({ one, many }) => ({
     project: one(projects, {
@@ -15,6 +16,7 @@ export const amcRelations = relations(amcs, ({ one, many }) => ({
     sites: many(amcSites),
     products: many(amcProducts),
     serviceEngineers: many(amcServiceEngineers),
+    completedServices: many(amcCompletedServices),
 }));
 
 export const amcSiteRelations = relations(amcSites, ({ one, many }) => ({
@@ -47,5 +49,16 @@ export const amcServiceEngineerRelations = relations(amcServiceEngineers, ({ one
     amc: one(amcs, {
         fields: [amcServiceEngineers.amcId],
         references: [amcs.id],
+    }),
+}));
+
+export const amcCompletedServiceRelations = relations(amcCompletedServices, ({ one }) => ({
+    amc: one(amcs, {
+        fields: [amcCompletedServices.amcId],
+        references: [amcs.id],
+    }),
+    site: one(amcSites, {
+        fields: [amcCompletedServices.amcSiteId],
+        references: [amcSites.id],
     }),
 }));

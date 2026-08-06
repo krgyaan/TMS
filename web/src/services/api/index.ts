@@ -45,4 +45,5 @@ export { projectMasterService } from './projects-master.service';
 export { trainingApiService } from './training.service';
 export { leadEnquiryService } from './lead-enquiry.service';
 export { amcService } from './amc.service';
+export { amcBillingService } from './amc-billing.service';
 

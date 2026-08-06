@@ -10,6 +10,8 @@ const Services_AmcCreate = lazy(() => import('@/modules/services/amc/AmcCreatePa
 const Services_AmcEdit = lazy(() => import('@/modules/services/amc/AmcEditPage'));
 const Services_AmcShow = lazy(() => import('@/modules/services/amc/AmcShowPage'));
 const Services_AmcView = lazy(() => import('@/modules/services/amc/AmcViewPage'));
+const Services_AmcBillingList = lazy(() => import('@/modules/services/amc-billing/AmcBillingListPage'));
+const Services_AmcBillingShow = lazy(() => import('@/modules/services/amc-billing/AmcBillingShowPage'));
 
 export default function ServicesRoutes() {
     return (
@@ -22,6 +24,8 @@ export default function ServicesRoutes() {
             <Route path="amc/:id/edit" element={<RouteWrapper><Services_AmcEdit /></RouteWrapper>} />
             <Route path="amc/:id/view" element={<RouteWrapper><Services_AmcView /></RouteWrapper>} />
             <Route path="amc/:id" element={<RouteWrapper><Services_AmcShow /></RouteWrapper>} />
+            <Route path="amc-billing" element={<RouteWrapper><Services_AmcBillingList /></RouteWrapper>} />
+            <Route path="amc-billing/:id" element={<RouteWrapper><Services_AmcBillingShow /></RouteWrapper>} />
         </Routes>
     );
 }

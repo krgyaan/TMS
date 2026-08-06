@@ -21,6 +21,7 @@ import { extname } from "path";
 import { ZodValidationPipe } from "nestjs-zod";
 import { AmcService } from "./amc.service";
 import { CreateAmcSchema, UpdateAmcSchema } from "./dto/amc.dto";
+import { AmcBillingService } from "@/modules/services/amc-billing/amc-billing.service";
 
 const amcMulterConfig = {
     storage: diskStorage({
@@ -45,7 +46,10 @@ const AMC_PATH_FIELDS: Record<string, { field: "amcPoPath" | "serviceReportPath"
 
 @Controller("amc")
 export class AmcController {
-    constructor(private readonly service: AmcService) {}
+    constructor(
+        private readonly service: AmcService,
+        private readonly billingService: AmcBillingService,
+    ) {}
 
     @Get()
     list(@Query("projectId") projectId?: string) {
@@ -84,6 +88,7 @@ export class AmcController {
         @Param("id", ParseIntPipe) id: number,
         @Param("field") field: string,
         @UploadedFile() file: Express.Multer.File | undefined,
+        @Query("amcSiteId") amcSiteId?: string,
     ) {
         const config = AMC_PATH_FIELDS[field];
 
@@ -97,6 +102,16 @@ export class AmcController {
             throw new BadRequestException("File is required");
         }
 
-        return this.service.setFilePath(id, config.field, file.filename, config.subKey);
+        const updated = await this.service.setFilePath(id, config.field, file.filename, config.subKey);
+
+        if (field === "signed-service-report") {
+            await this.billingService.create({
+                amcId: id,
+                amcSiteId: amcSiteId ? Number(amcSiteId) : null,
+                serviceCompletedDate: new Date().toISOString(),
+            });
+        }
+
+        return updated;
     }
 }
