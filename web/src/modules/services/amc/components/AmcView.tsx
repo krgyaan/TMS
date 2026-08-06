@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useProjectsMaster } from "@/hooks/api/useProjects";
 import { useItems } from "@/hooks/api/useItems";
+import { useUsers } from "@/hooks/api/useUsers";
 import type { AmcDetail } from "../helpers/amc.types";
 import { sampleReport, filledReport } from "../helpers/amc.types";
 
@@ -93,9 +94,16 @@ function FileDownload({ label, path }: { label: string; path: string }) {
 export function AmcView({ amc }: { amc: AmcDetail }) {
     const { data: projects = [] } = useProjectsMaster();
     const { data: items = [] } = useItems();
+    const { data: allUsers = [] } = useUsers();
 
     const project = projects.find(p => p.id === amc.projectId);
     const itemName = (id: number) => items.find(i => i.id === id)?.name || `Item ${id}`;
+    const allocatedTeUser = allUsers.find(u => u.id === amc.allocatedTe);
+    const allocatedTeName = allocatedTeUser
+        ? allocatedTeUser.team?.name
+            ? `${allocatedTeUser.name} (${allocatedTeUser.team.name})`
+            : (allocatedTeUser.name ?? "—")
+        : null;
 
     return (
         <Card className="overflow-hidden">
@@ -125,6 +133,10 @@ export function AmcView({ amc }: { amc: AmcDetail }) {
                                     label="Project"
                                     value={project?.projectName || amc.projectId}
                                 />
+                            </TableRow>
+                            <TableRow className="hover:bg-muted/30">
+                                <InfoCell label="Allocated TE" value={allocatedTeName ?? "—"} />
+                                <TableCell colSpan={2} />
                             </TableRow>
                             <TableRow className="hover:bg-muted/30">
                                 <InfoCell label="Service Frequency" value={amc.serviceFrequency} />

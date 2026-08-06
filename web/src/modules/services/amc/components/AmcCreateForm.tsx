@@ -19,6 +19,7 @@ import { SelectField, Combobox } from "@/components/form/SelectField";
 import { paths } from "@/app/routes/paths";
 import { useProjectsMaster } from "@/hooks/api/useProjects";
 import { useItems } from "@/hooks/api/useItems";
+import { useUsers } from "@/hooks/api/useUsers";
 import {
     useAmc, useCreateAmc, useUpdateAmc, useAmcFileUpload,
 } from "@/hooks/api/useAmc";
@@ -478,6 +479,12 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
     const uploadFile = useAmcFileUpload();
     const { data: amc } = useAmc(amcId ?? 0);
     const { data: projects = [] } = useProjectsMaster();
+    const { data: allUsers = [], isLoading: teLoading } = useUsers();
+
+    const teOptions = allUsers.map(u => ({
+        value: u.id.toString(),
+        label: u.team?.name ? `${u.name} (${u.team.name})` : (u.name ?? ""),
+    }));
 
     const form = useForm<AmcFormValues>({
         resolver: zodResolver(AmcFormSchema) as Resolver<AmcFormValues>,
@@ -518,6 +525,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
         form.reset({
             teamName: amc.teamName,
             projectId: amc.projectId,
+            allocatedTe: amc.allocatedTe ?? null,
             serviceFrequency: amc.serviceFrequency,
             amcStartDate: amc.amcStartDate,
             amcEndDate: amc.amcEndDate,
@@ -552,6 +560,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
         const payload: CreateAmcDto = {
             teamName: values.teamName,
             projectId: values.projectId,
+            allocatedTe: values.allocatedTe ?? null,
             serviceFrequency: values.serviceFrequency,
             amcStartDate: values.amcStartDate,
             amcEndDate: values.amcEndDate,
@@ -608,7 +617,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
 
                     {/* ── 1. Team & Project ──────────────────────────────────── */}
                     <div className={sectionCls}>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <SelectField<AmcFormValues, "teamName">
                                 control={form.control}
                                 name="teamName"
@@ -626,6 +635,14 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                                     value: String(p.id),
                                     label: p.projectName ?? `Project ${p.id}`,
                                 }))}
+                            />
+                            <SelectField<AmcFormValues, "allocatedTe">
+                                control={form.control}
+                                name="allocatedTe"
+                                label="TE Allocate"
+                                valueType="number"
+                                placeholder={teLoading ? "Loading executives..." : "Select TE"}
+                                options={teOptions}
                             />
                         </div>
                     </div>
@@ -726,6 +743,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                                 control={form.control}
                                 name="billType"
                                 label="Bill Type"
+                                valueType="string"
                                 options={BILL_TYPE_OPTIONS}
                                 placeholder="Select Bill Type"
                             />

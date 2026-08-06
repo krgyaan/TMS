@@ -373,7 +373,7 @@ export default function AmcListPage() {
         {
             colId: "engineers",
             headerName: "Service Engg",
-            width: 140,
+            width: 142,
             sortable: false,
             cellRenderer: (params: CustomCellRendererProps<AmcSiteRow>) => {
                 const count = params.data?.serviceEngineers?.length ?? 0;
@@ -405,7 +405,7 @@ export default function AmcListPage() {
         {
             colId: "status",
             headerName: "Status",
-            width: 130,
+            width: 150,
             sortable: false,
             cellRenderer: (params: CustomCellRendererProps<AmcSiteRow>) => {
                 const value = params.data?.status ?? null;

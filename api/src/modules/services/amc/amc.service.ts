@@ -5,9 +5,8 @@ import { DRIZZLE } from "@/db/database.module";
 import {
     amcs,
     amcSites,
-    amcSiteContacts,
+    amcContacts,
     amcProducts,
-    amcServiceEngineers,
 } from "@/db/schemas";
 import type {
     AmcProductDto,
@@ -19,6 +18,11 @@ import type {
 } from "./dto/amc.dto";
 
 type AmcPathField = "amcPoPath" | "serviceReportPath" | "signedServiceReportPath";
+
+const CONTACT_SOURCE = {
+    site: "site_contacts",
+    engineer: "service_engineer",
+} as const;
 
 @Injectable()
 export class AmcService {
@@ -41,7 +45,7 @@ export class AmcService {
 
         const ids = amcRows.map(amc => amc.id);
 
-        const [sites, products, serviceEngineers] = await Promise.all([
+        const [sites, products, contacts] = await Promise.all([
             this.db
                 .select()
                 .from(amcSites)
@@ -54,18 +58,13 @@ export class AmcService {
                 .orderBy(asc(amcProducts.id)),
             this.db
                 .select()
-                .from(amcServiceEngineers)
-                .where(inArray(amcServiceEngineers.amcId, ids))
-                .orderBy(asc(amcServiceEngineers.id)),
+                .from(amcContacts)
+                .where(inArray(amcContacts.amcId, ids))
+                .orderBy(asc(amcContacts.id)),
         ]);
 
-        const siteIds = sites.map(site => site.id);
-        const siteContacts = siteIds.length
-            ? await this.db
-                  .select()
-                  .from(amcSiteContacts)
-                  .where(inArray(amcSiteContacts.amcSiteId, siteIds))
-            : [];
+        const engineerRows = contacts.filter(contact => contact.source === CONTACT_SOURCE.engineer);
+        const siteContactRows = contacts.filter(contact => contact.source === CONTACT_SOURCE.site);
 
         return amcRows.map(amc => ({
             ...amc,
@@ -73,10 +72,10 @@ export class AmcService {
                 .filter(site => site.amcId === amc.id)
                 .map(site => ({
                     ...site,
-                    contacts: siteContacts.filter(contact => contact.amcSiteId === site.id),
+                    contacts: siteContactRows.filter(contact => contact.amcSiteId === site.id),
                 })),
             products: products.filter(product => product.amcId === amc.id),
-            serviceEngineers: serviceEngineers.filter(engineer => engineer.amcId === amc.id),
+            serviceEngineers: engineerRows.filter(engineer => engineer.amcId === amc.id),
         }));
     }
 
@@ -91,7 +90,7 @@ export class AmcService {
             throw new NotFoundException(`AMC with ID ${id} not found`);
         }
 
-        const [sites, products, serviceEngineers] = await Promise.all([
+        const [sites, products, contacts] = await Promise.all([
             this.db
                 .select()
                 .from(amcSites)
@@ -104,18 +103,12 @@ export class AmcService {
                 .orderBy(asc(amcProducts.id)),
             this.db
                 .select()
-                .from(amcServiceEngineers)
-                .where(eq(amcServiceEngineers.amcId, id))
-                .orderBy(asc(amcServiceEngineers.id)),
+                .from(amcContacts)
+                .where(eq(amcContacts.amcId, id))
+                .orderBy(asc(amcContacts.id)),
         ]);
 
-        const siteIds = sites.map(site => site.id);
-        const siteContacts = siteIds.length
-            ? await this.db
-                  .select()
-                  .from(amcSiteContacts)
-                  .where(inArray(amcSiteContacts.amcSiteId, siteIds))
-            : [];
+        const siteContacts = contacts.filter(contact => contact.source === CONTACT_SOURCE.site);
 
         const sitesWithContacts = sites.map(site => ({
             ...site,
@@ -126,7 +119,7 @@ export class AmcService {
             ...amc,
             sites: sitesWithContacts,
             products,
-            serviceEngineers,
+            serviceEngineers: contacts.filter(contact => contact.source === CONTACT_SOURCE.engineer),
         };
     }
 
@@ -138,6 +131,7 @@ export class AmcService {
                     teamName: dto.teamName,
                     projectId: dto.projectId,
                     createdBy: createdBy ?? null,
+                    allocatedTe: dto.allocatedTe ?? null,
                     serviceFrequency: dto.serviceFrequency,
                     amcStartDate: dto.amcStartDate,
                     nextServiceDue: dto.nextServiceDue ?? this.nextServiceDue(dto.amcStartDate, dto.serviceFrequency),
@@ -178,6 +172,7 @@ export class AmcService {
 
             if (dto.teamName !== undefined) patch.teamName = dto.teamName;
             if (dto.projectId !== undefined) patch.projectId = dto.projectId;
+            if (dto.allocatedTe !== undefined) patch.allocatedTe = dto.allocatedTe;
             if (dto.serviceFrequency !== undefined) patch.serviceFrequency = dto.serviceFrequency;
             if (dto.amcStartDate !== undefined) patch.amcStartDate = dto.amcStartDate;
             if (dto.nextServiceDue !== undefined) {
@@ -305,8 +300,13 @@ export class AmcService {
 
         if (existingSites.length) {
             await tx
-                .delete(amcSiteContacts)
-                .where(inArray(amcSiteContacts.amcSiteId, existingSites.map(site => site.id)));
+                .delete(amcContacts)
+                .where(
+                    and(
+                        inArray(amcContacts.amcSiteId, existingSites.map(site => site.id)),
+                        eq(amcContacts.source, CONTACT_SOURCE.site),
+                    ),
+                );
         }
         await tx.delete(amcSites).where(eq(amcSites.amcId, amcId));
 
@@ -322,21 +322,31 @@ export class AmcService {
                 })
                 .returning();
 
-            await this.replaceSiteContacts(tx, insertedSite.id, site.contacts ?? []);
+            await this.replaceSiteContacts(tx, amcId, insertedSite.id, site.contacts ?? []);
         }
     }
 
     private async replaceSiteContacts(
         tx: Parameters<Parameters<DbInstance["transaction"]>[0]>[0],
+        amcId: number,
         amcSiteId: number,
         contacts: AmcSiteContactDto[],
     ) {
-        await tx.delete(amcSiteContacts).where(eq(amcSiteContacts.amcSiteId, amcSiteId));
+        await tx
+            .delete(amcContacts)
+            .where(
+                and(
+                    eq(amcContacts.amcSiteId, amcSiteId),
+                    eq(amcContacts.source, CONTACT_SOURCE.site),
+                ),
+            );
 
         if (contacts.length) {
-            await tx.insert(amcSiteContacts).values(
+            await tx.insert(amcContacts).values(
                 contacts.map(contact => ({
+                    amcId,
                     amcSiteId,
+                    source: CONTACT_SOURCE.site,
                     name: contact.name,
                     organization: contact.organization ?? null,
                     mobile: contact.mobile,
@@ -373,12 +383,21 @@ export class AmcService {
         amcId: number,
         engineers: AmcServiceEngineerDto[],
     ) {
-        await tx.delete(amcServiceEngineers).where(eq(amcServiceEngineers.amcId, amcId));
+        await tx
+            .delete(amcContacts)
+            .where(
+                and(
+                    eq(amcContacts.amcId, amcId),
+                    eq(amcContacts.source, CONTACT_SOURCE.engineer),
+                ),
+            );
 
         if (engineers.length) {
-            await tx.insert(amcServiceEngineers).values(
+            await tx.insert(amcContacts).values(
                 engineers.map(engineer => ({
                     amcId,
+                    amcSiteId: null,
+                    source: CONTACT_SOURCE.engineer,
                     name: engineer.name,
                     organization: engineer.organization ?? null,
                     mobile: engineer.mobile,

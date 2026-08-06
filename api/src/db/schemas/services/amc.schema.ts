@@ -20,6 +20,7 @@ export const amcs = pgTable(
         teamName: varchar("team_name", { length: 255 }).notNull(),
         projectId: bigint("project_id", { mode: "number" }).notNull(),
         createdBy: bigint("created_by", { mode: "number" }),
+        allocatedTe: bigint("allocated_te", { mode: "number" }),
         serviceFrequency: varchar("service_frequency", { length: 255 }).notNull(),
         amcStartDate: date("amc_start_date").notNull(),
         nextServiceDue: date("next_service_due").notNull().default("2025-06-30"),

@@ -1,12 +1,11 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
 import {
     amcs,
     amcSites,
-    amcSiteContacts,
-    amcServiceEngineers,
+    amcContacts,
     amcCompletedServices,
     projects,
 } from "@/db/schemas";
@@ -16,6 +15,10 @@ import type {
 } from "./dto/amc-billing.dto";
 
 const DEFAULT_STATUS = "Signed Service reports Received";
+const CONTACT_SOURCE = {
+    site: "site_contacts",
+    engineer: "service_engineer",
+} as const;
 
 @Injectable()
 export class AmcBillingService {
@@ -140,15 +143,25 @@ export class AmcBillingService {
         const engineerRows = amcIds.length
             ? await this.db
                   .select()
-                  .from(amcServiceEngineers)
-                  .where(inArray(amcServiceEngineers.amcId, amcIds))
+                  .from(amcContacts)
+                  .where(
+                      and(
+                          inArray(amcContacts.amcId, amcIds),
+                          eq(amcContacts.source, CONTACT_SOURCE.engineer),
+                      ),
+                  )
             : [];
 
         const contactRows = siteIds.length
             ? await this.db
                   .select()
-                  .from(amcSiteContacts)
-                  .where(inArray(amcSiteContacts.amcSiteId, siteIds))
+                  .from(amcContacts)
+                  .where(
+                      and(
+                          inArray(amcContacts.amcSiteId, siteIds),
+                          eq(amcContacts.source, CONTACT_SOURCE.site),
+                      ),
+                  )
             : [];
 
         const projectRows = amcRows.length
@@ -176,6 +189,7 @@ export class AmcBillingService {
 
         const contactsBySiteId = new Map<number, (typeof contactRows)[number][]>();
         for (const contact of contactRows) {
+            if (contact.amcSiteId === null) continue;
             const list = contactsBySiteId.get(contact.amcSiteId) ?? [];
             list.push(contact);
             contactsBySiteId.set(contact.amcSiteId, list);

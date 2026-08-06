@@ -46,6 +46,7 @@ export interface Amc {
     teamName: string;
     projectId: number;
     createdBy: number | null;
+    allocatedTe: number | null;
     serviceFrequency: string;
     amcStartDate: string;
     nextServiceDue: string | null;
@@ -70,6 +71,7 @@ export interface AmcDetail extends Amc {
 export interface CreateAmcDto {
     teamName: string;
     projectId: number;
+    allocatedTe?: number | null;
     serviceFrequency: string;
     amcStartDate: string;
     nextServiceDue?: string;
@@ -133,11 +135,18 @@ export const VARIABLE_BILL_LABELS = ["Q1", "Q2", "Q3", "Q4"];
 export const AmcFormSchema = z.object({
     teamName: z.string().min(1, { message: "Team Name is required" }),
     projectId: z.coerce.number().min(1, { message: "Please select a Project" }),
+    allocatedTe: z.coerce.number().min(1, { message: "Please select an Allocated TE" }).nullable().optional(),
     serviceFrequency: z.string().min(1, { message: "Service Frequency is required" }),
     amcStartDate: z.string().min(1, { message: "AMC Start Date is required" }),
     amcEndDate: z.string().min(1, { message: "AMC End Date is required" }),
     billFrequency: z.string().min(1, { message: "Bill Frequency is required" }),
-    billType: z.enum(["constant", "variable"]),
+    billType: z.preprocess(
+        v => {
+            const s = typeof v === "string" ? v.trim().toLowerCase() : "";
+            return s === "" ? "constant" : s;
+        },
+        z.enum(["constant", "variable"]),
+    ),
     billValue: z.string().optional(),
 });
 
@@ -146,6 +155,7 @@ export type AmcFormValues = z.infer<typeof AmcFormSchema>;
 export const amcFormDefaultValues: AmcFormValues = {
     teamName: "",
     projectId: 0,
+    allocatedTe: null,
     serviceFrequency: "Monthly",
     amcStartDate: "",
     amcEndDate: "",

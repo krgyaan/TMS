@@ -42,6 +42,7 @@ const VariableBillItemSchema = z.object({
 export const CreateAmcSchema = z.object({
     teamName: z.string().min(1),
     projectId: z.number().int().positive(),
+    allocatedTe: z.number().int().positive().nullable().optional(),
     serviceFrequency: z.string().min(1),
     amcStartDate: z.string().date(),
     nextServiceDue: z.string().date().optional(),
