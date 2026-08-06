@@ -13,7 +13,7 @@ import { useBeneficiaries, useCreateBeneficiary, useCreatePaymentRequest, useNex
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { formatINR } from "@/hooks/useINRFormatter";
-import { ArrowLeft, Building2, Hash, Landmark, Loader2, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, Hash, Loader2, UserPlus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -159,7 +159,7 @@ export default function CreatePaymentRequestPage() {
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="hidden">
                             <div className="space-y-2">
                                 <Label className="flex items-center gap-2">
                                     <Hash className="h-3.5 w-3.5 text-muted-foreground" />
@@ -176,100 +176,88 @@ export default function CreatePaymentRequestPage() {
                                 <Input value={overview?.project?.projectName || ""} readOnly className="bg-muted" />
                             </div>
                         </div>
-
-
-                        <div className="border rounded-lg border-dashed p-4 space-y-4">
-                            <h3 className="text-lg font-semibold">Payment Mode</h3>
-                            <RadioGroup
-                                value={paymentMode}
-                                onValueChange={(v) => form.setValue("paymentMode", v as "BANK_TRANSFER" | "PORTAL")}
-                                className="flex gap-6"
-                            >
-                                <div className="flex items-center gap-2">
-                                    <RadioGroupItem value="BANK_TRANSFER" id="bank-transfer" />
-                                    <Label htmlFor="bank-transfer" className="cursor-pointer">Bank Transfer</Label>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <RadioGroupItem value="PORTAL" id="pay-on-portal" />
-                                    <Label htmlFor="pay-on-portal" className="cursor-pointer">Pay on Portal</Label>
-                                </div>
-                            </RadioGroup>
-
+                        <RadioGroup
+                            value={paymentMode}
+                            onValueChange={(v) => form.setValue("paymentMode", v as "BANK_TRANSFER" | "PORTAL")}
+                            className="flex gap-6"
+                        >
+                            <div className="flex items-center gap-2">
+                                <RadioGroupItem value="BANK_TRANSFER" id="bank-transfer" />
+                                <Label htmlFor="bank-transfer" className="cursor-pointer">Bank Transfer</Label>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <RadioGroupItem value="PORTAL" id="pay-on-portal" />
+                                <Label htmlFor="pay-on-portal" className="cursor-pointer">Pay on Portal</Label>
+                            </div>
+                        </RadioGroup>
+                        <div className="border rounded-lg border-dashed p-4 grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
                             {paymentMode === "BANK_TRANSFER" && (
                                 <>
-                                    <h4 className="text-md font-semibold flex items-center gap-2">
-                                        <Landmark className="h-4 w-4" />
-                                        Beneficiary Details
-                                    </h4>
-                                    <div className="flex items-end gap-4">
-                                <SelectField
-                                    control={form.control}
-                                    name="selectedBeneficiaryId"
-                                    label="Beneficiary (Master)"
-                                    options={beneficiaryOptions}
-                                    placeholder="Select beneficiary..."
-                                />
-                                <Button variant="outline" size="sm" type="button" className="mb-1" onClick={() => setIsAddBeneficiaryOpen(true)}>
-                                    <UserPlus className="mr-2 h-4 w-4" />
-                                    Add New
-                                </Button>
-                                <BeneficiaryFormDialog
-                                    open={isAddBeneficiaryOpen}
-                                    onOpenChange={setIsAddBeneficiaryOpen}
-                                    onSubmit={handleAddBeneficiary}
-                                    isLoading={createBeneficiaryMutation.isPending}
-                                />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
-                                    {(field) => <Input {...field} placeholder="Enter party name" />}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="accountNumber" label={<>Account Number <span className="text-destructive">*</span></>}>
-                                    {(field) => <Input {...field} placeholder="Enter account number" />}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="bankName" label="Bank Name">
-                                    {(field) => <Input {...field} placeholder="e.g. State Bank of India" />}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="ifsc" label={<>IFSC <span className="text-destructive">*</span></>}>
-                                    {(field) => (
-                                        <Input
-                                            {...field}
-                                            placeholder="e.g. SBIN0001234"
-                                            className="font-mono"
-                                            onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                                        />
-                                    )}
-                                </FieldWrapper>
-                            </div>
+                                    <div className="col-span-4">
+                                        <div className="flex items-end gap-4">
+                                            <SelectField
+                                                control={form.control}
+                                                name="selectedBeneficiaryId"
+                                                label="Beneficiary (Master)"
+                                                options={beneficiaryOptions}
+                                                placeholder="Select beneficiary..."
+                                            />
+                                            <Button variant="outline" size="sm" type="button" className="mb-1" onClick={() => setIsAddBeneficiaryOpen(true)}>
+                                                <UserPlus className="mr-2 h-4 w-4" />
+                                                Add New
+                                            </Button>
+                                            <BeneficiaryFormDialog
+                                                open={isAddBeneficiaryOpen}
+                                                onOpenChange={setIsAddBeneficiaryOpen}
+                                                onSubmit={handleAddBeneficiary}
+                                                isLoading={createBeneficiaryMutation.isPending}
+                                            />
+                                        </div>
+                                    </div>
+                                    <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
+                                        {(field) => <Input {...field} placeholder="Enter party name" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="accountNumber" label={<>Account Number <span className="text-destructive">*</span></>}>
+                                        {(field) => <Input {...field} placeholder="Enter account number" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="bankName" label="Bank Name">
+                                        {(field) => <Input {...field} placeholder="e.g. State Bank of India" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="ifsc" label={<>IFSC <span className="text-destructive">*</span></>}>
+                                        {(field) => (
+                                            <Input
+                                                {...field}
+                                                placeholder="e.g. SBIN0001234"
+                                                className="font-mono"
+                                                onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                            />
+                                        )}
+                                    </FieldWrapper>
                                 </>
                             )}
 
                             {paymentMode === "PORTAL" && (
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <FieldWrapper control={form.control} name="portalLink" label="Portal URL">
-                                        {(field) => <Input {...field} placeholder="Enter portal payment link..." />}
-                                    </FieldWrapper>
-                                </div>
+                                <FieldWrapper control={form.control} name="portalLink" label="Portal URL">
+                                    {(field) => <Input {...field} placeholder="Enter portal payment link..." />}
+                                </FieldWrapper>
                             )}
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <FieldWrapper control={form.control} name="amount" label={<>Amount <span className="text-destructive">*</span></>}>
-                                    {(field) => (
-                                        <Input
-                                            type="number"
-                                            step="0.01"
-                                            placeholder="0.00"
-                                            value={field.value ?? ""}
-                                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                                        />
-                                    )}
-                                </FieldWrapper>
+                            <FieldWrapper control={form.control} name="amount" label={<>Amount <span className="text-destructive">*</span></>}>
+                                {(field) => (
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={field.value ?? ""}
+                                        onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                                    />
+                                )}
+                            </FieldWrapper>
+                            <div className="col-span-3">
+                                <PaymentAgainstField control={form.control} projectId={projectId} preSelectedPoId={preSelectedPoId} onRemainingChange={onRemainingChange} />
                             </div>
                         </div>
 
-                        <div className="border rounded-lg border-dashed p-4 space-y-4">
-                            <PaymentAgainstField control={form.control} projectId={projectId} preSelectedPoId={preSelectedPoId} onRemainingChange={onRemainingChange} />
-                        </div>
 
                         <div className="flex items-end justify-between">
                             <div>

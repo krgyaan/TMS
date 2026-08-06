@@ -2,8 +2,7 @@ import { z } from "zod";
 
 export const paymentAgainstOptions = [
     { value: "po", label: "PO" },
-    { value: "vwo", label: "Work Order" },
-    { value: "imprest", label: "Imprest" },
+    { value: "vwo", label: "Work Order" }
 ] as const;
 
 export const paymentRequestFormSchema = z.object({
