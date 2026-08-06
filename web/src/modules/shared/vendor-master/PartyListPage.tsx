@@ -1,23 +1,21 @@
-import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { Eye, Edit, Search, Trash2 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import DataTable from "@/components/ui/data-table";
-import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
-import type { CustomCellRendererProps } from "ag-grid-react";
-import { useNavigate } from "react-router-dom";
-import { formatDate } from "@/hooks/useFormatedDate";
-import { toast } from "sonner";
-import { usePoParties, useActivateParty, useDeactivateParty, useUpdateParty } from "@/hooks/api/usePurchaseOrders";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useActivateParty, useDeactivateParty, usePoParties, useUpdateParty } from "@/hooks/api/usePurchaseOrders";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { PartyFormDialog, type CreatePartyPayload } from "@/modules/shared/vendor-master/PartyFormDialog";
 import type { CreatePartyDTO } from "@/modules/shared/vendor-master/vendor-master.types";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import type { ColDef, GridApi, GridReadyEvent } from "ag-grid-community";
+import type { CustomCellRendererProps } from "ag-grid-react";
+import { Edit, Eye, Search, Trash2 } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 export interface VendorMasterRow {
     id: number;
@@ -56,52 +54,40 @@ const PartyViewDialog: React.FC<PartyViewDialogProps> = ({ party, open, onClose 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <span className="text-sm text-muted-foreground">Name</span>
-                            <p className="font-medium">{party.name || "—"}</p>
+                            <p className="font-medium">{party.name || "-"}</p>
                         </div>
                         <div>
                             <span className="text-sm text-muted-foreground">Alias</span>
-                            <p className="font-medium">{party.alias || "—"}</p>
+                            <p className="font-medium">{party.alias || "-"}</p>
                         </div>
                         <div>
                             <span className="text-sm text-muted-foreground">Email</span>
-                            <p className="font-medium">{party.email || "—"}</p>
+                            <p className="font-medium">{party.email || "-"}</p>
                         </div>
                         <div>
                             <span className="text-sm text-muted-foreground">Mobile</span>
-                            <p className="font-medium">{party.mobileNumber || "—"}</p>
+                            <p className="font-medium">{party.mobileNumber || "-"}</p>
                         </div>
                         <div>
                             <span className="text-sm text-muted-foreground">Contact Person</span>
-                            <p className="font-medium">{party.contactPerson || "—"}</p>
+                            <p className="font-medium">{party.contactPerson || "-"}</p>
                         </div>
                         <div>
-                            <span className="text-sm text-muted-foreground">Type</span>
-                            <p className="font-medium">{party.type || "—"}</p>
+                            <span className="text-sm text-muted-foreground">GST</span>
+                            <p className="font-medium">{party.gstNo || "-"}</p>
                         </div>
-                        {party.gstNo && (
-                            <div>
-                                <span className="text-sm text-muted-foreground">GST</span>
-                                <p className="font-medium">{party.gstNo}</p>
-                            </div>
-                        )}
-                        {party.pan && (
-                            <div>
-                                <span className="text-sm text-muted-foreground">PAN</span>
-                                <p className="font-medium">{party.pan}</p>
-                            </div>
-                        )}
-                        {party.msme && (
-                            <div>
-                                <span className="text-sm text-muted-foreground">MSME</span>
-                                <p className="font-medium">{party.msme}</p>
-                            </div>
-                        )}
-                        {party.address && (
-                            <div className="col-span-2">
-                                <span className="text-sm text-muted-foreground">Address</span>
-                                <p className="font-medium">{party.address}</p>
-                            </div>
-                        )}
+                        <div>
+                            <span className="text-sm text-muted-foreground">PAN</span>
+                            <p className="font-medium">{party.pan || "-"}</p>
+                        </div>
+                        <div>
+                            <span className="text-sm text-muted-foreground">MSME</span>
+                            <p className="font-medium">{party.msme || "-"}</p>
+                        </div>
+                        <div className="col-span-2">
+                            <span className="text-sm text-muted-foreground">Address</span>
+                            <p className="font-medium">{party.address || "-"}</p>
+                        </div>
                     </div>
                 </div>
                 <DialogFooter>
@@ -212,28 +198,7 @@ const VendorMasterListPage: React.FC = () => {
             headerName: "Party Name",
             sortable: true,
             filter: true,
-            flex: 1,
-            minWidth: 150,
-            getQuickFilterText: (params) => {
-                const d = params.data;
-                return `${d.name} ${d.alias || ""} ${d.email || ""} ${d.contactPerson || ""} ${d.mobileNumber || ""}`;
-            },
-            cellRenderer: (p: CustomCellRendererProps<VendorMasterRow>) => (
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span className="truncate block max-w-[200px] font-medium">{p.value || "-"}</span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" align="start" className="max-w-xs">
-                            <div className="space-y-1 text-xs">
-                                {p.data?.email && <p><strong>Email:</strong> {p.data.email}</p>}
-                                {p.data?.contactPerson && <p><strong>Contact:</strong> {p.data.contactPerson}</p>}
-                                {p.data?.mobileNumber && <p><strong>Mobile:</strong> {p.data.mobileNumber}</p>}
-                            </div>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            ),
+            width: 150
         },
         {
             field: "alias",
@@ -247,84 +212,56 @@ const VendorMasterListPage: React.FC = () => {
             headerName: "Email",
             sortable: true,
             filter: true,
-            width: 200,
-            cellRenderer: (p: CustomCellRendererProps<VendorMasterRow>) => (
-                <span className="text-muted-foreground truncate block max-w-[180px]">{p.value || "—"}</span>
-            ),
+            width: 200
         },
         {
             field: "contactPerson",
             headerName: "Contact Person",
             sortable: true,
             filter: true,
-            width: 160,
-            cellRenderer: (p: CustomCellRendererProps<VendorMasterRow>) => (
-                <span className="truncate block max-w-[140px]">{p.value || "—"}</span>
-            ),
+            width: 160
         },
         {
             field: "mobileNumber",
             headerName: "Mobile",
             sortable: true,
             filter: true,
-            width: 150,
-            cellRenderer: (p: CustomCellRendererProps<VendorMasterRow>) => (
-                <span className="truncate block max-w-[140px]">{p.value || "—"}</span>
-            ),
+            width: 150
         },
         {
             field: "gstNo",
             headerName: "GST",
             sortable: true,
             filter: true,
-            width: 150,
-            cellRenderer: (p: CustomCellRendererProps<VendorMasterRow>) => (
-                <span className="text-muted-foreground font-mono text-xs">{p.value || "—"}</span>
-            ),
+            width: 150
         },
         {
             field: "pan",
             headerName: "PAN",
             sortable: true,
             filter: true,
-            width: 120,
-            cellRenderer: (p: CustomCellRendererProps<VendorMasterRow>) => (
-                <span className="text-muted-foreground font-mono text-xs">{p.value || "—"}</span>
-            ),
+            width: 120
+        },
+        {
+            field: "msme",
+            headerName: "MSME",
+            sortable: true,
+            filter: true,
+            width: 130
         },
         {
             field: "isActive",
             headerName: "Status",
             sortable: true,
             filter: true,
-            width: 110,
+            width: 90,
             cellRenderer: (p: CustomCellRendererProps<VendorMasterRow>) => {
                 const val = p.value;
                 return (
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Badge variant={val ? "default" : "secondary"} className="gap-1 cursor-pointer">
-                                    {val ? "Active" : "Inactive"}
-                                </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>{val ? "This party is active" : "This party is inactive"}</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
+                    <Badge variant={val ? "default" : "secondary"} className="gap-1 cursor-pointer">
+                        {val ? "Active" : "Inactive"}
+                    </Badge>
                 );
-            },
-        },
-        {
-            field: "createdAt",
-            headerName: "Created On",
-            sortable: true,
-            filter: true,
-            width: 130,
-            valueFormatter: (p: ValueFormatterParams<VendorMasterRow>) => {
-                if (!p.value) return "—";
-                return formatDate(p.value);
             },
         },
         {
