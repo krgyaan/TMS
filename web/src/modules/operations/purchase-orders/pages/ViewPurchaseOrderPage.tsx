@@ -1,7 +1,7 @@
 import { useParams } from "react-router-dom";
 import { usePurchaseOrderDetails } from "@/hooks/api/usePurchaseOrders";
-import { OrderViewPage } from "@/modules/shared/order-view/OrderViewPage";
-import { parseAttachments, type OrderViewData } from "@/modules/shared/order-view/orderView.types";
+import { OrderViewPage } from "@/modules/operations/order-view/OrderViewPage";
+import { parseAttachments, type OrderViewData } from "@/modules/operations/order-view/orderView.types";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
 import type { PurchaseOrderView } from "../helpers/purchaseOrderView.types";
 
