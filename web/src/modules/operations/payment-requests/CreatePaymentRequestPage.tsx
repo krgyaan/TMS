@@ -4,7 +4,6 @@ import { SelectField } from "@/components/form/SelectField";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,12 +13,14 @@ import { useBeneficiaries, useCreateBeneficiary, useCreatePaymentRequest, useNex
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { formatINR } from "@/hooks/useINRFormatter";
-import { ArrowLeft, Building2, Hash, Landmark, Loader2, Plus, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, Hash, Landmark, Loader2, UserPlus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { PaymentAgainstField } from "./components/PaymentAgainstField";
+import { BeneficiaryFormDialog } from "@/modules/operations/vendor-master/components/BeneficiaryFormDialog";
+import type { BeneficiaryFormValues } from "@/modules/operations/vendor-master/vendor-master.types";
 import { mapPaymentRequestFormToCreateDTO } from "./helpers/paymentRequest.mapper";
 import { paymentRequestFormSchema, type PaymentRequestFormValues } from "./helpers/paymentRequest.schema";
 
@@ -53,7 +54,6 @@ export default function CreatePaymentRequestPage() {
     const { data: beneficiaries } = useBeneficiaries();
     const createBeneficiaryMutation = useCreateBeneficiary();
     const [isAddBeneficiaryOpen, setIsAddBeneficiaryOpen] = useState(false);
-    const [newBeneficiary, setNewBeneficiary] = useState({ name: "", accountNumber: "", ifsc: "", bankName: "" });
 
     const preSelectedPoId = poIdParam ? Number(poIdParam) : undefined;
     const [remainingAmount, setRemainingAmount] = useState(0);
@@ -89,11 +89,10 @@ export default function CreatePaymentRequestPage() {
         name: `${b.name} (${b.accountNumber})`,
     }));
 
-    const handleAddBeneficiary = async () => {
+    const handleAddBeneficiary = async (values: BeneficiaryFormValues) => {
         try {
-            const created = await createBeneficiaryMutation.mutateAsync(newBeneficiary);
+            const created = await createBeneficiaryMutation.mutateAsync(values);
             form.setValue("selectedBeneficiaryId", String(created.id));
-            setNewBeneficiary({ name: "", accountNumber: "", ifsc: "", bankName: "" });
             setIsAddBeneficiaryOpen(false);
             toast.success("Beneficiary added successfully");
         } catch {
@@ -210,62 +209,16 @@ export default function CreatePaymentRequestPage() {
                                     options={beneficiaryOptions}
                                     placeholder="Select beneficiary..."
                                 />
-                                <Dialog open={isAddBeneficiaryOpen} onOpenChange={setIsAddBeneficiaryOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button variant="outline" size="sm" type="button" className="mb-1">
-                                            <UserPlus className="mr-2 h-4 w-4" />
-                                            Add New
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>Add New Beneficiary</DialogTitle>
-                                            <DialogDescription>Save beneficiary bank details for future use</DialogDescription>
-                                        </DialogHeader>
-                                        <div className="space-y-4 py-4">
-                                            <div className="space-y-1">
-                                                <Label>Beneficiary Name <span className="text-destructive">*</span></Label>
-                                                <Input
-                                                    value={newBeneficiary.name}
-                                                    onChange={(e) => setNewBeneficiary(prev => ({ ...prev, name: e.target.value }))}
-                                                    placeholder="Enter beneficiary name"
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label>Account Number <span className="text-destructive">*</span></Label>
-                                                <Input
-                                                    value={newBeneficiary.accountNumber}
-                                                    onChange={(e) => setNewBeneficiary(prev => ({ ...prev, accountNumber: e.target.value }))}
-                                                    placeholder="Enter account number"
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label>IFSC Code <span className="text-destructive">*</span></Label>
-                                                <Input
-                                                    value={newBeneficiary.ifsc}
-                                                    onChange={(e) => setNewBeneficiary(prev => ({ ...prev, ifsc: e.target.value.toUpperCase() }))}
-                                                    placeholder="e.g. SBIN0001234"
-                                                    className="font-mono"
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label>Bank Name</Label>
-                                                <Input
-                                                    value={newBeneficiary.bankName}
-                                                    onChange={(e) => setNewBeneficiary(prev => ({ ...prev, bankName: e.target.value }))}
-                                                    placeholder="e.g. State Bank of India"
-                                                />
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <Button variant="outline" type="button" onClick={() => setIsAddBeneficiaryOpen(false)}>Cancel</Button>
-                                            <Button type="button" onClick={handleAddBeneficiary} disabled={!newBeneficiary.name || !newBeneficiary.accountNumber || !newBeneficiary.ifsc}>
-                                                <Plus className="mr-2 h-4 w-4" />
-                                                Add
-                                            </Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
+                                <Button variant="outline" size="sm" type="button" className="mb-1" onClick={() => setIsAddBeneficiaryOpen(true)}>
+                                    <UserPlus className="mr-2 h-4 w-4" />
+                                    Add New
+                                </Button>
+                                <BeneficiaryFormDialog
+                                    open={isAddBeneficiaryOpen}
+                                    onOpenChange={setIsAddBeneficiaryOpen}
+                                    onSubmit={handleAddBeneficiary}
+                                    isLoading={createBeneficiaryMutation.isPending}
+                                />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>

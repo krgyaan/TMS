@@ -6,13 +6,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import DataTable from "@/components/ui/data-table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { useActivateParty, useDeactivateParty, usePoParties, useUpdateParty } from "@/hooks/api/usePurchaseOrders";
-import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
-import { PartyFormDialog, type CreatePartyPayload } from "@/modules/operations/vendor-master/PartyFormDialog";
-import type { CreatePartyDTO } from "@/modules/operations/vendor-master/vendor-master.types";
+import { useBeneficiaries, useCreateBeneficiary, useUpdateBeneficiary } from "@/hooks/api/useProjectPaymentRequests";
+import { formatDate } from "@/hooks/useFormatedDate";
+import { BeneficiaryFormDialog } from "./components/BeneficiaryFormDialog";
+import { BeneficiaryViewDialog } from "./components/BeneficiaryViewDialog";
+import { PartyFormDialog, type CreatePartyPayload } from "./PartyFormDialog";
+import type { Beneficiary, BeneficiaryFormValues, CreatePartyDTO } from "./vendor-master.types";
 import type { ColDef, GridApi, GridReadyEvent } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { Edit, Eye, Search, Trash2 } from "lucide-react";
+import { Edit, Eye, Landmark, Plus, Search, Trash2 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -100,29 +105,47 @@ const PartyViewDialog: React.FC<PartyViewDialogProps> = ({ party, open, onClose 
 
 const VendorMasterListPage: React.FC = () => {
     const navigate = useNavigate();
-    const [gridApi, setGridApi] = useState<GridApi | null>(null);
-    const [internalSearch, setInternalSearch] = useState("");
-    const { search, setSearch } = { search: internalSearch, setSearch: setInternalSearch };
-    const debouncedSearch = useDebouncedSearch(search, 300);
+    const { activeTab, setActiveTab, search, setSearch, debouncedSearch } = usePersistentTableState<"vendors" | "beneficiaries">({
+        storageKey: "vendor-master-tab",
+        defaultTab: "vendors",
+    });
+
+    const [partyGridApi, setPartyGridApi] = useState<GridApi | null>(null);
+    const [beneficiaryGridApi, setBeneficiaryGridApi] = useState<GridApi | null>(null);
     const [viewParty, setViewParty] = useState<VendorMasterRow | null>(null);
     const [editParty, setEditParty] = useState<VendorMasterRow | null>(null);
+    const [viewBeneficiary, setViewBeneficiary] = useState<Beneficiary | null>(null);
+    const [editBeneficiary, setEditBeneficiary] = useState<Beneficiary | null>(null);
+    const [isBeneficiaryFormOpen, setIsBeneficiaryFormOpen] = useState(false);
 
     const { data: partiesData, isLoading: isPartiesLoading, refetch: refetchParties } = usePoParties();
+    const { data: beneficiariesData, isLoading: isBeneficiariesLoading } = useBeneficiaries();
     const activateMutation = useActivateParty();
     const deactivateMutation = useDeactivateParty();
     const updateMutation = useUpdateParty();
+    const createBeneficiaryMutation = useCreateBeneficiary();
+    const updateBeneficiaryMutation = useUpdateBeneficiary();
 
-    // const parties: VendorMasterRow[] = (partiesData as VendorMasterRow[] | undefined) ?? [];
     const parties: VendorMasterRow[] = (partiesData as VendorMasterRow[] | undefined)
-    ?.filter((p) => p.type === "seller") ?? [];
+        ?.filter((p) => p.type === "seller") ?? [];
 
-    const onGridReady = useCallback((event: GridReadyEvent<VendorMasterRow>) => {
-        setGridApi(event.api);
+    const beneficiaries: Beneficiary[] = (beneficiariesData as Beneficiary[] | undefined) ?? [];
+
+    const onPartyGridReady = useCallback((event: GridReadyEvent<VendorMasterRow>) => {
+        setPartyGridApi(event.api);
+    }, []);
+
+    const onBeneficiaryGridReady = useCallback((event: GridReadyEvent<Beneficiary>) => {
+        setBeneficiaryGridApi(event.api);
     }, []);
 
     useEffect(() => {
-        gridApi?.setGridOption("quickFilterText", debouncedSearch || undefined);
-    }, [debouncedSearch, gridApi]);
+        partyGridApi?.setGridOption("quickFilterText", debouncedSearch || undefined);
+    }, [debouncedSearch, partyGridApi]);
+
+    useEffect(() => {
+        beneficiaryGridApi?.setGridOption("quickFilterText", debouncedSearch || undefined);
+    }, [debouncedSearch, beneficiaryGridApi]);
 
     const handleToggleActive = async (party: VendorMasterRow) => {
         try {
@@ -160,6 +183,22 @@ const VendorMasterListPage: React.FC = () => {
             refetchParties();
         } catch (error: any) {
             toast.error(error?.message || "Failed to update party. Please try again.");
+        }
+    };
+
+    const handleBeneficiarySubmit = async (values: BeneficiaryFormValues) => {
+        try {
+            if (editBeneficiary) {
+                await updateBeneficiaryMutation.mutateAsync({ id: editBeneficiary.id, data: values });
+                toast.success(`Beneficiary "${values.name}" has been updated successfully.`);
+                setEditBeneficiary(null);
+            } else {
+                await createBeneficiaryMutation.mutateAsync(values);
+                toast.success(`Beneficiary "${values.name}" has been added successfully.`);
+            }
+            setIsBeneficiaryFormOpen(false);
+        } catch (error: any) {
+            toast.error(error?.message || "Failed to save beneficiary. Please try again.");
         }
     };
 
@@ -274,49 +313,157 @@ const VendorMasterListPage: React.FC = () => {
         },
     ], [navigate, partyActions]);
 
-    if (isPartiesLoading) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-base font-semibold">Vendor Master</CardTitle>
-                    <CardDescription>Loading parties...</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground">Please wait while we load the vendor master list.</p>
-                </CardContent>
-            </Card>
-        );
-    }
+    const beneficiaryActions: ActionItem<Beneficiary>[] = useMemo(() => [
+        {
+            label: "View Details",
+            icon: <Eye className="h-4 w-4" />,
+            onClick: (row) => setViewBeneficiary(row),
+        },
+        {
+            label: "Edit",
+            icon: <Edit className="h-4 w-4" />,
+            onClick: (row) => {
+                setEditBeneficiary(row);
+                setIsBeneficiaryFormOpen(true);
+            },
+        },
+    ], []);
+
+    const beneficiaryColumns = useMemo<ColDef<Beneficiary>[]>(() => [
+        {
+            field: "name",
+            headerName: "Beneficiary Name",
+            sortable: true,
+            filter: true,
+            width: 200
+        },
+        {
+            field: "accountNumber",
+            headerName: "Account Number",
+            sortable: true,
+            filter: true,
+            width: 180
+        },
+        {
+            field: "ifsc",
+            headerName: "IFSC",
+            sortable: true,
+            filter: true,
+            width: 130
+        },
+        {
+            field: "bankName",
+            headerName: "Bank Name",
+            sortable: true,
+            filter: true,
+            width: 200
+        },
+        {
+            field: "createdAt",
+            headerName: "Created At",
+            sortable: true,
+            filter: true,
+            width: 140,
+            valueFormatter: (p) => (p.value ? formatDate(p.value) : "-"),
+        },
+        {
+            headerName: "Actions",
+            filter: false,
+            sortable: false,
+            cellRenderer: createActionColumnRenderer<Beneficiary>(beneficiaryActions),
+            width: 120,
+            pinned: "right",
+        },
+    ], [beneficiaryActions]);
+
+    const searchBox = (
+        <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+                type="text"
+                placeholder="Search by name, email, contact, mobile..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8 w-64"
+            />
+        </div>
+    );
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="text-base font-semibold">Vendor Master</CardTitle>
-                <CardDescription>List of all vendor/seller and shipping parties for PO and WO.</CardDescription>
+                <CardTitle className="text-base font-semibold">Vendor & Beneficiary Master</CardTitle>
+                <CardDescription>Manage vendor/seller parties and project payment beneficiaries.</CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
-                <div className="flex justify-end mb-4">
-                    <div className="relative">
-                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            type="text"
-                            placeholder="Search by name, email, contact, mobile..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="pl-8 w-64"
-                        />
-                    </div>
-                </div>
-                <DataTable
-                    data={parties}
-                    columnDefs={partyColumns}
-                    onGridReady={onGridReady}
-                    gridOptions={{
-                        pagination: true,
-                        paginationPageSize: 100,
-                        domLayout: "autoHeight",
-                    }}
-                />
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "vendors" | "beneficiaries")}>
+                    <TabsList className="m-auto">
+                        <TabsTrigger value="vendors">Vendors</TabsTrigger>
+                        <TabsTrigger value="beneficiaries" className="flex items-center gap-1">
+                            <Landmark className="h-4 w-4" />
+                            Project Beneficiaries
+                        </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="vendors" className="m-0">
+                        {activeTab === "vendors" && (
+                            <>
+                                <div className="flex justify-end mb-4">
+                                    {searchBox}
+                                </div>
+                                {isPartiesLoading ? (
+                                    <div className="py-8 text-center text-sm text-muted-foreground">Loading vendors...</div>
+                                ) : (
+                                    <DataTable
+                                        data={parties}
+                                        columnDefs={partyColumns}
+                                        onGridReady={onPartyGridReady}
+                                        gridOptions={{
+                                            pagination: true,
+                                            paginationPageSize: 100,
+                                            domLayout: "autoHeight",
+                                        }}
+                                    />
+                                )}
+                            </>
+                        )}
+                    </TabsContent>
+
+                    <TabsContent value="beneficiaries" className="m-0">
+                        {activeTab === "beneficiaries" && (
+                            <>
+                                <div className="flex justify-between items-center mb-4">
+                                    <Button
+                                        type="button"
+                                        variant="default"
+                                        onClick={() => {
+                                            setEditBeneficiary(null);
+                                            setIsBeneficiaryFormOpen(true);
+                                        }}
+                                    >
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Add Beneficiary
+                                    </Button>
+                                    {searchBox}
+                                </div>
+                                {isBeneficiariesLoading ? (
+                                    <div className="py-8 text-center text-sm text-muted-foreground">Loading beneficiaries...</div>
+                                ) : (
+                                    <DataTable
+                                        data={beneficiaries}
+                                        columnDefs={beneficiaryColumns}
+                                        onGridReady={onBeneficiaryGridReady}
+                                        gridOptions={{
+                                            pagination: true,
+                                            paginationPageSize: 100,
+                                            domLayout: "autoHeight",
+                                        }}
+                                    />
+                                )}
+                            </>
+                        )}
+                    </TabsContent>
+                </Tabs>
             </CardContent>
 
             {viewParty && (
@@ -348,6 +495,36 @@ const VendorMasterListPage: React.FC = () => {
                     }}
                 />
             )}
+
+            {viewBeneficiary && (
+                <BeneficiaryViewDialog
+                    beneficiary={viewBeneficiary}
+                    open={!!viewBeneficiary}
+                    onClose={() => setViewBeneficiary(null)}
+                />
+            )}
+
+            <BeneficiaryFormDialog
+                open={isBeneficiaryFormOpen}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setEditBeneficiary(null);
+                        setIsBeneficiaryFormOpen(false);
+                    }
+                }}
+                onSubmit={handleBeneficiarySubmit}
+                isLoading={createBeneficiaryMutation.isPending || updateBeneficiaryMutation.isPending}
+                title={editBeneficiary ? "Edit Beneficiary" : "Add Beneficiary"}
+                description={editBeneficiary
+                    ? "Update beneficiary bank account information"
+                    : "Add a beneficiary to use as the payment receiving bank account."}
+                initialValues={editBeneficiary ? {
+                    name: editBeneficiary.name || "",
+                    accountNumber: editBeneficiary.accountNumber || "",
+                    ifsc: editBeneficiary.ifsc || "",
+                    bankName: editBeneficiary.bankName || "",
+                } : undefined}
+            />
         </Card>
     );
 };

@@ -22,3 +22,20 @@ export interface CreatePartyDTO {
     contact_person?: string;
     mobile_number?: string;
 }
+
+export interface Beneficiary {
+    id: number;
+    name: string | null;
+    accountNumber: string | null;
+    ifsc: string | null;
+    bankName: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface BeneficiaryFormValues {
+    name: string;
+    accountNumber: string;
+    ifsc: string;
+    bankName: string;
+}
