@@ -48,6 +48,7 @@ function numberToWords(num: number): string {
 
 function ProductRow({ index, product }: { index: number; product: ProductFormItem }) {
   const qty = product.qty ?? 0;
+  const unit = product.unit ?? "NOS";
   const rate = product.rate ?? 0;
   const amount = qty * rate;
   const gstAmount = (amount * product.gstRate) / 100;
@@ -56,8 +57,8 @@ function ProductRow({ index, product }: { index: number; product: ProductFormIte
   return (
     <tr className="border-b border-dashed last:border-0">
       <td className="py-2 px-2 text-sm text-center">{index + 1}</td>
-                      <td className="py-2 px-2 text-sm">{product.description}</td>
-                      <td className="py-2 px-2 text-sm text-right">{qty}</td>
+      <td className="py-2 px-2 text-sm">{product.description}</td>
+      <td className="py-2 px-2 text-sm text-right">{qty} {unit}</td>
       <td className="py-2 px-2 text-sm text-right">{formatINR(rate)}</td>
       <td className="py-2 px-2 text-sm text-right">{formatINR(amount)}</td>
       <td className="py-2 px-2 text-sm text-center">{product.gstRate}%</td>

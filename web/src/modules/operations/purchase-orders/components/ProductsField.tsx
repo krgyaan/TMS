@@ -2,6 +2,7 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { NumberInput } from "@/components/form/NumberInput";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,7 +28,7 @@ export function ProductsField({ control }: ProductsFieldProps) {
     const calculations = useMemo(() => calculateTotals(products), [products]);
 
     const addProduct = () => {
-        append({ description: "", qty: null, rate: null, gstRate: 18 } as any);
+        append({ description: "", qty: null, rate: null, gstRate: 18, unit: "" } as any);
     };
 
     const duplicateProduct = (index: number) => {
@@ -62,8 +63,9 @@ export function ProductsField({ control }: ProductsFieldProps) {
                     <TableHeader>
                         <TableRow>
                             <TableHead className="w-[5%]">#</TableHead>
-                            <TableHead className="w-[50%]">Description *</TableHead>
+                            <TableHead className="w-[40%]">Description *</TableHead>
                             <TableHead className="w-[9%]">Qty *</TableHead>
+                            <TableHead className="w-[9%]">Unit</TableHead>
                             <TableHead className="w-[11%]">Rate (₹) *</TableHead>
                             <TableHead className="w-[9%]">GST % *</TableHead>
                             <TableHead className="w-[12%] text-right">Taxable</TableHead>
@@ -103,6 +105,19 @@ export function ProductsField({ control }: ProductsFieldProps) {
                                                     min={0}
                                                     step={0.01}
                                                     placeholder="0"
+                                                    className="h-9 text-right"
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                    </TableCell>
+                                    <TableCell className="p-1 align-top pt-2">
+                                        <FieldWrapper control={control} name={`products.${index}.unit` as any} label="">
+                                            {(fieldProps) => (
+                                                <Input
+                                                    value={fieldProps.value}
+                                                    onChange={(e) => fieldProps.onChange(e.target.value.toUpperCase())}
+                                                    maxLength={10}
+                                                    placeholder="NOS"
                                                     className="h-9 text-right"
                                                 />
                                             )}
