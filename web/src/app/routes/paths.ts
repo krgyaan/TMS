@@ -154,8 +154,8 @@ export const paths = {
             `/operations/project-dashboard/${projectId}/sale-invoice/create`,
         saleInvoices: "/operations/sale-invoices",
         viewSaleInvoice: (siId: number) => `/operations/sale-invoices/${siId}`,
-        raiseProjectPaymentRequestForm: (projectId: number, poId?: number) =>
-            `/operations/project-dashboard/${projectId}/project-payment-request/create${poId ? `?poId=${poId}` : ''}`,
+        raiseProjectPaymentRequestForm: (projectId: number, poId?: number, vwoId?: number) =>
+            `/operations/project-dashboard/${projectId}/project-payment-request/create${poId ? `?poId=${poId}` : vwoId ? `?vwoId=${vwoId}` : ''}`,
         editProjectPaymentRequestPage: (prId: number, projectId: number) => `/operations/project-dashboard/${projectId}/project-payment-request/${prId}/edit`,
         paymentRequests: "/operations/payment-requests",
     },

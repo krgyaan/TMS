@@ -37,7 +37,7 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
             label: "Raise Payment",
             visible: (row) => row.woApproved === true
                 && Number(row.totalPaymentRequested || 0) < Number(row.amountAfterTds ?? row.grandTotal),
-            onClick: () => navigate(paths.operations.raiseProjectPaymentRequestForm(projectId!)),
+            onClick: (row) => navigate(paths.operations.raiseProjectPaymentRequestForm(projectId!, undefined, row.id)),
         },
         {
             label: "Upload Invoice",

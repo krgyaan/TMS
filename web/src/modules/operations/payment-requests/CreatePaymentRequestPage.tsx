@@ -46,6 +46,7 @@ export default function CreatePaymentRequestPage() {
     const projectId = Number(projectIdParam);
     const [searchParams] = useSearchParams();
     const poIdParam = searchParams.get("poId");
+    const vwoIdParam = searchParams.get("vwoId");
 
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
     const projectName = overview?.project?.projectName;
@@ -56,6 +57,7 @@ export default function CreatePaymentRequestPage() {
     const [isAddBeneficiaryOpen, setIsAddBeneficiaryOpen] = useState(false);
 
     const preSelectedPoId = poIdParam ? Number(poIdParam) : undefined;
+    const preSelectedVwoId = vwoIdParam ? Number(vwoIdParam) : undefined;
     const [remainingAmount, setRemainingAmount] = useState(0);
 
     const onRemainingChange = useCallback((remaining: number) => {
@@ -66,8 +68,9 @@ export default function CreatePaymentRequestPage() {
         resolver: zodResolver(paymentRequestFormSchema) as any,
         defaultValues: {
             ...defaultFormValues,
-            paymentAgainst: poIdParam ? "po" : "",
+            paymentAgainst: poIdParam ? "po" : vwoIdParam ? "vwo" : "",
             selectedPoId: poIdParam || "",
+            selectedVwoId: vwoIdParam || "",
         },
     });
 
@@ -106,6 +109,10 @@ export default function CreatePaymentRequestPage() {
         try {
             if (values.paymentAgainst === "po" && values.amount != null && remainingAmount > 0 && values.amount > remainingAmount) {
                 form.setError("amount", { message: `Amount exceeds remaining PO balance (${formatINR(remainingAmount)})` });
+                return;
+            }
+            if (values.paymentAgainst === "vwo" && values.amount != null && remainingAmount > 0 && values.amount > remainingAmount) {
+                form.setError("amount", { message: `Amount exceeds remaining Work Order balance (${formatINR(remainingAmount)})` });
                 return;
             }
 
@@ -254,16 +261,16 @@ export default function CreatePaymentRequestPage() {
                                 )}
                             </FieldWrapper>
                             <div className="col-span-3">
-                                <PaymentAgainstField control={form.control} projectId={projectId} preSelectedPoId={preSelectedPoId} onRemainingChange={onRemainingChange} />
+                                <PaymentAgainstField control={form.control} projectId={projectId} preSelectedPoId={preSelectedPoId} preSelectedVwoId={preSelectedVwoId} onRemainingChange={onRemainingChange} />
                             </div>
                         </div>
 
 
                         <div className="flex items-end justify-between">
                             <div>
-                                {remainingAmount <= 0 && poIdParam && (
+                                {(remainingAmount <= 0 && (poIdParam || vwoIdParam)) && (
                                     <p className="text-destructive text-sm font-medium">
-                                        This PO has no remaining balance. Payment request cannot be created.
+                                        This {poIdParam ? "PO" : "Work Order"} has no remaining balance. Payment request cannot be created.
                                     </p>
                                 )}
                             </div>
@@ -271,7 +278,7 @@ export default function CreatePaymentRequestPage() {
                                 <Button type="button" variant="outline" onClick={() => navigate(-1)}>
                                     Cancel
                                 </Button>
-                                <Button type="submit" className="min-w-40" disabled={createPRMutation.isPending || (remainingAmount <= 0 && !!poIdParam)}>
+                                <Button type="submit" className="min-w-40" disabled={createPRMutation.isPending || (remainingAmount <= 0 && (!!poIdParam || !!vwoIdParam))}>
                                     {createPRMutation.isPending ? (
                                         <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating...</>
                                     ) : (
