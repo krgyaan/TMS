@@ -91,9 +91,9 @@ export class PurchaseOrderService {
         } else if (status === "new") {
             conditions.push(sql`${purchaseOrders.poApproved} IS NOT FALSE`);
         } else if (status === "closed") {
-            conditions.push(sql`${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`);
+            conditions.push(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`);
         } else if (status === "invoice-pending") {
-            conditions.push(sql`${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`);
+            conditions.push(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`);
         }
 
         const purchaseOrdersData = await this.db
@@ -165,8 +165,8 @@ export class PurchaseOrderService {
             buildCount(eq(purchaseOrders.poApproved, true)),
             buildCount(sql`${purchaseOrders.poApproved} IS NOT FALSE`),
             buildCount(eq(purchaseOrders.poApproved, false)),
-            buildCount(sql`${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`),
-            buildCount(sql`${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`),
+            buildCount(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`),
+            buildCount(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`),
         ]);
 
         return { pending, approved, rejected, new: newCount, closed: closedCount, invoicePending: invoicePendingCount };

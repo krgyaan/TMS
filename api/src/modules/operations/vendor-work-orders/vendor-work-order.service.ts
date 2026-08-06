@@ -354,9 +354,9 @@ export class VendorWorkOrderService {
         } else if (status === "new") {
             conditions.push(sql`${vendorWorkOrders.woApproved} IS NOT FALSE`);
         } else if (status === "closed") {
-            conditions.push(sql`${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`);
+            conditions.push(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`);
         } else if (status === "invoice-pending") {
-            conditions.push(sql`${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`);
+            conditions.push(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`);
         }
 
         const rows = await this.db
@@ -427,8 +427,8 @@ export class VendorWorkOrderService {
             buildCount(eq(vendorWorkOrders.woApproved, true)),
             buildCount(sql`${vendorWorkOrders.woApproved} IS NOT FALSE`),
             buildCount(eq(vendorWorkOrders.woApproved, false)),
-            buildCount(sql`${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`),
-            buildCount(sql`${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`),
+            buildCount(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`),
+            buildCount(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`),
         ]);
 
         return { pending, approved, rejected, new: newCount, closed: closedCount, invoicePending: invoicePendingCount };
