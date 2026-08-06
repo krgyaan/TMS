@@ -6,20 +6,19 @@ import {
     timestamp,
     pgEnum,
 } from "drizzle-orm/pg-core";
-import { leads } from "./leads.schema";
 import { leadFollowups } from "./lead-followups.schema";
 
 export const contactSourceEnum = pgEnum('contact_source', [
     'call_followup',
     'visit_followup',
+    'quotation',
 ]);
 
 export const leadContacts = pgTable("lead_contacts", {
     id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
 
     leadId: bigint("lead_id", { mode: "number" })
-        .notNull()
-        .references(() => leads.id, { onDelete: "cascade" }),
+        .notNull(),
 
     // ✅ Links contact to a specific follow-up
     followupId: bigint("followup_id", { mode: "number" })

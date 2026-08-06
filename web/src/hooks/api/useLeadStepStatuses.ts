@@ -4,6 +4,8 @@ import { useLeadEnquiries } from "@/hooks/api/useLeadEnquiry";
 import { useQuery } from "@tanstack/react-query";
 import { leadEnquiryService } from "@/services/api/lead-enquiry.service";
 import { enquiryCostingService } from "@/services/api/enquirycosting.service";
+import { leadsQuotationService } from "@/services/api/leads-quotation.service";
+import { useEnquiryResultsByLead } from "@/hooks/api/useEnquiryResult";
 import type { StepStatus } from "@/components/layout/ShowPageLayout";
 
 function deriveStatus(hasData: boolean, isLoading: boolean): StepStatus {
@@ -41,6 +43,14 @@ export function useLeadStepStatuses(leadId: number | null) {
         queryFn: () => enquiryCostingService.getByLeadId(leadId!),
         enabled: !!leadId,
     });
+
+    const { data: quotations, isLoading: l6 } = useQuery({
+        queryKey: ['leads-quotations', 'by-lead', leadId],
+        queryFn: () => leadsQuotationService.getByLeadId(leadId!),
+        enabled: !!leadId,
+    });
+
+    const { data: enquiryResults, isLoading: l7 } = useEnquiryResultsByLead(leadId);
 
     const steps: LeadStepStatus[] = [
         {
@@ -87,6 +97,24 @@ export function useLeadStepStatuses(leadId: number | null) {
             hasData: Array.isArray(costings) && costings.length > 0,
             isLoading: l5,
             status: deriveStatus(Array.isArray(costings) && costings.length > 0, l5),
+        },
+        {
+            id: "quotations",
+            label: "Quotations",
+            shortLabel: "Quot",
+            stepNumber: 6,
+            hasData: Array.isArray(quotations) && quotations.length > 0,
+            isLoading: l6,
+            status: deriveStatus(Array.isArray(quotations) && quotations.length > 0, l6),
+        },
+        {
+            id: "enquiry-result",
+            label: "Enquiry Result",
+            shortLabel: "Result",
+            stepNumber: 7,
+            hasData: Array.isArray(enquiryResults) && enquiryResults.length > 0,
+            isLoading: l7,
+            status: deriveStatus(Array.isArray(enquiryResults) && enquiryResults.length > 0, l7),
         },
     ];
 

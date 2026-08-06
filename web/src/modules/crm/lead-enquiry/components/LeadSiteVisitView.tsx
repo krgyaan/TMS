@@ -63,7 +63,7 @@ export function LeadSiteVisitView({ siteVisit, isLoading = false, className = ""
                             <TableCell className="text-sm font-medium text-muted-foreground">Scheduled At</TableCell>
                             <TableCell className="text-sm">{siteVisit.scheduledAt ? new Date(siteVisit.scheduledAt).toLocaleString("en-IN") : "—"}</TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">Assigned To</TableCell>
-                            <TableCell className="text-sm">{siteVisit.assignedTo ? `User #${siteVisit.assignedTo}` : "—"}</TableCell>
+                            <TableCell className="text-sm">{siteVisit.assignedToName || (siteVisit.assignedTo ? `User #${siteVisit.assignedTo}` : "—")}</TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">Status</TableCell>

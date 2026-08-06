@@ -254,7 +254,11 @@ export const paths = {
         enquiryView: (id: number | string) => `/crm/enquiries/${id}`,
         enquiryCostings: "/crm/enquiry-costings",
         costingView: (id: number | string) => `/crm/enquiry-costings/${id}`,
-        quotations: "/crm/quotations",
+        leadsQuotations: "/crm/leads-quotations",
+        leadsQuotationView: (id: number | string) => `/crm/leads-quotations/${id}`,
+        enquiryResults: "/crm/enquiry-results",
+        enquiryResultView: (id: number | string) => `/crm/enquiry-results/${id}`,
+        enquiryResultFollowup: (id: number | string) => `/crm/enquiry-results/followup/${id}`,
     },
 
     // ==================== PERFORMANCE ====================

@@ -23,3 +23,6 @@ export * from './private-costing-sheets.schema';
 
 // Private Quotes
 export * from './private-quotes.schema';
+
+// Enquiry Results
+export * from './enquiry-result.schema';
