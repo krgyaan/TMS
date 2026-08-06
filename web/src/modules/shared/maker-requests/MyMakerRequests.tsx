@@ -28,7 +28,7 @@ import type { CustomCellRendererProps } from "ag-grid-react";
 import { Copy, Eye, Plus, Search, Upload } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { PAYMENT_AGAINST_LABELS, STATUS_CONFIG } from "../payment-requests/constants";
+import { PAYMENT_AGAINST_LABELS, STATUS_CONFIG } from "@/modules/operations/payment-requests/constants";
 import { toast } from "sonner";
 
 const MyMakerRequests: React.FC = () => {
