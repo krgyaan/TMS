@@ -10,6 +10,7 @@ export const purchaseOrderProducts = pgTable(
     description: text("description"),
     hsnSac: varchar("hsn_sac", { length: 100 }),
     qty: numeric("qty", { precision: 5, scale: 2 }).notNull(),
+    unit: varchar("unit", { length: 20 }),
     rate: numeric("rate", { precision: 12, scale: 2 }).notNull(),
     taxableAmount: numeric("taxable_amount", { precision: 14,scale: 2 }).notNull(),
     gstRate: numeric("gst_rate", { precision: 5, scale: 2 }).notNull(),

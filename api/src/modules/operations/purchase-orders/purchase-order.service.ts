@@ -277,6 +277,7 @@ export class PurchaseOrderService {
                 purchaseOrderId: po.id,
                 description: product.description,
                 qty: product.qty,
+                unit: (product.unit || "").trim().toUpperCase() || "NOS",
                 rate: product.rate.toString(),
                 taxableAmount: taxableAmount.toString(),
                 gstRate: product.gstRate.toString(),
@@ -335,6 +336,7 @@ export class PurchaseOrderService {
             products: (products || []).map((p: any) => ({
                 description: p.description,
                 qty: p.qty,
+                unit: p.unit,
                 rate: p.rate,
                 gstRate: p.gstRate,
             })),
@@ -354,6 +356,7 @@ export class PurchaseOrderService {
 
         const items = (products || []).map((p: any, i: number) => {
             const qty = Number(p.qty);
+            const unit = (p.unit || "").trim().toUpperCase() || "NOS";
             const rate = Number(p.rate);
             const gstRate = Number(p.gstRate);
             const amount = qty * rate;
@@ -362,6 +365,7 @@ export class PurchaseOrderService {
             return {
                 description: p.description || "",
                 quantity: qty,
+                unit,
                 rate,
                 amount,
                 gst_rate: gstRate,
@@ -374,11 +378,7 @@ export class PurchaseOrderService {
         const totalGstAmt = items.reduce((s: number, i: any) => s + i.gst_amount, 0);
         const grandTotal = totalAmount + totalGstAmt;
 
-        const [creatorUser] = await this.db
-            .select({ team: users.team })
-            .from(users)
-            .where(eq(users.id, po.poRaisedBy))
-            .limit(1);
+        const [creatorUser] = await this.db.select({ team: users.team }).from(users).where(eq(users.id, po.poRaisedBy)).limit(1);
         const team = creatorUser?.team;
         const isProd = process.env.NODE_ENV === 'production';
         const rootDir = isProd ? 'dist' : 'src';

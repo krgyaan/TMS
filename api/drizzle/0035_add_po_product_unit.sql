@@ -1,0 +1,1 @@
+ALTER TABLE "purchase_order_products" ADD COLUMN "unit" varchar(20);
