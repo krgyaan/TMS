@@ -5,6 +5,10 @@ export const contactPersonSchema = z.object({
     id: z.number().optional(),
     followUpId: z.number().optional(),
     name: z.string().optional(),
+    designation: z.preprocess(
+        (val) => (typeof val === "string" && val.trim() === "" ? null : val),
+        z.string().trim().nullable().optional()
+    ),
     email: z.preprocess(
         (val) => (typeof val === "string" && val.trim() === "" ? null : val),
         z.string().trim().email().nullable().optional()
@@ -63,6 +67,7 @@ export const createFollowUpSchema = z.object({
     attachments: z.array(z.string()).optional().default([]),
     followUpHistory: z.array(z.any()).optional().default([]), // will refine later
     emdId: z.number().positive().nullable().optional(),
+    quotationId: z.number().positive().nullable().optional(),
 });
 
 export type CreateFollowUpDto = z.infer<typeof createFollowUpSchema>;

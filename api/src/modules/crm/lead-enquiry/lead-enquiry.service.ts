@@ -33,6 +33,7 @@ export type LeadEnquiryWithNames = LeadEnquiry & {
     orgName?: string | null;
     createdByName?: string | null;
     updatedByName?: string | null;
+    teamName?: string | null;
     hasSiteVisit?: boolean;
     costingSheetStatus?: string | null;
 };
@@ -140,7 +141,7 @@ hasSiteVisit: row.hasSiteVisit ?? false,
         };
     }
 
-    async findById(id: number): Promise<LeadEnquiryWithNames> {
+async findById(id: number): Promise<LeadEnquiryWithNames> {
         const hasSiteVisitExpr = sql<boolean>`EXISTS (SELECT 1 FROM site_visits sv WHERE sv.enquiry_id = ${leadEnquiries.id})`;
         const costingSheetStatusExpr = sql<string | null>`(SELECT pcs.status FROM private_costing_sheets pcs WHERE pcs.enquiry_id = ${leadEnquiries.id} LIMIT 1)`;
 
@@ -150,12 +151,14 @@ hasSiteVisit: row.hasSiteVisit ?? false,
                 leadName: leads.name,
                 itemName: items.name,
                 orgName: organizations.name,
+                teamName: teams.name,
                 createdByName: createdByUser.name,
                 updatedByName: updatedByUser.name,
                 hasSiteVisit: hasSiteVisitExpr,
                 costingSheetStatus: costingSheetStatusExpr,
             })
             .from(leadEnquiries)
+            .leftJoin(teams, eq(teams.id, sql`NULLIF(${leadEnquiries.team}, '')::BIGINT`))
             .leftJoin(leads, eq(leads.id, leadEnquiries.leadId))
             .leftJoin(items, eq(items.id, leadEnquiries.itemId))
             .leftJoin(organizations, eq(organizations.id, leadEnquiries.organisationId))
@@ -171,10 +174,11 @@ hasSiteVisit: row.hasSiteVisit ?? false,
             leadName: row.leadName ?? null,
             itemName: row.itemName ?? null,
             orgName: row.orgName ?? null,
+            teamName: row.teamName ?? null,
             createdByName: row.createdByName ?? null,
             updatedByName: row.updatedByName ?? null,
-hasSiteVisit: row.hasSiteVisit ?? false,
-                costingSheetStatus: row.costingSheetStatus ?? null,
+            hasSiteVisit: row.hasSiteVisit ?? false,
+            costingSheetStatus: row.costingSheetStatus ?? null,
         };
     }
 
@@ -337,30 +341,59 @@ hasSiteVisit: row.hasSiteVisit ?? false,
         return visit;
     }
 
-    async findSiteVisitsByEnquiry(enquiryId: number): Promise<SiteVisit[]> {
+    async findSiteVisitsByEnquiry(enquiryId: number): Promise<(SiteVisit & { assignedToName: string | null })[]> {
         return this.db
-            .select()
+            .select({
+                id: siteVisits.id,
+                enquiryId: siteVisits.enquiryId,
+                assignedTo: siteVisits.assignedTo,
+                assignedToName: users.name,
+                scheduledAt: siteVisits.scheduledAt,
+                conductedAt: siteVisits.conductedAt,
+                information: siteVisits.information,
+                additionalNotes: siteVisits.additionalNotes,
+                documents: siteVisits.documents,
+                status: siteVisits.status,
+                createdAt: siteVisits.createdAt,
+                updatedAt: siteVisits.updatedAt,
+            })
             .from(siteVisits)
+            .leftJoin(users, eq(users.id, siteVisits.assignedTo))
             .where(eq(siteVisits.enquiryId, enquiryId))
             .orderBy(desc(siteVisits.createdAt));
     }
 
-    async findFirstSiteVisitByEnquiry(enquiryId: number): Promise<SiteVisit | null> {
+    async findFirstSiteVisitByEnquiry(enquiryId: number): Promise<(SiteVisit & { assignedToName: string | null }) | null> {
         const [visit] = await this.db
-            .select()
+            .select({
+                id: siteVisits.id,
+                enquiryId: siteVisits.enquiryId,
+                assignedTo: siteVisits.assignedTo,
+                assignedToName: users.name,
+                scheduledAt: siteVisits.scheduledAt,
+                conductedAt: siteVisits.conductedAt,
+                information: siteVisits.information,
+                additionalNotes: siteVisits.additionalNotes,
+                documents: siteVisits.documents,
+                status: siteVisits.status,
+                createdAt: siteVisits.createdAt,
+                updatedAt: siteVisits.updatedAt,
+            })
             .from(siteVisits)
+            .leftJoin(users, eq(users.id, siteVisits.assignedTo))
             .where(eq(siteVisits.enquiryId, enquiryId))
             .orderBy(desc(siteVisits.createdAt))
             .limit(1);
         return visit ?? null;
     }
 
-    async findSiteVisitsByLead(leadId: number): Promise<(SiteVisit & { enqName: string | null; enquiryNumber: string | null })[]> {
+    async findSiteVisitsByLead(leadId: number): Promise<(SiteVisit & { enqName: string | null; enquiryNumber: string | null; assignedToName: string | null })[]> {
         return this.db
             .select({
                 id: siteVisits.id,
                 enquiryId: siteVisits.enquiryId,
                 assignedTo: siteVisits.assignedTo,
+                assignedToName: users.name,
                 scheduledAt: siteVisits.scheduledAt,
                 conductedAt: siteVisits.conductedAt,
                 information: siteVisits.information,
@@ -374,6 +407,7 @@ hasSiteVisit: row.hasSiteVisit ?? false,
             })
             .from(siteVisits)
             .innerJoin(leadEnquiries, eq(leadEnquiries.id, siteVisits.enquiryId))
+            .leftJoin(users, eq(users.id, siteVisits.assignedTo))
             .where(eq(leadEnquiries.leadId, leadId))
             .orderBy(desc(siteVisits.createdAt));
     }

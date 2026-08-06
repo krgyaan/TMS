@@ -1,412 +1,419 @@
 {
-  "version": "7",
-  "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1764323534176,
-      "tag": "0000_material_the_fallen",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1764581920391,
-      "tag": "0001_remarkable_kitty_pryde",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1764584174926,
-      "tag": "0002_left_bullseye",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1764932213567,
-      "tag": "0003_fine_chat",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1765173984688,
-      "tag": "0004_overjoyed_thing",
-      "breakpoints": true
-    },
-    {
-      "idx": 30,
-      "version": "7",
-      "when": 1764145528661,
-      "tag": "0030_brave_kree",
-      "breakpoints": true
-    },
-    {
-      "idx": 31,
-      "version": "7",
-      "when": 1764149731584,
-      "tag": "0031_smiling_deathbird",
-      "breakpoints": true
-    },
-    {
-      "idx": 32,
-      "version": "7",
-      "when": 1764220860435,
-      "tag": "0032_conscious_colleen_wing",
-      "breakpoints": true
-    },
-    {
-      "idx": 33,
-      "version": "7",
-      "when": 1764229611165,
-      "tag": "0033_foamy_lizard",
-      "breakpoints": true
-    },
-    {
-      "idx": 34,
-      "version": "7",
-      "when": 1764229887693,
-      "tag": "0034_wandering_hannibal_king",
-      "breakpoints": true
-    },
-    {
-      "idx": 35,
-      "version": "7",
-      "when": 1764241407777,
-      "tag": "0035_lyrical_stranger",
-      "breakpoints": true
-    },
-    {
-      "idx": 36,
-      "version": "7",
-      "when": 1764328451989,
-      "tag": "0036_lumpy_black_tarantula",
-      "breakpoints": true
-    },
-    {
-      "idx": 37,
-      "version": "7",
-      "when": 1764480098139,
-      "tag": "0037_shocking_blackheart",
-      "breakpoints": true
-    },
-    {
-      "idx": 38,
-      "version": "7",
-      "when": 1764537483905,
-      "tag": "0038_overconfident_hex",
-      "breakpoints": true
-    },
-    {
-      "idx": 39,
-      "version": "7",
-      "when": 1764545770959,
-      "tag": "0039_fixed_scarecrow",
-      "breakpoints": true
-    },
-    {
-      "idx": 40,
-      "version": "7",
-      "when": 1764566294252,
-      "tag": "0040_colossal_scorpion",
-      "breakpoints": true
-    },
-    {
-      "idx": 41,
-      "version": "7",
-      "when": 1764568064145,
-      "tag": "0041_slim_whizzer",
-      "breakpoints": true
-    },
-    {
-      "idx": 42,
-      "version": "7",
-      "when": 1764592560825,
-      "tag": "0042_groovy_karma",
-      "breakpoints": true
-    },
-    {
-      "idx": 43,
-      "version": "7",
-      "when": 1764681581856,
-      "tag": "0043_spooky_mad_thinker",
-      "breakpoints": true
-    },
-    {
-      "idx": 44,
-      "version": "7",
-      "when": 1764757431484,
-      "tag": "0044_broad_jackpot",
-      "breakpoints": true
-    },
-    {
-      "idx": 45,
-      "version": "7",
-      "when": 1764849994125,
-      "tag": "0045_bumpy_leader",
-      "breakpoints": true
-    },
-    {
-      "idx": 46,
-      "version": "7",
-      "when": 1764852775353,
-      "tag": "0046_nice_next_avengers",
-      "breakpoints": true
-    },
-    {
-      "idx": 47,
-      "version": "7",
-      "when": 1764852911678,
-      "tag": "0047_majestic_gressill",
-      "breakpoints": true
-    },
-    {
-      "idx": 48,
-      "version": "7",
-      "when": 1765121462933,
-      "tag": "0048_tearful_rattler",
-      "breakpoints": true
-    },
-    {
-      "idx": 49,
-      "version": "7",
-      "when": 1765198336845,
-      "tag": "0049_amazing_nicolaos",
-      "breakpoints": true
-    },
-    {
-      "idx": 50,
-      "version": "7",
-      "when": 1765258943072,
-      "tag": "0050_spotty_carlie_cooper",
-      "breakpoints": true
-    },
-    {
-      "idx": 51,
-      "version": "7",
-      "when": 1765351322579,
-      "tag": "0051_yellow_captain_america",
-      "breakpoints": true
-    },
-    {
-      "idx": 52,
-      "version": "7",
-      "when": 1765364019895,
-      "tag": "0052_unique_blindfold",
-      "breakpoints": true
-    },
-    {
-      "idx": 53,
-      "version": "7",
-      "when": 1765390717489,
-      "tag": "0051_quiet_marvel_zombies",
-      "breakpoints": true
-    },
-    {
-      "idx": 54,
-      "version": "7",
-      "when": 1765431924167,
-      "tag": "0052_needy_archangel",
-      "breakpoints": true
-    },
-    {
-      "idx": 55,
-      "version": "7",
-      "when": 1765787470387,
-      "tag": "0055_secret_captain_marvel",
-      "breakpoints": true
-    },
-    {
-      "idx": 56,
-      "version": "7",
-      "when": 1765967138365,
-      "tag": "0056_misty_talkback",
-      "breakpoints": true
-    },
-    {
-      "idx": 57,
-      "version": "7",
-      "when": 1766130446324,
-      "tag": "0057_first_photon",
-      "breakpoints": true
-    },
-    {
-      "idx": 58,
-      "version": "7",
-      "when": 1766352000000,
-      "tag": "0058_increase_client_mobile_length",
-      "breakpoints": true
-    },
-    {
-      "idx": 59,
-      "version": "7",
-      "when": 1766352100000,
-      "tag": "0059_add_delivery_method_to_cheque",
-      "breakpoints": true
-    },
-    {
-      "idx": 60,
-      "version": "7",
-      "when": 1767869778000,
-      "tag": "0063_drop_budget_from_wo_details",
-      "breakpoints": true
-    },
-    {
-      "idx": 61,
-      "version": "7",
-      "when": 1748900000000,
-      "tag": "0067_fix_payment_instrument_default_status",
-      "breakpoints": true
-    },
-    {
-      "idx": 62,
-      "version": "7",
-      "when": 1781940291054,
-      "tag": "0070_add_tender_costing_details",
-      "breakpoints": true
-    },
-    {
-      "idx": 63,
-      "version": "7",
-      "when": 1781940292054,
-      "tag": "0071_drop_old_costing_sheet_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 64,
-      "version": "7",
-      "when": 1764323534176,
-      "tag": "0081_add_dd_fdr_to_payment_purpose_enum",
-      "breakpoints": true
-    },
-    {
-      "idx": 65,
-      "version": "7",
-      "when": 1768000000000,
-      "tag": "0082_add_po_type_and_pi_attachments",
-      "breakpoints": true
-    },
-    {
-      "idx": 66,
-      "version": "7",
-      "when": 1768100000000,
-      "tag": "0083_add_category_to_purchase_orders",
-      "breakpoints": true
-    },
-    {
-      "idx": 67,
-      "version": "7",
-      "when": 1768200000000,
-      "tag": "0084_add_vendor_work_order_id_to_payment_requests",
-      "breakpoints": true
-    },
-    {
-      "idx": 68,
-      "version": "7",
-      "when": 1768300000000,
-      "tag": "0085_change_qty_to_numeric",
-      "breakpoints": true
-    },
-    {
-      "idx": 69,
-      "version": "7",
-      "when": 1768400000000,
-      "tag": "0086_add_po_approval_fields",
-      "breakpoints": true
-    },
-    {
-      "idx": 70,
-      "version": "7",
-      "when": 1784948800001,
-      "tag": "0074_drop_old_result_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 71,
-      "version": "7",
-      "when": 1785948800000,
-      "tag": "0075_change_screenshots_to_jsonb",
-      "breakpoints": true
-    },
-    {
-      "idx": 72,
-      "version": "7",
-      "when": 1784948800000,
-      "tag": "0073_add_tender_result_details",
-      "breakpoints": true
-    },
-    {
-      "idx": 73,
-      "version": "7",
-      "when": 1786140800000,
-      "tag": "0087_create_sale_invoices_tables",
-      "breakpoints": true
-    },
-    {
-      "idx": 74,
-      "version": "7",
-      "when": 1786140800001,
-      "tag": "0088_add_missing_purchase_order_id_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 75,
-      "version": "7",
-      "when": 1784453857516,
-      "tag": "0089_add_action_logs_to_sale_invoices",
-      "breakpoints": true
-    },
-    {
-      "idx": 76,
-      "version": "7",
-      "when": 1784782345000,
-      "tag": "0090_add_disposal_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 77,
-      "version": "7",
-      "when": 1784782346000,
-      "tag": "0091_add_type_specs",
-      "breakpoints": true
-    },
-    {
-      "idx": 78,
-      "version": "7",
-      "when": 1784782347000,
-      "tag": "0092_migrate_asset_keys_to_text",
-      "breakpoints": true
-    },
-    {
-      "idx": 79,
-      "version": "7",
-      "when": 1784782348000,
-      "tag": "0093_unify_payment_requests",
-      "breakpoints": true
-    },
-    {
-      "idx": 80,
-      "version": "7",
-      "when": 1784891421218,
-      "tag": "0094_add_category_to_vendor_work_orders",
-      "breakpoints": true
-    },
-    {
-      "idx": 81,
-      "version": "7",
-      "when": 1785000000000,
-      "tag": "0095_remove_designations_add_team_category",
-      "breakpoints": true
-    },
-    {
-      "idx": 57,
-      "version": "7",
-      "when": 1785151177898,
-      "tag": "0099_add_vwo_approval_fields",
-      "breakpoints": true
-    }
-  ]
+    "version":  "7",
+    "dialect":  "postgresql",
+    "entries":  [
+                    {
+                        "idx":  0,
+                        "version":  "7",
+                        "when":  1764323534176,
+                        "tag":  "0000_material_the_fallen",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  1,
+                        "version":  "7",
+                        "when":  1764581920391,
+                        "tag":  "0001_remarkable_kitty_pryde",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  2,
+                        "version":  "7",
+                        "when":  1764584174926,
+                        "tag":  "0002_left_bullseye",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  3,
+                        "version":  "7",
+                        "when":  1764932213567,
+                        "tag":  "0003_fine_chat",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  4,
+                        "version":  "7",
+                        "when":  1765173984688,
+                        "tag":  "0004_overjoyed_thing",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  30,
+                        "version":  "7",
+                        "when":  1764145528661,
+                        "tag":  "0030_brave_kree",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  31,
+                        "version":  "7",
+                        "when":  1764149731584,
+                        "tag":  "0031_smiling_deathbird",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  32,
+                        "version":  "7",
+                        "when":  1764220860435,
+                        "tag":  "0032_conscious_colleen_wing",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  33,
+                        "version":  "7",
+                        "when":  1764229611165,
+                        "tag":  "0033_foamy_lizard",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  34,
+                        "version":  "7",
+                        "when":  1764229887693,
+                        "tag":  "0034_wandering_hannibal_king",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  35,
+                        "version":  "7",
+                        "when":  1764241407777,
+                        "tag":  "0035_lyrical_stranger",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  36,
+                        "version":  "7",
+                        "when":  1764328451989,
+                        "tag":  "0036_lumpy_black_tarantula",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  37,
+                        "version":  "7",
+                        "when":  1764480098139,
+                        "tag":  "0037_shocking_blackheart",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  38,
+                        "version":  "7",
+                        "when":  1764537483905,
+                        "tag":  "0038_overconfident_hex",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  39,
+                        "version":  "7",
+                        "when":  1764545770959,
+                        "tag":  "0039_fixed_scarecrow",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  40,
+                        "version":  "7",
+                        "when":  1764566294252,
+                        "tag":  "0040_colossal_scorpion",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  41,
+                        "version":  "7",
+                        "when":  1764568064145,
+                        "tag":  "0041_slim_whizzer",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  42,
+                        "version":  "7",
+                        "when":  1764592560825,
+                        "tag":  "0042_groovy_karma",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  43,
+                        "version":  "7",
+                        "when":  1764681581856,
+                        "tag":  "0043_spooky_mad_thinker",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  44,
+                        "version":  "7",
+                        "when":  1764757431484,
+                        "tag":  "0044_broad_jackpot",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  45,
+                        "version":  "7",
+                        "when":  1764849994125,
+                        "tag":  "0045_bumpy_leader",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  46,
+                        "version":  "7",
+                        "when":  1764852775353,
+                        "tag":  "0046_nice_next_avengers",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  47,
+                        "version":  "7",
+                        "when":  1764852911678,
+                        "tag":  "0047_majestic_gressill",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  48,
+                        "version":  "7",
+                        "when":  1765121462933,
+                        "tag":  "0048_tearful_rattler",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  49,
+                        "version":  "7",
+                        "when":  1765198336845,
+                        "tag":  "0049_amazing_nicolaos",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  50,
+                        "version":  "7",
+                        "when":  1765258943072,
+                        "tag":  "0050_spotty_carlie_cooper",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  51,
+                        "version":  "7",
+                        "when":  1765351322579,
+                        "tag":  "0051_yellow_captain_america",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  52,
+                        "version":  "7",
+                        "when":  1765364019895,
+                        "tag":  "0052_unique_blindfold",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  53,
+                        "version":  "7",
+                        "when":  1765390717489,
+                        "tag":  "0051_quiet_marvel_zombies",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  54,
+                        "version":  "7",
+                        "when":  1765431924167,
+                        "tag":  "0052_needy_archangel",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  55,
+                        "version":  "7",
+                        "when":  1765787470387,
+                        "tag":  "0055_secret_captain_marvel",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  56,
+                        "version":  "7",
+                        "when":  1765967138365,
+                        "tag":  "0056_misty_talkback",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  57,
+                        "version":  "7",
+                        "when":  1766130446324,
+                        "tag":  "0057_first_photon",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  58,
+                        "version":  "7",
+                        "when":  1766352000000,
+                        "tag":  "0058_increase_client_mobile_length",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  59,
+                        "version":  "7",
+                        "when":  1766352100000,
+                        "tag":  "0059_add_delivery_method_to_cheque",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  60,
+                        "version":  "7",
+                        "when":  1767869778000,
+                        "tag":  "0063_drop_budget_from_wo_details",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  61,
+                        "version":  "7",
+                        "when":  1748900000000,
+                        "tag":  "0067_fix_payment_instrument_default_status",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  62,
+                        "version":  "7",
+                        "when":  1781940291054,
+                        "tag":  "0070_add_tender_costing_details",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  63,
+                        "version":  "7",
+                        "when":  1781940292054,
+                        "tag":  "0071_drop_old_costing_sheet_columns",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  64,
+                        "version":  "7",
+                        "when":  1764323534176,
+                        "tag":  "0081_add_dd_fdr_to_payment_purpose_enum",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  65,
+                        "version":  "7",
+                        "when":  1768000000000,
+                        "tag":  "0082_add_po_type_and_pi_attachments",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  66,
+                        "version":  "7",
+                        "when":  1768100000000,
+                        "tag":  "0083_add_category_to_purchase_orders",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  67,
+                        "version":  "7",
+                        "when":  1768200000000,
+                        "tag":  "0084_add_vendor_work_order_id_to_payment_requests",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  68,
+                        "version":  "7",
+                        "when":  1768300000000,
+                        "tag":  "0085_change_qty_to_numeric",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  69,
+                        "version":  "7",
+                        "when":  1768400000000,
+                        "tag":  "0086_add_po_approval_fields",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  70,
+                        "version":  "7",
+                        "when":  1784948800001,
+                        "tag":  "0074_drop_old_result_columns",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  71,
+                        "version":  "7",
+                        "when":  1785948800000,
+                        "tag":  "0075_change_screenshots_to_jsonb",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  72,
+                        "version":  "7",
+                        "when":  1784948800000,
+                        "tag":  "0073_add_tender_result_details",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  73,
+                        "version":  "7",
+                        "when":  1786140800000,
+                        "tag":  "0087_create_sale_invoices_tables",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  74,
+                        "version":  "7",
+                        "when":  1786140800001,
+                        "tag":  "0088_add_missing_purchase_order_id_columns",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  75,
+                        "version":  "7",
+                        "when":  1784453857516,
+                        "tag":  "0089_add_action_logs_to_sale_invoices",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  76,
+                        "version":  "7",
+                        "when":  1784782345000,
+                        "tag":  "0090_add_disposal_columns",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  77,
+                        "version":  "7",
+                        "when":  1784782346000,
+                        "tag":  "0091_add_type_specs",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  78,
+                        "version":  "7",
+                        "when":  1784782347000,
+                        "tag":  "0092_migrate_asset_keys_to_text",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  79,
+                        "version":  "7",
+                        "when":  1784782348000,
+                        "tag":  "0093_unify_payment_requests",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  80,
+                        "version":  "7",
+                        "when":  1784891421218,
+                        "tag":  "0094_add_category_to_vendor_work_orders",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  81,
+                        "version":  "7",
+                        "when":  1785000000000,
+                        "tag":  "0095_remove_designations_add_team_category",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  57,
+                        "version":  "7",
+                        "when":  1785151177898,
+                        "tag":  "0099_add_vwo_approval_fields",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  82,
+                        "version":  "7",
+                        "when":  1785480136234,
+                        "tag":  "0100_add_quotation_id_to_followups",
+                        "breakpoints":  true
+                    }
+                ]
 }

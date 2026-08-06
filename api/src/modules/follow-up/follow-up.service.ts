@@ -86,6 +86,7 @@ export class FollowUpService {
             // ------------------------
             const contacts = (dto.contacts ?? []).map(c => ({
                 name: c.name ?? "",
+                designation: c.designation ?? null,
                 email: c.email ?? null,
                 phone: c.phone ?? null,
                 org: c.org ?? null,
@@ -146,6 +147,7 @@ export class FollowUpService {
                         updatedAt: new Date(),
                         deletedAt: null,
                         emdId: dto.emdId ?? null,
+                        quotationId: dto.quotationId ?? null,
                     })
                     .returning();
 

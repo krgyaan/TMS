@@ -149,6 +149,9 @@ export function buildEmailTemplate(instrumentType: string, data: EmailTemplateDa
 </div>
 </body></html>`;
 
+        case 'Quotation':
+            return ``;
+
         default:
             return `<p>No email template available for ${instrumentType}.</p>`;
     }

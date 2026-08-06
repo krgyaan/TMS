@@ -146,6 +146,10 @@ const LeadListPage = () => {
         team: activeTeam 
     });
 
+    const { data: acTeamResponse } = useLeads({ page: 1, limit: 1, team: 'AC' });
+    const { data: dcTeamResponse } = useLeads({ page: 1, limit: 1, team: 'DC' });
+    const { data: bdTeamResponse } = useLeads({ page: 1, limit: 1, team: 'Business Development' });
+
     const coldCount = Array.isArray(coldResponse) 
         ? coldResponse.length 
         : (coldResponse?.meta?.total ?? 0);
@@ -162,6 +166,12 @@ const LeadListPage = () => {
         if (key === 'cold') return coldCount;
         if (key === 'warm') return warmCount;
         return hotCount;
+    };
+
+    const getTeamCount = (key: LeadTeamTab) => {
+        if (key === 'AC') return Array.isArray(acTeamResponse) ? acTeamResponse.length : (acTeamResponse?.meta?.total ?? 0);
+        if (key === 'DC') return Array.isArray(dcTeamResponse) ? dcTeamResponse.length : (dcTeamResponse?.meta?.total ?? 0);
+        return Array.isArray(bdTeamResponse) ? bdTeamResponse.length : (bdTeamResponse?.meta?.total ?? 0);
     };
 
     const { data: apiResponse, isLoading } = useLeads(
@@ -397,40 +407,44 @@ const LeadListPage = () => {
             field: "recentFollowUp",
             headerName: "Status",
             width: 130,
-            cellRenderer: (params: any) => (
-                <TooltipProvider delayDuration={100}>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span className="cursor-help capitalize">
-                                {params.value || "-"}
-                            </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="p-1 w-auto min-w-[80px]">
-                            <div className="flex flex-col gap-0.5 text-[10px]">
-                                <p className="font-bold text-white border-b border-border/50 pb-0.5 text-[10px]">
-                                    Counts
-                                </p>
-                                <div className="grid grid-cols-2 gap-x-2 gap-y-0">
-                                    <span className="text-white">Mail:</span> 
-                                    <span>{params.data.mailFollowupCount || 0}</span>
-                                    
-                                    <span className="text-white">Call:</span> 
-                                    <span>{params.data.callFollowupCount || 0}</span>
-                                    
-                                    <span className="text-white">Visit:</span> 
-                                    <span>{params.data.visitFollowupCount || 0}</span>
-                                    
-                                    <span className="text-white">Letter:</span> 
-                                    <span>{params.data.letterSentCount || 0}</span>
-                                    
-                                    <span className="text-white">WhatsApp:</span> 
-                                    <span>{params.data.whatsappFollowupCount || 0}</span>
+            cellRenderer: (params: any) => {
+                const isNew = !params.value && !params.data?.isDeleted;
+                const displayValue = isNew ? "New" : (params.value || "-");
+                return (
+                    <TooltipProvider delayDuration={100}>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Badge variant="outline" className="cursor-help capitalize font-medium">
+                                    {displayValue}
+                                </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="p-1 w-auto min-w-[80px]">
+                                <div className="flex flex-col gap-0.5 text-[10px]">
+                                    <p className="font-bold text-white border-b border-border/50 pb-0.5 text-[10px]">
+                                        Counts
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-x-2 gap-y-0">
+                                        <span className="text-white">Mail:</span> 
+                                        <span>{params.data.mailFollowupCount || 0}</span>
+                                        
+                                        <span className="text-white">Call:</span> 
+                                        <span>{params.data.callFollowupCount || 0}</span>
+                                        
+                                        <span className="text-white">Visit:</span> 
+                                        <span>{params.data.visitFollowupCount || 0}</span>
+                                        
+                                        <span className="text-white">Letter:</span> 
+                                        <span>{params.data.letterSentCount || 0}</span>
+                                        
+                                        <span className="text-white">WhatsApp:</span> 
+                                        <span>{params.data.whatsappFollowupCount || 0}</span>
+                                    </div>
                                 </div>
-                            </div>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            )
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                );
+            }
         },
         { 
             headerName: "Action", 
@@ -455,13 +469,22 @@ const LeadListPage = () => {
                                 type="button" 
                                 onClick={() => setActiveTeam(tab.key)} 
                                 className={cn(
-                                    "px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
                                     activeTeam === tab.key 
                                         ? "bg-background text-foreground shadow-sm" 
                                         : "text-muted-foreground hover:text-foreground"
                                 )}
                             >
                                 {tab.label}
+                                <Badge 
+                                    variant="secondary" 
+                                    className={cn(
+                                        "text-xs h-4 min-w-4 px-1",
+                                        activeTeam === tab.key && "bg-primary/10 text-primary"
+                                    )}
+                                >
+                                    {getTeamCount(tab.key)}
+                                </Badge>
                             </button>
                         ))}
                     </div>

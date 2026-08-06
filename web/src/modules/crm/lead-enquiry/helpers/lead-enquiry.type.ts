@@ -29,6 +29,7 @@ export interface LeadEnquiryWithNames extends LeadEnquiry {
     orgName?: string | null;
     createdByName?: string | null;
     updatedByName?: string | null;
+    teamName?: string | null;
     hasSiteVisit?: boolean;
     costingSheetStatus?: string | null;
 }
@@ -118,6 +119,7 @@ export interface SiteVisit {
     id: number;
     enquiryId: number;
     assignedTo: number | null;
+    assignedToName: string | null;
     scheduledAt: string | null;
     conductedAt: string | null;
     information: string | null;

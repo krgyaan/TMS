@@ -13,6 +13,8 @@ import { LeadDetailsSection } from "../leads/components/LeadView";
 import { FollowupViewPage } from "../followups/FollowupViewPage";
 import { LeadSiteVisitsSection } from "./components/LeadSiteVisitView";
 import { LeadCostingsSection } from "../enquirycosting/EnquiryCostingViewPage";
+import { LeadQuotationsSection } from "../leads-quotation/LeadsQuotationViewPage";
+import { EnquiryResultSection } from "../enquiry-result/EnquiryResultViewPage";
 
 interface LeadEnquiryViewProps {
     enquiry?: LeadEnquiryWithNames | null;
@@ -90,7 +92,7 @@ export function LeadEnquiryView({ enquiry: manualEnquiry, enquiryId, isLoading: 
                             <TableCell className="text-sm font-medium text-muted-foreground">Lead</TableCell>
                             <TableCell className="text-sm">{enquiry.leadName || "—"}</TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">Team</TableCell>
-                            <TableCell className="text-sm">{enquiry.team || "—"}</TableCell>
+                            <TableCell className="text-sm">{enquiry.teamName || enquiry.team || "—"}</TableCell>
                         </TableRow>
 
                         <TableRow className="bg-muted/50">
@@ -221,6 +223,10 @@ export function LeadEnquiryViewPage({ enquiryId, onBack, backLabel }: LeadEnquir
                 return <LeadSiteVisitsSection leadId={leadId} />;
             case "costings":
                 return <LeadCostingsSection leadId={leadId} />;
+            case "quotations":
+                return <LeadQuotationsSection leadId={leadId} />;
+            case "enquiry-result":
+                return <EnquiryResultSection leadId={leadId} />;
             default:
                 return null;
         }

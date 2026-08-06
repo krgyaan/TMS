@@ -17,7 +17,10 @@ import { FollowupViewPage } from "../followups/FollowupViewPage";
 import { LeadEnquiriesSection } from "../lead-enquiry/LeadEnquiryViewPage";
 import { LeadSiteVisitsSection } from "../lead-enquiry/components/LeadSiteVisitView";
 import { enquiryCostingService } from "@/services/api/enquirycosting.service";
+import { LeadQuotationsSection } from "../leads-quotation/LeadsQuotationViewPage";
+import { EnquiryResultSection } from "../enquiry-result/EnquiryResultViewPage";
 import { paths } from "@/app/routes/paths";
+
 
 interface EnquiryCostingViewProps {
     costing?: EnquiryCosting | null;
@@ -131,6 +134,14 @@ export function EnquiryCostingView({ costing: manualCosting, costingId, isLoadin
                                 <User className="h-4 w-4 inline mr-2" /> Audit Information
                             </TableCell>
                         </TableRow>
+                        {costing.approvedByName && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">Approved By</TableCell>
+                                <TableCell className="text-sm">{costing.approvedByName}</TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground" />
+                                <TableCell className="text-sm" />
+                            </TableRow>
+                        )}
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">Created By</TableCell>
                             <TableCell className="text-sm">{costing.createdByName || "—"}</TableCell>
@@ -241,6 +252,10 @@ export function EnquiryCostingViewPage({ costingId, onBack, backLabel }: Enquiry
                 return <LeadSiteVisitsSection leadId={leadId} />;
             case "costings":
                 return <EnquiryCostingDetailsSection costingId={costingId} />;
+            case "quotations":
+                return <LeadQuotationsSection leadId={leadId} />;
+            case "enquiry-result":
+                return <EnquiryResultSection leadId={leadId} />;
             default:
                 return null;
         }

@@ -7,13 +7,23 @@ export const CreatePrivateQuoteSchema = z.object({
 
 export type CreatePrivateQuoteDto = z.infer<typeof CreatePrivateQuoteSchema>;
 
+export const ContactEntrySchema = z.object({
+    name: z.string().min(1, 'Name is required'),
+    designation: z.string().optional().nullable(),
+    phone: z.string().optional().nullable(),
+    email: z.string().optional().nullable(),
+});
+
+export type ContactEntryDto = z.infer<typeof ContactEntrySchema>;
+
 export const UpdatePrivateQuoteSchema = z.object({
-    quoteSubmissionDatetime: z.string().datetime().optional().nullable(),
+    quoteSubmissionDatetime: z.string().optional().nullable(),
     submittedDocuments: z.string().optional().nullable(),
-    contacts: z.string().optional().nullable(),
+    contacts: z.array(ContactEntrySchema).optional().nullable(),
     missedReason: z.string().optional().nullable(),
     oemName: z.string().optional().nullable(),
-    preventRepeat: z.number().int().min(0).max(1).optional().nullable(),
+    oemVendorId: z.number().int().positive().optional().nullable(),
+    preventRepeat: z.string().optional().nullable(),
     tmsImprovement: z.string().optional().nullable(),
     status: z.string().optional().nullable(),
 });

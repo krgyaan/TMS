@@ -16,6 +16,7 @@ export interface EnquiryCosting {
     approvedBudgetPreGst: string | null;
     approvedGrossMargin: string | null;
     preparedByName: string | null;
+    approvedByName: string | null;
     status: string | null;
     sheetUrl: string | null;
     remarks: string | null;
