@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, Query } from "@nestjs/common";
-import { and, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
 import { teams } from "@/db/schemas/master/teams.schema";
@@ -98,10 +98,31 @@ export class ProjectDashboardService {
                   .where(eq(tenderInformation.tenderId, tender.id))
             : [];
 
+        const { rows } = await this.db.execute(sql`
+            SELECT
+                COALESCE((SELECT SUM(ei.amount::numeric)
+                          FROM employee_imprests ei
+                          WHERE ei.approval_status = 1 AND ei.project_name = ${project.projectName}), 0) AS expenses_done,
+                COALESCE((SELECT SUM(pop.total_amount::numeric)
+                          FROM purchase_order_products pop
+                          JOIN purchase_orders po ON po.id = pop.purchase_order_id
+                          WHERE po.project_id = ${projectId} AND po.po_approved = true), 0) AS po_raised,
+                COALESCE((SELECT SUM(vwoi.total_amount::numeric)
+                          FROM vendor_work_order_items vwoi
+                          JOIN vendor_work_orders vwo ON vwo.id = vwoi.vendor_work_order_id
+                          WHERE vwo.project_id = ${projectId} AND vwo.wo_approved = true), 0) AS wo_raised
+        `);
+        const { expenses_done, po_raised, wo_raised } = rows?.[0] ?? {};
+
         return {
             project: { projectName: project.projectName },
             tender: tender ?? undefined,
-            woBasicDetail: basicDetail ?? {},
+            woBasicDetail: {
+                ...(basicDetail ?? {}),
+                expenses_done: Number(expenses_done ?? 0),
+                poRaised: Number(po_raised ?? 0),
+                woRaised: Number(wo_raised ?? 0),
+            },
             woDetail: woDetail ?? undefined,
             tenderInfoSheet: tenderInfo ?? undefined,
         };
