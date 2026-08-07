@@ -19,6 +19,7 @@ export interface MakerRequestRow {
     rejectionReason?: string;
     requestedBy: string;
     requestedByName?: string;
+    beneficiaryId?: number;
     createdAt: string;
     poFile?: string;
     uploadedInvoiceFile?: string;
@@ -50,6 +51,7 @@ export interface CreateMakerRequestDTO {
     paymentMode: 'BANK_TRANSFER' | 'PORTAL';
     amount: number;
     category?: string;
+    beneficiaryId?: number;
     partyName?: string;
     accountNumber?: string;
     ifsc?: string;
