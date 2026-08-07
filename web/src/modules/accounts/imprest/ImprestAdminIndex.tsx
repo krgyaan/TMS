@@ -1,28 +1,19 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import DataTable from "@/components/ui/data-table";
-import { ExternalLink, FileText, IndianRupee, LayoutDashboard, Loader2, Plus, Receipt } from "lucide-react";
-
 import { paths } from "@/app/routes/paths";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
+import { formatINR } from "@/hooks/useINRFormatter";
+import type { GridApi } from "ag-grid-community";
+import { ExternalLink, FileText, IndianRupee, LayoutDashboard, Loader2, Plus, Receipt } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { PayImprestDialog } from "./components/PayImprestDialog";
 import { useEmployeeImprestSummary } from "./imprest-admin.hooks";
 import type { EmployeeImprestSummary } from "./imprest-admin.types";
-
-import { Input } from "@/components/ui/input";
-import type { GridApi } from "ag-grid-community";
-import { PayImprestDialog } from "./components/PayImprestDialog";
-/** INR formatter */
-const formatINR = (num: number) =>
-    new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-    }).format(num);
 
 const ImprestAdminIndex: React.FC = () => {
     const [searchText, setSearchText] = useState("");
@@ -33,11 +24,7 @@ const ImprestAdminIndex: React.FC = () => {
         userName: string;
     } | null>(null);
 
-    const { isAdmin, isSuperUser, canRead } = useAuth();
-
-    console.log("Rendering ImprestAdminIndex...");
-    const loggedInUser = useAuth().user;
-    const isAuthorized = isAdmin || isSuperUser;
+    const { canRead } = useAuth();
     const navigate = useNavigate();
     const currentFinancialYear = useMemo(() => {
         const now = new Date();
@@ -47,7 +34,6 @@ const ImprestAdminIndex: React.FC = () => {
         return `${startYear}-${String(endYear).padStart(2, "0")}`;
     }, []);
     const { data = [], isLoading, error } = useEmployeeImprestSummary();
-    console.log("Fetched employee imprest summary data:", data);
 
     const canView = canRead("accounts.imprests");
 
