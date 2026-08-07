@@ -3,10 +3,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUsers } from "@/hooks/api/useUsers";
-import { Banknote, Landmark, Loader2, UserPlus, Users } from "lucide-react";
+import { Banknote, Landmark, Loader2, UserPlus } from "lucide-react";
 import type { BeneficiaryFormValues } from "../vendor-master.types";
+import { Combobox } from "@/components/form/SelectField";
 
 interface BeneficiaryFormDialogProps {
     open: boolean;
@@ -36,6 +36,10 @@ export function BeneficiaryFormDialog({
     });
 
     const { data: users = [] } = useUsers();
+    const userOptions = users.filter((user) => user.isActive).map((user) => ({
+        value: String(user.id),
+        label: `${user.name} (${user.email})`,
+    }));
 
     useEffect(() => {
         if (open) {
@@ -87,28 +91,15 @@ export function BeneficiaryFormDialog({
                     </div>
 
                     <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
-                            <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                            Linked Employee
-                        </Label>
-                        <Select
-                            value={form.userId != null ? String(form.userId) : "none"}
-                            onValueChange={(value) =>
-                                setForm((prev) => ({ ...prev, userId: value === "none" ? null : Number(value) }))
+                        <Label>Select employee (for imprest credits)</Label>
+                        <Combobox
+                            value={form.userId != null ? String(form.userId) : ""}
+                            onChange={(value) =>
+                                setForm((prev) => ({ ...prev, userId: value === "" ? null : Number(value) }))
                             }
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select employee (for imprest credits)" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="none">None</SelectItem>
-                                {(users || []).map((user) => (
-                                    <SelectItem key={user.id} value={String(user.id)}>
-                                        {user.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                            options={[{ id: "", name: "None" }, ...userOptions.map((o) => ({ id: o.value, name: o.label }))]}
+                            placeholder="Select employee"
+                        />
                     </div>
 
                     <div className="space-y-2">
