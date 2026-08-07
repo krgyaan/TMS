@@ -6,6 +6,12 @@ import { z } from "zod";
 
 export type BillType = "constant" | "variable";
 
+export interface VariableBillItem {
+    date?: string;
+    label?: string;
+    amount?: number;
+}
+
 export interface AmcSiteContact {
     id?: number;
     name: string;
@@ -54,7 +60,7 @@ export interface Amc {
     billFrequency: string;
     billType: BillType;
     billValue: string | null;
-    variableBills: Array<{ label?: string; amount?: number }> | null;
+    variableBills: VariableBillItem[] | null;
     amcPoPath: string | null;
     serviceReportPath: string[] | null;
     signedServiceReportPath: string | null;
@@ -66,6 +72,8 @@ export interface AmcDetail extends Amc {
     sites: AmcSite[];
     products: AmcProduct[];
     serviceEngineers: AmcServiceEngineer[];
+    services?: AmcService[];
+    bills?: AmcBill[];
 }
 
 export interface CreateAmcDto {
@@ -79,7 +87,7 @@ export interface CreateAmcDto {
     billFrequency: string;
     billType: BillType;
     billValue?: string;
-    variableBills?: Array<{ label?: string; amount?: number }>;
+    variableBills?: VariableBillItem[];
     amcPoPath?: string | null;
     serviceReportPath?: string[] | null;
     signedServiceReportPath?: string | null;
@@ -97,6 +105,82 @@ export const sampleReport = (entries?: string[] | null): string | null =>
 
 export const filledReport = (entries?: string[] | null): string | null =>
     entries?.find(e => e.startsWith("filled:"))?.slice("filled:".length) ?? null;
+
+// ============================================
+// AMC SERVICES (per-visit schedule) TYPES
+// ============================================
+
+export type AmcServiceStatus = "Pending" | "Done";
+
+export interface AmcService {
+    id: number;
+    amcId: number;
+    amcSiteId: number;
+    billId: number | null;
+    serviceNo: number;
+    serviceDueDate: string;
+    status: AmcServiceStatus | string;
+    serviceCompletedDate: string | null;
+    filledReport: string | null;
+    signedReport: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface AmcServiceAmcInfo {
+    id: number;
+    teamName: string;
+    projectName: string | null;
+    signedServiceReportPath: string | null;
+    serviceEngineers: AmcServiceEngineer[];
+}
+
+export interface AmcServiceDetail extends AmcService {
+    amc: AmcServiceAmcInfo | null;
+    site: (AmcSite & { contacts: AmcSiteContact[] }) | null;
+}
+
+export type ServicePathField = "filled-service-report" | "signed-service-report";
+
+export const serviceFileUrl = (name?: string | null) =>
+    name ? `/uploads/amc-services/${name}` : "";
+
+// ============================================
+// AMC BILLING (bill rows) TYPES
+// ============================================
+
+export type AmcBillStatus =
+    | "Pending"
+    | "Bill Submitted"
+    | "Payment Received"
+    | "Follow-up";
+
+export interface AmcBill {
+    id: number;
+    amcId: number;
+    amcSiteId: number;
+    billNo: number;
+    billDueDate: string;
+    status: AmcBillStatus | string;
+    invoices: string[];
+    paymentReceipts: string[];
+    amount: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface AmcBillDetail extends AmcBill {
+    amc: AmcServiceAmcInfo | null;
+    site: (AmcSite & { contacts: AmcSiteContact[] }) | null;
+    services: AmcService[];
+}
+
+export type BillPathField = "invoice" | "payment-receipt";
+
+export const billFileUrl = (name?: string | null) =>
+    name ? `/uploads/amc-billing/${name}` : "";
+
+export const INVOICE_DEADLINE_HOURS = 48;
 
 // ============================================================
 // FORM DEFAULTS

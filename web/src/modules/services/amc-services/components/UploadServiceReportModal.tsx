@@ -9,22 +9,30 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Loader2, FileText, Banknote } from "lucide-react";
-import { useAmcBilling, useAmcBillingFileUpload } from "@/hooks/api/useAmcBilling";
-import { billingFileUrl } from "../helpers/amc-billing.types";
+import { Loader2, FileText, FileUp, FileSignature } from "lucide-react";
+import { useAmcService, useAmcServiceFileUpload } from "@/hooks/api/useAmcServices";
+import type { ServicePathField } from "@/modules/services/amc/helpers/amc.types";
+import { serviceFileUrl } from "@/modules/services/amc/helpers/amc.types";
 
-interface PaymentReceivedModalProps {
+interface UploadServiceReportModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    billingId: number | null;
+    serviceId: number | null;
+    field: ServicePathField;
 }
 
-export function PaymentReceivedModal({ open, onOpenChange, billingId }: PaymentReceivedModalProps) {
-    const { data: billing } = useAmcBilling(billingId ?? 0);
-    const uploadFile = useAmcBillingFileUpload();
+export function UploadServiceReportModal({
+    open,
+    onOpenChange,
+    serviceId,
+    field,
+}: UploadServiceReportModalProps) {
+    const { data: service } = useAmcService(serviceId ?? 0);
+    const uploadFile = useAmcServiceFileUpload();
     const [file, setFile] = useState<File | null>(null);
 
-    const existing = billing?.paymentReceipt;
+    const isSigned = field === "signed-service-report";
+    const existing = isSigned ? service?.signedReport : service?.filledReport;
     const pending = uploadFile.isPending;
 
     useEffect(() => {
@@ -37,9 +45,9 @@ export function PaymentReceivedModal({ open, onOpenChange, billingId }: PaymentR
     };
 
     const handleUpload = async () => {
-        if (!billingId || !file) return;
+        if (!serviceId || !file) return;
         try {
-            await uploadFile.mutateAsync({ id: billingId, field: "payment-receipt", file });
+            await uploadFile.mutateAsync({ id: serviceId, field, file });
             handleClose();
         } catch {
             // handled by hook
@@ -51,19 +59,26 @@ export function PaymentReceivedModal({ open, onOpenChange, billingId }: PaymentR
             <DialogContent className="sm:max-w-[480px]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Banknote className="h-5 w-5" /> Payment Received
+                        {isSigned ? (
+                            <FileSignature className="h-5 w-5" />
+                        ) : (
+                            <FileUp className="h-5 w-5" />
+                        )}
+                        {isSigned ? "Upload Signed Service Report" : "Upload Filled Service Report"}
                     </DialogTitle>
                     <DialogDescription>
-                        Upload the payment receipt for this completed service. It marks the payment as received.
+                        {isSigned
+                            ? "Uploading the signed report marks this service visit as Done."
+                            : "Upload the filled service report for this visit."}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4 py-4">
                     {existing && (
                         <div className="rounded-lg border bg-muted/30 p-3 flex items-center justify-between gap-2">
-                            <span className="text-sm text-muted-foreground">Current receipt:</span>
+                            <span className="text-sm text-muted-foreground">Current report:</span>
                             <a
-                                href={billingFileUrl(existing)}
+                                href={serviceFileUrl(existing)}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
@@ -73,9 +88,9 @@ export function PaymentReceivedModal({ open, onOpenChange, billingId }: PaymentR
                         </div>
                     )}
                     <div className="space-y-2">
-                        <Label htmlFor="payment-receipt-file">Select payment receipt file</Label>
+                        <Label htmlFor="service-report-file">Select report file</Label>
                         <input
-                            id="payment-receipt-file"
+                            id="service-report-file"
                             type="file"
                             className="border-input dark:bg-input/30 h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm outline-none file:mr-2 file:border-0 file:bg-transparent file:text-sm file:font-medium"
                             onChange={e => setFile(e.target.files?.[0] ?? null)}
@@ -93,8 +108,10 @@ export function PaymentReceivedModal({ open, onOpenChange, billingId }: PaymentR
                             <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading...
                             </>
+                        ) : isSigned ? (
+                            "Mark Done"
                         ) : (
-                            "Payment Received"
+                            "Upload"
                         )}
                     </Button>
                 </DialogFooter>

@@ -15,9 +15,7 @@ import {
     ExternalLink,
     Search,
     Download,
-    FileUp,
     MapPin,
-    FileSignature,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -40,8 +38,6 @@ import type {
     AmcServiceEngineer,
 } from "./helpers/amc.types";
 import { sampleReport } from "./helpers/amc.types";
-import { UploadFilledServiceReportModal } from "./components/UploadFilledServiceReportModal";
-import { UploadSignedServiceReportModal } from "./components/UploadSignedServiceReportModal";
 
 type AmcTeamTab = "AC" | "DC";
 type AmcServiceTab = "due" | "missed" | "done";
@@ -115,14 +111,6 @@ export default function AmcListPage() {
     const [contactsList, setContactsList] = useState<AmcSiteContact[]>([]);
     const [engineersModalOpen, setEngineersModalOpen] = useState(false);
     const [engineersList, setEngineersList] = useState<AmcServiceEngineer[]>([]);
-    const [filledModal, setFilledModal] = useState<{ open: boolean; amcId: number | null }>({
-        open: false,
-        amcId: null,
-    });
-    const [signedModal, setSignedModal] = useState<{ open: boolean; amcId: number | null }>({
-        open: false,
-        amcId: null,
-    });
 
     const projectMap = useMemo(
         () => new Map(projects.map(p => [p.id, p.projectName || `Project ${p.id}`])),
@@ -261,16 +249,6 @@ export default function AmcListPage() {
             label: "Sample Service Report Download",
             onClick: handleSampleDownload,
             icon: <Download className="h-4 w-4" />,
-        },
-        {
-            label: "Upload Filled Service Report",
-            onClick: row => setFilledModal({ open: true, amcId: row.amcId }),
-            icon: <FileUp className="h-4 w-4" />,
-        },
-        {
-            label: "Upload Signed Service Report",
-            onClick: row => setSignedModal({ open: true, amcId: row.amcId }),
-            icon: <FileSignature className="h-4 w-4" />,
         },
     ];
 
@@ -644,18 +622,6 @@ export default function AmcListPage() {
                     </div>
                 </DialogContent>
             </Dialog>
-
-            {/* ── Upload modals ────────────────────────────────────────────── */}
-            <UploadFilledServiceReportModal
-                open={filledModal.open}
-                onOpenChange={open => setFilledModal(prev => ({ ...prev, open }))}
-                amcId={filledModal.amcId}
-            />
-            <UploadSignedServiceReportModal
-                open={signedModal.open}
-                onOpenChange={open => setSignedModal(prev => ({ ...prev, open }))}
-                amcId={signedModal.amcId}
-            />
         </Card>
     );
 }

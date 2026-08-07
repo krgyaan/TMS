@@ -4,17 +4,23 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { useProjectsMaster } from "@/hooks/api/useProjects";
 import { useItems } from "@/hooks/api/useItems";
 import { useUsers } from "@/hooks/api/useUsers";
 import type { AmcDetail } from "../helpers/amc.types";
-import { sampleReport, filledReport } from "../helpers/amc.types";
+import { sampleReport, filledReport, serviceFileUrl } from "../helpers/amc.types";
 
 const fileUrl = (name?: string | null) => (name ? `/uploads/amc/${name}` : "");
 
 function fmtDate(v?: string | null) {
     if (!v) return "—";
     try { return format(new Date(v), "PP"); } catch { return v; }
+}
+
+function fmtDateTime(v?: string | null) {
+    if (!v) return "—";
+    try { return format(new Date(v), "PP p"); } catch { return v; }
 }
 
 function fmtBillDate(v?: string | null) {
@@ -168,7 +174,40 @@ export function AmcView({ amc }: { amc: AmcDetail }) {
                     Billing Information
                 </SectionTitle>
 
-                {amc.billType === "constant" ? (
+                {amc.bills?.length ? (
+                    <div className="rounded-lg border overflow-hidden">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-muted/40">
+                                    <TableHead>Bill No.</TableHead>
+                                    <TableHead>Bill Due Date</TableHead>
+                                    <TableHead>Site</TableHead>
+                                    <TableHead>Amount (Pre GST)</TableHead>
+                                    <TableHead>Status</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {amc.bills.map(bill => (
+                                    <TableRow key={bill.id} className="hover:bg-muted/30">
+                                        <TableCell>{bill.billNo}</TableCell>
+                                        <TableCell>{fmtDate(bill.billDueDate)}</TableCell>
+                                        <TableCell>
+                                            {amc.sites.find(s => s.id === bill.amcSiteId)?.name ?? "—"}
+                                        </TableCell>
+                                        <TableCell>
+                                            {bill.amount != null ? bill.amount : "—"}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline" className="capitalize">
+                                                {bill.status}
+                                            </Badge>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                ) : amc.billType === "constant" ? (
                     <div className="rounded-lg border overflow-hidden">
                         <Table>
                             <TableBody>
@@ -193,7 +232,7 @@ export function AmcView({ amc }: { amc: AmcDetail }) {
                                 {amc.variableBills?.length ? (
                                     amc.variableBills.map((b, idx) => (
                                         <TableRow key={idx} className="hover:bg-muted/30">
-                                            <TableCell>{fmtBillDate(b.label)}</TableCell>
+                                            <TableCell>{fmtBillDate(b.date || b.label)}</TableCell>
                                             <TableCell>
                                                 {b.amount != null ? b.amount : "—"}
                                             </TableCell>
@@ -209,6 +248,92 @@ export function AmcView({ amc }: { amc: AmcDetail }) {
                                         </TableCell>
                                     </TableRow>
                                 )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+            </div>
+
+            {/* ── 2b. Service Schedule ─────────────────────────────────────── */}
+            <div className={sectionCls}>
+                <SectionTitle icon={<Wrench className="h-4 w-4" />}>
+                    Service Schedule (Visit-wise)
+                </SectionTitle>
+
+                {!amc.services?.length ? (
+                    <p className="text-sm text-muted-foreground">
+                        No service schedule generated yet.
+                    </p>
+                ) : (
+                    <div className="rounded-lg border overflow-hidden">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-muted/40">
+                                    <TableHead>Service No.</TableHead>
+                                    <TableHead>Due Date</TableHead>
+                                    <TableHead>Site</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Completed Date</TableHead>
+                                    <TableHead>Filled Report</TableHead>
+                                    <TableHead>Signed Report</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {amc.services.map(service => (
+                                    <TableRow key={service.id} className="hover:bg-muted/30">
+                                        <TableCell>{service.serviceNo}</TableCell>
+                                        <TableCell>{fmtDate(service.serviceDueDate)}</TableCell>
+                                        <TableCell>
+                                            {amc.sites.find(s => s.id === service.amcSiteId)?.name ?? "—"}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge
+                                                variant="outline"
+                                                className={cn(
+                                                    "capitalize",
+                                                    service.status === "Done"
+                                                        ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                                        : "bg-amber-100 text-amber-800 border-amber-200",
+                                                )}
+                                            >
+                                                {service.status}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            {service.serviceCompletedDate
+                                                ? fmtDateTime(service.serviceCompletedDate)
+                                                : "—"}
+                                        </TableCell>
+                                        <TableCell>
+                                            {service.filledReport ? (
+                                                <a
+                                                    href={serviceFileUrl(service.filledReport)}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                                                >
+                                                    <Download className="h-3.5 w-3.5" /> Open
+                                                </a>
+                                            ) : (
+                                                "—"
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            {service.signedReport ? (
+                                                <a
+                                                    href={serviceFileUrl(service.signedReport)}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                                                >
+                                                    <Download className="h-3.5 w-3.5" /> Open
+                                                </a>
+                                            ) : (
+                                                "—"
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
                             </TableBody>
                         </Table>
                     </div>

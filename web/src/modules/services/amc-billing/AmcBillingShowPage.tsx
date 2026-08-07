@@ -1,25 +1,26 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2, FileText } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Loader2, ReceiptText, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { useAmcBilling } from "@/hooks/api/useAmcBilling";
 import { paths } from "@/app/routes/paths";
-import { billingFileUrl } from "./helpers/amc-billing.types";
+import { ManageInvoicesModal } from "./components/ManageInvoicesModal";
+import { ManageReceiptsModal } from "./components/ManageReceiptsModal";
 
 const STATUS_STYLES: Record<string, string> = {
-    "Signed Service reports Received": "bg-amber-100 text-amber-800 border-amber-200",
+    Pending: "bg-amber-100 text-amber-800 border-amber-200",
     "Bill Submitted": "bg-blue-100 text-blue-800 border-blue-200",
     "Payment Received": "bg-emerald-100 text-emerald-800 border-emerald-200",
+    "Follow-up": "bg-orange-100 text-orange-800 border-orange-200",
 };
 
 const fmtDate = (value: string | null | undefined) =>
     value ? format(new Date(value), "MMM d, yyyy") : "—";
-
-const fmtDateTime = (value: string | null | undefined) =>
-    value ? format(new Date(value), "MMM d, yyyy hh:mm a") : "—";
 
 export default function AmcBillingShowPage() {
     const { id } = useParams<{ id: string }>();
@@ -27,6 +28,9 @@ export default function AmcBillingShowPage() {
     const billingId = Number(id);
 
     const { data: billing, isLoading } = useAmcBilling(billingId);
+
+    const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+    const [receiptModalOpen, setReceiptModalOpen] = useState(false);
 
     if (isLoading) {
         return (
@@ -64,7 +68,7 @@ export default function AmcBillingShowPage() {
                         <div>
                             <CardTitle>{billing.amc?.projectName ?? "Project"}</CardTitle>
                             <CardDescription>
-                                Billing record for completed service #{billing.id}
+                                Bill #{billing.billNo} — due {fmtDate(billing.billDueDate)}
                             </CardDescription>
                         </div>
                         <Badge
@@ -78,7 +82,7 @@ export default function AmcBillingShowPage() {
                         </Badge>
                     </div>
                 </CardHeader>
-                <CardContent className="px-6 pb-6">
+                <CardContent className="px-6 pb-6 space-y-6">
                     <Table>
                         <TableBody>
                             <TableRow>
@@ -129,83 +133,116 @@ export default function AmcBillingShowPage() {
                             </TableRow>
                             <TableRow>
                                 <TableCell className="w-1/3 text-sm font-medium text-muted-foreground">
-                                    Service Due Date
+                                    Bill Due Date
                                 </TableCell>
-                                <TableCell className="text-sm">{fmtDate(billing.serviceDueDate)}</TableCell>
+                                <TableCell className="text-sm">{fmtDate(billing.billDueDate)}</TableCell>
                             </TableRow>
                             <TableRow>
                                 <TableCell className="w-1/3 text-sm font-medium text-muted-foreground">
-                                    Service Completed Date
+                                    Amount (Pre GST)
                                 </TableCell>
-                                <TableCell className="text-sm">{fmtDateTime(billing.serviceCompletedDate)}</TableCell>
+                                <TableCell className="text-sm">{billing.amount ?? "—"}</TableCell>
                             </TableRow>
                             <TableRow>
                                 <TableCell className="w-1/3 text-sm font-medium text-muted-foreground">
-                                    Signed Service report Received
+                                    Invoices
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {billing.amc?.signedServiceReportPath ? (
-                                        <a
-                                            href={`/uploads/amc/${billing.amc.signedServiceReportPath}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                                    <div className="flex items-center gap-3">
+                                        <Badge variant="secondary">{billing.invoices?.length ?? 0}</Badge>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setInvoiceModalOpen(true)}
+                                            className="h-8"
                                         >
-                                            <FileText className="h-3.5 w-3.5" /> Open
-                                        </a>
-                                    ) : (
-                                        "—"
-                                    )}
+                                            <ReceiptText className="h-3.5 w-3.5 mr-1" /> Manage
+                                        </Button>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                             <TableRow>
                                 <TableCell className="w-1/3 text-sm font-medium text-muted-foreground">
-                                    Invoice
+                                    Payment Receipts
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {billing.invoice ? (
-                                        <a
-                                            href={billingFileUrl(billing.invoice)}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                                    <div className="flex items-center gap-3">
+                                        <Badge variant="secondary">{billing.paymentReceipts?.length ?? 0}</Badge>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setReceiptModalOpen(true)}
+                                            className="h-8"
                                         >
-                                            <FileText className="h-3.5 w-3.5" /> Open
-                                        </a>
-                                    ) : (
-                                        "—"
-                                    )}
+                                            <Banknote className="h-3.5 w-3.5 mr-1" /> Manage
+                                        </Button>
+                                    </div>
                                 </TableCell>
-                            </TableRow>
-                            <TableRow>
-                                <TableCell className="w-1/3 text-sm font-medium text-muted-foreground">
-                                    Payment Receipt
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {billing.paymentReceipt ? (
-                                        <a
-                                            href={billingFileUrl(billing.paymentReceipt)}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-flex items-center gap-1 text-primary hover:underline"
-                                        >
-                                            <FileText className="h-3.5 w-3.5" /> Open
-                                        </a>
-                                    ) : (
-                                        "—"
-                                    )}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow>
-                                <TableCell className="w-1/3 text-sm font-medium text-muted-foreground">
-                                    Notes
-                                </TableCell>
-                                <TableCell className="text-sm">{billing.notes ?? "—"}</TableCell>
                             </TableRow>
                         </TableBody>
                     </Table>
+
+                    <div>
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Services in this bill
+                        </p>
+                        <div className="rounded-lg border overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-muted/40">
+                                        <TableHead>Service No.</TableHead>
+                                        <TableHead>Due Date</TableHead>
+                                        <TableHead>Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {billing.services?.length ? (
+                                        billing.services.map(service => (
+                                            <TableRow key={service.id} className="hover:bg-muted/30">
+                                                <TableCell>{service.serviceNo}</TableCell>
+                                                <TableCell>{fmtDate(service.serviceDueDate)}</TableCell>
+                                                <TableCell>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={cn(
+                                                            "capitalize",
+                                                            service.status === "Done"
+                                                                ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                                                : "bg-amber-100 text-amber-800 border-amber-200",
+                                                        )}
+                                                    >
+                                                        {service.status}
+                                                    </Badge>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell
+                                                colSpan={3}
+                                                className="text-center text-sm text-muted-foreground py-4"
+                                            >
+                                                No services assigned to this bill.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
                 </CardContent>
             </Card>
+
+            <ManageInvoicesModal
+                open={invoiceModalOpen}
+                onOpenChange={setInvoiceModalOpen}
+                billingId={billingId}
+            />
+            <ManageReceiptsModal
+                open={receiptModalOpen}
+                onOpenChange={setReceiptModalOpen}
+                billingId={billingId}
+            />
         </div>
     );
 }

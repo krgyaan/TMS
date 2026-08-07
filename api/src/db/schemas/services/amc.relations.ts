@@ -5,7 +5,8 @@ import { amcs } from "./amc.schema";
 import { amcSites } from "./amc-sites.schema";
 import { amcContacts } from "./amc-contacts.schema";
 import { amcProducts } from "./amc-products.schema";
-import { amcCompletedServices } from "./amc-completed.schema";
+import { amcServices } from "./amc-services.schema";
+import { amcBills } from "./amc-bill.schema";
 
 export const amcRelations = relations(amcs, ({ one, many }) => ({
     project: one(projects, {
@@ -15,7 +16,8 @@ export const amcRelations = relations(amcs, ({ one, many }) => ({
     sites: many(amcSites),
     products: many(amcProducts),
     contacts: many(amcContacts),
-    completedServices: many(amcCompletedServices),
+    services: many(amcServices),
+    bills: many(amcBills),
 }));
 
 export const amcSiteRelations = relations(amcSites, ({ one, many }) => ({
@@ -24,6 +26,8 @@ export const amcSiteRelations = relations(amcSites, ({ one, many }) => ({
         references: [amcs.id],
     }),
     contacts: many(amcContacts),
+    services: many(amcServices),
+    bills: many(amcBills),
 }));
 
 export const amcContactRelations = relations(amcContacts, ({ one }) => ({
@@ -48,13 +52,29 @@ export const amcProductRelations = relations(amcProducts, ({ one }) => ({
     }),
 }));
 
-export const amcCompletedServiceRelations = relations(amcCompletedServices, ({ one }) => ({
+export const amcServiceRelations = relations(amcServices, ({ one }) => ({
     amc: one(amcs, {
-        fields: [amcCompletedServices.amcId],
+        fields: [amcServices.amcId],
         references: [amcs.id],
     }),
     site: one(amcSites, {
-        fields: [amcCompletedServices.amcSiteId],
+        fields: [amcServices.amcSiteId],
         references: [amcSites.id],
     }),
+    bill: one(amcBills, {
+        fields: [amcServices.billId],
+        references: [amcBills.id],
+    }),
+}));
+
+export const amcBillRelations = relations(amcBills, ({ one, many }) => ({
+    amc: one(amcs, {
+        fields: [amcBills.amcId],
+        references: [amcs.id],
+    }),
+    site: one(amcSites, {
+        fields: [amcBills.amcSiteId],
+        references: [amcSites.id],
+    }),
+    services: many(amcServices),
 }));

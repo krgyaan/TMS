@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { amcBillingService } from "@/services/api";
-import type { BillingPathField } from "@/modules/services/amc-billing/helpers/amc-billing.types";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";
 
@@ -27,15 +26,70 @@ export const useAmcBilling = (id: number) => {
     });
 };
 
-export const useAmcBillingFileUpload = () => {
+export const useAddInvoices = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, field, file }: { id: number; field: BillingPathField; file: File }) =>
-            amcBillingService.uploadFile(id, field, file),
+        mutationFn: ({ id, files }: { id: number; files: File[] }) =>
+            amcBillingService.addInvoices(id, files),
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: amcBillingKeys.lists() });
             queryClient.invalidateQueries({ queryKey: amcBillingKeys.detail(variables.id) });
-            toast.success("File uploaded successfully");
+            toast.success("Invoices uploaded successfully");
+        },
+        onError: error => toast.error(handleQueryError(error)),
+    });
+};
+
+export const useAddReceipts = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, files }: { id: number; files: File[] }) =>
+            amcBillingService.addReceipts(id, files),
+        onSuccess: (_data, variables) => {
+            queryClient.invalidateQueries({ queryKey: amcBillingKeys.lists() });
+            queryClient.invalidateQueries({ queryKey: amcBillingKeys.detail(variables.id) });
+            toast.success("Receipts uploaded successfully");
+        },
+        onError: error => toast.error(handleQueryError(error)),
+    });
+};
+
+export const useRemoveInvoice = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, index }: { id: number; index: number }) =>
+            amcBillingService.removeInvoice(id, index),
+        onSuccess: (_data, variables) => {
+            queryClient.invalidateQueries({ queryKey: amcBillingKeys.lists() });
+            queryClient.invalidateQueries({ queryKey: amcBillingKeys.detail(variables.id) });
+            toast.success("Invoice removed");
+        },
+        onError: error => toast.error(handleQueryError(error)),
+    });
+};
+
+export const useRemoveReceipt = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, index }: { id: number; index: number }) =>
+            amcBillingService.removeReceipt(id, index),
+        onSuccess: (_data, variables) => {
+            queryClient.invalidateQueries({ queryKey: amcBillingKeys.lists() });
+            queryClient.invalidateQueries({ queryKey: amcBillingKeys.detail(variables.id) });
+            toast.success("Receipt removed");
+        },
+        onError: error => toast.error(handleQueryError(error)),
+    });
+};
+
+export const useAmcBillingFollowup = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: number) => amcBillingService.followup(id),
+        onSuccess: (_data, id) => {
+            queryClient.invalidateQueries({ queryKey: amcBillingKeys.lists() });
+            queryClient.invalidateQueries({ queryKey: amcBillingKeys.detail(id) });
+            toast.success("Follow-up initiated");
         },
         onError: error => toast.error(handleQueryError(error)),
     });

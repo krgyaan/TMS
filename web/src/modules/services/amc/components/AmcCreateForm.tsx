@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type Resolver } from "react-hook-form";
@@ -419,7 +419,9 @@ function SectionDivider({
 const defaultSite: AmcSite = { name: "", address: "", contacts: [] };
 const defaultEngineer: AmcServiceEngineer = { name: "", mobile: "" };
 const defaultProduct: AmcProduct = { itemId: 0, quantity: 1 };
-const defaultVariableBill = { label: "", amount: "" };
+const defaultVariableBill = { date: "", amount: "" };
+
+type VariableBillRow = { date: string; amount: string };
 
 const FREQUENCY_MONTHS: Record<string, number> = {
     Monthly: 1,
@@ -495,15 +497,24 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
     const amcStartDate = form.watch("amcStartDate");
     const amcEndDate = form.watch("amcEndDate");
     const billFrequency = form.watch("billFrequency");
+    const billValue = form.watch("billValue") ?? "";
 
     const [sites, setSites] = useState<AmcSite[]>([defaultSite]);
     const [products, setProducts] = useState<AmcProduct[]>([]);
     const [engineers, setEngineers] = useState<AmcServiceEngineer[]>([]);
-    const [variableBills, setVariableBills] = useState<
-        Array<{ label: string; amount: string }>
-    >([defaultVariableBill]);
+    const [variableBills, setVariableBills] = useState<VariableBillRow[]>(
+        [defaultVariableBill],
+    );
     const [serviceReportFile, setServiceReportFile] = useState<File | null>(null);
     const [amcPoFile, setAmcPoFile] = useState<File | null>(null);
+
+    const constantBillDates = useMemo(
+        () =>
+            billType === "constant" && amcStartDate && amcEndDate && billFrequency
+                ? computeBillDates(amcStartDate, amcEndDate, billFrequency)
+                : [],
+        [billType, amcStartDate, amcEndDate, billFrequency],
+    );
 
     useEffect(() => {
         if (billType !== "variable") return;
@@ -514,9 +525,9 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
 
         setVariableBills(prev => {
             const matches =
-                prev.length === dates.length && prev.every((row, i) => row.label === dates[i]);
+                prev.length === dates.length && prev.every((row, i) => row.date === dates[i]);
             if (matches) return prev;
-            return dates.map((date, i) => ({ label: date, amount: prev[i]?.amount ?? "" }));
+            return dates.map((date, i) => ({ date, amount: prev[i]?.amount ?? "" }));
         });
     }, [billType, amcStartDate, amcEndDate, billFrequency]);
 
@@ -539,7 +550,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
         setVariableBills(
             amc.variableBills?.length
                 ? amc.variableBills.map((b, i) => ({
-                      label: b.label || `Q${i + 1}`,
+                      date: b.date || b.label || `Q${i + 1}`,
                       amount: b.amount != null ? String(b.amount) : "",
                   }))
                 : [defaultVariableBill],
@@ -573,8 +584,8 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
             variableBills:
                 values.billType === "variable"
                     ? variableBills
-                          .filter(b => b.label || b.amount)
-                          .map(b => ({ label: b.label, amount: b.amount ? Number(b.amount) : undefined }))
+                          .filter(b => b.date || b.amount)
+                          .map(b => ({ date: b.date, amount: b.amount ? Number(b.amount) : undefined }))
                     : undefined,
             serviceReportPath: amc?.serviceReportPath ?? null,
             amcPoPath: amc?.amcPoPath ?? null,
@@ -767,6 +778,31 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                             )}
                         </div>
 
+                        {/* Constant bills preview (read-only amounts from Bill Value) */}
+                        {billType === "constant" && constantBillDates.length > 0 && (
+                            <div className="mt-5 space-y-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Bill Schedule Preview (per bill due date)
+                                </p>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Bill Date</TableHead>
+                                            <TableHead>Bill Value (Pre GST)</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {constantBillDates.map((date, idx) => (
+                                            <TableRow key={idx}>
+                                                <TableCell>{date}</TableCell>
+                                                <TableCell>{billValue || "0.00"}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
+
                         {/* Variable bills */}
                         {billType === "variable" && (
                             <div className="mt-5 space-y-3">
@@ -782,7 +818,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                                         onClick={() =>
                                             setVariableBills(vb => [
                                                 ...vb,
-                                                { label: "", amount: "" },
+                                                { date: "", amount: "" },
                                             ])
                                         }
                                     >
@@ -804,12 +840,12 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                                                     <Input
                                                         className={inputCls}
                                                         type="date"
-                                                        value={row.label}
+                                                        value={row.date}
                                                         onChange={e =>
                                                             setVariableBills(vb =>
                                                                 vb.map((r, i) =>
                                                                     i === idx
-                                                                        ? { ...r, label: e.target.value }
+                                                                        ? { ...r, date: e.target.value }
                                                                         : r,
                                                                 ),
                                                             )

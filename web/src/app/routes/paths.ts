@@ -170,6 +170,7 @@ export const paths = {
         amcEdit: (id: number | string) => `/services/amc/${id}/edit`,
         amcShow: (id: number | string) => `/services/amc/${id}`,
         amcView: (id: number | string) => `/services/amc/${id}/view`,
+        amcServices: "/services/amc-services",
         amcBilling: "/services/amc-billing",
         amcBillingShow: (id: number | string) => `/services/amc-billing/${id}`,
     },
