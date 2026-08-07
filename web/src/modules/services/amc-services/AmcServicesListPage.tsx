@@ -25,7 +25,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import DataTable from "@/components/ui/data-table";
 import { paths } from "@/app/routes/paths";
 import { useAmcServices } from "@/hooks/api/useAmcServices";
-import { usePersistedTab } from "@/hooks/usePersistedTab";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { cn } from "@/lib/utils";
@@ -77,13 +77,16 @@ export default function AmcServicesListPage() {
     const navigate = useNavigate();
     const { data: services = [], isLoading } = useAmcServices();
 
-    const [activeServiceTab, setActiveServiceTab] = usePersistedTab<ServiceTab>({
-        param: "tab",
-        defaultValue: "due",
-        validValues: ["due", "missed", "done"],
-        storageKey: "tms:amc-services-tab",
+    const {
+        activeTab: activeServiceTab,
+        setActiveTab: setActiveServiceTab,
+        search,
+        setSearch,
+    } = usePersistentTableState({
+        storageKey: "amc-services",
+        defaultTab: "due" as ServiceTab,
+        tabParam: "tab",
     });
-    const [search, setSearch] = useState("");
 
     const [contactsModalOpen, setContactsModalOpen] = useState(false);
     const [contactsList, setContactsList] = useState<AmcSiteContact[]>([]);

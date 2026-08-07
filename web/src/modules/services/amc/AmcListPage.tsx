@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
 import {
@@ -28,7 +28,7 @@ import DataTable from "@/components/ui/data-table";
 import { paths } from "@/app/routes/paths";
 import { useAmcs } from "@/hooks/api/useAmc";
 import { useProjectsMaster } from "@/hooks/api/useProjects";
-import { usePersistedTab } from "@/hooks/usePersistedTab";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { cn } from "@/lib/utils";
@@ -154,19 +154,25 @@ export default function AmcListPage() {
     const { data: amcs = [], isLoading } = useAmcs();
     const { data: projects = [] } = useProjectsMaster();
 
-    const [activeTeam, setActiveTeam] = usePersistedTab<AmcTeamTab>({
-        param: "team",
-        defaultValue: "AC",
-        validValues: ["AC", "DC"],
-        storageKey: "tms:amc-team-tab",
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    const activeTeam = (searchParams.get("team") as AmcTeamTab) || "AC";
+    const setActiveTeam = (team: AmcTeamTab) => {
+        const next = new URLSearchParams(searchParams);
+        next.set("team", team);
+        setSearchParams(next, { replace: true });
+    };
+
+    const {
+        activeTab: activeServiceTab,
+        setActiveTab: setActiveServiceTab,
+        search,
+        setSearch,
+    } = usePersistentTableState({
+        storageKey: "amc-list",
+        defaultTab: "due" as AmcServiceTab,
+        tabParam: "tab",
     });
-    const [activeServiceTab, setActiveServiceTab] = usePersistedTab<AmcServiceTab>({
-        param: "tab",
-        defaultValue: "due",
-        validValues: ["due", "missed", "done"],
-        storageKey: "tms:amc-service-tab",
-    });
-    const [search, setSearch] = useState("");
 
     const [contactsModalOpen, setContactsModalOpen] = useState(false);
     const [contactsList, setContactsList] = useState<AmcSiteContact[]>([]);

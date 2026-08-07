@@ -144,10 +144,13 @@ export interface AmcService {
     updatedAt: string;
 }
 
+// ── Shared amc info shape returned by both service and billing enrichAll ──────
 export interface AmcServiceAmcInfo {
     id: number;
     teamName: string;
     projectName: string | null;
+    orgName: string | null;
+    orgAcronym: string | null;        // ← added: acronym takes priority over orgName
     allocatedTe?: number | null;
     signedServiceReportPath: string | null;
     serviceEngineers: AmcServiceEngineer[];
@@ -185,7 +188,7 @@ export interface AmcBill {
 }
 
 export interface AmcBillDetail extends AmcBill {
-    amc: AmcServiceAmcInfo | null;
+    amc: AmcServiceAmcInfo | null;   // orgAcronym now available here too
     site: (AmcSite & { contacts: AmcSiteContact[] }) | null;
     services: AmcService[];
 }
@@ -231,7 +234,11 @@ export const VARIABLE_BILL_LABELS = ["Q1", "Q2", "Q3", "Q4"];
 export const AmcFormSchema = z.object({
     teamName: z.string().min(1, { message: "Team Name is required" }),
     projectId: z.coerce.number().min(1, { message: "Please select a Project" }),
-    allocatedTe: z.coerce.number().min(1, { message: "Please select an Allocated TE" }).nullable().optional(),
+    allocatedTe: z.coerce
+        .number()
+        .min(1, { message: "Please select an Allocated TE" })
+        .nullable()
+        .optional(),
     serviceFrequency: z.string().min(1, { message: "Service Frequency is required" }),
     amcStartDate: z.string().min(1, { message: "AMC Start Date is required" }),
     amcEndDate: z.string().min(1, { message: "AMC End Date is required" }),

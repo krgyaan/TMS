@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
 import {
@@ -24,9 +24,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import DataTable from "@/components/ui/data-table";
 import { paths } from "@/app/routes/paths";
-import { useAmcBillings, useAmcBillingFollowup } from "@/hooks/api/useAmcBilling";
+import { useAmcBillings } from "@/hooks/api/useAmcBilling";
 import { useUsers } from "@/hooks/api/useUsers";
-import { usePersistedTab } from "@/hooks/usePersistedTab";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { cn } from "@/lib/utils";
@@ -138,19 +138,23 @@ export default function AmcBillingListPage() {
     const navigate = useNavigate();
     const { data: bills = [], isLoading } = useAmcBillings();
     const { data: users = [] } = useUsers();
-    const followup = useAmcBillingFollowup();
 
-    const [statusTab, setStatusTab] = usePersistedTab<BillStatusTab>({
-        param: "tab",
-        defaultValue: "due",
-        validValues: ["due", "missed", "done"],
-        storageKey: "tms:amc-billing-status-tab",
-    });
-    const [periodTab, setPeriodTab] = usePersistedTab<BillPeriodTab>({
-        param: "period",
-        defaultValue: "all",
-        validValues: ["all", "week", "month", "year"],
-        storageKey: "tms:amc-billing-period-tab",
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    const periodTab = (searchParams.get("period") as BillPeriodTab) || "all";
+    const setPeriodTab = (tab: BillPeriodTab) => {
+        const next = new URLSearchParams(searchParams);
+        next.set("period", tab);
+        setSearchParams(next, { replace: true });
+    };
+
+    const {
+        activeTab: statusTab,
+        setActiveTab: setStatusTab,
+    } = usePersistentTableState({
+        storageKey: "amc-billing",
+        defaultTab: "due" as BillStatusTab,
+        tabParam: "tab",
     });
 
     const [invoiceModal, setInvoiceModal] = useState<{ open: boolean; id: number | null }>({
@@ -210,7 +214,7 @@ export default function AmcBillingListPage() {
             },
             {
                 label: "Initiate Followup",
-                onClick: row => followup.mutate(row.id),
+                onClick: row => navigate(paths.services.amcBillingFollowUp(row.id)),
                 icon: <PhoneCall className="h-4 w-4" />,
             },
             {
@@ -228,6 +232,15 @@ export default function AmcBillingListPage() {
             valueGetter: params => params.data?.amc?.projectName ?? "—",
             cellRenderer: (params: CustomCellRendererProps<AmcBillDetail>) => (
                 <span>{params.data?.amc?.projectName ?? "—"}</span>
+            ),
+        },
+        {
+            colId: "siteName",
+            headerName: "Site Name",
+            width: 180,
+            valueGetter: params => params.data?.site?.name ?? "—",
+            cellRenderer: (params: CustomCellRendererProps<AmcBillDetail>) => (
+                <span>{params.data?.site?.name ?? "—"}</span>
             ),
         },
         {
@@ -321,7 +334,7 @@ export default function AmcBillingListPage() {
             cellRenderer: createActionColumnRenderer(actions),
         },
         ];
-    }, [userMap, billCountBySite, navigate, followup]);
+    }, [userMap, billCountBySite, navigate]);
 
     return (
         <Card className="min-h-[calc(100vh-2rem)] flex flex-col border-0 shadow-none">

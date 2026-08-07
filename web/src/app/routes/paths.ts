@@ -176,6 +176,7 @@ export const paths = {
         amcBilling: "/services/amc-billing",
         amcBillingShow: (id: number | string) => `/services/amc-billing/${id}`,
         amcBillingView: (id: number | string) => `/services/amc-billing/${id}/view`,
+        amcBillingFollowUp: (id: number | string) => `/services/amc-billing/${id}/follow-up`,
     },
 
     // ==================== BI DASHBOARD ====================

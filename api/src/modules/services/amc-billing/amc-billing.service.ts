@@ -1,15 +1,8 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, and, asc, count, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, asc, inArray, isNotNull } from "drizzle-orm";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
-import {
-    amcs,
-    amcSites,
-    amcContacts,
-    amcServices,
-    amcBills,
-    projects,
-} from "@/db/schemas";
+import { amcs, amcSites, amcContacts, amcServices, amcBills, projects, organizations } from "@/db/schemas";
 
 const CONTACT_SOURCE = {
     site: "site_contacts",
@@ -210,10 +203,36 @@ export class AmcBillingService {
 
         const projectRows = amcRows.length
             ? await this.db
-                  .select({ id: projects.id, name: projects.projectName })
+                  .select({
+                      id: projects.id,
+                      name: projects.projectName,
+                      orgId: projects.organisationId,
+                  })
                   .from(projects)
                   .where(inArray(projects.id, amcRows.map(amc => amc.projectId)))
             : [];
+
+        const orgIds = Array.from(
+            new Set(
+                projectRows
+                    .map(p => p.orgId)
+                    .filter((id): id is number => id !== null && id !== undefined),
+            ),
+        );
+
+        // ── Fetch both name AND acronym from organizations ────────────────────
+        const orgRows = orgIds.length
+            ? await this.db
+                  .select({
+                      id: organizations.id,
+                      name: organizations.name,
+                      acronym: organizations.acronym,   // ← added
+                  })
+                  .from(organizations)
+                  .where(inArray(organizations.id, orgIds))
+            : [];
+
+        // ── Build lookup maps ─────────────────────────────────────────────────
 
         const amcById = new Map<number, (typeof amcRows)[number]>();
         for (const amc of amcRows) amcById.set(amc.id, amc);
@@ -223,6 +242,16 @@ export class AmcBillingService {
 
         const projectNameById = new Map<number, string | null>();
         for (const project of projectRows) projectNameById.set(project.id, project.name);
+
+        const projectOrgIdById = new Map<number, number | null>();
+        for (const project of projectRows) projectOrgIdById.set(project.id, project.orgId);
+
+        const orgNameById = new Map<number, string>();
+        for (const org of orgRows) orgNameById.set(org.id, org.name);
+
+        // ← added: acronym map
+        const orgAcronymById = new Map<number, string | null>();
+        for (const org of orgRows) orgAcronymById.set(org.id, org.acronym ?? null);
 
         const engineersByAmcId = new Map<number, (typeof engineerRows)[number][]>();
         for (const engineer of engineerRows) {
@@ -251,6 +280,13 @@ export class AmcBillingService {
             const amc = amcById.get(row.amcId);
             const site = row.amcSiteId ? siteById.get(row.amcSiteId) : undefined;
 
+            // Helper to resolve org fields for this amc's project
+            const resolveOrg = <T>(map: Map<number, T>): T | null => {
+                if (!amc) return null;
+                const orgId = projectOrgIdById.get(amc.projectId);
+                return orgId != null ? (map.get(orgId) ?? null) : null;
+            };
+
             return {
                 ...row,
                 invoices: (row.invoices as string[]) ?? [],
@@ -260,6 +296,8 @@ export class AmcBillingService {
                           id: amc.id,
                           teamName: amc.teamName,
                           projectName: projectNameById.get(amc.projectId) ?? null,
+                          orgName: resolveOrg(orgNameById),           // full name
+                          orgAcronym: resolveOrg(orgAcronymById),     // ← acronym
                           allocatedTe: amc.allocatedTe,
                           signedServiceReportPath: amc.signedServiceReportPath,
                           serviceEngineers: engineersByAmcId.get(amc.id) ?? [],
@@ -268,7 +306,9 @@ export class AmcBillingService {
                 site: site
                     ? {
                           ...site,
-                          contacts: row.amcSiteId ? (contactsBySiteId.get(row.amcSiteId) ?? []) : [],
+                          contacts: row.amcSiteId
+                              ? (contactsBySiteId.get(row.amcSiteId) ?? [])
+                              : [],
                       }
                     : null,
                 services: servicesByBillId.get(row.id) ?? [],

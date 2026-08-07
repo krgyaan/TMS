@@ -13,6 +13,7 @@ const Services_AmcView = lazy(() => import('@/modules/services/amc/AmcViewPage')
 const Services_AmcBillingList = lazy(() => import('@/modules/services/amc-billing/AmcBillingListPage'));
 const Services_AmcBillingShow = lazy(() => import('@/modules/services/amc-billing/AmcBillingShowPage'));
 const Services_AmcBillingView = lazy(() => import('@/modules/services/amc-billing/AmcBillingViewPage'));
+const Services_AmcBillingFollowUp = lazy(() => import('@/modules/services/amc-billing/AmcBillingFollowUpPage'));
 const Services_AmcServicesList = lazy(() => import('@/modules/services/amc-services/AmcServicesListPage'));
 const Services_AmcServiceShow = lazy(() => import('@/modules/services/amc-services/AmcServiceShowPage'));
 const Services_AmcServiceView = lazy(() => import('@/modules/services/amc-services/AmcServiceViewPage'));
@@ -33,6 +34,7 @@ export default function ServicesRoutes() {
             <Route path="amc-services/:id" element={<RouteWrapper><Services_AmcServiceShow /></RouteWrapper>} />
             <Route path="amc-billing" element={<RouteWrapper><Services_AmcBillingList /></RouteWrapper>} />
             <Route path="amc-billing/:id/view" element={<RouteWrapper><Services_AmcBillingView /></RouteWrapper>} />
+            <Route path="amc-billing/:id/follow-up" element={<RouteWrapper><Services_AmcBillingFollowUp /></RouteWrapper>} />
             <Route path="amc-billing/:id" element={<RouteWrapper><Services_AmcBillingShow /></RouteWrapper>} />
         </Routes>
     );
