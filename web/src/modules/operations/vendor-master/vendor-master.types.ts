@@ -26,6 +26,7 @@ export interface CreatePartyDTO {
 export interface Beneficiary {
     id: number;
     name: string | null;
+    userId?: number | null;
     accountNumber: string | null;
     ifsc: string | null;
     bankName: string | null;
@@ -35,6 +36,7 @@ export interface Beneficiary {
 
 export interface BeneficiaryFormValues {
     name: string;
+    userId?: number | null;
     accountNumber: string;
     ifsc: string;
     bankName: string;

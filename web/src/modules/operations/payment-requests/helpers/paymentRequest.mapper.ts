@@ -9,6 +9,7 @@ export function mapPaymentRequestFormToCreateDTO(
     const dto: CreatePaymentRequestDTO = {
         projectId,
         projectName: projectName || undefined,
+        beneficiaryId: values.selectedBeneficiaryId ? Number(values.selectedBeneficiaryId) : undefined,
         paymentMode: values.paymentMode,
         amount: values.amount!,
         paymentAgainst: values.paymentAgainst,

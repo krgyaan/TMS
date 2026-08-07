@@ -520,6 +520,7 @@ const VendorMasterListPage: React.FC = () => {
                     : "Add a beneficiary to use as the payment receiving bank account."}
                 initialValues={editBeneficiary ? {
                     name: editBeneficiary.name || "",
+                    userId: editBeneficiary.userId ?? null,
                     accountNumber: editBeneficiary.accountNumber || "",
                     ifsc: editBeneficiary.ifsc || "",
                     bankName: editBeneficiary.bankName || "",

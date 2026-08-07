@@ -1,6 +1,7 @@
 export interface PaymentRequestRow {
     id: number;
     projectId: number | null;
+    beneficiaryId?: number | null;
     requestNo: string;
     partyName: string;
     accountNumber: string;
@@ -58,6 +59,7 @@ export interface PaymentRequestRow {
 export interface CreatePaymentRequestDTO {
     projectId?: number | null;
     projectName?: string;
+    beneficiaryId?: number;
     partyName?: string;
     accountNumber?: string;
     bankName?: string;
