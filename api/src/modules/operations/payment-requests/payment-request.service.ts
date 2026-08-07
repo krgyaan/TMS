@@ -3,7 +3,8 @@ import { DRIZZLE } from "@/db/database.module";
 import { users } from "@/db/schemas/";
 import { projects } from "@/db/schemas/master/projects.schema";
 import { beneficiaries } from "@/db/schemas/operations/beneficiaries.schema";
-import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
+import { paymentRequests, type PaymentRequest as OperationPaymentRequest } from "@/db/schemas/operations/payment-requests.schema";
+import { employeeImprestTransactions } from "@/db/schemas/shared/employee-imprest-transaction.schema";
 import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
@@ -129,6 +130,7 @@ export class PaymentRequestService {
                 .insert(paymentRequests)
                 .values({
                     projectId: body.projectId || null,
+                    beneficiaryId: body.beneficiaryId || null,
                     requestNo,
                     partyName: body.partyName,
                     accountNumber: body.accountNumber,
@@ -166,6 +168,7 @@ export class PaymentRequestService {
             await this.db
                 .update(paymentRequests)
                 .set({
+                    beneficiaryId: body.beneficiaryId || null,
                     partyName: body.partyName,
                     accountNumber: body.accountNumber,
                     bankName: body.bankName,
@@ -209,21 +212,90 @@ export class PaymentRequestService {
             );
         }
 
-        const updated = (
-            await this.db
-                .update(paymentRequests)
-                .set({
-                    status: body.status,
-                    utrNumber: body.utrNumber || null,
-                    rejectionReason: body.rejectionReason || null,
-                    updatedAt: new Date(),
-                })
-                .where(eq(paymentRequests.id, id))
-                .returning()
-        )[0];
+        return await this.db.transaction(async tx => {
+            const updated = (
+                await tx
+                    .update(paymentRequests)
+                    .set({
+                        status: body.status,
+                        utrNumber: body.utrNumber || null,
+                        rejectionReason: body.rejectionReason || null,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(paymentRequests.id, id))
+                    .returning()
+            )[0];
 
-        this.logger.info(`Payment Request #${id} status updated to "${body.status}"`);
-        return updated;
+            if (existing.paymentAgainst != null && body.status === "payment_done" && ["imprest", "others"].includes(existing.paymentAgainst)) {
+                await this.creditImprestForPaymentRequest(tx, existing);
+            }
+
+            this.logger.info(`Payment Request #${id} status updated to "${body.status}"`);
+            return updated;
+        });
+    }
+
+    /**
+     * Credits the beneficiary's imprest (employee_imprest_transactions) when an
+     * imprest-category payment request is marked payment_done.
+     *
+     * Requires an explicit user link via the beneficiary record (beneficiary.user_id).
+     * No name matching — name differences between the beneficiary and the user table
+     * are intentionally left unresolved; if there is no link, the credit is skipped.
+     */
+    private async creditImprestForPaymentRequest(tx: DbInstance, existing: OperationPaymentRequest) {
+        const userId = await this.resolveImprestUserId(tx, existing);
+
+        if (userId == null) {
+            this.logger.warn(
+                `Imprest credit skipped for payment request #${existing.id} (${existing.requestNo}): no linked user for beneficiary`
+            );
+            return;
+        }
+
+        const [user] = await tx
+            .select({ id: users.id, name: users.name })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+
+        if (!user) {
+            this.logger.warn(
+                `Imprest credit skipped for payment request #${existing.id}: linked user #${userId} not found`
+            );
+            return;
+        }
+
+        await tx.insert(employeeImprestTransactions).values({
+            userId: user.id,
+            txnDate: new Date().toISOString().split("T")[0],
+            teamMemberName: user.name,
+            amount: Math.round(Number(existing.amount) || 0),
+            projectName: `${existing.requestNo ?? `PR #${existing.id}`} (${existing.paymentAgainst} Maker)`,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+        });
+
+        this.logger.info(
+            `Imprest credited ${existing.amount} to user #${user.id} (${user.name}) for payment request #${existing.id} (${existing.requestNo})`
+        );
+    }
+
+    private async resolveImprestUserId(tx: DbInstance, existing: OperationPaymentRequest): Promise<number | null> {
+        if (existing.beneficiaryId == null) return null;
+
+        const [ben] = await tx
+            .select({ userId: beneficiaries.userId })
+            .from(beneficiaries)
+            .where(eq(beneficiaries.id, existing.beneficiaryId))
+            .limit(1);
+
+        if (ben?.userId == null) {
+            this.logger.warn(`Imprest credit: beneficiary #${existing.beneficiaryId} has no linked user`);
+            return null;
+        }
+
+        return ben.userId;
     }
 
     async uploadInvoiceAfterPayment(id: number, files: string[]) {
@@ -252,6 +324,7 @@ export class PaymentRequestService {
     private readonly prFields = {
         id: paymentRequests.id,
         projectId: paymentRequests.projectId,
+        beneficiaryId: paymentRequests.beneficiaryId,
         requestNo: paymentRequests.requestNo,
         partyName: paymentRequests.partyName,
         accountNumber: paymentRequests.accountNumber,
@@ -417,6 +490,7 @@ export class PaymentRequestService {
                 .update(beneficiaries)
                 .set({
                     name: body.name,
+                    userId: body.userId === undefined ? existing.userId : body.userId || null,
                     accountNumber: body.accountNumber,
                     ifsc: body.ifsc,
                     bankName: body.bankName,

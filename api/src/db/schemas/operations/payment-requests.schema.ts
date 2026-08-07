@@ -1,10 +1,12 @@
-import { pgTable, bigserial, bigint, varchar, text, numeric, timestamp, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, varchar, text, numeric, timestamp, jsonb, index, integer } from "drizzle-orm/pg-core";
+import { beneficiaries } from "./beneficiaries.schema";
 
 export const paymentRequests = pgTable(
     "project_payment_requests",
     {
         id: bigserial("id", { mode: "number" }).primaryKey(),
         projectId: bigint("project_id", { mode: "number" }),
+        beneficiaryId: integer("beneficiary_id").references(() => beneficiaries.id),
         requestNo: varchar("request_no", { length: 255 }),
         partyName: varchar("party_name", { length: 255 }),
         accountNumber: varchar("account_number", { length: 100 }),
