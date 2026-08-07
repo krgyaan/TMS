@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { amcServicesService } from "@/services/api";
 import type { ServicePathField } from "@/modules/services/amc/helpers/amc.types";
+import { amcBillingKeys } from "@/hooks/api/useAmcBilling";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";
 
@@ -31,11 +32,12 @@ export const useAmcService = (id: number) => {
 export const useAmcServiceFileUpload = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, field, file }: { id: number; field: ServicePathField; file: File }) =>
-            amcServicesService.uploadFile(id, field, file),
+        mutationFn: ({ id, field, path }: { id: number; field: ServicePathField; path: string }) =>
+            amcServicesService.uploadFile(id, field, path),
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: amcServicesKeys.lists() });
             queryClient.invalidateQueries({ queryKey: amcServicesKeys.detail(variables.id) });
+            queryClient.invalidateQueries({ queryKey: amcBillingKeys.lists() });
             queryClient.invalidateQueries({ queryKey: ["amcs"] });
             toast.success("Service report uploaded successfully");
         },

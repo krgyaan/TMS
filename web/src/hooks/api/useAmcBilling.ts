@@ -29,8 +29,8 @@ export const useAmcBilling = (id: number) => {
 export const useAddInvoices = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, files }: { id: number; files: File[] }) =>
-            amcBillingService.addInvoices(id, files),
+        mutationFn: ({ id, paths }: { id: number; paths: string[] }) =>
+            amcBillingService.addInvoices(id, paths),
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: amcBillingKeys.lists() });
             queryClient.invalidateQueries({ queryKey: amcBillingKeys.detail(variables.id) });
@@ -43,8 +43,8 @@ export const useAddInvoices = () => {
 export const useAddReceipts = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, files }: { id: number; files: File[] }) =>
-            amcBillingService.addReceipts(id, files),
+        mutationFn: ({ id, paths }: { id: number; paths: string[] }) =>
+            amcBillingService.addReceipts(id, paths),
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: amcBillingKeys.lists() });
             queryClient.invalidateQueries({ queryKey: amcBillingKeys.detail(variables.id) });

@@ -3,31 +3,14 @@ import { ExternalLink, MapPin, Package, Wrench, FileText, BadgeDollarSign, Downl
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { formatDate, formatDateTime } from "@/hooks/useFormatedDate";
+import { formatINR } from "@/hooks/useINRFormatter";
 import { useProjectsMaster } from "@/hooks/api/useProjects";
 import { useItems } from "@/hooks/api/useItems";
 import { useUsers } from "@/hooks/api/useUsers";
 import type { AmcDetail } from "../helpers/amc.types";
-import { sampleReport, filledReport, serviceFileUrl } from "../helpers/amc.types";
-
-const fileUrl = (name?: string | null) => (name ? `/uploads/amc/${name}` : "");
-
-function fmtDate(v?: string | null) {
-    if (!v) return "—";
-    try { return format(new Date(v), "PP"); } catch { return v; }
-}
-
-function fmtDateTime(v?: string | null) {
-    if (!v) return "—";
-    try { return format(new Date(v), "PP p"); } catch { return v; }
-}
-
-function fmtBillDate(v?: string | null) {
-    if (!v) return "—";
-    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return fmtDate(v);
-    return v;
-}
+import { sampleReport, filledReport, serviceFileUrl, amcDocUrl } from "../helpers/amc.types";
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -149,11 +132,11 @@ export function AmcView({ amc }: { amc: AmcDetail }) {
                                 <InfoCell label="Bill Frequency" value={amc.billFrequency} />
                             </TableRow>
                             <TableRow className="hover:bg-muted/30">
-                                <InfoCell label="AMC Start Date" value={fmtDate(amc.amcStartDate)} />
-                                <InfoCell label="AMC End Date" value={fmtDate(amc.amcEndDate)} />
+                                <InfoCell label="AMC Start Date" value={formatDate(amc.amcStartDate)} />
+                                <InfoCell label="AMC End Date" value={formatDate(amc.amcEndDate)} />
                             </TableRow>
                             <TableRow className="hover:bg-muted/30">
-                                <InfoCell label="Next Service Due" value={fmtDate(amc.nextServiceDue)} />
+                                <InfoCell label="Next Service Due" value={formatDate(amc.nextServiceDue)} />
                                 <InfoCell
                                     label="Bill Type"
                                     value={
@@ -190,12 +173,12 @@ export function AmcView({ amc }: { amc: AmcDetail }) {
                                 {amc.bills.map(bill => (
                                     <TableRow key={bill.id} className="hover:bg-muted/30">
                                         <TableCell>{bill.billNo}</TableCell>
-                                        <TableCell>{fmtDate(bill.billDueDate)}</TableCell>
+                                        <TableCell>{formatDate(bill.billDueDate)}</TableCell>
                                         <TableCell>
                                             {amc.sites.find(s => s.id === bill.amcSiteId)?.name ?? "—"}
                                         </TableCell>
                                         <TableCell>
-                                            {bill.amount != null ? bill.amount : "—"}
+                                            {bill.amount != null ? formatINR(bill.amount) : "—"}
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant="outline" className="capitalize">
@@ -212,7 +195,12 @@ export function AmcView({ amc }: { amc: AmcDetail }) {
                         <Table>
                             <TableBody>
                                 <TableRow className="hover:bg-muted/30">
-                                    <InfoCell label="Bill Value" value={amc.billValue} />
+                                    <InfoCell
+                                        label="Bill Value"
+                                        value={
+                                            amc.billValue != null ? formatINR(amc.billValue) : "—"
+                                        }
+                                    />
                                     <TableCell />
                                     <TableCell />
                                 </TableRow>
@@ -232,9 +220,9 @@ export function AmcView({ amc }: { amc: AmcDetail }) {
                                 {amc.variableBills?.length ? (
                                     amc.variableBills.map((b, idx) => (
                                         <TableRow key={idx} className="hover:bg-muted/30">
-                                            <TableCell>{fmtBillDate(b.date || b.label)}</TableCell>
+                                            <TableCell>{formatDate(b.date || b.label)}</TableCell>
                                             <TableCell>
-                                                {b.amount != null ? b.amount : "—"}
+                                                {b.amount != null ? formatINR(b.amount) : "—"}
                                             </TableCell>
                                         </TableRow>
                                     ))
@@ -282,7 +270,7 @@ export function AmcView({ amc }: { amc: AmcDetail }) {
                                 {amc.services.map(service => (
                                     <TableRow key={service.id} className="hover:bg-muted/30">
                                         <TableCell>{service.serviceNo}</TableCell>
-                                        <TableCell>{fmtDate(service.serviceDueDate)}</TableCell>
+                                        <TableCell>{formatDate(service.serviceDueDate)}</TableCell>
                                         <TableCell>
                                             {amc.sites.find(s => s.id === service.amcSiteId)?.name ?? "—"}
                                         </TableCell>
@@ -301,7 +289,7 @@ export function AmcView({ amc }: { amc: AmcDetail }) {
                                         </TableCell>
                                         <TableCell>
                                             {service.serviceCompletedDate
-                                                ? fmtDateTime(service.serviceCompletedDate)
+                                                ? formatDateTime(service.serviceCompletedDate)
                                                 : "—"}
                                         </TableCell>
                                         <TableCell>
@@ -502,10 +490,10 @@ export function AmcView({ amc }: { amc: AmcDetail }) {
                 </SectionTitle>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
-                        { label: "Service Report Format (Sample)", path: fileUrl(sampleReport(amc.serviceReportPath)) },
-                        { label: "Filled Service Report", path: fileUrl(filledReport(amc.serviceReportPath)) },
-                        { label: "AMC PO", path: fileUrl(amc.amcPoPath) },
-                        { label: "Signed Service Report", path: fileUrl(amc.signedServiceReportPath) },
+                        { label: "Service Report Format (Sample)", path: amcDocUrl(sampleReport(amc.serviceReportPath)) },
+                        { label: "Filled Service Report", path: amcDocUrl(filledReport(amc.serviceReportPath)) },
+                        { label: "AMC PO", path: amcDocUrl(amc.amcPoPath) },
+                        { label: "Signed Service Report", path: amcDocUrl(amc.signedServiceReportPath) },
                     ].map(({ label, path }) => (
                         <div
                             key={label}

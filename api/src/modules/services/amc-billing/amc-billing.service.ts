@@ -260,6 +260,7 @@ export class AmcBillingService {
                           id: amc.id,
                           teamName: amc.teamName,
                           projectName: projectNameById.get(amc.projectId) ?? null,
+                          allocatedTe: amc.allocatedTe,
                           signedServiceReportPath: amc.signedServiceReportPath,
                           serviceEngineers: engineersByAmcId.get(amc.id) ?? [],
                       }

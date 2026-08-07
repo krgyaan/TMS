@@ -21,10 +21,8 @@ class AmcServicesService extends BaseApiService {
         return this.get<AmcServiceDetail>(`/${id}`);
     }
 
-    async uploadFile(id: number, field: ServicePathField, file: File): Promise<AmcServiceDetail> {
-        const formData = new FormData();
-        formData.append("file", file);
-        return this.post<AmcServiceDetail>(`/${id}/upload/${field}`, formData);
+    async uploadFile(id: number, field: ServicePathField, path: string): Promise<AmcServiceDetail> {
+        return this.post<AmcServiceDetail>(`/${id}/upload/${field}`, { path });
     }
 }
 

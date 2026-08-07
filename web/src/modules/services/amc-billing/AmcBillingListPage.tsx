@@ -9,15 +9,27 @@ import {
     PhoneCall,
     Loader2,
 } from "lucide-react";
+import {
+    startOfWeek,
+    endOfWeek,
+    startOfMonth,
+    endOfMonth,
+    startOfYear,
+    endOfYear,
+    startOfDay,
+} from "date-fns";
+import { formatDate } from "@/hooks/useFormatedDate";
+import { formatINR } from "@/hooks/useINRFormatter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import DataTable from "@/components/ui/data-table";
 import { paths } from "@/app/routes/paths";
 import { useAmcBillings, useAmcBillingFollowup } from "@/hooks/api/useAmcBilling";
+import { useUsers } from "@/hooks/api/useUsers";
+import { usePersistedTab } from "@/hooks/usePersistedTab";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
 import type { AmcBillDetail } from "@/modules/services/amc/helpers/amc.types";
 import { INVOICE_DEADLINE_HOURS } from "@/modules/services/amc/helpers/amc.types";
 import { ManageInvoicesModal } from "./components/ManageInvoicesModal";
@@ -30,14 +42,54 @@ const STATUS_STYLES: Record<string, string> = {
     "Follow-up": "bg-orange-100 text-orange-800 border-orange-200",
 };
 
-const fmtDate = (value?: string | null) =>
-    value ? format(new Date(`${value}T00:00:00`), "MMM d, yyyy") : "—";
+type BillStatusTab = "due" | "missed" | "done";
+type BillPeriodTab = "all" | "week" | "month" | "year";
+
+const STATUS_TABS: { key: BillStatusTab; label: string }[] = [
+    { key: "due", label: "Due" },
+    { key: "missed", label: "Missed" },
+    { key: "done", label: "Done" },
+];
+
+const PERIOD_TABS: { key: BillPeriodTab; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "week", label: "This Week" },
+    { key: "month", label: "This Month" },
+    { key: "year", label: "This Year" },
+];
 
 function pad(value: number) {
     return String(value).padStart(2, "0");
 }
 
-function TimerCell({ billDueDate, stopped }: { billDueDate: string | null; stopped: boolean }) {
+function billInPeriod(bill: AmcBillDetail, period: BillPeriodTab) {
+    if (!bill.billDueDate || period === "all") return true;
+    const due = new Date(`${bill.billDueDate}T00:00:00`);
+    const today = new Date();
+    if (period === "week") {
+        return (
+            due >= startOfWeek(today, { weekStartsOn: 1 }) &&
+            due <= endOfWeek(today, { weekStartsOn: 1 })
+        );
+    }
+    if (period === "month") {
+        return due >= startOfMonth(today) && due <= endOfMonth(today);
+    }
+    return due >= startOfYear(today) && due <= endOfYear(today);
+}
+
+function billMatchesStatus(bill: AmcBillDetail, tab: BillStatusTab) {
+    const today = startOfDay(new Date());
+    const paid = bill.status === "Payment Received";
+    if (tab === "done") return paid;
+    if (paid) return false;
+    if (!bill.billDueDate) return tab === "due";
+    const due = new Date(`${bill.billDueDate}T00:00:00`);
+    if (tab === "missed") return due < today;
+    return due >= today;
+}
+
+function TimerCell({ services }: { services?: AmcBillDetail["services"] }) {
     const [now, setNow] = useState(() => Date.now());
 
     useEffect(() => {
@@ -45,11 +97,24 @@ function TimerCell({ billDueDate, stopped }: { billDueDate: string | null; stopp
         return () => clearInterval(timer);
     }, []);
 
-    if (stopped || !billDueDate) {
+    const list = services ?? [];
+    const allDone = list.length > 0 && list.every(s => s.status === "Done");
+
+    if (!allDone) {
         return <span className="text-muted-foreground">—</span>;
     }
 
-    const deadline = new Date(`${billDueDate}T00:00:00`).getTime() + INVOICE_DEADLINE_HOURS * 3600 * 1000;
+    const lastCompleted = list.reduce<number>((max, s) => {
+        if (!s.serviceCompletedDate) return max;
+        const ts = new Date(s.serviceCompletedDate).getTime();
+        return isNaN(ts) ? max : Math.max(max, ts);
+    }, 0);
+
+    if (!lastCompleted) {
+        return <span className="text-muted-foreground">—</span>;
+    }
+
+    const deadline = lastCompleted + INVOICE_DEADLINE_HOURS * 3600 * 1000;
     const remaining = deadline - now;
 
     if (remaining <= 0) {
@@ -69,25 +134,24 @@ function TimerCell({ billDueDate, stopped }: { billDueDate: string | null; stopp
     );
 }
 
-function ContactCell({ row }: { row: AmcBillDetail }) {
-    const contact = row.site?.contacts?.[0];
-
-    if (!contact) {
-        return <span className="text-muted-foreground">—</span>;
-    }
-
-    return (
-        <div className="flex flex-col">
-            <span className="font-medium">{contact.name}</span>
-            <span className="text-xs text-muted-foreground">{contact.mobile}</span>
-        </div>
-    );
-}
-
 export default function AmcBillingListPage() {
     const navigate = useNavigate();
     const { data: bills = [], isLoading } = useAmcBillings();
+    const { data: users = [] } = useUsers();
     const followup = useAmcBillingFollowup();
+
+    const [statusTab, setStatusTab] = usePersistedTab<BillStatusTab>({
+        param: "tab",
+        defaultValue: "due",
+        validValues: ["due", "missed", "done"],
+        storageKey: "tms:amc-billing-status-tab",
+    });
+    const [periodTab, setPeriodTab] = usePersistedTab<BillPeriodTab>({
+        param: "period",
+        defaultValue: "all",
+        validValues: ["all", "week", "month", "year"],
+        storageKey: "tms:amc-billing-period-tab",
+    });
 
     const [invoiceModal, setInvoiceModal] = useState<{ open: boolean; id: number | null }>({
         open: false,
@@ -98,99 +162,126 @@ export default function AmcBillingListPage() {
         id: null,
     });
 
-    const rows = useMemo(() => bills, [bills]);
+    const userMap = useMemo(() => {
+        const map = new Map<number, { name: string }>();
+        for (const user of users) {
+            if (user.id != null) map.set(user.id, { name: user.name });
+        }
+        return map;
+    }, [users]);
 
-    const actions: ActionItem<AmcBillDetail>[] = [
-        {
-            label: "Manage Invoices",
-            onClick: row => setInvoiceModal({ open: true, id: row.id }),
-            icon: <ReceiptText className="h-4 w-4" />,
-        },
-        {
-            label: "Manage Receipts",
-            onClick: row => setReceiptModal({ open: true, id: row.id }),
-            icon: <Banknote className="h-4 w-4" />,
-        },
-        {
-            label: "Initiate Followup",
-            onClick: row => followup.mutate(row.id),
-            icon: <PhoneCall className="h-4 w-4" />,
-        },
-        {
-            label: "View",
-            onClick: row => navigate(paths.services.amcBillingShow(row.id)),
-            icon: <Eye className="h-4 w-4" />,
-        },
-    ];
+    const billCountBySite = useMemo(() => {
+        const map = new Map<number, number>();
+        for (const bill of bills) {
+            map.set(bill.amcSiteId, (map.get(bill.amcSiteId) ?? 0) + 1);
+        }
+        return map;
+    }, [bills]);
 
-    const [colDefs] = useState<ColDef<AmcBillDetail>[]>(() => [
+    const periodRows = useMemo(
+        () => bills.filter(bill => billInPeriod(bill, periodTab)),
+        [bills, periodTab],
+    );
+
+    const statusCounts = useMemo<Record<BillStatusTab, number>>(() => {
+        return {
+            due: periodRows.filter(bill => billMatchesStatus(bill, "due")).length,
+            missed: periodRows.filter(bill => billMatchesStatus(bill, "missed")).length,
+            done: periodRows.filter(bill => billMatchesStatus(bill, "done")).length,
+        };
+    }, [periodRows]);
+
+    const rows = useMemo(
+        () => periodRows.filter(bill => billMatchesStatus(bill, statusTab)),
+        [periodRows, statusTab],
+    );
+
+    const colDefs = useMemo<ColDef<AmcBillDetail>[]>(() => {
+        const actions: ActionItem<AmcBillDetail>[] = [
+            {
+                label: "Manage Invoices",
+                onClick: row => setInvoiceModal({ open: true, id: row.id }),
+                icon: <ReceiptText className="h-4 w-4" />,
+            },
+            {
+                label: "Manage Receipts",
+                onClick: row => setReceiptModal({ open: true, id: row.id }),
+                icon: <Banknote className="h-4 w-4" />,
+            },
+            {
+                label: "Initiate Followup",
+                onClick: row => followup.mutate(row.id),
+                icon: <PhoneCall className="h-4 w-4" />,
+            },
+            {
+                label: "View",
+                onClick: row => navigate(paths.services.amcBillingView(row.id)),
+                icon: <Eye className="h-4 w-4" />,
+            },
+        ];
+
+        return [
         {
             colId: "projectName",
             headerName: "Project Name",
-            width: 230,
+            width: 220,
             valueGetter: params => params.data?.amc?.projectName ?? "—",
             cellRenderer: (params: CustomCellRendererProps<AmcBillDetail>) => (
                 <span>{params.data?.amc?.projectName ?? "—"}</span>
             ),
         },
         {
-            colId: "siteName",
-            headerName: "Site Name",
-            width: 160,
-            valueGetter: params => params.data?.site?.name ?? "—",
+            colId: "amount",
+            headerName: "Amount",
+            width: 140,
+            valueGetter: params => params.data?.amount ?? null,
             cellRenderer: (params: CustomCellRendererProps<AmcBillDetail>) => (
-                <span>{params.data?.site?.name ?? "—"}</span>
+                <span>{params.data?.amount != null ? formatINR(params.data.amount) : "—"}</span>
             ),
         },
         {
-            colId: "contactDetails",
-            headerName: "Contact details",
-            width: 190,
-            cellRenderer: (params: CustomCellRendererProps<AmcBillDetail>) => (
-                <ContactCell row={params.data!} />
-            ),
+            colId: "billDueDate",
+            headerName: "Billing Due",
+            width: 140,
+            sort: "asc",
+            valueGetter: params => params.data?.billDueDate ?? "",
+            cellRenderer: (params: CustomCellRendererProps<AmcBillDetail>) => {
+                const value = params.data?.billDueDate ?? null;
+                if (!value) return <span className="text-muted-foreground">—</span>;
+                const due = new Date(`${value}T00:00:00`);
+                const crossed = due < startOfDay(new Date());
+                return (
+                    <span className={cn("font-medium", crossed && "text-red-600")}>
+                        {formatDate(value)}
+                    </span>
+                );
+            },
+        },
+        {
+            colId: "te",
+            headerName: "TE",
+            width: 140,
+            sortable: false,
+            cellRenderer: (params: CustomCellRendererProps<AmcBillDetail>) => {
+                const teId = params.data?.amc?.allocatedTe;
+                const name = teId != null ? (userMap.get(teId)?.name ?? null) : null;
+                return <span>{name ?? "—"}</span>;
+            },
         },
         {
             colId: "billNo",
             headerName: "Bill No.",
-            width: 90,
-            valueGetter: params => params.data?.billNo ?? "—",
-        },
-        {
-            colId: "billDueDate",
-            headerName: "Billing Due date",
-            width: 140,
-            sort: "asc",
-            valueGetter: params => params.data?.billDueDate ?? "",
-            cellRenderer: (params: CustomCellRendererProps<AmcBillDetail>) => (
-                <span className={cn(!params.data?.billDueDate && "text-muted-foreground")}>
-                    {fmtDate(params.data?.billDueDate ?? null)}
-                </span>
-            ),
-        },
-        {
-            colId: "amount",
-            headerName: "Amount (Pre GST)",
-            width: 130,
-            valueGetter: params => params.data?.amount ?? "—",
-            cellRenderer: (params: CustomCellRendererProps<AmcBillDetail>) => (
-                <span>{params.data?.amount ?? "—"}</span>
-            ),
-        },
-        {
-            colId: "serviceEngineer",
-            headerName: "Service Engg Name",
-            width: 170,
-            valueGetter: params => params.data?.amc?.serviceEngineers?.[0]?.name ?? "—",
-            cellRenderer: (params: CustomCellRendererProps<AmcBillDetail>) => (
-                <span>{params.data?.amc?.serviceEngineers?.[0]?.name ?? "—"}</span>
-            ),
-        },
-        {
-            colId: "teamName",
-            headerName: "TE Name",
             width: 100,
-            valueGetter: params => params.data?.amc?.teamName ?? "—",
+            cellRenderer: (params: CustomCellRendererProps<AmcBillDetail>) => {
+                const row = params.data;
+                if (!row) return null;
+                const total = billCountBySite.get(row.amcSiteId) ?? 0;
+                return (
+                    <span className="font-medium tabular-nums">
+                        {row.billNo}/{total}
+                    </span>
+                );
+            },
         },
         {
             colId: "status",
@@ -213,48 +304,12 @@ export default function AmcBillingListPage() {
             },
         },
         {
-            colId: "invoices",
-            headerName: "Invoices",
-            width: 110,
-            valueGetter: params => params.data?.invoices?.length ?? 0,
-            cellRenderer: (params: CustomCellRendererProps<AmcBillDetail>) => {
-                const count = params.data?.invoices?.length ?? 0;
-                if (count === 0) return <span className="text-muted-foreground">—</span>;
-                return (
-                    <Badge variant="secondary" className="cursor-pointer">
-                        {count}
-                    </Badge>
-                );
-            },
-        },
-        {
-            colId: "receipts",
-            headerName: "Receipts",
-            width: 110,
-            valueGetter: params => params.data?.paymentReceipts?.length ?? 0,
-            cellRenderer: (params: CustomCellRendererProps<AmcBillDetail>) => {
-                const count = params.data?.paymentReceipts?.length ?? 0;
-                if (count === 0) return <span className="text-muted-foreground">—</span>;
-                return (
-                    <Badge variant="secondary" className="cursor-pointer">
-                        {count}
-                    </Badge>
-                );
-            },
-        },
-        {
             colId: "timer",
             headerName: "Invoice Timer",
-            width: 120,
-            cellRenderer: (params: CustomCellRendererProps<AmcBillDetail>) => {
-                const hasPendingServices = params.data?.services?.some(s => s.status !== "Done") ?? false;
-                return (
-                    <TimerCell
-                        billDueDate={params.data?.billDueDate ?? null}
-                        stopped={!hasPendingServices}
-                    />
-                );
-            },
+            width: 130,
+            cellRenderer: (params: CustomCellRendererProps<AmcBillDetail>) => (
+                <TimerCell services={params.data?.services} />
+            ),
         },
         {
             colId: "actions",
@@ -265,18 +320,67 @@ export default function AmcBillingListPage() {
             filter: false,
             cellRenderer: createActionColumnRenderer(actions),
         },
-    ]);
+        ];
+    }, [userMap, billCountBySite, navigate, followup]);
 
     return (
         <Card className="min-h-[calc(100vh-2rem)] flex flex-col border-0 shadow-none">
             <CardHeader className="flex-none pb-4">
-                <CardTitle>AMC Billing Dashboard</CardTitle>
-                <CardDescription>
-                    One row per bill. Manage invoices and receipts per bill.
-                </CardDescription>
+                <div className="flex items-center justify-between gap-4">
+                    <div>
+                        <CardTitle>AMC Billing Dashboard</CardTitle>
+                        <CardDescription>
+                            One row per bill. Manage invoices and receipts per bill.
+                        </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+                        {PERIOD_TABS.map(tab => (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                onClick={() => setPeriodTab(tab.key)}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                                    periodTab === tab.key
+                                        ? "bg-background text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground",
+                                )}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
             </CardHeader>
 
             <CardContent className="flex-1 px-0">
+                <div className="flex items-center gap-1 bg-muted p-1 rounded-lg mb-4 mx-6 w-fit">
+                    {STATUS_TABS.map(tab => (
+                        <button
+                            key={tab.key}
+                            type="button"
+                            onClick={() => setStatusTab(tab.key)}
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                                statusTab === tab.key
+                                    ? "bg-background text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground",
+                            )}
+                        >
+                            {tab.label}
+                            <Badge
+                                variant="secondary"
+                                className={cn(
+                                    "text-xs h-4 min-w-4 px-1",
+                                    statusTab === tab.key && "bg-primary/10 text-primary",
+                                )}
+                            >
+                                {statusCounts[tab.key]}
+                            </Badge>
+                        </button>
+                    ))}
+                </div>
+
                 {isLoading && bills.length === 0 ? (
                     <div className="flex justify-center py-20">
                         <Loader2 className="h-6 w-6 animate-spin" />

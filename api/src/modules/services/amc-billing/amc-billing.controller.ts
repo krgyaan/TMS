@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    Body,
     Controller,
     Delete,
     Get,
@@ -7,31 +8,8 @@ import {
     ParseIntPipe,
     Post,
     Query,
-    UploadedFiles,
-    UseInterceptors,
 } from "@nestjs/common";
-import { FilesInterceptor } from "@nestjs/platform-express";
-import { diskStorage } from "multer";
-import { extname, join } from "path";
-import { mkdirSync } from "fs";
 import { AmcBillingService } from "./amc-billing.service";
-
-const uploadsDir = join(process.cwd(), "uploads", "amc-billing");
-mkdirSync(uploadsDir, { recursive: true });
-
-const amcBillingMulterConfig = {
-    storage: diskStorage({
-        destination: uploadsDir,
-        filename: (req, file, callback) => {
-            const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-            const ext = extname(file.originalname);
-            callback(null, `${uniqueSuffix}${ext}`);
-        },
-    }),
-    limits: {
-        fileSize: 25 * 1024 * 1024,
-    },
-};
 
 @Controller("amc-billing")
 export class AmcBillingController {
@@ -48,29 +26,25 @@ export class AmcBillingController {
     }
 
     @Post("bills/:id/invoices")
-    @UseInterceptors(FilesInterceptor("files", 10, amcBillingMulterConfig))
     async addInvoices(
         @Param("id", ParseIntPipe) id: number,
-        @UploadedFiles() files: Express.Multer.File[],
+        @Body() body: { paths: string[] },
     ) {
-        if (!files || files.length === 0) {
-            throw new BadRequestException("At least one file is required");
+        if (!body?.paths || body.paths.length === 0) {
+            throw new BadRequestException("At least one file path is required");
         }
-        const filePaths = files.map(f => f.filename);
-        return this.service.addInvoices(id, filePaths);
+        return this.service.addInvoices(id, body.paths);
     }
 
     @Post("bills/:id/receipts")
-    @UseInterceptors(FilesInterceptor("files", 10, amcBillingMulterConfig))
     async addReceipts(
         @Param("id", ParseIntPipe) id: number,
-        @UploadedFiles() files: Express.Multer.File[],
+        @Body() body: { paths: string[] },
     ) {
-        if (!files || files.length === 0) {
-            throw new BadRequestException("At least one file is required");
+        if (!body?.paths || body.paths.length === 0) {
+            throw new BadRequestException("At least one file path is required");
         }
-        const filePaths = files.map(f => f.filename);
-        return this.service.addReceipts(id, filePaths);
+        return this.service.addReceipts(id, body.paths);
     }
 
     @Delete("bills/:id/invoices/:index")

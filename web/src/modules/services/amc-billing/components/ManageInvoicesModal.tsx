@@ -8,10 +8,12 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Loader2, FileText, Trash2, ReceiptText, CheckSquare } from "lucide-react";
+import { Loader2, Trash2, ReceiptText, CheckSquare } from "lucide-react";
 import { useAmcBilling, useAddInvoices, useRemoveInvoice } from "@/hooks/api/useAmcBilling";
+import { billFileUrl } from "@/modules/services/amc/helpers/amc.types";
+import { formatDate } from "@/hooks/useFormatedDate";
 import { cn } from "@/lib/utils";
+import { TenderFileUploader } from "@/components/tender-file-upload/TenderFileUploader";
 
 interface ManageInvoicesModalProps {
     open: boolean;
@@ -23,7 +25,7 @@ export function ManageInvoicesModal({ open, onOpenChange, billingId }: ManageInv
     const { data: billing } = useAmcBilling(billingId ?? 0);
     const addInvoices = useAddInvoices();
     const removeInvoice = useRemoveInvoice();
-    const [files, setFiles] = useState<File[]>([]);
+    const [paths, setPaths] = useState<string[]>([]);
     const [selectedServiceIds, setSelectedServiceIds] = useState<number[]>([]);
 
     const existingInvoices = billing?.invoices ?? [];
@@ -32,13 +34,13 @@ export function ManageInvoicesModal({ open, onOpenChange, billingId }: ManageInv
 
     useEffect(() => {
         if (!open) {
-            setFiles([]);
+            setPaths([]);
             setSelectedServiceIds([]);
         }
     }, [open]);
 
     const handleClose = () => {
-        setFiles([]);
+        setPaths([]);
         setSelectedServiceIds([]);
         onOpenChange(false);
     };
@@ -52,10 +54,10 @@ export function ManageInvoicesModal({ open, onOpenChange, billingId }: ManageInv
     };
 
     const handleUpload = async () => {
-        if (!billingId || files.length === 0) return;
+        if (!billingId || paths.length === 0) return;
         if (selectedServiceIds.length === 0) return;
         try {
-            await addInvoices.mutateAsync({ id: billingId, files });
+            await addInvoices.mutateAsync({ id: billingId, paths });
             handleClose();
         } catch {
             // handled by hook
@@ -70,9 +72,6 @@ export function ManageInvoicesModal({ open, onOpenChange, billingId }: ManageInv
             // handled by hook
         }
     };
-
-    const fmtDate = (value?: string | null) =>
-        value ? new Date(value).toLocaleDateString() : "—";
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
@@ -99,13 +98,14 @@ export function ManageInvoicesModal({ open, onOpenChange, billingId }: ManageInv
                                     className="rounded-lg border bg-muted/30 p-3 flex items-center justify-between gap-2"
                                 >
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        <FileText className="h-5 w-5 text-muted-foreground" />
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-medium truncate">{invoice}</p>
-                                            <p className="text-xs text-muted-foreground">
-                                                Uploaded
-                                            </p>
-                                        </div>
+                                        <a
+                                            href={billFileUrl(invoice)}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-sm font-medium truncate hover:underline"
+                                        >
+                                            {invoice.split("/").pop() || invoice}
+                                        </a>
                                     </div>
                                     <Button
                                         type="button"
@@ -155,11 +155,11 @@ export function ManageInvoicesModal({ open, onOpenChange, billingId }: ManageInv
                                             )}
                                         />
                                         <span className="text-sm font-medium">
-                                            Visit {service.serviceNo} — {fmtDate(service.serviceDueDate)}
+                                            Visit {service.serviceNo} — {formatDate(service.serviceDueDate)}
                                         </span>
                                         <span className="text-xs text-muted-foreground ml-auto">
                                             {service.serviceCompletedDate
-                                                ? fmtDate(service.serviceCompletedDate)
+                                                ? formatDate(service.serviceCompletedDate)
                                                 : "Pending"}
                                         </span>
                                     </label>
@@ -170,24 +170,16 @@ export function ManageInvoicesModal({ open, onOpenChange, billingId }: ManageInv
 
                     {/* File upload */}
                     <div className="space-y-2">
-                        <Label htmlFor="invoice-files">Select invoice files</Label>
-                        <input
-                            id="invoice-files"
-                            type="file"
-                            multiple
-                            className="border-input dark:bg-input/30 h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm outline-none file:mr-2 file:border-0 file:bg-transparent file:text-sm file:font-medium"
-                            onChange={e => {
-                                const selected = Array.from(e.target.files ?? []);
-                                setFiles(selected);
-                            }}
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Invoice Files
+                        </p>
+                        <TenderFileUploader
+                            context="amc-invoices"
+                            value={paths}
+                            onChange={setPaths}
                             disabled={doneServices.length === 0}
                         />
-                        {files.length > 0 && (
-                            <p className="text-xs text-muted-foreground">
-                                {files.length} file{files.length > 1 ? "s" : ""} selected
-                            </p>
-                        )}
-                        {doneServices.length === 0 && files.length > 0 && (
+                        {doneServices.length === 0 && paths.length > 0 && (
                             <p className="text-xs text-amber-600">
                                 Please select at least one completed service visit.
                             </p>
@@ -202,7 +194,7 @@ export function ManageInvoicesModal({ open, onOpenChange, billingId }: ManageInv
                     <Button
                         type="button"
                         onClick={handleUpload}
-                        disabled={pending || files.length === 0 || selectedServiceIds.length === 0}
+                        disabled={pending || paths.length === 0 || selectedServiceIds.length === 0}
                     >
                         {pending ? (
                             <>

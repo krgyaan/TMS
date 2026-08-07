@@ -20,7 +20,6 @@ import type {
     VariableBillItemDto,
 } from "./dto/amc.dto";
 
-type AmcPathField = "amcPoPath" | "serviceReportPath" | "signedServiceReportPath";
 type Tx = Parameters<Parameters<DbInstance["transaction"]>[0]>[0];
 
 const CONTACT_SOURCE = {
@@ -311,45 +310,6 @@ export class AmcService {
             .set({ deletedAt: new Date() })
             .where(eq(amcs.id, id));
         return { id, deleted: true };
-    }
-
-    async setFilePath(id: number, field: AmcPathField, path: string | null, subKey?: "sample" | "filled") {
-        await this.ensureExists(id);
-
-        if (field === "serviceReportPath" && subKey && path) {
-            const [amc] = await this.db
-                .select({ serviceReportPath: amcs.serviceReportPath })
-                .from(amcs)
-                .where(eq(amcs.id, id))
-                .limit(1);
-
-            const current = Array.isArray(amc?.serviceReportPath)
-                ? amc.serviceReportPath.filter((entry): entry is string => typeof entry === "string")
-                : [];
-
-            const others = current.filter(entry => !entry.startsWith(`${subKey}:`));
-            const entry = `${subKey}:${path}`;
-            let next: string[];
-            if (subKey === "sample") {
-                next = [entry, ...others];
-            } else {
-                const sample = others.find(e => e.startsWith("sample:"));
-                const rest = others.filter(e => !e.startsWith("sample:"));
-                next = sample ? [sample, entry, ...rest] : [entry, ...rest];
-            }
-
-            await this.db
-                .update(amcs)
-                .set({ serviceReportPath: next })
-                .where(eq(amcs.id, id));
-        } else {
-            await this.db
-                .update(amcs)
-                .set({ [field]: path } as Record<string, unknown>)
-                .where(eq(amcs.id, id));
-        }
-
-        return this.getById(id);
     }
 
     // ── Schedule generation ────────────────────────────────────────────────

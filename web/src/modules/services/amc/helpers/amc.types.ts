@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { tenderFilesService } from "@/services/api/tender-files.service";
 
 // ============================================
 // AMC ENTITY TYPES
@@ -98,13 +99,29 @@ export interface CreateAmcDto {
 
 export type UpdateAmcDto = Partial<CreateAmcDto>;
 
-export type AmcPathField = "po" | "service-report" | "filled-service-report" | "signed-service-report";
-
 export const sampleReport = (entries?: string[] | null): string | null =>
     entries?.find(e => e.startsWith("sample:"))?.slice("sample:".length) ?? null;
 
 export const filledReport = (entries?: string[] | null): string | null =>
     entries?.find(e => e.startsWith("filled:"))?.slice("filled:".length) ?? null;
+
+const fileServeUrl = (value?: string | null, legacyDir?: string): string => {
+    if (!value) return "";
+    if (value.includes("/")) return tenderFilesService.getFileUrl(value);
+    return legacyDir ? `/uploads/${legacyDir}/${value}` : "";
+};
+
+/** File URL helper for AMC-level documents (PO / service report / signed report) */
+export const amcDocUrl = (value?: string | null): string =>
+    fileServeUrl(value, "amc");
+
+/** File URL helper for per-service filled/signed reports */
+export const serviceFileUrl = (value?: string | null): string =>
+    fileServeUrl(value, "amc-services");
+
+/** File URL helper for bill invoices / payment receipts */
+export const billFileUrl = (value?: string | null): string =>
+    fileServeUrl(value, "amc-billing");
 
 // ============================================
 // AMC SERVICES (per-visit schedule) TYPES
@@ -131,6 +148,7 @@ export interface AmcServiceAmcInfo {
     id: number;
     teamName: string;
     projectName: string | null;
+    allocatedTe?: number | null;
     signedServiceReportPath: string | null;
     serviceEngineers: AmcServiceEngineer[];
 }
@@ -141,9 +159,6 @@ export interface AmcServiceDetail extends AmcService {
 }
 
 export type ServicePathField = "filled-service-report" | "signed-service-report";
-
-export const serviceFileUrl = (name?: string | null) =>
-    name ? `/uploads/amc-services/${name}` : "";
 
 // ============================================
 // AMC BILLING (bill rows) TYPES
@@ -176,9 +191,6 @@ export interface AmcBillDetail extends AmcBill {
 }
 
 export type BillPathField = "invoice" | "payment-receipt";
-
-export const billFileUrl = (name?: string | null) =>
-    name ? `/uploads/amc-billing/${name}` : "";
 
 export const INVOICE_DEADLINE_HOURS = 48;
 

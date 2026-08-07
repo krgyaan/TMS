@@ -14,16 +14,12 @@ class AmcBillingService extends BaseApiService {
         return this.get<AmcBillDetail>(`/bills/${id}`);
     }
 
-    async addInvoices(id: number, files: File[]): Promise<AmcBillDetail> {
-        const formData = new FormData();
-        files.forEach(f => formData.append("files", f));
-        return this.post<AmcBillDetail>(`/bills/${id}/invoices`, formData);
+    async addInvoices(id: number, paths: string[]): Promise<AmcBillDetail> {
+        return this.post<AmcBillDetail>(`/bills/${id}/invoices`, { paths });
     }
 
-    async addReceipts(id: number, files: File[]): Promise<AmcBillDetail> {
-        const formData = new FormData();
-        files.forEach(f => formData.append("files", f));
-        return this.post<AmcBillDetail>(`/bills/${id}/receipts`, formData);
+    async addReceipts(id: number, paths: string[]): Promise<AmcBillDetail> {
+        return this.post<AmcBillDetail>(`/bills/${id}/receipts`, { paths });
     }
 
     async removeInvoice(id: number, index: number): Promise<AmcBillDetail> {

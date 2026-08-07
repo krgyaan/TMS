@@ -8,9 +8,10 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Loader2, FileText, Banknote, Trash2 } from "lucide-react";
+import { Loader2, Banknote, Trash2 } from "lucide-react";
 import { useAmcBilling, useAddReceipts, useRemoveReceipt } from "@/hooks/api/useAmcBilling";
+import { billFileUrl } from "@/modules/services/amc/helpers/amc.types";
+import { TenderFileUploader } from "@/components/tender-file-upload/TenderFileUploader";
 
 interface ManageReceiptsModalProps {
     open: boolean;
@@ -22,24 +23,24 @@ export function ManageReceiptsModal({ open, onOpenChange, billingId }: ManageRec
     const { data: billing } = useAmcBilling(billingId ?? 0);
     const addReceipts = useAddReceipts();
     const removeReceipt = useRemoveReceipt();
-    const [files, setFiles] = useState<File[]>([]);
+    const [paths, setPaths] = useState<string[]>([]);
 
     const existingReceipts = billing?.paymentReceipts ?? [];
     const pending = addReceipts.isPending || removeReceipt.isPending;
 
     useEffect(() => {
-        if (!open) setFiles([]);
+        if (!open) setPaths([]);
     }, [open]);
 
     const handleClose = () => {
-        setFiles([]);
+        setPaths([]);
         onOpenChange(false);
     };
 
     const handleUpload = async () => {
-        if (!billingId || files.length === 0) return;
+        if (!billingId || paths.length === 0) return;
         try {
-            await addReceipts.mutateAsync({ id: billingId, files });
+            await addReceipts.mutateAsync({ id: billingId, paths });
             handleClose();
         } catch {
             // handled by hook
@@ -79,12 +80,14 @@ export function ManageReceiptsModal({ open, onOpenChange, billingId }: ManageRec
                                     key={idx}
                                     className="rounded-lg border bg-muted/30 p-3 flex items-center justify-between gap-2"
                                 >
-                                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        <FileText className="h-5 w-5 text-muted-foreground" />
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-medium truncate">{receipt}</p>
-                                        </div>
-                                    </div>
+                                    <a
+                                        href={billFileUrl(receipt)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-sm font-medium truncate flex-1 min-w-0 hover:underline"
+                                    >
+                                        {receipt.split("/").pop() || receipt}
+                                    </a>
                                     <Button
                                         type="button"
                                         variant="ghost"
@@ -104,19 +107,14 @@ export function ManageReceiptsModal({ open, onOpenChange, billingId }: ManageRec
 
                     {/* File upload */}
                     <div className="space-y-2">
-                        <Label htmlFor="receipt-files">Select receipt files</Label>
-                        <input
-                            id="receipt-files"
-                            type="file"
-                            multiple
-                            className="border-input dark:bg-input/30 h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm outline-none file:mr-2 file:border-0 file:bg-transparent file:text-sm file:font-medium"
-                            onChange={e => setFiles(Array.from(e.target.files ?? []))}
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Receipt Files
+                        </p>
+                        <TenderFileUploader
+                            context="amc-receipts"
+                            value={paths}
+                            onChange={setPaths}
                         />
-                        {files.length > 0 && (
-                            <p className="text-xs text-muted-foreground">
-                                {files.length} file{files.length > 1 ? "s" : ""} selected
-                            </p>
-                        )}
                     </div>
                 </div>
 
@@ -127,7 +125,7 @@ export function ManageReceiptsModal({ open, onOpenChange, billingId }: ManageRec
                     <Button
                         type="button"
                         onClick={handleUpload}
-                        disabled={pending || files.length === 0}
+                        disabled={pending || paths.length === 0}
                     >
                         {pending ? (
                             <>

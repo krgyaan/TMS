@@ -28,9 +28,11 @@ import DataTable from "@/components/ui/data-table";
 import { paths } from "@/app/routes/paths";
 import { useAmcs } from "@/hooks/api/useAmc";
 import { useProjectsMaster } from "@/hooks/api/useProjects";
+import { usePersistedTab } from "@/hooks/usePersistedTab";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { cn } from "@/lib/utils";
+import { formatDate } from "@/hooks/useFormatedDate";
 import type {
     AmcDetail,
     AmcSite,
@@ -56,6 +58,7 @@ const SERVICE_SUBTABS: { key: AmcServiceTab; label: string }[] = [
 interface AmcSiteRow {
     key: string;
     amcId: number;
+    siteId: number | null;
     projectName: string;
     siteName: string;
     siteAddress: string;
@@ -65,6 +68,40 @@ interface AmcSiteRow {
     status: string | null;
     serviceEngineers: AmcServiceEngineer[];
     amc: AmcDetail;
+}
+
+interface SiteServiceProgress {
+    total: number;
+    done: number;
+    earliestPendingDue: string | null;
+}
+
+function siteServiceProgress(amc: AmcDetail, siteId: number | null): SiteServiceProgress {
+    const services = siteId
+        ? (amc.services ?? []).filter(s => s.amcSiteId === siteId)
+        : [];
+    if (!services.length) {
+        return { total: 0, done: 0, earliestPendingDue: null };
+    }
+    const pending = services
+        .filter(s => s.status !== "Done")
+        .sort((a, b) => (a.serviceDueDate < b.serviceDueDate ? -1 : 1));
+    return {
+        total: services.length,
+        done: services.length - pending.length,
+        earliestPendingDue: pending[0]?.serviceDueDate ?? null,
+    };
+}
+
+function siteBillProgress(amc: AmcDetail, siteId: number | null) {
+    const bills = siteId ? (amc.bills ?? []).filter(b => b.amcSiteId === siteId) : [];
+    if (!bills.length) {
+        return { total: 0, submitted: 0 };
+    }
+    return {
+        total: bills.length,
+        submitted: bills.filter(b => b.status !== "Pending").length,
+    };
 }
 
 function isServiceDue(nextServiceDue: string | null) {
@@ -83,6 +120,20 @@ function isServiceMissed(nextServiceDue: string | null) {
     return !isNaN(due.getTime()) && due.getTime() < today.getTime();
 }
 
+function rowMatchesServiceTab(row: AmcSiteRow, tab: AmcServiceTab) {
+    const progress = siteServiceProgress(row.amc, row.siteId);
+    if (tab === "done") {
+        return progress.total > 0 && progress.done === progress.total;
+    }
+    if (progress.total === 0 || progress.done === progress.total) {
+        return false;
+    }
+    if (tab === "missed") {
+        return isServiceMissed(progress.earliestPendingDue);
+    }
+    return isServiceDue(progress.earliestPendingDue);
+}
+
 function NextServiceDueCell({
     value,
 }: CustomCellRendererProps<AmcSiteRow, string | null>) {
@@ -93,7 +144,7 @@ function NextServiceDueCell({
     const crossed = !isNaN(due.getTime()) && due.getTime() < today.getTime();
     return (
         <span className={crossed ? "font-medium text-red-600" : "font-medium text-green-600"}>
-            {value}
+            {formatDate(value)}
         </span>
     );
 }
@@ -103,8 +154,18 @@ export default function AmcListPage() {
     const { data: amcs = [], isLoading } = useAmcs();
     const { data: projects = [] } = useProjectsMaster();
 
-    const [activeTeam, setActiveTeam] = useState<AmcTeamTab>("AC");
-    const [activeServiceTab, setActiveServiceTab] = useState<AmcServiceTab>("due");
+    const [activeTeam, setActiveTeam] = usePersistedTab<AmcTeamTab>({
+        param: "team",
+        defaultValue: "AC",
+        validValues: ["AC", "DC"],
+        storageKey: "tms:amc-team-tab",
+    });
+    const [activeServiceTab, setActiveServiceTab] = usePersistedTab<AmcServiceTab>({
+        param: "tab",
+        defaultValue: "due",
+        validValues: ["due", "missed", "done"],
+        storageKey: "tms:amc-service-tab",
+    });
     const [search, setSearch] = useState("");
 
     const [contactsModalOpen, setContactsModalOpen] = useState(false);
@@ -154,6 +215,7 @@ export default function AmcListPage() {
                 result.push({
                     key: `${amc.id}-0`,
                     amcId: amc.id,
+                    siteId: null,
                     projectName,
                     siteName: "—",
                     siteAddress: "—",
@@ -171,6 +233,7 @@ export default function AmcListPage() {
                 result.push({
                     key: `${amc.id}-${site.id ?? 0}`,
                     amcId: amc.id,
+                    siteId: site.id ?? null,
                     projectName,
                     siteName: site.name || "—",
                     siteAddress: site.address || "—",
@@ -199,24 +262,16 @@ export default function AmcListPage() {
 
     const serviceCounts = useMemo<Record<AmcServiceTab, number>>(() => {
         return {
-            due: teamRows.filter(row => isServiceDue(row.nextServiceDue)).length,
-            missed: teamRows.filter(row => isServiceMissed(row.nextServiceDue)).length,
-            done: 0,
+            due: teamRows.filter(row => rowMatchesServiceTab(row, "due")).length,
+            missed: teamRows.filter(row => rowMatchesServiceTab(row, "missed")).length,
+            done: teamRows.filter(row => rowMatchesServiceTab(row, "done")).length,
         };
     }, [teamRows]);
 
     const rows = useMemo<AmcSiteRow[]>(() => {
         const query = search.trim().toLowerCase();
         return teamRows.filter(row => {
-            let matchesTab: boolean;
-            if (activeServiceTab === "due") {
-                matchesTab = isServiceDue(row.nextServiceDue);
-            } else if (activeServiceTab === "missed") {
-                matchesTab = isServiceMissed(row.nextServiceDue);
-            } else {
-                matchesTab = false;
-            }
-            if (!matchesTab) return false;
+            if (!rowMatchesServiceTab(row, activeServiceTab)) return false;
             if (!query) return true;
 
             const contactNames = row.siteContacts.map(c => c.name).join(" ");
@@ -346,6 +401,44 @@ export default function AmcListPage() {
             width: 170,
             sort: "asc",
             cellRenderer: NextServiceDueCell,
+        },
+
+        {
+            colId: "serviceStatus",
+            headerName: "Service Status",
+            width: 120,
+            cellRenderer: (params: CustomCellRendererProps<AmcSiteRow>) => {
+                const row = params.data;
+                if (!row) return null;
+                const progress = siteServiceProgress(row.amc, row.siteId);
+                if (progress.total === 0) {
+                    return <span className="text-muted-foreground">—</span>;
+                }
+                return (
+                    <span className="font-medium tabular-nums">
+                        {progress.done}/{progress.total}
+                    </span>
+                );
+            },
+        },
+
+        {
+            colId: "billingStatus",
+            headerName: "Billing Status",
+            width: 120,
+            cellRenderer: (params: CustomCellRendererProps<AmcSiteRow>) => {
+                const row = params.data;
+                if (!row) return null;
+                const progress = siteBillProgress(row.amc, row.siteId);
+                if (progress.total === 0) {
+                    return <span className="text-muted-foreground">—</span>;
+                }
+                return (
+                    <span className="font-medium tabular-nums">
+                        {progress.submitted}/{progress.total}
+                    </span>
+                );
+            },
         },
 
         {

@@ -1,16 +1,16 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAmcBilling } from "@/hooks/api/useAmcBilling";
+import { useAmcService } from "@/hooks/api/useAmcServices";
 import { paths } from "@/app/routes/paths";
-import { AmcBillingView } from "./components/AmcBillingView";
+import { AmcServiceView } from "./components/AmcServiceView";
 
-export default function AmcBillingShowPage() {
+export default function AmcServiceShowPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const billingId = Number(id);
+    const serviceId = Number(id);
 
-    const { data: billing, isLoading } = useAmcBilling(billingId);
+    const { data: service, isLoading } = useAmcService(serviceId);
 
     if (isLoading) {
         return (
@@ -20,13 +20,13 @@ export default function AmcBillingShowPage() {
         );
     }
 
-    if (!billing) {
+    if (!service) {
         return (
             <div className="space-y-4">
-                <Button variant="ghost" size="sm" onClick={() => navigate(paths.services.amcBilling)}>
+                <Button variant="ghost" size="sm" onClick={() => navigate(paths.services.amcServices)}>
                     <ArrowLeft className="h-4 w-4 mr-1" /> Back
                 </Button>
-                <p className="text-sm text-muted-foreground">Billing record not found.</p>
+                <p className="text-sm text-muted-foreground">Service record not found.</p>
             </div>
         );
     }
@@ -37,13 +37,13 @@ export default function AmcBillingShowPage() {
                 <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => navigate(paths.services.amcBilling)}
+                    onClick={() => navigate(paths.services.amcServices)}
                     className="-ml-2"
                 >
-                    <ArrowLeft className="h-4 w-4 mr-2" /> Back to AMC Billing
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Back to AMC Services
                 </Button>
             </div>
-            <AmcBillingView billing={billing} />
+            <AmcServiceView service={service} />
         </div>
     );
 }

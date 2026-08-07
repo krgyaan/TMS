@@ -171,8 +171,11 @@ export const paths = {
         amcShow: (id: number | string) => `/services/amc/${id}`,
         amcView: (id: number | string) => `/services/amc/${id}/view`,
         amcServices: "/services/amc-services",
+        amcServiceShow: (id: number | string) => `/services/amc-services/${id}`,
+        amcServiceView: (id: number | string) => `/services/amc-services/${id}/view`,
         amcBilling: "/services/amc-billing",
         amcBillingShow: (id: number | string) => `/services/amc-billing/${id}`,
+        amcBillingView: (id: number | string) => `/services/amc-billing/${id}/view`,
     },
 
     // ==================== BI DASHBOARD ====================
