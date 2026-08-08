@@ -2,5 +2,6 @@ export * from "./amc.schema";
 export * from "./amc-sites.schema";
 export * from "./amc-contacts.schema";
 export * from "./amc-products.schema";
-export * from "./amc-completed.schema";
+export * from "./amc-services.schema";
+export * from "./amc-bill.schema";
 export * from "./amc.relations";

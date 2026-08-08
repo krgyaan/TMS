@@ -1,26 +1,37 @@
 import { BaseApiService } from "./base.service";
-import type {
-    AmcBilling,
-    BillingPathField,
-} from "@/modules/services/amc-billing/helpers/amc-billing.types";
+import type { AmcBillDetail } from "@/modules/services/amc/helpers/amc.types";
 
 class AmcBillingService extends BaseApiService {
     constructor() {
         super("/amc-billing");
     }
 
-    async getAll(amcId?: number): Promise<AmcBilling[]> {
-        return this.get<AmcBilling[]>(amcId ? `?amcId=${amcId}` : "");
+    async getAll(amcId?: number): Promise<AmcBillDetail[]> {
+        return this.get<AmcBillDetail[]>(`/bills${amcId ? `?amcId=${amcId}` : ""}`);
     }
 
-    async getById(id: number): Promise<AmcBilling> {
-        return this.get<AmcBilling>(`/${id}`);
+    async getById(id: number): Promise<AmcBillDetail> {
+        return this.get<AmcBillDetail>(`/bills/${id}`);
     }
 
-    async uploadFile(id: number, field: BillingPathField, file: File): Promise<AmcBilling> {
-        const formData = new FormData();
-        formData.append("file", file);
-        return this.post<AmcBilling>(`/${id}/upload/${field}`, formData);
+    async addInvoices(id: number, paths: string[]): Promise<AmcBillDetail> {
+        return this.post<AmcBillDetail>(`/bills/${id}/invoices`, { paths });
+    }
+
+    async addReceipts(id: number, paths: string[]): Promise<AmcBillDetail> {
+        return this.post<AmcBillDetail>(`/bills/${id}/receipts`, { paths });
+    }
+
+    async removeInvoice(id: number, index: number): Promise<AmcBillDetail> {
+        return this.delete<AmcBillDetail>(`/bills/${id}/invoices/${index}`);
+    }
+
+    async removeReceipt(id: number, index: number): Promise<AmcBillDetail> {
+        return this.delete<AmcBillDetail>(`/bills/${id}/receipts/${index}`);
+    }
+
+    async followup(id: number): Promise<AmcBillDetail> {
+        return this.post<AmcBillDetail>(`/bills/${id}/followup`, {});
     }
 }
 

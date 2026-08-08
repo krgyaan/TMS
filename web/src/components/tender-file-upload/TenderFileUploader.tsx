@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { useFileConfig, useFileUpload } from '@/hooks/api/useTenderFiles';
 import { tenderFilesService } from '@/services/api/tender-files.service';
 import type { TenderFileContext, FileConfig } from './types';
+import { parseFileMeta } from '@/modules/services/amc/helpers/amcFileMeta';
 
 const DEFAULT_CONFIG: FileConfig = {
     context: 'tender-documents',
@@ -155,7 +156,7 @@ export function TenderFileUploader({
             {value.length > 0 && (
                 <div className="space-y-2">
                     {value.map((filePath) => {
-                        const fileName = filePath.split('/').pop() || filePath;
+                        const fileName = parseFileMeta(filePath).displayName;
                         return (
                             <div
                                 key={filePath}

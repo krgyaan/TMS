@@ -1,35 +1,79 @@
+import { useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Loader2, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { AmcView } from "./components/AmcView";
-import { useAmc } from "@/hooks/api/useAmc";
+import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { useAmcStepStatuses } from "@/hooks/api/useAmcStepStatuses";
 import { paths } from "@/app/routes/paths";
+import { AmcDetailsSection } from "./components/AmcView";
+import { AmcServiceSection } from "@/modules/services/amc-services/components/AmcServiceView";
+import { AmcBillingSection } from "@/modules/services/amc-billing/components/AmcBillingView";
 
-export default function AmcViewPage() {
+interface AmcViewPageProps {
+    amcId: number;
+    defaultSection: string;
+    onBack?: () => void;
+    backLabel?: string;
+}
+
+export function AmcViewPage({ amcId, defaultSection, onBack, backLabel }: AmcViewPageProps) {
+    const { steps } = useAmcStepStatuses(amcId);
+
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set([defaultSection]));
+
+    const toggleSection = useCallback((id: string) => {
+        setExpandedSections(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
+
+    const expandAll = useCallback(() => setExpandedSections(new Set(steps.map(s => s.id))), [steps]);
+    const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
+
+    const renderSectionContent = useCallback(
+        (stepId: string) => {
+            switch (stepId) {
+                case "amc-details":
+                    return <AmcDetailsSection amcId={amcId} />;
+                case "service-details":
+                    return <AmcServiceSection amcId={amcId} />;
+                case "billing-details":
+                    return <AmcBillingSection amcId={amcId} />;
+                default:
+                    return null;
+            }
+        },
+        [amcId]
+    );
+
+    return (
+        <ShowPageLayout
+            steps={steps}
+            expandedSections={expandedSections}
+            onToggleSection={toggleSection}
+            onExpandAll={expandAll}
+            onCollapseAll={collapseAll}
+            onBack={onBack}
+            backLabel={backLabel}
+            renderSectionContent={renderSectionContent}
+        />
+    );
+}
+
+function AmcViewRoute() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const amcId = Number(id);
 
-    const { data: amc, isLoading } = useAmc(amcId);
-
-    if (isLoading) {
-        return (
-            <div className="flex justify-center py-20">
-                <Loader2 className="h-6 w-6 animate-spin" />
-            </div>
-        );
-    }
-
-    if (!amc) {
-        return <p className="text-sm text-muted-foreground">AMC not found.</p>;
-    }
-
     return (
-        <div className="max-w-7xl mx-auto space-y-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate(paths.services.amc)}>
-                <ArrowLeft className="h-4 w-4 mr-1" /> Back
-            </Button>
-            <AmcView amc={amc} />
-        </div>
+        <AmcViewPage
+            amcId={amcId}
+            defaultSection="amc-details"
+            onBack={() => navigate(paths.services.amc)}
+            backLabel="Back to List"
+        />
     );
 }
+
+export default AmcViewRoute;

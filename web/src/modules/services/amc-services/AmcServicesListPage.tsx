@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
 import {
-    Plus,
+    FileUp,
+    FileSignature,
+    Loader2,
     Eye,
-    Pencil,
     Users,
     User,
     Wrench,
@@ -14,154 +15,67 @@ import {
     Building2,
     ExternalLink,
     Search,
-    Download,
     MapPin,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import DataTable from "@/components/ui/data-table";
 import { paths } from "@/app/routes/paths";
-import { useAmcs } from "@/hooks/api/useAmc";
-import { useProjectsMaster } from "@/hooks/api/useProjects";
+import { useAmcServices } from "@/hooks/api/useAmcServices";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/hooks/useFormatedDate";
 import type {
-    AmcDetail,
-    AmcSite,
+    AmcServiceDetail,
     AmcSiteContact,
     AmcServiceEngineer,
-} from "./helpers/amc.types";
-import { sampleReport } from "./helpers/amc.types";
+} from "@/modules/services/amc/helpers/amc.types";
+import { UploadServiceReportModal } from "./components/UploadServiceReportModal";
+import type { ServicePathField } from "@/modules/services/amc/helpers/amc.types";
 
-type AmcTeamTab = "AC" | "DC";
-type AmcServiceTab = "due" | "missed" | "done";
+type ServiceTab = "due" | "missed" | "done";
 
-const TEAM_TABS: { key: AmcTeamTab; label: string }[] = [
-    { key: "AC", label: "AC" },
-    { key: "DC", label: "DC" },
-];
-
-const SERVICE_SUBTABS: { key: AmcServiceTab; label: string }[] = [
+const SERVICE_SUBTABS: { key: ServiceTab; label: string }[] = [
     { key: "due", label: "Service Due" },
     { key: "missed", label: "Service Missed" },
     { key: "done", label: "Service Done" },
 ];
 
-interface AmcSiteRow {
-    key: string;
-    amcId: number;
-    siteId: number | null;
-    projectName: string;
-    siteName: string;
-    siteAddress: string;
-    siteMapLink: string | null;
-    siteContacts: AmcSiteContact[];
-    nextServiceDue: string | null;
-    status: string | null;
-    serviceEngineers: AmcServiceEngineer[];
-    amc: AmcDetail;
-}
-
-interface SiteServiceProgress {
-    total: number;
-    done: number;
-    earliestPendingDue: string | null;
-}
-
-function siteServiceProgress(amc: AmcDetail, siteId: number | null): SiteServiceProgress {
-    const services = siteId
-        ? (amc.services ?? []).filter(s => s.amcSiteId === siteId)
-        : [];
-    if (!services.length) {
-        return { total: 0, done: 0, earliestPendingDue: null };
-    }
-    const pending = services
-        .filter(s => s.status !== "Done")
-        .sort((a, b) => (a.serviceDueDate < b.serviceDueDate ? -1 : 1));
-    return {
-        total: services.length,
-        done: services.length - pending.length,
-        earliestPendingDue: pending[0]?.serviceDueDate ?? null,
-    };
-}
-
-function siteBillProgress(amc: AmcDetail, siteId: number | null) {
-    const bills = siteId ? (amc.bills ?? []).filter(b => b.amcSiteId === siteId) : [];
-    if (!bills.length) {
-        return { total: 0, submitted: 0 };
-    }
-    return {
-        total: bills.length,
-        submitted: bills.filter(b => b.status !== "Pending").length,
-    };
-}
-
-function isServiceDue(nextServiceDue: string | null) {
-    if (!nextServiceDue) return true;
-    const due = new Date(`${nextServiceDue}T00:00:00`);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return isNaN(due.getTime()) || due.getTime() >= today.getTime();
-}
-
-function isServiceMissed(nextServiceDue: string | null) {
-    if (!nextServiceDue) return false;
-    const due = new Date(`${nextServiceDue}T00:00:00`);
+function isMissed(service: AmcServiceDetail) {
+    if (service.status === "Done" || !service.serviceDueDate) return false;
+    const due = new Date(`${service.serviceDueDate}T00:00:00`);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return !isNaN(due.getTime()) && due.getTime() < today.getTime();
 }
 
-function rowMatchesServiceTab(row: AmcSiteRow, tab: AmcServiceTab) {
-    const progress = siteServiceProgress(row.amc, row.siteId);
-    if (tab === "done") {
-        return progress.total > 0 && progress.done === progress.total;
-    }
-    if (progress.total === 0 || progress.done === progress.total) {
-        return false;
-    }
-    if (tab === "missed") {
-        return isServiceMissed(progress.earliestPendingDue);
-    }
-    return isServiceDue(progress.earliestPendingDue);
+function rowMatchesTab(row: AmcServiceDetail, tab: ServiceTab) {
+    if (tab === "done") return row.status === "Done";
+    if (row.status === "Done") return false;
+    if (tab === "missed") return isMissed(row);
+    return !isMissed(row);
 }
 
-function NextServiceDueCell({
-    value,
-}: CustomCellRendererProps<AmcSiteRow, string | null>) {
-    if (!value) return <span>—</span>;
+function DueDateCell({ value }: { value: string }) {
     const due = new Date(`${value}T00:00:00`);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const crossed = !isNaN(due.getTime()) && due.getTime() < today.getTime();
+    const crossed = due.getTime() < today.getTime();
     return (
-        <span className={crossed ? "font-medium text-red-600" : "font-medium text-green-600"}>
+        <span className={cn("font-medium", crossed ? "text-red-600" : "")}>
             {formatDate(value)}
         </span>
     );
 }
 
-export default function AmcListPage() {
+export default function AmcServicesListPage() {
     const navigate = useNavigate();
-    const { data: amcs = [], isLoading } = useAmcs();
-    const { data: projects = [] } = useProjectsMaster();
-
-    const [searchParams, setSearchParams] = useSearchParams();
-
-    const activeTeam = (searchParams.get("team") as AmcTeamTab) || "AC";
-    const setActiveTeam = (team: AmcTeamTab) => {
-        const next = new URLSearchParams(searchParams);
-        next.set("team", team);
-        setSearchParams(next, { replace: true });
-    };
+    const { data: services = [], isLoading } = useAmcServices();
 
     const {
         activeTab: activeServiceTab,
@@ -169,8 +83,8 @@ export default function AmcListPage() {
         search,
         setSearch,
     } = usePersistentTableState({
-        storageKey: "amc-list",
-        defaultTab: "due" as AmcServiceTab,
+        storageKey: "amc-services",
+        defaultTab: "due" as ServiceTab,
         tabParam: "tab",
     });
 
@@ -179,10 +93,11 @@ export default function AmcListPage() {
     const [engineersModalOpen, setEngineersModalOpen] = useState(false);
     const [engineersList, setEngineersList] = useState<AmcServiceEngineer[]>([]);
 
-    const projectMap = useMemo(
-        () => new Map(projects.map(p => [p.id, p.projectName || `Project ${p.id}`])),
-        [projects],
-    );
+    const [uploadModal, setUploadModal] = useState<{
+        open: boolean;
+        serviceId: number | null;
+        field: ServicePathField;
+    }>({ open: false, serviceId: null, field: "filled-service-report" });
 
     const handleOpenContacts = (list: AmcSiteContact[]) => {
         setContactsList(list ?? []);
@@ -194,98 +109,26 @@ export default function AmcListPage() {
         setEngineersModalOpen(true);
     };
 
-    const handleSampleDownload = (row: AmcSiteRow) => {
-        const sample = sampleReport(row.amc.serviceReportPath);
-        if (!sample) {
-            toast.error("No sample service report uploaded for this AMC");
-            return;
-        }
-        const url = `/uploads/amc/${sample}`;
-        const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.download = sample;
-        anchor.rel = "noopener noreferrer";
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-    };
-
-    const allRows = useMemo<AmcSiteRow[]>(() => {
-        const result: AmcSiteRow[] = [];
-        for (const amc of amcs) {
-            const projectName = projectMap.get(amc.projectId) ?? `Project ${amc.projectId}`;
-            const sites: AmcSite[] = amc.sites && amc.sites.length ? amc.sites : [];
-            const serviceEngineers: AmcServiceEngineer[] = amc.serviceEngineers ?? [];
-
-            if (!sites.length) {
-                result.push({
-                    key: `${amc.id}-0`,
-                    amcId: amc.id,
-                    siteId: null,
-                    projectName,
-                    siteName: "—",
-                    siteAddress: "—",
-                    siteMapLink: null,
-                    siteContacts: [],
-                    nextServiceDue: amc.nextServiceDue,
-                    status: null,
-                    serviceEngineers,
-                    amc,
-                });
-                continue;
-            }
-
-            for (const site of sites) {
-                result.push({
-                    key: `${amc.id}-${site.id ?? 0}`,
-                    amcId: amc.id,
-                    siteId: site.id ?? null,
-                    projectName,
-                    siteName: site.name || "—",
-                    siteAddress: site.address || "—",
-                    siteMapLink: site.mapLink ?? null,
-                    siteContacts: site.contacts ?? [],
-                    nextServiceDue: amc.nextServiceDue,
-                    status: site.status ?? "Pending",
-                    serviceEngineers,
-                    amc,
-                });
-            }
-        }
-        return result;
-    }, [amcs, projectMap]);
-
-    const teamCounts = useMemo<Record<AmcTeamTab, number>>(() => {
-        const ac = allRows.filter(row => row.amc.teamName === "AC").length;
-        const dc = allRows.filter(row => row.amc.teamName === "DC").length;
-        return { AC: ac, DC: dc };
-    }, [allRows]);
-
-    const teamRows = useMemo<AmcSiteRow[]>(
-        () => allRows.filter(row => row.amc.teamName === activeTeam),
-        [allRows, activeTeam],
-    );
-
-    const serviceCounts = useMemo<Record<AmcServiceTab, number>>(() => {
+    const serviceCounts = useMemo<Record<ServiceTab, number>>(() => {
         return {
-            due: teamRows.filter(row => rowMatchesServiceTab(row, "due")).length,
-            missed: teamRows.filter(row => rowMatchesServiceTab(row, "missed")).length,
-            done: teamRows.filter(row => rowMatchesServiceTab(row, "done")).length,
+            due: services.filter(row => rowMatchesTab(row, "due")).length,
+            missed: services.filter(row => rowMatchesTab(row, "missed")).length,
+            done: services.filter(row => rowMatchesTab(row, "done")).length,
         };
-    }, [teamRows]);
+    }, [services]);
 
-    const rows = useMemo<AmcSiteRow[]>(() => {
+    const rows = useMemo(() => {
         const query = search.trim().toLowerCase();
-        return teamRows.filter(row => {
-            if (!rowMatchesServiceTab(row, activeServiceTab)) return false;
+        return services.filter(row => {
+            if (!rowMatchesTab(row, activeServiceTab)) return false;
             if (!query) return true;
 
-            const contactNames = row.siteContacts.map(c => c.name).join(" ");
-            const engineerNames = row.serviceEngineers.map(e => e.name).join(" ");
+            const contactNames = (row.site?.contacts ?? []).map(c => c.name).join(" ");
+            const engineerNames = (row.amc?.serviceEngineers ?? []).map(e => e.name).join(" ");
             const haystack = [
-                row.projectName,
-                row.siteName,
-                row.siteAddress,
+                row.amc?.projectName,
+                row.site?.name,
+                row.site?.address,
                 contactNames,
                 engineerNames,
             ]
@@ -293,43 +136,61 @@ export default function AmcListPage() {
                 .toLowerCase();
             return haystack.includes(query);
         });
-    }, [teamRows, activeServiceTab, search]);
+    }, [services, activeServiceTab, search]);
 
-    const amcActions: ActionItem<AmcSiteRow>[] = [
+    const serviceCountBySite = useMemo(() => {
+        const map = new Map<number, number>();
+        for (const service of services) {
+            map.set(service.amcSiteId, (map.get(service.amcSiteId) ?? 0) + 1);
+        }
+        return map;
+    }, [services]);
+
+    const colDefs = useMemo<ColDef<AmcServiceDetail>[]>(() => {
+        const actions: ActionItem<AmcServiceDetail>[] = [
+            {
+                label: "Upload Filled Service Report",
+                onClick: row =>
+                    setUploadModal({ open: true, serviceId: row.id, field: "filled-service-report" }),
+                icon: <FileUp className="h-4 w-4" />,
+            },
+            {
+                label: "Upload Signed Service Report",
+                onClick: row =>
+                    setUploadModal({ open: true, serviceId: row.id, field: "signed-service-report" }),
+                icon: <FileSignature className="h-4 w-4" />,
+            },
+            {
+                label: "View",
+                onClick: row => navigate(paths.services.amcServiceView(row.id)),
+                icon: <Eye className="h-4 w-4" />,
+            },
+        ];
+
+        return [
         {
-            label: "View",
-            onClick: row => navigate(paths.services.amcView(row.amcId)),
-            icon: <Eye className="h-4 w-4" />,
+            colId: "projectName",
+            headerName: "Project Name",
+            width: 200,
+            valueGetter: params => params.data?.amc?.projectName ?? "—",
+            cellRenderer: (params: CustomCellRendererProps<AmcServiceDetail>) => (
+                <span>{params.data?.amc?.projectName ?? "—"}</span>
+            ),
         },
         {
-            label: "Edit",
-            onClick: row => navigate(paths.services.amcEdit(row.amcId)),
-            icon: <Pencil className="h-4 w-4" />,
-        },
-        {
-            label: "Sample Service Report Download",
-            onClick: handleSampleDownload,
-            icon: <Download className="h-4 w-4" />,
-        },
-    ];
-
-    const [colDefs] = useState<ColDef<AmcSiteRow>[]>([
-        { field: "projectName", headerName: "Project Name", minWidth: 180 },
-
-        // ── Site Name column with structured tooltip ──────────────────────────
-        {
-            field: "siteName",
+            colId: "siteName",
             headerName: "Site Name",
-            minWidth: 200,
-            cellRenderer: (params: CustomCellRendererProps<AmcSiteRow>) => {
-                const site = params.data;
-                if (!site) return null;
+            width: 190,
+            valueGetter: params => params.data?.site?.name ?? "—",
+            cellRenderer: (params: CustomCellRendererProps<AmcServiceDetail>) => {
+                const row = params.data;
+                if (!row) return null;
                 return (
                     <TooltipProvider delayDuration={100}>
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <span className="cursor-help truncate block">
-                                    {site.siteName}
+                                    {row.site?.name ?? "—"}
                                 </span>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="p-2 w-fit">
@@ -339,17 +200,17 @@ export default function AmcListPage() {
                                     </div>
                                     <p>
                                         <span className="text-white">Name:</span>{" "}
-                                        {site.siteName || "-"}
+                                        {row.site?.name || "-"}
                                     </p>
                                     <p>
                                         <span className="text-white">Addr:</span>{" "}
-                                        {site.siteAddress || "-"}
+                                        {row.site?.address || "-"}
                                     </p>
                                     <p>
                                         <span className="text-white">Location:</span>{" "}
-                                        {site.siteMapLink ? (
+                                        {row.site?.mapLink ? (
                                             <a
-                                                href={site.siteMapLink}
+                                                href={row.site.mapLink}
                                                 target="_blank"
                                                 rel="noreferrer"
                                                 className="inline-flex items-center gap-0.5 text-blue-400 hover:underline"
@@ -368,14 +229,13 @@ export default function AmcListPage() {
                 );
             },
         },
-
         {
             colId: "contacts",
             headerName: "Contact Details",
             width: 140,
             sortable: false,
-            cellRenderer: (params: CustomCellRendererProps<AmcSiteRow>) => {
-                const count = params.data?.siteContacts?.length ?? 0;
+            cellRenderer: (params: CustomCellRendererProps<AmcServiceDetail>) => {
+                const count = params.data?.site?.contacts?.length ?? 0;
                 if (count === 0) return <span className="text-muted-foreground">—</span>;
                 return (
                     <TooltipProvider delayDuration={100}>
@@ -385,7 +245,7 @@ export default function AmcListPage() {
                                     type="button"
                                     className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
                                     onClick={() =>
-                                        handleOpenContacts(params.data?.siteContacts ?? [])
+                                        handleOpenContacts(params.data?.site?.contacts ?? [])
                                     }
                                 >
                                     <Users className="h-3.5 w-3.5" />
@@ -400,60 +260,13 @@ export default function AmcListPage() {
                 );
             },
         },
-
-        {
-            field: "nextServiceDue",
-            headerName: "Next Service Due",
-            width: 170,
-            sort: "asc",
-            cellRenderer: NextServiceDueCell,
-        },
-
-        {
-            colId: "serviceStatus",
-            headerName: "Service Status",
-            width: 120,
-            cellRenderer: (params: CustomCellRendererProps<AmcSiteRow>) => {
-                const row = params.data;
-                if (!row) return null;
-                const progress = siteServiceProgress(row.amc, row.siteId);
-                if (progress.total === 0) {
-                    return <span className="text-muted-foreground">—</span>;
-                }
-                return (
-                    <span className="font-medium tabular-nums">
-                        {progress.done}/{progress.total}
-                    </span>
-                );
-            },
-        },
-
-        {
-            colId: "billingStatus",
-            headerName: "Billing Status",
-            width: 120,
-            cellRenderer: (params: CustomCellRendererProps<AmcSiteRow>) => {
-                const row = params.data;
-                if (!row) return null;
-                const progress = siteBillProgress(row.amc, row.siteId);
-                if (progress.total === 0) {
-                    return <span className="text-muted-foreground">—</span>;
-                }
-                return (
-                    <span className="font-medium tabular-nums">
-                        {progress.submitted}/{progress.total}
-                    </span>
-                );
-            },
-        },
-
         {
             colId: "engineers",
             headerName: "Service Engg",
             width: 142,
             sortable: false,
-            cellRenderer: (params: CustomCellRendererProps<AmcSiteRow>) => {
-                const count = params.data?.serviceEngineers?.length ?? 0;
+            cellRenderer: (params: CustomCellRendererProps<AmcServiceDetail>) => {
+                const count = params.data?.amc?.serviceEngineers?.length ?? 0;
                 if (count === 0) return <span className="text-muted-foreground">—</span>;
                 return (
                     <TooltipProvider delayDuration={100}>
@@ -463,7 +276,7 @@ export default function AmcListPage() {
                                     type="button"
                                     className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
                                     onClick={() =>
-                                        handleOpenEngineers(params.data?.serviceEngineers ?? [])
+                                        handleOpenEngineers(params.data?.amc?.serviceEngineers ?? [])
                                     }
                                 >
                                     <Wrench className="h-3.5 w-3.5" />
@@ -478,32 +291,57 @@ export default function AmcListPage() {
                 );
             },
         },
-
+        {
+            colId: "serviceDueDate",
+            headerName: "Service Due",
+            width: 140,
+            sort: "asc",
+            valueGetter: params => params.data?.serviceDueDate ?? "",
+            cellRenderer: (params: CustomCellRendererProps<AmcServiceDetail>) =>
+                params.data?.serviceDueDate ? (
+                    <DueDateCell value={params.data.serviceDueDate} />
+                ) : (
+                    <span className="text-muted-foreground">—</span>
+                ),
+        },
+        {
+            colId: "serviceNo",
+            headerName: "Service No.",
+            width: 100,
+            cellRenderer: (params: CustomCellRendererProps<AmcServiceDetail>) => {
+                const row = params.data;
+                if (!row) return null;
+                const total = serviceCountBySite.get(row.amcSiteId) ?? 0;
+                return (
+                    <span className="font-medium tabular-nums">
+                        {row.serviceNo}/{total}
+                    </span>
+                );
+            },
+        },
         {
             colId: "status",
             headerName: "Status",
-            width: 150,
-            sortable: false,
-            cellRenderer: (params: CustomCellRendererProps<AmcSiteRow>) => {
-                const value = params.data?.status ?? null;
-                if (!value) return <span className="text-muted-foreground">—</span>;
-                const statusStyles: Record<string, string> = {
-                    Pending: "bg-amber-100 text-amber-800 border-transparent",
-                };
+            width: 130,
+            valueGetter: params => params.data?.status ?? "",
+            cellRenderer: (params: CustomCellRendererProps<AmcServiceDetail>) => {
+                const value = params.data?.status ?? "";
+                const done = value === "Done";
                 return (
                     <Badge
+                        variant="outline"
                         className={cn(
-                            "capitalize",
-                            statusStyles[value] ??
-                                "bg-muted text-muted-foreground border-transparent",
+                            "font-medium",
+                            done
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                : "bg-amber-100 text-amber-800 border-amber-200",
                         )}
                     >
-                        {value}
+                        {value || "—"}
                     </Badge>
                 );
             },
         },
-
         {
             colId: "actions",
             headerName: "Actions",
@@ -511,47 +349,19 @@ export default function AmcListPage() {
             pinned: "right",
             sortable: false,
             filter: false,
-            cellRenderer: createActionColumnRenderer(amcActions),
+            cellRenderer: createActionColumnRenderer(actions),
         },
-    ]);
+        ];
+    }, [serviceCountBySite, navigate]);
 
     return (
         <Card className="min-h-[calc(100vh-2rem)] flex flex-col border-0 shadow-none">
             <CardHeader className="flex-none pb-4">
-                <div className="flex items-center justify-between gap-4">
-                    <div>
-                        <CardTitle>AMCs</CardTitle>
-                        <CardDescription>All AMC / Warranty Services listed</CardDescription>
-                    </div>
-                    <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
-                        {TEAM_TABS.map(tab => (
-                            <button
-                                key={tab.key}
-                                type="button"
-                                onClick={() => setActiveTeam(tab.key)}
-                                className={cn(
-                                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
-                                    activeTeam === tab.key
-                                        ? "bg-background text-foreground shadow-sm"
-                                        : "text-muted-foreground hover:text-foreground",
-                                )}
-                            >
-                                {tab.label}
-                                <Badge
-                                    variant="secondary"
-                                    className={cn(
-                                        "text-xs h-4 min-w-4 px-1",
-                                        activeTeam === tab.key && "bg-primary/10 text-primary",
-                                    )}
-                                >
-                                    {teamCounts[tab.key]}
-                                </Badge>
-                            </button>
-                        ))}
-                    </div>
-                    <Button onClick={() => navigate(paths.services.amcCreate)}>
-                        <Plus className="h-4 w-4 mr-1" /> Add AMC
-                    </Button>
+                <div>
+                    <CardTitle>AMC Services</CardTitle>
+                    <CardDescription>
+                        Scheduled service visits per site. Upload filled / signed reports for each visit.
+                    </CardDescription>
                 </div>
             </CardHeader>
 
@@ -589,7 +399,7 @@ export default function AmcListPage() {
                             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 type="text"
-                                placeholder="Search AMCs..."
+                                placeholder="Search services..."
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
                                 className="pl-8 w-64"
@@ -598,16 +408,22 @@ export default function AmcListPage() {
                     </div>
                 </div>
 
-                <DataTable
-                    data={rows}
-                    loading={isLoading}
-                    columnDefs={colDefs}
-                    gridOptions={{
-                        defaultColDef: { filter: true, sortable: true },
-                        pagination: true,
-                    }}
-                    enablePagination={true}
-                />
+                {isLoading && services.length === 0 ? (
+                    <div className="flex justify-center py-20">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                ) : (
+                    <DataTable
+                        data={rows}
+                        loading={isLoading}
+                        columnDefs={colDefs}
+                        gridOptions={{
+                            defaultColDef: { filter: true, sortable: true },
+                            pagination: true,
+                        }}
+                        enablePagination={true}
+                    />
+                )}
             </CardContent>
 
             {/* ── Contacts modal ───────────────────────────────────────────── */}
@@ -721,6 +537,13 @@ export default function AmcListPage() {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            <UploadServiceReportModal
+                open={uploadModal.open}
+                onOpenChange={open => setUploadModal(prev => ({ ...prev, open }))}
+                serviceId={uploadModal.serviceId}
+                field={uploadModal.field}
+            />
         </Card>
     );
 }

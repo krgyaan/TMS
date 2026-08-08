@@ -76,7 +76,12 @@ export type TenderFileContext =
     | 'contract-agreement'
     | 'cancel-tender'
     | 'payment-proof'
-    | 'followups';    
+    | 'followups'
+    | 'amc-po'
+    | 'amc-service-report'
+    | 'amc-invoices'
+    | 'amc-receipts'
+    | 'amc-service-reports';
 
 export interface FileConfig {
     context: string;
