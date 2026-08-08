@@ -80,11 +80,13 @@ export class TenderFilesService implements OnModuleInit {
      * Upload files
      * @param files - Multer files
      * @param context - Which module (emds, rfqs, etc.)
+     * @param userId - Authenticated user performing the upload
      * @returns Array of uploaded file paths
      */
     async upload(
         files: Express.Multer.File[],
         context: TenderFileContext,
+        userId: number,
     ): Promise<UploadResult> {
         const config = getFileConfig(context);
         const result: UploadResult = {
@@ -125,7 +127,7 @@ export class TenderFilesService implements OnModuleInit {
                 }
 
                 // Process and save
-                const uploaded = await this.processAndSave(file, context, config);
+                const uploaded = await this.processAndSave(file, context, config, userId);
                 result.files.push(uploaded);
 
                 // Log successful upload with details
@@ -180,17 +182,30 @@ export class TenderFilesService implements OnModuleInit {
         file: Express.Multer.File,
         context: TenderFileContext,
         config: FileConfig,
+        userId: number,
     ): Promise<UploadedFile> {
-        // Generate unique filename: timestamp_sanitizedName.ext
+        // Generate unique filename. AMC contexts use a readable timestamp so the
+        // uploader and time can be recovered from the stored name:
+        //   amc: {userId}_{ddmmyy}_{hhmmss}_{sanitizedName}.ext  (e.g. 100_080826_031045_report.pdf)
+        //   other contexts: {epochMs}_{sanitizedName}.ext
         const timestamp = Date.now();
         const ext = path.extname(file.originalname).toLowerCase();
         const baseName = path
             .basename(file.originalname, ext)
             .replace(/[^a-zA-Z0-9-_]/g, '_')
             .substring(0, 50);
-        const fileName = `${timestamp}_${baseName}${ext}`;
+        const isAmc = context.startsWith('amc-');
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const fileName = isAmc
+            ? (() => {
+                  const now = new Date();
+                  const datePart = `${pad(now.getDate())}${pad(now.getMonth() + 1)}${String(now.getFullYear()).slice(-2)}`;
+                  const timePart = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+                  return `${userId}_${datePart}_${timePart}_${baseName}${ext}`;
+              })()
+            : `${timestamp}_${baseName}${ext}`;
 
-        const relativePath = path.join(context, fileName);
+        const relativePath = path.join(context, fileName).replace(/\\/g, '/');
         const absolutePath = path.join(this.baseUploadPath, relativePath);
 
         let buffer = file.buffer;

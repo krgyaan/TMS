@@ -15,7 +15,14 @@ export const ContactPersonSchema = z.object({
         (val) => (typeof val === "string" && val.trim() === "" ? null : val),
         z.string().trim().nullable().optional()
     ),
-    email: z.string().trim().min(1, "Email is required").email("Invalid email address"),
+    designation: z.preprocess(
+        (val) => (typeof val === "string" && val.trim() === "" ? null : val),
+        z.string().trim().nullable().optional()
+    ),
+    email: z.preprocess(
+        (val) => (typeof val === "string" && val.trim() === "" ? null : val),
+        z.string().trim().email().nullable().optional()
+    ),
     phone: z.preprocess(
         (val) => (typeof val === "string" && val.trim() === "" ? null : val),
         z.string().trim().nullable().optional()
@@ -71,7 +78,7 @@ export const CreateFollowUpSchema = z.object({
     amount: z.number().optional(),
     categoryId: z.number().nullable().optional(),
 
-    assignedToId: z.number(),
+    assignedToId: z.number().nullable().optional(),
     comment: z.string().optional(),
 
     contacts: z.array(ContactPersonSchema),
@@ -79,6 +86,10 @@ export const CreateFollowUpSchema = z.object({
 
     startFrom: z.string().optional(), // YYYY-MM-DD
     emdId: z.number().nullable().optional(),
+
+    // Email body / scheduling (same fields the API accepts)
+    details: z.string().nullable().optional(),
+    frequency: z.number().int().optional().nullable(),
 });
 
 export type CreateFollowUpDto = z.infer<typeof CreateFollowUpSchema>;

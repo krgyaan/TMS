@@ -5,6 +5,7 @@ import { createReadStream } from 'fs';
 import * as path from 'path';
 import { z } from 'zod';
 import { Public } from '@/modules/auth/decorators/public.decorator';
+import { CurrentUser, type CurrentUserType } from '@/decorators/current-user.decorator';
 import { TenderFilesService } from './tender-files.service';
 import { FILE_CONFIGS, type TenderFileContext } from './config/file-configs';
 
@@ -54,9 +55,10 @@ export class TenderFilesController {
     async upload(
         @UploadedFiles() files: Express.Multer.File[],
         @Body() body: unknown,
+        @CurrentUser() user: CurrentUserType,
     ) {
         const { context } = UploadBodySchema.parse(body);
-        return this.service.upload(files, context);
+        return this.service.upload(files, context, user.id);
     }
 
     /**
