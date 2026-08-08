@@ -21,7 +21,10 @@ export const createImprestSchema = z
         partyName: z.string().optional().nullable(),
         projectName: z.string().optional().nullable(),
         remark: z.string().optional().nullable(),
-        dateOfExpense: z.preprocess(v => (v === "" || v === undefined || v === null ? undefined : new Date(v as string)), z.date().optional()),
+        dateOfExpense: z.preprocess(
+            v => (v === "" || v === undefined || v === null ? undefined : new Date(v as string)),
+            z.date({ error: "Expense Date is required" })
+        ),
     })
     .superRefine((data, ctx) => {
         const isTransferMode = Number(data.categoryId) === TEAM_MEMBER_CATEGORY_ID;

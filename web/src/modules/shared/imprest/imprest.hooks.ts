@@ -1,8 +1,5 @@
-// src/modules/imprest/imprest.hooks.ts
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-
 import {
     getMyImprests,
     getUserImprests,
@@ -10,47 +7,35 @@ import {
     updateImprest,
     deleteImprest,
     uploadImprestProofs,
-
-    // vouchers
     getImprestVouchers,
     accountApproveVoucher,
     adminApproveVoucher,
-
-    // NEW – imprest actions
     approveImprest,
     tallyImprest,
     proofImprest,
     addImprestAccRemark,
-
-    //PAYMENT HISTORY
     getImprestPaymentHistory,
     deleteImprestPaymentHistory,
-    type CreateImprestInput,
     creditImprest,
     type CreditImprestInput,
     getImprestVoucher,
     getImprestById,
     deleteImprestProof,
 } from "./imprest.api";
-
-import type { EmployeeImprestDashboard, ImprestPaymentHistoryRow, ImprestVoucherRow } from "./imprest.types";
+import type { EmployeeImprestDashboard, ImprestPaymentHistoryRow } from "./imprest.types";
 import type { UpdateImprestInput } from "./imprest.schema";
 
 /* ---------------- QUERY KEYS ---------------- */
 
 export const imprestKeys = {
     root: ["employee-imprest"] as const,
-
     list: (userId?: number) => [...imprestKeys.root, "list", userId ?? "me"] as const,
-
     detail: (id: number) => [...imprestKeys.root, "detail", id] as const,
 };
 
 export const imprestVoucherKeys = {
     root: ["imprest-vouchers"] as const,
-
     list: (userId?: number) => [...imprestVoucherKeys.root, "list", userId ?? "all"] as const,
-
     detail: (id: number) => [...imprestVoucherKeys.root, "detail", id] as const,
 };
 
@@ -91,7 +76,10 @@ export const useCreateImprest = () => {
             toast.success("Imprest created successfully");
             qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
-        onError: () => toast.error("Failed to create imprest"),
+        onError: (e) => {
+            const errorMessage = e?.message || "Something went wrong";
+            toast.error(`Failed to create imprest: ${errorMessage}`);
+        },
     });
 };
 
@@ -289,7 +277,7 @@ export const useUpdateImprest = () => {
         },
 
         onError: (e) => {
-            const errorMessage = e?.response?.data?.message || e.message || "Something went wrong";
+            const errorMessage = e.message || "Something went wrong";
             toast.error(`Failed to update imprest: ${errorMessage}`);
         },
     });
