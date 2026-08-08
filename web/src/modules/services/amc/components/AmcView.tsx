@@ -1,16 +1,20 @@
 import type { ReactNode } from "react";
-import { ExternalLink, MapPin, Package, Wrench, FileText, BadgeDollarSign, Download } from "lucide-react";
+import { ExternalLink, MapPin, Package, Wrench, FileText, BadgeDollarSign, Download, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { formatDate, formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { useAmc } from "@/hooks/api/useAmc";
 import { useProjectsMaster } from "@/hooks/api/useProjects";
 import { useItems } from "@/hooks/api/useItems";
 import { useUsers } from "@/hooks/api/useUsers";
 import type { AmcDetail } from "../helpers/amc.types";
 import { sampleReport, filledReport, serviceFileUrl, amcDocUrl } from "../helpers/amc.types";
+import { UploadedByTooltip } from "../helpers/UploadedByMeta";
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
 
@@ -53,7 +57,15 @@ function InfoCell({ label, value }: { label: string; value: ReactNode }) {
     );
 }
 
-function FileDownload({ label, path }: { label: string; path: string }) {
+function FileDownload({
+    label,
+    path,
+    users,
+}: {
+    label: string;
+    path: string;
+    users?: Array<{ id: number; name: string }>;
+}) {
     if (!path) {
         return (
             <div className="flex items-center gap-2">
@@ -64,15 +76,17 @@ function FileDownload({ label, path }: { label: string; path: string }) {
         );
     }
     return (
-        <a
-            href={path}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-2 text-sm text-primary hover:underline"
-        >
-            <Download className="h-4 w-4" />
-            {label}
-        </a>
+        <UploadedByTooltip path={path} users={users}>
+            <a
+                href={path}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 text-sm text-primary hover:underline"
+            >
+                <Download className="h-4 w-4" />
+                {label}
+            </a>
+        </UploadedByTooltip>
     );
 }
 
@@ -499,12 +513,275 @@ export function AmcView({ amc }: { amc: AmcDetail }) {
                             key={label}
                             className="flex items-center gap-3 rounded-lg border px-4 py-3 bg-muted/10"
                         >
-                            <FileDownload label={label} path={path} />
+                            <FileDownload label={label} path={path} users={allUsers} />
                         </div>
                     ))}
                 </div>
             </div>
 
+        </Card>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACCORDION SECTION — AMC DETAILS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function AmcDetailsSection({ amcId }: { amcId: number }) {
+    const { data: amc, isLoading } = useAmc(amcId);
+    const { data: projects = [] } = useProjectsMaster();
+    const { data: items = [] } = useItems();
+    const { data: allUsers = [] } = useUsers();
+
+    if (isLoading && !amc) {
+        return (
+            <Card className="overflow-hidden">
+                <div className="px-6 py-4 border-b bg-muted/30">
+                    <Skeleton className="h-5 w-40" />
+                </div>
+                <div className="p-6 space-y-2">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                        <Skeleton key={i} className="h-10 w-full" />
+                    ))}
+                </div>
+            </Card>
+        );
+    }
+
+    if (!amc) {
+        return (
+            <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>AMC information not available.</AlertDescription>
+            </Alert>
+        );
+    }
+
+    const project = projects.find(p => p.id === amc.projectId);
+    const itemName = (id: number) => items.find(i => i.id === id)?.name || `Item ${id}`;
+    const allocatedTeUser = allUsers.find(u => u.id === amc.allocatedTe);
+    const allocatedTeName = allocatedTeUser
+        ? allocatedTeUser.team?.name
+            ? `${allocatedTeUser.name} (${allocatedTeUser.team.name})`
+            : (allocatedTeUser.name ?? "—")
+        : null;
+
+    return (
+        <Card className="overflow-hidden">
+            {/* ── 1. Basic Information ────────────────────────────────────── */}
+            <div className={sectionCls}>
+                <SectionTitle icon={<FileText className="h-4 w-4" />}>
+                    Basic Information
+                </SectionTitle>
+                <div className="rounded-lg border overflow-hidden">
+                    <Table>
+                        <TableBody>
+                            <TableRow className="hover:bg-muted/30">
+                                <InfoCell label="Team Name" value={amc.teamName} />
+                                <InfoCell label="Project" value={project?.projectName || amc.projectId} />
+                            </TableRow>
+                            <TableRow className="hover:bg-muted/30">
+                                <InfoCell label="Allocated TE" value={allocatedTeName ?? "—"} />
+                                <TableCell colSpan={2} />
+                            </TableRow>
+                            <TableRow className="hover:bg-muted/30">
+                                <InfoCell label="Service Frequency" value={amc.serviceFrequency} />
+                                <InfoCell label="Bill Frequency" value={amc.billFrequency} />
+                            </TableRow>
+                            <TableRow className="hover:bg-muted/30">
+                                <InfoCell label="AMC Start Date" value={formatDate(amc.amcStartDate)} />
+                                <InfoCell label="AMC End Date" value={formatDate(amc.amcEndDate)} />
+                            </TableRow>
+                            <TableRow className="hover:bg-muted/30">
+                                <InfoCell label="Next Service Due" value={formatDate(amc.nextServiceDue)} />
+                                <InfoCell
+                                    label="Bill Type"
+                                    value={
+                                        <Badge variant="outline">
+                                            {amc.billType === "variable" ? "Variable" : "Constant"}
+                                        </Badge>
+                                    }
+                                />
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </div>
+            </div>
+
+            {/* ── 2. Site Details ─────────────────────────────────────────── */}
+            <div className={sectionCls}>
+                <SectionTitle icon={<MapPin className="h-4 w-4" />}>
+                    Site Details
+                </SectionTitle>
+
+                {amc.sites.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No sites added.</p>
+                ) : (
+                    <div className="space-y-4">
+                        {amc.sites.map((site, idx) => (
+                            <div key={idx} className="rounded-lg border overflow-hidden">
+                                <Table>
+                                    <TableBody>
+                                        <SectionRow>Site {idx + 1}</SectionRow>
+                                        <TableRow className="hover:bg-muted/30">
+                                            <InfoCell label="Site Name" value={site.name} />
+                                            <InfoCell label="Site Address" value={site.address} />
+                                        </TableRow>
+                                        <TableRow className="hover:bg-muted/30">
+                                            <InfoCell
+                                                label="Site Location"
+                                                value={
+                                                    site.mapLink ? (
+                                                        <a
+                                                            href={site.mapLink}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                                                        >
+                                                            <ExternalLink className="h-3.5 w-3.5" />
+                                                            Open Location
+                                                        </a>
+                                                    ) : null
+                                                }
+                                            />
+                                            <InfoCell
+                                                label="Status"
+                                                value={
+                                                    <Badge className="capitalize bg-amber-100 text-amber-800 border-transparent">
+                                                        {site.status ?? "Pending"}
+                                                    </Badge>
+                                                }
+                                            />
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+
+                                {site.contacts.length > 0 && (
+                                    <div className="border-t">
+                                        <p className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-muted/30">
+                                            Site Contacts
+                                        </p>
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow className="bg-muted/20">
+                                                    <TableHead>Name</TableHead>
+                                                    <TableHead>Organization</TableHead>
+                                                    <TableHead>Mobile</TableHead>
+                                                    <TableHead>Email</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {site.contacts.map((c, i) => (
+                                                    <TableRow key={i} className="hover:bg-muted/30">
+                                                        <TableCell>{c.name}</TableCell>
+                                                        <TableCell>{c.organization || "—"}</TableCell>
+                                                        <TableCell>{c.mobile}</TableCell>
+                                                        <TableCell>{c.email || "—"}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* ── 3. Service Engineers ────────────────────────────────────── */}
+            <div className={sectionCls}>
+                <SectionTitle icon={<Wrench className="h-4 w-4" />}>
+                    Service Engineers
+                </SectionTitle>
+
+                {amc.serviceEngineers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No engineers assigned.</p>
+                ) : (
+                    <div className="rounded-lg border overflow-hidden">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-muted/40">
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Organization</TableHead>
+                                    <TableHead>Mobile</TableHead>
+                                    <TableHead>Email</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {amc.serviceEngineers.map((e, idx) => (
+                                    <TableRow key={idx} className="hover:bg-muted/30">
+                                        <TableCell>{e.name}</TableCell>
+                                        <TableCell>{e.organization || "—"}</TableCell>
+                                        <TableCell>{e.mobile}</TableCell>
+                                        <TableCell>{e.email || "—"}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+            </div>
+
+            {/* ── 4. Products ─────────────────────────────────────────────── */}
+            <div className={sectionCls}>
+                <SectionTitle icon={<Package className="h-4 w-4" />}>
+                    Products under AMC
+                </SectionTitle>
+
+                {amc.products.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No products added.</p>
+                ) : (
+                    <div className="rounded-lg border overflow-hidden">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-muted/40">
+                                    <TableHead>Item</TableHead>
+                                    <TableHead>Description</TableHead>
+                                    <TableHead>Make</TableHead>
+                                    <TableHead>Model</TableHead>
+                                    <TableHead>Serial Nos.</TableHead>
+                                    <TableHead>Qty</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {amc.products.map((p, idx) => (
+                                    <TableRow key={idx} className="hover:bg-muted/30">
+                                        <TableCell>{itemName(p.itemId)}</TableCell>
+                                        <TableCell>{p.description || "—"}</TableCell>
+                                        <TableCell>{p.make || "—"}</TableCell>
+                                        <TableCell>{p.model || "—"}</TableCell>
+                                        <TableCell>{p.serialNo || "—"}</TableCell>
+                                        <TableCell>{p.quantity}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+            </div>
+
+            {/* ── 5. Documents ────────────────────────────────────────────── */}
+            <div className={sectionCls}>
+                <SectionTitle icon={<FileText className="h-4 w-4" />}>
+                    Documents
+                </SectionTitle>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                        { label: "Service Report Format (Sample)", path: amcDocUrl(sampleReport(amc.serviceReportPath)) },
+                        { label: "Filled Service Report", path: amcDocUrl(filledReport(amc.serviceReportPath)) },
+                        { label: "AMC PO", path: amcDocUrl(amc.amcPoPath) },
+                        { label: "Signed Service Report", path: amcDocUrl(amc.signedServiceReportPath) },
+                    ].map(({ label, path }) => (
+                        <div
+                            key={label}
+                            className="flex items-center gap-3 rounded-lg border px-4 py-3 bg-muted/10"
+                        >
+                            <FileDownload label={label} path={path} users={allUsers} />
+                        </div>
+                    ))}
+                </div>
+            </div>
         </Card>
     );
 }

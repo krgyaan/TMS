@@ -1,9 +1,8 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { Loader2, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import { useAmcService } from "@/hooks/api/useAmcServices";
 import { paths } from "@/app/routes/paths";
-import { AmcServiceView } from "./components/AmcServiceView";
+import { AmcViewPage } from "@/modules/services/amc/AmcViewPage";
 
 export default function AmcServiceViewPage() {
     const { id } = useParams<{ id: string }>();
@@ -25,11 +24,11 @@ export default function AmcServiceViewPage() {
     }
 
     return (
-        <div className="max-w-5xl mx-auto space-y-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate(paths.services.amcServices)}>
-                <ArrowLeft className="h-4 w-4 mr-1" /> Back
-            </Button>
-            <AmcServiceView service={service} />
-        </div>
+        <AmcViewPage
+            amcId={service.amcId}
+            defaultSection="service-details"
+            onBack={() => navigate(paths.services.amcServices)}
+            backLabel="Back to List"
+        />
     );
 }
