@@ -97,7 +97,7 @@ export class ImprestAdminService {
                 voucher_base AS (
                     SELECT
                         user_id,
-                        COALESCE(approved_date, created_at)::date AS effective_date
+                        COALESCE(date_of_expense, approved_date, created_at)::date AS effective_date
                     FROM employee_imprests
                     WHERE approval_status = 1
                 ),
@@ -356,8 +356,8 @@ export class ImprestAdminService {
                         ei.id AS imprest_id,
                         ei.user_id,
 
-                        /* Laravel: COALESCE(approved_date, created_at) */
-                        COALESCE(ei.approved_date, ei.created_at)::date AS effective_date,
+                        /* Grouping by expense date; legacy fallback */
+                        COALESCE(ei.date_of_expense, ei.approved_date, ei.created_at)::date AS effective_date,
 
                         ei.amount,
                         ei.invoice_proof
@@ -503,8 +503,8 @@ export class ImprestAdminService {
         SELECT invoice_proof
         FROM employee_imprests
         WHERE user_id = ${userId}
-          AND EXTRACT(ISOYEAR FROM COALESCE(approved_date, created_at)) = ${year}
-          AND EXTRACT(WEEK FROM COALESCE(approved_date, created_at)) = ${week}
+          AND EXTRACT(ISOYEAR FROM COALESCE(date_of_expense, approved_date, created_at)) = ${year}
+          AND EXTRACT(WEEK FROM COALESCE(date_of_expense, approved_date, created_at)) = ${week}
     `);
 
         const files = rows.rows.flatMap(r => (Array.isArray(r.invoice_proof) ? r.invoice_proof : [])).filter(Boolean);
@@ -632,13 +632,13 @@ export class ImprestAdminService {
                     eq(employeeImprests.userId, voucher.employeeId),
                     eq(employeeImprests.approvalStatus, 1),
                     sql`
-                ${employeeImprests.approvedDate}::date
+                COALESCE(${employeeImprests.dateOfExpense}, ${employeeImprests.approvedDate})::date
                 BETWEEN ${voucher.validFrom}::date
                 AND ${voucher.validTo}::date
             `
                 )
             )
-            .orderBy(employeeImprests.approvedDate);
+            .orderBy(sql`COALESCE(${employeeImprests.dateOfExpense}, ${employeeImprests.approvedDate})`);
 
         /* -----------------------------------------
        RETURN STRUCTURE (Laravel-equivalent)
@@ -701,7 +701,7 @@ export class ImprestAdminService {
                     eq(employeeImprests.userId, userId),
                     eq(employeeImprests.approvalStatus, 1),
                     sql`
-                    ${employeeImprests.approvedDate}::date
+                    COALESCE(${employeeImprests.dateOfExpense}, ${employeeImprests.approvedDate})::date
                     BETWEEN ${from}::date AND ${to}::date
                 `
                 )

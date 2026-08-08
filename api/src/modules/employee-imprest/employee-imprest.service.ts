@@ -1,22 +1,28 @@
-// employee-imprest.service.ts
-import { Inject, Injectable, ForbiddenException, NotFoundException, InternalServerErrorException, BadRequestException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import { and, desc, eq, sql } from "drizzle-orm";
-
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
-
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@db";
-
 import { employeeImprests, employeeImprestTransactions } from "@db/schemas/shared";
-
+import type { DataScope } from "@/common/constants/roles.constant";
+import { imprestCategories, users } from "@/db/schemas";
+import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-voucher";
+import { PermissionService } from "@/modules/auth/services/permission.service";
 import type { CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
 import type { UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
-import { CreateEmployeeImprestCreditDto } from "../imprest-admin/zod/create-employee-imprest-credit.schema";
-import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-voucher";
-import { imprestCategories, users } from "@/db/schemas";
-
 const TRANSFER_CATEGORY_ID = 22;
+const WEEK_LOCK_EXEMPT_PERMISSION = { module: "shared.imprests", action: "week-lock-exempt" } as const;
+
+export type ImprestActorUser = {
+    sub?: number;
+    roleId?: number | null;
+    role?: string | null;
+    roleName?: string | null;
+    teamId?: number | null;
+    dataScope?: DataScope;
+};
+
 @Injectable()
 export class EmployeeImprestService {
     constructor(
@@ -24,11 +30,64 @@ export class EmployeeImprestService {
         private readonly db: DbInstance,
 
         @Inject(WINSTON_MODULE_PROVIDER)
-        private readonly logger: Logger
+        private readonly logger: Logger,
+
+        private readonly permissionService: PermissionService
     ) {}
 
+    /* ----------------------- WEEK LOCK GUARD ------------------------ */
+    private async assertExpenseWeekNotLocked({
+        beneficiaryUserId,
+        expenseDate,
+        actorUser,
+    }: {
+        beneficiaryUserId?: number | null;
+        expenseDate?: Date | null;
+        actorUser?: ImprestActorUser | null;
+    }) {
+        if (!expenseDate || !beneficiaryUserId) {
+            return;
+        }
+
+        const isExempt = actorUser?.sub
+            ? await this.permissionService.hasPermission(
+                  {
+                      userId: actorUser.sub,
+                      roleId: actorUser.roleId ?? null,
+                      roleName: actorUser.role ?? actorUser.roleName ?? null,
+                      teamId: actorUser.teamId ?? null,
+                      dataScope: (actorUser.dataScope ?? "self") as DataScope,
+                  },
+                  WEEK_LOCK_EXEMPT_PERMISSION
+              )
+            : false;
+
+        if (isExempt) {
+            return;
+        }
+
+        const [lockedVoucher] = await this.db
+            .select({ voucherCode: employeeImprestVouchers.voucherCode })
+            .from(employeeImprestVouchers)
+            .where(
+                and(
+                    eq(employeeImprestVouchers.beneficiaryName, String(beneficiaryUserId)),
+                    sql`TRIM(COALESCE(${employeeImprestVouchers.accountsSignedBy}, '')) <> ''`,
+                    sql`EXTRACT(ISOYEAR FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(ISOYEAR FROM ${expenseDate})`,
+                    sql`EXTRACT(WEEK FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(WEEK FROM ${expenseDate})`
+                )
+            )
+            .limit(1);
+
+        if (lockedVoucher) {
+            throw new ForbiddenException(
+                `Expenses for the week of ${expenseDate.toISOString().split("T")[0]} are locked: voucher ${lockedVoucher.voucherCode} is already approved by accounts.`
+            );
+        }
+    }
+
     /* ----------------------------- CREATE ----------------------------- */
-    async createWithTransfer(data: CreateEmployeeImprestDto, files: Express.Multer.File[]) {
+    async createWithTransfer(data: CreateEmployeeImprestDto, files: Express.Multer.File[], actorUser?: ImprestActorUser) {
         const isTransfer = Number(data.categoryId) === TRANSFER_CATEGORY_ID;
 
         this.logger.debug("Logging the dto", {
@@ -38,6 +97,12 @@ export class EmployeeImprestService {
         if (!data.userId) {
             throw new Error("No sender user found. Kindly login again");
         }
+
+        await this.assertExpenseWeekNotLocked({
+            beneficiaryUserId: data.userId,
+            expenseDate: data.dateOfExpense,
+            actorUser,
+        });
 
         if (isTransfer) {
             if (!data.transferToId) {
@@ -280,12 +345,18 @@ export class EmployeeImprestService {
     }
 
     /* ----------------------------- UPDATE ----------------------------- */
-    async update(id: number, data: UpdateEmployeeImprestDto) {
+    async update(id: number, data: UpdateEmployeeImprestDto, actorUser?: ImprestActorUser) {
         const existing = await this.findOne(id);
 
         if (!existing) {
             throw new NotFoundException("Employee imprest not found");
         }
+
+        await this.assertExpenseWeekNotLocked({
+            beneficiaryUserId: data.userId ?? existing.userId,
+            expenseDate: data.dateOfExpense ?? existing.dateOfExpense,
+            actorUser,
+        });
 
         const oldIsTransfer = Number(existing.categoryId) === TRANSFER_CATEGORY_ID;
         const newIsTransfer = Number(data.categoryId ?? existing.categoryId) === TRANSFER_CATEGORY_ID;

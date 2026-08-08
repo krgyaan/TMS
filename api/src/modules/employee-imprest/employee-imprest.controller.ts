@@ -1,12 +1,11 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe, UseInterceptors, UploadedFiles, UploadedFile, BadRequestException, Req, Patch } from "@nestjs/common";
-import { FilesInterceptor, FileInterceptor } from "@nestjs/platform-express";
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req, UploadedFiles, UseInterceptors } from "@nestjs/common";
+import { FilesInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
 import { extname } from "path";
-
-import { EmployeeImprestService } from "@/modules/employee-imprest/employee-imprest.service";
-import { CreateEmployeeImprestSchema, type CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
-import { UpdateEmployeeImprestSchema, type UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
 import { CurrentUser } from "@/decorators/current-user.decorator";
+import { EmployeeImprestService, type ImprestActorUser } from "@/modules/employee-imprest/employee-imprest.service";
+import { CreateEmployeeImprestSchema } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
+import { UpdateEmployeeImprestSchema, type UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
 import { ZodValidationPipe } from "nestjs-zod";
 
 // Multer config
@@ -37,7 +36,7 @@ export class EmployeeImprestController {
         }
 
         // Pass sender's userId from JWT — service resolves name from DB
-        return this.service.createWithTransfer(parsed.data, files ?? []);
+        return this.service.createWithTransfer(parsed.data, files ?? [], req.user as ImprestActorUser);
     }
 
     @Get()
@@ -58,13 +57,14 @@ export class EmployeeImprestController {
 
     @Patch(":id")
     update(
+        @Req() req,
         @Param("id", ParseIntPipe) id: number,
         @Body(new ZodValidationPipe(UpdateEmployeeImprestSchema))
         body: UpdateEmployeeImprestDto
     ) {
         console.log("TEST");
         console.log(id, body);
-        return this.service.update(id, body);
+        return this.service.update(id, body, req.user as ImprestActorUser);
     }
 
     @Delete(":id")
