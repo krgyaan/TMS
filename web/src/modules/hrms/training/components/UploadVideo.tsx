@@ -26,6 +26,7 @@ const CHUNK_SIZE = parseInt(import.meta.env.VITE_UPLOAD_CHUNK_SIZE || '10485760'
 const CATEGORIES = [
     { value: "Tendering", label: "Tendering", icon: "📋", color: "bg-orange-500/10 text-orange-600 border-orange-500/20" },
     { value: "Operations", label: "Operations", icon: "⚙️", color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" },
+    { value: "Accounts", label: "Accounts", icon: "💼", color: "bg-green-500/10 text-green-600 border-green-500/20" },
     { value: "Onboarding", label: "Onboarding", icon: "🎯", color: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
     { value: "Compliance", label: "Compliance", icon: "🛡️", color: "bg-purple-500/10 text-purple-600 border-purple-500/20" },
     { value: "Technical", label: "Technical", icon: "💻", color: "bg-cyan-500/10 text-cyan-600 border-cyan-500/20" }
