@@ -192,7 +192,14 @@ const MyMakerRequests: React.FC = () => {
             width: 130, 
             valueFormatter: (p: ValueFormatterParams<MakerRequestRow>) => formatDate(p.value) 
         },
-        { headerName: "Actions", filter: false, sortable: false, cellRenderer: createActionColumnRenderer<MakerRequestRow>(mrActions), width: 80, pinned: "right" as const },
+        { 
+            headerName: "", 
+            filter: false, 
+            sortable: false, 
+            cellRenderer: createActionColumnRenderer<MakerRequestRow>(mrActions), 
+            width: 80, 
+            pinned: "right" as const 
+        },
     ], []);
 
     const detail = detailData as MakerRequestRow | undefined;

@@ -58,6 +58,7 @@ const fixedCategory = [
     {label: 'office_maintenance', value: 'Office Maintenance'},
     {label: 'portal_renewal_charges', value: 'Portal Renewal Charges'},
     {label: 'professional_charges', value: 'Professional Charges'},
+    {label: 'od_ac_interest', value: 'OD A/C Interest'},
 ];
 
 const loanReturnCategory = [

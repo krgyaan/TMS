@@ -17,6 +17,7 @@ export const PAYMENT_AGAINST_LABELS: Record<string, string> = {
     salary: 'Salary',
     software: 'Software',
     office_expenses: 'Office Expenses',
+    od_ac_interest: 'OD A/C Interest',
     printing_stationary: 'Printing & Stationary',
     office_maintenance: 'Office Maintenance',
     related_party: 'Related Party',
