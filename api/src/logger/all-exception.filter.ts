@@ -57,6 +57,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       errorResponse = exception.getResponse() as Record<string, unknown>;
+      // nestjs-zod validation failures expose raw zod issues under `errors`
+      if (Array.isArray(errorResponse.errors) && !errorResponse.issues) {
+        errorResponse.issues = errorResponse.errors;
+      }
     } else {
       const pgCode = extractPgCode(exception);
       const pgMapping = pgCode ? PG_ERROR_MAP[pgCode] : undefined;
