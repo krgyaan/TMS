@@ -2,7 +2,7 @@ import * as winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 import { getRequestId } from "./request-context";
 
-const serviceName = "tms-api";
+const serviceName = process.env.SERVICE_NAME || "tms-api";
 const version = "1.0.1";
 const environment = process.env.NODE_ENV || "development";
 
@@ -65,7 +65,7 @@ if (isProduction) {
   transports.unshift(
     new DailyRotateFile({
       dirname: logDir,
-      filename: "tms-%DATE%.log",
+      filename: `${serviceName}-%DATE%.log`,
       datePattern: "YYYY-MM-DD",
       maxSize: "20m",
       maxFiles: "14d",

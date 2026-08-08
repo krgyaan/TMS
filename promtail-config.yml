@@ -14,7 +14,27 @@ scrape_configs:
       - targets: [localhost]
         labels:
           job: tms-api
-          __path__: /logs/tms-*.log
+          __path__: /logs/tms-api-*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            message: message
+            timestamp: timestamp
+      - labels:
+          level:
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      - structured_metadata:
+          {}
+
+  - job_name: tms-worker
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: tms-worker
+          __path__: /logs/tms-worker-*.log
     pipeline_stages:
       - json:
           expressions:
