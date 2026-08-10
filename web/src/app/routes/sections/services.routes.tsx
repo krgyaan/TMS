@@ -7,7 +7,10 @@ const Services_CustomerCreate = lazy(() => import('@/modules/services/customer/C
 const Services_CustomerEdit = lazy(() => import('@/modules/services/customer/CustomerEditPage'));
 const Services_CustomerShow = lazy(() => import('@/modules/services/customer/CustomerShowPage'));
 const Services_CustomerView = lazy(() => import('@/modules/services/customer/CustomerViewPage'));
-const Services_Conference = lazy(() => import('@/modules/services/conference'));
+const Services_Conference = lazy(() => import('@/modules/services/conference/ConferenceListPage'));
+const Services_ConferenceCreate = lazy(() => import('@/modules/services/conference/ConferenceCreatePage'));
+const Services_ConferenceView = lazy(() => import('@/modules/services/conference/ConferenceViewPage'));
+const Services_ConferenceShow = lazy(() => import('@/modules/services/conference/ConferenceShowPage'));
 const Services_Visit = lazy(() => import('@/modules/services/visit'));
 const Services_AmcList = lazy(() => import('@/modules/services/amc/AmcListPage'));
 const Services_AmcCreate = lazy(() => import('@/modules/services/amc/AmcCreatePage'));
@@ -31,6 +34,9 @@ export default function ServicesRoutes() {
             <Route path="customer/:id/view" element={<RouteWrapper><Services_CustomerView /></RouteWrapper>} />
             <Route path="customer/:id" element={<RouteWrapper><Services_CustomerShow /></RouteWrapper>} />
             <Route path="conference" element={<RouteWrapper><Services_Conference /></RouteWrapper>} />
+            <Route path="conference/create" element={<RouteWrapper><Services_ConferenceCreate /></RouteWrapper>} />
+            <Route path="conference/:id/view" element={<RouteWrapper><Services_ConferenceView /></RouteWrapper>} />
+            <Route path="conference/:id" element={<RouteWrapper><Services_ConferenceShow /></RouteWrapper>} />
             <Route path="visit" element={<RouteWrapper><Services_Visit /></RouteWrapper>} />
             <Route path="amc" element={<RouteWrapper><Services_AmcList /></RouteWrapper>} />
             <Route path="amc/create" element={<RouteWrapper><Services_AmcCreate /></RouteWrapper>} />
