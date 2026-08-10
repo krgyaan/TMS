@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, desc, ilike, or } from "drizzle-orm";
+import { eq, desc, ilike, like, or } from "drizzle-orm";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
 import { customerComplaints, serviceEngineers } from "@/db/schemas";
@@ -8,9 +8,32 @@ import type {
     UpdateCustomerComplaintDto,
 } from "./dto/customer.dto";
 
+type Tx = Parameters<Parameters<DbInstance["transaction"]>[0]>[0];
+
+type Executor = Tx | DbInstance;
+
 @Injectable()
 export class CustomerService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
+
+    private async generateTicketNo(tx: Tx): Promise<string> {
+        const now = new Date();
+        const mmyy = `${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getFullYear()).slice(-2)}`;
+        const prefix = `CC/${mmyy}/`;
+
+        const [last] = await tx
+            .select({ ticketNo: customerComplaints.ticketNo })
+            .from(customerComplaints)
+            .where(like(customerComplaints.ticketNo, `${prefix}%`))
+            .orderBy(desc(customerComplaints.ticketNo))
+            .limit(1);
+
+        const seq = last?.ticketNo
+            ? (Number(last.ticketNo.split("/").pop()) || 0) + 1
+            : 1;
+
+        return `${prefix}${String(seq).padStart(3, "0")}`;
+    }
 
     async list(search?: string) {
         const where = search
@@ -28,8 +51,8 @@ export class CustomerService {
             .orderBy(desc(customerComplaints.createdAt));
     }
 
-    async getById(id: number) {
-        const [complaint] = await this.db
+    private async getByIdTx(tx: Executor, id: number) {
+        const [complaint] = await tx
             .select()
             .from(customerComplaints)
             .where(eq(customerComplaints.id, id))
@@ -39,7 +62,7 @@ export class CustomerService {
             throw new NotFoundException("Customer complaint not found");
         }
 
-        const engineers = await this.db
+        const engineers = await tx
             .select()
             .from(serviceEngineers)
             .where(eq(serviceEngineers.complaintId, id))
@@ -48,8 +71,14 @@ export class CustomerService {
         return { ...complaint, engineers };
     }
 
+    async getById(id: number) {
+        return this.getByIdTx(this.db, id);
+    }
+
     async create(body: CreateCustomerComplaintDto, userId?: number) {
         return this.db.transaction(async tx => {
+            const ticketNo = await this.generateTicketNo(tx);
+
             const [complaint] = await tx
                 .insert(customerComplaints)
                 .values({
@@ -64,6 +93,7 @@ export class CustomerService {
                     attachment: body.attachment ?? null,
                     issueFaced: body.issueFaced ?? null,
                     status: body.status,
+                    ticketNo,
                     createdBy: userId,
                 })
                 .returning();
@@ -81,7 +111,7 @@ export class CustomerService {
                 await tx.insert(serviceEngineers).values(engineers);
             }
 
-            return this.getById(complaint.id);
+            return this.getByIdTx(tx, complaint.id);
         });
     }
 
@@ -131,7 +161,7 @@ export class CustomerService {
                 }
             }
 
-            return this.getById(id);
+            return this.getByIdTx(tx, id);
         });
     }
 

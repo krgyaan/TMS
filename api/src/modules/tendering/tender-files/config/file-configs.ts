@@ -106,12 +106,17 @@ const MIME = {
     WEBP: "image/webp",
     ZIP: "application/zip",
     RAR: "application/x-rar-compressed",
+    MP4: "video/mp4",
+    MOV: "video/quicktime",
+    WEBM: "video/webm",
+    MKV: "video/x-matroska",
 };
 
 const IMAGES = [MIME.JPG, MIME.PNG, MIME.WEBP];
 const DOCS = [MIME.PDF, ...IMAGES];
 const OFFICE = [MIME.DOC, MIME.DOCX, MIME.XLS, MIME.XLSX];
 const ARCHIVES = [MIME.ZIP, MIME.RAR];
+const VIDEOS = [MIME.MP4, MIME.MOV, MIME.WEBM, MIME.MKV];
 
 export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
     "tender-documents": {
@@ -931,9 +936,9 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
     },
     "customer-attachments": {
         maxFiles: 1,
-        maxSizeBytes: MB(10),
-        allowedMimeTypes: [...DOCS, ...OFFICE],
-        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"],
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...VIDEOS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".mp4", ".mov", ".webm", ".mkv"],
         compressImages: true,
         imageQuality: 80,
         compressPdf: true,

@@ -163,6 +163,10 @@ export const paths = {
     // ==================== SERVICES ====================
     services: {
         customer: "/services/customer",
+        customerCreate: "/services/customer/create",
+        customerEdit: (id: number | string) => `/services/customer/${id}/edit`,
+        customerShow: (id: number | string) => `/services/customer/${id}`,
+        customerView: (id: number | string) => `/services/customer/${id}/view`,
         conference: "/services/conference",
         visit: "/services/visit",
         amc: "/services/amc",

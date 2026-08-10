@@ -2,7 +2,11 @@ import { lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { RouteWrapper } from '../components/RouteWrapper';
 
-const Services_Customer = lazy(() => import('@/modules/services/customer'));
+const Services_CustomerList = lazy(() => import('@/modules/services/customer/CustomerListPage'));
+const Services_CustomerCreate = lazy(() => import('@/modules/services/customer/CustomerCreatePage'));
+const Services_CustomerEdit = lazy(() => import('@/modules/services/customer/CustomerEditPage'));
+const Services_CustomerShow = lazy(() => import('@/modules/services/customer/CustomerShowPage'));
+const Services_CustomerView = lazy(() => import('@/modules/services/customer/CustomerViewPage'));
 const Services_Conference = lazy(() => import('@/modules/services/conference'));
 const Services_Visit = lazy(() => import('@/modules/services/visit'));
 const Services_AmcList = lazy(() => import('@/modules/services/amc/AmcListPage'));
@@ -21,7 +25,11 @@ const Services_AmcServiceView = lazy(() => import('@/modules/services/amc-servic
 export default function ServicesRoutes() {
     return (
         <Routes>
-            <Route path="customer" element={<RouteWrapper><Services_Customer /></RouteWrapper>} />
+            <Route path="customer" element={<RouteWrapper><Services_CustomerList /></RouteWrapper>} />
+            <Route path="customer/create" element={<RouteWrapper><Services_CustomerCreate /></RouteWrapper>} />
+            <Route path="customer/:id/edit" element={<RouteWrapper><Services_CustomerEdit /></RouteWrapper>} />
+            <Route path="customer/:id/view" element={<RouteWrapper><Services_CustomerView /></RouteWrapper>} />
+            <Route path="customer/:id" element={<RouteWrapper><Services_CustomerShow /></RouteWrapper>} />
             <Route path="conference" element={<RouteWrapper><Services_Conference /></RouteWrapper>} />
             <Route path="visit" element={<RouteWrapper><Services_Visit /></RouteWrapper>} />
             <Route path="amc" element={<RouteWrapper><Services_AmcList /></RouteWrapper>} />
