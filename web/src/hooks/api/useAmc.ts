@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { amcService } from "@/services/api";
-import type { CreateAmcDto, UpdateAmcDto, AmcPathField } from "@/modules/services/amc/helpers/amc.types";
+import type { CreateAmcDto, UpdateAmcDto } from "@/modules/services/amc/helpers/amc.types";
+import { amcServicesKeys } from "@/hooks/api/useAmcServices";
+import { amcBillingKeys } from "@/hooks/api/useAmcBilling";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";
 
@@ -33,6 +35,8 @@ export const useCreateAmc = () => {
         mutationFn: (data: CreateAmcDto) => amcService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: amcKeys.lists() });
+            queryClient.invalidateQueries({ queryKey: amcServicesKeys.lists() });
+            queryClient.invalidateQueries({ queryKey: amcBillingKeys.lists() });
             toast.success("AMC created successfully");
         },
         onError: error => toast.error(handleQueryError(error)),
@@ -46,6 +50,8 @@ export const useUpdateAmc = () => {
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: amcKeys.lists() });
             queryClient.invalidateQueries({ queryKey: amcKeys.detail(variables.id) });
+            queryClient.invalidateQueries({ queryKey: amcServicesKeys.lists() });
+            queryClient.invalidateQueries({ queryKey: amcBillingKeys.lists() });
             toast.success("AMC updated successfully");
         },
         onError: error => toast.error(handleQueryError(error)),
@@ -58,21 +64,9 @@ export const useDeleteAmc = () => {
         mutationFn: (id: number) => amcService.remove(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: amcKeys.lists() });
+            queryClient.invalidateQueries({ queryKey: amcServicesKeys.lists() });
+            queryClient.invalidateQueries({ queryKey: amcBillingKeys.lists() });
             toast.success("AMC deleted successfully");
-        },
-        onError: error => toast.error(handleQueryError(error)),
-    });
-};
-
-export const useAmcFileUpload = () => {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: ({ id, field, file }: { id: number; field: AmcPathField; file: File }) =>
-            amcService.uploadFile(id, field, file),
-        onSuccess: (_data, variables) => {
-            queryClient.invalidateQueries({ queryKey: amcKeys.detail(variables.id) });
-            queryClient.invalidateQueries({ queryKey: amcKeys.lists() });
-            toast.success("File uploaded successfully");
         },
         onError: error => toast.error(handleQueryError(error)),
     });

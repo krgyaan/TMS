@@ -29,6 +29,7 @@ import { GoogleIntegrationModule } from "@/modules/integrations/google/google.mo
 import { CompaniesModule } from "@/modules/master/companies/companies.module";
 import { AmcModule } from "@/modules/services/amc/amc.module";
 import { AmcBillingModule } from "@/modules/services/amc-billing/amc-billing.module";
+import { AmcServicesModule } from "@/modules/services/amc-services/amc-services.module";
 import { DocumentsSubmittedModule } from "@/modules/master/documents-submitted/documents-submitted.module";
 import { EmdResponsibilitiesModule } from "@/modules/master/emd-responsibilities/emd-responsibilities.module";
 import { FinanceDocTypeModule } from "@/modules/master/finance-doc-type/finance-doc-type.module";
@@ -263,6 +264,7 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         CircularsModule,
         AmcModule,
         AmcBillingModule,
+        AmcServicesModule,
     ],
     controllers: [AppController,],
     providers: [

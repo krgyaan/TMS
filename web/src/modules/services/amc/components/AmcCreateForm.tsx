@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type Resolver } from "react-hook-form";
@@ -20,9 +20,8 @@ import { paths } from "@/app/routes/paths";
 import { useProjectsMaster } from "@/hooks/api/useProjects";
 import { useItems } from "@/hooks/api/useItems";
 import { useUsers } from "@/hooks/api/useUsers";
-import {
-    useAmc, useCreateAmc, useUpdateAmc, useAmcFileUpload,
-} from "@/hooks/api/useAmc";
+import { useAmc, useCreateAmc, useUpdateAmc } from "@/hooks/api/useAmc";
+import { TenderFileUploader } from "@/components/tender-file-upload/TenderFileUploader";
 import {
     AmcFormSchema,
     amcFormDefaultValues,
@@ -30,6 +29,8 @@ import {
     BILL_TYPE_OPTIONS,
     SERVICE_FREQUENCY_OPTIONS,
     BILL_FREQUENCY_OPTIONS,
+    sampleReport,
+    amcDocUrl,
     type AmcFormValues,
     type AmcSite,
     type AmcSiteContact,
@@ -360,38 +361,6 @@ function EngineerRow({ value, onChange, onRemove }: RowProps<AmcServiceEngineer>
     );
 }
 
-// ── File input ────────────────────────────────────────────────────────────────
-
-function FileInput({
-    label,
-    file,
-    onChange,
-}: {
-    label: string;
-    file: File | null;
-    onChange: (f: File | null) => void;
-}) {
-    return (
-        <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <FileText className="h-3.5 w-3.5" /> {label}
-            </label>
-            <input
-                type="file"
-                className={
-                    "border-input dark:bg-input/30 h-9 w-full rounded-md border " +
-                    "bg-transparent px-3 py-1 text-sm outline-none file:mr-2 " +
-                    "file:border-0 file:bg-transparent file:text-sm file:font-medium"
-                }
-                onChange={e => onChange(e.target.files?.[0] ?? null)}
-            />
-            {file && (
-                <span className="text-xs text-muted-foreground">{file.name}</span>
-            )}
-        </div>
-    );
-}
-
 // ── Section divider ───────────────────────────────────────────────────────────
 
 function SectionDivider({
@@ -419,7 +388,9 @@ function SectionDivider({
 const defaultSite: AmcSite = { name: "", address: "", contacts: [] };
 const defaultEngineer: AmcServiceEngineer = { name: "", mobile: "" };
 const defaultProduct: AmcProduct = { itemId: 0, quantity: 1 };
-const defaultVariableBill = { label: "", amount: "" };
+const defaultVariableBill = { date: "", amount: "" };
+
+type VariableBillRow = { date: string; amount: string };
 
 const FREQUENCY_MONTHS: Record<string, number> = {
     Monthly: 1,
@@ -470,13 +441,24 @@ const cleanProducts = (products: AmcProduct[]) => products.filter(p => p.itemId 
 const cleanEngineers = (engineers: AmcServiceEngineer[]) =>
     engineers.filter(e => e.name.trim() && e.mobile.trim());
 
+const buildServiceReportPath = (
+    existing: string[] | null | undefined,
+    newSample: string | undefined,
+): string[] | null => {
+    const filledEntries = (existing ?? []).filter(e => e.startsWith("filled:"));
+    const sample = newSample
+        ? `sample:${newSample}`
+        : existing?.find(e => e.startsWith("sample:"));
+    const next = [...(sample ? [sample] : []), ...filledEntries];
+    return next.length ? next : null;
+};
+
 export function AmcCreateForm({ amcId }: { amcId?: number }) {
     const navigate = useNavigate();
     const isEdit = !!amcId;
 
     const createAmc = useCreateAmc();
     const updateAmc = useUpdateAmc();
-    const uploadFile = useAmcFileUpload();
     const { data: amc } = useAmc(amcId ?? 0);
     const { data: projects = [] } = useProjectsMaster();
     const { data: allUsers = [], isLoading: teLoading } = useUsers();
@@ -495,15 +477,24 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
     const amcStartDate = form.watch("amcStartDate");
     const amcEndDate = form.watch("amcEndDate");
     const billFrequency = form.watch("billFrequency");
+    const billValue = form.watch("billValue") ?? "";
 
     const [sites, setSites] = useState<AmcSite[]>([defaultSite]);
     const [products, setProducts] = useState<AmcProduct[]>([]);
     const [engineers, setEngineers] = useState<AmcServiceEngineer[]>([]);
-    const [variableBills, setVariableBills] = useState<
-        Array<{ label: string; amount: string }>
-    >([defaultVariableBill]);
-    const [serviceReportFile, setServiceReportFile] = useState<File | null>(null);
-    const [amcPoFile, setAmcPoFile] = useState<File | null>(null);
+    const [variableBills, setVariableBills] = useState<VariableBillRow[]>(
+        [defaultVariableBill],
+    );
+    const [reportFormatPaths, setReportFormatPaths] = useState<string[]>([]);
+    const [amcPoPaths, setAmcPoPaths] = useState<string[]>([]);
+
+    const constantBillDates = useMemo(
+        () =>
+            billType === "constant" && amcStartDate && amcEndDate && billFrequency
+                ? computeBillDates(amcStartDate, amcEndDate, billFrequency)
+                : [],
+        [billType, amcStartDate, amcEndDate, billFrequency],
+    );
 
     useEffect(() => {
         if (billType !== "variable") return;
@@ -514,9 +505,9 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
 
         setVariableBills(prev => {
             const matches =
-                prev.length === dates.length && prev.every((row, i) => row.label === dates[i]);
+                prev.length === dates.length && prev.every((row, i) => row.date === dates[i]);
             if (matches) return prev;
-            return dates.map((date, i) => ({ label: date, amount: prev[i]?.amount ?? "" }));
+            return dates.map((date, i) => ({ date, amount: prev[i]?.amount ?? "" }));
         });
     }, [billType, amcStartDate, amcEndDate, billFrequency]);
 
@@ -539,7 +530,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
         setVariableBills(
             amc.variableBills?.length
                 ? amc.variableBills.map((b, i) => ({
-                      label: b.label || `Q${i + 1}`,
+                      date: b.date || b.label || `Q${i + 1}`,
                       amount: b.amount != null ? String(b.amount) : "",
                   }))
                 : [defaultVariableBill],
@@ -547,14 +538,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isEdit, amc]);
 
-    const saving = createAmc.isPending || updateAmc.isPending || uploadFile.isPending;
-
-    const uploadPendingFiles = async (id: number) => {
-        if (amcPoFile)
-            await uploadFile.mutateAsync({ id, field: "po", file: amcPoFile });
-        if (serviceReportFile)
-            await uploadFile.mutateAsync({ id, field: "service-report", file: serviceReportFile });
-    };
+    const saving = createAmc.isPending || updateAmc.isPending;
 
     const onSubmit = async (values: AmcFormValues) => {
         const payload: CreateAmcDto = {
@@ -573,11 +557,14 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
             variableBills:
                 values.billType === "variable"
                     ? variableBills
-                          .filter(b => b.label || b.amount)
-                          .map(b => ({ label: b.label, amount: b.amount ? Number(b.amount) : undefined }))
+                          .filter(b => b.date || b.amount)
+                          .map(b => ({ date: b.date, amount: b.amount ? Number(b.amount) : undefined }))
                     : undefined,
-            serviceReportPath: amc?.serviceReportPath ?? null,
-            amcPoPath: amc?.amcPoPath ?? null,
+            serviceReportPath: buildServiceReportPath(
+                amc?.serviceReportPath,
+                reportFormatPaths[0],
+            ),
+            amcPoPath: amcPoPaths[0] ?? amc?.amcPoPath ?? null,
             sites: cleanSites(sites),
             products: cleanProducts(products),
             serviceEngineers: cleanEngineers(engineers),
@@ -585,14 +572,11 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
 
         try {
             if (isEdit && amcId) {
-                const updated = await updateAmc.mutateAsync({ id: amcId, data: payload });
-                await uploadPendingFiles(updated.id);
-                navigate(paths.services.amc);
+                await updateAmc.mutateAsync({ id: amcId, data: payload });
             } else {
-                const created = await createAmc.mutateAsync(payload);
-                await uploadPendingFiles(created.id);
-                navigate(paths.services.amc);
+                await createAmc.mutateAsync(payload);
             }
+            navigate(paths.services.amc);
         } catch {
             // handled by hooks
         }
@@ -767,6 +751,31 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                             )}
                         </div>
 
+                        {/* Constant bills preview (read-only amounts from Bill Value) */}
+                        {billType === "constant" && constantBillDates.length > 0 && (
+                            <div className="mt-5 space-y-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Bill Schedule Preview (per bill due date)
+                                </p>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Bill Date</TableHead>
+                                            <TableHead>Bill Value (Pre GST)</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {constantBillDates.map((date, idx) => (
+                                            <TableRow key={idx}>
+                                                <TableCell>{date}</TableCell>
+                                                <TableCell>{billValue || "0.00"}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
+
                         {/* Variable bills */}
                         {billType === "variable" && (
                             <div className="mt-5 space-y-3">
@@ -782,7 +791,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                                         onClick={() =>
                                             setVariableBills(vb => [
                                                 ...vb,
-                                                { label: "", amount: "" },
+                                                { date: "", amount: "" },
                                             ])
                                         }
                                     >
@@ -804,12 +813,12 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                                                     <Input
                                                         className={inputCls}
                                                         type="date"
-                                                        value={row.label}
+                                                        value={row.date}
                                                         onChange={e =>
                                                             setVariableBills(vb =>
                                                                 vb.map((r, i) =>
                                                                     i === idx
-                                                                        ? { ...r, label: e.target.value }
+                                                                        ? { ...r, date: e.target.value }
                                                                         : r,
                                                                 ),
                                                             )
@@ -913,16 +922,48 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                         />
                         {/* ↓ two-column grid puts both uploads on one line */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <FileInput
-                                label="Service Report Format Upload"
-                                file={serviceReportFile}
-                                onChange={setServiceReportFile}
-                            />
-                            <FileInput
-                                label="Upload AMC PO"
-                                file={amcPoFile}
-                                onChange={setAmcPoFile}
-                            />
+                            <div className="space-y-2">
+                                <p className="text-xs font-semibold text-muted-foreground">
+                                    Service Report Format (Sample)
+                                </p>
+                                {sampleReport(amc?.serviceReportPath) && (
+                                    <a
+                                        href={amcDocUrl(sampleReport(amc?.serviceReportPath))}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                    >
+                                        <FileText className="h-3.5 w-3.5" /> Current format file
+                                    </a>
+                                )}
+                                <TenderFileUploader
+                                    context="amc-service-report"
+                                    value={reportFormatPaths}
+                                    onChange={setReportFormatPaths}
+                                    label="Upload sample format"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <p className="text-xs font-semibold text-muted-foreground">
+                                    AMC PO
+                                </p>
+                                {amc?.amcPoPath && (
+                                    <a
+                                        href={amcDocUrl(amc.amcPoPath)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                    >
+                                        <FileText className="h-3.5 w-3.5" /> Current PO file
+                                    </a>
+                                )}
+                                <TenderFileUploader
+                                    context="amc-po"
+                                    value={amcPoPaths}
+                                    onChange={setAmcPoPaths}
+                                    label="Upload PO"
+                                />
+                            </div>
                         </div>
                     </div>
 

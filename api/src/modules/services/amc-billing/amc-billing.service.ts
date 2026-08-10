@@ -1,20 +1,9 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { eq, and, asc, inArray, isNotNull } from "drizzle-orm";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
-import {
-    amcs,
-    amcSites,
-    amcContacts,
-    amcCompletedServices,
-    projects,
-} from "@/db/schemas";
-import type {
-    CreateAmcBillingDto,
-    UpdateAmcBillingDto,
-} from "./dto/amc-billing.dto";
+import { amcs, amcSites, amcContacts, amcServices, amcBills, projects, organizations } from "@/db/schemas";
 
-const DEFAULT_STATUS = "Signed Service reports Received";
 const CONTACT_SOURCE = {
     site: "site_contacts",
     engineer: "service_engineer",
@@ -26,14 +15,14 @@ export class AmcBillingService {
 
     async list(amcId?: number) {
         const where = amcId
-            ? eq(amcCompletedServices.amcId, amcId)
+            ? eq(amcBills.amcId, amcId)
             : undefined;
 
         const rows = await this.db
             .select()
-            .from(amcCompletedServices)
+            .from(amcBills)
             .where(where)
-            .orderBy(desc(amcCompletedServices.serviceCompletedDate));
+            .orderBy(asc(amcBills.billDueDate));
 
         return this.enrichAll(rows);
     }
@@ -41,97 +30,132 @@ export class AmcBillingService {
     async getById(id: number) {
         const [row] = await this.db
             .select()
-            .from(amcCompletedServices)
-            .where(eq(amcCompletedServices.id, id))
+            .from(amcBills)
+            .where(eq(amcBills.id, id))
             .limit(1);
 
         if (!row) {
-            throw new NotFoundException(`Completed service with ID ${id} not found`);
+            throw new NotFoundException(`AMC bill with ID ${id} not found`);
         }
 
         const [enriched] = await this.enrichAll([row]);
         return enriched;
     }
 
-    async create(dto: CreateAmcBillingDto) {
-        const [row] = await this.db
-            .insert(amcCompletedServices)
-            .values({
-                amcId: dto.amcId,
-                amcSiteId: dto.amcSiteId ?? null,
-                serviceDueDate: dto.serviceDueDate ?? null,
-                serviceCompletedDate: dto.serviceCompletedDate
-                    ? new Date(dto.serviceCompletedDate)
-                    : null,
-                notes: dto.notes ?? null,
-                status: dto.status ?? DEFAULT_STATUS,
-                invoice: dto.invoice ?? null,
-                paymentReceipt: dto.paymentReceipt ?? null,
-            })
-            .returning();
-
-        return this.getById(row.id);
-    }
-
-    async update(id: number, dto: UpdateAmcBillingDto) {
+    async addInvoices(id: number, filePaths: string[]) {
         await this.ensureExists(id);
 
-        const patch: Record<string, unknown> = {};
+        const [bill] = await this.db
+            .select({ invoices: amcBills.invoices })
+            .from(amcBills)
+            .where(eq(amcBills.id, id))
+            .limit(1);
 
-        if (dto.amcId !== undefined) patch.amcId = dto.amcId;
-        if (dto.amcSiteId !== undefined) patch.amcSiteId = dto.amcSiteId;
-        if (dto.serviceDueDate !== undefined) patch.serviceDueDate = dto.serviceDueDate;
-        if (dto.serviceCompletedDate !== undefined) {
-            patch.serviceCompletedDate = dto.serviceCompletedDate
-                ? new Date(dto.serviceCompletedDate)
-                : null;
+        const currentInvoices = (bill?.invoices as string[]) ?? [];
+        const updatedInvoices = [...currentInvoices, ...filePaths];
+
+        await this.db
+            .update(amcBills)
+            .set({ invoices: updatedInvoices, status: "Bill Submitted" })
+            .where(eq(amcBills.id, id));
+
+        return this.getById(id);
+    }
+
+    async addReceipts(id: number, filePaths: string[]) {
+        await this.ensureExists(id);
+
+        const [bill] = await this.db
+            .select({ paymentReceipts: amcBills.paymentReceipts })
+            .from(amcBills)
+            .where(eq(amcBills.id, id))
+            .limit(1);
+
+        const currentReceipts = (bill?.paymentReceipts as string[]) ?? [];
+        const updatedReceipts = [...currentReceipts, ...filePaths];
+
+        await this.db
+            .update(amcBills)
+            .set({ paymentReceipts: updatedReceipts, status: "Payment Received" })
+            .where(eq(amcBills.id, id));
+
+        return this.getById(id);
+    }
+
+    async removeInvoice(id: number, index: number) {
+        await this.ensureExists(id);
+
+        const [bill] = await this.db
+            .select({ invoices: amcBills.invoices })
+            .from(amcBills)
+            .where(eq(amcBills.id, id))
+            .limit(1);
+
+        const currentInvoices = (bill?.invoices as string[]) ?? [];
+        if (index < 0 || index >= currentInvoices.length) {
+            throw new BadRequestException("Invalid invoice index");
         }
-        if (dto.notes !== undefined) patch.notes = dto.notes;
-        if (dto.status !== undefined) patch.status = dto.status;
-        if (dto.invoice !== undefined) patch.invoice = dto.invoice;
-        if (dto.paymentReceipt !== undefined) patch.paymentReceipt = dto.paymentReceipt;
+
+        const updatedInvoices = currentInvoices.filter((_, i) => i !== index);
 
         await this.db
-            .update(amcCompletedServices)
-            .set(patch)
-            .where(eq(amcCompletedServices.id, id));
+            .update(amcBills)
+            .set({ invoices: updatedInvoices })
+            .where(eq(amcBills.id, id));
 
         return this.getById(id);
     }
 
-    async setFilePath(id: number, field: "invoice" | "paymentReceipt", path: string) {
+    async removeReceipt(id: number, index: number) {
         await this.ensureExists(id);
 
-        const status = field === "invoice" ? "Bill Submitted" : "Payment Received";
+        const [bill] = await this.db
+            .select({ paymentReceipts: amcBills.paymentReceipts })
+            .from(amcBills)
+            .where(eq(amcBills.id, id))
+            .limit(1);
+
+        const currentReceipts = (bill?.paymentReceipts as string[]) ?? [];
+        if (index < 0 || index >= currentReceipts.length) {
+            throw new BadRequestException("Invalid receipt index");
+        }
+
+        const updatedReceipts = currentReceipts.filter((_, i) => i !== index);
 
         await this.db
-            .update(amcCompletedServices)
-            .set({ [field]: path, status } as Record<string, unknown>)
-            .where(eq(amcCompletedServices.id, id));
+            .update(amcBills)
+            .set({ paymentReceipts: updatedReceipts })
+            .where(eq(amcBills.id, id));
 
         return this.getById(id);
     }
 
-    async remove(id: number) {
+    async followup(id: number) {
         await this.ensureExists(id);
+
         await this.db
-            .delete(amcCompletedServices)
-            .where(eq(amcCompletedServices.id, id));
-        return { id, deleted: true };
+            .update(amcBills)
+            .set({ status: "Follow-up" })
+            .where(eq(amcBills.id, id));
+
+        return this.getById(id);
     }
 
-    private async enrichAll(rows: (typeof amcCompletedServices.$inferSelect)[]) {
+    private async enrichAll(rows: (typeof amcBills.$inferSelect)[]) {
         if (!rows.length) {
             return [];
         }
 
         const amcIds = [...new Set(rows.map(row => row.amcId))];
-        const siteIds = [...new Set(rows.map(row => row.amcSiteId).filter((id): id is number => !!id))];
+        const siteIds = [...new Set(rows.map(row => row.amcSiteId))];
+        const billIds = rows.map(row => row.id);
 
-        const amcRows = await this.db
-            .select()
-            .from(amcs)
-            .where(inArray(amcs.id, amcIds));
+        const amcRows = amcIds.length
+            ? await this.db
+                  .select()
+                  .from(amcs)
+                  .where(inArray(amcs.id, amcIds))
+            : [];
 
         const siteRows = siteIds.length
             ? await this.db
@@ -164,12 +188,51 @@ export class AmcBillingService {
                   )
             : [];
 
+        const serviceRows = billIds.length
+            ? await this.db
+                  .select()
+                  .from(amcServices)
+                  .where(
+                      and(
+                          inArray(amcServices.billId, billIds),
+                          isNotNull(amcServices.billId),
+                      ),
+                  )
+                  .orderBy(asc(amcServices.serviceDueDate))
+            : [];
+
         const projectRows = amcRows.length
             ? await this.db
-                  .select({ id: projects.id, name: projects.projectName })
+                  .select({
+                      id: projects.id,
+                      name: projects.projectName,
+                      orgId: projects.organisationId,
+                  })
                   .from(projects)
                   .where(inArray(projects.id, amcRows.map(amc => amc.projectId)))
             : [];
+
+        const orgIds = Array.from(
+            new Set(
+                projectRows
+                    .map(p => p.orgId)
+                    .filter((id): id is number => id !== null && id !== undefined),
+            ),
+        );
+
+        // ── Fetch both name AND acronym from organizations ────────────────────
+        const orgRows = orgIds.length
+            ? await this.db
+                  .select({
+                      id: organizations.id,
+                      name: organizations.name,
+                      acronym: organizations.acronym,   // ← added
+                  })
+                  .from(organizations)
+                  .where(inArray(organizations.id, orgIds))
+            : [];
+
+        // ── Build lookup maps ─────────────────────────────────────────────────
 
         const amcById = new Map<number, (typeof amcRows)[number]>();
         for (const amc of amcRows) amcById.set(amc.id, amc);
@@ -179,6 +242,16 @@ export class AmcBillingService {
 
         const projectNameById = new Map<number, string | null>();
         for (const project of projectRows) projectNameById.set(project.id, project.name);
+
+        const projectOrgIdById = new Map<number, number | null>();
+        for (const project of projectRows) projectOrgIdById.set(project.id, project.orgId);
+
+        const orgNameById = new Map<number, string>();
+        for (const org of orgRows) orgNameById.set(org.id, org.name);
+
+        // ← added: acronym map
+        const orgAcronymById = new Map<number, string | null>();
+        for (const org of orgRows) orgAcronymById.set(org.id, org.acronym ?? null);
 
         const engineersByAmcId = new Map<number, (typeof engineerRows)[number][]>();
         for (const engineer of engineerRows) {
@@ -195,17 +268,37 @@ export class AmcBillingService {
             contactsBySiteId.set(contact.amcSiteId, list);
         }
 
+        const servicesByBillId = new Map<number, (typeof serviceRows)[number][]>();
+        for (const service of serviceRows) {
+            if (service.billId === null) continue;
+            const list = servicesByBillId.get(service.billId) ?? [];
+            list.push(service);
+            servicesByBillId.set(service.billId, list);
+        }
+
         return rows.map(row => {
             const amc = amcById.get(row.amcId);
             const site = row.amcSiteId ? siteById.get(row.amcSiteId) : undefined;
 
+            // Helper to resolve org fields for this amc's project
+            const resolveOrg = <T>(map: Map<number, T>): T | null => {
+                if (!amc) return null;
+                const orgId = projectOrgIdById.get(amc.projectId);
+                return orgId != null ? (map.get(orgId) ?? null) : null;
+            };
+
             return {
                 ...row,
+                invoices: (row.invoices as string[]) ?? [],
+                paymentReceipts: (row.paymentReceipts as string[]) ?? [],
                 amc: amc
                     ? {
                           id: amc.id,
                           teamName: amc.teamName,
                           projectName: projectNameById.get(amc.projectId) ?? null,
+                          orgName: resolveOrg(orgNameById),           // full name
+                          orgAcronym: resolveOrg(orgAcronymById),     // ← acronym
+                          allocatedTe: amc.allocatedTe,
                           signedServiceReportPath: amc.signedServiceReportPath,
                           serviceEngineers: engineersByAmcId.get(amc.id) ?? [],
                       }
@@ -213,22 +306,25 @@ export class AmcBillingService {
                 site: site
                     ? {
                           ...site,
-                          contacts: row.amcSiteId ? (contactsBySiteId.get(row.amcSiteId) ?? []) : [],
+                          contacts: row.amcSiteId
+                              ? (contactsBySiteId.get(row.amcSiteId) ?? [])
+                              : [],
                       }
                     : null,
+                services: servicesByBillId.get(row.id) ?? [],
             };
         });
     }
 
     private async ensureExists(id: number) {
         const [row] = await this.db
-            .select({ id: amcCompletedServices.id })
-            .from(amcCompletedServices)
-            .where(eq(amcCompletedServices.id, id))
+            .select({ id: amcBills.id })
+            .from(amcBills)
+            .where(eq(amcBills.id, id))
             .limit(1);
 
         if (!row) {
-            throw new NotFoundException(`Completed service with ID ${id} not found`);
+            throw new NotFoundException(`AMC bill with ID ${id} not found`);
         }
     }
 }

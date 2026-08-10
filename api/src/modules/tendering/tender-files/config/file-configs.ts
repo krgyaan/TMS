@@ -74,7 +74,12 @@ export type TenderFileContext =
     | "tender-rejection-proof"
     | "cancel-tender"
     | "payment-proof"
-    | "followups";
+    | "followups"
+    | "amc-po"
+    | "amc-service-report"
+    | "amc-invoices"
+    | "amc-receipts"
+    | "amc-service-reports";
 
 export interface FileConfig {
     maxFiles: number;
@@ -870,6 +875,56 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx"],
         compressImages: true,
         imageQuality: 85,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "amc-po": {
+        maxFiles: 1,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "amc-service-report": {
+        maxFiles: 1,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "amc-invoices": {
+        maxFiles: 10,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "amc-receipts": {
+        maxFiles: 10,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "amc-service-reports": {
+        maxFiles: 1,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"],
+        compressImages: true,
+        imageQuality: 80,
         compressPdf: true,
         pdfQuality: 80,
     },

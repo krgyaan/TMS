@@ -1,7 +1,6 @@
 import { BaseApiService } from "./base.service";
 import type {
     AmcDetail,
-    AmcPathField,
     CreateAmcDto,
     UpdateAmcDto,
 } from "@/modules/services/amc/helpers/amc.types";
@@ -29,12 +28,6 @@ class AmcService extends BaseApiService {
 
     async remove(id: number): Promise<{ id: number; deleted: boolean }> {
         return this.delete<{ id: number; deleted: boolean }>(`/${id}`);
-    }
-
-    async uploadFile(id: number, field: AmcPathField, file: File): Promise<AmcDetail> {
-        const formData = new FormData();
-        formData.append("file", file);
-        return this.post<AmcDetail>(`/${id}/upload/${field}`, formData);
     }
 }
 
