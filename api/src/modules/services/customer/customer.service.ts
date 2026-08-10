@@ -4,6 +4,7 @@ import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
 import { customerComplaints, serviceEngineers } from "@/db/schemas";
 import type {
+    AllotEngineerDto,
     CreateCustomerComplaintDto,
     UpdateCustomerComplaintDto,
 } from "./dto/customer.dto";
@@ -103,7 +104,6 @@ export class CustomerService {
                 name: engineer.name,
                 phone: engineer.phone,
                 email: engineer.email,
-                status: engineer.status,
                 allotedBy: engineer.allotedBy ?? userId,
             }));
 
@@ -152,7 +152,6 @@ export class CustomerService {
                     name: engineer.name,
                     phone: engineer.phone,
                     email: engineer.email,
-                    status: engineer.status,
                     allotedBy: engineer.allotedBy ?? null,
                 }));
 
@@ -162,6 +161,59 @@ export class CustomerService {
             }
 
             return this.getByIdTx(tx, id);
+        });
+    }
+
+    async allotEngineer(id: number, body: AllotEngineerDto, userId?: number) {
+        return this.db.transaction(async tx => {
+            const [existing] = await tx
+                .select({ id: customerComplaints.id })
+                .from(customerComplaints)
+                .where(eq(customerComplaints.id, id))
+                .limit(1);
+
+            if (!existing) {
+                throw new NotFoundException("Customer complaint not found");
+            }
+
+            const [engineer] = await tx
+                .insert(serviceEngineers)
+                .values({
+                    complaintId: id,
+                    name: body.name,
+                    phone: body.phone,
+                    email: body.email,
+                    allotedBy: userId,
+                })
+                .returning();
+
+            return engineer;
+        });
+    }
+
+    async updateEngineer(complaintId: number, engineerId: number, body: AllotEngineerDto) {
+        return this.db.transaction(async tx => {
+            const [existing] = await tx
+                .select({ id: serviceEngineers.id })
+                .from(serviceEngineers)
+                .where(eq(serviceEngineers.id, engineerId))
+                .limit(1);
+
+            if (!existing) {
+                throw new NotFoundException("Service engineer not found");
+            }
+
+            const [engineer] = await tx
+                .update(serviceEngineers)
+                .set({
+                    name: body.name,
+                    phone: body.phone,
+                    email: body.email,
+                })
+                .where(eq(serviceEngineers.id, engineerId))
+                .returning();
+
+            return engineer;
         });
     }
 

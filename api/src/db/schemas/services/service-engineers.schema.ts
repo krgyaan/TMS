@@ -1,6 +1,4 @@
-import { pgTable, bigserial, bigint, varchar, timestamp, index, pgEnum } from "drizzle-orm/pg-core";
-
-export const serviceEngineerStatusEnum = pgEnum("service_engineer_status", ["0", "1"]);
+import { pgTable, bigserial, bigint, varchar, timestamp, index } from "drizzle-orm/pg-core";
 
 export const serviceEngineers = pgTable(
     "service_engineers",
@@ -10,7 +8,6 @@ export const serviceEngineers = pgTable(
         name: varchar("name", { length: 255 }).notNull(),
         phone: varchar("phone", { length: 20 }).notNull(),
         email: varchar("email", { length: 255 }).notNull(),
-        status: serviceEngineerStatusEnum("status").default("1"),
         allotedBy: bigint("alloted_by", { mode: "number" }),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

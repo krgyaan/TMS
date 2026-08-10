@@ -1,26 +1,55 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
-import { Plus, Eye, Pencil, Trash2, Search } from "lucide-react";
+import { Plus, Eye, Pencil, Search, UserPlus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import DataTable from "@/components/ui/data-table";
 import { paths } from "@/app/routes/paths";
-import { useCustomers, useDeleteCustomer } from "@/hooks/api/useCustomer";
+import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
+import { useCustomers } from "@/hooks/api/useCustomer";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
-import { dateCol } from "@/components/data-grid";
 import { cn } from "@/lib/utils";
+import { AllotEngineerModal } from "./components/AllotEngineerModal";
 import type { CustomerComplaintDetail } from "./helpers/customer.types";
+
+const COMPLAINT_SLA_MS = 12 * 60 * 60 * 1000;
+
+function ComplaintTimerCell({ createdAt }: { createdAt?: string | null }) {
+    const [now, setNow] = useState(() => Date.now());
+
+    useEffect(() => {
+        const interval = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const end = createdAt ? new Date(createdAt).getTime() + COMPLAINT_SLA_MS : null;
+    const overdue = end !== null && end - now <= 0;
+
+    if (end === null) {
+        return <TenderTimerDisplay remainingSeconds={0} status="TIMER_NOT_FOUND" />;
+    }
+
+    return (
+        <TenderTimerDisplay
+            remainingSeconds={Math.max(0, Math.floor((end - now) / 1000))}
+            status={overdue ? "OVERDUE" : "RUNNING"}
+            deadline={new Date(end)}
+        />
+    );
+}
 
 export default function CustomerListPage() {
     const navigate = useNavigate();
     const { data: complaints = [], isLoading } = useCustomers();
-    const deleteCustomer = useDeleteCustomer();
+
+    const [allotOpen, setAllotOpen] = useState(false);
+    const [allotComplaint, setAllotComplaint] = useState<CustomerComplaintDetail | null>(null);
 
     const { search, setSearch, debouncedSearch } = usePersistentTableState({
         storageKey: "customer-complaints-list",
@@ -31,17 +60,13 @@ export default function CustomerListPage() {
         const query = debouncedSearch.trim().toLowerCase();
         if (!query) return complaints;
         return complaints.filter(row =>
-            [row.name, row.organization, row.phone, row.email, row.siteProjectName, row.siteLocation, row.ticketNo]
+            [row.ticketNo, row.organization, row.siteProjectName, row.siteLocation, row.issueFaced]
                 .filter(Boolean)
                 .join(" ")
                 .toLowerCase()
                 .includes(query),
         );
     }, [complaints, debouncedSearch]);
-
-    const handleDelete = async (row: CustomerComplaintDetail) => {
-        await deleteCustomer.mutateAsync(row.id);
-    };
 
     const actions: ActionItem<CustomerComplaintDetail>[] = [
         {
@@ -55,22 +80,22 @@ export default function CustomerListPage() {
             icon: <Pencil className="h-4 w-4" />,
         },
         {
-            label: "Delete",
-            onClick: handleDelete,
-            icon: <Trash2 className="h-4 w-4" />,
-            className: "text-destructive",
+            label: "Allot Engineer",
+            onClick: row => {
+                setAllotComplaint(row);
+                setAllotOpen(true);
+            },
+            icon: <UserPlus className="h-4 w-4" />,
         },
     ];
 
     const colDefs = useMemo<ColDef<CustomerComplaintDetail>[]>(() => {
         return [
-            { field: "ticketNo", headerName: "Ticket No.", minWidth: 130 },
-            { field: "name", headerName: "Name", minWidth: 150 },
-            { field: "organization", headerName: "Organization", minWidth: 150 },
-            { field: "phone", headerName: "Phone No.", minWidth: 130 },
-            { field: "email", headerName: "Email", minWidth: 180 },
-            { field: "siteProjectName", headerName: "Site/Project Name", minWidth: 180 },
+            { field: "ticketNo", headerName: "Ticket No.", width: 130 },
+            { field: "organization", headerName: "Organization" , width: 160 },
+            { field: "siteProjectName", headerName: "Site/Project", width: 160 },
             { field: "siteLocation", headerName: "Site Location", minWidth: 160 },
+            { field: "issueFaced", headerName: "Issue Faced", width: 160 },
             {
                 colId: "status",
                 headerName: "Status",
@@ -92,7 +117,16 @@ export default function CustomerListPage() {
                     );
                 },
             },
-            dateCol("createdAt", { includeTime: false }, { headerName: "Created Date", width: 140 }),
+            {
+                colId: "timer",
+                headerName: "Timer",
+                width: 110,
+                sortable: false,
+                filter: false,
+                cellRenderer: (params: CustomCellRendererProps<CustomerComplaintDetail>) => (
+                    <ComplaintTimerCell createdAt={params.data?.createdAt} />
+                ),
+            },
             {
                 colId: "actions",
                 headerName: "Actions",
@@ -104,7 +138,7 @@ export default function CustomerListPage() {
             },
         ];
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [navigate, deleteCustomer.isPending]);
+    }, [navigate, allotOpen]);
 
     return (
         <Card className="min-h-[calc(100vh-2rem)] flex flex-col border-0 shadow-none">
@@ -138,7 +172,7 @@ export default function CustomerListPage() {
 
                 <DataTable
                     data={rows}
-                    loading={isLoading || deleteCustomer.isPending}
+                    loading={isLoading}
                     columnDefs={colDefs}
                     gridOptions={{
                         defaultColDef: { filter: true, sortable: true },
@@ -147,6 +181,13 @@ export default function CustomerListPage() {
                     enablePagination={true}
                 />
             </CardContent>
+
+            <AllotEngineerModal
+                open={allotOpen}
+                onOpenChange={setAllotOpen}
+                complaintId={allotComplaint?.id ?? null}
+                ticketNo={allotComplaint?.ticketNo}
+            />
         </Card>
     );
 }

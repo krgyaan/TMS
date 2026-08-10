@@ -1,9 +1,17 @@
 import type { ReactNode } from "react";
-import { FileText, Download } from "lucide-react";
+import { FileText, Download, Wrench } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { formatDate, formatDateTime } from "@/hooks/useFormatedDate";
+import { formatDateTime } from "@/hooks/useFormatedDate";
+import { useUsers } from "@/hooks/api/useUsers";
 import type { CustomerComplaintDetail } from "../helpers/customer.types";
 import { customerAttachmentUrl } from "../helpers/customer.types";
 
@@ -37,6 +45,10 @@ function InfoCell({ label, value }: { label: string; value: ReactNode }) {
 export function CustomerView({ complaint }: { complaint: CustomerComplaintDetail }) {
     const isImage = complaint.attachment?.match(/\.(jpg|jpeg|png|webp)$/i);
     const isVideo = complaint.attachment?.match(/\.(mp4|mov|webm|mkv)$/i);
+
+    const { data: allUsers = [] } = useUsers();
+    const createdByUser = allUsers.find(u => u.id === complaint.createdBy);
+    const createdByName = createdByUser?.name ?? "—";
 
     return (
         <Card className="overflow-hidden">
@@ -82,6 +94,10 @@ export function CustomerView({ complaint }: { complaint: CustomerComplaintDetail
                                 />
                                 <InfoCell label="Created Date" value={formatDateTime(complaint.createdAt)} />
                             </TableRow>
+                            <TableRow className="hover:bg-muted/30">
+                                <InfoCell label="Created By" value={createdByName} />
+                                <InfoCell label="" value={null} />
+                            </TableRow>
                         </TableBody>
                     </Table>
                 </div>
@@ -101,7 +117,7 @@ export function CustomerView({ complaint }: { complaint: CustomerComplaintDetail
                             </TableRow>
                             <TableRow className="hover:bg-muted/30">
                                 <InfoCell label="PO No." value={complaint.poNo} />
-                                <InfoCell label="Last Updated" value={formatDate(complaint.updatedAt)} />
+                                <InfoCell label="" value={null} />
                             </TableRow>
                         </TableBody>
                     </Table>
@@ -118,7 +134,41 @@ export function CustomerView({ complaint }: { complaint: CustomerComplaintDetail
                 </div>
             </div>
 
-            {/* ── 4. Attachment ───────────────────────────────────────────── */}
+            {/* ── 4. Service Engineers ────────────────────────────────────── */}
+            <div className={sectionCls}>
+                <SectionTitle icon={<Wrench className="h-4 w-4" />}>
+                    Service Engineers
+                </SectionTitle>
+
+                {complaint.engineers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No engineers allotted.</p>
+                ) : (
+                    <div className="rounded-lg border overflow-hidden">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-muted/40">
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Email</TableHead>
+                                    <TableHead>Mobile No.</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {complaint.engineers.map((engineer, idx) => (
+                                    <TableRow key={engineer.id ?? idx} className="hover:bg-muted/30">
+                                        <TableCell className="text-sm font-medium">
+                                            {engineer.name}
+                                        </TableCell>
+                                        <TableCell className="text-sm">{engineer.email || "—"}</TableCell>
+                                        <TableCell className="text-sm">{engineer.phone || "—"}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+            </div>
+
+            {/* ── 5. Attachment ───────────────────────────────────────────── */}
             <div className={sectionCls}>
                 <SectionTitle icon={<Download className="h-4 w-4" />}>
                     Photo / Video

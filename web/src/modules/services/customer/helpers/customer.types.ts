@@ -6,8 +6,13 @@ export interface CustomerServiceEngineer {
     name: string;
     phone: string;
     email: string;
-    status?: "0" | "1";
     allotedBy?: number | null;
+}
+
+export interface AllotEngineerDto {
+    name: string;
+    email: string;
+    phone: string;
 }
 
 export interface CustomerComplaint {

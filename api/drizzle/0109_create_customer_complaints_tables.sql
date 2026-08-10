@@ -1,4 +1,3 @@
-CREATE TYPE "public"."service_engineer_status" AS ENUM('0', '1');--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "customer_complaints" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"name" varchar(255) NOT NULL,
@@ -24,7 +23,6 @@ CREATE TABLE IF NOT EXISTS "service_engineers" (
 	"name" varchar(255) NOT NULL,
 	"phone" varchar(20) NOT NULL,
 	"email" varchar(255) NOT NULL,
-	"status" "service_engineer_status" DEFAULT '1',
 	"alloted_by" bigint,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL

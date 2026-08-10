@@ -5,8 +5,13 @@ const ServiceEngineerSchema = z.object({
     name: z.string().min(1),
     phone: z.string().min(1),
     email: z.string().min(1),
-    status: z.enum(["0", "1"]).default("1"),
     allotedBy: z.number().int().positive().optional(),
+});
+
+export const AllotEngineerSchema = z.object({
+    name: z.string().min(1),
+    email: z.string().min(1),
+    phone: z.string().min(1),
 });
 
 export const CreateCustomerComplaintSchema = z.object({
@@ -28,3 +33,4 @@ export const UpdateCustomerComplaintSchema = CreateCustomerComplaintSchema.parti
 
 export type CreateCustomerComplaintDto = z.infer<typeof CreateCustomerComplaintSchema>;
 export type UpdateCustomerComplaintDto = z.infer<typeof UpdateCustomerComplaintSchema>;
+export type AllotEngineerDto = z.infer<typeof AllotEngineerSchema>;

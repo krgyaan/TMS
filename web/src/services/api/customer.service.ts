@@ -1,5 +1,6 @@
 import { BaseApiService } from "./base.service";
 import type {
+    AllotEngineerDto,
     CustomerComplaintDetail,
     CreateCustomerComplaintDto,
     UpdateCustomerComplaintDto,
@@ -30,6 +31,14 @@ class CustomerService extends BaseApiService {
 
     async remove(id: number): Promise<{ success: boolean }> {
         return this.delete<{ success: boolean }>(`/${id}`);
+    }
+
+    async allotEngineer(id: number, data: AllotEngineerDto) {
+        return this.post(`/${id}/engineers`, data);
+    }
+
+    async updateEngineer(id: number, engineerId: number, data: AllotEngineerDto) {
+        return this.put(`/${id}/engineers/${engineerId}`, data);
     }
 }
 

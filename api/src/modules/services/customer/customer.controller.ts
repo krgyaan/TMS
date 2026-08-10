@@ -14,7 +14,11 @@ import {
 } from "@nestjs/common";
 import { ZodValidationPipe } from "nestjs-zod";
 import { CustomerService } from "./customer.service";
-import { CreateCustomerComplaintSchema, UpdateCustomerComplaintSchema } from "./dto/customer.dto";
+import {
+    AllotEngineerSchema,
+    CreateCustomerComplaintSchema,
+    UpdateCustomerComplaintSchema,
+} from "./dto/customer.dto";
 
 @Controller("customer")
 export class CustomerController {
@@ -43,6 +47,26 @@ export class CustomerController {
         @Body(new ZodValidationPipe(UpdateCustomerComplaintSchema)) body: any,
     ) {
         return this.service.update(id, body);
+    }
+
+    @Post(":id/engineers")
+    @HttpCode(HttpStatus.CREATED)
+    allotEngineer(
+        @Param("id", ParseIntPipe) id: number,
+        @Body(new ZodValidationPipe(AllotEngineerSchema)) body: any,
+        @Req() req: any,
+    ) {
+        return this.service.allotEngineer(id, body, req.user?.id ?? req.user?.sub);
+    }
+
+    @Put(":id/engineers/:engineerId")
+    @HttpCode(HttpStatus.OK)
+    updateEngineer(
+        @Param("id", ParseIntPipe) id: number,
+        @Param("engineerId", ParseIntPipe) engineerId: number,
+        @Body(new ZodValidationPipe(AllotEngineerSchema)) body: any,
+    ) {
+        return this.service.updateEngineer(id, engineerId, body);
     }
 
     @Delete(":id")
