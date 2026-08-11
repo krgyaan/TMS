@@ -49,4 +49,5 @@ export { amcBillingService } from './amc-billing.service';
 export { amcServicesService } from './amc-services.service';
 export { customerService } from './customer.service';
 export { conferenceService } from './conference.service';
+export { serviceVisitService } from './service-visit.service';
 

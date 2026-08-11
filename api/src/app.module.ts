@@ -32,6 +32,7 @@ import { AmcBillingModule } from "@/modules/services/amc-billing/amc-billing.mod
 import { AmcServicesModule } from "@/modules/services/amc-services/amc-services.module";
 import { CustomerModule } from "@/modules/services/customer/customer.module";
 import { ConferenceModule } from "@/modules/services/conference/conference.module";
+import { ServiceVisitModule } from "@/modules/services/service-visit/servicevisit.module";
 import { DocumentsSubmittedModule } from "@/modules/master/documents-submitted/documents-submitted.module";
 import { EmdResponsibilitiesModule } from "@/modules/master/emd-responsibilities/emd-responsibilities.module";
 import { FinanceDocTypeModule } from "@/modules/master/finance-doc-type/finance-doc-type.module";
@@ -269,6 +270,7 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         AmcServicesModule,
         CustomerModule,
         ConferenceModule,
+        ServiceVisitModule,
     ],
     controllers: [AppController,],
     providers: [
