@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { imprestService } from "@/services/api";
-import type { CreateImprestCreditPayload } from "@/modules/imprest/helpers/imprest-admin.types";
-import type { EmployeeImprestDashboard, EmployeeImprestSummary, ImprestPaymentHistoryRow, ImprestRow } from "@/modules/imprest/helpers/imprest.types";
+import type { CreateImprestCreditPayload, EmployeeImprestSummary } from "@/modules/imprest/helpers/imprest-admin.types";
+import type { EmployeeImprestDashboard, ImprestPaymentHistoryRow, ImprestRow } from "@/modules/imprest/helpers/imprest.types";
 
 /* ---------------- QUERY KEYS ---------------- */
 
@@ -15,7 +15,7 @@ export const imprestKeys = {
 export const imprestVoucherKeys = {
     root: ["imprest-vouchers"] as const,
     list: (userId?: number) => [...imprestVoucherKeys.root, "list", userId ?? "all"] as const,
-    detail: (id: number) => [...imprestVoucherKeys.root, "detail", id] as const,
+    detail: (params: { userId: number; from: string; to: string }) => [...imprestVoucherKeys.root, "detail", params] as const,
 };
 
 export const imprestPaymentHistoryKeys = {

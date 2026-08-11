@@ -21,7 +21,7 @@ import FilePondPluginImagePreview from "filepond-plugin-image-preview";
 import { User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { FilePond, registerPlugin } from "react-filepond";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { imprestFormSchema, type ImprestFormValues } from "../helpers/imprest.schema";
 import type { ImprestRow } from "../helpers/imprest.types";
@@ -62,7 +62,7 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
         .sort((a, b) => a.name.localeCompare(b.name));
 
     const form = useForm<ImprestFormValues>({
-        resolver: zodResolver(imprestFormSchema),
+        resolver: zodResolver(imprestFormSchema) as unknown as Resolver<ImprestFormValues>,
         defaultValues: {
             userId: undefined,
             categoryId: undefined,
@@ -81,32 +81,29 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
     const excludeUserId = String(mode === "create" ? (user?.id ?? -1) : (imprest?.userId ?? -1));
     const transferUserOptions = userOptions.filter(u => u.id !== excludeUserId);
 
-    // Prefill the sender for create mode
     useEffect(() => {
         if (mode === "create" && user?.id) {
             form.setValue("userId", user.id);
         }
     }, [mode, user, form]);
 
-    // Clear the transfer recipient when category changes in create mode
     useEffect(() => {
         if (mode === "create") {
             form.setValue("transferToId", null, { shouldValidate: false });
         }
     }, [watchedCategoryId, mode, form]);
 
-    // Populate the form when data loads (edit mode)
     useEffect(() => {
         if (mode !== "edit" || !imprest) return;
 
         form.reset({
             userId: imprest.userId,
-            categoryId: imprest.categoryId,
+            categoryId: imprest.categoryId ?? undefined,
             partyName: imprest.partyName,
             projectName: imprest.projectName,
             transferToId: imprest.teamId,
             amount: imprest.amount,
-            dateOfExpense: imprest.dateOfExpense ? format(new Date(imprest.dateOfExpense), "yyyy-MM-dd") : "",
+            dateOfExpense: imprest.dateOfExpense ? new Date(imprest.dateOfExpense) : undefined,
             remark: imprest.remark || "",
         });
     }, [imprest, mode, form]);
@@ -114,23 +111,11 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
     const imprestId = imprest?.id ?? 0;
 
     const handlePondProcess = (items: FilePondFile[]) => {
-        setPondFiles(items.map(fi => fi.file).filter(Boolean));
+        setPondFiles(items.map(fi => fi.file as File));
     };
 
-    const handleCreateSubmit = async (data: ImprestFormValues) => {
-        await createMutation.mutateAsync({
-            data: {
-                ...data,
-                transferToId: isTransferMode ? data.transferToId : null,
-            },
-            files: pondFiles,
-        });
-
-        navigate(paths.shared.imprest);
-    };
-
-    const handleUpdateSubmit = async (data: ImprestFormValues) => {
-        try {
+    const handleSubmit = async (data: ImprestFormValues) => {
+        if (mode === "edit" && imprest) {
             await updateMutation.mutateAsync({
                 id: imprestId,
                 data: {
@@ -142,8 +127,8 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
                     amount: data.amount,
                     dateOfExpense: data.dateOfExpense instanceof Date ? format(data.dateOfExpense, "yyyy-MM-dd") : data.dateOfExpense,
                     remark: data.remark,
-                    approvalStatus: imprest?.approvalStatus,
-                    approvedDate: imprest?.approvedDate,
+                    approvalStatus: imprest.approvalStatus,
+                    approvedDate: imprest.approvedDate,
                 },
             });
 
@@ -154,13 +139,21 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
                 });
             }
 
-            if (imprest?.userId) {
+            if (imprest.userId) {
                 navigate(paths.shared.imprestUser(imprest.userId));
             } else {
                 navigate(paths.accounts.imprests);
             }
-        } catch (err) {
-            console.error("Failed to update imprest:", err);
+        } else {
+            await createMutation.mutateAsync({
+                data: {
+                    ...data,
+                    transferToId: isTransferMode ? data.transferToId : null,
+                },
+                files: pondFiles,
+            });
+
+            navigate(paths.shared.imprest);
         }
     };
 
@@ -190,7 +183,7 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
 
                 <CardContent>
                     <Form {...form}>
-                        <form onSubmit={form.handleSubmit(mode === "edit" ? handleUpdateSubmit : handleCreateSubmit)} className="space-y-6">
+                        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 {/* Category — always shown */}
                                 <SelectField

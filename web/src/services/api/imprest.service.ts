@@ -1,8 +1,7 @@
 import { BaseApiService } from './base.service';
-import type { CreateImprestCreditPayload } from '@/modules/imprest/helpers/imprest-admin.types';
+import type { CreateImprestCreditPayload, EmployeeImprestSummary } from '@/modules/imprest/helpers/imprest-admin.types';
 import type {
     EmployeeImprestDashboard,
-    EmployeeImprestSummary,
     ImprestPaymentHistoryRow,
     ImprestRow,
     ImprestVoucherRow,
@@ -14,8 +13,6 @@ class ImprestService extends BaseApiService {
         super('/imprest');
     }
 
-    /* ---------------- EMPLOYEE DASHBOARD ---------------- */
-
     async getMyDashboard(): Promise<EmployeeImprestDashboard> {
         return this.get<EmployeeImprestDashboard>('/employee');
     }
@@ -23,8 +20,6 @@ class ImprestService extends BaseApiService {
     async getUserDashboard(userId: number): Promise<EmployeeImprestDashboard> {
         return this.get<EmployeeImprestDashboard>(`/employee/user/${userId}`);
     }
-
-    /* ---------------- EMPLOYEE CRUD ---------------- */
 
     async create({ data, files }: { data: Record<string, unknown>; files: File[] }): Promise<ImprestRow> {
         const formData = new FormData();
@@ -52,8 +47,6 @@ class ImprestService extends BaseApiService {
         return this.get<ImprestRow>(`/employee/${id}`);
     }
 
-    /* ---------------- WORKFLOW TOGGLES ---------------- */
-
     async approveToggle(id: number): Promise<unknown> {
         return this.post(`/employee/${id}/approve`);
     }
@@ -70,8 +63,6 @@ class ImprestService extends BaseApiService {
         return this.patch(`/employee/${id}/account-remark`, { remark });
     }
 
-    /* ---------------- PROOFS ---------------- */
-
     async uploadProofs(id: number, files: File[]): Promise<unknown> {
         const formData = new FormData();
         files.forEach(file => formData.append('files', file));
@@ -82,13 +73,9 @@ class ImprestService extends BaseApiService {
         return super.delete(`/employee/${id}/proof/${encodeURIComponent(filename)}`);
     }
 
-    /* ---------------- ADMIN SUMMARY ---------------- */
-
     async getSummary(): Promise<EmployeeImprestSummary[]> {
         return this.get<EmployeeImprestSummary[]>('');
     }
-
-    /* ---------------- VOUCHERS ---------------- */
 
     async getVouchers(params?: { userId?: number }): Promise<ImprestVoucherRow[]> {
         const search = new URLSearchParams();
@@ -125,8 +112,6 @@ class ImprestService extends BaseApiService {
         return this.post(`/voucher/${id}/admin-approve`, body);
     }
 
-    /* ---------------- PAYMENT HISTORY ---------------- */
-
     async getPaymentHistory(userId?: number): Promise<ImprestPaymentHistoryRow[]> {
         const search = new URLSearchParams();
         if (userId !== undefined && userId !== null) {
@@ -142,8 +127,6 @@ class ImprestService extends BaseApiService {
     async deletePaymentHistory(id: number): Promise<{ success: boolean }> {
         return super.delete<{ success: boolean }>(`/payment-history/${id}`);
     }
-
-    /* ---------------- CREDIT ---------------- */
 
     async credit(data: CreateImprestCreditPayload): Promise<{ success: boolean }> {
         return this.post<{ success: boolean }>('/credit', data);

@@ -2,7 +2,7 @@ import { lazy } from "react";
 import { Routes, Route } from "react-router-dom";
 import { RouteWrapper } from "../components/RouteWrapper";
 
-const Accounts_Imprests = lazy(() => import("@/modules/imprest/UsersListPage"));
+const Accounts_Imprests = lazy(() => import("@/modules/imprest/UsersImpresstListPage"));
 const Accounts_FinancialDocs = lazy(() => import("@/modules/accounts/financial-docs"));
 const Accounts_LoanAdvances = lazy(() => import("@/modules/accounts/loan-advances/LoanAdvanceListPage"));
 const Accounts_LoanAdvances_Create = lazy(() => import("@/modules/accounts/loan-advances/LoanAdvanceCreatePage"));

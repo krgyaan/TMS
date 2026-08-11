@@ -1,35 +1,38 @@
+import { paths } from "@/app/routes/paths";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+    useAddImprestAccRemark, useApproveImprest, useDeleteImprest, useImprestList,
+    useProofImprest, useTallyImprest,
+    useUploadImprestProofs
+} from "@/hooks/api/imprest.hooks";
+import { useUser } from "@/hooks/api/useUsers";
+import { formatDate } from "@/hooks/useFormatedDate";
+import { formatINR } from "@/hooks/useINRFormatter";
+import { cn } from "@/lib/utils";
+import type { GridApi } from "ag-grid-community";
+import { saveAs } from "file-saver";
+import {
+    AlertCircle, ArrowLeft, CheckCircle, Download, Eye, FileCheck, ImagePlus,
+    ListChecks, Loader2, MessageSquarePlus, Pencil, Plus, Trash2
+} from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { 
-    AlertCircle, ArrowLeft, CheckCircle, Download, Eye, FileCheck, ImagePlus, 
-    ListChecks, Loader2, MessageSquarePlus, Pencil, Plus, Trash2 
-} from "lucide-react";
-import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
 import "yet-another-react-lightbox/styles.css";
-import { paths } from "@/app/routes/paths";
-import { 
-    useAddImprestAccRemark, useApproveImprest, useDeleteImprest, useImprestList,
-    useProofImprest, useTallyImprest, useUpdateImprest, useUploadImprestProofs 
-} from "@/hooks/api/imprest.hooks";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
-import type { ImprestRow, ProofItem } from "./helpers/imprest.types";
-import { mapProofFiles } from "./helpers/imprest.mapper";
-import SelectInput from "@/components/SelectInput";
-import { useAuth } from "@/contexts/AuthContext";
-import { useImprestCategories } from "@/hooks/api/useImprestCategories";
-import { useUser } from "@/hooks/api/useUsers";
-import { useProjectOptions } from "@/hooks/useSelectOptions";
-import type { GridApi } from "ag-grid-community";
+import { ConfirmUnapproveDialog } from "./components/ConfirmUnapproveDialog";
+import { ProofUploadDialog } from "./components/ProofUploadDialog";
+import { ProofViewerDialog } from "./components/ProofViewerDialog";
+import { RemarkDialog } from "./components/RemarkDialog";
 import { SummaryCards } from "./components/SummaryCards";
-import { formatINR } from "@/hooks/useINRFormatter";
+import { mapProofFiles } from "./helpers/imprest.mapper";
+import type { ImprestRow, ProofItem } from "./helpers/imprest.types";
 
 /** Inline Status Toggle */
 const StatusToggle: React.FC<{
@@ -108,27 +111,17 @@ const UserImprestsPage: React.FC = () => {
     const { user, hasPermission, canUpdate, canDelete } = useAuth();
     const { id } = useParams<{ id?: string }>();
     const [isMobile, setIsMobile] = useState(false);
-
-    const projectOptions = useProjectOptions();
-    const { data: imprestCategories = [] } = useImprestCategories();
-
     let userDetails = null;
 
     const canMutateStatusAdmin = canUpdate("accounts.imprest-admin");
-    const canDeleteStatus = canDelete("accounts.imprests");
-
     const isAuthorized = hasPermission("shared.imprests", "read");
 
     const requestedUserId = id ? Number(id) : null;
     const isOwnPage = !requestedUserId || requestedUserId === user?.id;
 
-    // console.log(requestedUserId, isOwnPage);
-
     if (requestedUserId) {
         userDetails = useUser(requestedUserId).data;
     }
-
-    // console.log("user details", userDetails);
 
     if (!isOwnPage && !isAuthorized) {
         return (
@@ -142,17 +135,14 @@ const UserImprestsPage: React.FC = () => {
         );
     }
 
-    // Add these state variables near your other useState declarations
     const [unapproveDialog, setUnapproveDialog] = useState<{
         open: boolean;
         label: string;
         onConfirm: () => void;
     }>({ open: false, label: "", onConfirm: () => {} });
 
-    // Helper to trigger any toggle — shows confirm dialog if currently active
     const handleStatusToggle = (isActive: boolean, label: string, onToggle: () => void) => {
         if (isActive) {
-            // Currently active → unapproving, so show confirmation
             setUnapproveDialog({
                 open: true,
                 label,
@@ -162,7 +152,6 @@ const UserImprestsPage: React.FC = () => {
                 },
             });
         } else {
-            // Currently inactive → approving, no confirmation needed
             onToggle();
         }
     };
@@ -172,16 +161,11 @@ const UserImprestsPage: React.FC = () => {
     const addRemarkMutation = useAddImprestAccRemark();
     const summary = data?.summary;
     const rows = data?.imprests ?? [];
-
     const deleteMutation = useDeleteImprest();
     const uploadProofsMutation = useUploadImprestProofs();
     const approveMutation = useApproveImprest();
     const tallyMutation = useTallyImprest();
     const proofMutation = useProofImprest();
-
-    const MOBILE_PAGE_SIZE = 10;
-
-    const [visibleCount, setVisibleCount] = useState(MOBILE_PAGE_SIZE);
     const [proofModalOpen, setProofModalOpen] = useState(false);
     const [proofs, setProofs] = useState<ProofItem[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -194,10 +178,6 @@ const UserImprestsPage: React.FC = () => {
     const [remarkOpen, setRemarkOpen] = useState(false);
     const [remarkRow, setRemarkRow] = useState<ImprestRow | null>(null);
     const [remarkText, setRemarkText] = useState("");
-
-    const [editOpen, setEditOpen] = useState(false);
-    const [editRow, setEditRow] = useState<ImprestRow | null>(null);
-    const updateImprestMutation = useUpdateImprest();
 
     useEffect(() => {
         const mq = window.matchMedia("(max-width: 768px)");
@@ -264,32 +244,6 @@ const UserImprestsPage: React.FC = () => {
         );
     };
 
-    const submitEditImprest = (e?: React.FormEvent) => {
-        e?.preventDefault();
-
-        if (!editRow) return;
-
-        updateImprestMutation.mutate(
-            {
-                id: editRow.id,
-                data: {
-                    partyName: editRow.partyName?.trim() || null,
-                    projectName: editRow.projectName || null,
-                    categoryId: typeof editRow.categoryId === "number" ? editRow.categoryId : null,
-                    teamId: typeof editRow.teamId === "number" ? editRow.teamId : null,
-                    amount: Number(editRow.amount) || 0,
-                    remark: editRow.remark?.trim() || null,
-                },
-            },
-            {
-                onSuccess: () => {
-                    setEditOpen(false);
-                    setEditRow(null);
-                },
-            }
-        );
-    };
-
     const openProofModal = (row: ImprestRow) => {
         if (!Array.isArray(row.invoiceProof)) return;
 
@@ -305,14 +259,12 @@ const UserImprestsPage: React.FC = () => {
         setProofModalOpen(true);
     };
 
-    /* -------------------- EXCEL -------------------- */
-
     const exportExcel = () => {
         const excelData = rows.map(r => ({
             Date: new Date(r.dateOfExpense || r.createdAt).toLocaleDateString("en-GB"),
             Party: r.partyName,
             Project: r.projectName,
-            Category: r.formattedCategory,
+            Category: r.categoryName,
             Amount: r.amount,
             Approved: r.approvalStatus === 1 ? "Yes" : "No",
             Tallied: r.tallyStatus === 1 ? "Yes" : "No",
@@ -328,14 +280,6 @@ const UserImprestsPage: React.FC = () => {
         saveAs(new Blob([buf]), `Imprest_${new Date().toISOString().slice(0, 10)}.xlsx`);
     };
 
-    useEffect(() => {
-        console.log("QuickFilter:", searchText);
-    }, [searchText]);
-
-    useEffect(() => {
-        setVisibleCount(MOBILE_PAGE_SIZE);
-    }, [rows]);
-
     const StatusChip = ({ done, doneText, pendingText, color }: { done: boolean; doneText: string; pendingText: string; color: "green" | "blue" | "purple" }) => {
         const colorMap = {
             green: done ? "bg-green-100 text-green-700 border-green-200" : "bg-yellow-50 text-yellow-700 border-yellow-200",
@@ -346,7 +290,31 @@ const UserImprestsPage: React.FC = () => {
         return <button className={cn("px-2 py-1 rounded-full text-[11px] border font-medium", colorMap[color])}>{done ? doneText : pendingText}</button>;
     };
 
-    /* -------------------- COLUMNS -------------------- */
+    const imprestAction: ActionItem<ImprestRow>[] = [
+        {
+            label: "Add Remark",
+            onClick: (row: ImprestRow) => openRemarkModal(row),
+            icon: <MessageSquarePlus className="h-4 w-4" />,
+            visible: () => canUpdate("accounts.imprest-admin"), 
+        },
+        {
+            label: "Add Proof",
+            onClick: (row: ImprestRow) => openAddProof(row.id),
+            icon: <ImagePlus className="h-4 w-4" />,
+        },
+        {
+            label: "Edit Imprest",
+            onClick: (row: ImprestRow) => navigate(paths.shared.imprestEdit(row.id)),
+            icon: <Pencil className="h-4 w-4" />,
+            visible: () => canUpdate("accounts.imprest-admin"), 
+        },
+        {
+            label: "Delete",
+            onClick: (row: ImprestRow) => handleDelete(row),
+            icon: <Trash2 className="h-4 w-4" />,
+            visible: () => canDelete("accounts.imprests"), 
+        },
+    ]
 
     const columns = useMemo(
         () => [
@@ -354,7 +322,7 @@ const UserImprestsPage: React.FC = () => {
                 field: "createdAt",
                 headerName: "Date",
                 width: 100,
-                valueGetter: p => new Date(p.data.createdAt).toLocaleDateString("en-GB"),
+                valueGetter: (p: ImprestRow) => formatDate(p.createdAt),
             },
             {
                 field: "partyName",
@@ -369,7 +337,7 @@ const UserImprestsPage: React.FC = () => {
                 minWidth: 140,
             },
             {
-                field: "formattedCategory",
+                field: "categoryName",
                 headerName: "Category",
                 flex: 1,
                 minWidth: 140,
@@ -379,7 +347,7 @@ const UserImprestsPage: React.FC = () => {
                 headerName: "Amount",
                 width: 90,
                 maxWidth: 100,
-                valueFormatter: p => formatINR(p.value),
+                valueFormatter: (p: ImprestRow) => formatINR(p.amount),
                 cellClass: "",
             },
             {
@@ -438,9 +406,7 @@ const UserImprestsPage: React.FC = () => {
                 width: 140,
                 sortable: false,
                 filter: false,
-                cellRenderer: p => {
-                    const row = p.data as ImprestRow;
-
+                cellRenderer: (row: ImprestRow) => {
                     return (
                         <div className="flex items-center gap-1">
                             <StatusToggle
@@ -471,24 +437,13 @@ const UserImprestsPage: React.FC = () => {
                 },
             },
             {
-                headerName: "Actions",
-                width: 130,
-                sortable: false,
+                headerName: "",
                 filter: false,
-                cellRenderer: p => {
-                    const row = p.data as ImprestRow;
-
-                    return (
-                        <div className="flex items-center gap-1">
-                            {canDeleteStatus && <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />}
-                            <IconAction icon={ImagePlus} label="Add Proof" onClick={() => openAddProof(row.id)} />
-                            {/* {canMutateStatus && <IconAction icon={Pencil} label="Edit Imprest" onClick={() => openEditModal(row)} />} */}
-                            {canMutateStatusAdmin && <IconAction icon={Pencil} label="Edit Imprest" onClick={() => navigate(paths.shared.imprestEdit(row.id))} />}
-                            {canDeleteStatus && <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />}
-                        </div>
-                    );
-                },
-            },
+                sortable: false,
+                cellRenderer: createActionColumnRenderer(imprestAction),
+                pinned: "right",
+                width: 57,
+            }
         ],
         [approveMutation, tallyMutation, proofMutation, handleDelete]
     );
@@ -604,12 +559,12 @@ const UserImprestsPage: React.FC = () => {
                                     Add Imprest
                                 </Button>
 
-                                <Button size="sm" onClick={() => navigate(paths.shared.imprestVoucherByUser(numericUserId))}>
+                                <Button size="sm" onClick={() => navigate(paths.shared.imprestVoucherByUser(numericUserId!))}>
                                     <Plus className="h-4 w-4 mr-2" />
                                     View Vouchers
                                 </Button>
 
-                                <Button size="sm" onClick={() => navigate(paths.shared.imprestPaymentHistoryByUser(numericUserId))}>
+                                <Button size="sm" onClick={() => navigate(paths.shared.imprestPaymentHistoryByUser(numericUserId!))}>
                                     <Plus className="h-4 w-4 mr-2" />
                                     View Payment History
                                 </Button>
@@ -692,273 +647,38 @@ const UserImprestsPage: React.FC = () => {
             </CardContent>
 
             {/* Upload Proof Dialog */}
-            <Dialog open={addProofOpen} onOpenChange={setAddProofOpen}>
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle className="text-xl">Upload Proof Documents</DialogTitle>
-                        <DialogDescription>Drag & drop files here or click to browse. Supported: images and PDF.</DialogDescription>
-                    </DialogHeader>
-
-                    <form onSubmit={submitAddProof} className="space-y-6">
-                        {/* Dropzone */}
-                        <label
-                            htmlFor="proof-upload"
-                            className="flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-8 text-center cursor-pointer hover:bg-muted/50 transition"
-                        >
-                            <div className="text-muted-foreground">
-                                <p className="font-medium">Click to upload files here</p>
-                                <p className="text-xs mt-1">PNG, JPG, PDF allowed</p>
-                            </div>
-
-                            <Input
-                                id="proof-upload"
-                                type="file"
-                                multiple
-                                accept="image/*,.pdf"
-                                className="hidden"
-                                onChange={e => setFilesToUpload(Array.from(e.target.files ?? []))}
-                            />
-                        </label>
-
-                        {/* Selected files preview */}
-                        {filesToUpload.length > 0 && (
-                            <div className="space-y-2 max-h-40 overflow-auto border rounded-md p-3 bg-muted/30">
-                                <p className="text-sm font-medium">
-                                    {filesToUpload.length} file{filesToUpload.length > 1 && "s"} selected
-                                </p>
-
-                                <ul className="text-xs space-y-1">
-                                    {filesToUpload.map((file, idx) => (
-                                        <li key={idx} className="flex justify-between items-center bg-background px-2 py-1 rounded border">
-                                            <span className="truncate">{file.name}</span>
-                                            <span className="text-muted-foreground ml-2">{(file.size / 1024).toFixed(1)} KB</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-
-                        {/* Actions */}
-                        <div className="flex justify-end gap-2 pt-2">
-                            <Button type="button" variant="outline" onClick={() => setAddProofOpen(false)}>
-                                Cancel
-                            </Button>
-
-                            <Button type="submit" disabled={filesToUpload.length === 0 || uploadProofsMutation.isPending}>
-                                {uploadProofsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                Upload Files
-                            </Button>
-                        </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            <ProofUploadDialog
+                open={addProofOpen}
+                onOpenChange={setAddProofOpen}
+                files={filesToUpload}
+                setFiles={setFilesToUpload}
+                isPending={uploadProofsMutation.isPending}
+                onSubmit={submitAddProof}
+            />
 
             {/* Add Remark Dialog */}
-            <Dialog open={remarkOpen} onOpenChange={setRemarkOpen}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Add Remark</DialogTitle>
-                        <DialogDescription>Add a note or comment for this imprest record.</DialogDescription>
-                    </DialogHeader>
+            <RemarkDialog
+                open={remarkOpen}
+                onOpenChange={setRemarkOpen}
+                text={remarkText}
+                setText={setRemarkText}
+                onSubmit={submitAddRemark}
+            />
 
-                    <form onSubmit={submitAddRemark} className="space-y-4">
-                        <Textarea value={remarkText} onChange={e => setRemarkText(e.target.value)} placeholder="Enter your remark…" rows={4} />
+            <ProofViewerDialog
+                open={proofModalOpen}
+                onOpenChange={setProofModalOpen}
+                proofs={proofs}
+                index={currentIndex}
+                setIndex={setCurrentIndex}
+            />
 
-                        <div className="flex justify-end gap-2">
-                            <Button type="button" variant="outline" onClick={() => setRemarkOpen(false)}>
-                                Cancel
-                            </Button>
-                            <Button type="submit" disabled={!remarkText.trim()}>
-                                Save
-                            </Button>
-                        </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog open={editOpen} onOpenChange={setEditOpen}>
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>Edit Imprest</DialogTitle>
-                        <DialogDescription>Update imprest details before approval.</DialogDescription>
-                    </DialogHeader>
-
-                    {editRow && (
-                        <form onSubmit={submitEditImprest} className="space-y-4">
-                            {/* Party Name */}
-                            <Input
-                                value={editRow.partyName ?? ""}
-                                onChange={e =>
-                                    setEditRow({
-                                        ...editRow,
-                                        partyName: e.target.value,
-                                    })
-                                }
-                                placeholder="Party Name"
-                            />
-
-                            <SelectInput
-                                label="Select Project"
-                                placeholder="-- Select Project --"
-                                value={editRow.projectName ?? ""}
-                                options={projectOptions}
-                                onChange={val =>
-                                    setEditRow({
-                                        ...editRow,
-                                        projectName: val,
-                                    })
-                                }
-                            />
-
-                            <SelectInput
-                                label="Select Category"
-                                placeholder="-- Select Category --"
-                                value={String(editRow.categoryId ?? "")}
-                                options={imprestCategories.map(i => ({
-                                    id: String(i.id),
-                                    name: i.name,
-                                }))}
-                                onChange={val =>
-                                    setEditRow({
-                                        ...editRow,
-                                        categoryId: Number(val),
-                                    })
-                                }
-                            />
-
-                            {/* Amount */}
-                            <Input
-                                type="number"
-                                value={editRow.amount}
-                                onChange={e =>
-                                    setEditRow({
-                                        ...editRow,
-                                        amount: Number(e.target.value),
-                                    })
-                                }
-                                placeholder="Amount"
-                            />
-
-                            {/* Remark */}
-                            <Textarea
-                                value={editRow.remark ?? ""}
-                                onChange={e =>
-                                    setEditRow({
-                                        ...editRow,
-                                        remark: e.target.value,
-                                    })
-                                }
-                                placeholder="Remark"
-                            />
-
-                            <div className="flex justify-end gap-2 pt-2">
-                                <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
-                                    Cancel
-                                </Button>
-
-                                <Button type="submit">Save Changes</Button>
-                            </div>
-                        </form>
-                    )}
-                </DialogContent>
-            </Dialog>
-
-            <Dialog open={proofModalOpen} onOpenChange={setProofModalOpen}>
-                <DialogContent
-                    className="
-        max-w-none w-screen h-screen
-        p-0
-        overflow-hidden
-        flex flex-col
-        [&>[data-radix-dialog-close]]:hidden
-    "
-                    aria-describedby={undefined}
-                >
-                    {/* Accessibility (required by Radix) */}
-                    <DialogTitle className="sr-only">Proof Viewer</DialogTitle>
-                    <DialogDescription className="sr-only">View uploaded proof documents</DialogDescription>
-
-                    {/* Top Bar */}
-                    <div className="flex items-center justify-between h-14 px-4 border-b bg-background">
-                        <div className="min-w-0">
-                            <p className="text-sm font-semibold truncate">{proofs[currentIndex]?.name ?? "Document"}</p>
-                            <p className="text-xs text-muted-foreground">{proofs.length ? `${currentIndex + 1} of ${proofs.length}` : ""}</p>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            {proofs[currentIndex]?.url && (
-                                <Button variant="outline" size="sm" onClick={() => window.open(proofs[currentIndex].url, "_blank", "noopener,noreferrer")}>
-                                    Open in new tab
-                                </Button>
-                            )}
-
-                            <Button variant="ghost" size="icon" onClick={() => setProofModalOpen(false)} aria-label="Close">
-                                ✕
-                            </Button>
-                        </div>
-                    </div>
-
-                    {/* Viewer */}
-                    <div className="flex-1 w-full bg-muted/30">
-                        {proofs[currentIndex] ? (
-                            proofs[currentIndex].type === "image" ? (
-                                <div className="w-full h-full flex items-center justify-center overflow-auto">
-                                    <img src={proofs[currentIndex].url} alt={proofs[currentIndex].name} className="max-w-full max-h-full object-contain bg-white" />
-                                </div>
-                            ) : (
-                                <iframe src={proofs[currentIndex].url} title={proofs[currentIndex].name} className="w-full h-full border-0 bg-white" />
-                            )
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-sm text-muted-foreground">No preview available</div>
-                        )}
-                    </div>
-
-                    {/* Navigation */}
-                    {proofs.length > 1 && (
-                        <div className="pointer-events-none absolute inset-y-14 left-0 right-0 flex items-center justify-between px-4">
-                            <Button
-                                size="icon"
-                                variant="secondary"
-                                className="pointer-events-auto shadow"
-                                disabled={currentIndex === 0}
-                                onClick={() => setCurrentIndex(i => i - 1)}
-                            >
-                                ‹
-                            </Button>
-
-                            <Button
-                                size="icon"
-                                variant="secondary"
-                                className="pointer-events-auto shadow"
-                                disabled={currentIndex === proofs.length - 1}
-                                onClick={() => setCurrentIndex(i => i + 1)}
-                            >
-                                ›
-                            </Button>
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
-
-            <Dialog open={unapproveDialog.open} onOpenChange={open => setUnapproveDialog(d => ({ ...d, open }))}>
-                <DialogContent className="sm:max-w-sm">
-                    <DialogHeader>
-                        <DialogTitle>Remove {unapproveDialog.label}?</DialogTitle>
-                        <DialogDescription>
-                            Are you sure you want to mark this record as <strong>not {unapproveDialog.label.toLowerCase()}</strong>?
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button variant="outline" onClick={() => setUnapproveDialog(d => ({ ...d, open: false }))}>
-                            Cancel
-                        </Button>
-                        <Button variant="destructive" onClick={unapproveDialog.onConfirm}>
-                            Yes, Remove
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <ConfirmUnapproveDialog
+                open={unapproveDialog.open}
+                onOpenChange={open => setUnapproveDialog(d => ({ ...d, open }))}
+                label={unapproveDialog.label}
+                onConfirm={unapproveDialog.onConfirm}
+            />
         </Card>
     );
 };

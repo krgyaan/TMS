@@ -8,7 +8,7 @@ export const ProofViewerDialog: React.FC<{
     onOpenChange: (open: boolean) => void;
     proofs: ProofItem[];
     index: number;
-    setIndex: (index: number) => void;
+    setIndex: React.Dispatch<React.SetStateAction<number>>;
 }> = ({ open, onOpenChange, proofs, index, setIndex }) => (
     <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent

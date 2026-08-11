@@ -22,7 +22,7 @@ export const imprestFormSchema = z
         projectName: z.string().optional().nullable(),
         transferToId: z.preprocess(
             v => (v === "" || v === undefined || v === null ? null : Number(v)),
-            z.number().nullable().optional()
+            z.number().nullable()
         ),
 
         amount: z.preprocess(

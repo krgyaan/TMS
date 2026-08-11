@@ -15,17 +15,11 @@ const ImprestPaymentHistory: React.FC = () => {
     const [searchParams] = useSearchParams();
     const { canDelete } = useAuth();
     const canDeletePayment = canDelete("accounts.imprests");
-
-    // ✅ userId is OPTIONAL (admin vs employee)
     const userIdParam = searchParams.get("userId");
     const userId = userIdParam ? Number(userIdParam) : undefined;
-
     const { data = [], isLoading, error } = useImprestPaymentHistory(userId);
     const deleteMutation = useDeleteImprestPaymentHistory();
-
-    /**
-     * Delete handler
-     */
+    
     const handleDelete = useCallback(
         (row: ImprestPaymentHistoryRow) => {
             if (!confirm("Delete this transaction?")) return;
@@ -34,9 +28,6 @@ const ImprestPaymentHistory: React.FC = () => {
         [deleteMutation]
     );
 
-    /**
-     * Column definitions
-     */
     const columns: ColDef[] = useMemo(() => {
         const baseColumns: ColDef[] = [
             {
@@ -80,9 +71,6 @@ const ImprestPaymentHistory: React.FC = () => {
         return baseColumns;
     }, [handleDelete, deleteMutation.isPending, canDeletePayment]);
 
-    /**
-     * Loading state
-     */
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -92,9 +80,6 @@ const ImprestPaymentHistory: React.FC = () => {
         );
     }
 
-    /**
-     * Error state
-     */
     if (error) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -108,9 +93,6 @@ const ImprestPaymentHistory: React.FC = () => {
         );
     }
 
-    /**
-     * Render
-     */
     return (
         <Card>
             <CardHeader className="flex items-center justify-between">

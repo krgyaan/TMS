@@ -1,5 +1,3 @@
-// src/modules/imprest/imprest.types.ts
-
 export interface ImprestProof {
     url: string;
     type: "image" | "file" | "pdf" | "doc" | string;
@@ -8,58 +6,41 @@ export interface ImprestProof {
 
 export interface ImprestRow {
     id: number;
-
-    // timestamps
     createdAt: string;
     updatedAt?: string;
     approvedDate?: string | null;
-
-    // relations
     userId: number;
     categoryId: number | null;
+    categoryName: string | null;
     teamId: number | null;
-
-    // strings
     partyName: string | null;
     projectName: string | null;
     remark: string | null;
     ip?: string | null;
     dateOfExpense?: string | null;
-
-    // numeric
     amount: number;
     strtotime?: number | null;
-
-    // workflow statuses
     approvalStatus: number;
     tallyStatus: number;
     proofStatus: number;
     status: number;
-
-    // jsonb
+    accRemark: string | null;
     invoiceProof: ImprestProof[];
 }
 
 export type ImprestVoucherRow = {
     id: number;
     voucherCode: string;
-
     beneficiaryName: string;
     beneficiaryId: string;
-
     amount: number;
-
     validFrom: string;
     validTo: string;
-
     year: number;
     week: number;
-
     adminApproval: boolean;
     accountantApproval: boolean;
-
-    proofs: InvoiceProof[]; // 👈 added
-
+    proofs: InvoiceProof[];
     createdAt: string;
 };
 
@@ -94,6 +75,8 @@ export type ImprestVoucherView = {
     items: {
         id: number;
         categoryId: number;
+        category: string;
+        projectCode: string;
         projectName: string;
         remark: string;
         amount: number;
@@ -144,7 +127,6 @@ export interface EmployeeImprestDashboard {
 export interface ImprestPaymentHistoryRow {
     id: number;
     userId: number;
-
     teamMemberName: string;
     date: string; // ISO date
     amount: number;

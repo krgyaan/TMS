@@ -1,15 +1,15 @@
-import { AlertCircle, ArrowLeft, CheckCircle, FileQuestion, Loader2, MessageSquare, Printer, ShieldAlert } from "lucide-react";
-import React, { useEffect } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { useAccountApproveVoucher, useAdminApproveVoucher, useImprestVoucherView } from "@/hooks/api/imprest.hooks";
-import type { InvoiceProof } from "./helpers/imprest.types";
 import { useAuth } from "@/contexts/AuthContext";
-import html2pdf from "html2pdf.js";
+import { useAccountApproveVoucher, useAdminApproveVoucher, useImprestVoucherView } from "@/hooks/api/imprest.hooks";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
+import html2pdf from "html2pdf.js";
+import { AlertCircle, ArrowLeft, CheckCircle, FileQuestion, Loader2, MessageSquare, Printer, ShieldAlert } from "lucide-react";
+import React, { useEffect } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import type { InvoiceProof } from "./helpers/imprest.types";
 
 const ImprestVoucherView: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -40,15 +40,15 @@ const ImprestVoucherView: React.FC = () => {
 
     const { data, isLoading, refetch } = useImprestVoucherView({ userId, from, to});
 
-    const voucher = data.voucher;
+    const voucher = data?.voucher;
     const items = data?.items || [];
     
     // Merge proofs from state or voucher
     let proofs: InvoiceProof[] = [];
     if (stateProofs && stateProofs.length > 0) {
         proofs = stateProofs;
-    } else if (voucher?.proofs && voucher.proofs.length > 0) {
-        proofs = voucher.proofs;
+    } else if (voucher?.proofs && voucher?.proofs.length > 0) {
+        proofs = voucher?.proofs;
     }
 
     useEffect(() => {
@@ -95,7 +95,7 @@ const ImprestVoucherView: React.FC = () => {
         return (
             <div className="flex h-[80vh] flex-col items-center justify-center p-6 text-center">
                 <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" />
-                <h2 className="text-xl font-medium text-muted-foreground animate-pulse">Loading Voucher...</h2>
+                <h2 className="text-xl font-medium text-muted-foreground animate-pulse">Loading Voucher?...</h2>
             </div>
         );
     }
@@ -126,15 +126,11 @@ const ImprestVoucherView: React.FC = () => {
         setAdminApprove(false);
     };
 
-    /* ---------------------------------- */
-    /* Handlers                           */
-    /* ---------------------------------- */
-
     const handleAccountSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         accountApproveMutation.mutate(
             {
-                id: voucher.id,
+                id: voucher?.id,
                 remark,
                 approve: accApprove,
             },
@@ -152,7 +148,7 @@ const ImprestVoucherView: React.FC = () => {
         e.preventDefault();
         adminApproveMutation.mutate(
             {
-                id: voucher.id,
+                id: voucher?.id,
                 remark,
                 approve: adminApprove,
             },
@@ -213,7 +209,7 @@ const ImprestVoucherView: React.FC = () => {
             await html2pdf()
                 .set({
                     margin: [5, 5, 5, 5] as const,
-                    filename: `Imprest-Voucher-${voucher.voucherCode}.pdf`,
+                    filename: `Imprest-Voucher-${voucher?.voucherCode}.pdf`,
                     image: { type: "jpeg", quality: 0.98 },
                     html2canvas: {
                         scale: 2,
@@ -229,15 +225,10 @@ const ImprestVoucherView: React.FC = () => {
                 .from(element)
                 .save();
         } finally {
-            // 🔑 Always clean up
             document.documentElement.classList.remove("pdf-export");
             removeHtml2CanvasSafeCSS();
         }
     };
-
-    /* ---------------------------------- */
-    /* Render                             */
-    /* ---------------------------------- */
 
     return (
         <div className="voucher-page">
@@ -271,10 +262,10 @@ const ImprestVoucherView: React.FC = () => {
 
                         <tr>
                             <td>
-                                FROM <b>{formatDate(voucher.validFrom)}</b> TO <b>{formatDate(voucher.validTo)}</b>
+                                FROM <b>{formatDate(voucher?.validFrom)}</b> TO <b>{formatDate(voucher?.validTo)}</b>
                             </td>
                             <td colSpan={3} className="text-right">
-                                <b>Voucher No: {voucher.voucherCode}</b>
+                                <b>Voucher No: {voucher?.voucherCode}</b>
                             </td>
                         </tr>
 
@@ -282,17 +273,17 @@ const ImprestVoucherView: React.FC = () => {
                             <td>
                                 Employee Name:
                                 <br />
-                                <b>{voucher.beneficiaryName}</b>
+                                <b>{voucher?.beneficiaryName}</b>
                             </td>
                             <td>
                                 Employee ID:
                                 <br />
-                                <b>ID00{voucher.beneficiaryId}</b>
+                                <b>ID00{voucher?.beneficiaryId}</b>
                             </td>
                             <td colSpan={2}>
                                 Team Name:
                                 <br />
-                                <b>{voucher.teamName}</b>
+                                <b>{voucher?.teamName}</b>
                             </td>
                         </tr>
                     </tbody>
@@ -344,23 +335,23 @@ const ImprestVoucherView: React.FC = () => {
                     <tbody>
                         <tr>
                             <th>Prepared By:</th>
-                            <td>{voucher.employeeName}</td>
+                            <td>{voucher?.employeeName}</td>
                             <th>Date:</th>
                             <td></td>
                         </tr>
 
                         <tr>
                             <th>Checked By:</th>
-                            <td>{voucher.accountsSignedBy ? <img src={`/uploads/signs/${voucher.accountsSignedBy}`} alt="Accounts Sign" /> : <i>to be signed</i>}</td>
+                            <td>{voucher?.accountsSignedBy ? <img src={`/uploads/signs/${voucher?.accountsSignedBy}`} alt="Accounts Sign" /> : <i>to be signed</i>}</td>
                             <th>Date:</th>
-                            <td>{formatDate(voucher.accountsSignedAt)}</td>
+                            <td>{formatDate(voucher?.accountsSignedAt)}</td>
                         </tr>
 
                         <tr>
                             <th>Approved By:</th>
-                            <td>{voucher.adminSignedBy ? <img src={`/uploads/signs/${voucher.adminSignedBy}`} alt="Admin Sign" /> : <i>to be signed</i>}</td>
+                            <td>{voucher?.adminSignedBy ? <img src={`/uploads/signs/${voucher?.adminSignedBy}`} alt="Admin Sign" /> : <i>to be signed</i>}</td>
                             <th>Date:</th>
-                            <td>{formatDate(voucher.adminSignedAt)}</td>
+                            <td>{formatDate(voucher?.adminSignedAt)}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -377,7 +368,7 @@ const ImprestVoucherView: React.FC = () => {
                         <div className="space-y-1 mt-0.5">
                             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Accounts Comment</p>
                             {voucher?.accountsRemark ? (
-                                <p className="text-sm font-medium text-foreground">{voucher.accountsRemark}</p>
+                                <p className="text-sm font-medium text-foreground">{voucher?.accountsRemark}</p>
                             ) : (
                                 <span className="inline-flex items-center rounded-md bg-muted/60 px-2 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border italic">
                                     No comment added
@@ -392,7 +383,7 @@ const ImprestVoucherView: React.FC = () => {
                         <div className="space-y-1 mt-0.5">
                             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">CEO Comment</p>
                             {voucher?.adminRemark ? (
-                                <p className="text-sm font-medium text-foreground">{voucher.adminRemark}</p>
+                                <p className="text-sm font-medium text-foreground">{voucher?.adminRemark}</p>
                             ) : (
                                 <span className="inline-flex items-center rounded-md bg-muted/60 px-2 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border italic">
                                     No comment added
@@ -487,7 +478,7 @@ const ImprestVoucherView: React.FC = () => {
                                 </div>
                             ) : (
                                 <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-border bg-background px-4 text-center text-sm text-muted-foreground">
-                                    No proofs found for this voucher.
+                                    No proofs found for this voucher?.
                                 </div>
                             )}
                         </div>
@@ -569,7 +560,7 @@ const ImprestVoucherView: React.FC = () => {
                     <DialogHeader>
                         <DialogTitle className="text-xl">Accounts Approval</DialogTitle>
                         <DialogDescription>
-                            Add an optional remark and confirm your approval for this imprest voucher.
+                            Add an optional remark and confirm your approval for this imprest voucher?.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -613,8 +604,8 @@ const ImprestVoucherView: React.FC = () => {
                             <Button type="button" variant="outline" onClick={() => setAccModalOpen(false)} className="w-24">
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={accountApproveMutation.isLoading} className="w-32">
-                                {accountApproveMutation.isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                            <Button type="submit" className="w-32">
+                                <CheckCircle className="h-4 w-4 mr-2" />
                                 Submit
                             </Button>
                         </div>
@@ -628,7 +619,7 @@ const ImprestVoucherView: React.FC = () => {
                     <DialogHeader>
                         <DialogTitle className="text-xl">CEO Approval</DialogTitle>
                         <DialogDescription>
-                            Add an optional remark and confirm your approval for this imprest voucher.
+                            Add an optional remark and confirm your approval for this imprest voucher?.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -675,8 +666,8 @@ const ImprestVoucherView: React.FC = () => {
                             <Button type="button" variant="outline" onClick={() => setAdminModalOpen(false)} className="w-24">
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={adminApproveMutation.isLoading} className="w-32">
-                                {adminApproveMutation.isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                            <Button type="submit" className="w-32">
+                                <CheckCircle className="h-4 w-4 mr-2" />
                                 Submit
                             </Button>
                         </div>
