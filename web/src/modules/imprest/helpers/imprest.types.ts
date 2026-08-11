@@ -92,39 +92,24 @@ export interface EmployeeImprestDashboardSummaryDto {
     amountApproved: number;
     amountReceived: number;
     amountLeft: number;
-
-    voucherInfo: {
-        totalVouchers: number;
-        accountsApproved: number;
-        adminApproved: number;
-    };
 }
 
 export interface EmployeeImprestDashboard {
-    summary: {
-        amountSpent: number;
-        amountApproved: number;
-        amountReceived: number;
-        amountLeft: number;
-
-        voucherInfo: {
-            totalVouchers: number;
-            accountsApproved: number;
-            adminApproved: number;
-        };
-    };
+    summary: EmployeeImprestDashboardSummaryDto;
 
     imprests: ImprestRow[];
-    transactions: {
-        id: number;
-        userId: number;
-        txnDate: string;
-        teamMemberName: string | null;
-        projectName: string | null;
-        amount: number;
-        createdAt: string;
-        updatedAt: string;
-    }[];
+}
+
+export interface EmployeeImprestTransactionRow {
+    id: number;
+    userId: number;
+    txnDate: string;
+    teamMemberName: string | null;
+    projectName: string | null;
+    amount: number;
+    createdAt: string;
+    updatedAt: string;
+    categoryName: string | null;
 }
 
 export interface ImprestPaymentHistoryRow {

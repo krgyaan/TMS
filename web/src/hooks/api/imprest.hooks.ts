@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { imprestService } from "@/services/api";
 import type { CreateImprestCreditPayload, EmployeeImprestSummary } from "@/modules/imprest/helpers/imprest-admin.types";
-import type { EmployeeImprestDashboard, ImprestPaymentHistoryRow, ImprestRow } from "@/modules/imprest/helpers/imprest.types";
+import type { EmployeeImprestDashboard, EmployeeImprestTransactionRow, ImprestPaymentHistoryRow, ImprestRow } from "@/modules/imprest/helpers/imprest.types";
 
 /* ---------------- QUERY KEYS ---------------- */
 
@@ -10,6 +10,7 @@ export const imprestKeys = {
     root: ["employee-imprest"] as const,
     list: (userId?: number) => [...imprestKeys.root, "list", userId ?? "me"] as const,
     detail: (id: number) => [...imprestKeys.root, "detail", id] as const,
+    transactions: (userId?: number) => [...imprestKeys.root, "transactions", userId ?? "me"] as const,
 };
 
 export const imprestVoucherKeys = {
@@ -44,6 +45,23 @@ export const useImprestList = (userId?: number) => {
         // Enable:
         // - When viewing own page (userId undefined)
         // - When viewing another user (valid userId number)
+        enabled: userId === undefined || typeof userId === "number",
+    });
+};
+
+/* ---------------- TRANSACTIONS ---------------- */
+
+export const useImprestTransactions = (userId?: number) => {
+    return useQuery<EmployeeImprestTransactionRow[]>({
+        queryKey: imprestKeys.transactions(userId),
+
+        queryFn: () => {
+            if (userId) {
+                return imprestService.getUserTransactions(userId);
+            }
+            return imprestService.getMyTransactions();
+        },
+
         enabled: userId === undefined || typeof userId === "number",
     });
 };

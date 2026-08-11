@@ -2,6 +2,7 @@ import { BaseApiService } from './base.service';
 import type { CreateImprestCreditPayload, EmployeeImprestSummary } from '@/modules/imprest/helpers/imprest-admin.types';
 import type {
     EmployeeImprestDashboard,
+    EmployeeImprestTransactionRow,
     ImprestPaymentHistoryRow,
     ImprestRow,
     ImprestVoucherRow,
@@ -19,6 +20,14 @@ class ImprestService extends BaseApiService {
 
     async getUserDashboard(userId: number): Promise<EmployeeImprestDashboard> {
         return this.get<EmployeeImprestDashboard>(`/employee/user/${userId}`);
+    }
+
+    async getMyTransactions(): Promise<EmployeeImprestTransactionRow[]> {
+        return this.get<EmployeeImprestTransactionRow[]>('/employee/transactions');
+    }
+
+    async getUserTransactions(userId: number): Promise<EmployeeImprestTransactionRow[]> {
+        return this.get<EmployeeImprestTransactionRow[]>(`/employee/user/${userId}/transactions`);
     }
 
     async create({ data, files }: { data: Record<string, unknown>; files: File[] }): Promise<ImprestRow> {

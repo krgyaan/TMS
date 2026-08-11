@@ -213,33 +213,6 @@ export class EmployeeImprestService {
                 .from(employeeImprestTransactions)
                 .where(eq(employeeImprestTransactions.userId, userId));
 
-            const [voucherAgg] = await this.db
-                .select({
-                    totalVouchers: sql<number>`
-          COUNT(${employeeImprestVouchers.id})
-        `.as("totalVouchers"),
-
-                    accountsApproved: sql<number>`
-          SUM(
-            CASE 
-              WHEN ${employeeImprestVouchers.accountsSignedBy} IS NOT NULL 
-              THEN 1 ELSE 0
-            END
-          )
-        `.as("accountsApproved"),
-
-                    adminApproved: sql<number>`
-          SUM(
-            CASE 
-              WHEN ${employeeImprestVouchers.adminSignedBy} IS NOT NULL 
-              THEN 1 ELSE 0
-            END
-          )
-        `.as("adminApproved"),
-                })
-                .from(employeeImprestVouchers)
-                .where(eq(employeeImprestVouchers.beneficiaryName, String(userId)));
-
             const amountSpent = Number(imprestAgg.amountSpent);
             const amountApproved = Number(imprestAgg.amountApproved);
             const amountReceived = Number(txnAgg.amountReceived);
@@ -250,21 +223,11 @@ export class EmployeeImprestService {
             const imprests = await this.db
                 .select({
                     id: employeeImprests.id,
-                    userId: employeeImprests.userId,
 
-                    categoryId: employeeImprests.categoryId,
                     categoryName: imprestCategories.name,
 
                     teamId: employeeImprests.teamId,
                     teamName: users.name, // ✅
-
-                    formattedCategory: sql<string>`
-                    CASE 
-                        WHEN ${employeeImprests.categoryId} = 22 
-                        THEN 'Transfer To Team Member - ' || ${users.name}
-                        ELSE ${imprestCategories.name}
-                    END
-                    `.as("formattedCategory"),
 
                     partyName: employeeImprests.partyName,
                     projectName: employeeImprests.projectName,
@@ -287,32 +250,9 @@ export class EmployeeImprestService {
                 .where(eq(employeeImprests.userId, userId))
                 .orderBy(desc(employeeImprests.createdAt));
 
-            const transactions = await this.db
-                .select({
-                    id: employeeImprestTransactions.id,
-                    userId: employeeImprestTransactions.userId,
-                    txnDate: employeeImprestTransactions.txnDate,
-                    teamMemberName: employeeImprestTransactions.teamMemberName,
-                    projectName: employeeImprestTransactions.projectName,
-                    amount: employeeImprestTransactions.amount,
-                    createdAt: employeeImprestTransactions.createdAt,
-                    updatedAt: employeeImprestTransactions.updatedAt,
-
-                    categoryName: imprestCategories.name,
-                })
-                .from(employeeImprestTransactions)
-                .leftJoin(
-                    employeeImprests,
-                    and(eq(employeeImprests.userId, employeeImprestTransactions.userId), eq(employeeImprests.projectName, employeeImprestTransactions.projectName))
-                )
-                .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
-                .where(eq(employeeImprestTransactions.userId, userId))
-                .orderBy(desc(employeeImprestTransactions.txnDate));
-
             this.logger.info("Employee dashboard fetched", {
                 userId,
                 imprestCount: imprests.length,
-                transactionCount: transactions.length,
             });
 
             return {
@@ -321,15 +261,8 @@ export class EmployeeImprestService {
                     amountApproved,
                     amountReceived,
                     amountLeft: amountApproved - amountReceived,
-
-                    voucherInfo: {
-                        totalVouchers: Number(voucherAgg.totalVouchers),
-                        accountsApproved: Number(voucherAgg.accountsApproved),
-                        adminApproved: Number(voucherAgg.adminApproved),
-                    },
                 },
                 imprests,
-                transactions,
             };
         } catch (error: any) {
             this.logger.error("Failed to fetch employee dashboard", {
@@ -340,6 +273,30 @@ export class EmployeeImprestService {
 
             throw error;
         }
+    }
+
+    /* ------------------------- TRANSACTIONS ------------------------- */
+    async getTransactions(userId: number) {
+        const transactions = await this.db
+            .select({
+                id: employeeImprestTransactions.id,
+                userId: employeeImprestTransactions.userId,
+                txnDate: employeeImprestTransactions.txnDate,
+                teamMemberName: employeeImprestTransactions.teamMemberName,
+                projectName: employeeImprestTransactions.projectName,
+                amount: employeeImprestTransactions.amount,
+                createdAt: employeeImprestTransactions.createdAt,
+                updatedAt: employeeImprestTransactions.updatedAt,
+
+                categoryName: imprestCategories.name,
+            })
+            .from(employeeImprestTransactions)
+            .leftJoin(employeeImprests, eq(employeeImprests.id, employeeImprestTransactions.imprestId))
+            .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
+            .where(eq(employeeImprestTransactions.userId, userId))
+            .orderBy(desc(employeeImprestTransactions.txnDate));
+
+        return transactions;
     }
 
     async findOne(id: number) {

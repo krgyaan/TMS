@@ -44,10 +44,20 @@ export class EmployeeImprestController {
         return this.service.getEmployeeDashboard(req.user.sub);
     }
 
+    @Get("transactions")
+    getMyTransactions(@Req() req) {
+        return this.service.getTransactions(req.user.sub);
+    }
+
     @Get("user/:userId")
     getByUser(@Param("userId", ParseIntPipe) userId: number) {
         console.log("Fetching imprests for userId (controller):", userId);
         return this.service.getEmployeeDashboard(userId);
+    }
+
+    @Get("user/:userId/transactions")
+    getByUserTransactions(@Param("userId", ParseIntPipe) userId: number) {
+        return this.service.getTransactions(userId);
     }
 
     @Get(":id")
