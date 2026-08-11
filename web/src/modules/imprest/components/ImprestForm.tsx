@@ -162,167 +162,165 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
         (mode === "edit" && (updateMutation.isPending || uploadMutation.isPending));
 
     return (
-        <div className="container mx-auto py-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle>{mode === "create" ? "Add Employee Imprest" : `Edit Imprest #${imprestId}`}</CardTitle>
-                    <CardAction>
-                        <Button
-                            variant="outline"
-                            onClick={() =>
-                                imprest?.userId
-                                    ? navigate(paths.shared.imprestUser(imprest.userId))
-                                    : navigate(paths.shared.imprest)
-                            }
-                        >
-                            <User className="h-4 w-4 mr-1" />
-                            Return Back
-                        </Button>
-                    </CardAction>
-                </CardHeader>
+        <Card>
+            <CardHeader>
+                <CardTitle>{mode === "create" ? "Add Employee Imprest" : `Edit Imprest #${imprestId}`}</CardTitle>
+                <CardAction>
+                    <Button
+                        variant="outline"
+                        onClick={() =>
+                            imprest?.userId
+                                ? navigate(paths.shared.imprestUser(imprest.userId))
+                                : navigate(paths.shared.imprest)
+                        }
+                    >
+                        <User className="h-4 w-4 mr-1" />
+                        Return Back
+                    </Button>
+                </CardAction>
+            </CardHeader>
 
-                <CardContent>
-                    <Form {...form}>
-                        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                {/* Category — always shown */}
+            <CardContent>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {/* Category — always shown */}
+                            <SelectField
+                                control={form.control}
+                                name="categoryId"
+                                label="Select Category"
+                                placeholder="-- Select Category --"
+                                options={categoryOptions}
+                            />
+
+                            {/* Assigned To — disabled in create (auto = current user) */}
+                            <SelectField
+                                control={form.control}
+                                name="userId"
+                                label="Assigned To"
+                                placeholder="-- Select User --"
+                                options={userOptions}
+                                disabled={mode === "create"}
+                            />
+
+                            {/* Party Name — hidden in transfer mode */}
+                            {!isTransferMode && (
+                                <FieldWrapper<ImprestFormValues, "partyName">
+                                    control={form.control}
+                                    name="partyName"
+                                    label="Party Name"
+                                >
+                                    {field => <Input placeholder="Party Name" {...field} value={field.value ?? ""} />}
+                                </FieldWrapper>
+                            )}
+
+                            {/* Project — hidden in transfer mode */}
+                            {!isTransferMode && (
                                 <SelectField
                                     control={form.control}
-                                    name="categoryId"
-                                    label="Select Category"
-                                    placeholder="-- Select Category --"
-                                    options={categoryOptions}
+                                    name="projectName"
+                                    label="Select Project"
+                                    placeholder="-- Select Project --"
+                                    options={projectOptions}
                                 />
+                            )}
 
-                                {/* Assigned To — disabled in create (auto = current user) */}
+                            {/* Transfer To — only shown in transfer mode */}
+                            {isTransferMode && (
                                 <SelectField
                                     control={form.control}
-                                    name="userId"
-                                    label="Assigned To"
-                                    placeholder="-- Select User --"
-                                    options={userOptions}
-                                    disabled={mode === "create"}
+                                    name="transferToId"
+                                    label="Transfer To"
+                                    placeholder="-- Select Team Member --"
+                                    options={transferUserOptions}
                                 />
+                            )}
 
-                                {/* Party Name — hidden in transfer mode */}
-                                {!isTransferMode && (
-                                    <FieldWrapper<ImprestFormValues, "partyName">
-                                        control={form.control}
-                                        name="partyName"
-                                        label="Party Name"
-                                    >
-                                        {field => <Input placeholder="Party Name" {...field} value={field.value ?? ""} />}
-                                    </FieldWrapper>
-                                )}
+                            {/* Amount — always shown */}
+                            <FieldWrapper<ImprestFormValues, "amount">
+                                control={form.control}
+                                name="amount"
+                                label="Amount"
+                            >
+                                {field => <NumberInput placeholder="Amount" value={field.value} onChange={field.onChange} />}
+                            </FieldWrapper>
 
-                                {/* Project — hidden in transfer mode */}
-                                {!isTransferMode && (
-                                    <SelectField
-                                        control={form.control}
-                                        name="projectName"
-                                        label="Select Project"
-                                        placeholder="-- Select Project --"
-                                        options={projectOptions}
+                            {/* Date of Expense — always shown */}
+                            <FieldWrapper<ImprestFormValues, "dateOfExpense">
+                                control={form.control}
+                                name="dateOfExpense"
+                                label="Date of Expense"
+                            >
+                                {field => (
+                                    <DateInput
+                                        value={field.value instanceof Date ? format(field.value, "yyyy-MM-dd") : (field.value ?? "")}
+                                        onChange={field.onChange}
                                     />
                                 )}
+                            </FieldWrapper>
 
-                                {/* Transfer To — only shown in transfer mode */}
-                                {isTransferMode && (
-                                    <SelectField
-                                        control={form.control}
-                                        name="transferToId"
-                                        label="Transfer To"
-                                        placeholder="-- Select Team Member --"
-                                        options={transferUserOptions}
+                            {/* Proofs — always shown */}
+                            <div className="space-y-3 md:col-span-1">
+                                <div className="space-y-2">
+                                    <Label>Invoice / Proof</Label>
+                                    <FilePond
+                                        files={pondFiles}
+                                        onupdatefiles={handlePondProcess}
+                                        allowMultiple
+                                        acceptedFileTypes={[
+                                            "image/*",
+                                            "application/pdf",
+                                            "application/msword",
+                                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                            "text/plain",
+                                        ]}
+                                        labelIdle='Drag & drop files or <span class="filepond--label-action">Browse</span>'
+                                        className="cursor-pointer"
                                     />
-                                )}
-
-                                {/* Amount — always shown */}
-                                <FieldWrapper<ImprestFormValues, "amount">
-                                    control={form.control}
-                                    name="amount"
-                                    label="Amount"
-                                >
-                                    {field => <NumberInput placeholder="Amount" value={field.value} onChange={field.onChange} />}
-                                </FieldWrapper>
-
-                                {/* Date of Expense — always shown */}
-                                <FieldWrapper<ImprestFormValues, "dateOfExpense">
-                                    control={form.control}
-                                    name="dateOfExpense"
-                                    label="Date of Expense"
-                                >
-                                    {field => (
-                                        <DateInput
-                                            value={field.value instanceof Date ? format(field.value, "yyyy-MM-dd") : (field.value ?? "")}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
-
-                                {/* Proofs — always shown */}
-                                <div className="space-y-3 md:col-span-3">
-                                    <div className="space-y-2">
-                                        <Label>Invoice / Proof</Label>
-                                        <FilePond
-                                            files={pondFiles}
-                                            onupdatefiles={handlePondProcess}
-                                            allowMultiple
-                                            acceptedFileTypes={[
-                                                "image/*",
-                                                "application/pdf",
-                                                "application/msword",
-                                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                                "text/plain",
-                                            ]}
-                                            labelIdle='Drag & drop files or <span class="filepond--label-action">Browse</span>'
-                                            className="cursor-pointer"
-                                        />
-                                    </div>
                                 </div>
-
-                                {/* Remarks — always shown (optional) */}
-                                <FieldWrapper<ImprestFormValues, "remark">
-                                    control={form.control}
-                                    name="remark"
-                                    label="Remarks"
-                                    className="md:col-span-3"
-                                >
-                                    {field => (
-                                        <textarea
-                                            className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                            placeholder="Remarks (optional)"
-                                            {...field}
-                                            value={field.value ?? ""}
-                                        />
-                                    )}
-                                </FieldWrapper>
                             </div>
 
-                            <div className="w-full flex items-center justify-center gap-2">
-                                <Button type="submit" disabled={isPending}>
-                                    {isPending
-                                        ? "Saving..."
-                                        : mode === "create"
-                                            ? "Create Imprest"
-                                            : "Save Changes"}
-                                </Button>
-                                <Button type="button" variant="outline" onClick={() => form.reset()} disabled={isPending}>
-                                    Reset
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => navigate(paths.shared.imprest)}
-                                    disabled={isPending}
-                                >
-                                    Cancel
-                                </Button>
-                            </div>
-                        </form>
-                    </Form>
-                </CardContent>
-            </Card>
-        </div>
+                            {/* Remarks — always shown (optional) */}
+                            <FieldWrapper<ImprestFormValues, "remark">
+                                control={form.control}
+                                name="remark"
+                                label="Remarks"
+                                className="md:col-span-1"
+                            >
+                                {field => (
+                                    <textarea
+                                        className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                        placeholder="Remarks (optional)"
+                                        {...field}
+                                        value={field.value ?? ""}
+                                    />
+                                )}
+                            </FieldWrapper>
+                        </div>
+
+                        <div className="w-full flex items-center justify-center gap-2">
+                            <Button type="submit" disabled={isPending}>
+                                {isPending
+                                    ? "Saving..."
+                                    : mode === "create"
+                                        ? "Create Imprest"
+                                        : "Save Changes"}
+                            </Button>
+                            <Button type="button" variant="outline" onClick={() => form.reset()} disabled={isPending}>
+                                Reset
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => navigate(paths.shared.imprest)}
+                                disabled={isPending}
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    </form>
+                </Form>
+            </CardContent>
+        </Card>
     );
 }

@@ -121,11 +121,19 @@ export function useProjectOptions() {
     const { data: projects = [] } = useProjectsMaster();
 
     return useMemo(
-        () =>
-            projects.map((p) => ({
-                id: p.projectName,
-                name: p.projectName,
-            })),
+        () => {
+            const seen = new Set<string>();
+            return projects
+                .filter((p) => {
+                    if (seen.has(p.projectName)) return false;
+                    seen.add(p.projectName);
+                    return true;
+                })
+                .map((p) => ({
+                    id: p.projectName,
+                    name: p.projectName,
+                }));
+        },
         [projects]
     );
 }
