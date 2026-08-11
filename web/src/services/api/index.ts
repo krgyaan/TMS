@@ -47,4 +47,5 @@ export { trainingApiService } from './training.service';
 export { leadEnquiryService } from './lead-enquiry.service';
 export { amcService } from './amc.service';
 export { amcBillingService } from './amc-billing.service';
+export { amcServicesService } from './amc-services.service';
 

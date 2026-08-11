@@ -36,8 +36,11 @@ const AmcServiceEngineerSchema = z.object({
 
 const VariableBillItemSchema = z.object({
     label: z.string().optional(),
+    date: z.string().optional(),
     amount: z.number().optional(),
 });
+
+export type VariableBillItemDto = z.infer<typeof VariableBillItemSchema>;
 
 export const CreateAmcSchema = z.object({
     teamName: z.string().min(1),
