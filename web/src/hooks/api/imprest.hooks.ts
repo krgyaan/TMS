@@ -54,7 +54,7 @@ export const useCreateImprest = () => {
     const qc = useQueryClient();
 
     return useMutation({
-        mutationFn: imprestService.create,
+        mutationFn: ({ data, files }: { data: Record<string, unknown>; files: File[] }) => imprestService.create({ data, files }),
         onSuccess: () => {
             toast.success("Imprest created successfully");
             qc.invalidateQueries({ queryKey: imprestKeys.root });
@@ -206,7 +206,7 @@ export const useDeleteImprestPaymentHistory = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: imprestService.deletePaymentHistory,
+        mutationFn: (id: number) => imprestService.deletePaymentHistory(id),
         onSuccess: () => {
             queryClient.invalidateQueries({
                 queryKey: imprestPaymentHistoryKeys.all,
@@ -220,7 +220,7 @@ export const useAccountApproveVoucher = () => {
     const qc = useQueryClient();
 
     return useMutation({
-        mutationFn: imprestService.accountApproveVoucher,
+        mutationFn: (payload: { id: number; remark?: string; approve: boolean }) => imprestService.accountApproveVoucher(payload),
 
         onSuccess: () => {
             toast.success("Voucher updated successfully");
@@ -236,7 +236,7 @@ export const useAdminApproveVoucher = () => {
     const qc = useQueryClient();
 
     return useMutation({
-        mutationFn: imprestService.adminApproveVoucher,
+        mutationFn: (payload: { id: number; remark?: string; approve: boolean }) => imprestService.adminApproveVoucher(payload),
 
         onSuccess: () => {
             toast.success("Voucher updated successfully");
@@ -319,7 +319,7 @@ export const useCreateImprestCredit = () => {
     const qc = useQueryClient();
 
     return useMutation({
-        mutationFn: imprestService.credit,
+        mutationFn: (data: CreateImprestCreditPayload) => imprestService.credit(data),
 
         onSuccess: (_, variables) => {
             toast.success("Imprest paid successfully");

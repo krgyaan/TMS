@@ -340,6 +340,7 @@ const UserImprestsPage: React.FC = () => {
                 headerName: "Category",
                 flex: 1,
                 minWidth: 140,
+                cellRenderer: (p: { data: ImprestRow }) => p.data.teamId ? `${p.data.categoryName} - ${p.data.teamName}` : p.data.categoryName,
             },
             {
                 field: "amount",

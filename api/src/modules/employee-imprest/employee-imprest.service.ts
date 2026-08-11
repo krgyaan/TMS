@@ -73,8 +73,8 @@ export class EmployeeImprestService {
                 and(
                     eq(employeeImprestVouchers.beneficiaryName, String(beneficiaryUserId)),
                     sql`TRIM(COALESCE(${employeeImprestVouchers.accountsSignedBy}, '')) <> ''`,
-                    sql`EXTRACT(ISOYEAR FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(ISOYEAR FROM ${expenseDate})`,
-                    sql`EXTRACT(WEEK FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(WEEK FROM ${expenseDate})`
+                    sql`EXTRACT(ISOYEAR FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(ISOYEAR FROM CAST(${expenseDate} AS TIMESTAMP))`,
+                    sql`EXTRACT(WEEK FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(WEEK FROM CAST(${expenseDate} AS TIMESTAMP))`
                 )
             )
             .limit(1);
@@ -137,9 +137,7 @@ export class EmployeeImprestService {
                         amount: data.amount,
                         remark: data.remark,
                         invoiceProof: files.map(f => f.filename),
-                        dateOfExpense: data.dateOfExpense,
-                        createdAt: new Date(),
-                        updatedAt: new Date(),
+                        dateOfExpense: data.dateOfExpense
                     })
                     .returning();
 
@@ -163,8 +161,14 @@ export class EmployeeImprestService {
         const [imprest] = await this.db
             .insert(employeeImprests)
             .values({
-                ...data,
+                userId: data.userId,
+                categoryId: data.categoryId,
+                partyName: data.partyName,
+                projectName: data.projectName,
+                amount: data.amount,
+                remark: data.remark,
                 invoiceProof: files.map(f => f.filename),
+                dateOfExpense: data.dateOfExpense
             })
             .returning();
 

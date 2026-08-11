@@ -13,6 +13,7 @@ export interface ImprestRow {
     categoryId: number | null;
     categoryName: string | null;
     teamId: number | null;
+    teamName: string | null;
     partyName: string | null;
     projectName: string | null;
     remark: string | null;
