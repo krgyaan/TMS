@@ -1,0 +1,527 @@
+WEB/src
+├── app
+│   ├── layout
+│   ├── providers
+│   └── routes
+│       ├── components
+│       └── sections
+├── components
+│   ├── bi-dashboard
+│   ├── data-grid
+│   │   └── renderers
+│   ├── form
+│   ├── layout
+│   ├── styles
+│   ├── tender-file-upload
+│   ├── tendering
+│   └── ui
+├── contexts
+├── hooks
+│   └── api
+├── lib
+├── modules
+│   ├── accounts
+│   │   ├── delegation
+│   │   ├── financial-docs
+│   │   ├── fixed-expenses
+│   │   ├── gst-checklists
+│   │   ├── loan-advances
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── task-checklist
+│   │   │   └── components
+│   │   └── tds-checklists
+│   ├── auth
+│   ├── bi-dashboard
+│   │   ├── bank-guarantee
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── bank-tranfer
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── cheque
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── demand-draft
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── fdr
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── pay-on-portal
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   └── tender-fee
+│   │       ├── components
+│   │       └── helpers
+│   ├── crm
+│   │   ├── enquirycosting
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── enquiry-result
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── followups
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── lead-enquiry
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── leads
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   └── leads-quotation
+│   │       ├── components
+│   │       └── helpers
+│   ├── hrms
+│   │   ├── assets
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── employees
+│   │   ├── onboarding
+│   │   │   └── components
+│   │   └── training
+│   │       ├── components
+│   │       └── helpers
+│   ├── imprest
+│   │   ├── api
+│   │   ├── components
+│   │   ├── hooks
+│   │   ├── pages
+│   │   ├── schemas
+│   │   └── types
+│   ├── integrations
+│   │   └── google
+│   ├── master
+│   │   ├── circulars
+│   │   │   └── components
+│   │   ├── companies
+│   │   ├── company
+│   │   ├── document-submitted
+│   │   │   └── components
+│   │   ├── document-type
+│   │   ├── emd-responsibility
+│   │   │   └── components
+│   │   ├── financial-year
+│   │   │   └── components
+│   │   ├── followup-category
+│   │   │   └── components
+│   │   ├── imprest-category
+│   │   │   └── components
+│   │   ├── industry
+│   │   │   └── components
+│   │   ├── item
+│   │   │   └── components
+│   │   ├── lead-type
+│   │   │   └── components
+│   │   ├── loan-party
+│   │   │   └── components
+│   │   ├── location
+│   │   │   └── components
+│   │   ├── organization
+│   │   │   └── components
+│   │   ├── permissions
+│   │   ├── role
+│   │   │   └── components
+│   │   ├── state
+│   │   │   └── components
+│   │   ├── status
+│   │   │   └── components
+│   │   ├── team
+│   │   │   └── components
+│   │   ├── tq-type
+│   │   │   └── components
+│   │   ├── user
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── vendor
+│   │   │   └── components
+│   │   ├── vendor-account
+│   │   ├── vendor-file
+│   │   ├── vendor-gst
+│   │   ├── vendor-organization
+│   │   │   └── components
+│   │   ├── vendors
+│   │   │   └── components
+│   │   └── website
+│   │       └── components
+│   ├── operations
+│   │   ├── contract-agreement
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── kick-off
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── order-view
+│   │   ├── payment-requests
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── project-dashboard
+│   │   │   ├── components
+│   │   │   └── sections
+│   │   ├── purchase-invoices
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── purchase-orders
+│   │   │   ├── components
+│   │   │   ├── helpers
+│   │   │   ├── pages
+│   │   │   └── sections
+│   │   ├── sale-invoices
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── types
+│   │   ├── vendor-master
+│   │   │   └── components
+│   │   ├── vendor-work-orders
+│   │   │   ├── components
+│   │   │   ├── helpers
+│   │   │   └── pages
+│   │   ├── wo-basic-details
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   └── wo-details
+│   │       ├── components
+│   │       │   └── pages
+│   │       └── helpers
+│   ├── performance
+│   │   ├── business-performance
+│   │   ├── customer-performance
+│   │   ├── location-performance
+│   │   ├── oem-dashboard
+│   │   ├── team-leader
+│   │   └── tender-executive
+│   │       ├── components
+│   │       └── types
+│   ├── profile
+│   │   ├── components
+│   │   │   └── onboarding
+│   │   │       ├── components
+│   │   │       └── contexts
+│   │   └── contexts
+│   ├── services
+│   │   ├── amc
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── amc-billing
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── conference
+│   │   ├── customer
+│   │   └── visit
+│   ├── shared
+│   │   ├── client-directory
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── courier
+│   │   ├── finance-document
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   ├── follow-up
+│   │   ├── maker-requests
+│   │   │   └── helpers
+│   │   ├── master-project
+│   │   │   ├── components
+│   │   │   └── helpers
+│   │   └── pqr
+│   │       ├── components
+│   │       └── helpers
+│   └── tendering
+│       ├── bid-submissions
+│       │   ├── components
+│       │   └── helpers
+│       ├── checklists
+│       │   ├── components
+│       │   └── helpers
+│       ├── components
+│       ├── costing-approvals
+│       │   ├── components
+│       │   └── helpers
+│       ├── costing-sheets
+│       │   ├── components
+│       │   └── helpers
+│       ├── emds-tenderfees
+│       │   ├── components
+│       │   └── helpers
+│       ├── hooks
+│       ├── info-sheet
+│       │   ├── components
+│       │   └── helpers
+│       ├── physical-docs
+│       │   ├── components
+│       │   └── helpers
+│       ├── ras
+│       │   ├── components
+│       │   └── helpers
+│       ├── request-extension
+│       │   ├── components
+│       │   └── helpers
+│       ├── results
+│       │   ├── components
+│       │   └── helpers
+│       ├── rfq-response
+│       │   ├── components
+│       │   └── helpers
+│       ├── rfqs
+│       │   ├── components
+│       │   └── helpers
+│       ├── submit-queries
+│       │   ├── components
+│       │   └── helpers
+│       ├── tender-approval
+│       │   ├── components
+│       │   └── helpers
+│       ├── tenders
+│       │   ├── components
+│       │   └── helpers
+│       ├── timer-dashboard
+│       └── tq-management
+│           ├── components
+│           └── helpers
+├── services
+│   └── api
+├── types
+└── utils
+
+284 directories
+
+API/src
+.
+├── common
+│   └── constants
+├── config
+├── core
+│   └── mail
+├── db
+│   ├── schemas
+│   │   ├── accounts
+│   │   ├── auth
+│   │   ├── crm
+│   │   ├── email
+│   │   ├── hrms
+│   │   ├── master
+│   │   ├── operations
+│   │   ├── services
+│   │   ├── shared
+│   │   ├── tendering
+│   │   ├── vendors
+│   │   └── workflow
+│   └── seeds
+├── decorators
+├── infra
+│   └── queue
+├── logger
+├── mailer
+│   └── zod
+├── modules
+│   ├── accounts
+│   │   ├── account-checklist
+│   │   │   └── mails
+│   │   └── loan-advance
+│   │       └── dto
+│   ├── auth
+│   │   ├── decorators
+│   │   ├── guards
+│   │   ├── services
+│   │   ├── strategies
+│   │   └── types
+│   ├── bi-dashboard
+│   │   ├── bank-guarantee
+│   │   │   └── helpers
+│   │   ├── bank-transfer
+│   │   │   └── helpers
+│   │   ├── cheque
+│   │   │   └── helpers
+│   │   ├── demand-draft
+│   │   │   └── helpers
+│   │   ├── fdr
+│   │   │   └── helpers
+│   │   ├── pay-on-portal
+│   │   │   └── helpers
+│   │   └── tender-fee
+│   │       └── helpers
+│   ├── courier
+│   │   ├── mails
+│   │   └── zod
+│   ├── crm
+│   │   ├── enquirycosting
+│   │   │   └── dto
+│   │   ├── enquiry-result
+│   │   │   └── dto
+│   │   ├── followups
+│   │   │   └── dto
+│   │   ├── lead-enquiry
+│   │   │   └── dto
+│   │   ├── leads
+│   │   │   └── dto
+│   │   └── leads-quotation
+│   │       └── dto
+│   ├── email
+│   │   ├── cron
+│   │   ├── dto
+│   │   └── templates
+│   ├── employee-imprest
+│   │   └── zod
+│   ├── follow-up
+│   │   ├── mails
+│   │   └── zod
+│   ├── hrms
+│   │   ├── assets
+│   │   ├── employee-onboarding
+│   │   ├── employee-profiles
+│   │   ├── onboarding
+│   │   └── training
+│   │       └── worker
+│   ├── imprest-admin
+│   │   └── zod
+│   ├── integrations
+│   │   └── google
+│   ├── master
+│   │   ├── circulars
+│   │   ├── companies
+│   │   ├── documents-submitted
+│   │   ├── emd-responsibilities
+│   │   ├── finance-doc-type
+│   │   ├── financial-year
+│   │   ├── followup-categories
+│   │   ├── health
+│   │   ├── imprest-categories
+│   │   ├── industries
+│   │   ├── item-headings
+│   │   ├── items
+│   │   ├── lead-industries
+│   │   ├── lead-types
+│   │   ├── loan-parties
+│   │   ├── locations
+│   │   ├── oauth-accounts
+│   │   ├── organizations
+│   │   ├── permissions
+│   │   ├── projects-master
+│   │   ├── roles
+│   │   ├── states
+│   │   ├── statuses
+│   │   ├── teams
+│   │   ├── tender-status
+│   │   ├── tq-types
+│   │   ├── user-profiles
+│   │   │   └── guards
+│   │   ├── users
+│   │   ├── vendor-accounts
+│   │   ├── vendor-files
+│   │   ├── vendor-gsts
+│   │   ├── vendor-organizations
+│   │   ├── vendors
+│   │   └── websites
+│   ├── operations
+│   │   ├── contract-agreement
+│   │   │   └── dto
+│   │   ├── kick-off-meeting
+│   │   │   └── dto
+│   │   ├── maker-requests
+│   │   ├── payment-requests
+│   │   │   └── dto
+│   │   ├── projects
+│   │   ├── purchase-invoices
+│   │   │   └── dto
+│   │   ├── purchase-orders
+│   │   ├── sale-invoices
+│   │   │   └── dto
+│   │   ├── vendor-work-orders
+│   │   │   └── dto
+│   │   ├── wo-amendments
+│   │   │   └── dto
+│   │   ├── wo-basic-details
+│   │   │   └── dto
+│   │   ├── wo-contacts
+│   │   │   └── dto
+│   │   ├── wo-details
+│   │   │   └── dto
+│   │   ├── wo-documents
+│   │   │   └── dto
+│   │   └── wo-queries
+│   │       └── dto
+│   ├── pdf
+│   │   ├── assets
+│   │   ├── config
+│   │   ├── dto
+│   │   └── templates
+│   │       ├── bg
+│   │       ├── dd
+│   │       ├── fdr
+│   │       └── letters
+│   ├── performance
+│   │   ├── business-performance
+│   │   │   └── zod
+│   │   ├── config
+│   │   ├── customer-performance
+│   │   │   └── zod
+│   │   ├── helpers
+│   │   ├── location-performance
+│   │   │   └── zod
+│   │   ├── oem-performance
+│   │   │   └── zod
+│   │   ├── team-leader-performance
+│   │   ├── tender-executive-performance
+│   │   │   └── zod
+│   │   └── types
+│   ├── profile
+│   ├── scheduler
+│   ├── services
+│   │   ├── amc
+│   │   │   └── dto
+│   │   └── amc-billing
+│   │       └── dto
+│   ├── shared
+│   │   ├── client-directory
+│   │   │   └── dto
+│   │   ├── finance-documents
+│   │   │   └── dto
+│   │   ├── pqr
+│   │   │   └── dto
+│   │   └── projects-master
+│   │       └── dto
+│   ├── tendering
+│   │   ├── bid-submissions
+│   │   │   └── dto
+│   │   ├── checklists
+│   │   │   └── dto
+│   │   ├── costing-approvals
+│   │   │   └── dto
+│   │   ├── costing-sheets
+│   │   │   └── dto
+│   │   ├── info-sheets
+│   │   │   └── dto
+│   │   ├── payment-requests
+│   │   │   ├── constants
+│   │   │   ├── dto
+│   │   │   └── services
+│   │   ├── physical-docs
+│   │   │   └── dto
+│   │   ├── request_extensions
+│   │   │   └── dto
+│   │   ├── reverse-auction
+│   │   │   └── dto
+│   │   ├── rfq-response
+│   │   │   └── dto
+│   │   ├── rfqs
+│   │   │   └── dto
+│   │   ├── submit-queries
+│   │   │   └── dto
+│   │   ├── tender-approval
+│   │   │   └── dto
+│   │   ├── tender-files
+│   │   │   └── config
+│   │   ├── tender-result
+│   │   │   └── dto
+│   │   ├── tenders
+│   │   │   └── dto
+│   │   ├── tender-status-history
+│   │   ├── tq-management
+│   │   │   └── dto
+│   │   └── types
+│   ├── timer-dashboard
+│   └── timers
+└── utils
+
+236 directories
+

@@ -16,12 +16,12 @@ const CourierViewPage = lazy(() => import("@/modules/shared/courier/CourierView"
 const CourierEditPage = lazy(() => import("@/modules/shared/courier/CourierEdit"));
 
 // Imprests
-const Shared_Imprest = lazy(() => import("@/modules/shared/imprest"));
-const ImprestCreatePage = lazy(() => import("@/modules/shared/imprest/create"));
-const ImprestEditPage = lazy(() => import("@/modules/shared/imprest/edit"));
-const ImprestPaymentHistoryPage = lazy(() => import("@/modules/shared/imprest/ImprestPaymentHistory"));
-const ImprestVoucherPage = lazy(() => import("@/modules/shared/imprest/ImprestVoucher"));
-const ImprestVoucherViewPage = lazy(() => import("@/modules/shared/imprest/ImprestVoucherView"));
+const Shared_Imprest = lazy(() => import("@/modules/imprest/UserImprestsPage"));
+const ImprestCreatePage = lazy(() => import("@/modules/imprest/CreateImprestPage"));
+const ImprestEditPage = lazy(() => import("@/modules/imprest/EditImprestPage"));
+const ImprestPaymentHistoryPage = lazy(() => import("@/modules/imprest/PaymentHistoryPage"));
+const ImprestVoucherPage = lazy(() => import("@/modules/imprest/VoucherListPage"));
+const ImprestVoucherViewPage = lazy(() => import("@/modules/imprest/VoucherViewPage"));
 
 // Maker Requests
 const Shared_MakerRequests = lazy(() => import("@/modules/shared/maker-requests/MyMakerRequests"));

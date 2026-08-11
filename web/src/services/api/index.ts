@@ -11,6 +11,7 @@ export { vendorsService } from './vendor.service'
 export { vendorOrganizationsService } from './vendor-organization.service'
 export { websitesService } from './website.service'
 export { imprestCategoriesService } from './imprest-category.service'
+export { imprestService } from './imprest.service'
 export { followupCategoriesService } from './followup-category.service'
 export { documentsSubmittedService } from './document-submitted.service'
 export { industriesService } from './industry.service';

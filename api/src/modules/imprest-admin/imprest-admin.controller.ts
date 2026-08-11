@@ -1,17 +1,12 @@
-import { Controller, Delete, ForbiddenException, Get, Param, ParseIntPipe, Post, Query, Req, UseGuards, Body, BadRequestException } from "@nestjs/common";
-
-import { ImprestAdminService } from "./imprest-admin.service";
-import { Roles } from "@/modules/auth/decorators/roles.decorator";
-import { RolesGuard } from "@/modules/auth/guards/roles.guard";
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 import { CanDelete, CanRead, CanUpdate, CurrentUser } from "../auth/decorators";
 import { PermissionGuard } from "../auth/guards/permission.guard";
+import { PermissionService } from "../auth/services/permission.service";
+import { ImprestAdminService } from "./imprest-admin.service";
 import { CreateEmployeeImprestCreditSchema } from "./zod/create-employee-imprest-credit.schema";
-import { PermissionService, UserPermissionContext } from "../auth/services/permission.service";
 
-import { ValidatedUser } from "../auth/strategies/jwt.strategy";
-
-@Controller("accounts/imprest")
+@Controller("imprest")
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class ImprestAdminController {
     constructor(

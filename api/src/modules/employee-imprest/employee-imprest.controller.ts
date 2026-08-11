@@ -22,7 +22,7 @@ const multerConfig = {
         fileSize: 25 * 1024 * 1024,
     },
 };
-@Controller("employee-imprest")
+@Controller("imprest/employee")
 export class EmployeeImprestController {
     constructor(private readonly service: EmployeeImprestService) {}
 

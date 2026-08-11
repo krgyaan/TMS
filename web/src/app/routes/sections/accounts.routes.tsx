@@ -2,7 +2,7 @@ import { lazy } from "react";
 import { Routes, Route } from "react-router-dom";
 import { RouteWrapper } from "../components/RouteWrapper";
 
-const Accounts_Imprests = lazy(() => import("@/modules/accounts/imprest/ImprestAdminIndex"));
+const Accounts_Imprests = lazy(() => import("@/modules/imprest/UsersListPage"));
 const Accounts_FinancialDocs = lazy(() => import("@/modules/accounts/financial-docs"));
 const Accounts_LoanAdvances = lazy(() => import("@/modules/accounts/loan-advances/LoanAdvanceListPage"));
 const Accounts_LoanAdvances_Create = lazy(() => import("@/modules/accounts/loan-advances/LoanAdvanceCreatePage"));
@@ -19,8 +19,7 @@ const TaskChecklistCreate = lazy(() => import("@/modules/accounts/task-checklist
 const TaskChecklistEdit = lazy(() => import("@/modules/accounts/task-checklist/ChecklistEdit"));
 const TaskChecklistView = lazy(() => import("@/modules/accounts/task-checklist/ChecklistView"));
 const TaskChecklistReport = lazy(() => import("@/modules/accounts/task-checklist/ChecklistReport"));
-
-const Imprest_Admin_UserView = lazy(() => import("@/modules/accounts/imprest/ImprestAdminUserView"));
+const Imprest_Admin_UserView = lazy(() => import("@/modules/imprest/UserImprestsPage"));
 
 const TaskDashboard = lazy(() => import("@/modules/accounts/delegation/TaskDashboard"));
 const AddTask = lazy(() => import("@/modules/accounts/delegation/AddTask"));
