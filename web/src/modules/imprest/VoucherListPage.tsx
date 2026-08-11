@@ -11,6 +11,7 @@ import { useImprestVoucherList } from "@/hooks/api/imprest.hooks";
 import { useUser } from "@/hooks/api/useUsers";
 import type { ImprestVoucherRow } from "./helpers/imprest.types";
 import { formatINR } from "@/hooks/useINRFormatter";
+import type { ColDef } from "ag-grid-community";
 
 const ImprestVoucherList: React.FC = () => {
     const navigate = useNavigate();
@@ -43,7 +44,7 @@ const ImprestVoucherList: React.FC = () => {
     // Extract unique available financial years
     const availableFYs = useMemo(() => {
         const years = new Set<string>();
-        rows.forEach((r: any) => {
+        rows.forEach((r: ImprestVoucherRow) => {
             if (r.validFrom) {
                 const fy = getFinancialYearForDate(r.validFrom);
                 if (fy) {
@@ -65,7 +66,7 @@ const ImprestVoucherList: React.FC = () => {
     const filteredRows = useMemo(() => {
         const activeFY = selectedFY || availableFYs[0] || "all";
         if (activeFY === "all") return rows;
-        return rows.filter((r: any) => {
+        return rows.filter((r: ImprestVoucherRow) => {
             if (!r.validFrom) return false;
             return getFinancialYearForDate(r.validFrom) === activeFY;
         });
@@ -90,14 +91,14 @@ const ImprestVoucherList: React.FC = () => {
         ],
         [navigate]
     );
-    const columns = useMemo(
+    const columns = useMemo<ColDef<ImprestVoucherRow>[]>(
         () => [
             // ✅ Employee / Beneficiary column
             { field: "beneficiaryName", headerName: "Employee" },
             {
                 field: "voucherNumber",
                 headerName: "Voucher No.",
-                valueGetter: (p: any) => {
+                valueGetter: p => {
                     return p.data?.voucherCode ? p.data.voucherCode : "-";
                 },
             },
@@ -106,7 +107,7 @@ const ImprestVoucherList: React.FC = () => {
                 headerName: "Voucher Period",
                 autoHeight: true,
                 cellStyle: { whiteSpace: "pre-line" },
-                valueGetter: (p: any) => {
+                valueGetter: p => {
                     const formatDate = (d: string) =>
                         new Date(d).toLocaleDateString("en-GB", {
                             day: "2-digit",
@@ -123,14 +124,14 @@ const ImprestVoucherList: React.FC = () => {
             {
                 field: "amount",
                 headerName: "Amount",
-                valueFormatter: (p: any) => formatINR(p.value),
+                valueFormatter: p => formatINR(p.value),
             },
 
             {
                 field: "accountantApproval",
                 headerName: "Accountant Approval",
                 autoHeight: true,
-                cellRenderer: (p: any) => {
+                cellRenderer: p => {
                     const remark = p.data?.accountsRemark;
 
                     return (
@@ -151,7 +152,7 @@ const ImprestVoucherList: React.FC = () => {
                 field: "adminApproval",
                 headerName: "Admin Approval",
                 autoHeight: true,
-                cellRenderer: (p: any) => {
+                cellRenderer: p => {
                     const remark = p.data?.adminRemark;
 
                     return (
@@ -204,7 +205,7 @@ const ImprestVoucherList: React.FC = () => {
             </CardHeader>
 
             <CardContent>
-                <DataTable data={filteredRows} columnDefs={columns as any} gridOptions={{ pagination: true }} loading={isLoading} />
+                <DataTable data={filteredRows} columnDefs={columns} gridOptions={{ pagination: true }} loading={isLoading} />
             </CardContent>
         </Card>
     );

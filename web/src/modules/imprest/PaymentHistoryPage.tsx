@@ -9,6 +9,7 @@ import { useDeleteImprestPaymentHistory, useImprestPaymentHistory } from "@/hook
 import { useAuth } from "@/contexts/AuthContext";
 import type { ImprestPaymentHistoryRow } from "./helpers/imprest.types";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { formatDate } from "@/hooks/useFormatedDate";
 
 const ImprestPaymentHistory: React.FC = () => {
     const navigate = useNavigate();
@@ -28,13 +29,13 @@ const ImprestPaymentHistory: React.FC = () => {
         [deleteMutation]
     );
 
-    const columns: ColDef[] = useMemo(() => {
-        const baseColumns: ColDef[] = [
+    const columns: ColDef<ImprestPaymentHistoryRow>[] = useMemo(() => {
+        const baseColumns: ColDef<ImprestPaymentHistoryRow>[] = [
             {
                 headerName: "Date",
                 field: "date",
                 width: 140,
-                valueFormatter: p => (p.value ? new Date(p.value).toLocaleDateString("en-GB") : "-"),
+                valueFormatter: p => (p.value ? formatDate(p.value) : "-"),
             },
             {
                 headerName: "Name",
@@ -60,7 +61,7 @@ const ImprestPaymentHistory: React.FC = () => {
                 width: 120,
                 sortable: false,
                 filter: false,
-                cellRenderer: p => (
+                cellRenderer: (p: { data: ImprestPaymentHistoryRow }) => (
                     <Button variant="destructive" size="sm" onClick={() => handleDelete(p.data)} disabled={deleteMutation.isPending}>
                         <Trash className="h-4 w-4" />
                     </Button>

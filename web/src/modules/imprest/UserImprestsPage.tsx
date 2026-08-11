@@ -9,14 +9,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useAuth } from "@/contexts/AuthContext";
 import {
     useAddImprestAccRemark, useApproveImprest, useDeleteImprest, useImprestList,
-    useProofImprest, useTallyImprest,
-    useUploadImprestProofs
+    useProofImprest, useTallyImprest, useUploadImprestProofs
 } from "@/hooks/api/imprest.hooks";
 import { useUser } from "@/hooks/api/useUsers";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { cn } from "@/lib/utils";
-import type { GridApi } from "ag-grid-community";
+import type { ColDef, GridApi } from "ag-grid-community";
 import { saveAs } from "file-saver";
 import {
     AlertCircle, ArrowLeft, CheckCircle, Download, Eye, FileCheck, ImagePlus,
@@ -316,13 +315,13 @@ const UserImprestsPage: React.FC = () => {
         },
     ]
 
-    const columns = useMemo(
+    const columns = useMemo<ColDef<ImprestRow>[]>(
         () => [
             {
                 field: "createdAt",
                 headerName: "Date",
                 width: 100,
-                valueGetter: (p: ImprestRow) => formatDate(p.createdAt),
+                valueGetter: p => formatDate(p.data?.createdAt),
             },
             {
                 field: "partyName",
@@ -347,7 +346,7 @@ const UserImprestsPage: React.FC = () => {
                 headerName: "Amount",
                 width: 90,
                 maxWidth: 100,
-                valueFormatter: (p: ImprestRow) => formatINR(p.amount),
+                valueFormatter: p => formatINR(p.value),
                 cellClass: "",
             },
             {
@@ -379,8 +378,8 @@ const UserImprestsPage: React.FC = () => {
                 headerName: "Proofs",
                 width: 90,
                 sortable: false,
-                cellRenderer: p => {
-                    const row = p.data as ImprestRow;
+                cellRenderer: (p: { data: ImprestRow }) => {
+                    const row = p.data;
                     if (!row.invoiceProof.length) {
                         return <span className="text-muted-foreground">—</span>;
                     }
@@ -406,7 +405,9 @@ const UserImprestsPage: React.FC = () => {
                 width: 140,
                 sortable: false,
                 filter: false,
-                cellRenderer: (row: ImprestRow) => {
+                cellRenderer: (p: { data: ImprestRow }) => {
+                    const row = p.data;
+
                     return (
                         <div className="flex items-center gap-1">
                             <StatusToggle
@@ -628,14 +629,10 @@ const UserImprestsPage: React.FC = () => {
                         columnDefs={columns}
                         onGridReady={params => {
                             setGridApi(params.api);
-                            params.api.setQuickFilter(searchText);
                         }}
                         gridOptions={{
                             pagination: true,
-                            paginationPageSize: 20,
-                            getRowHeight: params => {
-                                return params.node.rowHeight || "auto";
-                            },
+                            paginationPageSize: 100,
                             headerHeight: 44,
                             suppressCellFocus: true,
                             onGridReady: params => {

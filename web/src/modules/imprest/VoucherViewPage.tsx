@@ -38,7 +38,7 @@ const ImprestVoucherView: React.FC = () => {
 
     const [preview, setPreview] = React.useState<InvoiceProof | null>(null);
 
-    const { data, isLoading, refetch } = useImprestVoucherView({ userId, from, to});
+    const { data, isLoading, refetch } = useImprestVoucherView({ userId, from: from ?? '', to: to ?? '' });
 
     const voucher = data?.voucher;
     const items = data?.items || [];
@@ -47,8 +47,8 @@ const ImprestVoucherView: React.FC = () => {
     let proofs: InvoiceProof[] = [];
     if (stateProofs && stateProofs.length > 0) {
         proofs = stateProofs;
-    } else if (voucher?.proofs && voucher?.proofs.length > 0) {
-        proofs = voucher?.proofs;
+    } else if (voucher && voucher.proofs.length > 0) {
+        proofs = voucher.proofs;
     }
 
     useEffect(() => {
@@ -95,7 +95,7 @@ const ImprestVoucherView: React.FC = () => {
         return (
             <div className="flex h-[80vh] flex-col items-center justify-center p-6 text-center">
                 <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" />
-                <h2 className="text-xl font-medium text-muted-foreground animate-pulse">Loading Voucher?...</h2>
+                <h2 className="text-xl font-medium text-muted-foreground animate-pulse">Loading Voucher...</h2>
             </div>
         );
     }
@@ -118,6 +118,24 @@ const ImprestVoucherView: React.FC = () => {
     }
 
 
+    if (!voucher) {
+        return (
+            <div className="flex h-[80vh]flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-300">
+                <div className="bg-muted p-4 rounded-full mb-4">
+                    <FileQuestion className="h-10 w-10 text-muted-foreground" />
+                </div>
+                <h2 className="text-2xl font-semibold tracking-tight">Voucher Not Found</h2>
+                <p className="text-muted-foreground mt-2 max-w-sm">
+                    We couldn't load the voucher details. It may have been removed or the link is incomplete.
+                </p>
+                <Button variant="outline" className="mt-6" onClick={() => navigate(-1)}>
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Go Back
+                </Button>
+            </div>
+        );
+    }
+
+
     const totalAmount = items.reduce((sum, i) => sum + i.amount, 0);
 
     const resetForm = () => {
@@ -130,7 +148,7 @@ const ImprestVoucherView: React.FC = () => {
         e.preventDefault();
         accountApproveMutation.mutate(
             {
-                id: voucher?.id,
+                id: voucher.id,
                 remark,
                 approve: accApprove,
             },
@@ -148,7 +166,7 @@ const ImprestVoucherView: React.FC = () => {
         e.preventDefault();
         adminApproveMutation.mutate(
             {
-                id: voucher?.id,
+                id: voucher.id,
                 remark,
                 approve: adminApprove,
             },
@@ -209,7 +227,7 @@ const ImprestVoucherView: React.FC = () => {
             await html2pdf()
                 .set({
                     margin: [5, 5, 5, 5] as const,
-                    filename: `Imprest-Voucher-${voucher?.voucherCode}.pdf`,
+                    filename: `Imprest-Voucher-${voucher.voucherCode}.pdf`,
                     image: { type: "jpeg", quality: 0.98 },
                     html2canvas: {
                         scale: 2,
@@ -262,10 +280,10 @@ const ImprestVoucherView: React.FC = () => {
 
                         <tr>
                             <td>
-                                FROM <b>{formatDate(voucher?.validFrom)}</b> TO <b>{formatDate(voucher?.validTo)}</b>
+                                FROM <b>{formatDate(voucher.validFrom)}</b> TO <b>{formatDate(voucher.validTo)}</b>
                             </td>
                             <td colSpan={3} className="text-right">
-                                <b>Voucher No: {voucher?.voucherCode}</b>
+                                <b>Voucher No: {voucher.voucherCode}</b>
                             </td>
                         </tr>
 
@@ -273,17 +291,17 @@ const ImprestVoucherView: React.FC = () => {
                             <td>
                                 Employee Name:
                                 <br />
-                                <b>{voucher?.beneficiaryName}</b>
+                                <b>{voucher.beneficiaryName}</b>
                             </td>
                             <td>
                                 Employee ID:
                                 <br />
-                                <b>ID00{voucher?.beneficiaryId}</b>
+                                <b>ID00{voucher.beneficiaryId}</b>
                             </td>
                             <td colSpan={2}>
                                 Team Name:
                                 <br />
-                                <b>{voucher?.teamName}</b>
+                                <b>{voucher.teamName}</b>
                             </td>
                         </tr>
                     </tbody>
@@ -335,23 +353,23 @@ const ImprestVoucherView: React.FC = () => {
                     <tbody>
                         <tr>
                             <th>Prepared By:</th>
-                            <td>{voucher?.employeeName}</td>
+                            <td>{voucher.employeeName}</td>
                             <th>Date:</th>
                             <td></td>
                         </tr>
 
                         <tr>
                             <th>Checked By:</th>
-                            <td>{voucher?.accountsSignedBy ? <img src={`/uploads/signs/${voucher?.accountsSignedBy}`} alt="Accounts Sign" /> : <i>to be signed</i>}</td>
+                            <td>{voucher.accountsSignedBy ? <img src={`/uploads/signs/${voucher.accountsSignedBy}`} alt="Accounts Sign" /> : <i>to be signed</i>}</td>
                             <th>Date:</th>
-                            <td>{formatDate(voucher?.accountsSignedAt)}</td>
+                            <td>{formatDate(voucher.accountsSignedAt)}</td>
                         </tr>
 
                         <tr>
                             <th>Approved By:</th>
-                            <td>{voucher?.adminSignedBy ? <img src={`/uploads/signs/${voucher?.adminSignedBy}`} alt="Admin Sign" /> : <i>to be signed</i>}</td>
+                            <td>{voucher.adminSignedBy ? <img src={`/uploads/signs/${voucher.adminSignedBy}`} alt="Admin Sign" /> : <i>to be signed</i>}</td>
                             <th>Date:</th>
-                            <td>{formatDate(voucher?.adminSignedAt)}</td>
+                            <td>{formatDate(voucher.adminSignedAt)}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -367,8 +385,8 @@ const ImprestVoucherView: React.FC = () => {
                         </div>
                         <div className="space-y-1 mt-0.5">
                             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Accounts Comment</p>
-                            {voucher?.accountsRemark ? (
-                                <p className="text-sm font-medium text-foreground">{voucher?.accountsRemark}</p>
+                            {voucher.accountsRemark ? (
+                                <p className="text-sm font-medium text-foreground">{voucher.accountsRemark}</p>
                             ) : (
                                 <span className="inline-flex items-center rounded-md bg-muted/60 px-2 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border italic">
                                     No comment added
@@ -382,8 +400,8 @@ const ImprestVoucherView: React.FC = () => {
                         </div>
                         <div className="space-y-1 mt-0.5">
                             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">CEO Comment</p>
-                            {voucher?.adminRemark ? (
-                                <p className="text-sm font-medium text-foreground">{voucher?.adminRemark}</p>
+                            {voucher.adminRemark ? (
+                                <p className="text-sm font-medium text-foreground">{voucher.adminRemark}</p>
                             ) : (
                                 <span className="inline-flex items-center rounded-md bg-muted/60 px-2 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border italic">
                                     No comment added
@@ -478,7 +496,7 @@ const ImprestVoucherView: React.FC = () => {
                                 </div>
                             ) : (
                                 <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-border bg-background px-4 text-center text-sm text-muted-foreground">
-                                    No proofs found for this voucher?.
+                                    No proofs found for this voucher.
                                 </div>
                             )}
                         </div>
@@ -560,7 +578,7 @@ const ImprestVoucherView: React.FC = () => {
                     <DialogHeader>
                         <DialogTitle className="text-xl">Accounts Approval</DialogTitle>
                         <DialogDescription>
-                            Add an optional remark and confirm your approval for this imprest voucher?.
+                            Add an optional remark and confirm your approval for this imprest voucher.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -575,7 +593,7 @@ const ImprestVoucherView: React.FC = () => {
                             />
                         </div>
 
-                        {!voucher?.accountsSignedBy ? (
+                        {!voucher.accountsSignedBy ? (
                             <div className="flex items-start gap-3 p-4 bg-muted/40 border rounded-lg">
                                 <input 
                                     type="checkbox" 
@@ -619,7 +637,7 @@ const ImprestVoucherView: React.FC = () => {
                     <DialogHeader>
                         <DialogTitle className="text-xl">CEO Approval</DialogTitle>
                         <DialogDescription>
-                            Add an optional remark and confirm your approval for this imprest voucher?.
+                            Add an optional remark and confirm your approval for this imprest voucher.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -634,21 +652,21 @@ const ImprestVoucherView: React.FC = () => {
                             />
                         </div>
 
-                        {!voucher?.adminSignedBy ? (
-                            <div className={`flex items-start gap-3 p-4 border rounded-lg ${!voucher?.accountsSignedBy ? "bg-muted/60 opacity-80" : "bg-muted/40"}`}>
+                        {!voucher.adminSignedBy ? (
+                            <div className={`flex items-start gap-3 p-4 border rounded-lg ${!voucher.accountsSignedBy ? "bg-muted/60 opacity-80" : "bg-muted/40"}`}>
                                 <input 
                                     type="checkbox" 
                                     id="admin-approve"
                                     checked={adminApprove} 
-                                    disabled={!voucher?.accountsSignedBy}
+                                    disabled={!voucher.accountsSignedBy}
                                     onChange={e => setAdminApprove(e.target.checked)} 
                                     className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-not-allowed"
                                 />
                                 <div className="space-y-1">
-                                    <label htmlFor="admin-approve" className={`text-sm font-medium leading-none ${!voucher?.accountsSignedBy ? "cursor-not-allowed" : "cursor-pointer"}`}>
+                                    <label htmlFor="admin-approve" className={`text-sm font-medium leading-none ${!voucher.accountsSignedBy ? "cursor-not-allowed" : "cursor-pointer"}`}>
                                         Approve this voucher
                                     </label>
-                                    {!voucher?.accountsSignedBy && (
+                                    {!voucher.accountsSignedBy && (
                                         <p className="text-xs font-medium text-destructive mt-1">
                                             Accounts approval is required first.
                                         </p>

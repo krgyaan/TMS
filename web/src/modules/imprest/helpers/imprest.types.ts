@@ -40,6 +40,8 @@ export type ImprestVoucherRow = {
     week: number;
     adminApproval: boolean;
     accountantApproval: boolean;
+    accountsRemark?: string | null;
+    adminRemark?: string | null;
     proofs: InvoiceProof[];
     createdAt: string;
 };

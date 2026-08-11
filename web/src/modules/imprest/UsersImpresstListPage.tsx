@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEmployeeImprestSummary } from "@/hooks/api/imprest.hooks";
 import { formatINR } from "@/hooks/useINRFormatter";
-import type { GridApi } from "ag-grid-community";
+import type { ColDef, GridApi } from "ag-grid-community";
 import { ExternalLink, FileText, IndianRupee, LayoutDashboard, Loader2, Plus, Receipt } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -137,17 +137,17 @@ const ImprestAdminIndex: React.FC = () => {
     }, [data]);
 
     /* -------------------- TABLE COLUMNS -------------------- */
-    const columns = useMemo(
+    const columns = useMemo<ColDef<EmployeeImprestSummary>[]>(
         () => [
             {
                 field: "userName",
                 headerName: "Employee Name",
-                cellRenderer: (p: any) => {
+                cellRenderer: (p: {data: EmployeeImprestSummary}) => {
                     const userId = p.data.userId;
 
                     return (
                         <a href={paths.shared.imprestUser(userId)} className="underline inline-flex items-center gap-1">
-                            {p.value}
+                            {p.data.userName}
                             <ExternalLink className="h-3 w-3" />
                         </a>
                     );
@@ -156,22 +156,22 @@ const ImprestAdminIndex: React.FC = () => {
             {
                 field: "amountReceived",
                 headerName: "Amount Received",
-                valueFormatter: (p: any) => formatINR(p.value),
+                valueFormatter: p => formatINR(p.value),
             },
             {
                 field: "amountSpent",
                 headerName: "Amount Spent",
-                valueFormatter: (p: any) => formatINR(p.value),
+                valueFormatter: p => formatINR(p.value),
             },
             {
                 field: "amountApproved",
                 headerName: "Amount Approved",
-                valueFormatter: (p: any) => formatINR(p.value),
+                valueFormatter: p => formatINR(p.value),
             },
             {
                 field: "amountLeft",
                 headerName: "Amount Left",
-                valueFormatter: (p: any) => formatINR(p.value),
+                valueFormatter: p => formatINR(p.value),
             },
             {
                 headerName: "Total Vouchers",
@@ -184,7 +184,7 @@ const ImprestAdminIndex: React.FC = () => {
                 headerName: "Accounts Pending",
                 wrapHeaderText: true,
                 autoHeaderHeight: true,
-                valueGetter: (p: any) => {
+                valueGetter: p => {
                     const total = p.data?.voucherInfo?.totalVouchers || 0;
                     const approved = p.data?.voucherInfo?.accountsApproved || 0;
                     return total - approved;
@@ -197,7 +197,7 @@ const ImprestAdminIndex: React.FC = () => {
                 headerName: "Admin Pending",
                 wrapHeaderText: true,
                 autoHeaderHeight: true,
-                valueGetter: (p: any) => {
+                valueGetter: p => {
                     const total = p.data?.voucherInfo?.totalVouchers || 0;
                     const approved = p.data?.voucherInfo?.adminApproved || 0;
                     return total - approved;
@@ -440,7 +440,7 @@ const ImprestAdminIndex: React.FC = () => {
                         columnDefs={columns}
                         onGridReady={params => {
                             setGridApi(params.api);
-                            params.api.setQuickFilter(searchText);
+                            params.api.setGridOption("quickFilterText", searchText);
                         }}
                         gridOptions={{ pagination: true }}
                     />
