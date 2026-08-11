@@ -419,8 +419,13 @@ export class EmployeeImprestService {
             };
 
             if (data.userId !== undefined) updateData.userId = data.userId;
-            if (data.partyName !== undefined) updateData.partyName = data.partyName;
-            if (data.projectName !== undefined) updateData.projectName = data.projectName;
+            if (newIsTransfer) {
+                updateData.partyName = null;
+                updateData.projectName = null;
+            } else {
+                if (data.partyName !== undefined) updateData.partyName = data.partyName;
+                if (data.projectName !== undefined) updateData.projectName = data.projectName;
+            }
             if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
             if (data.teamId !== undefined) updateData.teamId = data.teamId;
             if (data.amount !== undefined) updateData.amount = data.amount;

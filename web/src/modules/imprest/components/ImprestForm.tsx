@@ -121,8 +121,8 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
                 data: {
                     userId: data.userId,
                     categoryId: data.categoryId,
-                    partyName: data.partyName,
-                    projectName: data.projectName,
+                    partyName: isTransferMode ? null : data.partyName,
+                    projectName: isTransferMode ? null : data.projectName,
                     teamId: isTransferMode ? data.transferToId : null,
                     amount: data.amount,
                     dateOfExpense: data.dateOfExpense instanceof Date ? format(data.dateOfExpense, "yyyy-MM-dd") : data.dateOfExpense,
