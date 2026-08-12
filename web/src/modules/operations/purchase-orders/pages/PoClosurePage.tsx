@@ -375,7 +375,7 @@ const PoClosurePage: React.FC = () => {
                                                 <TableCell>
                                                     <Input
                                                         type="date"
-                                                        className="h-8 w-36"
+                                                        className="h-8"
                                                         value={row.paymentDate}
                                                         onChange={(e) => updatePaymentRow(i, "paymentDate", e.target.value)}
                                                     />
@@ -384,7 +384,7 @@ const PoClosurePage: React.FC = () => {
                                                     <Input
                                                         type="number"
                                                         min="0"
-                                                        className="h-8 w-32 text-right"
+                                                        className="h-8 text-right"
                                                         placeholder="0.00"
                                                         value={row.amount}
                                                         onChange={(e) => updatePaymentRow(i, "amount", e.target.value)}
@@ -392,7 +392,7 @@ const PoClosurePage: React.FC = () => {
                                                 </TableCell>
                                                 <TableCell>
                                                     <Input
-                                                        className="h-8 w-40"
+                                                        className="h-8"
                                                         placeholder={po.sellerName || "Account name"}
                                                         value={row.accountName}
                                                         onChange={(e) => updatePaymentRow(i, "accountName", e.target.value)}
@@ -400,7 +400,7 @@ const PoClosurePage: React.FC = () => {
                                                 </TableCell>
                                                 <TableCell>
                                                     <Input
-                                                        className="h-8 w-40"
+                                                        className="h-8"
                                                         placeholder="Account no."
                                                         value={row.accountNumber}
                                                         onChange={(e) => updatePaymentRow(i, "accountNumber", e.target.value)}
@@ -408,7 +408,7 @@ const PoClosurePage: React.FC = () => {
                                                 </TableCell>
                                                 <TableCell>
                                                     <Input
-                                                        className="h-8 w-32 font-mono uppercase"
+                                                        className="h-8 font-mono uppercase"
                                                         placeholder="IFSC"
                                                         value={row.ifsc}
                                                         onChange={(e) => updatePaymentRow(i, "ifsc", e.target.value)}
@@ -416,7 +416,7 @@ const PoClosurePage: React.FC = () => {
                                                 </TableCell>
                                                 <TableCell>
                                                     <Input
-                                                        className="h-8 w-36 font-mono"
+                                                        className="h-8 font-mono"
                                                         placeholder="UTR"
                                                         value={row.utr}
                                                         onChange={(e) => updatePaymentRow(i, "utr", e.target.value)}
@@ -427,7 +427,7 @@ const PoClosurePage: React.FC = () => {
                                                         type="button"
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="h-8 w-8 p-0 text-destructive"
+                                                        className="h-8 p-0 text-destructive"
                                                         onClick={() => setPaymentRows((rows) => rows.filter((_, idx) => idx !== i))}
                                                     >
                                                         <Trash2 className="h-4 w-4" />
