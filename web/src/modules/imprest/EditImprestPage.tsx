@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,7 +10,9 @@ import { ImprestForm } from "./components/ImprestForm";
 export default function EditImprestPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const imprestId = Number(id);
+    const isAccountsSection = location.pathname.includes("/accounts/");
 
     const { data: imprest, isLoading, isError, error } = useImprestDetail(imprestId);
 
@@ -34,7 +36,7 @@ export default function EditImprestPage() {
                             variant="outline"
                             size="sm"
                             className="ml-4"
-                            onClick={() => navigate(paths.shared.imprest)}
+                            onClick={() => navigate(isAccountsSection ? paths.accounts.imprests : paths.shared.imprest)}
                         >
                             <ArrowLeft className="h-4 w-4 mr-1" />
                             Back to List

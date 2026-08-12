@@ -47,17 +47,17 @@ const ImprestAdminIndex: React.FC = () => {
         {
             label: "Dashboard",
             icon: <LayoutDashboard className="h-4 w-4" />,
-            onClick: row => navigate(paths.shared.imprestUser(row.userId)),
+            onClick: row => navigate(paths.accounts.imprestsUserView(row.userId)),
         },
         {
             label: "Payment History",
             icon: <Receipt className="h-4 w-4" />,
-            onClick: row => navigate(paths.shared.imprestPaymentHistoryByUser(row.userId)),
+            onClick: row => navigate(paths.accounts.imprestsPaymentHistoryByUser(row.userId)),
         },
         {
             label: "Voucher",
             icon: <FileText className="h-4 w-4" />,
-            onClick: row => navigate(paths.shared.imprestVoucherByUser(row.userId)),
+            onClick: row => navigate(paths.accounts.imprestsVoucherByUser(row.userId)),
         },
         {
             label: "Pay Imprest",
@@ -146,7 +146,7 @@ const ImprestAdminIndex: React.FC = () => {
                     const userId = p.data.userId;
 
                     return (
-                        <a href={paths.shared.imprestUser(userId)} className="underline inline-flex items-center gap-1">
+                        <a href={paths.accounts.imprestsUserView(userId)} className="underline inline-flex items-center gap-1">
                             {p.data.userName}
                             <ExternalLink className="h-3 w-3" />
                         </a>
@@ -423,11 +423,11 @@ const ImprestAdminIndex: React.FC = () => {
                             className="w-64"
                         />
 
-                        <Button size="sm" onClick={() => navigate(paths.shared.imprestPaymentHistory)}>
+                        <Button size="sm" onClick={() => navigate(paths.accounts.imprestsPaymentHistory)}>
                             <Plus className="h-4 w-4 mr-2" />
                             All Payment History
                         </Button>
-                        <Button size="sm" onClick={() => navigate(paths.shared.imprestVoucher)}>
+                        <Button size="sm" onClick={() => navigate(paths.accounts.imprestsVoucher)}>
                             <Plus className="h-4 w-4 mr-2" />
                             All Vouchers
                         </Button>

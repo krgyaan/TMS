@@ -22,7 +22,7 @@ import { User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { FilePond, registerPlugin } from "react-filepond";
 import { useForm, type Resolver } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { imprestFormSchema, type ImprestFormValues } from "../helpers/imprest.schema";
 import type { ImprestRow } from "../helpers/imprest.types";
 
@@ -38,10 +38,12 @@ interface ImprestFormProps {
 
 export function ImprestForm({ imprest, mode }: ImprestFormProps) {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user } = useAuth();
     const { data: imprestCategories = [] } = useImprestCategories();
     const { data: allUsers = [] } = useUsers();
     const projectOptions = useProjectOptions();
+    const isAccountsSection = location.pathname.includes("/accounts/");
 
     const createMutation = useCreateImprest();
     const updateMutation = useUpdateImprest();
@@ -140,9 +142,9 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
             }
 
             if (imprest.userId) {
-                navigate(paths.shared.imprestUser(imprest.userId));
+                navigate(isAccountsSection ? paths.accounts.imprestsUserView(imprest.userId) : paths.shared.imprestUser(imprest.userId));
             } else {
-                navigate(paths.accounts.imprests);
+                navigate(isAccountsSection ? paths.accounts.imprests : paths.shared.imprest);
             }
         } else {
             await createMutation.mutateAsync({
@@ -153,7 +155,7 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
                 files: pondFiles,
             });
 
-            navigate(paths.shared.imprest);
+            navigate(isAccountsSection ? paths.accounts.imprests : paths.shared.imprest);
         }
     };
 
@@ -170,8 +172,8 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
                         variant="outline"
                         onClick={() =>
                             imprest?.userId
-                                ? navigate(paths.shared.imprestUser(imprest.userId))
-                                : navigate(paths.shared.imprest)
+                                ? navigate(isAccountsSection ? paths.accounts.imprestsUserView(imprest.userId) : paths.shared.imprestUser(imprest.userId))
+                                : navigate(isAccountsSection ? paths.accounts.imprests : paths.shared.imprest)
                         }
                     >
                         <User className="h-4 w-4 mr-1" />
@@ -312,7 +314,7 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => navigate(paths.shared.imprest)}
+                                onClick={() => navigate(isAccountsSection ? paths.accounts.imprests : paths.shared.imprest)}
                                 disabled={isPending}
                             >
                                 Cancel

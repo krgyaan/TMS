@@ -1,36 +1,32 @@
-import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import { paths } from "@/app/routes/paths";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Eye } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { paths } from "@/app/routes/paths";
 import { useImprestVoucherList } from "@/hooks/api/imprest.hooks";
 import { useUser } from "@/hooks/api/useUsers";
-import type { ImprestVoucherRow } from "./helpers/imprest.types";
+import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { ColDef } from "ag-grid-community";
+import { ArrowLeft, Eye } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import type { ImprestVoucherRow } from "./helpers/imprest.types";
 
 const ImprestVoucherList: React.FC = () => {
     const navigate = useNavigate();
-
-    // ✅ Read query param
+    const location = useLocation();
     const [searchParams] = useSearchParams();
+    const isAccountsSection = location.pathname.includes("/accounts/");
     const userIdParam = searchParams.get("userId");
     const queryUserId = userIdParam ? Number(userIdParam) : undefined;
-
     const safeUserId = queryUserId ?? 0;
-
     const { data: userDetails } = useUser(safeUserId);
-
-    // ✅ Fetch vouchers
     const { data: rows = [], isLoading } = useImprestVoucherList(queryUserId);
 
     const [selectedFY, setSelectedFY] = useState<string>("");
 
-    // Helper to calculate financial year (e.g. 2024-25) for a date string
     const getFinancialYearForDate = (dateStr: string) => {
         const d = new Date(dateStr);
         if (isNaN(d.getTime())) return null;
@@ -41,7 +37,6 @@ const ImprestVoucherList: React.FC = () => {
         return `${startYear}-${String(endYear).padStart(2, "0")}`;
     };
 
-    // Extract unique available financial years
     const availableFYs = useMemo(() => {
         const years = new Set<string>();
         rows.forEach((r: ImprestVoucherRow) => {
@@ -55,14 +50,12 @@ const ImprestVoucherList: React.FC = () => {
         return Array.from(years).sort((a, b) => b.localeCompare(a));
     }, [rows]);
 
-    // Set the latest year as default once availableFYs load
     useEffect(() => {
         if (availableFYs.length > 0 && selectedFY === "") {
             setSelectedFY(availableFYs[0]);
         }
     }, [availableFYs, selectedFY]);
 
-    // Filter rows client-side
     const filteredRows = useMemo(() => {
         const activeFY = selectedFY || availableFYs[0] || "all";
         if (activeFY === "all") return rows;
@@ -71,29 +64,9 @@ const ImprestVoucherList: React.FC = () => {
             return getFinancialYearForDate(r.validFrom) === activeFY;
         });
     }, [rows, selectedFY, availableFYs]);
-    // console.log(rows);
 
-    const actionItems = useMemo(
-        () => [
-            {
-                label: "View",
-                icon: <Eye className="h-4 w-4" />,
-                onClick: (row: ImprestVoucherRow) =>
-                    navigate(
-                        paths.shared.imprestVoucherView({
-                            userId: Number(row.beneficiaryId), // ✅ numeric
-                            from: row.validFrom,
-                            to: row.validTo,
-                        }),
-                        { state: { proofs: row.proofs } }
-                    ),
-            },
-        ],
-        [navigate]
-    );
     const columns = useMemo<ColDef<ImprestVoucherRow>[]>(
         () => [
-            // ✅ Employee / Beneficiary column
             { field: "beneficiaryName", headerName: "Employee" },
             {
                 field: "voucherNumber",
@@ -102,31 +75,30 @@ const ImprestVoucherList: React.FC = () => {
                     return p.data?.voucherCode ? p.data.voucherCode : "-";
                 },
             },
-            // ✅ Voucher Period column (Year + Week + Range)
             {
                 headerName: "Voucher Period",
                 autoHeight: true,
-                cellStyle: { whiteSpace: "pre-line" },
-                valueGetter: p => {
-                    const formatDate = (d: string) =>
-                        new Date(d).toLocaleDateString("en-GB", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                        });
-
-                    return `Year: ${p.data.year}
-                        Week: ${p.data.week}
-                        ${formatDate(p.data.validFrom)} - ${formatDate(p.data.validTo)}`;
-                },
+                cellRenderer: p => {
+                    return (
+                        <div className="flex flex-col gap-1 py-2">
+                            <span className="text-xs text-wrap text-emerald-400">
+                                Week: {p.data.week}
+                            </span>
+                            <span className="text-xs text-wrap">
+                                {formatDate(p.data.validFrom)} to
+                            </span>
+                            <span className="text-xs text-wrap">
+                                {formatDate(p.data.validTo)}
+                            </span>
+                        </div>
+                    );
+                }
             },
-
             {
                 field: "amount",
                 headerName: "Amount",
                 valueFormatter: p => formatINR(p.value),
             },
-
             {
                 field: "accountantApproval",
                 headerName: "Accountant Approval",
@@ -137,9 +109,9 @@ const ImprestVoucherList: React.FC = () => {
                     return (
                         <div className="flex flex-col gap-1 py-2">
                             {p.value ? (
-                                <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded w-fit">Approved</span>
+                                <Badge variant='success'>Approved</Badge>
                             ) : (
-                                <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded w-fit">Pending</span>
+                                <Badge variant='destructive'>Pending</Badge>
                             )}
 
                             {remark && <div className="text-xs text-muted-foreground font-semibold text-wrap py-2">{remark}</div>}
@@ -147,7 +119,6 @@ const ImprestVoucherList: React.FC = () => {
                     );
                 },
             },
-
             {
                 field: "adminApproval",
                 headerName: "Admin Approval",
@@ -158,9 +129,9 @@ const ImprestVoucherList: React.FC = () => {
                     return (
                         <div className="flex flex-col gap-1 py-2">
                             {p.value ? (
-                                <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded w-fit">Approved</span>
+                                <Badge variant='success'>Approved</Badge>
                             ) : (
-                                <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded w-fit">Pending</span>
+                                <Badge variant='destructive'>Pending</Badge>
                             )}
 
                             {remark && <div className="text-xs text-muted-foreground font-semibold text-wrap py-2">{remark}</div>}
@@ -168,13 +139,18 @@ const ImprestVoucherList: React.FC = () => {
                     );
                 },
             },
-
             {
-                headerName: "Action",
-                cellRenderer: createActionColumnRenderer(actionItems),
+                headerName: "",
+                cellRenderer: (p: { data: ImprestVoucherRow }) => (
+                    <Button variant="default" size="sm" 
+                        onClick={() => navigate(isAccountsSection ? paths.accounts.imprestsVoucherView({userId: Number(p.data.beneficiaryId), from: p.data.validFrom, to: p.data.validTo}) : paths.shared.imprestVoucherView({userId: Number(p.data.beneficiaryId), from: p.data.validFrom, to: p.data.validTo}), { state: { proofs: p.data.proofs } })}
+                    >
+                        <Eye className="h-4 w-4" />
+                    </Button>
+                ),
             },
         ],
-        [actionItems]
+        [navigate, isAccountsSection]
     );
 
     return (
@@ -196,7 +172,7 @@ const ImprestVoucherList: React.FC = () => {
                                 <SelectItem value="all">All Years</SelectItem>
                             </SelectContent>
                         </Select>
-                        <Button variant="outline" size="sm" onClick={() => navigate(paths.accounts.imprests)}>
+                        <Button variant="outline" size="sm" onClick={() => navigate(isAccountsSection ? paths.accounts.imprests : paths.shared.imprest)}>
                             <ArrowLeft className="h-4 w-4" />
                             Back
                         </Button>

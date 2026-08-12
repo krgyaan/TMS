@@ -3,6 +3,11 @@ import { Routes, Route } from "react-router-dom";
 import { RouteWrapper } from "../components/RouteWrapper";
 
 const Accounts_Imprests = lazy(() => import("@/modules/imprest/UsersImpresstListPage"));
+const Accounts_Imprests_Create = lazy(() => import("@/modules/imprest/CreateImprestPage"));
+const Accounts_Imprests_Edit = lazy(() => import("@/modules/imprest/EditImprestPage"));
+const Accounts_Imprests_PaymentHistory = lazy(() => import("@/modules/imprest/PaymentHistoryPage"));
+const Accounts_Imprests_Voucher = lazy(() => import("@/modules/imprest/VoucherListPage"));
+const Accounts_Imprests_VoucherView = lazy(() => import("@/modules/imprest/VoucherViewPage"));
 const Accounts_FinancialDocs = lazy(() => import("@/modules/accounts/financial-docs"));
 const Accounts_LoanAdvances = lazy(() => import("@/modules/accounts/loan-advances/LoanAdvanceListPage"));
 const Accounts_LoanAdvances_Create = lazy(() => import("@/modules/accounts/loan-advances/LoanAdvanceCreatePage"));
@@ -37,9 +42,12 @@ export default function AccountsRoutes() {
     return (
         <Routes>
             <Route path="imprests" element={<RouteWrapper><Accounts_Imprests /></RouteWrapper>} />
+            <Route path="imprests/create" element={<RouteWrapper><Accounts_Imprests_Create /></RouteWrapper>} />
             <Route path="imprests/user/:userId" element={<RouteWrapper><Imprest_Admin_UserView /></RouteWrapper>} />
-            {/* <Route path="imprests/payment-history" element={<ImprestPaymentHistoryPage />} />
-            <Route path="imprests/voucher" element={<ImprestVoucherPage />} /> */}
+            <Route path="imprests/payment-history" element={<RouteWrapper><Accounts_Imprests_PaymentHistory /></RouteWrapper>} />
+            <Route path="imprests/voucher" element={<RouteWrapper><Accounts_Imprests_Voucher /></RouteWrapper>} />
+            <Route path="imprests/voucher/view" element={<RouteWrapper><Accounts_Imprests_VoucherView /></RouteWrapper>} />
+            <Route path="imprests/:id/edit" element={<RouteWrapper><Accounts_Imprests_Edit /></RouteWrapper>} />
             <Route path="financial-docs" element={<RouteWrapper><Accounts_FinancialDocs /></RouteWrapper>} />
             <Route path="loan-advances" element={<RouteWrapper><Accounts_LoanAdvances /></RouteWrapper>} />
             <Route path="loan-advances/create" element={<RouteWrapper><Accounts_LoanAdvances_Create /></RouteWrapper>} />

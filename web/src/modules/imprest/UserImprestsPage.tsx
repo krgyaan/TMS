@@ -22,7 +22,7 @@ import {
     ListChecks, Loader2, MessageSquarePlus, Pencil, Plus, Trash2
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import * as XLSX from "xlsx";
 import "yet-another-react-lightbox/styles.css";
 import { ConfirmUnapproveDialog } from "./components/ConfirmUnapproveDialog";
@@ -107,13 +107,16 @@ const IconAction: React.FC<{
 
 const UserImprestsPage: React.FC = () => {
     const navigate = useNavigate();
-    const { user, hasPermission, canUpdate, canDelete } = useAuth();
+    const location = useLocation();
+    const { user, hasPermission, canRead, canUpdate, canDelete } = useAuth();
     const { id } = useParams<{ id?: string }>();
     const [isMobile, setIsMobile] = useState(false);
     let userDetails = null;
 
+    const isAccountsSection = location.pathname.includes("/accounts/");
+
     const canMutateStatusAdmin = canUpdate("accounts.imprest-admin");
-    const isAuthorized = hasPermission("shared.imprests", "read");
+    const isAuthorized = hasPermission("shared.imprests", "read") || canRead("accounts.imprests");
 
     const requestedUserId = id ? Number(id) : null;
     const isOwnPage = !requestedUserId || requestedUserId === user?.id;
@@ -303,7 +306,7 @@ const UserImprestsPage: React.FC = () => {
         },
         {
             label: "Edit Imprest",
-            onClick: (row: ImprestRow) => navigate(paths.shared.imprestEdit(row.id)),
+            onClick: (row: ImprestRow) => navigate(isAccountsSection ? paths.accounts.imprestsEdit(row.id) : paths.shared.imprestEdit(row.id)),
             icon: <Pencil className="h-4 w-4" />,
             visible: () => canUpdate("accounts.imprest-admin"), 
         },
@@ -556,17 +559,17 @@ const UserImprestsPage: React.FC = () => {
                                     }}
                                     className="w-64"
                                 />
-                                <Button size="sm" title="Add Imprest" onClick={() => navigate(paths.shared.imprestCreate)}>
+                                <Button size="sm" title="Add Imprest" onClick={() => navigate(isAccountsSection ? paths.accounts.imprestsCreate : paths.shared.imprestCreate)}>
                                     <Plus className="h-4 w-4 mr-2" />
                                     Add Imprest
                                 </Button>
 
-                                <Button size="sm" onClick={() => navigate(paths.shared.imprestVoucherByUser(numericUserId!))}>
+                                <Button size="sm" onClick={() => navigate(isAccountsSection ? paths.accounts.imprestsVoucherByUser(numericUserId!) : paths.shared.imprestVoucherByUser(numericUserId!))}>
                                     <Plus className="h-4 w-4 mr-2" />
                                     View Vouchers
                                 </Button>
 
-                                <Button size="sm" onClick={() => navigate(paths.shared.imprestPaymentHistoryByUser(numericUserId!))}>
+                                <Button size="sm" onClick={() => navigate(isAccountsSection ? paths.accounts.imprestsPaymentHistoryByUser(numericUserId!) : paths.shared.imprestPaymentHistoryByUser(numericUserId!))}>
                                     <Plus className="h-4 w-4 mr-2" />
                                     View Payment History
                                 </Button>
@@ -594,7 +597,7 @@ const UserImprestsPage: React.FC = () => {
                             />
 
                             <div className="flex gap-2">
-                                <Button size="sm" onClick={() => navigate(paths.shared.imprestCreate)} className="flex-1">
+                                <Button size="sm" onClick={() => navigate(isAccountsSection ? paths.accounts.imprestsCreate : paths.shared.imprestCreate)} className="flex-1">
                                     <Plus className="h-4 w-4 mr-2" />
                                     Add
                                 </Button>
