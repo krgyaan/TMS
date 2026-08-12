@@ -14,12 +14,22 @@ class ImprestService extends BaseApiService {
         super('/imprest');
     }
 
-    async getMyDashboard(): Promise<EmployeeImprestDashboard> {
-        return this.get<EmployeeImprestDashboard>('/employee');
+    async getMyDashboard(params?: { page?: number; limit?: number; search?: string }): Promise<EmployeeImprestDashboard> {
+        return this.get<EmployeeImprestDashboard>(`/employee${this.buildQuery(params)}`);
     }
 
-    async getUserDashboard(userId: number): Promise<EmployeeImprestDashboard> {
-        return this.get<EmployeeImprestDashboard>(`/employee/user/${userId}`);
+    async getUserDashboard(userId: number, params?: { page?: number; limit?: number; search?: string }): Promise<EmployeeImprestDashboard> {
+        return this.get<EmployeeImprestDashboard>(`/employee/user/${userId}${this.buildQuery(params)}`);
+    }
+
+    private buildQuery(params?: { page?: number; limit?: number; search?: string }): string {
+        if (!params) return "";
+        const search = new URLSearchParams();
+        if (params.page !== undefined) search.set("page", String(params.page));
+        if (params.limit !== undefined) search.set("limit", String(params.limit));
+        if (params.search) search.set("search", params.search);
+        const qs = search.toString();
+        return qs ? `?${qs}` : "";
     }
 
     async getMyTransactions(): Promise<EmployeeImprestTransactionRow[]> {

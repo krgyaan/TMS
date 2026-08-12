@@ -31,15 +31,15 @@ export const imprestSummaryKeys = {
 
 /* ---------------- IMPREST LIST ---------------- */
 
-export const useImprestList = (userId?: number) => {
+export const useImprestList = (userId?: number, params?: { page?: number; limit?: number; search?: string }) => {
     return useQuery<EmployeeImprestDashboard>({
-        queryKey: imprestKeys.list(userId),
+        queryKey: [...imprestKeys.list(userId), { params }],
 
         queryFn: () => {
             if (userId) {
-                return imprestService.getUserDashboard(userId);
+                return imprestService.getUserDashboard(userId, params);
             }
-            return imprestService.getMyDashboard();
+            return imprestService.getMyDashboard(params);
         },
 
         // Enable:

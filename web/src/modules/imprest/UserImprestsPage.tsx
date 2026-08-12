@@ -11,11 +11,12 @@ import {
     useAddImprestAccRemark, useApproveImprest, useDeleteImprest, useImprestList,
     useProofImprest, useTallyImprest, useUploadImprestProofs
 } from "@/hooks/api/imprest.hooks";
-import { useUser } from "@/hooks/api/useUsers";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { cn } from "@/lib/utils";
-import type { ColDef, GridApi } from "ag-grid-community";
+import { imprestService } from "@/services/api";
+import type { ColDef } from "ag-grid-community";
 import { saveAs } from "file-saver";
 import {
     AlertCircle, ArrowLeft, CheckCircle, Download, Eye, FileCheck, ImagePlus,
@@ -111,8 +112,6 @@ const UserImprestsPage: React.FC = () => {
     const { user, hasPermission, canRead, canUpdate, canDelete } = useAuth();
     const { id } = useParams<{ id?: string }>();
     const [isMobile, setIsMobile] = useState(false);
-    let userDetails = null;
-
     const isAccountsSection = location.pathname.includes("/accounts/");
 
     const canMutateStatusAdmin = canUpdate("accounts.imprest-admin");
@@ -121,21 +120,7 @@ const UserImprestsPage: React.FC = () => {
     const requestedUserId = id ? Number(id) : null;
     const isOwnPage = !requestedUserId || requestedUserId === user?.id;
 
-    if (requestedUserId) {
-        userDetails = useUser(requestedUserId).data;
-    }
-
-    if (!isOwnPage && !isAuthorized) {
-        return (
-            <Card>
-                <CardContent className="flex flex-col items-center justify-center h-64 gap-2">
-                    <AlertCircle className="h-8 w-8 text-destructive" />
-                    <p className="text-sm font-medium">Access Denied</p>
-                    <p className="text-xs text-muted-foreground">You do not have permission to view this user's imprests.</p>
-                </CardContent>
-            </Card>
-        );
-    }
+    const accessDenied = !isOwnPage && !isAuthorized;
 
     const [unapproveDialog, setUnapproveDialog] = useState<{
         open: boolean;
@@ -159,10 +144,18 @@ const UserImprestsPage: React.FC = () => {
     };
 
     const numericUserId = isOwnPage ? user?.id : requestedUserId;
-    const { data, isLoading, error } = useImprestList(numericUserId);
+    const { pagination, setPagination, search, setSearch, debouncedSearch } = usePersistentTableState({
+        storageKey: "user-imprests",
+        defaultTab: "" as const,
+    });
+    const { data, isLoading, error } = useImprestList(
+        numericUserId,
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined }
+    );
     const addRemarkMutation = useAddImprestAccRemark();
     const summary = data?.summary;
-    const rows = data?.imprests ?? [];
+    const rows = data?.imprests?.data ?? [];
+    const totalRows = data?.imprests?.meta?.total ?? 0;
     const deleteMutation = useDeleteImprest();
     const uploadProofsMutation = useUploadImprestProofs();
     const approveMutation = useApproveImprest();
@@ -174,8 +167,6 @@ const UserImprestsPage: React.FC = () => {
     const [addProofOpen, setAddProofOpen] = useState(false);
     const [currentProofRowId, setCurrentProofRowId] = useState<number | null>(null);
     const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
-    const [searchText, setSearchText] = useState("");
-    const [gridApi, setGridApi] = useState<GridApi | null>(null);
 
     const [remarkOpen, setRemarkOpen] = useState(false);
     const [remarkRow, setRemarkRow] = useState<ImprestRow | null>(null);
@@ -193,7 +184,6 @@ const UserImprestsPage: React.FC = () => {
         (row: ImprestRow) => {
             if (confirm("Are you sure you want to delete this record?")) {
                 deleteMutation.mutate(row.id);
-                2;
             }
         },
         [deleteMutation]
@@ -261,8 +251,27 @@ const UserImprestsPage: React.FC = () => {
         setProofModalOpen(true);
     };
 
-    const exportExcel = () => {
-        const excelData = rows.map(r => ({
+    const exportExcel = async () => {
+        const fetchAll = async () => {
+            const first = numericUserId
+                ? await imprestService.getUserDashboard(numericUserId, { page: 1, limit: 100 })
+                : await imprestService.getMyDashboard({ page: 1, limit: 100 });
+
+            const totals = first.imprests.meta.total;
+            const remaining = Math.ceil(totals / 100) - 1;
+
+            let allRows = [...first.imprests.data];
+            for (let p = 2; p <= 1 + remaining; p++) {
+                const next = numericUserId
+                    ? await imprestService.getUserDashboard(numericUserId, { page: p, limit: 100 })
+                    : await imprestService.getMyDashboard({ page: p, limit: 100 });
+                allRows = allRows.concat(next.imprests.data);
+            }
+            return allRows;
+        };
+
+        const allRows = await fetchAll();
+        const excelData = allRows.map(r => ({
             Date: new Date(r.dateOfExpense || r.createdAt).toLocaleDateString("en-GB"),
             Party: r.partyName,
             Project: r.projectName,
@@ -450,10 +459,8 @@ const UserImprestsPage: React.FC = () => {
                 width: 57,
             }
         ],
-        [approveMutation, tallyMutation, proofMutation, handleDelete]
+        [approveMutation, tallyMutation, proofMutation, imprestAction, canMutateStatusAdmin]
     );
-
-    /* -------------------- RENDER -------------------- */
 
     const ImprestMobileCard: React.FC<{ row: ImprestRow }> = ({ row }) => {
         const proofCount = row.invoiceProof.length;
@@ -522,7 +529,19 @@ const UserImprestsPage: React.FC = () => {
         );
     }
 
-    const pageTitle = isOwnPage ? "My Imprests" : `${userDetails?.name ?? "User"}'s Imprests`;
+    const pageTitle = isOwnPage ? "My Imprests" : `${summary?.userName ?? "User"}'s Imprests`;
+
+    if (accessDenied) {
+        return (
+            <Card>
+                <CardContent className="flex flex-col items-center justify-center h-64 gap-2">
+                    <AlertCircle className="h-8 w-8 text-destructive" />
+                    <p className="text-sm font-medium">Access Denied</p>
+                    <p className="text-xs text-muted-foreground">You do not have permission to view this user's imprests.</p>
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <Card>
@@ -541,7 +560,7 @@ const UserImprestsPage: React.FC = () => {
                             <div>
                                 <CardTitle className="leading-none">{pageTitle}</CardTitle>
                                 <CardDescription className="mt-1">
-                                    {rows.length} {rows.length === 1 ? "record" : "records"}
+                                    {totalRows} {totalRows === 1 ? "record" : "records"}
                                 </CardDescription>
                             </div>
                         </div>
@@ -551,12 +570,8 @@ const UserImprestsPage: React.FC = () => {
                             <div className="flex items-center gap-2">
                                 <Input
                                     placeholder="Search imprests..."
-                                    value={searchText}
-                                    onChange={e => {
-                                        const value = e.target.value;
-                                        setSearchText(value);
-                                        gridApi?.setGridOption("quickFilterText", value);
-                                    }}
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
                                     className="w-64"
                                 />
                                 <Button size="sm" title="Add Imprest" onClick={() => navigate(isAccountsSection ? paths.accounts.imprestsCreate : paths.shared.imprestCreate)}>
@@ -587,12 +602,8 @@ const UserImprestsPage: React.FC = () => {
                         <div className="flex flex-col gap-2">
                             <Input
                                 placeholder="Search imprests..."
-                                value={searchText}
-                                onChange={e => {
-                                    const value = e.target.value;
-                                    setSearchText(value);
-                                    gridApi?.setGridOption("quickFilterText", value);
-                                }}
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
                                 className="w-full"
                             />
 
@@ -613,7 +624,6 @@ const UserImprestsPage: React.FC = () => {
             </CardHeader>
 
             {/* SUMMARY */}
-            {/* ================= FINANCIAL SUMMARY ================= */}
             {summary && (
                 <div className="mx-3 p-4">
                     <SummaryCards summary={summary} isMobile={isMobile} />
@@ -631,17 +641,14 @@ const UserImprestsPage: React.FC = () => {
                     <DataTable
                         data={rows}
                         columnDefs={columns}
-                        onGridReady={params => {
-                            setGridApi(params.api);
-                        }}
+                        manualPagination
+                        paginationState={pagination}
+                        onPaginationChange={setPagination}
+                        rowCount={totalRows}
+                        loading={isLoading}
                         gridOptions={{
-                            pagination: true,
-                            paginationPageSize: 100,
                             headerHeight: 44,
                             suppressCellFocus: true,
-                            onGridReady: params => {
-                                setGridApi(params.api);
-                            },
                         }}
                     />
                 )}

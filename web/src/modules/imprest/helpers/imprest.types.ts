@@ -1,3 +1,5 @@
+import type { PaginatedResult } from "@/types/api.types";
+
 export interface ImprestProof {
     url: string;
     type: "image" | "file" | "pdf" | "doc" | string;
@@ -88,6 +90,7 @@ export type ImprestVoucherView = {
 };
 
 export interface EmployeeImprestDashboardSummaryDto {
+    userName: string;
     amountSpent: number;
     amountApproved: number;
     amountReceived: number;
@@ -97,7 +100,7 @@ export interface EmployeeImprestDashboardSummaryDto {
 export interface EmployeeImprestDashboard {
     summary: EmployeeImprestDashboardSummaryDto;
 
-    imprests: ImprestRow[];
+    imprests: PaginatedResult<ImprestRow>;
 }
 
 export interface EmployeeImprestTransactionRow {

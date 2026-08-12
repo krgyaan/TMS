@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req, UploadedFiles, UseInterceptors } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req, UploadedFiles, UseInterceptors } from "@nestjs/common";
 import { FilesInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
 import { extname } from "path";
@@ -40,8 +40,12 @@ export class EmployeeImprestController {
     }
 
     @Get()
-    getMyImprests(@Req() req) {
-        return this.service.getEmployeeDashboard(req.user.sub);
+    getMyImprests(@Req() req, @Query("page") page?: string, @Query("limit") limit?: string, @Query("search") search?: string) {
+        return this.service.getEmployeeDashboard(req.user.sub, {
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            search,
+        });
     }
 
     @Get("transactions")
@@ -50,9 +54,13 @@ export class EmployeeImprestController {
     }
 
     @Get("user/:userId")
-    getByUser(@Param("userId", ParseIntPipe) userId: number) {
+    getByUser(@Param("userId", ParseIntPipe) userId: number, @Query("page") page?: string, @Query("limit") limit?: string, @Query("search") search?: string) {
         console.log("Fetching imprests for userId (controller):", userId);
-        return this.service.getEmployeeDashboard(userId);
+        return this.service.getEmployeeDashboard(userId, {
+            page: page ? parseInt(page, 10) : undefined,
+            limit: limit ? parseInt(limit, 10) : undefined,
+            search,
+        });
     }
 
     @Get("user/:userId/transactions")

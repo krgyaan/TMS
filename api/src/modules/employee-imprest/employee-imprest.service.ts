@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { DRIZZLE } from "@/db/database.module";
@@ -8,6 +8,7 @@ import { employeeImprests, employeeImprestTransactions } from "@db/schemas/share
 import type { DataScope } from "@/common/constants/roles.constant";
 import { imprestCategories, users } from "@/db/schemas";
 import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-voucher";
+import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import { PermissionService } from "@/modules/auth/services/permission.service";
 import type { CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
 import type { UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
@@ -176,10 +177,17 @@ export class EmployeeImprestService {
     }
 
     /* ----------------------------- READ ------------------------------ */
-    async getEmployeeDashboard(userId: number) {
+    async getEmployeeDashboard(userId: number, pagination?: { page?: number; limit?: number; search?: string }) {
         this.logger.info("Fetching employee dashboard", { userId });
 
         try {
+            const page = Math.max(1, pagination?.page ?? 1);
+            const limit = Math.max(1, Math.min(pagination?.limit ?? 50, 100));
+            const offset = (page - 1) * limit;
+            const search = pagination?.search?.trim();
+
+            const [user] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, userId)).limit(1);
+
             // ==============================
             // 1️⃣ Summary (reuse logic pattern)
             // ==============================
@@ -220,6 +228,19 @@ export class EmployeeImprestService {
             // ==============================
             // 2️⃣ Detailed Lists
             // ==============================
+            const searchCondition = search
+                ? or(
+                      ilike(employeeImprests.partyName, `%${search}%`),
+                      ilike(employeeImprests.projectName, `%${search}%`),
+                      ilike(employeeImprests.remark, `%${search}%`)
+                  )
+                : undefined;
+
+            const [countRow] = await this.db
+                .select({ total: sql<number>`COUNT(*)`.as("total") })
+                .from(employeeImprests)
+                .where(and(eq(employeeImprests.userId, userId), searchCondition));
+
             const imprests = await this.db
                 .select({
                     id: employeeImprests.id,
@@ -247,8 +268,10 @@ export class EmployeeImprestService {
                 .from(employeeImprests)
                 .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
                 .leftJoin(users, eq(users.id, employeeImprests.teamId)) // ✅ IMPORTANT
-                .where(eq(employeeImprests.userId, userId))
-                .orderBy(desc(employeeImprests.createdAt));
+                .where(and(eq(employeeImprests.userId, userId), searchCondition))
+                .orderBy(desc(employeeImprests.createdAt))
+                .limit(limit)
+                .offset(offset);
 
             this.logger.info("Employee dashboard fetched", {
                 userId,
@@ -257,12 +280,13 @@ export class EmployeeImprestService {
 
             return {
                 summary: {
+                    userName: user?.name ?? "User",
                     amountSpent,
                     amountApproved,
                     amountReceived,
                     amountLeft: amountApproved - amountReceived,
                 },
-                imprests,
+                imprests: wrapPaginatedResponse(imprests, Number(countRow?.total ?? 0), page, limit),
             };
         } catch (error: any) {
             this.logger.error("Failed to fetch employee dashboard", {
