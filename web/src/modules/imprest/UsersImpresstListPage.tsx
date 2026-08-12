@@ -7,6 +7,7 @@ import DataTable from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEmployeeImprestSummary } from "@/hooks/api/imprest.hooks";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { ColDef, GridApi } from "ag-grid-community";
 import { ExternalLink, FileText, IndianRupee, LayoutDashboard, Loader2, Plus, Receipt } from "lucide-react";
@@ -16,8 +17,16 @@ import { PayImprestDialog } from "./components/PayImprestDialog";
 import type { EmployeeImprestSummary } from "./helpers/imprest-admin.types";
 
 const ImprestAdminIndex: React.FC = () => {
-    const [searchText, setSearchText] = useState("");
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
+
+    const { search, setSearch, debouncedSearch } = usePersistentTableState({
+        storageKey: "imprest-user-summaries",
+        defaultTab: "" as const,
+    });
+
+    useEffect(() => {
+        gridApi?.setGridOption("quickFilterText", debouncedSearch);
+    }, [gridApi, debouncedSearch]);
 
     const [payImprestUser, setPayImprestUser] = useState<{
         userId: number;
@@ -55,7 +64,7 @@ const ImprestAdminIndex: React.FC = () => {
             onClick: row => navigate(paths.accounts.imprestsPaymentHistoryByUser(row.userId)),
         },
         {
-            label: "Voucher",
+            label: "Vouchers",
             icon: <FileText className="h-4 w-4" />,
             onClick: row => navigate(paths.accounts.imprestsVoucherByUser(row.userId)),
         },
@@ -70,7 +79,6 @@ const ImprestAdminIndex: React.FC = () => {
         },
     ];
 
-    /* -------------------- GLOBAL SUMMARY -------------------- */
     const totals = useMemo(() => {
         const current = {
             received: 0,
@@ -136,19 +144,20 @@ const ImprestAdminIndex: React.FC = () => {
         };
     }, [data]);
 
-    /* -------------------- TABLE COLUMNS -------------------- */
     const columns = useMemo<ColDef<EmployeeImprestSummary>[]>(
         () => [
             {
                 field: "userName",
                 headerName: "Employee Name",
+                width: 250,
+                maxWidth: 250,
                 cellRenderer: (p: {data: EmployeeImprestSummary}) => {
                     const userId = p.data.userId;
 
                     return (
-                        <a href={paths.accounts.imprestsUserView(userId)} className="underline inline-flex items-center gap-1">
+                        <a href={paths.accounts.imprestsUserView(userId)} className="text-sm inline-flex items-center gap-1">
+                            <ExternalLink className="h-3 w-3 text-primary" />
                             {p.data.userName}
-                            <ExternalLink className="h-3 w-3" />
                         </a>
                     );
                 },
@@ -156,45 +165,94 @@ const ImprestAdminIndex: React.FC = () => {
             {
                 field: "amountReceived",
                 headerName: "Amount Received",
-                valueFormatter: p => formatINR(p.value),
+                cellClass: "text-xs",
+                cellRenderer: ({ data }: { data: EmployeeImprestSummary }) => {
+                    const amount = data.current.amountReceived;
+                    return (
+                        <span
+                            className={`text-xs ${
+                                amount > 0 ? "text-emerald-500" : amount < 0 ? "text-red-500" : amount === 0 ? "text-gray-500" : ""
+                            }`}
+                        >
+                            {formatINR(amount)}
+                        </span>
+                    );
+                },
             },
             {
                 field: "amountSpent",
                 headerName: "Amount Spent",
-                valueFormatter: p => formatINR(p.value),
+                cellClass: "text-xs",
+                cellRenderer: ({ data }: { data: EmployeeImprestSummary }) => {
+                    const amount = data.current.amountSpent;
+                    return (
+                        <span
+                            className={`text-xs ${
+                                amount > 0 ? "text-emerald-500" : amount < 0 ? "text-red-500" : amount === 0 ? "text-gray-500" : ""
+                            }`}
+                        >
+                            {formatINR(amount)}
+                        </span>
+                    );
+                },
             },
             {
                 field: "amountApproved",
+                cellClass: "text-xs",
                 headerName: "Amount Approved",
-                valueFormatter: p => formatINR(p.value),
+                cellRenderer: ({ data }: { data: EmployeeImprestSummary }) => {
+                    const amount = data.current.amountApproved;
+                    return (
+                        <span
+                            className={`text-xs ${
+                                amount > 0 ? "text-emerald-500" : amount < 0 ? "text-red-500" : amount === 0 ? "text-gray-500" : ""
+                            }`}
+                        >
+                            {formatINR(amount)}
+                        </span>
+                    );
+                },
             },
             {
                 field: "amountLeft",
+                cellClass: "text-xs",
                 headerName: "Amount Left",
-                valueFormatter: p => formatINR(p.value),
+                cellRenderer: ({ data }: { data: EmployeeImprestSummary }) => {
+                    const amount = data.current.amountLeft;
+                    return (
+                        <span
+                            className={`text-xs ${
+                                amount > 0 ? "text-emerald-500" : amount < 0 ? "text-red-500" : amount === 0 ? "text-gray-500" : ""
+                            }`}
+                        >
+                            {formatINR(amount)}
+                        </span>
+                    );
+                },
             },
             {
                 headerName: "Total Vouchers",
                 field: "voucherInfo.totalVouchers",
+                cellClass: "text-xs text-center",
                 filter: "agNumberColumnFilter",
-                width: 140,
-                cellStyle: { textAlign: "center" },
+                width: 100,
             },
             {
                 headerName: "Accounts Pending",
                 wrapHeaderText: true,
                 autoHeaderHeight: true,
+                cellClass: "text-xs text-center",
                 valueGetter: p => {
                     const total = p.data?.voucherInfo?.totalVouchers || 0;
                     const approved = p.data?.voucherInfo?.accountsApproved || 0;
                     return total - approved;
                 },
                 filter: "agNumberColumnFilter",
-                width: 160,
-                cellStyle: { textAlign: "center" },
+                width: 100,
             },
             {
                 headerName: "Admin Pending",
+                cellClass: "text-xs text-center",
                 wrapHeaderText: true,
                 autoHeaderHeight: true,
                 valueGetter: p => {
@@ -203,23 +261,21 @@ const ImprestAdminIndex: React.FC = () => {
                     return total - approved;
                 },
                 filter: "agNumberColumnFilter",
-                width: 160,
-                cellStyle: { textAlign: "center" },
+                width: 100,
             },
 
             {
-                headerName: "Actions",
+                headerName: "",
                 filter: false,
                 sortable: false,
                 cellRenderer: createActionColumnRenderer<EmployeeImprestSummary>(imprestActions),
-                width: 80,
+                width: 60,
                 pinned: "right",
             },
         ],
         [navigate]
     );
 
-    /* -------------------- STATES -------------------- */
     if (isLoading) {
         return (
             <div className="flex justify-center items-center h-64">
@@ -233,7 +289,6 @@ const ImprestAdminIndex: React.FC = () => {
         return <div className="text-red-600">Failed to load data</div>;
     }
 
-    /* -------------------- UI -------------------- */
     return (
         <div className="space-y-6">
             {/* SUMMARY */}
@@ -414,12 +469,8 @@ const ImprestAdminIndex: React.FC = () => {
                         <Input
                             type="text"
                             placeholder="Search employee..."
-                            value={searchText}
-                            onChange={e => {
-                                const value = e.target.value;
-                                setSearchText(value);
-                                gridApi?.setGridOption("quickFilterText", value);
-                            }}
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
                             className="w-64"
                         />
 
@@ -440,7 +491,6 @@ const ImprestAdminIndex: React.FC = () => {
                         columnDefs={columns}
                         onGridReady={params => {
                             setGridApi(params.api);
-                            params.api.setGridOption("quickFilterText", searchText);
                         }}
                         gridOptions={{ pagination: true }}
                     />
