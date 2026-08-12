@@ -63,7 +63,7 @@ const ImprestVoucherList: React.FC = () => {
         () => [
             { field: "beneficiaryName", headerName: "Employee" },
             {
-                field: "voucherNumber",
+                field: "voucherCode",
                 headerName: "Voucher No.",
                 valueGetter: p => {
                     return p.data?.voucherCode ? p.data.voucherCode : "-";
@@ -72,7 +72,7 @@ const ImprestVoucherList: React.FC = () => {
             {
                 headerName: "Voucher Period",
                 autoHeight: true,
-                cellRenderer: p => {
+                cellRenderer: (p: { data: ImprestVoucherRow }) => {
                     return (
                         <div className="flex flex-col gap-1 py-2">
                             <span className="text-xs text-wrap text-emerald-400">
@@ -97,7 +97,7 @@ const ImprestVoucherList: React.FC = () => {
                 field: "accountantApproval",
                 headerName: "Accountant Approval",
                 autoHeight: true,
-                cellRenderer: p => {
+                cellRenderer: (p: { data: ImprestVoucherRow; value?: boolean }) => {
                     const remark = p.data?.accountsRemark;
 
                     return (
@@ -117,7 +117,7 @@ const ImprestVoucherList: React.FC = () => {
                 field: "adminApproval",
                 headerName: "Admin Approval",
                 autoHeight: true,
-                cellRenderer: p => {
+                cellRenderer: (p: { data: ImprestVoucherRow; value?: boolean }) => {
                     const remark = p.data?.adminRemark;
 
                     return (
