@@ -1,8 +1,12 @@
+import { useCallback, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Loader2, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { ConferenceView } from "./components/ConferenceView";
+import { Loader2 } from "lucide-react";
+import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 import { useConference } from "@/hooks/api/useConference";
+import { useComplaintStepStatuses } from "@/hooks/api/useComplaintStepStatuses";
+import { CustomerView } from "@/modules/services/customer/components/CustomerView";
+import { ConferenceView } from "./components/ConferenceView";
+import { ServiceReportView } from "@/modules/services/visit/components/ServiceReportView";
 import { paths } from "@/app/routes/paths";
 
 export default function ConferenceViewPage() {
@@ -10,9 +14,42 @@ export default function ConferenceViewPage() {
     const navigate = useNavigate();
     const conferenceId = Number(id);
 
-    const { data: conference, isLoading } = useConference(conferenceId);
+    const { data: conference, isLoading: isConferenceLoading } = useConference(conferenceId);
+    const complaintId = conference?.complaintId ?? null;
 
-    if (isLoading) {
+    const { steps, complaint, visitReport } = useComplaintStepStatuses(complaintId);
+
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["conference-report"]));
+
+    const toggleSection = useCallback((id: string) => {
+        setExpandedSections(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
+
+    const expandAll = useCallback(() => setExpandedSections(new Set(steps.map(s => s.id))), [steps]);
+    const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
+
+    const renderSectionContent = useCallback(
+        (stepId: string) => {
+            switch (stepId) {
+                case "complaint-details":
+                    return complaint ? <CustomerView complaint={complaint} /> : <p className="text-sm text-muted-foreground">Complaint details not available.</p>;
+                case "conference-report":
+                    return conference ? <ConferenceView conference={conference} /> : <p className="text-sm text-muted-foreground">No conference call report yet.</p>;
+                case "service-visit-report":
+                    return visitReport ? <ServiceReportView report={visitReport} /> : <p className="text-sm text-muted-foreground">No service visit report yet.</p>;
+                default:
+                    return null;
+            }
+        },
+        [conference, complaint, visitReport],
+    );
+
+    if (isConferenceLoading) {
         return (
             <div className="flex justify-center py-20">
                 <Loader2 className="h-6 w-6 animate-spin" />
@@ -21,24 +58,19 @@ export default function ConferenceViewPage() {
     }
 
     if (!conference) {
-        return (
-            <div className="space-y-4">
-                <Button variant="ghost" size="sm" onClick={() => navigate(paths.services.conference)} className="-ml-2">
-                    <ArrowLeft className="h-4 w-4 mr-1" /> Back to Conference Reports
-                </Button>
-                <p className="text-sm text-muted-foreground">Conference call report not found.</p>
-            </div>
-        );
+        return <p className="text-sm text-muted-foreground">Conference call report not found.</p>;
     }
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8 relative">
-            <div className="sticky top-[-1rem] z-30 bg-background py-4 -mt-4 border-b border-border shadow-md transition-all">
-                <Button variant="ghost" size="sm" onClick={() => navigate(paths.services.conference)} className="-ml-2">
-                    <ArrowLeft className="h-4 w-4 mr-2" /> Back to Conference Reports
-                </Button>
-            </div>
-            <ConferenceView conference={conference} />
-        </div>
+        <ShowPageLayout
+            steps={steps}
+            expandedSections={expandedSections}
+            onToggleSection={toggleSection}
+            onExpandAll={expandAll}
+            onCollapseAll={collapseAll}
+            onBack={() => navigate(paths.services.conference)}
+            backLabel="Back to Conference Reports"
+            renderSectionContent={renderSectionContent}
+        />
     );
 }

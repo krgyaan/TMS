@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type Resolver } from "react-hook-form";
-import { Save, Loader2, FileText, Mic, Image } from "lucide-react";
+import { Save, Loader2, Mic, Image } from "lucide-react";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -151,16 +151,6 @@ export function ConferenceForm({ complaintId, conferenceId }: ConferenceFormProp
                             disabled={saving}
                             label="Upload additional photos or videos"
                         />
-                        {attachmentPaths.length > 0 && (
-                            <div className="mt-3 flex flex-wrap gap-2">
-                                {attachmentPaths.map((att, idx) => (
-                                    <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-muted rounded">
-                                        <FileText className="h-3 w-3" />
-                                        {att.name || att.path.split("/").pop() || `Attachment ${idx + 1}`}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
                     </div>
 
                     {/* Phone Voice Recording */}

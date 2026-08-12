@@ -1,8 +1,12 @@
+import { useCallback, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Loader2, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { ServiceReportView } from "./components/ServiceReportView";
+import { Loader2 } from "lucide-react";
+import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 import { useServiceVisit } from "@/hooks/api/useServiceVisit";
+import { useComplaintStepStatuses } from "@/hooks/api/useComplaintStepStatuses";
+import { CustomerView } from "@/modules/services/customer/components/CustomerView";
+import { ConferenceView } from "@/modules/services/conference/components/ConferenceView";
+import { ServiceReportView } from "./components/ServiceReportView";
 import { paths } from "@/app/routes/paths";
 
 export default function ServiceVisitViewPage() {
@@ -10,9 +14,42 @@ export default function ServiceVisitViewPage() {
     const navigate = useNavigate();
     const reportId = Number(id);
 
-    const { data: report, isLoading } = useServiceVisit(reportId);
+    const { data: report, isLoading: isReportLoading } = useServiceVisit(reportId);
+    const complaintId = report?.complaintId ?? null;
 
-    if (isLoading) {
+    const { steps, complaint, conference } = useComplaintStepStatuses(complaintId);
+
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["service-visit-report"]));
+
+    const toggleSection = useCallback((id: string) => {
+        setExpandedSections(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
+
+    const expandAll = useCallback(() => setExpandedSections(new Set(steps.map(s => s.id))), [steps]);
+    const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
+
+    const renderSectionContent = useCallback(
+        (stepId: string) => {
+            switch (stepId) {
+                case "complaint-details":
+                    return complaint ? <CustomerView complaint={complaint} /> : <p className="text-sm text-muted-foreground">Complaint details not available.</p>;
+                case "conference-report":
+                    return conference ? <ConferenceView conference={conference} /> : <p className="text-sm text-muted-foreground">No conference call report yet.</p>;
+                case "service-visit-report":
+                    return report ? <ServiceReportView report={report} /> : <p className="text-sm text-muted-foreground">No service visit report yet.</p>;
+                default:
+                    return null;
+            }
+        },
+        [report, complaint, conference],
+    );
+
+    if (isReportLoading) {
         return (
             <div className="flex justify-center py-20">
                 <Loader2 className="h-6 w-6 animate-spin" />
@@ -21,24 +58,19 @@ export default function ServiceVisitViewPage() {
     }
 
     if (!report) {
-        return (
-            <div className="space-y-4">
-                <Button variant="ghost" size="sm" onClick={() => navigate(paths.services.visit)} className="-ml-2">
-                    <ArrowLeft className="h-4 w-4 mr-1" /> Back to Service Visits
-                </Button>
-                <p className="text-sm text-muted-foreground">Service visit report not found.</p>
-            </div>
-        );
+        return <p className="text-sm text-muted-foreground">Service visit report not found.</p>;
     }
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8 relative">
-            <div className="sticky top-[-1rem] z-30 bg-background py-4 -mt-4 border-b border-border shadow-md transition-all">
-                <Button variant="ghost" size="sm" onClick={() => navigate(paths.services.visit)} className="-ml-2">
-                    <ArrowLeft className="h-4 w-4 mr-2" /> Back to Service Visits
-                </Button>
-            </div>
-            <ServiceReportView report={report} />
-        </div>
+        <ShowPageLayout
+            steps={steps}
+            expandedSections={expandedSections}
+            onToggleSection={toggleSection}
+            onExpandAll={expandAll}
+            onCollapseAll={collapseAll}
+            onBack={() => navigate(paths.services.visit)}
+            backLabel="Back to Service Visits"
+            renderSectionContent={renderSectionContent}
+        />
     );
 }

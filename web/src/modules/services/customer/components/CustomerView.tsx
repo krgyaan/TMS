@@ -43,9 +43,6 @@ function InfoCell({ label, value }: { label: string; value: ReactNode }) {
 }
 
 export function CustomerView({ complaint }: { complaint: CustomerComplaintDetail }) {
-    const isImage = complaint.attachment?.match(/\.(jpg|jpeg|png|webp)$/i);
-    const isVideo = complaint.attachment?.match(/\.(mp4|mov|webm|mkv)$/i);
-
     const { data: allUsers = [] } = useUsers();
     const createdByUser = allUsers.find(u => u.id === complaint.createdBy);
     const createdByName = createdByUser?.name ?? "—";
@@ -176,33 +173,15 @@ export function CustomerView({ complaint }: { complaint: CustomerComplaintDetail
                 {!complaint.attachment ? (
                     <p className="text-sm text-muted-foreground">No attachment uploaded.</p>
                 ) : (
-                    <div className="space-y-3">
-                        <a
-                            href={customerAttachmentUrl(complaint.attachment)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
-                        >
-                            <Download className="h-4 w-4" />
-                            Open attachment
-                        </a>
-                        {isImage && (
-                            <div className="max-w-md rounded-lg border overflow-hidden">
-                                <img
-                                    src={customerAttachmentUrl(complaint.attachment)}
-                                    alt="Customer complaint attachment"
-                                    className="w-full object-cover"
-                                />
-                            </div>
-                        )}
-                        {isVideo && (
-                            <video
-                                controls
-                                className="max-w-md rounded-lg border"
-                                src={customerAttachmentUrl(complaint.attachment)}
-                            />
-                        )}
-                    </div>
+                    <a
+                        href={customerAttachmentUrl(complaint.attachment)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                    >
+                        <Download className="h-4 w-4" />
+                        View Attachment
+                    </a>
                 )}
             </div>
         </Card>

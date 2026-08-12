@@ -159,16 +159,6 @@ export function ServiceReportForm({ complaintId, reportId }: ServiceReportFormPr
                             disabled={saving}
                             label="Upload photo after resolution"
                         />
-                        {resolvedPhotoPaths.length > 0 && (
-                            <div className="mt-3 flex flex-wrap gap-2">
-                                {resolvedPhotoPaths.map((att, idx) => (
-                                    <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-muted rounded">
-                                        <FileText className="h-3 w-3" />
-                                        {att.name || att.path.split("/").pop() || `Photo ${idx + 1}`}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
                     </div>
 
                     {/* Upload customer-signed visit report */}
@@ -184,16 +174,6 @@ export function ServiceReportForm({ complaintId, reportId }: ServiceReportFormPr
                             disabled={saving}
                             label="Upload customer-signed visit report"
                         />
-                        {signedPhotoPaths.length > 0 && (
-                            <div className="mt-3 flex flex-wrap gap-2">
-                                {signedPhotoPaths.map((att, idx) => (
-                                    <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-muted rounded">
-                                        <FileText className="h-3 w-3" />
-                                        {att.name || att.path.split("/").pop() || `Report ${idx + 1}`}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
                     </div>
 
                     {/* Footer Actions */}
