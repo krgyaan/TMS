@@ -615,6 +615,37 @@ export class VendorWorkOrderService {
         };
     }
 
+    async closeVendorWorkOrder(id: number) {
+        const wo = await this.db
+            .select()
+            .from(vendorWorkOrders)
+            .where(eq(vendorWorkOrders.id, id))
+            .then(rows => rows[0]);
+
+        if (!wo) throw new NotFoundException("Vendor Work Order not found");
+        if (wo.woApproved !== true) {
+            throw new BadRequestException("Only approved Vendor Work Orders can be closed");
+        }
+
+        const closureStatus = await this.checkClosure(id);
+        if (!closureStatus.canClose) {
+            throw new BadRequestException(
+                "Vendor Work Order cannot be closed until all payment requests and purchase invoices are cleared.",
+            );
+        }
+
+        const [updated] = await this.db
+            .update(vendorWorkOrders)
+            .set({
+                updatedAt: sql`now()`,
+            })
+            .where(eq(vendorWorkOrders.id, id))
+            .returning();
+
+        this.logger.info(`Vendor Work Order closed #${id}`);
+        return updated ?? wo;
+    }
+
     async getVendorWorkOrderClosure(id: number) {
         const wo = await this.db
             .select()

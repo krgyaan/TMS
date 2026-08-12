@@ -95,6 +95,10 @@ class VendorWorkOrderApiService extends BaseApiService {
     async getClosureStatus(id: number): Promise<any> {
         return this.get(`/${id}/closure-status`);
     }
+
+    async close(id: number): Promise<any> {
+        return this.post(`/${id}/close`);
+    }
 }
 
 export const vendorWorkOrderApi = new VendorWorkOrderApiService();

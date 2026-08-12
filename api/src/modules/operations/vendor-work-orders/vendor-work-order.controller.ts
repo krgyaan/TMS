@@ -102,6 +102,12 @@ export class VendorWorkOrderController {
     return this.service.getVendorWorkOrderClosure(id);
   }
 
+  @Post(":id/close")
+  @HttpCode(HttpStatus.OK)
+  closeVendorWorkOrder(@Param("id", ParseIntPipe) id: number) {
+    return this.service.closeVendorWorkOrder(id);
+  }
+
   @Post(":id/bulk-payment-requests")
   @HttpCode(HttpStatus.CREATED)
   bulkCreatePaymentRequests(

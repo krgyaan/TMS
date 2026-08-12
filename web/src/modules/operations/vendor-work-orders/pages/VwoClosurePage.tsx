@@ -634,7 +634,20 @@ const VwoClosurePage = () => {
 
       <CardFooter className="flex gap-3">
         {canClose && (
-          <Button className="bg-green-600 hover:bg-green-700">
+          <Button
+            className="bg-green-600 hover:bg-green-700"
+            onClick={async () => {
+              try {
+                setSaveMsg(null);
+                await vendorWorkOrderApi.close(woId);
+                setSaveMsg({ type: "success", text: "Vendor Work Order closed successfully." });
+                await fetchData();
+              } catch (err) {
+                console.error(err);
+                setSaveMsg({ type: "error", text: "Failed to close Vendor Work Order." });
+              }
+            }}
+          >
             <CheckCircle2 className="h-4 w-4 mr-2" />
             Close VWO
           </Button>
