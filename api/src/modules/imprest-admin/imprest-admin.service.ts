@@ -1,22 +1,17 @@
-import { Injectable, Inject, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common";
-import { sql, eq, desc, SQL, and, gte, lte } from "drizzle-orm";
-
-import { DRIZZLE } from "@/db/database.module";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { DbInstance } from "@/db";
-
-import { users } from "@/db/schemas/auth/users.schema";
-import { employeeImprests } from "@/db/schemas/shared/employee-imprest.schema";
-import { employeeImprestTransactions } from "@/db/schemas/shared/employee-imprest-transaction.schema";
+import { DRIZZLE } from "@/db/database.module";
 import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-voucher";
-
-import type { EmployeeImprestSummaryDto } from "./zod/imprest-admin.dto";
-import { admin } from "googleapis/build/src/apis/admin";
+import { users } from "@/db/schemas/auth/users.schema";
+import { employeeImprestTransactions } from "@/db/schemas/shared/employee-imprest-transaction.schema";
+import { employeeImprests } from "@/db/schemas/shared/employee-imprest.schema";
 import { CreateEmployeeImprestCreditDto } from "./zod/create-employee-imprest-credit.schema";
-
+import type { EmployeeImprestSummaryDto } from "./zod/imprest-admin.dto";
+import { imprestCategories, teams, userProfiles } from "@/db/schemas";
+import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
-import { imprestCategories, teams, userProfiles } from "@/db/schemas";
-import { projects } from "@/db/schemas/operations/projects.schema";
 
 @Injectable()
 export class ImprestAdminService {
@@ -39,22 +34,6 @@ export class ImprestAdminService {
      *
      * Only users having at least one imprest entry are returned.
      */
-
-    /**
-     * Returns ISO-8601 week number for a given date
-     * Week starts on Monday
-     */
-    private getISOWeek(date: Date): number {
-        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-
-        // Thursday determines the year
-        d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-
-        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-        const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-
-        return weekNo;
-    }
 
     private formatFinancialYear(startYear: number): string {
         const endYear = (startYear + 1) % 100;
@@ -168,9 +147,6 @@ export class ImprestAdminService {
                 rowsCount: rows.length,
             });
 
-            // ==============================
-            // 5️⃣ Map Result
-            // ==============================
             // Group rows by user
             const userGroups = new Map<number, {
                 userId: number;
@@ -338,19 +314,28 @@ export class ImprestAdminService {
         };
     }
 
-    // Role-based filtering
-    // if (user.role !== "admin") {
-    //     conditions.push(eq(employee_imprest_vouchers.beneficiaryName, String(user.id)));
-    // }
+    async listVouchersRaw(userId?: number, params?: { page?: number; limit?: number; search?: string; fy?: number }) {
+        const page = Math.max(1, params?.page ?? 1);
+        const limit = Math.max(1, Math.min(params?.limit ?? 50, 100));
+        const offset = (page - 1) * limit;
+        const search = params?.search?.trim();
 
-    async listVouchersRaw(userId?: number) {
         const whereSql = userId ? sql`AND ei.user_id = ${userId}` : sql``;
+        const searchCondition = search
+            ? sql`
+                AND (
+                    u.name ILIKE ${`%${search}%`}
+                    OR v.voucher_code ILIKE ${`%${search}%`}
+                    OR a.week::text ILIKE ${`%${search}%`}
+                    OR a.total_amount::text ILIKE ${`%${search}%`}
+                    OR v.accounts_remark ILIKE ${`%${search}%`}
+                    OR v.admin_remark ILIKE ${`%${search}%`}
+                )
+            `
+            : sql``;
+        const fyCondition = params?.fy ? sql`AND EXTRACT(YEAR FROM a.start_date - INTERVAL '3 months') = ${params.fy}` : sql``;
 
-        const result = await this.db.execute(
-            sql`
-                /* -------------------------------------------------
-                BASE: APPROVED IMPRESTS (DATE ONLY)
-                -------------------------------------------------- */
+        const selectSql = sql`
                 WITH base AS (
                     SELECT
                         ei.id AS imprest_id,
@@ -365,35 +350,28 @@ export class ImprestAdminService {
                     WHERE ei.approval_status = 1
                     ${whereSql}
                 ),
+                amounts AS (
+                    SELECT
+                        user_id,
 
-                /* -------------------------------------------------
-                AMOUNTS: GROUP EXACTLY LIKE LARAVEL
-                -------------------------------------------------- */
-                    amounts AS (
-                        SELECT
-                            user_id,
+                        EXTRACT(ISOYEAR FROM effective_date)::int AS year,
+                        EXTRACT(WEEK FROM effective_date)::int AS week,
 
-                            EXTRACT(ISOYEAR FROM effective_date)::int AS year,
-                            EXTRACT(WEEK FROM effective_date)::int AS week,
+                        MIN(effective_date) AS start_date,
 
-                            MIN(effective_date) AS start_date,
+                        (
+                            MIN(effective_date)
+                            + (
+                                (6 - ((EXTRACT(DOW FROM MIN(effective_date)) + 6) % 7))
+                                * INTERVAL '1 day'
+                            )
+                        )::date AS end_date,
 
-                            (
-                                MIN(effective_date)
-                                + (
-                                    (6 - ((EXTRACT(DOW FROM MIN(effective_date)) + 6) % 7))
-                                    * INTERVAL '1 day'
-                                )
-                            )::date AS end_date,
+                        SUM(amount)::numeric AS total_amount
+                    FROM base
+                    GROUP BY user_id, year, week
+                ),
 
-                            SUM(amount)::numeric AS total_amount
-                        FROM base
-                        GROUP BY user_id, year, week
-                    ),
-
-                /* -------------------------------------------------
-                PROOFS: COLLECT SEPARATELY (NO EFFECT ON SUM)
-                -------------------------------------------------- */
                 proofs AS (
                     SELECT
                         user_id,
@@ -417,9 +395,6 @@ export class ImprestAdminService {
                     GROUP BY user_id, year, week
                 )
 
-                /* -------------------------------------------------
-                FINAL RESULT (DATE MATCH, NOT TIMESTAMP)
-                -------------------------------------------------- */
                 SELECT
                     v.id AS "id",
                     v.voucher_code AS "voucherCode",
@@ -450,11 +425,29 @@ export class ImprestAdminService {
                     ON v.beneficiary_name = a.user_id::text
                 AND v.valid_from::date = a.start_date
                 AND v.valid_to::date   = a.end_date
+                WHERE 1 = 1
+                ${searchCondition}
+                ${fyCondition}
                 ORDER BY a.year DESC, a.week DESC
-                        `
+        `;
+
+        const countResult = await this.db.execute(sql`SELECT COUNT(*)::int AS "total" FROM (${selectSql}) t`);
+        const total = Number(countResult.rows[0]?.total ?? 0);
+
+        const result = await this.db.execute(sql`${selectSql} LIMIT ${limit} OFFSET ${offset}`);
+
+        const fyOptionsResult = await this.db.execute(
+            sql`
+                SELECT DISTINCT
+                    EXTRACT(YEAR FROM (COALESCE(ei.date_of_expense, ei.approved_date, ei.created_at)::date - INTERVAL '3 months'))::int AS "fy"
+                FROM employee_imprests ei
+                WHERE ei.approval_status = 1
+                ${userId ? sql`AND ei.user_id = ${userId}` : sql``}
+                ORDER BY "fy" DESC
+            `
         );
 
-        return result.rows.map((r: any) => ({
+        const data = result.rows.map((r: any) => ({
             id: r.id ?? null,
             voucherCode: r.voucherCode ?? null,
 
@@ -486,6 +479,11 @@ export class ImprestAdminService {
             accountsRemark: r.accounts_remark ?? null,
             adminRemark: r.admin_remark ?? null,
         }));
+
+        return {
+            ...wrapPaginatedResponse(data, total, page, limit),
+            fyOptions: fyOptionsResult.rows.map((r: Record<string, unknown>) => Number(r.fy)),
+        };
     }
 
     async createVoucher({ user, userId, validFrom, validTo }: { user: any; userId: number; validFrom: Date; validTo: Date }) {
@@ -522,9 +520,6 @@ export class ImprestAdminService {
 
         return { proofs };
     }
-    /* -----------------------------------------
-     VOUCHER CODE GENERATOR
-  ------------------------------------------ */
 
     private getFinancialYear() {
         const now = new Date();
@@ -547,9 +542,6 @@ export class ImprestAdminService {
     }
 
     async getVoucherById({ user, voucherId }: { user: { id: number; role: string }; voucherId: number }) {
-        /* -----------------------------------------
-       FETCH VOUCHER + EMPLOYEE (Laravel: $voucher + $abc)
-    ------------------------------------------ */
 
         const [voucher] = await this.db
             .select({
@@ -570,7 +562,6 @@ export class ImprestAdminService {
                 adminSignedAt: employeeImprestVouchers.adminSignedAt,
                 adminRemark: employeeImprestVouchers.adminRemark,
 
-                // 👇 Laravel: User::where('id', name_id)
                 employeeId: users.id,
                 employeeName: users.name,
                 teamName: teams.name,
@@ -589,13 +580,6 @@ export class ImprestAdminService {
             throw new NotFoundException("Voucher beneficiary not found");
         }
 
-        /* -----------------------------------------
-       FETCH LINE ITEMS (Laravel: $vo)
-       EXACT PARITY WITH:
-       whereDate(approved_date)
-       where buttonstatus = 1
-    ------------------------------------------ */
-
         const items = await this.db
             .select({
                 id: employeeImprests.id,
@@ -604,7 +588,6 @@ export class ImprestAdminService {
 
                 projectName: employeeImprests.projectName,
 
-                // 👇 derived safely (never duplicates)
                 projectCode: sql<string>`
             COALESCE(p.project_code, '-')
         `.as("projectCode"),
@@ -614,7 +597,6 @@ export class ImprestAdminService {
             })
             .from(employeeImprests)
             .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
-            // 👇 SAFE project lookup (NO DUPLICATES)
             .leftJoin(
                 sql`
                 LATERAL (
@@ -639,10 +621,6 @@ export class ImprestAdminService {
                 )
             )
             .orderBy(sql`COALESCE(${employeeImprests.dateOfExpense}, ${employeeImprests.approvedDate})`);
-
-        /* -----------------------------------------
-       RETURN STRUCTURE (Laravel-equivalent)
-    ------------------------------------------ */
 
         return {
             voucher: {
@@ -675,7 +653,6 @@ export class ImprestAdminService {
     }
 
     async buildVoucherIfMissing({ userId, from, to, createdBy }: { userId: number; from: Date; to: Date; createdBy: string }) {
-        // 1️⃣ DATE-ONLY lookup (Laravel parity)
         const [existing] = await this.db
             .select()
             .from(employeeImprestVouchers)
@@ -692,7 +669,6 @@ export class ImprestAdminService {
             return existing;
         }
 
-        // 2️⃣ Fetch imprests (DATE-based, approved only)
         const imprests = await this.db
             .select({ amount: employeeImprests.amount })
             .from(employeeImprests)
@@ -713,7 +689,6 @@ export class ImprestAdminService {
 
         const totalAmount = imprests.reduce((sum, r) => sum + Number(r.amount), 0);
 
-        // 3️⃣ Create voucher (timestamps irrelevant now)
         const [voucher] = await this.db
             .insert(employeeImprestVouchers)
             .values({
@@ -753,27 +728,22 @@ export class ImprestAdminService {
     }
 
     async accountApproveVoucher({ user, voucherId, remark, approve }: { user: { id: number; role: string }; voucherId: number; remark?: string; approve: boolean }) {
-        // 1️⃣ Fetch voucher
         const [voucher] = await this.db.select().from(employeeImprestVouchers).where(eq(employeeImprestVouchers.id, voucherId)).limit(1);
 
         if (!voucher) {
             throw new NotFoundException("Voucher not found");
         }
 
-        // 2️⃣ Check already signed
         if (approve && voucher.accountsSignedBy) {
             throw new BadRequestException("Voucher already approved by accounts");
         }
 
-        // 3️⃣ Fetch user signature (Laravel: $user->sign)
         const [profile] = await this.db.select({ signature: userProfiles.signature }).from(userProfiles).where(eq(userProfiles.userId, user.id)).limit(1);
         console.log("profile", profile);
 
-        // 4️⃣ Update voucher
         await this.db
             .update(employeeImprestVouchers)
             .set({
-                // Always update remark (Laravel parity)
                 accountsRemark: remark ?? voucher.accountsRemark,
 
                 ...(approve && {
@@ -790,14 +760,12 @@ export class ImprestAdminService {
     }
 
     async adminApproveVoucher({ user, voucherId, remark, approve }: { user: { id: number; role: string }; voucherId: number; remark?: string; approve: boolean }) {
-        // 1️⃣ Fetch voucher
         const [voucher] = await this.db.select().from(employeeImprestVouchers).where(eq(employeeImprestVouchers.id, voucherId)).limit(1);
 
         if (!voucher) {
             throw new NotFoundException("Voucher not found");
         }
 
-        // 2️⃣ Check already signed
         if (approve && voucher.adminSignedBy) {
             throw new BadRequestException("Voucher already approved by admin");
         }
@@ -807,14 +775,11 @@ export class ImprestAdminService {
             throw new BadRequestException("Admin Approval can only be done once the Account Approval has been submitted");
         }
 
-        // 3️⃣ Fetch user signature
         const [profile] = await this.db.select({ signature: userProfiles.signature }).from(userProfiles).where(eq(userProfiles.userId, user.id)).limit(1);
 
-        // 4️⃣ Update voucher
         await this.db
             .update(employeeImprestVouchers)
             .set({
-                // Always update remark
                 adminRemark: remark ?? voucher.adminRemark,
 
                 ...(approve && {
@@ -830,9 +795,6 @@ export class ImprestAdminService {
         };
     }
 
-    // ========================
-    // DELETE PAYMENT
-    // ========================
     async delete(id: number) {
         const existing = await this.db
             .select()
@@ -870,7 +832,6 @@ export class ImprestAdminService {
     }
 
     async getUserAmts(userId: number) {
-        // -------- Imprest totals (spent + approved) --------
         const [imprestAgg] = await this.db
             .select({
                 amountSpent: sql<number>`
@@ -892,7 +853,6 @@ export class ImprestAdminService {
             .from(employeeImprests)
             .where(eq(employeeImprests.userId, userId));
 
-        // -------- Transaction total (received) --------
         const [txnAgg] = await this.db
             .select({
                 amountReceived: sql<number>`

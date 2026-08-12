@@ -1,5 +1,5 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { CanDelete, CanRead, CanUpdate, CurrentUser } from "../auth/decorators";
 import { PermissionGuard } from "../auth/guards/permission.guard";
 import { PermissionService } from "../auth/services/permission.service";
@@ -14,28 +14,11 @@ export class ImprestAdminController {
         private readonly permissionService: PermissionService
     ) {}
 
-    /**
-     * ADMIN / ACCOUNT:
-     * Employee Imprest Summary
-     */
     @Get()
     @CanRead("shared.imprests")
     async getEmployeeImprestSummary() {
         return this.service.getEmployeeSummary();
     }
-
-    // ========================
-    // GET PAYMENT HISTORY (BY USER)
-    // ========================
-    // @Get("payment-history/:userId")
-    // async getByUser(@Param("userId", ParseIntPipe) userId: number, @CurrentUser() user) {
-    //     // employee can only view their own history
-    //     // if (user.role === "employee" && user.id !== userId) {
-    //     //     throw new ForbiddenException("Access denied");
-    //     // }
-
-    //     return this.service.getByUser(userId);
-    // }
 
     @Get("payment-history")
     async getPaymentHistory(@CurrentUser() user: any, @Query("userId") userId?: number) {
@@ -50,12 +33,9 @@ export class ImprestAdminController {
             { module: "accounts.imprests", action: "read" }
         );
 
-        // 🔐 Admin / Accounts can see all or filter by user
         if (canReadAll) {
             return this.service.getPaymentHistory(userId);
         }
-
-        // 👤 Employee can only see their own
         return this.service.getPaymentHistory(user.sub);
     }
 
@@ -68,12 +48,15 @@ export class ImprestAdminController {
         });
     }
 
-    // ========================
-    // LIST VOUCHERS
-    // ========================
-
     @Get("voucher")
-    async listVouchers(@CurrentUser() user: any, @Query("userId") userId?: number) {
+    async listVouchers(
+        @CurrentUser() user: any,
+        @Query("userId") userId?: number,
+        @Query("page") page?: number,
+        @Query("limit") limit?: number,
+        @Query("search") search?: string,
+        @Query("fy") fy?: number
+    ) {
         const canReadAll = await this.permissionService.hasPermission(
             {
                 userId: user.sub,
@@ -85,16 +68,15 @@ export class ImprestAdminController {
             { module: "accounts.imprests", action: "read" }
         );
 
-        if (canReadAll) {
-            return this.service.listVouchersRaw(userId);
-        }
+        const effectiveUserId = canReadAll ? (userId ? Number(userId) : undefined) : (user.sub as number);
 
-        return this.service.listVouchersRaw(user.sub);
+        return this.service.listVouchersRaw(effectiveUserId, {
+            page: page ? Number(page) : undefined,
+            limit: limit ? Number(limit) : undefined,
+            search,
+            fy: fy ? Number(fy) : undefined,
+        });
     }
-
-    // ========================
-    // CREATE VOUCHER
-    // ========================
 
     @Post("voucher")
     @CanUpdate("accounts.imprests")
@@ -106,10 +88,6 @@ export class ImprestAdminController {
             validTo: body.validTo,
         });
     }
-
-    //=========================
-    // VIEW VOUCHER BY ID
-    //=========================
 
     @Get("voucher/view")
     async getVoucherView(@Query("userId", ParseIntPipe) userId: number, @Query("from") from: string, @Query("to") to: string, @Req() req) {
@@ -138,9 +116,6 @@ export class ImprestAdminController {
         });
     }
 
-    // ========================
-    // APPROVE VOUCHER
-    // ========================
     @Post("voucher/:id/account-approve")
     @CanUpdate("accounts.imprests")
     accountApprove(@Req() req, @Param("id") id: string, @Body() body: { remark?: string; approve?: boolean }) {
@@ -152,9 +127,6 @@ export class ImprestAdminController {
         });
     }
 
-    // =========================
-    // ADMIN APPROVE VOUCHER
-    // ========================
     @Post("voucher/:id/admin-approve")
     @CanUpdate("accounts.imprests")
     adminApprove(@Req() req, @Param("id") id: string, @Body() body: { remark?: string; approve?: boolean }) {
@@ -166,9 +138,6 @@ export class ImprestAdminController {
         });
     }
 
-    // ========================
-    // DELETE TRANSACTION Payment History
-    // ========================
     @Delete("/:id")
     @CanDelete("accounts.imprests")
     async delete(@Param("id", ParseIntPipe) id: number) {
