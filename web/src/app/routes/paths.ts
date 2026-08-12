@@ -252,9 +252,9 @@ export const paths = {
         poClosure: (poId: number) => `/accounts/purchase-orders/${poId}/closure`,
         saleInvoices: "/accounts/sale-invoices",
         vendorWorkOrders: "/accounts/vendor-work-orders",
+        vwoClosure: (id: number) => `/accounts/vendor-work-orders/${id}/closure`,
         paymentRequests: "/accounts/payment-requests",
         vendorMaster: "/accounts/vendor-master",
-
     },
 
     

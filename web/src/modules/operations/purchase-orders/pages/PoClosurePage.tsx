@@ -20,7 +20,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "def
     rejected: { label: "Rejected", variant: "destructive" },
 };
 
-const BUDGET_CATEGORIES = ["Supply", "Service", "Freight", "Admin/Misc.", "Buyback/Sale", "GEM Charges"];
+const BUDGET_CATEGORIES = ["Supply", "Admin/Misc.", "Buyback/Sale", "GEM Charges","Warranty"];
 
 interface PoClosureData {
     id: number;

@@ -36,6 +36,7 @@ const Accounts_PoClosure = lazy(() => import("@/modules/operations/purchase-orde
 const Accounts_PaymentRequestTabs = lazy(() => import("@/modules/operations/payment-requests/PaymentRequestTabsPage"));
 const Accounts_SaleInvoiceTabs = lazy(() => import("@/modules/operations/sale-invoices/SaleInvoiceTabsPage"));
 const Accounts_VendorWorkOrderTabs = lazy(() => import("@/modules/operations/vendor-work-orders/VendorWorkOrderTabsPage"));
+const Accounts_VwoClosure = lazy(() => import("@/modules/operations/vendor-work-orders/pages/VwoClosurePage"));
 const Accounts_VendorMaster = lazy(() => import("@/modules/operations/vendor-master/PartyListPage"));
 
 export default function AccountsRoutes() {
@@ -73,6 +74,7 @@ export default function AccountsRoutes() {
             <Route path="vendor-master" element={<RouteWrapper><Accounts_VendorMaster /></RouteWrapper>} />
             <Route path="sale-invoices" element={<RouteWrapper><Accounts_SaleInvoiceTabs /></RouteWrapper>} />
             <Route path="vendor-work-orders" element={<RouteWrapper><Accounts_VendorWorkOrderTabs /></RouteWrapper>} />
+            <Route path="vendor-work-orders/:id/closure" element={<RouteWrapper><Accounts_VwoClosure /></RouteWrapper>} />
             <Route path="payment-requests" element={<RouteWrapper><Accounts_PaymentRequestTabs /></RouteWrapper>} />
             <Route path="delegation/add" element={<RouteWrapper><AddTask /></RouteWrapper>} />
             <Route path="delegation/:id" element={<RouteWrapper><TaskDetail /></RouteWrapper>} />

@@ -87,7 +87,7 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
                 label: "Closure",
                 icon: <Lock className="h-4 w-4" />,
                 visible: (row) => row.woApproved === true,
-                onClick: (row) => navigate(paths.accounts.poClosure(row.id)),
+                onClick: (row) => navigate(paths.accounts.vwoClosure(row.id)),
             });
         }
 
