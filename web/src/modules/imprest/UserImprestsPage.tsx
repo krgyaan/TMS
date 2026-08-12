@@ -301,34 +301,34 @@ const UserImprestsPage: React.FC = () => {
         return <button className={cn("px-2 py-1 rounded-full text-[11px] border font-medium", colorMap[color])}>{done ? doneText : pendingText}</button>;
     };
 
-    const imprestAction: ActionItem<ImprestRow>[] = [
-        {
-            label: "Add Remark",
-            onClick: (row: ImprestRow) => openRemarkModal(row),
-            icon: <MessageSquarePlus className="h-4 w-4" />,
-            visible: () => canUpdate("accounts.imprest-admin"), 
-        },
-        {
-            label: "Add Proof",
-            onClick: (row: ImprestRow) => openAddProof(row.id),
-            icon: <ImagePlus className="h-4 w-4" />,
-        },
-        {
-            label: "Edit Imprest",
-            onClick: (row: ImprestRow) => navigate(isAccountsSection ? paths.accounts.imprestsEdit(row.id) : paths.shared.imprestEdit(row.id)),
-            icon: <Pencil className="h-4 w-4" />,
-            visible: () => canUpdate("accounts.imprest-admin"), 
-        },
-        {
-            label: "Delete",
-            onClick: (row: ImprestRow) => handleDelete(row),
-            icon: <Trash2 className="h-4 w-4" />,
-            visible: () => canDelete("accounts.imprests"), 
-        },
-    ]
+    const columns = useMemo<ColDef<ImprestRow>[]>(() => {
+        const imprestAction: ActionItem<ImprestRow>[] = [
+            {
+                label: "Add Remark",
+                onClick: (row: ImprestRow) => openRemarkModal(row),
+                icon: <MessageSquarePlus className="h-4 w-4" />,
+                visible: () => canUpdate("accounts.imprest-admin"),
+            },
+            {
+                label: "Add Proof",
+                onClick: (row: ImprestRow) => openAddProof(row.id),
+                icon: <ImagePlus className="h-4 w-4" />,
+            },
+            {
+                label: "Edit Imprest",
+                onClick: (row: ImprestRow) => navigate(isAccountsSection ? paths.accounts.imprestsEdit(row.id) : paths.shared.imprestEdit(row.id)),
+                icon: <Pencil className="h-4 w-4" />,
+                visible: () => canUpdate("accounts.imprest-admin"),
+            },
+            {
+                label: "Delete",
+                onClick: (row: ImprestRow) => handleDelete(row),
+                icon: <Trash2 className="h-4 w-4" />,
+                visible: () => canDelete("accounts.imprests"),
+            },
+        ];
 
-    const columns = useMemo<ColDef<ImprestRow>[]>(
-        () => [
+        return [
             {
                 field: "createdAt",
                 headerName: "Date",
@@ -458,9 +458,8 @@ const UserImprestsPage: React.FC = () => {
                 pinned: "right",
                 width: 57,
             }
-        ],
-        [approveMutation, tallyMutation, proofMutation, imprestAction, canMutateStatusAdmin]
-    );
+        ];
+    }, [approveMutation, tallyMutation, proofMutation, canMutateStatusAdmin, canDelete, canUpdate, handleDelete, isAccountsSection, navigate]);
 
     const ImprestMobileCard: React.FC<{ row: ImprestRow }> = ({ row }) => {
         const proofCount = row.invoiceProof.length;
