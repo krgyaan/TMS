@@ -187,6 +187,8 @@ export class CustomerService {
                 })
                 .returning();
 
+            await tx.update(customerComplaints).set({ status: "Allotted Engineer" }).where(eq(customerComplaints.id, id));
+
             return engineer;
         });
     }

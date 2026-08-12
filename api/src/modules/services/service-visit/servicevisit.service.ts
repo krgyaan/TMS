@@ -2,7 +2,7 @@ import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { eq, desc } from "drizzle-orm";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
-import { serviceReports, customerComplaints, serviceEngineers } from "@/db/schemas";
+import { serviceReports, customerComplaints, serviceEngineers, conferenceCallReports } from "@/db/schemas";
 import type { CreateServiceReportDto, UpdateServiceReportDto } from "./dto/service-visit.dto";
 
 @Injectable()
@@ -52,6 +52,7 @@ export class ServiceVisitService {
             })
             .from(serviceEngineers)
             .innerJoin(customerComplaints, eq(serviceEngineers.complaintId, customerComplaints.id))
+            .innerJoin(conferenceCallReports, eq(conferenceCallReports.complaintId, customerComplaints.id))
             .leftJoin(serviceReports, eq(serviceReports.complaintId, customerComplaints.id))
             .orderBy(desc(serviceEngineers.createdAt));
     }
@@ -78,6 +79,7 @@ export class ServiceVisitService {
                     uploadedBy: userId,
                 })
                 .returning();
+            await tx.update(customerComplaints).set({ status: "Done" }).where(eq(customerComplaints.id, body.complaintId));
             return report;
         });
     }

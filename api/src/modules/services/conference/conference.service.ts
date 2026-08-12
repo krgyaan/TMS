@@ -73,6 +73,7 @@ export class ConferenceService {
                     createdBy: userId,
                 })
                 .returning();
+            await tx.update(customerComplaints).set({ status: "Conference Done" }).where(eq(customerComplaints.id, body.complaintId));
             return report;
         });
     }

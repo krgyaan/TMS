@@ -103,7 +103,7 @@ export default function ServiceVisitListPage() {
             <CardHeader className="flex-none pb-4">
                 <div>
                     <CardTitle>Service Visits</CardTitle>
-                    <CardDescription>Complaints with allotted engineers</CardDescription>
+                    <CardDescription>Complaints with conference report submitted</CardDescription>
                 </div>
             </CardHeader>
 
