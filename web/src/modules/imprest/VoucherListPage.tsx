@@ -3,67 +3,61 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useImprestVoucherList } from "@/hooks/api/imprest.hooks";
 import { useUser } from "@/hooks/api/useUsers";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import type { ColDef } from "ag-grid-community";
 import { ArrowLeft, Eye } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import React, { useMemo } from "react";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ImprestVoucherRow } from "./helpers/imprest.types";
+
+const formatFY = (startYear: number) => `${startYear}-${String((startYear + 1) % 100).padStart(2, "0")}`;
 
 const ImprestVoucherList: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const [searchParams] = useSearchParams();
+    const { userId: userIdParam } = useParams<{ userId?: string }>();
+    const [searchParams, setSearchParams] = useSearchParams();
     const isAccountsSection = location.pathname.includes("/accounts/");
-    const userIdParam = searchParams.get("userId");
-    const queryUserId = userIdParam ? Number(userIdParam) : undefined;
+
+    const queryUserId = userIdParam && !isNaN(Number(userIdParam)) ? Number(userIdParam) : undefined;
     const safeUserId = queryUserId ?? 0;
     const { data: userDetails } = useUser(safeUserId);
-    const { data: rows = [], isLoading } = useImprestVoucherList(queryUserId);
 
-    const [selectedFY, setSelectedFY] = useState<string>("");
+    const { pagination, setPagination, search, setSearch, debouncedSearch } = usePersistentTableState({
+        storageKey: "imprest-vouchers",
+        defaultTab: "" as const,
+    });
 
-    const getFinancialYearForDate = (dateStr: string) => {
-        const d = new Date(dateStr);
-        if (isNaN(d.getTime())) return null;
-        const year = d.getFullYear();
-        const month = d.getMonth();
-        const startYear = month >= 3 ? year : year - 1;
-        const endYear = (startYear + 1) % 100;
-        return `${startYear}-${String(endYear).padStart(2, "0")}`;
+    const fyParam = searchParams.get("fy");
+    const fyFromUrl: "all" | number | undefined =
+        fyParam === null ? undefined : fyParam === "all" ? "all" : Number(fyParam);
+    const effectiveFY = typeof fyFromUrl === "number" && !Number.isNaN(fyFromUrl) ? fyFromUrl : undefined;
+
+    const { data, isLoading } = useImprestVoucherList(queryUserId, {
+        page: pagination.pageIndex + 1,
+        limit: pagination.pageSize,
+        search: debouncedSearch || undefined,
+        fy: effectiveFY,
+    });
+
+    const rows = data?.data ?? [];
+    const totalRows = data?.meta?.total ?? 0;
+    const fyOptions = data?.fyOptions ?? [];
+
+    const selectValue = fyFromUrl ?? fyOptions[0] ?? "all";
+
+    const handleFyChange = (value: string) => {
+        const next = new URLSearchParams(searchParams);
+        next.set("fy", value);
+        setSearchParams(next, { replace: true });
+        setPagination(p => ({ ...p, pageIndex: 0 }));
     };
-
-    const availableFYs = useMemo(() => {
-        const years = new Set<string>();
-        rows.forEach((r: ImprestVoucherRow) => {
-            if (r.validFrom) {
-                const fy = getFinancialYearForDate(r.validFrom);
-                if (fy) {
-                    years.add(fy);
-                }
-            }
-        });
-        return Array.from(years).sort((a, b) => b.localeCompare(a));
-    }, [rows]);
-
-    useEffect(() => {
-        if (availableFYs.length > 0 && selectedFY === "") {
-            setSelectedFY(availableFYs[0]);
-        }
-    }, [availableFYs, selectedFY]);
-
-    const filteredRows = useMemo(() => {
-        const activeFY = selectedFY || availableFYs[0] || "all";
-        if (activeFY === "all") return rows;
-        return rows.filter((r: ImprestVoucherRow) => {
-            if (!r.validFrom) return false;
-            return getFinancialYearForDate(r.validFrom) === activeFY;
-        });
-    }, [rows, selectedFY, availableFYs]);
 
     const columns = useMemo<ColDef<ImprestVoucherRow>[]>(
         () => [
@@ -133,7 +127,6 @@ const ImprestVoucherList: React.FC = () => {
                             ) : (
                                 <Badge variant='destructive'>Pending</Badge>
                             )}
-
                             {remark && <div className="text-xs text-muted-foreground font-semibold text-wrap py-2">{remark}</div>}
                         </div>
                     );
@@ -141,6 +134,8 @@ const ImprestVoucherList: React.FC = () => {
             },
             {
                 headerName: "",
+                width: 80,
+                maxWidth: 80,
                 cellRenderer: (p: { data: ImprestVoucherRow }) => (
                     <Button variant="default" size="sm" 
                         onClick={() => navigate(isAccountsSection ? paths.accounts.imprestsVoucherView({userId: Number(p.data.beneficiaryId), from: p.data.validFrom, to: p.data.validTo}) : paths.shared.imprestVoucherView({userId: Number(p.data.beneficiaryId), from: p.data.validFrom, to: p.data.validTo}), { state: { proofs: p.data.proofs } })}
@@ -157,16 +152,22 @@ const ImprestVoucherList: React.FC = () => {
         <Card>
             <CardHeader>
                 <div className="flex items-center justify-between">
-                    <CardTitle>{queryUserId ? `Imprest Vouchers - ${userDetails?.name ?? ""}` : "Imprest Vouchers"}</CardTitle>
+                    <CardTitle>{queryUserId ? `${userDetails?.name ?? ""}'s Vouchers` : "Imprest Vouchers"}</CardTitle>
                     <div className="flex items-center gap-3">
-                        <Select value={selectedFY || availableFYs[0] || "all"} onValueChange={setSelectedFY}>
+                        <Input
+                            placeholder="Search vouchers..."
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            className="w-64"
+                        />
+                        <Select value={String(selectValue)} onValueChange={handleFyChange}>
                             <SelectTrigger className="w-[180px]">
                                 <SelectValue placeholder="Filter by Year" />
                             </SelectTrigger>
                             <SelectContent>
-                                {availableFYs.map(fy => (
-                                    <SelectItem key={fy} value={fy}>
-                                        {fy}
+                                {fyOptions.map(fy => (
+                                    <SelectItem key={fy} value={String(fy)}>
+                                        {formatFY(fy)}
                                     </SelectItem>
                                 ))}
                                 <SelectItem value="all">All Years</SelectItem>
@@ -181,7 +182,16 @@ const ImprestVoucherList: React.FC = () => {
             </CardHeader>
 
             <CardContent>
-                <DataTable data={filteredRows} columnDefs={columns} gridOptions={{ pagination: true }} loading={isLoading} />
+                <DataTable
+                    data={rows}
+                    columnDefs={columns}
+                    manualPagination
+                    paginationState={pagination}
+                    onPaginationChange={setPagination}
+                    rowCount={totalRows}
+                    loading={isLoading}
+                    gridOptions={{ headerHeight: 44, suppressCellFocus: true }}
+                />
             </CardContent>
         </Card>
     );

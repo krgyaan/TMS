@@ -46,6 +46,7 @@ export default function AccountsRoutes() {
             <Route path="imprests/user/:id" element={<RouteWrapper><Imprest_Admin_UserView /></RouteWrapper>} />
             <Route path="imprests/payment-history" element={<RouteWrapper><Accounts_Imprests_PaymentHistory /></RouteWrapper>} />
             <Route path="imprests/voucher" element={<RouteWrapper><Accounts_Imprests_Voucher /></RouteWrapper>} />
+            <Route path="imprests/voucher/:userId" element={<RouteWrapper><Accounts_Imprests_Voucher /></RouteWrapper>} />
             <Route path="imprests/voucher/view" element={<RouteWrapper><Accounts_Imprests_VoucherView /></RouteWrapper>} />
             <Route path="imprests/:id/edit" element={<RouteWrapper><Accounts_Imprests_Edit /></RouteWrapper>} />
             <Route path="financial-docs" element={<RouteWrapper><Accounts_FinancialDocs /></RouteWrapper>} />

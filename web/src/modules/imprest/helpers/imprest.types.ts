@@ -49,6 +49,10 @@ export type ImprestVoucherRow = {
     createdAt: string;
 };
 
+export interface ImprestVoucherListResponse extends PaginatedResult<ImprestVoucherRow> {
+    fyOptions: number[];
+}
+
 export type InvoiceProof = {
     id: number;
     file: string;

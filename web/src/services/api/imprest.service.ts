@@ -5,7 +5,7 @@ import type {
     EmployeeImprestTransactionRow,
     ImprestPaymentHistoryRow,
     ImprestRow,
-    ImprestVoucherRow,
+    ImprestVoucherListResponse,
     ImprestVoucherView,
 } from '@/modules/imprest/helpers/imprest.types';
 
@@ -96,13 +96,25 @@ class ImprestService extends BaseApiService {
         return this.get<EmployeeImprestSummary[]>('');
     }
 
-    async getVouchers(params?: { userId?: number }): Promise<ImprestVoucherRow[]> {
+    async getVouchers(params?: { userId?: number; page?: number; limit?: number; search?: string; fy?: number }): Promise<ImprestVoucherListResponse> {
         const search = new URLSearchParams();
         if (params?.userId !== undefined && params?.userId !== null) {
             search.set('userId', String(params.userId));
         }
+        if (params?.page !== undefined) {
+            search.set('page', String(params.page));
+        }
+        if (params?.limit !== undefined) {
+            search.set('limit', String(params.limit));
+        }
+        if (params?.search) {
+            search.set('search', params.search);
+        }
+        if (params?.fy !== undefined) {
+            search.set('fy', String(params.fy));
+        }
         const queryString = search.toString();
-        return this.get<ImprestVoucherRow[]>(queryString ? `/voucher?${queryString}` : '/voucher');
+        return this.get<ImprestVoucherListResponse>(queryString ? `/voucher?${queryString}` : '/voucher');
     }
 
     async getVoucherView(params: { userId: number; from: string; to: string }): Promise<ImprestVoucherView> {

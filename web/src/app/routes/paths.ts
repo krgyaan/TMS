@@ -220,7 +220,7 @@ export const paths = {
         imprestsPaymentHistory: "/accounts/imprests/payment-history",
         imprestsPaymentHistoryByUser: (id: number) => `/accounts/imprests/payment-history?userId=${id}`,
         imprestsVoucher: "/accounts/imprests/voucher",
-        imprestsVoucherByUser: (id: number) => `/accounts/imprests/voucher?userId=${id}`,
+        imprestsVoucherByUser: (id: number) => `/accounts/imprests/voucher/${id}`,
         imprestsVoucherView: (params: { userId: number; from: string; to: string }) =>
             `/accounts/imprests/voucher/view?userId=${params.userId}&from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}`,
         financialDocs: "/accounts/financial-docs",
@@ -407,7 +407,7 @@ export const paths = {
         imprestPaymentHistoryByUser: (id: number) => `/shared/imprests/payment-history?userId=${id}`,
 
         imprestVoucher: "/shared/imprests/voucher",
-        imprestVoucherByUser: (id: number) => `/shared/imprests/voucher?userId=${id}`,
+        imprestVoucherByUser: (id: number) => `/shared/imprests/voucher/${id}`,
 
         imprestVoucherView: (params: { userId: number; from: string; to: string }) =>
             `/shared/imprests/voucher/view?userId=${params.userId}&from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}`,

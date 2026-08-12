@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { imprestService } from "@/services/api";
 import type { CreateImprestCreditPayload, EmployeeImprestSummary } from "@/modules/imprest/helpers/imprest-admin.types";
-import type { EmployeeImprestDashboard, EmployeeImprestTransactionRow, ImprestPaymentHistoryRow, ImprestRow } from "@/modules/imprest/helpers/imprest.types";
+import type { EmployeeImprestDashboard, EmployeeImprestTransactionRow, ImprestPaymentHistoryRow, ImprestRow, ImprestVoucherListResponse } from "@/modules/imprest/helpers/imprest.types";
 
 /* ---------------- QUERY KEYS ---------------- */
 
@@ -188,10 +188,11 @@ export const useUploadImprestProofs = () => {
 
 /* ---------------- VOUCHERS ---------------- */
 
-export const useImprestVoucherList = (userId?: number) => {
-    return useQuery({
-        queryKey: imprestVoucherKeys.list(userId),
-        queryFn: () => imprestService.getVouchers({ userId }),
+export const useImprestVoucherList = (userId?: number, params?: { page?: number; limit?: number; search?: string; fy?: number }) => {
+    return useQuery<ImprestVoucherListResponse>({
+        queryKey: [...imprestVoucherKeys.list(userId), { params }],
+        queryFn: () => imprestService.getVouchers({ userId, ...params }),
+        enabled: userId === undefined || typeof userId === "number",
     });
 };
 
