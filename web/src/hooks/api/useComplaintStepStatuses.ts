@@ -1,6 +1,7 @@
 import { useCustomer } from "@/hooks/api/useCustomer";
 import { useConferenceByComplaint } from "@/hooks/api/useConference";
 import { useServiceVisitByComplaint } from "@/hooks/api/useServiceVisit";
+import { useServiceFeedbackByComplaint } from "@/hooks/api/useServiceFeedback";
 import type { StepStatus } from "@/components/layout/ShowPageLayout";
 
 function deriveStatus(hasData: boolean, isLoading: boolean): StepStatus {
@@ -23,6 +24,7 @@ export function useComplaintStepStatuses(complaintId: number | null) {
     const { data: complaint, isLoading: l1 } = useCustomer(complaintId ?? 0);
     const { data: conference, isLoading: l2 } = useConferenceByComplaint(complaintId ?? 0);
     const { data: visitReport, isLoading: l3 } = useServiceVisitByComplaint(complaintId ?? 0);
+    const { data: feedback, isLoading: l4 } = useServiceFeedbackByComplaint(complaintId ?? 0);
 
     const steps: ComplaintStepStatus[] = [
         {
@@ -52,7 +54,16 @@ export function useComplaintStepStatuses(complaintId: number | null) {
             isLoading: l3,
             status: deriveStatus(!!visitReport, l3),
         },
+        {
+            id: "customer-feedback",
+            label: "Customer Feedback",
+            shortLabel: "Feedback",
+            stepNumber: 4,
+            hasData: !!feedback,
+            isLoading: l4,
+            status: deriveStatus(!!feedback, l4),
+        },
     ];
 
-    return { steps, complaint, conference, visitReport, isLoading: l1 || l2 || l3 };
+    return { steps, complaint, conference, visitReport, feedback, isLoading: l1 || l2 || l3 || l4 };
 }

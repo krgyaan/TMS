@@ -12,10 +12,11 @@ export const customerKeys = {
     detail: (id: number) => [...customerKeys.details(), id] as const,
 };
 
-export const useCustomers = (search?: string) => {
+export const useCustomers = (search?: string, enabled = true) => {
     return useQuery({
         queryKey: customerKeys.list(search),
         queryFn: () => customerService.getAll(search),
+        enabled,
     });
 };
 

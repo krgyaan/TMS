@@ -9,3 +9,4 @@ export * from "./customer-complaints.schema";
 export * from "./service-engineers.schema";
 export * from "./conference-call-reports.schema";
 export * from "./service-reports.schema";
+export * from "./service-customer-feedback.schema";

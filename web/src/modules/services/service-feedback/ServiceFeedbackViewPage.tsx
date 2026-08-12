@@ -1,27 +1,32 @@
 import { useCallback, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { useServiceFeedback } from "@/hooks/api/useServiceFeedback";
 import { useComplaintStepStatuses } from "@/hooks/api/useComplaintStepStatuses";
-import { CustomerView } from "./components/CustomerView";
+import { CustomerView } from "@/modules/services/customer/components/CustomerView";
 import { ConferenceView } from "@/modules/services/conference/components/ConferenceView";
 import { ServiceReportView } from "@/modules/services/visit/components/ServiceReportView";
-import { ServiceFeedbackView } from "@/modules/services/service-feedback/components/ServiceFeedbackView";
+import { ServiceFeedbackView } from "./components/ServiceFeedbackView";
 import { paths } from "@/app/routes/paths";
 
-export default function CustomerViewPage() {
+export default function ServiceFeedbackViewPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const complaintId = Number(id);
+    const feedbackId = Number(id);
 
-    const { steps, complaint, conference, visitReport, feedback } = useComplaintStepStatuses(complaintId);
+    const { data: feedback, isLoading: isFeedbackLoading } = useServiceFeedback(feedbackId);
+    const complaintId = feedback?.complaintId ?? null;
 
-    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["complaint-details"]));
+    const { steps, complaint, conference, visitReport } = useComplaintStepStatuses(complaintId);
 
-    const toggleSection = useCallback((id: string) => {
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["customer-feedback"]));
+
+    const toggleSection = useCallback((sectionId: string) => {
         setExpandedSections(prev => {
             const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
+            if (next.has(sectionId)) next.delete(sectionId);
+            else next.add(sectionId);
             return next;
         });
     }, []);
@@ -44,8 +49,20 @@ export default function CustomerViewPage() {
                     return null;
             }
         },
-        [complaint, conference, visitReport, feedback],
+        [feedback, complaint, conference, visitReport],
     );
+
+    if (isFeedbackLoading) {
+        return (
+            <div className="flex justify-center py-20">
+                <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+        );
+    }
+
+    if (!feedback) {
+        return <p className="text-sm text-muted-foreground">Customer feedback not found.</p>;
+    }
 
     return (
         <ShowPageLayout
@@ -54,8 +71,8 @@ export default function CustomerViewPage() {
             onToggleSection={toggleSection}
             onExpandAll={expandAll}
             onCollapseAll={collapseAll}
-            onBack={() => navigate(paths.services.customer)}
-            backLabel="Back to Complaints"
+            onBack={() => navigate(paths.services.feedback)}
+            backLabel="Back to Customer Feedback"
             renderSectionContent={renderSectionContent}
         />
     );

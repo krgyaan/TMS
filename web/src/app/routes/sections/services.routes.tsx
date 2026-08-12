@@ -15,6 +15,9 @@ const Services_VisitList = lazy(() => import('@/modules/services/visit/ServiceVi
 const Services_VisitCreate = lazy(() => import('@/modules/services/visit/ServiceVisitCreatePage'));
 const Services_VisitView = lazy(() => import('@/modules/services/visit/ServiceVisitViewPage'));
 const Services_VisitShow = lazy(() => import('@/modules/services/visit/ServiceVisitShowPage'));
+const Services_FeedbackList = lazy(() => import('@/modules/services/service-feedback/ServiceFeedbackListPage'));
+const Services_FeedbackView = lazy(() => import('@/modules/services/service-feedback/ServiceFeedbackViewPage'));
+const Services_FeedbackShow = lazy(() => import('@/modules/services/service-feedback/ServiceFeedbackShowPage'));
 const Services_AmcList = lazy(() => import('@/modules/services/amc/AmcListPage'));
 const Services_AmcCreate = lazy(() => import('@/modules/services/amc/AmcCreatePage'));
 const Services_AmcEdit = lazy(() => import('@/modules/services/amc/AmcEditPage'));
@@ -44,6 +47,9 @@ export default function ServicesRoutes() {
             <Route path="visit/create" element={<RouteWrapper><Services_VisitCreate /></RouteWrapper>} />
             <Route path="visit/:id/view" element={<RouteWrapper><Services_VisitView /></RouteWrapper>} />
             <Route path="visit/:id" element={<RouteWrapper><Services_VisitShow /></RouteWrapper>} />
+            <Route path="feedback" element={<RouteWrapper><Services_FeedbackList /></RouteWrapper>} />
+            <Route path="feedback/:id/view" element={<RouteWrapper><Services_FeedbackView /></RouteWrapper>} />
+            <Route path="feedback/:id" element={<RouteWrapper><Services_FeedbackShow /></RouteWrapper>} />
             <Route path="amc" element={<RouteWrapper><Services_AmcList /></RouteWrapper>} />
             <Route path="amc/create" element={<RouteWrapper><Services_AmcCreate /></RouteWrapper>} />
             <Route path="amc/:id/edit" element={<RouteWrapper><Services_AmcEdit /></RouteWrapper>} />

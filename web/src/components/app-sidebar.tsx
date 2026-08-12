@@ -76,6 +76,7 @@ const navMain: NavGroup[] = [
             { title: "Customer", url: paths.services.customer, permission: "services.customers" },
             { title: "Conference", url: paths.services.conference, permission: "services.conferences" },
             { title: "Visit", url: paths.services.visit, permission: "services.visits" },
+            { title: "Feedback", url: paths.services.feedback, permission: "services.feedbacks" },
             { title: "AMC", url: paths.services.amc, permission: "services.amc" },
             { title: "AMC Services", url: paths.services.amcServices, permission: "services.amc" },
             { title: "AMC Billing", url: paths.services.amcBilling, permission: "services.amc" },
