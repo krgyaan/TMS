@@ -1,5 +1,6 @@
 import type { CreateMakerRequestDTO } from "./makerRequest.types";
 import type { MakerRequestFormValues } from "./makerRequest.schema";
+import { buildInsurancePayload } from "@/modules/insurance/helpers/insurance.mapper";
 
 export function mapMakerRequestFormToCreateDTO(
     values: MakerRequestFormValues,
@@ -21,6 +22,11 @@ export function mapMakerRequestFormToCreateDTO(
         dto.ifsc = values.ifsc || undefined;
     } else {
         dto.portalLink = values.portalLink || undefined;
+    }
+
+    const insurancePayload = buildInsurancePayload(values);
+    if (insurancePayload) {
+        dto.insurance = JSON.stringify(insurancePayload);
     }
 
     return dto;

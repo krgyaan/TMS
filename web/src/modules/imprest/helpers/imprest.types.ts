@@ -1,4 +1,5 @@
 import type { PaginatedResult } from "@/types/api.types";
+import type { InsurancePolicyRow } from "@/modules/insurance/helpers/insurance.types";
 
 export interface ImprestProof {
     url: string;
@@ -29,6 +30,8 @@ export interface ImprestRow {
     status: number;
     accRemark: string | null;
     invoiceProof: ImprestProof[];
+    insurancePolicyId: number | null;
+    insurancePolicy?: InsurancePolicyRow | null;
 }
 
 export type ImprestVoucherRow = {
