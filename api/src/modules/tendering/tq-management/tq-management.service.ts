@@ -416,7 +416,6 @@ export class TqManagementService {
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            eq(bidSubmissions.status, 'Bid Submitted'),
             ...roleFilterConditions,
         ];
 
@@ -432,7 +431,6 @@ export class TqManagementService {
                 bidSubmissions,
                 and(
                     eq(bidSubmissions.tenderId, tenderInfos.id),
-                    eq(bidSubmissions.status, 'Bid Submitted')
                 )
             )
             .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
