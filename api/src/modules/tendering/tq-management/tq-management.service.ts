@@ -139,7 +139,6 @@ export class TqManagementService {
         const conditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            eq(bidSubmissions.status, 'Bid Submitted'),
         ];
 
         // Apply role-based filtering
@@ -170,12 +169,12 @@ export class TqManagementService {
 
         // Tab-specific conditions (simple & readable)
         if (activeTab === 'awaited') {
-            conditions.push(
-                or(
-                    isNull(tenderResults.id),
-                    eq(tenderResults.tqStatus, 'pending') as any
-                ) as any
-            );
+            // conditions.push(
+            //     or(
+            //         isNull(tenderResults.id),
+            //         eq(tenderResults.tqStatus, 'pending') as any
+            //     ) as any
+            // );
             conditions.push(isNull(latestTq.id) as any);
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'received') {
@@ -194,15 +193,15 @@ export class TqManagementService {
                     'TQ replied, Qualified',
                     'TQ Replied, Qualified'
                 ]) as any,
-                and (
-                    isNotNull(tenderResults.id),
-                    inArray(tenderResults.tqStatus, 
-                        ['Qualified, No TQ received',
-                        'Qualified, TQ replied',
-                        'Qualified, TQ Replied',
-                        'TQ replied, Qualified',
-                        'TQ Replied, Qualified'])
-                    ) as any,
+                // and (
+                //     isNotNull(tenderResults.id),
+                //     inArray(tenderResults.tqStatus, 
+                //         ['Qualified, No TQ received',
+                //         'Qualified, TQ replied',
+                //         'Qualified, TQ Replied',
+                //         'TQ replied, Qualified',
+                //         'TQ Replied, Qualified'])
+                //     ) as any,
                 ) as any
             );
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
@@ -214,13 +213,13 @@ export class TqManagementService {
                     'Disqualified, TQ missed',
                     'Disqualified, TQ Missed',
                 ]) as any,
-                and (
-                    isNotNull(tenderResults.id),
-                    inArray(tenderResults.tqStatus, 
-                        ['Disqualified, No TQ received',
-                        'Disqualified, TQ missed',
-                        'Disqualified, TQ Missed'])
-                    ) as any,
+                // and (
+                //     isNotNull(tenderResults.id),
+                //     inArray(tenderResults.tqStatus, 
+                //         ['Disqualified, No TQ received',
+                //         'Disqualified, TQ missed',
+                //         'Disqualified, TQ Missed'])
+                //     ) as any,
                 ) as any
             );
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
@@ -286,7 +285,6 @@ export class TqManagementService {
                 bidSubmissions,
                 and(
                     eq(bidSubmissions.tenderId, tenderInfos.id),
-                    eq(bidSubmissions.status, 'Bid Submitted')
                 )
             )
             .where(whereClause);
@@ -327,12 +325,7 @@ export class TqManagementService {
             .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
-            .innerJoin(
-                bidSubmissions,
-                and(
-                    eq(bidSubmissions.tenderId, tenderInfos.id),
-                    eq(bidSubmissions.status, 'Bid Submitted')
-                )
+            .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id)
             )
             .where(whereClause)
             .limit(limit)
@@ -419,7 +412,6 @@ export class TqManagementService {
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            eq(bidSubmissions.status, 'Bid Submitted'),
             ...roleFilterConditions,
         ];
 
@@ -435,7 +427,6 @@ export class TqManagementService {
                 bidSubmissions,
                 and(
                     eq(bidSubmissions.tenderId, tenderInfos.id),
-                    eq(bidSubmissions.status, 'Bid Submitted')
                 )
             )
             .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
