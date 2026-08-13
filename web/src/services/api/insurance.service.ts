@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service';
-import type { InsuranceListResponse, InsuranceCreatePayload, InsurancePolicyRow } from '@/modules/insurance/helpers/insurance.types';
+import type { InsuranceCreatePayload, InsurancePolicyDetail, InsurancePolicyRow } from '@/modules/insurance/helpers/insurance.types';
 import type { PaginatedResult } from '@/types/api.types';
 
 class InsuranceApiService extends BaseApiService {
@@ -21,8 +21,8 @@ class InsuranceApiService extends BaseApiService {
         return this.get<PaginatedResult<InsurancePolicyRow>>(queryString ? `?${queryString}` : '');
     }
 
-    async getById(id: number): Promise<InsuranceListResponse | InsurancePolicyRow> {
-        return this.get<InsuranceListResponse | InsurancePolicyRow>(`/${id}`);
+    async getById(id: number): Promise<InsurancePolicyDetail> {
+        return this.get<InsurancePolicyDetail>(`/${id}`);
     }
 
     async create(data: InsuranceCreatePayload): Promise<InsurancePolicyRow> {

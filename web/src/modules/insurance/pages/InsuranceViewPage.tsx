@@ -8,6 +8,7 @@ import { useInsurancePolicy } from "@/hooks/api/useInsurancePolicies";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { tenderFilesService } from "@/services/api/tender-files.service";
+import { paths } from "@/app/routes/paths";
 import { AlertCircle, ArrowLeft, Download } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -16,6 +17,18 @@ const STATUS_BADGE_VARIANT: Record<string, 'default' | 'secondary' | 'destructiv
     'Expiring Soon': 'secondary',
     Expired: 'destructive',
 };
+
+const SectionTitle = ({ children }: { children: React.ReactNode }) => (
+    <h3 className="mt-6 mb-2 text-lg font-semibold text-muted-foreground">{children}</h3>
+);
+
+const DetailRow = ({ label, value }: { label: string; value?: React.ReactNode }) => (
+    <TableRow className="hover:bg-muted/30 transition-colors">
+        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">{label}</TableCell>
+        <TableCell className="w-1/4">{value ?? '—'}</TableCell>
+        <TableCell className="w-1/2" />
+    </TableRow>
+);
 
 const FileList = ({ files }: { files?: string[] | null }) => {
     if (!files || files.length === 0) return null;
@@ -213,6 +226,80 @@ const InsuranceViewPage = () => {
                         </TableRow>
                     </TableBody>
                 </Table>
+
+                {policy.linkedImprest && (
+                    <>
+                        <SectionTitle>Linked Imprest Details</SectionTitle>
+                        <Table>
+                            <TableBody className="border rounded-2xl">
+                                <DetailRow
+                                    label="Imprest ID"
+                                    value={
+                                        <a
+                                            className="text-blue-600 hover:underline"
+                                            href={paths.accounts.imprestsEdit(policy.linkedImprest.imprestId)}
+                                        >
+                                            Imprest #{policy.linkedImprest.imprestId}
+                                        </a>
+                                    }
+                                />
+                                <DetailRow label="Employee Name" value={policy.linkedImprest.userName} />
+                                <DetailRow label="Category" value={policy.linkedImprest.categoryName} />
+                                <DetailRow label="Project Name" value={policy.linkedImprest.projectName} />
+                                <DetailRow
+                                    label="Amount"
+                                    value={policy.linkedImprest.amount != null ? formatINR(String(policy.linkedImprest.amount)) : undefined}
+                                />
+                                <DetailRow
+                                    label="Date of Expense"
+                                    value={policy.linkedImprest.dateOfExpense ? formatDate(policy.linkedImprest.dateOfExpense) : undefined}
+                                />
+                                <DetailRow
+                                    label="Approval Status"
+                                    value={
+                                        policy.linkedImprest.approvalStatus != null ? (
+                                            <Badge variant={policy.linkedImprest.approvalStatus === 1 ? "default" : "secondary"}>
+                                                {policy.linkedImprest.approvalStatus === 1 ? "Approved" : "Approval Pending"}
+                                            </Badge>
+                                        ) : undefined
+                                    }
+                                />
+                            </TableBody>
+                        </Table>
+                    </>
+                )}
+
+                {policy.linkedMakerRequest && (
+                    <>
+                        <SectionTitle>Linked Maker Request Details</SectionTitle>
+                        <Table>
+                            <TableBody className="border rounded-2xl">
+                                <DetailRow label="Request No" value={policy.linkedMakerRequest.requestNo} />
+                                <DetailRow label="Party Name" value={policy.linkedMakerRequest.partyName} />
+                                <DetailRow
+                                    label="Amount"
+                                    value={policy.linkedMakerRequest.amount != null ? formatINR(policy.linkedMakerRequest.amount) : undefined}
+                                />
+                                <DetailRow label="Payment Mode" value={policy.linkedMakerRequest.paymentMode} />
+                                <DetailRow
+                                    label="Status"
+                                    value={
+                                        policy.linkedMakerRequest.status ? (
+                                            <Badge variant="outline" className="capitalize">
+                                                {policy.linkedMakerRequest.status}
+                                            </Badge>
+                                        ) : undefined
+                                    }
+                                />
+                                <DetailRow label="Requested By" value={policy.linkedMakerRequest.requestedByName} />
+                                <DetailRow
+                                    label="Created At"
+                                    value={policy.linkedMakerRequest.createdAt ? formatDate(policy.linkedMakerRequest.createdAt) : undefined}
+                                />
+                            </TableBody>
+                        </Table>
+                    </>
+                )}
             </CardContent>
         </Card>
     );

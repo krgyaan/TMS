@@ -67,3 +67,31 @@ export interface InsuranceListResponse {
     data: InsurancePolicyRow[];
     meta: { total: number; page: number; limit: number; totalPages: number };
 }
+
+export interface LinkedImprestDetails {
+    imprestId: number;
+    userId: number | null;
+    userName: string | null;
+    categoryName: string | null;
+    projectName: string | null;
+    amount: number | null;
+    dateOfExpense: string | null;
+    approvalStatus: number | null;
+}
+
+export interface LinkedMakerRequestDetails {
+    makerRequestId: number;
+    requestNo: string | null;
+    partyName: string | null;
+    amount: string | null;
+    paymentMode: string | null;
+    status: string | null;
+    requestedBy: number | null;
+    requestedByName: string | null;
+    createdAt: string | null;
+}
+
+export interface InsurancePolicyDetail extends InsurancePolicyRow {
+    linkedImprest: LinkedImprestDetails | null;
+    linkedMakerRequest: LinkedMakerRequestDetails | null;
+}

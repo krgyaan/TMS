@@ -1,8 +1,10 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { insurancePolicies } from "@/db/schemas/accounts/insurance-policy.schema";
+import { imprestCategories } from "@/db/schemas/accounts/imprest-categories.schema";
 import { employeeImprests } from "@db/schemas/shared";
 import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
 import { users } from "@/db/schemas";
@@ -32,12 +34,43 @@ export interface InsuranceListRow {
     daysRemaining: number;
 }
 
+export interface LinkedImprestDetails {
+    imprestId: number;
+    userId: number | null;
+    userName: string | null;
+    categoryName: string | null;
+    projectName: string | null;
+    amount: number | null;
+    dateOfExpense: Date | null;
+    approvalStatus: number | null;
+}
+
+export interface LinkedMakerRequestDetails {
+    makerRequestId: number;
+    requestNo: string | null;
+    partyName: string | null;
+    amount: string | null;
+    paymentMode: string | null;
+    status: string | null;
+    requestedBy: number | null;
+    requestedByName: string | null;
+    createdAt: Date | null;
+}
+
+export interface InsuranceDetailRow extends InsuranceListRow {
+    linkedImprest: LinkedImprestDetails | null;
+    linkedMakerRequest: LinkedMakerRequestDetails | null;
+}
+
 @Injectable()
 export class InsurancePolicyService {
     constructor(
         @Inject(DRIZZLE)
         private readonly db: DbInstance
     ) {}
+
+    private readonly imprestUser = alias(users, "imprest_user");
+    private readonly makerRequestUser = alias(users, "maker_request_user");
 
     /* ------------------------- STATUS HELPERS ------------------------- */
 
@@ -253,11 +286,27 @@ export class InsurancePolicyService {
                 createdByName: users.name,
                 createdAt: insurancePolicies.createdAt,
                 updatedAt: insurancePolicies.updatedAt,
+                imprestUserId: employeeImprests.userId,
+                imprestUserName: this.imprestUser.name,
+                categoryName: imprestCategories.name,
+                imprestAmount: employeeImprests.amount,
+                imprestDateOfExpense: employeeImprests.dateOfExpense,
+                imprestApprovalStatus: employeeImprests.approvalStatus,
+                mrPartyName: paymentRequests.partyName,
+                mrAmount: paymentRequests.amount,
+                mrPaymentMode: paymentRequests.paymentMode,
+                mrStatus: paymentRequests.status,
+                mrRequestedBy: paymentRequests.requestedBy,
+                mrRequestedByName: this.makerRequestUser.name,
+                mrCreatedAt: paymentRequests.createdAt,
             })
             .from(insurancePolicies)
             .leftJoin(employeeImprests, eq(employeeImprests.id, insurancePolicies.imprestId))
             .leftJoin(paymentRequests, eq(paymentRequests.id, insurancePolicies.makerRequestId))
             .leftJoin(users, eq(users.id, insurancePolicies.createdBy))
+            .leftJoin(this.imprestUser, eq(this.imprestUser.id, employeeImprests.userId))
+            .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
+            .leftJoin(this.makerRequestUser, eq(this.makerRequestUser.id, paymentRequests.requestedBy))
             .where(eq(insurancePolicies.id, id))
             .limit(1);
 
@@ -267,13 +316,39 @@ export class InsurancePolicyService {
         }
 
         const now = new Date();
-        return {
+        const detail: InsuranceDetailRow = {
             ...row,
             projectName: row.imprestId ? row.projectName : null,
             linkedRequest: row.makerRequestId ? row.linkedRequest : row.imprestId ? `Imprest #${row.imprestId}` : null,
             status: this.getStatus(row.endDate, now),
             daysRemaining: this.getDaysRemaining(row.endDate, now),
+            linkedImprest: row.imprestId
+                ? {
+                      imprestId: row.imprestId,
+                      userId: row.imprestUserId,
+                      userName: row.imprestUserName,
+                      categoryName: row.categoryName,
+                      projectName: row.projectName,
+                      amount: row.imprestAmount,
+                      dateOfExpense: row.imprestDateOfExpense,
+                      approvalStatus: row.imprestApprovalStatus,
+                  }
+                : null,
+            linkedMakerRequest: row.makerRequestId
+                ? {
+                      makerRequestId: row.makerRequestId,
+                      requestNo: row.linkedRequest,
+                      partyName: row.mrPartyName,
+                      amount: row.mrAmount,
+                      paymentMode: row.mrPaymentMode,
+                      status: row.mrStatus,
+                      requestedBy: row.mrRequestedBy,
+                      requestedByName: row.mrRequestedByName,
+                      createdAt: row.mrCreatedAt,
+                  }
+                : null,
         };
+        return detail;
     }
 
     /* ----------------------------- DELETE ----------------------------- */

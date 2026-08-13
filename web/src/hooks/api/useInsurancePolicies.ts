@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { insuranceService } from '@/services/api/insurance.service';
-import type { InsuranceCreatePayload, InsurancePolicyRow } from '@/modules/insurance/helpers/insurance.types';
+import type { InsuranceCreatePayload, InsurancePolicyDetail, InsurancePolicyRow } from '@/modules/insurance/helpers/insurance.types';
 import type { PaginatedResult } from '@/types/api.types';
 import { toast } from 'sonner';
 import { handleQueryError } from '@/lib/react-query';
@@ -33,13 +33,9 @@ export const useInsurancePolicies = (
 };
 
 export const useInsurancePolicy = (id: number) => {
-    return useQuery<InsurancePolicyRow | null>({
+    return useQuery<InsurancePolicyDetail>({
         queryKey: insurancePolicyKeys.detail(id),
-        queryFn: async () => {
-            const res = await insuranceService.getById(id);
-            if (res && 'data' in res) return res.data as unknown as InsurancePolicyRow;
-            return res as InsurancePolicyRow;
-        },
+        queryFn: () => insuranceService.getById(id),
         enabled: !!id,
     });
 };
