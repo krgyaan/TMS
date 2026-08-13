@@ -48,4 +48,8 @@ export { leadEnquiryService } from './lead-enquiry.service';
 export { amcService } from './amc.service';
 export { amcBillingService } from './amc-billing.service';
 export { amcServicesService } from './amc-services.service';
+export { customerService } from './customer.service';
+export { conferenceService } from './conference.service';
+export { serviceVisitService } from './service-visit.service';
+export { serviceFeedbackService } from './service-feedback.service';
 

@@ -81,7 +81,8 @@ export type TenderFileContext =
     | 'amc-service-report'
     | 'amc-invoices'
     | 'amc-receipts'
-    | 'amc-service-reports';
+    | 'amc-service-reports'
+    | 'customer-attachments';
 
 export interface FileConfig {
     context: string;
