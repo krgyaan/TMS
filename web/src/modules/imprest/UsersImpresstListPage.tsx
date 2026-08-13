@@ -15,6 +15,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PayImprestDialog } from "./components/PayImprestDialog";
 import type { EmployeeImprestSummary } from "./helpers/imprest-admin.types";
+import { currencyCol } from "@/components/data-grid";
 
 const ImprestAdminIndex: React.FC = () => {
     const [gridApi, setGridApi] = useState<GridApi | null>(null);
@@ -162,12 +163,14 @@ const ImprestAdminIndex: React.FC = () => {
                     );
                 },
             },
-            {
-                field: "amountReceived",
+            currencyCol('amountReceived', {
+                colId: "amountReceived",
                 headerName: "Amount Received",
                 cellClass: "text-xs",
+                filter: true,
+                sortable: true,
                 cellRenderer: ({ data }: { data: EmployeeImprestSummary }) => {
-                    const amount = data.current.amountReceived;
+                    const amount = data.amountReceived;
                     return (
                         <span
                             className={`text-xs ${
@@ -178,13 +181,15 @@ const ImprestAdminIndex: React.FC = () => {
                         </span>
                     );
                 },
-            },
-            {
-                field: "amountSpent",
+            }),
+            currencyCol('amountSpent', {
+                colId: "amountSpent",
                 headerName: "Amount Spent",
                 cellClass: "text-xs",
+                filter: true,
+                sortable: true,
                 cellRenderer: ({ data }: { data: EmployeeImprestSummary }) => {
-                    const amount = data.current.amountSpent;
+                    const amount = data.amountSpent;
                     return (
                         <span
                             className={`text-xs ${
@@ -195,30 +200,15 @@ const ImprestAdminIndex: React.FC = () => {
                         </span>
                     );
                 },
-            },
-            {
-                field: "amountApproved",
-                cellClass: "text-xs",
+            }),
+            currencyCol('amountApproved', {
+                colId: "amountApproved",
                 headerName: "Amount Approved",
-                cellRenderer: ({ data }: { data: EmployeeImprestSummary }) => {
-                    const amount = data.current.amountApproved;
-                    return (
-                        <span
-                            className={`text-xs ${
-                                amount > 0 ? "text-emerald-500" : amount < 0 ? "text-red-500" : amount === 0 ? "text-gray-500" : ""
-                            }`}
-                        >
-                            {formatINR(amount)}
-                        </span>
-                    );
-                },
-            },
-            {
-                field: "amountLeft",
                 cellClass: "text-xs",
-                headerName: "Amount Left",
+                filter: true,
+                sortable: true,
                 cellRenderer: ({ data }: { data: EmployeeImprestSummary }) => {
-                    const amount = data.current.amountLeft;
+                    const amount = data.amountApproved;
                     return (
                         <span
                             className={`text-xs ${
@@ -229,7 +219,26 @@ const ImprestAdminIndex: React.FC = () => {
                         </span>
                     );
                 },
-            },
+            }),
+            currencyCol('amountLeft', {
+                colId: "amountLeft",
+                headerName: "Amount Left",
+                cellClass: "text-xs",
+                filter: true,
+                sortable: true,
+                cellRenderer: ({ data }: { data: EmployeeImprestSummary }) => {
+                    const amount = data.amountLeft;
+                    return (
+                        <span
+                            className={`text-xs ${
+                                amount > 0 ? "text-emerald-500" : amount < 0 ? "text-red-500" : amount === 0 ? "text-gray-500" : ""
+                            }`}
+                        >
+                            {formatINR(amount)}
+                        </span>
+                    );
+                },
+            }),
             {
                 headerName: "Total Vouchers",
                 field: "voucherInfo.totalVouchers",
