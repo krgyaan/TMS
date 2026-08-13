@@ -10,9 +10,12 @@ import { imprestCategories, users } from "@/db/schemas";
 import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-voucher";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import { PermissionService } from "@/modules/auth/services/permission.service";
+import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
+import { insurancePayloadSchema, type InsurancePayload } from "@/modules/insurance/zod/insurance-policy.schema";
 import type { CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
 import type { UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
 const TRANSFER_CATEGORY_ID = 22;
+const INSURANCE_CATEGORY_ID = 8;
 const WEEK_LOCK_EXEMPT_PERMISSION = { module: "shared.imprests", action: "week-lock-exempt" } as const;
 
 export type ImprestActorUser = {
@@ -33,7 +36,9 @@ export class EmployeeImprestService {
         @Inject(WINSTON_MODULE_PROVIDER)
         private readonly logger: Logger,
 
-        private readonly permissionService: PermissionService
+        private readonly permissionService: PermissionService,
+
+        private readonly insurancePolicyService: InsurancePolicyService
     ) {}
 
     /* ----------------------- WEEK LOCK GUARD ------------------------ */
@@ -125,7 +130,6 @@ export class EmployeeImprestService {
 
             // Both inserts wrapped in a transaction — if one fails, both roll back
             return await this.db.transaction(async tx => {
-
                 // Record 1: Imprest expense for the sender
                 const [imprest] = await tx
                     .insert(employeeImprests)
@@ -138,7 +142,7 @@ export class EmployeeImprestService {
                         amount: data.amount,
                         remark: data.remark,
                         invoiceProof: files.map(f => f.filename),
-                        dateOfExpense: data.dateOfExpense
+                        dateOfExpense: data.dateOfExpense,
                     })
                     .returning();
 
@@ -159,21 +163,45 @@ export class EmployeeImprestService {
         }
 
         // Normal flow — any other category
-        const [imprest] = await this.db
-            .insert(employeeImprests)
-            .values({
-                userId: data.userId,
-                categoryId: data.categoryId,
-                partyName: data.partyName,
-                projectName: data.projectName,
-                amount: data.amount,
-                remark: data.remark,
-                invoiceProof: files.map(f => f.filename),
-                dateOfExpense: data.dateOfExpense
-            })
-            .returning();
+        const imprest = await this.db.transaction(async tx => {
+            const [created] = await tx
+                .insert(employeeImprests)
+                .values({
+                    userId: data.userId,
+                    categoryId: data.categoryId,
+                    partyName: data.partyName,
+                    projectName: data.projectName,
+                    amount: data.amount,
+                    remark: data.remark,
+                    invoiceProof: files.map(f => f.filename),
+                    dateOfExpense: data.dateOfExpense,
+                })
+                .returning();
+
+            const insurance = this.parseInsurancePayload(data.insurance);
+
+            if (insurance) {
+                await this.insurancePolicyService.createFromImprest(tx, insurance, created.id, actorUser?.sub ?? data.userId ?? 0);
+            }
+
+            return created;
+        });
 
         return imprest;
+    }
+
+    private parseInsurancePayload(raw?: string | null): InsurancePayload | null {
+        if (!raw || raw.trim() === "") {
+            return null;
+        }
+
+        const parsed = insurancePayloadSchema.safeParse(raw);
+
+        if (!parsed.success) {
+            throw new BadRequestException(parsed.error.flatten());
+        }
+
+        return parsed.data;
     }
 
     /* ----------------------------- READ ------------------------------ */
@@ -229,11 +257,7 @@ export class EmployeeImprestService {
             // 2️⃣ Detailed Lists
             // ==============================
             const searchCondition = search
-                ? or(
-                      ilike(employeeImprests.partyName, `%${search}%`),
-                      ilike(employeeImprests.projectName, `%${search}%`),
-                      ilike(employeeImprests.remark, `%${search}%`)
-                  )
+                ? or(ilike(employeeImprests.partyName, `%${search}%`), ilike(employeeImprests.projectName, `%${search}%`), ilike(employeeImprests.remark, `%${search}%`))
                 : undefined;
 
             const [countRow] = await this.db
@@ -258,12 +282,13 @@ export class EmployeeImprestService {
 
                     invoiceProof: employeeImprests.invoiceProof,
                     approvalStatus: employeeImprests.approvalStatus,
-                    accRemark : employeeImprests.accRemark,
+                    accRemark: employeeImprests.accRemark,
                     tallyStatus: employeeImprests.tallyStatus,
                     proofStatus: employeeImprests.proofStatus,
 
                     dateOfExpense: employeeImprests.dateOfExpense,
                     createdAt: employeeImprests.createdAt,
+                    insurancePolicyId: employeeImprests.insurancePolicyId,
                 })
                 .from(employeeImprests)
                 .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
@@ -324,9 +349,12 @@ export class EmployeeImprestService {
     }
 
     async findOne(id: number) {
-        const result = await this.db.select().from(employeeImprests).where(eq(employeeImprests.id, id)).limit(1);
+        const result = await this.db.query.employeeImprests.findFirst({
+            where: eq(employeeImprests.id, id),
+            with: { insurancePolicy: true },
+        });
 
-        return result[0] ?? null;
+        return result ?? null;
     }
 
     /* ----------------------------- UPDATE ----------------------------- */
@@ -347,7 +375,6 @@ export class EmployeeImprestService {
         const newIsTransfer = Number(data.categoryId ?? existing.categoryId) === TRANSFER_CATEGORY_ID;
 
         return await this.db.transaction(async tx => {
-
             // =========================
             // 1️⃣ CHECK LINKED TRANSACTION
             // =========================
@@ -358,9 +385,7 @@ export class EmployeeImprestService {
             const hasLinkedTxn = !!existingTxn;
 
             if (oldIsTransfer && !hasLinkedTxn) {
-                throw new BadRequestException(
-                    "This transfer cannot be edited because it was created before system upgrade. Please delete and recreate it."
-                );
+                throw new BadRequestException("This transfer cannot be edited because it was created before system upgrade. Please delete and recreate it.");
             }
 
             // =========================
@@ -371,24 +396,17 @@ export class EmployeeImprestService {
 
             const shouldDeleteOld =
                 oldIsTransfer &&
-                (
-                    !newIsTransfer ||      // transfer → non-transfer
-                    isReceiverChanged      // receiver changed
-                );
+                (!newIsTransfer || // transfer → non-transfer
+                    isReceiverChanged); // receiver changed
 
             // =========================
             // 3️⃣ DELETE OLD TRANSFER (if needed)
             // =========================
             if (shouldDeleteOld) {
-                const deleted = await tx
-                    .delete(employeeImprestTransactions)
-                    .where(eq(employeeImprestTransactions.imprestId, id))
-                    .returning();
+                const deleted = await tx.delete(employeeImprestTransactions).where(eq(employeeImprestTransactions.imprestId, id)).returning();
 
                 if (deleted.length === 0) {
-                    throw new BadRequestException(
-                        "Unable to update transfer: linked transaction not found."
-                    );
+                    throw new BadRequestException("Unable to update transfer: linked transaction not found.");
                 }
             }
 
@@ -419,11 +437,7 @@ export class EmployeeImprestService {
             if (data.approvedDate !== undefined) updateData.approvedDate = data.approvedDate;
             if (data.dateOfExpense !== undefined) updateData.dateOfExpense = data.dateOfExpense;
 
-            const [updated] = await tx
-                .update(employeeImprests)
-                .set(updateData)
-                .where(eq(employeeImprests.id, id))
-                .returning();
+            const [updated] = await tx.update(employeeImprests).set(updateData).where(eq(employeeImprests.id, id)).returning();
 
             // =========================
             // 5️⃣ HANDLE TRANSFER LOGIC
@@ -432,26 +446,18 @@ export class EmployeeImprestService {
             // ➕ CREATE (non-transfer → transfer)
             if (!oldIsTransfer && newIsTransfer) {
                 const receiverId = data.teamId;
-                
-                if(!updated.userId){
+
+                if (!updated.userId) {
                     throw new BadRequestException("User ID missing for transfer");
                 }
-                
+
                 if (!receiverId) {
                     throw new BadRequestException("Transfer requires a team member");
                 }
 
-                const [sender] = await tx
-                    .select({ name: users.name })
-                    .from(users)
-                    .where(eq(users.id, updated.userId))
-                    .limit(1);
+                const [sender] = await tx.select({ name: users.name }).from(users).where(eq(users.id, updated.userId)).limit(1);
 
-                const [receiver] = await tx
-                    .select({ name: users.name })
-                    .from(users)
-                    .where(eq(users.id, receiverId))
-                    .limit(1);
+                const [receiver] = await tx.select({ name: users.name }).from(users).where(eq(users.id, receiverId)).limit(1);
 
                 await tx.insert(employeeImprestTransactions).values({
                     imprestId: updated.id,
@@ -481,21 +487,13 @@ export class EmployeeImprestService {
                 const receiverId = data.teamId!;
                 const amount = data.amount ?? existing.amount;
 
-                if(!updated.userId){
-                    throw new BadRequestException("User ID not found for the imprest.")
+                if (!updated.userId) {
+                    throw new BadRequestException("User ID not found for the imprest.");
                 }
 
-                const [sender] = await tx
-                    .select({ name: users.name })
-                    .from(users)
-                    .where(eq(users.id, updated.userId))
-                    .limit(1);
+                const [sender] = await tx.select({ name: users.name }).from(users).where(eq(users.id, updated.userId)).limit(1);
 
-                const [receiver] = await tx
-                    .select({ name: users.name })
-                    .from(users)
-                    .where(eq(users.id, receiverId))
-                    .limit(1);
+                const [receiver] = await tx.select({ name: users.name }).from(users).where(eq(users.id, receiverId)).limit(1);
 
                 await tx.insert(employeeImprestTransactions).values({
                     imprestId: updated.id,
@@ -511,23 +509,30 @@ export class EmployeeImprestService {
 
             // (transfer → non-transfer already handled by delete)
 
+            // =========================
+            // 6️⃣ HANDLE INSURANCE POLICY
+            // =========================
+            const insurance = this.parseInsurancePayload(data.insurance);
+            const newCategoryIsInsurance = Number(data.categoryId ?? existing.categoryId) === INSURANCE_CATEGORY_ID;
+
+            if (newCategoryIsInsurance && insurance) {
+                await this.insurancePolicyService.upsertForImprest(tx, updated.id, insurance, actorUser?.sub ?? data.userId ?? 0);
+            } else if (!newCategoryIsInsurance && existing.insurancePolicyId) {
+                await this.insurancePolicyService.unlinkFromImprest(tx, updated.id);
+            }
+
             return updated;
         });
     }
 
     private async deleteExistingTransfer(tx: any, existing: any) {
-        const deleted = await tx
-            .delete(employeeImprestTransactions)
-            .where(eq(employeeImprestTransactions.imprestId, existing.id))
-            .returning();
+        const deleted = await tx.delete(employeeImprestTransactions).where(eq(employeeImprestTransactions.imprestId, existing.id)).returning();
 
         if (deleted.length === 0) {
-            throw new BadRequestException(
-                "Unable to delete transfer: linked transaction not found. This record may be legacy or inconsistent."
-            );
+            throw new BadRequestException("Unable to delete transfer: linked transaction not found. This record may be legacy or inconsistent.");
         }
     }
-    
+
     /* ------------------------- UPLOAD DOCUMENTS ------------------------ */
     async uploadDocs(id: number, files: Express.Multer.File[], userId: number) {
         const existing = await this.findOne(id);
@@ -639,15 +644,20 @@ export class EmployeeImprestService {
             throw new NotFoundException("Employee imprest not found");
         }
 
-        await this.db.delete(employeeImprests).where(eq(employeeImprests.id, id));
+        await this.db.transaction(async tx => {
+            if (existing.insurancePolicyId) {
+                await this.insurancePolicyService.removeByImprestId(tx, id);
+            }
+
+            await tx.delete(employeeImprests).where(eq(employeeImprests.id, id));
+        });
 
         return { success: true };
     }
 
-
     async deleteProof(id: number, filename: string, userId: number) {
         const existing = await this.findOne(id);
-        
+
         if (!existing) {
             throw new NotFoundException("Employee imprest not found");
         }
@@ -674,13 +684,12 @@ export class EmployeeImprestService {
         return updated;
     }
 
-    async addAccountRemark(id, remark){
-        const imprest = await this.db.query.employeeImprests.findFirst(
-            {
-                where: eq(employeeImprests.id , id),
-            });
+    async addAccountRemark(id, remark) {
+        const imprest = await this.db.query.employeeImprests.findFirst({
+            where: eq(employeeImprests.id, id),
+        });
 
-        if(!imprest){
+        if (!imprest) {
             throw new BadRequestException(`Imprest #${id} not Found `);
         }
 
@@ -712,8 +721,5 @@ export class EmployeeImprestService {
 
             throw new InternalServerErrorException("Failed to add remark");
         }
-
     }
-
-    
 }

@@ -7,7 +7,6 @@ export const CreateEmployeeImprestSchema = z.object({
     partyName: z.string().max(255).optional().nullable(),
     projectName: z.string().max(255).optional().nullable(),
     amount: z.coerce.number().int().min(1),
-    strtotime: z.coerce.number().int().optional().nullable(),
     remark: z.string().optional().nullable(),
     invoiceProof: z.array(z.unknown()).optional(),
     approvalStatus: z.coerce.number().int().optional(),
@@ -17,6 +16,7 @@ export const CreateEmployeeImprestSchema = z.object({
     dateOfExpense: z.coerce.date(),
     approvedDate: z.coerce.date().optional().nullable(),
     transferToId: z.coerce.number().int().optional(),
+    insurance: z.string().optional().nullable(),
 });
 
 export type CreateEmployeeImprestDto = z.infer<typeof CreateEmployeeImprestSchema>;
