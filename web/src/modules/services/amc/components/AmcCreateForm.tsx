@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type Resolver } from "react-hook-form";
 import {
     Plus, Save, Upload, Loader2,
-    MapPin, Package, Wrench, FileText, BadgeDollarSign,
+    MapPin, Package, Wrench, FileText, BadgeDollarSign, Trash2,
 } from "lucide-react";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
@@ -555,11 +555,13 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                     ? values.billValue
                     : undefined,
             variableBills:
-                values.billType === "variable"
-                    ? variableBills
+                values.billType === "constant"
+                    ? constantBillDates
+                          .filter(date => date && values.billValue?.trim())
+                          .map(date => ({ date, amount: Number(values.billValue) }))
+                    : variableBills
                           .filter(b => b.date || b.amount)
-                          .map(b => ({ date: b.date, amount: b.amount ? Number(b.amount) : undefined }))
-                    : undefined,
+                          .map(b => ({ date: b.date, amount: b.amount ? Number(b.amount) : undefined })),
             serviceReportPath: buildServiceReportPath(
                 amc?.serviceReportPath,
                 reportFormatPaths[0],
@@ -751,11 +753,11 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                             )}
                         </div>
 
-                        {/* Constant bills preview (read-only amounts from Bill Value) */}
+                        {/* Constant bill schedule (read-only summary) */}
                         {billType === "constant" && constantBillDates.length > 0 && (
                             <div className="mt-5 space-y-3">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    Bill Schedule Preview (per bill due date)
+                                    Constant Bill Schedule (per bill due date)
                                 </p>
                                 <Table>
                                     <TableHeader>
@@ -776,7 +778,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                             </div>
                         )}
 
-                        {/* Variable bills */}
+                        {/* Variable bills (editable) */}
                         {billType === "variable" && (
                             <div className="mt-5 space-y-3">
                                 <div className="flex items-center justify-between">
@@ -848,15 +850,16 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                                                         <Button
                                                             type="button"
                                                             variant="ghost"
-                                                            size="sm"
-                                                            className="text-xs text-destructive hover:text-destructive"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-destructive hover:text-destructive"
+                                                            title="Remove"
                                                             onClick={() =>
                                                                 setVariableBills(vb =>
                                                                     vb.filter((_, i) => i !== idx),
                                                                 )
                                                             }
                                                         >
-                                                            Remove
+                                                            <Trash2 className="h-4 w-4" />
                                                         </Button>
                                                     )}
                                                 </TableCell>
