@@ -76,7 +76,7 @@ export class ImprestAdminService {
                 voucher_base AS (
                     SELECT
                         user_id,
-                        COALESCE(date_of_expense, approved_date, created_at)::date AS effective_date
+                        COALESCE(approved_date, created_at)::date AS effective_date
                     FROM employee_imprests
                     WHERE approval_status = 1
                 ),
@@ -342,7 +342,7 @@ export class ImprestAdminService {
                         ei.user_id,
 
                         /* Grouping by expense date; legacy fallback */
-                        COALESCE(ei.date_of_expense, ei.approved_date, ei.created_at)::date AS effective_date,
+                        COALESCE(ei.approved_date, ei.created_at)::date AS effective_date,
 
                         ei.amount,
                         ei.invoice_proof
@@ -439,7 +439,7 @@ export class ImprestAdminService {
         const fyOptionsResult = await this.db.execute(
             sql`
                 SELECT DISTINCT
-                    EXTRACT(YEAR FROM (COALESCE(ei.date_of_expense, ei.approved_date, ei.created_at)::date - INTERVAL '3 months'))::int AS "fy"
+                    EXTRACT(YEAR FROM (COALESCE(ei.approved_date, ei.created_at)::date - INTERVAL '3 months'))::int AS "fy"
                 FROM employee_imprests ei
                 WHERE ei.approval_status = 1
                 ${userId ? sql`AND ei.user_id = ${userId}` : sql``}
@@ -501,8 +501,8 @@ export class ImprestAdminService {
         SELECT invoice_proof
         FROM employee_imprests
         WHERE user_id = ${userId}
-          AND EXTRACT(ISOYEAR FROM COALESCE(date_of_expense, approved_date, created_at)) = ${year}
-          AND EXTRACT(WEEK FROM COALESCE(date_of_expense, approved_date, created_at)) = ${week}
+          AND EXTRACT(ISOYEAR FROM COALESCE(approved_date, created_at)) = ${year}
+          AND EXTRACT(WEEK FROM COALESCE(approved_date, created_at)) = ${week}
     `);
 
         const files = rows.rows.flatMap(r => (Array.isArray(r.invoice_proof) ? r.invoice_proof : [])).filter(Boolean);
