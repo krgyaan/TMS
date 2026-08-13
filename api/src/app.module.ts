@@ -20,6 +20,7 @@ import { TenderFeeModule } from "@/modules/bi-dashboard/tender-fee/tender-fee.mo
 import { CourierModule } from "@/modules/courier/courier.module";
 import { EmailModule } from "@/modules/email/email.module";
 import { EmployeeImprestModule } from "@/modules/employee-imprest/employee-imprest.module";
+import { InsurancePolicyModule } from "@/modules/insurance/insurance-policy.module";
 import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
 import { FollowUpModule } from "@/modules/follow-up/follow-up.module";
 import { AssetsModule } from "@/modules/hrms/assets/assets.module";
@@ -101,12 +102,12 @@ import { ServeStaticModule } from "@nestjs/serve-static";
 import { SentryGlobalFilter, SentryModule } from "@sentry/nestjs/setup";
 import { join } from "path";
 import { AllExceptionsFilter } from "./logger/all-exception.filter";
-import { AccountChecklistModule } from './modules/accounts/account-checklist/account-checklist.module';
+import { AccountChecklistModule } from "./modules/accounts/account-checklist/account-checklist.module";
 import { LoanAdvanceModule } from "./modules/accounts/loan-advance/loan-advance.module";
-import { EmployeeOnboardingModule } from './modules/hrms/employee-onboarding/employee-onboarding.module';
-import { OnboardingModule } from './modules/hrms/onboarding/onboarding.module';
-import { TrainingModule } from './modules/hrms/training/training.module';
-import { CircularsModule } from './modules/master/circulars/circulars.module';
+import { EmployeeOnboardingModule } from "./modules/hrms/employee-onboarding/employee-onboarding.module";
+import { OnboardingModule } from "./modules/hrms/onboarding/onboarding.module";
+import { TrainingModule } from "./modules/hrms/training/training.module";
+import { CircularsModule } from "./modules/master/circulars/circulars.module";
 import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
 import { ContractAgreementModule } from "./modules/operations/contract-agreement/contract-agreement.module";
 import { KickOffMeetingModule } from "./modules/operations/kick-off-meeting/kick-off-meeting.module";
@@ -128,7 +129,7 @@ import { LocationPerformanceModule } from "./modules/performance/location-perfor
 import { OemPerformanceModule } from "./modules/performance/oem-performance/oem-performance.module";
 import { TeamLeaderPerformanceModule } from "./modules/performance/team-leader-performance/team-leader-performance.module";
 import { TenderExecutivePerformanceModule } from "./modules/performance/tender-executive-performance/tender-executive-performance.module";
-import { ProfileModule } from './modules/profile/profile.module';
+import { ProfileModule } from "./modules/profile/profile.module";
 import { RequestExtensionsModule } from "./modules/tendering/request_extensions/request-extension.module";
 import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-queries.module";
 
@@ -196,6 +197,7 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         EnquiryResultModule,
         TendersModule,
         EmployeeImprestModule,
+        InsurancePolicyModule,
         TenderInfoSheetsModule,
         TenderApprovalModule,
         PhysicalDocsModule,
@@ -274,7 +276,7 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         ServiceVisitModule,
         ServiceFeedbackModule,
     ],
-    controllers: [AppController,],
+    controllers: [AppController],
     providers: [
         AppService,
         {
@@ -289,7 +291,7 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
             provide: APP_FILTER,
             useClass: AllExceptionsFilter,
         },
-        AllExceptionsFilter
+        AllExceptionsFilter,
     ],
 })
 export class AppModule {}
