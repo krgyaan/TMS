@@ -32,6 +32,7 @@ export interface ConferenceListItem {
     serviceEngineerName: string | null;
     engineerAllottedAt: string | null;
     createdAt: string;
+    conferenceCreatedAt?: string | null;
 }
 
 export interface ConferenceListItemWithReport extends ConferenceListItem {

@@ -2,6 +2,7 @@ import { BaseApiService } from "./base.service";
 import type {
     AllotEngineerDto,
     CustomerComplaintDetail,
+    CustomerComplaintListItem,
     CreateCustomerComplaintDto,
     UpdateCustomerComplaintDto,
 } from "@/modules/services/customer/helpers/customer.types";
@@ -11,8 +12,8 @@ class CustomerService extends BaseApiService {
         super("/customer");
     }
 
-    async getAll(search?: string): Promise<CustomerComplaintDetail[]> {
-        return this.get<CustomerComplaintDetail[]>(
+    async getAll(search?: string): Promise<CustomerComplaintListItem[]> {
+        return this.get<CustomerComplaintListItem[]>(
             search ? `?search=${encodeURIComponent(search)}` : "",
         );
     }

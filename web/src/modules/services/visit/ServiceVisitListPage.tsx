@@ -6,6 +6,7 @@ import { Eye, Search, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DataTable from "@/components/ui/data-table";
 import { paths } from "@/app/routes/paths";
 import { useServiceVisitList } from "@/hooks/api/useServiceVisit";
@@ -15,26 +16,39 @@ import type { ActionItem } from "@/components/ui/ActionMenu";
 import { cn } from "@/lib/utils";
 import type { ServiceVisitListItemWithReport } from "./helpers/service-visit.types";
 
+type StatusTab = "pending" | "done";
+
+const isDoneStatus = (status?: string | null) => status === "Done";
+
 export default function ServiceVisitListPage() {
     const navigate = useNavigate();
     const { data: visits = [], isLoading } = useServiceVisitList();
 
-    const { search, setSearch, debouncedSearch } = usePersistentTableState({
+    const { activeTab, setActiveTab, search, setSearch, debouncedSearch } = usePersistentTableState<StatusTab>({
         storageKey: "service-visit-reports-list",
-        defaultTab: "all",
+        defaultTab: "pending",
     });
 
+    const statusTab = activeTab;
+
     const rows = useMemo(() => {
+        let filtered = visits;
+        if (statusTab === "pending") {
+            filtered = filtered.filter(row => !isDoneStatus(row.complaintStatus));
+        } else if (statusTab === "done") {
+            filtered = filtered.filter(row => isDoneStatus(row.complaintStatus));
+        }
+
         const query = debouncedSearch.trim().toLowerCase();
-        if (!query) return visits;
-        return visits.filter(row =>
+        if (!query) return filtered;
+        return filtered.filter(row =>
             [row.ticketNo, row.siteProjectName, row.customerName, row.organization, row.siteLocation, row.serviceEngineerName]
                 .filter(Boolean)
                 .join(" ")
                 .toLowerCase()
                 .includes(query),
         );
-    }, [visits, debouncedSearch]);
+    }, [visits, debouncedSearch, statusTab]);
 
     const actions: ActionItem<ServiceVisitListItemWithReport>[] = [
         {
@@ -109,6 +123,12 @@ export default function ServiceVisitListPage() {
 
             <CardContent className="flex-1 px-0">
                 <div className="flex items-center gap-4 px-6 pb-4">
+                    <Tabs value={statusTab} onValueChange={v => setActiveTab(v as StatusTab)}>
+                        <TabsList>
+                            <TabsTrigger value="pending">Pending</TabsTrigger>
+                            <TabsTrigger value="done">Done</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
                     <div className="flex-1 flex justify-end">
                         <div className="relative">
                             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

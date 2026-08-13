@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, desc, ilike, like, or } from "drizzle-orm";
+import { eq, desc, ilike, like, or, sql, getTableColumns } from "drizzle-orm";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
 import { customerComplaints, serviceEngineers } from "@/db/schemas";
@@ -10,7 +10,6 @@ import type {
 } from "./dto/customer.dto";
 
 type Tx = Parameters<Parameters<DbInstance["transaction"]>[0]>[0];
-
 type Executor = Tx | DbInstance;
 
 @Injectable()
@@ -45,9 +44,22 @@ export class CustomerService {
               )
             : undefined;
 
+        const engSubquery = this.db
+            .select({
+                complaintId: serviceEngineers.complaintId,
+                maxCreatedAt: sql<string>`max(${serviceEngineers.createdAt})::text`.as("max_created"),
+            })
+            .from(serviceEngineers)
+            .groupBy(serviceEngineers.complaintId)
+            .as("eng_sub");
+
         return this.db
-            .select()
+            .select({
+                ...getTableColumns(customerComplaints),
+                allottedAt: engSubquery.maxCreatedAt,
+            })
             .from(customerComplaints)
+            .leftJoin(engSubquery, eq(customerComplaints.id, engSubquery.complaintId))
             .where(where)
             .orderBy(desc(customerComplaints.createdAt));
     }

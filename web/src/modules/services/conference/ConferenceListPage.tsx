@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
@@ -6,6 +6,7 @@ import { Eye, Search, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DataTable from "@/components/ui/data-table";
 import { paths } from "@/app/routes/paths";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
@@ -18,24 +19,51 @@ import type { ConferenceListItemWithReport } from "./helpers/conference.types";
 
 const CONFERENCE_SLA_MS = 12 * 60 * 60 * 1000;
 
-function ConferenceTimerCell({ engineerAllottedAt }: { engineerAllottedAt?: string | null }) {
-    const [now, setNow] = useState(() => Date.now());
+type StatusTab = "pending" | "done";
 
-    useEffect(() => {
-        const interval = setInterval(() => setNow(Date.now()), 1000);
-        return () => clearInterval(interval);
-    }, []);
+const isDoneStatus = (status?: string | null) => status === "Done";
+
+function ConferenceTimerCell({
+    engineerAllottedAt,
+    conferenceFilled,
+    conferenceFilledAt,
+}: {
+    engineerAllottedAt?: string | null;
+    conferenceFilled?: boolean;
+    conferenceFilledAt?: string | null;
+}) {
+    const [now, setNow] = useState(() => Date.now());
+    const frozenSeconds = useRef<number | null>(null);
 
     const end = engineerAllottedAt ? new Date(engineerAllottedAt).getTime() + CONFERENCE_SLA_MS : null;
-    const overdue = end !== null && end - now <= 0;
+
+    useEffect(() => {
+        if (conferenceFilled) return;
+        const interval = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(interval);
+    }, [conferenceFilled]);
+
+    const remaining = end === null ? 0 : Math.max(0, Math.floor((end - now) / 1000));
 
     if (end === null) {
         return <TenderTimerDisplay remainingSeconds={0} status="TIMER_NOT_FOUND" />;
     }
 
+    if (conferenceFilled) {
+        const stopMs = conferenceFilledAt ? new Date(conferenceFilledAt).getTime() : null;
+        if (stopMs !== null) {
+            frozenSeconds.current = Math.max(0, Math.floor((end - stopMs) / 1000));
+        } else if (frozenSeconds.current === null) {
+            frozenSeconds.current = remaining;
+        }
+        return <TenderTimerDisplay remainingSeconds={frozenSeconds.current} status="STOPPED" />;
+    }
+
+    const overdue = end - now <= 0;
+
     return (
         <TenderTimerDisplay
-            remainingSeconds={Math.max(0, Math.floor((end - now) / 1000))}
+            remainingSeconds={remaining}
             status={overdue ? "OVERDUE" : "RUNNING"}
             deadline={new Date(end)}
         />
@@ -46,22 +74,31 @@ export default function ConferenceListPage() {
     const navigate = useNavigate();
     const { data: conferences = [], isLoading } = useConferenceList();
 
-    const { search, setSearch, debouncedSearch } = usePersistentTableState({
+    const { activeTab, setActiveTab, search, setSearch, debouncedSearch } = usePersistentTableState<StatusTab>({
         storageKey: "conference-call-reports-list",
-        defaultTab: "all",
+        defaultTab: "pending",
     });
 
+    const statusTab = activeTab;
+
     const rows = useMemo(() => {
+        let filtered = conferences;
+        if (statusTab === "pending") {
+            filtered = filtered.filter(row => !isDoneStatus(row.complaintStatus));
+        } else if (statusTab === "done") {
+            filtered = filtered.filter(row => isDoneStatus(row.complaintStatus));
+        }
+
         const query = debouncedSearch.trim().toLowerCase();
-        if (!query) return conferences;
-        return conferences.filter(row =>
+        if (!query) return filtered;
+        return filtered.filter(row =>
             [row.ticketNo, row.siteProjectName, row.customerName, row.organization, row.siteLocation, row.serviceEngineerName]
                 .filter(Boolean)
                 .join(" ")
                 .toLowerCase()
                 .includes(query),
         );
-    }, [conferences, debouncedSearch]);
+    }, [conferences, debouncedSearch, statusTab]);
 
     const actions: ActionItem<ConferenceListItemWithReport>[] = [
         {
@@ -119,7 +156,14 @@ export default function ConferenceListPage() {
                 sortable: false,
                 filter: false,
                 cellRenderer: (params: CustomCellRendererProps<ConferenceListItemWithReport>) => (
-                    <ConferenceTimerCell engineerAllottedAt={params.data?.engineerAllottedAt} />
+                    <ConferenceTimerCell
+                        engineerAllottedAt={params.data?.engineerAllottedAt}
+                        conferenceFilled={
+                            params.data?.complaintStatus === "Conference Done" ||
+                            params.data?.complaintStatus === "Done"
+                        }
+                        conferenceFilledAt={params.data?.conferenceCreatedAt}
+                    />
                 ),
             },
             {
@@ -146,6 +190,12 @@ export default function ConferenceListPage() {
 
             <CardContent className="flex-1 px-0">
                 <div className="flex items-center gap-4 px-6 pb-4">
+                    <Tabs value={statusTab} onValueChange={v => setActiveTab(v as StatusTab)}>
+                        <TabsList>
+                            <TabsTrigger value="pending">Pending</TabsTrigger>
+                            <TabsTrigger value="done">Done</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
                     <div className="flex-1 flex justify-end">
                         <div className="relative">
                             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
