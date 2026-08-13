@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { imprestService } from "@/services/api";
 import type { CreateImprestCreditPayload, EmployeeImprestSummary } from "@/modules/imprest/helpers/imprest-admin.types";
-import type { EmployeeImprestDashboard, EmployeeImprestTransactionRow, ImprestPaymentHistoryRow, ImprestRow, ImprestVoucherListResponse } from "@/modules/imprest/helpers/imprest.types";
+import type { EmployeeImprestDashboard, EmployeeImprestTransactionRow, ImprestPaymentHistoryRow, ImprestVoucherListResponse, UpdateImprestPayload } from "@/modules/imprest/helpers/imprest.types";
 
 /* ---------------- QUERY KEYS ---------------- */
 
@@ -274,7 +274,7 @@ export const useUpdateImprest = () => {
     const qc = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: Partial<ImprestRow> }) => imprestService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: UpdateImprestPayload }) => imprestService.update(id, data),
 
         onSuccess: () => {
             toast.success("Updated successfully");

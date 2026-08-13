@@ -60,4 +60,5 @@ export interface CreateMakerRequestDTO {
     uploadInvoice?: string[];
     uploadPI?: string[];
     remark?: string;
+    insurance?: string;
 }

@@ -80,7 +80,8 @@ export type TenderFileContext =
     | "amc-invoices"
     | "amc-receipts"
     | "amc-service-reports"
-    | "customer-attachments";
+    | "customer-attachments"
+    | "insurances";
 
 export interface FileConfig {
     maxFiles: number;
@@ -939,6 +940,16 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         maxSizeBytes: MB(25),
         allowedMimeTypes: [...DOCS, ...OFFICE, ...VIDEOS],
         allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".mp4", ".mov", ".webm", ".mkv"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    insurances: {
+        maxFiles: 10,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx"],
         compressImages: true,
         imageQuality: 80,
         compressPdf: true,
