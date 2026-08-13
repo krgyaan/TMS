@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, type Resolver } from "react-hook-form";
 import {
     Plus, Save, Upload, Loader2,
-    MapPin, Package, Wrench, FileText, BadgeDollarSign,
+    MapPin, Package, Wrench, FileText, BadgeDollarSign, Trash2,
 } from "lucide-react";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
@@ -48,16 +48,12 @@ const sectionCls = "py-6 px-6 border-b last:border-b-0";
 const sectionHeaderCls = "flex items-center justify-between mb-4";
 const sectionTitleCls = "text-sm font-semibold flex items-center gap-2 text-foreground";
 
-// ── helpers ──────────────────────────────────────────────────────────────────
-
 interface RowProps<T> {
     value: T;
     onChange: (v: T) => void;
     onRemove: () => void;
     removable?: boolean;
 }
-
-// ── Site ─────────────────────────────────────────────────────────────────────
 
 function SiteRow({ value, onChange, onRemove, removable = true }: RowProps<AmcSite>) {
     const set = (patch: Partial<AmcSite>) => onChange({ ...value, ...patch });
@@ -93,7 +89,7 @@ function SiteRow({ value, onChange, onRemove, removable = true }: RowProps<AmcSi
                 </div>
                 <div className="space-y-1">
                     <label className="text-xs font-medium text-muted-foreground">
-                         Address
+                        Address
                     </label>
                     <Input
                         className={inputCls}
@@ -118,8 +114,6 @@ function SiteRow({ value, onChange, onRemove, removable = true }: RowProps<AmcSi
         </div>
     );
 }
-
-// ── Contact ───────────────────────────────────────────────────────────────────
 
 function SiteContactRow({ value, onChange, onRemove }: RowProps<AmcSiteContact>) {
     const set = (patch: Partial<AmcSiteContact>) => onChange({ ...value, ...patch });
@@ -221,8 +215,6 @@ function ContactList({
     );
 }
 
-// ── Product ───────────────────────────────────────────────────────────────────
-
 function ProductRow({ value, onChange, onRemove }: RowProps<AmcProduct>) {
     const set = (patch: Partial<AmcProduct>) => onChange({ ...value, ...patch });
     return (
@@ -304,8 +296,6 @@ function ItemSelect({
     );
 }
 
-// ── Engineer ──────────────────────────────────────────────────────────────────
-
 function EngineerRow({ value, onChange, onRemove }: RowProps<AmcServiceEngineer>) {
     const set = (patch: Partial<AmcServiceEngineer>) => onChange({ ...value, ...patch });
     return (
@@ -361,8 +351,6 @@ function EngineerRow({ value, onChange, onRemove }: RowProps<AmcServiceEngineer>
     );
 }
 
-// ── Section divider ───────────────────────────────────────────────────────────
-
 function SectionDivider({
     icon,
     title,
@@ -382,8 +370,6 @@ function SectionDivider({
         </div>
     );
 }
-
-// ── Defaults ──────────────────────────────────────────────────────────────────
 
 const defaultSite: AmcSite = { name: "", address: "", contacts: [] };
 const defaultEngineer: AmcServiceEngineer = { name: "", mobile: "" };
@@ -426,10 +412,6 @@ const computeBillDates = (start: string, end: string, frequency: string) => {
     }
     return dates;
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MAIN FORM
-// ─────────────────────────────────────────────────────────────────────────────
 
 const cleanSites = (sites: AmcSite[]) =>
     sites
@@ -482,9 +464,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
     const [sites, setSites] = useState<AmcSite[]>([defaultSite]);
     const [products, setProducts] = useState<AmcProduct[]>([]);
     const [engineers, setEngineers] = useState<AmcServiceEngineer[]>([]);
-    const [variableBills, setVariableBills] = useState<VariableBillRow[]>(
-        [defaultVariableBill],
-    );
+    const [variableBills, setVariableBills] = useState<VariableBillRow[]>([defaultVariableBill]);
     const [reportFormatPaths, setReportFormatPaths] = useState<string[]>([]);
     const [amcPoPaths, setAmcPoPaths] = useState<string[]>([]);
 
@@ -535,7 +515,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                   }))
                 : [defaultVariableBill],
         );
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isEdit, amc]);
 
     const saving = createAmc.isPending || updateAmc.isPending;
@@ -555,11 +535,13 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                     ? values.billValue
                     : undefined,
             variableBills:
-                values.billType === "variable"
-                    ? variableBills
+                values.billType === "constant"
+                    ? constantBillDates
+                          .filter(date => date && values.billValue?.trim())
+                          .map(date => ({ date, amount: Number(values.billValue) }))
+                    : variableBills
                           .filter(b => b.date || b.amount)
-                          .map(b => ({ date: b.date, amount: b.amount ? Number(b.amount) : undefined }))
-                    : undefined,
+                          .map(b => ({ date: b.date, amount: b.amount ? Number(b.amount) : undefined })),
             serviceReportPath: buildServiceReportPath(
                 amc?.serviceReportPath,
                 reportFormatPaths[0],
@@ -587,19 +569,15 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <Card className="overflow-hidden">
 
-                    {/* Header */}
                     <div className="px-6 py-4 border-b bg-muted/30">
                         <h2 className="text-base font-semibold">
-                            {isEdit
-                                ? "Edit AMC / Warranty Service"
-                                : "Create New AMC / Warranty Service"}
+                            {isEdit ? "Edit AMC / Warranty Service" : "Create New AMC / Warranty Service"}
                         </h2>
                         <p className="text-xs text-muted-foreground mt-0.5">
                             Fill in all sections below and save.
                         </p>
                     </div>
 
-                    {/* ── 1. Team & Project ──────────────────────────────────── */}
                     <div className={sectionCls}>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <SelectField<AmcFormValues, "teamName">
@@ -631,7 +609,6 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                         </div>
                     </div>
 
-                    {/* ── 2. Site Details ────────────────────────────────────── */}
                     <div className={sectionCls}>
                         <SectionDivider
                             icon={<MapPin className="h-4 w-4" />}
@@ -643,10 +620,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                                     size="sm"
                                     className="h-7 text-xs"
                                     onClick={() =>
-                                        setSites(s => [
-                                            ...s,
-                                            { ...defaultSite, contacts: [] },
-                                        ])
+                                        setSites(s => [...s, { ...defaultSite, contacts: [] }])
                                     }
                                 >
                                     <Plus className="h-3 w-3 mr-1" /> Add Site
@@ -660,9 +634,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                                     value={site}
                                     removable={sites.length > 1}
                                     onChange={v =>
-                                        setSites(s =>
-                                            s.map((it, i) => (i === idx ? v : it)),
-                                        )
+                                        setSites(s => s.map((it, i) => (i === idx ? v : it)))
                                     }
                                     onRemove={() =>
                                         setSites(s => s.filter((_, i) => i !== idx))
@@ -672,13 +644,12 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                         </div>
                     </div>
 
-                    {/* ── 3. Service & Billing ───────────────────────────────── */}
                     <div className={sectionCls}>
                         <SectionDivider
                             icon={<BadgeDollarSign className="h-4 w-4" />}
                             title="Service & Billing"
                         />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <SelectField<AmcFormValues, "serviceFrequency">
                                 control={form.control}
                                 name="serviceFrequency"
@@ -751,11 +722,10 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                             )}
                         </div>
 
-                        {/* Constant bills preview (read-only amounts from Bill Value) */}
                         {billType === "constant" && constantBillDates.length > 0 && (
                             <div className="mt-5 space-y-3">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    Bill Schedule Preview (per bill due date)
+                                    Constant Bill Schedule (per bill due date)
                                 </p>
                                 <Table>
                                     <TableHeader>
@@ -776,7 +746,6 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                             </div>
                         )}
 
-                        {/* Variable bills */}
                         {billType === "variable" && (
                             <div className="mt-5 space-y-3">
                                 <div className="flex items-center justify-between">
@@ -789,10 +758,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                                         size="sm"
                                         className="h-7 text-xs"
                                         onClick={() =>
-                                            setVariableBills(vb => [
-                                                ...vb,
-                                                { date: "", amount: "" },
-                                            ])
+                                            setVariableBills(vb => [...vb, { date: "", amount: "" }])
                                         }
                                     >
                                         <Plus className="h-3 w-3 mr-1" /> Add Row
@@ -848,15 +814,16 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                                                         <Button
                                                             type="button"
                                                             variant="ghost"
-                                                            size="sm"
-                                                            className="text-xs text-destructive hover:text-destructive"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-destructive hover:text-destructive"
+                                                            title="Remove"
                                                             onClick={() =>
                                                                 setVariableBills(vb =>
                                                                     vb.filter((_, i) => i !== idx),
                                                                 )
                                                             }
                                                         >
-                                                            Remove
+                                                            <Trash2 className="h-4 w-4" />
                                                         </Button>
                                                     )}
                                                 </TableCell>
@@ -868,7 +835,6 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                         )}
                     </div>
 
-                    {/* ── 4. Service Engineers ───────────────────────────────── */}
                     <div className={sectionCls}>
                         <SectionDivider
                             icon={<Wrench className="h-4 w-4" />}
@@ -914,13 +880,11 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                         )}
                     </div>
 
-                    {/* ── 5. Documents (side by side) ────────────────────────── */}
                     <div className={sectionCls}>
                         <SectionDivider
                             icon={<Upload className="h-4 w-4" />}
                             title="Documents"
                         />
-                        {/* ↓ two-column grid puts both uploads on one line */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <p className="text-xs font-semibold text-muted-foreground">
@@ -967,7 +931,6 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                         </div>
                     </div>
 
-                    {/* ── 6. Products ────────────────────────────────────────── */}
                     <div className={sectionCls}>
                         <SectionDivider
                             icon={<Package className="h-4 w-4" />}
@@ -1011,9 +974,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                                                 value={p}
                                                 onChange={v =>
                                                     setProducts(ps =>
-                                                        ps.map((it, i) =>
-                                                            i === idx ? v : it,
-                                                        ),
+                                                        ps.map((it, i) => (i === idx ? v : it)),
                                                     )
                                                 }
                                                 onRemove={() =>
@@ -1029,7 +990,6 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                         )}
                     </div>
 
-                    {/* ── Actions ────────────────────────────────────────────── */}
                     <div className="px-6 py-4 border-t bg-muted/20 flex justify-end gap-2">
                         <Button
                             type="button"

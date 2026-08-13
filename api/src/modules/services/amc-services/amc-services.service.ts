@@ -199,6 +199,7 @@ export class AmcServicesService {
                           id: amc.id,
                           teamName: amc.teamName,
                           projectName: projectNameById.get(amc.projectId) ?? null,
+                          serviceReportPath: amc.serviceReportPath,
                           signedServiceReportPath: amc.signedServiceReportPath,
                           serviceEngineers: engineersByAmcId.get(amc.id) ?? [],
                       }

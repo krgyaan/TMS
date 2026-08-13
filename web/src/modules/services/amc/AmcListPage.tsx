@@ -42,17 +42,16 @@ import type {
 import { sampleReport } from "./helpers/amc.types";
 
 type AmcTeamTab = "AC" | "DC";
-type AmcServiceTab = "due" | "missed" | "done";
+type StatusTab = "pending" | "done";
 
 const TEAM_TABS: { key: AmcTeamTab; label: string }[] = [
     { key: "AC", label: "AC" },
     { key: "DC", label: "DC" },
 ];
 
-const SERVICE_SUBTABS: { key: AmcServiceTab; label: string }[] = [
-    { key: "due", label: "Service Due" },
-    { key: "missed", label: "Service Missed" },
-    { key: "done", label: "Service Done" },
+const STATUS_TABS: { key: StatusTab; label: string }[] = [
+    { key: "pending", label: "Pending" },
+    { key: "done", label: "Done" },
 ];
 
 interface AmcSiteRow {
@@ -104,34 +103,13 @@ function siteBillProgress(amc: AmcDetail, siteId: number | null) {
     };
 }
 
-function isServiceDue(nextServiceDue: string | null) {
-    if (!nextServiceDue) return true;
-    const due = new Date(`${nextServiceDue}T00:00:00`);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return isNaN(due.getTime()) || due.getTime() >= today.getTime();
-}
-
-function isServiceMissed(nextServiceDue: string | null) {
-    if (!nextServiceDue) return false;
-    const due = new Date(`${nextServiceDue}T00:00:00`);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return !isNaN(due.getTime()) && due.getTime() < today.getTime();
-}
-
-function rowMatchesServiceTab(row: AmcSiteRow, tab: AmcServiceTab) {
-    const progress = siteServiceProgress(row.amc, row.siteId);
-    if (tab === "done") {
-        return progress.total > 0 && progress.done === progress.total;
-    }
-    if (progress.total === 0 || progress.done === progress.total) {
-        return false;
-    }
-    if (tab === "missed") {
-        return isServiceMissed(progress.earliestPendingDue);
-    }
-    return isServiceDue(progress.earliestPendingDue);
+function isRowDone(row: AmcSiteRow): boolean {
+    const serviceProgress = siteServiceProgress(row.amc, row.siteId);
+    const billProgress = siteBillProgress(row.amc, row.siteId);
+    const servicesAllDone =
+        serviceProgress.total > 0 && serviceProgress.done === serviceProgress.total;
+    const billsAllDone = billProgress.total > 0 && billProgress.submitted === billProgress.total;
+    return servicesAllDone && billsAllDone;
 }
 
 function NextServiceDueCell({
@@ -164,13 +142,13 @@ export default function AmcListPage() {
     };
 
     const {
-        activeTab: activeServiceTab,
-        setActiveTab: setActiveServiceTab,
+        activeTab: activeStatusTab,
+        setActiveTab: setActiveStatusTab,
         search,
         setSearch,
-    } = usePersistentTableState({
+    } = usePersistentTableState<StatusTab>({
         storageKey: "amc-list",
-        defaultTab: "due" as AmcServiceTab,
+        defaultTab: "pending",
         tabParam: "tab",
     });
 
@@ -266,18 +244,17 @@ export default function AmcListPage() {
         [allRows, activeTeam],
     );
 
-    const serviceCounts = useMemo<Record<AmcServiceTab, number>>(() => {
+    const statusCounts = useMemo<Record<StatusTab, number>>(() => {
         return {
-            due: teamRows.filter(row => rowMatchesServiceTab(row, "due")).length,
-            missed: teamRows.filter(row => rowMatchesServiceTab(row, "missed")).length,
-            done: teamRows.filter(row => rowMatchesServiceTab(row, "done")).length,
+            pending: teamRows.filter(row => !isRowDone(row)).length,
+            done: teamRows.filter(row => isRowDone(row)).length,
         };
     }, [teamRows]);
 
     const rows = useMemo<AmcSiteRow[]>(() => {
         const query = search.trim().toLowerCase();
         return teamRows.filter(row => {
-            if (!rowMatchesServiceTab(row, activeServiceTab)) return false;
+            if (isRowDone(row) !== (activeStatusTab === "done")) return false;
             if (!query) return true;
 
             const contactNames = row.siteContacts.map(c => c.name).join(" ");
@@ -293,7 +270,7 @@ export default function AmcListPage() {
                 .toLowerCase();
             return haystack.includes(query);
         });
-    }, [teamRows, activeServiceTab, search]);
+    }, [teamRows, activeStatusTab, search]);
 
     const amcActions: ActionItem<AmcSiteRow>[] = [
         {
@@ -558,14 +535,14 @@ export default function AmcListPage() {
             <CardContent className="flex-1 px-0">
                 <div className="flex items-center gap-4 px-6 pb-4">
                     <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
-                        {SERVICE_SUBTABS.map(tab => (
+                        {STATUS_TABS.map(tab => (
                             <button
                                 key={tab.key}
                                 type="button"
-                                onClick={() => setActiveServiceTab(tab.key)}
+                                onClick={() => setActiveStatusTab(tab.key)}
                                 className={cn(
                                     "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
-                                    activeServiceTab === tab.key
+                                    activeStatusTab === tab.key
                                         ? "bg-background text-foreground shadow-sm"
                                         : "text-muted-foreground hover:text-foreground",
                                 )}
@@ -575,11 +552,11 @@ export default function AmcListPage() {
                                     variant="secondary"
                                     className={cn(
                                         "text-xs h-4 min-w-4 px-1",
-                                        activeServiceTab === tab.key &&
+                                        activeStatusTab === tab.key &&
                                             "bg-primary/10 text-primary",
                                     )}
                                 >
-                                    {serviceCounts[tab.key]}
+                                    {statusCounts[tab.key]}
                                 </Badge>
                             </button>
                         ))}
