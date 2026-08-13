@@ -2,9 +2,22 @@ import { lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { RouteWrapper } from '../components/RouteWrapper';
 
-const Services_Customer = lazy(() => import('@/modules/services/customer'));
-const Services_Conference = lazy(() => import('@/modules/services/conference'));
-const Services_Visit = lazy(() => import('@/modules/services/visit'));
+const Services_CustomerList = lazy(() => import('@/modules/services/customer/CustomerListPage'));
+const Services_CustomerCreate = lazy(() => import('@/modules/services/customer/CustomerCreatePage'));
+const Services_CustomerEdit = lazy(() => import('@/modules/services/customer/CustomerEditPage'));
+const Services_CustomerShow = lazy(() => import('@/modules/services/customer/CustomerShowPage'));
+const Services_CustomerView = lazy(() => import('@/modules/services/customer/CustomerViewPage'));
+const Services_Conference = lazy(() => import('@/modules/services/conference/ConferenceListPage'));
+const Services_ConferenceCreate = lazy(() => import('@/modules/services/conference/ConferenceCreatePage'));
+const Services_ConferenceView = lazy(() => import('@/modules/services/conference/ConferenceViewPage'));
+const Services_ConferenceShow = lazy(() => import('@/modules/services/conference/ConferenceShowPage'));
+const Services_VisitList = lazy(() => import('@/modules/services/visit/ServiceVisitListPage'));
+const Services_VisitCreate = lazy(() => import('@/modules/services/visit/ServiceVisitCreatePage'));
+const Services_VisitView = lazy(() => import('@/modules/services/visit/ServiceVisitViewPage'));
+const Services_VisitShow = lazy(() => import('@/modules/services/visit/ServiceVisitShowPage'));
+const Services_FeedbackList = lazy(() => import('@/modules/services/service-feedback/ServiceFeedbackListPage'));
+const Services_FeedbackView = lazy(() => import('@/modules/services/service-feedback/ServiceFeedbackViewPage'));
+const Services_FeedbackShow = lazy(() => import('@/modules/services/service-feedback/ServiceFeedbackShowPage'));
 const Services_AmcList = lazy(() => import('@/modules/services/amc/AmcListPage'));
 const Services_AmcCreate = lazy(() => import('@/modules/services/amc/AmcCreatePage'));
 const Services_AmcEdit = lazy(() => import('@/modules/services/amc/AmcEditPage'));
@@ -21,9 +34,22 @@ const Services_AmcServiceView = lazy(() => import('@/modules/services/amc-servic
 export default function ServicesRoutes() {
     return (
         <Routes>
-            <Route path="customer" element={<RouteWrapper><Services_Customer /></RouteWrapper>} />
+            <Route path="customer" element={<RouteWrapper><Services_CustomerList /></RouteWrapper>} />
+            <Route path="customer/create" element={<RouteWrapper><Services_CustomerCreate /></RouteWrapper>} />
+            <Route path="customer/:id/edit" element={<RouteWrapper><Services_CustomerEdit /></RouteWrapper>} />
+            <Route path="customer/:id/view" element={<RouteWrapper><Services_CustomerView /></RouteWrapper>} />
+            <Route path="customer/:id" element={<RouteWrapper><Services_CustomerShow /></RouteWrapper>} />
             <Route path="conference" element={<RouteWrapper><Services_Conference /></RouteWrapper>} />
-            <Route path="visit" element={<RouteWrapper><Services_Visit /></RouteWrapper>} />
+            <Route path="conference/create" element={<RouteWrapper><Services_ConferenceCreate /></RouteWrapper>} />
+            <Route path="conference/:id/view" element={<RouteWrapper><Services_ConferenceView /></RouteWrapper>} />
+            <Route path="conference/:id" element={<RouteWrapper><Services_ConferenceShow /></RouteWrapper>} />
+            <Route path="visit" element={<RouteWrapper><Services_VisitList /></RouteWrapper>} />
+            <Route path="visit/create" element={<RouteWrapper><Services_VisitCreate /></RouteWrapper>} />
+            <Route path="visit/:id/view" element={<RouteWrapper><Services_VisitView /></RouteWrapper>} />
+            <Route path="visit/:id" element={<RouteWrapper><Services_VisitShow /></RouteWrapper>} />
+            <Route path="feedback" element={<RouteWrapper><Services_FeedbackList /></RouteWrapper>} />
+            <Route path="feedback/:id/view" element={<RouteWrapper><Services_FeedbackView /></RouteWrapper>} />
+            <Route path="feedback/:id" element={<RouteWrapper><Services_FeedbackShow /></RouteWrapper>} />
             <Route path="amc" element={<RouteWrapper><Services_AmcList /></RouteWrapper>} />
             <Route path="amc/create" element={<RouteWrapper><Services_AmcCreate /></RouteWrapper>} />
             <Route path="amc/:id/edit" element={<RouteWrapper><Services_AmcEdit /></RouteWrapper>} />

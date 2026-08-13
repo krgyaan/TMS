@@ -12,6 +12,9 @@ import { paths } from "./paths";
 // Auth
 const Auth_GoogleCallback = lazy(() => import("@/modules/auth/google-callback"));
 
+// Public customer feedback form (no login / no app layout)
+const Public_CustomerFeedbackForm = lazy(() => import("@/modules/services/service-feedback/ServiceFeedbackFormPage"));
+
 // Section Routes
 const MasterRoutes = lazy(() => import("./sections/master.routes"));
 const TenderingRoutes = lazy(() => import("./sections/tendering.routes"));
@@ -47,6 +50,16 @@ export default function AppRoutes() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/sign-up" element={<SignUp />} />
             </Route>
+
+            {/* Public Customer Feedback form — shareable, no login / no app layout */}
+            <Route
+                path={paths.services.feedbackForm}
+                element={
+                    <RouteWrapper>
+                        <Public_CustomerFeedbackForm />
+                    </RouteWrapper>
+                }
+            />
 
             {/* ==================== PROTECTED ROUTES ==================== */}
             <Route element={<ProtectedRoute />}>

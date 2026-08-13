@@ -5,3 +5,8 @@ export * from "./amc-products.schema";
 export * from "./amc-services.schema";
 export * from "./amc-bill.schema";
 export * from "./amc.relations";
+export * from "./customer-complaints.schema";
+export * from "./service-engineers.schema";
+export * from "./conference-call-reports.schema";
+export * from "./service-reports.schema";
+export * from "./service-customer-feedback.schema";
