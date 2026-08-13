@@ -583,11 +583,8 @@ export class ImprestAdminService {
         const items = await this.db
             .select({
                 id: employeeImprests.id,
-
                 category: imprestCategories.name,
-
                 projectName: employeeImprests.projectName,
-
                 projectCode: sql<string>`
             COALESCE(p.project_code, '-')
         `.as("projectCode"),
@@ -614,13 +611,13 @@ export class ImprestAdminService {
                     eq(employeeImprests.userId, voucher.employeeId),
                     eq(employeeImprests.approvalStatus, 1),
                     sql`
-                COALESCE(${employeeImprests.dateOfExpense}, ${employeeImprests.approvedDate})::date
+                COALESCE(${employeeImprests.approvedDate})::date
                 BETWEEN ${voucher.validFrom}::date
                 AND ${voucher.validTo}::date
             `
                 )
             )
-            .orderBy(sql`COALESCE(${employeeImprests.dateOfExpense}, ${employeeImprests.approvedDate})`);
+            .orderBy(sql`COALESCE(${employeeImprests.approvedDate})`);
 
         return {
             voucher: {
@@ -677,7 +674,7 @@ export class ImprestAdminService {
                     eq(employeeImprests.userId, userId),
                     eq(employeeImprests.approvalStatus, 1),
                     sql`
-                    COALESCE(${employeeImprests.dateOfExpense}, ${employeeImprests.approvedDate})::date
+                    COALESCE(${employeeImprests.approvedDate})::date
                     BETWEEN ${from}::date AND ${to}::date
                 `
                 )
