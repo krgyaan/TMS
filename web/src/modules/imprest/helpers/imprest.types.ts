@@ -34,6 +34,8 @@ export interface ImprestRow {
     insurancePolicy?: InsurancePolicyRow | null;
 }
 
+export type UpdateImprestPayload = Partial<ImprestRow> & { insurance?: string | null };
+
 export type ImprestVoucherRow = {
     id: number;
     voucherCode: string;

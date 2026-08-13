@@ -1,15 +1,15 @@
-import { useParams, useNavigate } from "react-router-dom";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, Edit, Download } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { paths } from "@/app/routes/paths";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { useInsurancePolicy } from "@/hooks/api/useInsurancePolicies";
+import { formatDate } from "@/hooks/useFormatedDate";
+import { formatINR } from "@/hooks/useINRFormatter";
 import { tenderFilesService } from "@/services/api/tender-files.service";
-import { format } from "date-fns";
+import { AlertCircle, ArrowLeft, Download } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 
 const STATUS_BADGE_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     Active: 'default',
@@ -17,18 +17,10 @@ const STATUS_BADGE_VARIANT: Record<string, 'default' | 'secondary' | 'destructiv
     Expired: 'destructive',
 };
 
-const Field = ({ label, value }: { label: string; value?: React.ReactNode }) => (
-    <div className="space-y-1">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="font-medium">{value ?? '—'}</p>
-    </div>
-);
-
-const FileList = ({ label, files }: { label: string; files?: string[] | null }) => {
+const FileList = ({ files }: { files?: string[] | null }) => {
     if (!files || files.length === 0) return null;
     return (
         <div className="space-y-1">
-            <p className="text-sm text-muted-foreground">{label}</p>
             <div className="flex flex-wrap gap-2">
                 {files.map((filePath, i) => (
                     <Button key={i} variant="outline" size="sm" asChild>
@@ -69,41 +61,158 @@ const InsuranceViewPage = () => {
     return (
         <Card>
             <CardHeader>
-                <CardAction className="flex gap-2">
-                    <Button variant="outline" onClick={() => navigate(-1)}>
-                        <ArrowLeft className="h-4 w-4" /> Back
-                    </Button>
-                    <Button onClick={() => navigate(paths.accounts.insuranceEdit(policy.id))}>
-                        <Edit className="h-4 w-4" /> Edit
-                    </Button>
-                </CardAction>
                 <CardTitle>Insurance Policy #{policy.id}</CardTitle>
                 <CardDescription className="flex items-center gap-2">
                     <Badge variant={STATUS_BADGE_VARIANT[policy.status] ?? 'outline'}>{policy.status}</Badge>
                     <span>{policy.daysRemaining} days remaining</span>
                 </CardDescription>
+                <CardAction className="flex gap-2">
+                    <Button variant="outline" onClick={() => navigate(-1)}>
+                        <ArrowLeft className="h-4 w-4" /> Back
+                    </Button>
+                </CardAction>
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <Field label="Insurance Type" value={<Badge variant="outline">{policy.insuranceType}</Badge>} />
-                    <Field label="Policy Number" value={policy.policyNumber} />
-                    <Field label="Insurer Name" value={policy.insurerName} />
-                    <Field label="Start Date" value={policy.startDate ? format(new Date(policy.startDate), "dd MMM yyyy") : undefined} />
-                    <Field label="End Date" value={policy.endDate ? format(new Date(policy.endDate), "dd MMM yyyy") : undefined} />
-                    <Field label="Sum Assured" value={policy.sumAssured ? Number(policy.sumAssured).toLocaleString("en-IN", { style: "currency", currency: "INR" }) : undefined} />
-                    <Field label="Project Name" value={policy.projectName} />
-                    <Field label="Linked Request" value={policy.linkedRequest} />
-                    <Field label="Created By" value={policy.createdByName} />
-                    {policy.noOfManpower != null && <Field label="No. of Manpower" value={policy.noOfManpower} />}
-                    {policy.manpowerNames && <Field label="Manpower Covered" value={policy.manpowerNames} />}
-                    {policy.location && <Field label="Location" value={policy.location} />}
-                    {policy.itemsCovered && <Field label="Items Covered" value={policy.itemsCovered} />}
-                </div>
-
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FileList label="Policy Document" files={policy.policyDocument} />
-                    <FileList label="LR Copy" files={policy.lrCopy} />
-                </div>
+                <Table>
+                    <TableBody className="border rounded-2xl">
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Insurance Type
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold w-1/4">
+                                {policy.insuranceType}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Policy Number
+                            </TableCell>
+                            <TableCell className="w-1/4">
+                                {policy.policyNumber}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Insurer Name
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold w-1/4">
+                                {policy.insurerName}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Start Date
+                            </TableCell>
+                            <TableCell className="w-1/4">
+                                {policy.startDate ? formatDate(policy.startDate) : undefined}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                End Date
+                            </TableCell>
+                            <TableCell className="w-1/4">
+                                {policy.endDate ? formatDate(policy.endDate) : undefined}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Value / Sum Assured
+                            </TableCell>
+                            <TableCell className="w-1/4">
+                                {policy.sumAssured ? formatINR(policy.sumAssured) : undefined}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Project Name
+                            </TableCell>
+                            <TableCell className="w-1/4">
+                                {policy.projectName}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Linked Request
+                            </TableCell>
+                            <TableCell className="w-1/4">
+                                {policy.linkedRequest}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Created By
+                            </TableCell>
+                            <TableCell className="w-1/4">
+                                {policy.createdByName}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            {
+                                policy.noOfManpower && (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                            No. of Manpower
+                                        </TableCell>
+                                        <TableCell className="w-1/4">
+                                            {policy.noOfManpower}
+                                        </TableCell>
+                                    </>
+                                )
+                            }
+                            {
+                                policy.manpowerNames && (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                            Manpower Covered
+                                        </TableCell>
+                                        <TableCell className="w-1/4">
+                                            {policy.manpowerNames}
+                                        </TableCell>
+                                    </>
+                                )
+                            }
+                            {
+                                policy.location && (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                            Location
+                                        </TableCell>
+                                        <TableCell className="w-1/4">
+                                            {policy.location}
+                                        </TableCell>
+                                    </>
+                                )
+                            }
+                            {
+                                policy.itemsCovered && (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                            Items Covered
+                                        </TableCell>
+                                        <TableCell className="w-1/4">
+                                            {policy.itemsCovered}
+                                        </TableCell>
+                                    </>
+                                )
+                            }
+                        </TableRow>
+                        <TableRow>
+                            {
+                                policy.policyDocument && policy.policyDocument.length > 0 && (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                            Policy Document
+                                        </TableCell>
+                                        <TableCell className="w-1/4">
+                                            <FileList files={policy.policyDocument} />
+                                        </TableCell>
+                                    </>
+                                )
+                            }
+                            {
+                                policy.lrCopy && policy.lrCopy.length > 0 && (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                            LR Copy
+                                        </TableCell>
+                                        <TableCell className="w-1/4">
+                                            <FileList files={policy.lrCopy} />
+                                        </TableCell>
+                                    </>
+                                )
+                            }
+                        </TableRow>
+                    </TableBody>
+                </Table>
             </CardContent>
         </Card>
     );
