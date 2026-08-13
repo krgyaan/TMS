@@ -139,7 +139,6 @@ export class TqManagementService {
         const conditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            eq(bidSubmissions.status, 'Bid Submitted'),
         ];
 
         // Apply role-based filtering
@@ -286,7 +285,6 @@ export class TqManagementService {
                 bidSubmissions,
                 and(
                     eq(bidSubmissions.tenderId, tenderInfos.id),
-                    eq(bidSubmissions.status, 'Bid Submitted')
                 )
             )
             .where(whereClause);
@@ -331,7 +329,6 @@ export class TqManagementService {
                 bidSubmissions,
                 and(
                     eq(bidSubmissions.tenderId, tenderInfos.id),
-                    eq(bidSubmissions.status, 'Bid Submitted')
                 )
             )
             .where(whereClause)
