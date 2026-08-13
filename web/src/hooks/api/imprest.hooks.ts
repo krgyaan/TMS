@@ -78,7 +78,10 @@ export const useCreateImprest = () => {
             qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
         onError: (e) => {
-            const errorMessage = e?.message || "Something went wrong";
+            const responseMessage = (e as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
+            const errorMessage = Array.isArray(responseMessage)
+                ? responseMessage.filter(Boolean).join(", ")
+                : responseMessage || "Something went wrong";
             toast.error(`Failed to create imprest: ${errorMessage}`);
         },
     });
@@ -279,7 +282,10 @@ export const useUpdateImprest = () => {
         },
 
         onError: (e) => {
-            const errorMessage = e.message || "Something went wrong";
+            const responseMessage = (e as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
+            const errorMessage = Array.isArray(responseMessage)
+                ? responseMessage.filter(Boolean).join(", ")
+                : responseMessage || "Something went wrong";
             toast.error(`Failed to update imprest: ${errorMessage}`);
         },
     });

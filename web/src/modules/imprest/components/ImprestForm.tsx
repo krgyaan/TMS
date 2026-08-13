@@ -3,6 +3,7 @@ import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { NumberInput } from "@/components/form/NumberInput";
 import { SelectField } from "@/components/form/SelectField";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
@@ -18,7 +19,7 @@ import { format } from "date-fns";
 import type { FilePondFile } from "filepond";
 import FilePondPluginFileValidateType from "filepond-plugin-file-validate-type";
 import FilePondPluginImagePreview from "filepond-plugin-image-preview";
-import { User } from "lucide-react";
+import { AlertCircle, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { FilePond, registerPlugin } from "react-filepond";
 import { useForm, type Resolver } from "react-hook-form";
@@ -49,6 +50,7 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
     const updateMutation = useUpdateImprest();
     const uploadMutation = useUploadImprestProofs();
     const [pondFiles, setPondFiles] = useState<File[]>([]);
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
     const categoryOptions = imprestCategories.map(i => ({
         id: String(i.id),
@@ -110,52 +112,72 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
         });
     }, [imprest, mode, form]);
 
+    useEffect(() => {
+        if (!submitError) return;
+
+        const subscription = form.watch(() => setSubmitError(null));
+        return () => subscription.unsubscribe();
+    }, [form, submitError]);
+
     const imprestId = imprest?.id ?? 0;
 
     const handlePondProcess = (items: FilePondFile[]) => {
         setPondFiles(items.map(fi => fi.file as File));
     };
 
-    const handleSubmit = async (data: ImprestFormValues) => {
-        if (mode === "edit" && imprest) {
-            await updateMutation.mutateAsync({
-                id: imprestId,
-                data: {
-                    userId: data.userId,
-                    categoryId: data.categoryId,
-                    partyName: isTransferMode ? null : data.partyName,
-                    projectName: isTransferMode ? null : data.projectName,
-                    teamId: isTransferMode ? data.transferToId : null,
-                    amount: data.amount,
-                    dateOfExpense: data.dateOfExpense instanceof Date ? format(data.dateOfExpense, "yyyy-MM-dd") : data.dateOfExpense,
-                    remark: data.remark,
-                    approvalStatus: imprest.approvalStatus,
-                    approvedDate: imprest.approvedDate,
-                },
-            });
+    const extractServerError = (err: unknown): string => {
+        const message = (err as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
+        if (Array.isArray(message)) {
+            return message.filter(Boolean).join(", ");
+        }
+        return message || "Failed to save imprest. Please try again.";
+    };
 
-            if (pondFiles.length > 0) {
-                await uploadMutation.mutateAsync({
+    const handleSubmit = async (data: ImprestFormValues) => {
+        setSubmitError(null);
+        try {
+            if (mode === "edit" && imprest) {
+                await updateMutation.mutateAsync({
                     id: imprestId,
+                    data: {
+                        userId: data.userId,
+                        categoryId: data.categoryId,
+                        partyName: isTransferMode ? null : data.partyName,
+                        projectName: isTransferMode ? null : data.projectName,
+                        teamId: isTransferMode ? data.transferToId : null,
+                        amount: data.amount,
+                        dateOfExpense: data.dateOfExpense instanceof Date ? format(data.dateOfExpense, "yyyy-MM-dd") : data.dateOfExpense,
+                        remark: data.remark,
+                        approvalStatus: imprest.approvalStatus,
+                        approvedDate: imprest.approvedDate,
+                    },
+                });
+
+                if (pondFiles.length > 0) {
+                    await uploadMutation.mutateAsync({
+                        id: imprestId,
+                        files: pondFiles,
+                    });
+                }
+
+                if (imprest.userId) {
+                    navigate(isAccountsSection ? paths.accounts.imprestsUserView(imprest.userId) : paths.shared.imprestUser(imprest.userId));
+                } else {
+                    navigate(isAccountsSection ? paths.accounts.imprests : paths.shared.imprest);
+                }
+            } else {
+                await createMutation.mutateAsync({
+                    data: {
+                        ...data,
+                        transferToId: isTransferMode ? data.transferToId : null,
+                    },
                     files: pondFiles,
                 });
-            }
 
-            if (imprest.userId) {
-                navigate(isAccountsSection ? paths.accounts.imprestsUserView(imprest.userId) : paths.shared.imprestUser(imprest.userId));
-            } else {
                 navigate(isAccountsSection ? paths.accounts.imprests : paths.shared.imprest);
             }
-        } else {
-            await createMutation.mutateAsync({
-                data: {
-                    ...data,
-                    transferToId: isTransferMode ? data.transferToId : null,
-                },
-                files: pondFiles,
-            });
-
-            navigate(isAccountsSection ? paths.accounts.imprests : paths.shared.imprest);
+        } catch (err) {
+            setSubmitError(extractServerError(err));
         }
     };
 
@@ -185,6 +207,14 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                        {submitError && (
+                            <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Unable to Save</AlertTitle>
+                                <AlertDescription>{submitError}</AlertDescription>
+                            </Alert>
+                        )}
+
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {/* Category — always shown */}
                             <SelectField
