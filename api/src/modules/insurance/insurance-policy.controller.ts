@@ -1,6 +1,6 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
-import { CanCreate, CanRead, CanUpdate } from "@/modules/auth/decorators";
+import { CanCreate, CanDelete, CanRead, CanUpdate } from "@/modules/auth/decorators";
 import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
 import { BadRequestException } from "@nestjs/common";
 import type { Request } from "express";
@@ -60,5 +60,11 @@ export class InsurancePolicyController {
         }
 
         return this.service.update(id, parsed.data);
+    }
+
+    @Delete(":id")
+    @CanDelete("accounts.insurance")
+    remove(@Param("id", ParseIntPipe) id: number) {
+        return this.service.remove(id);
     }
 }

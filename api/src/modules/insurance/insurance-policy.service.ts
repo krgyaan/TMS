@@ -140,6 +140,23 @@ export class InsurancePolicyService {
 
     /* ------------------------------ READ ------------------------------ */
 
+    async remove(id: number) {
+        const existing = await this.db.query.insurancePolicies.findFirst({
+            where: eq(insurancePolicies.id, id),
+        });
+
+        if (!existing) {
+            throw new NotFoundException("Insurance policy not found");
+        }
+
+        if (existing.imprestId) {
+            await this.unlinkFromImprest(this.db, existing.imprestId);
+        }
+
+        const [deleted] = await this.db.delete(insurancePolicies).where(eq(insurancePolicies.id, id)).returning({ id: insurancePolicies.id });
+        return deleted ?? null;
+    }
+
     async findAll(params?: { page?: number; limit?: number; search?: string; status?: string; insuranceType?: string }) {
         const page = Math.max(1, params?.page ?? 1);
         const limit = Math.max(1, Math.min(params?.limit ?? 50, 100));
