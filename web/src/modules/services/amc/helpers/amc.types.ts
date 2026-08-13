@@ -152,6 +152,7 @@ export interface AmcServiceAmcInfo {
     orgName: string | null;
     orgAcronym: string | null;        // ← added: acronym takes priority over orgName
     allocatedTe?: number | null;
+    serviceReportPath: string[] | null;
     signedServiceReportPath: string | null;
     serviceEngineers: AmcServiceEngineer[];
 }
