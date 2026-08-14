@@ -1,6 +1,8 @@
 import * as z from "zod";
+import { insuranceFieldsSchema, validateInsuranceFields } from "@/modules/insurance/helpers/insurance.schema";
 
 const TEAM_MEMBER_CATEGORY_ID = 22;
+export const INSURANCE_CATEGORY_ID = 8;
 
 export const imprestFormSchema = z
     .object({
@@ -40,9 +42,12 @@ export const imprestFormSchema = z
         ),
 
         remark: z.string().optional().nullable(),
+
+        ...insuranceFieldsSchema.shape,
     })
     .superRefine((data, ctx) => {
         const isTransferMode = Number(data.categoryId) === TEAM_MEMBER_CATEGORY_ID;
+        const isInsuranceMode = Number(data.categoryId) === INSURANCE_CATEGORY_ID;
 
         if (!isTransferMode) {
             if (!data.partyName || data.partyName.trim() === "") {
@@ -70,6 +75,8 @@ export const imprestFormSchema = z
                 });
             }
         }
+
+        validateInsuranceFields(data, ctx, isInsuranceMode);
     });
 
 export type ImprestFormValues = z.infer<typeof imprestFormSchema>;

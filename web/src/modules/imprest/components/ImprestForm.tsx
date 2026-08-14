@@ -24,8 +24,10 @@ import { useEffect, useState } from "react";
 import { FilePond, registerPlugin } from "react-filepond";
 import { useForm, type Resolver } from "react-hook-form";
 import { useNavigate, useLocation } from "react-router-dom";
-import { imprestFormSchema, type ImprestFormValues } from "../helpers/imprest.schema";
+import { imprestFormSchema, INSURANCE_CATEGORY_ID, type ImprestFormValues } from "../helpers/imprest.schema";
 import type { ImprestRow } from "../helpers/imprest.types";
+import { InsuranceDetailsForm } from "@/modules/insurance/components/InsuranceDetailsForm";
+import { buildInsurancePayload } from "@/modules/insurance/helpers/insurance.mapper";
 
 registerPlugin(FilePondPluginFileValidateType, FilePondPluginImagePreview);
 
@@ -76,6 +78,18 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
             amount: undefined,
             dateOfExpense: undefined,
             remark: "",
+            insuranceType: null,
+            policyNumber: null,
+            insurerName: null,
+            startDate: null,
+            endDate: null,
+            policyDocument: [],
+            sumAssured: null,
+            noOfManpower: null,
+            manpowerNames: null,
+            location: null,
+            itemsCovered: null,
+            lrCopy: [],
         },
     });
 
@@ -109,6 +123,18 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
             amount: imprest.amount,
             dateOfExpense: imprest.dateOfExpense ? new Date(imprest.dateOfExpense) : undefined,
             remark: imprest.remark || "",
+            insuranceType: imprest.insurancePolicy?.insuranceType ?? null,
+            policyNumber: imprest.insurancePolicy?.policyNumber ?? null,
+            insurerName: imprest.insurancePolicy?.insurerName ?? null,
+            startDate: imprest.insurancePolicy?.startDate ?? null,
+            endDate: imprest.insurancePolicy?.endDate ?? null,
+            policyDocument: imprest.insurancePolicy?.policyDocument ?? [],
+            sumAssured: imprest.insurancePolicy?.sumAssured ? Number(imprest.insurancePolicy.sumAssured) : null,
+            noOfManpower: imprest.insurancePolicy?.noOfManpower ?? null,
+            manpowerNames: imprest.insurancePolicy?.manpowerNames ?? null,
+            location: imprest.insurancePolicy?.location ?? null,
+            itemsCovered: imprest.insurancePolicy?.itemsCovered ?? null,
+            lrCopy: imprest.insurancePolicy?.lrCopy ?? [],
         });
     }, [imprest, mode, form]);
 
@@ -136,6 +162,9 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
     const handleSubmit = async (data: ImprestFormValues) => {
         setSubmitError(null);
         try {
+            const insurancePayload = buildInsurancePayload(data);
+            const insurance = insurancePayload ? JSON.stringify(insurancePayload) : null;
+
             if (mode === "edit" && imprest) {
                 await updateMutation.mutateAsync({
                     id: imprestId,
@@ -150,6 +179,7 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
                         remark: data.remark,
                         approvalStatus: imprest.approvalStatus,
                         approvedDate: imprest.approvedDate,
+                        insurance,
                     },
                 });
 
@@ -170,6 +200,7 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
                     data: {
                         ...data,
                         transferToId: isTransferMode ? data.transferToId : null,
+                        insurance,
                     },
                     files: pondFiles,
                 });
@@ -329,6 +360,9 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
                                 )}
                             </FieldWrapper>
                         </div>
+
+                        {/* Insurance Details — only for Insurance Charges category */}
+                        {Number(watchedCategoryId) === INSURANCE_CATEGORY_ID && <InsuranceDetailsForm />}
 
                         <div className="w-full flex items-center justify-center gap-2">
                             <Button type="submit" disabled={isPending}>

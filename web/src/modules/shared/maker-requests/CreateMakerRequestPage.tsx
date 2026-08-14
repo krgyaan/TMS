@@ -20,6 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { paths } from "@/app/routes/paths";
 import { makerRequestFormSchema, type MakerRequestFormValues } from "./helpers/makerRequest.schema";
 import { mapMakerRequestFormToCreateDTO } from "./helpers/makerRequest.mapper";
+import { InsuranceDetailsForm } from "@/modules/insurance/components/InsuranceDetailsForm";
 
 const defaultFormValues: MakerRequestFormValues = {
     selectedHeading: "",
@@ -35,6 +36,18 @@ const defaultFormValues: MakerRequestFormValues = {
     uploadInvoice: [],
     uploadPI: [],
     remark: "",
+    insuranceType: null,
+    policyNumber: null,
+    insurerName: null,
+    startDate: null,
+    endDate: null,
+    policyDocument: [],
+    sumAssured: null,
+    noOfManpower: null,
+    manpowerNames: null,
+    location: null,
+    itemsCovered: null,
+    lrCopy: [],
 };
 
 const headings = [
@@ -59,6 +72,7 @@ const fixedCategory = [
     {label: 'portal_renewal_charges', value: 'Portal Renewal Charges'},
     {label: 'professional_charges', value: 'Professional Charges'},
     {label: 'od_ac_interest', value: 'OD A/C Interest'},
+    {label: 'insurance', value: 'Insurance'},
 ];
 
 const loanReturnCategory = [
@@ -96,6 +110,7 @@ const CATEGORY_UPLOAD_CONFIG: Record<string, { allowedUserIds?: number[]; upload
     office_maintenance: { uploadInvoice: true, uploadPI: true, uploadInvoiceAfterPayment: true },
     portal_renewal_charges: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: true },
     professional_charges: { uploadInvoice: true, uploadPI: true, uploadInvoiceAfterPayment: true },
+    insurance: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
     related_party: { allowedUserIds: [13, 7, 21, 26], uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
     nbfc_oc_acc: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
     loan_principal_return: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
@@ -405,6 +420,8 @@ export default function CreateMakerRequestPage() {
                                 </FieldWrapper>
                             </div>
                         </div>
+
+                        {categoryId === "insurance" && <InsuranceDetailsForm />}
 
                         <div className="flex items-end justify-end">
                             <div className="flex items-center gap-4">

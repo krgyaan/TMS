@@ -5,3 +5,6 @@ export * from "./loan-parties.relations";
 // Imprest Categories
 export * from "./imprest-categories.schema";
 export * from "./imprest-categories.relations";
+
+// Insurance Policies
+export * from "./insurance-policy.schema";

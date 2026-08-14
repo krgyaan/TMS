@@ -8,12 +8,17 @@ import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
+import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
+import { insurancePayloadSchema, insurancePolicySchema, type InsurancePayload } from "@/modules/insurance/zod/insurance-policy.schema";
+
+const INSURANCE_CATEGORY = "insurance";
 
 @Injectable()
 export class MakerRequestService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
+        private readonly insurancePolicyService: InsurancePolicyService
     ) {}
 
     async generateNumber(): Promise<string> {
@@ -41,9 +46,10 @@ export class MakerRequestService {
 
     async create(body: any, userId: number) {
         const requestNo = await this.generateNumber();
+        const insurance = this.parseInsurancePayload(body.insurance);
 
-        const mr = (
-            await this.db
+        const mr = await this.db.transaction(async tx => {
+            const [created] = await tx
                 .insert(paymentRequests)
                 .values({
                     projectId: null,
@@ -63,11 +69,31 @@ export class MakerRequestService {
                     uploadInvoiceAfterPayment: body.uploadInvoiceAfterPayment || [],
                     requestedBy: userId,
                 })
-                .returning()
-        )[0];
+                .returning();
+
+            if (body.category === INSURANCE_CATEGORY && insurance) {
+                await this.insurancePolicyService.createFromMakerRequest(tx, insurance, created.id, userId);
+            }
+
+            return created;
+        });
 
         this.logger.info(`Maker Request created: ${requestNo}`);
         return mr;
+    }
+
+    private parseInsurancePayload(raw?: unknown): InsurancePayload | null {
+        if (!raw) {
+            return null;
+        }
+
+        const parsed = typeof raw === "string" ? insurancePayloadSchema.safeParse(raw) : insurancePolicySchema.safeParse(raw);
+
+        if (!parsed.success) {
+            throw new BadRequestException(parsed.error.flatten());
+        }
+
+        return parsed.data;
     }
 
     async updateStatus(id: number, body: { status: string; utrNumber?: string; rejectionReason?: string }) {
@@ -84,9 +110,7 @@ export class MakerRequestService {
         };
 
         if (!validTransitions[existing.status]?.includes(body.status)) {
-            throw new BadRequestException(
-                `Cannot transition from "${existing.status}" to "${body.status}"`
-            );
+            throw new BadRequestException(`Cannot transition from "${existing.status}" to "${body.status}"`);
         }
 
         const updated = (
