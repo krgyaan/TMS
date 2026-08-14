@@ -20,6 +20,7 @@ import { tenderCostingDetails } from '@db/schemas/tendering/tender-costing-detai
 import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, notInArray, or, sql } from 'drizzle-orm';
 
 export type BidSubmissionDashboardRow = {
@@ -68,6 +69,7 @@ export class BidSubmissionsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly configService: ConfigService,
         private readonly timersService: TimersService,
     ) {
         this.logger = this.appLogger.withContext(BidSubmissionsService.name);
@@ -996,19 +998,26 @@ export class BidSubmissionsService {
             ccRecipients.push({ type: 'role', role: 'Admin', teamId: accountsTeamId });
         }
 
-        // Collect attachments
-        const attachmentFiles: string[] = [];
-        if (bidSubmission.documents) {
-            if (bidSubmission.documents.submittedDocs && bidSubmission.documents.submittedDocs.length > 0) {
-                attachmentFiles.push(...bidSubmission.documents.submittedDocs);
-            }
-            if (bidSubmission.documents.submissionProof) {
-                attachmentFiles.push(bidSubmission.documents.submissionProof);
-            }
-            if (bidSubmission.documents.finalPriceSs) {
-                attachmentFiles.push(bidSubmission.documents.finalPriceSs);
-            }
-        }
+        // Build document links
+        const fileBaseUrl = this.configService.get<string>('app.apiUrl') || '';
+        const buildUrl = (path?: string | null) =>
+            path ? `${fileBaseUrl}/tender-files/serve/${path}` : null;
+
+        const submittedDocs = bidSubmission.documents?.submittedDocs ?? [];
+        const document_urls = submittedDocs.map(path => ({
+            name: path.split('/').pop() || path,
+            url: buildUrl(path),
+        }));
+        const submissionProofUrl = buildUrl(bidSubmission.documents?.submissionProof);
+        const finalPriceUrl = buildUrl(bidSubmission.documents?.finalPriceSs);
+
+        const emailDataWithLinks = {
+            ...emailData,
+            document_urls,
+            has_documents: document_urls.length > 0,
+            submission_proof_url: submissionProofUrl,
+            final_price_url: finalPriceUrl,
+        };
 
         await this.sendEmail(
             'bid.submitted',
@@ -1016,11 +1025,10 @@ export class BidSubmissionsService {
             submittedBy,
             `Bid Submitted - ${tender.tenderName}`,
             'bid-submitted',
-            emailData,
+            emailDataWithLinks,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
                 cc: ccRecipients,
-                attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
             }
         );
     }

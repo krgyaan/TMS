@@ -20,6 +20,7 @@ import { tenderResultDetails } from '@db/schemas/tendering/tender-result-details
 import { tenderResults } from '@db/schemas/tendering/tender-result.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 
 export type RaDashboardFilters = {
@@ -91,6 +92,7 @@ export class ReverseAuctionService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly configService: ConfigService,
         private readonly tenderResultService: TenderResultService,
     ) {
         this.logger = this.appLogger.withContext(ReverseAuctionService.name);
@@ -1234,6 +1236,8 @@ export class ReverseAuctionService {
             return isNaN(num) ? value : `₹${num.toLocaleString('en-IN')}`;
         };
 
+        const fileBaseUrl = this.configService.get<string>('app.apiUrl') || '';
+
         const emailData = {
             tender_no: tender.tenderNo,
             tender_name: tender.tenderName,
@@ -1242,9 +1246,24 @@ export class ReverseAuctionService {
             ra_start_price: formatCurrency(raRecord.raStartPrice),
             ra_close_price: formatCurrency(raRecord.raClosePrice),
             ra_duration: raDuration,
-            qualified_parties_screenshot: !!raRecord.screenshotQualifiedParties,
-            decrements_screenshot: !!raRecord.screenshotDecrements,
-            final_result: !!raRecord.finalResultScreenshot,
+            qualified_parties_url: raRecord.screenshotQualifiedParties
+                ? `${fileBaseUrl}/tender-files/serve/${raRecord.screenshotQualifiedParties}`
+                : null,
+            qualified_parties_name: raRecord.screenshotQualifiedParties
+                ? raRecord.screenshotQualifiedParties.split('/').pop()
+                : null,
+            decrements_url: raRecord.screenshotDecrements
+                ? `${fileBaseUrl}/tender-files/serve/${raRecord.screenshotDecrements}`
+                : null,
+            decrements_name: raRecord.screenshotDecrements
+                ? raRecord.screenshotDecrements.split('/').pop()
+                : null,
+            final_result_url: raRecord.finalResultScreenshot
+                ? `${fileBaseUrl}/tender-files/serve/${raRecord.finalResultScreenshot}`
+                : null,
+            final_result_name: raRecord.finalResultScreenshot
+                ? raRecord.finalResultScreenshot.split('/').pop()
+                : null,
             isWon: raRecord.raResult === 'Won',
             isLost: raRecord.raResult === 'Lost',
             isH1Elimination: raRecord.raResult === 'H1 Elimination',
@@ -1259,28 +1278,6 @@ export class ReverseAuctionService {
             { type: 'role', role: 'Coordinator', teamId: tender.team },
         ];
 
-        // Collect attachments
-        const attachments: any[] = [];
-        
-        if (raRecord.screenshotQualifiedParties) {
-            attachments.push({
-                filename: raRecord.screenshotQualifiedParties.split('/').pop() || 'qualified-parties.png',
-                path: raRecord.screenshotQualifiedParties,
-            });
-        }
-        if (raRecord.screenshotDecrements) {
-            attachments.push({
-                filename: raRecord.screenshotDecrements.split('/').pop() || 'decrements.png',
-                path: raRecord.screenshotDecrements,
-            });
-        }
-        if (raRecord.finalResultScreenshot) {
-            attachments.push({
-                filename: raRecord.finalResultScreenshot.split('/').pop() || 'final-result.png',
-                path: raRecord.finalResultScreenshot,
-            });
-        }
-
         await this.sendEmail(
             'ra.result',
             tenderId,
@@ -1291,7 +1288,6 @@ export class ReverseAuctionService {
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
                 cc: ccRecipients,
-                attachments: attachments.length > 0 ? attachments : undefined,
             }
         );
     }

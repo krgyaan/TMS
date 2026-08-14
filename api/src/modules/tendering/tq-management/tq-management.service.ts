@@ -1,4 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { and, eq, desc, isNotNull, sql, inArray, asc, isNull, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
@@ -72,6 +73,7 @@ export class TqManagementService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly configService: ConfigService,
         private readonly tenderResulService : TenderResultService,
     ) {
         this.logger = this.appLogger.withContext(TqManagementService.name);
@@ -1092,6 +1094,12 @@ export class TqManagementService {
             due,
             tqData,
             coordinator: coordinatorName,
+            tq_document_url: tqRecord.tqDocumentReceived
+                ? `${this.configService.get<string>('app.apiUrl') || ''}/tender-files/serve/${tqRecord.tqDocumentReceived}`
+                : null,
+            tq_document_name: tqRecord.tqDocumentReceived
+                ? tqRecord.tqDocumentReceived.split('/').pop()
+                : null,
         };
 
         // Build CC recipients
@@ -1111,7 +1119,6 @@ export class TqManagementService {
             {
                 to: [{ type: 'user', userId: tender.teamMember }],
                 cc: ccRecipients,
-                attachments: tqRecord.tqDocumentReceived ? { files: [tqRecord.tqDocumentReceived] } : undefined,
             }
         );
     }
@@ -1170,6 +1177,8 @@ export class TqManagementService {
             timeBeforeDeadline = `${diffHours} hours ${diffMinutes} minutes`;
         }
 
+        const fileBaseUrl = this.configService.get<string>('app.apiUrl') || '';
+
         const emailData = {
             tlName,
             tender_name: tender.tenderName,
@@ -1178,6 +1187,18 @@ export class TqManagementService {
             tqSubmissionDate,
             timeBeforeDeadline,
             teName: teUser.name,
+            replied_document_url: tqRecord.repliedDocument
+                ? `${fileBaseUrl}/tender-files/serve/${tqRecord.repliedDocument}`
+                : null,
+            replied_document_name: tqRecord.repliedDocument
+                ? tqRecord.repliedDocument.split('/').pop()
+                : null,
+            proof_of_submission_url: tqRecord.proofOfSubmission
+                ? `${fileBaseUrl}/tender-files/serve/${tqRecord.proofOfSubmission}`
+                : null,
+            proof_of_submission_name: tqRecord.proofOfSubmission
+                ? tqRecord.proofOfSubmission.split('/').pop()
+                : null,
         };
 
         // Build CC recipients
@@ -1185,14 +1206,6 @@ export class TqManagementService {
             { type: 'role', role: 'Admin', teamId: tender.team },
             { type: 'role', role: 'Coordinator', teamId: tender.team },
         ];
-
-        const attachmentFiles: string[] = [];
-        if (tqRecord.repliedDocument) {
-            attachmentFiles.push(tqRecord.repliedDocument);
-        }
-        if (tqRecord.proofOfSubmission) {
-            attachmentFiles.push(tqRecord.proofOfSubmission);
-        }
 
         await this.sendEmail(
             'tq.replied',
@@ -1204,7 +1217,6 @@ export class TqManagementService {
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
                 cc: ccRecipients,
-                attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
             }
         );
     }
