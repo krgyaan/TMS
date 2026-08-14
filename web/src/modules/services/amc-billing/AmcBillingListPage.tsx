@@ -42,13 +42,16 @@ const STATUS_STYLES: Record<string, string> = {
     "Follow-up": "bg-orange-100 text-orange-800 border-orange-200",
 };
 
-type BillStatusTab = "due" | "missed" | "done";
+const BILL_DUE_WINDOW_DAYS = 30;
+
+type BillStatusTab = "due" | "missed" | "done" | "all";
 type BillPeriodTab = "all" | "week" | "month" | "year";
 
 const STATUS_TABS: { key: BillStatusTab; label: string }[] = [
     { key: "due", label: "Due" },
     { key: "missed", label: "Missed" },
     { key: "done", label: "Done" },
+    { key: "all", label: "All" },
 ];
 
 const PERIOD_TABS: { key: BillPeriodTab; label: string }[] = [
@@ -82,11 +85,14 @@ function billMatchesStatus(bill: AmcBillDetail, tab: BillStatusTab) {
     const today = startOfDay(new Date());
     const paid = bill.status === "Payment Received";
     if (tab === "done") return paid;
+    if (tab === "all") return true;
     if (paid) return false;
-    if (!bill.billDueDate) return tab === "due";
+    if (!bill.billDueDate) return false;
     const due = new Date(`${bill.billDueDate}T00:00:00`);
     if (tab === "missed") return due < today;
-    return due >= today;
+    const windowEnd = new Date(today);
+    windowEnd.setDate(windowEnd.getDate() + BILL_DUE_WINDOW_DAYS);
+    return due >= today && due <= windowEnd;
 }
 
 function TimerCell({ services }: { services?: AmcBillDetail["services"] }) {
@@ -192,6 +198,7 @@ export default function AmcBillingListPage() {
             due: periodRows.filter(bill => billMatchesStatus(bill, "due")).length,
             missed: periodRows.filter(bill => billMatchesStatus(bill, "missed")).length,
             done: periodRows.filter(bill => billMatchesStatus(bill, "done")).length,
+            all: periodRows.length,
         };
     }, [periodRows]);
 
@@ -261,10 +268,11 @@ export default function AmcBillingListPage() {
             cellRenderer: (params: CustomCellRendererProps<AmcBillDetail>) => {
                 const value = params.data?.billDueDate ?? null;
                 if (!value) return <span className="text-muted-foreground">—</span>;
+                const paid = params.data?.status === "Payment Received";
                 const due = new Date(`${value}T00:00:00`);
                 const crossed = due < startOfDay(new Date());
                 return (
-                    <span className={cn("font-medium", crossed && "text-red-600")}>
+                    <span className={cn("font-medium", !paid && crossed ? "text-red-600" : "", !paid && !crossed ? "text-green-600" : "")}>
                         {formatDate(value)}
                     </span>
                 );
