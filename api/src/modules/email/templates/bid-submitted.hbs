@@ -1,7 +1,25 @@
 <div>
     <p>Dear {{data.tlName}},</p>
 
-    <p>The bid has been submitted for {{data.tenderName}}. Please find attached the file bidding price and proof of Tender submission.</p>
+    <p>The bid has been submitted for {{data.tenderName}}.</p>
+
+    {{#if data.document_urls.length}}
+        <p>Bidding documents:</p>
+        <ul>
+            {{#each data.document_urls}}
+                <li><a href="{{this.url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{this.name}}</a></li>
+            {{/each}}
+        </ul>
+    {{/if}}
+
+    {{#if data.submission_proof_url}}
+        <p>Proof of Tender Submission: <a href="{{data.submission_proof_url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">Open</a></p>
+    {{/if}}
+
+    {{#if data.final_price_url}}
+        <p>Final Price Screenshot: <a href="{{data.final_price_url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">Open</a></p>
+    {{/if}}
+
     <p>The tender due date and time was {{data.dueDate}}</p>
     <p>The bidding date and time was {{data.bidSubmissionDate}}.</p>
     <p>We submitted the bid {{data.timeBeforeDeadline}} before the bid submission deadline.</p>

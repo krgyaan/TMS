@@ -27,6 +27,10 @@
         <p>No queries available.</p>
     {{/if}}
 
+    {{#if data.tq_document_url}}
+        <p>TQ Document: <a href="{{data.tq_document_url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{data.tq_document_name}}</a></p>
+    {{/if}}
+
     <p>Please ensure the timely reply to the queries.</p>
 
     <p>Best Regards,<br />{{data.coordinator}}</p>

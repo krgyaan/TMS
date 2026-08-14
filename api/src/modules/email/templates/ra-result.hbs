@@ -22,24 +22,24 @@
     <ul>
         <li>
             Screenshot of Qualified Parties:
-            {{#if data.qualified_parties_screenshot}}
-                Attached
+            {{#if data.qualified_parties_url}}
+                <a href="{{data.qualified_parties_url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{data.qualified_parties_name}}</a>
             {{else}}
                 Not Available
             {{/if}}
         </li>
         <li>
             Screenshot of all decrements:
-            {{#if data.decrements_screenshot}}
-                Attached
+            {{#if data.decrements_url}}
+                <a href="{{data.decrements_url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{data.decrements_name}}</a>
             {{else}}
                 Not Available
             {{/if}}
         </li>
         <li>
             Screenshot of the Final result:
-            {{#if data.final_result}}
-                Attached
+            {{#if data.final_result_url}}
+                <a href="{{data.final_result_url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{data.final_result_name}}</a>
             {{else}}
                 Not Available
             {{/if}}

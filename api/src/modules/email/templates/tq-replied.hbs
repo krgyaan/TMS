@@ -1,7 +1,15 @@
 <div>
     <p>Dear {{data.tlName}},</p>
 
-    <p>The TQ reply has been submitted for {{data.tender_name}} ({{data.tender_no}}). Please find attached the TQ reply documents and proof of TQ submission.</p>
+    <p>The TQ reply has been submitted for {{data.tender_name}} ({{data.tender_no}}).</p>
+
+    {{#if data.replied_document_url}}
+        <p>TQ Reply Document: <a href="{{data.replied_document_url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{data.replied_document_name}}</a></p>
+    {{/if}}
+
+    {{#if data.proof_of_submission_url}}
+        <p>Proof of TQ Submission: <a href="{{data.proof_of_submission_url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{data.proof_of_submission_name}}</a></p>
+    {{/if}}
 
     <p>The Tender due date and time was {{data.dueDate}}.</p>
     <p>The TQ reply date and time was {{data.tqSubmissionDate}}.</p>
