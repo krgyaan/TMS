@@ -81,6 +81,13 @@ export default function ConferenceListPage() {
 
     const statusTab = activeTab;
 
+    const statusCounts = useMemo(() => {
+        return {
+            pending: conferences.filter(row => !isDoneStatus(row.complaintStatus)).length,
+            done: conferences.filter(row => isDoneStatus(row.complaintStatus)).length,
+        };
+    }, [conferences]);
+
     const rows = useMemo(() => {
         let filtered = conferences;
         if (statusTab === "pending") {
@@ -152,7 +159,7 @@ export default function ConferenceListPage() {
             {
                 colId: "timer",
                 headerName: "Timer",
-                width: 110,
+                width: 125,
                 sortable: false,
                 filter: false,
                 cellRenderer: (params: CustomCellRendererProps<ConferenceListItemWithReport>) => (
@@ -192,8 +199,22 @@ export default function ConferenceListPage() {
                 <div className="flex items-center gap-4 px-6 pb-4">
                     <Tabs value={statusTab} onValueChange={v => setActiveTab(v as StatusTab)}>
                         <TabsList>
-                            <TabsTrigger value="pending">Pending</TabsTrigger>
-                            <TabsTrigger value="done">Done</TabsTrigger>
+                            <TabsTrigger value="pending">
+                                <span className="flex items-center gap-1.5">
+                                    Pending
+                                    <Badge variant="secondary" className="h-4 min-w-5 px-1">
+                                        {statusCounts.pending}
+                                    </Badge>
+                                </span>
+                            </TabsTrigger>
+                            <TabsTrigger value="done">
+                                <span className="flex items-center gap-1.5">
+                                    Done
+                                    <Badge variant="secondary" className="h-4 min-w-5 px-1">
+                                        {statusCounts.done}
+                                    </Badge>
+                                </span>
+                            </TabsTrigger>
                         </TabsList>
                     </Tabs>
                     <div className="flex-1 flex justify-end">

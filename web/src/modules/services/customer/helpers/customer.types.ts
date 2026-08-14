@@ -32,7 +32,10 @@ export interface CustomerComplaint {
     createdBy: number | null;
     createdAt: string;
     updatedAt: string;
-    allottedAt?: string | null;
+}
+
+export interface CustomerComplaintListItem extends CustomerComplaint {
+    allottedAt: string | null;
 }
 
 export interface CustomerComplaintDetail extends CustomerComplaint {

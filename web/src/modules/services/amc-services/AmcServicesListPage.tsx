@@ -16,6 +16,7 @@ import {
     ExternalLink,
     Search,
     MapPin,
+    Download,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,21 +30,26 @@ import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { formatDate } from "@/hooks/useFormatedDate";
 import type {
     AmcServiceDetail,
     AmcSiteContact,
     AmcServiceEngineer,
 } from "@/modules/services/amc/helpers/amc.types";
+import { sampleReport } from "@/modules/services/amc/helpers/amc.types";
 import { UploadServiceReportModal } from "./components/UploadServiceReportModal";
 import type { ServicePathField } from "@/modules/services/amc/helpers/amc.types";
 
-type ServiceTab = "due" | "missed" | "done";
+const SERVICE_DUE_WINDOW_DAYS = 30;
+
+type ServiceTab = "due" | "missed" | "done" | "all";
 
 const SERVICE_SUBTABS: { key: ServiceTab; label: string }[] = [
     { key: "due", label: "Service Due" },
     { key: "missed", label: "Service Missed" },
     { key: "done", label: "Service Done" },
+    { key: "all", label: "All" },
 ];
 
 function isMissed(service: AmcServiceDetail) {
@@ -54,20 +60,36 @@ function isMissed(service: AmcServiceDetail) {
     return !isNaN(due.getTime()) && due.getTime() < today.getTime();
 }
 
-function rowMatchesTab(row: AmcServiceDetail, tab: ServiceTab) {
-    if (tab === "done") return row.status === "Done";
-    if (row.status === "Done") return false;
-    if (tab === "missed") return isMissed(row);
-    return !isMissed(row);
+function isDueWithin30Days(service: AmcServiceDetail) {
+    if (service.status === "Done" || !service.serviceDueDate) return false;
+    const due = new Date(`${service.serviceDueDate}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const windowEnd = new Date(today);
+    windowEnd.setDate(windowEnd.getDate() + SERVICE_DUE_WINDOW_DAYS);
+    return (
+        !isNaN(due.getTime()) &&
+        due.getTime() >= today.getTime() &&
+        due.getTime() <= windowEnd.getTime()
+    );
 }
 
-function DueDateCell({ value }: { value: string }) {
+function rowMatchesTab(row: AmcServiceDetail, tab: ServiceTab) {
+    if (tab === "done") return row.status === "Done";
+    if (tab === "all") return true;
+    if (row.status === "Done") return false;
+    if (tab === "missed") return isMissed(row);
+    return isDueWithin30Days(row);
+}
+
+function DueDateCell({ value, status }: { value: string; status?: string | null }) {
+    const done = status === "Done";
     const due = new Date(`${value}T00:00:00`);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const crossed = due.getTime() < today.getTime();
     return (
-        <span className={cn("font-medium", crossed ? "text-red-600" : "")}>
+        <span className={cn("font-medium", !done && crossed ? "text-red-600" : "", !done && !crossed ? "text-green-600" : "")}>
             {formatDate(value)}
         </span>
     );
@@ -109,11 +131,28 @@ export default function AmcServicesListPage() {
         setEngineersModalOpen(true);
     };
 
+    const handleSampleDownload = (row: AmcServiceDetail) => {
+        const sample = sampleReport(row.amc?.serviceReportPath);
+        if (!sample) {
+            toast.error("No sample service report uploaded for this AMC");
+            return;
+        }
+        const url = `/uploads/amc/${sample}`;
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = sample;
+        anchor.rel = "noopener noreferrer";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+    };
+
     const serviceCounts = useMemo<Record<ServiceTab, number>>(() => {
         return {
             due: services.filter(row => rowMatchesTab(row, "due")).length,
             missed: services.filter(row => rowMatchesTab(row, "missed")).length,
             done: services.filter(row => rowMatchesTab(row, "done")).length,
+            all: services.length,
         };
     }, [services]);
 
@@ -148,6 +187,11 @@ export default function AmcServicesListPage() {
 
     const colDefs = useMemo<ColDef<AmcServiceDetail>[]>(() => {
         const actions: ActionItem<AmcServiceDetail>[] = [
+            {
+                label: "Sample Service Report Download",
+                onClick: row => handleSampleDownload(row),
+                icon: <Download className="h-4 w-4" />,
+            },
             {
                 label: "Upload Filled Service Report",
                 onClick: row =>
@@ -299,7 +343,7 @@ export default function AmcServicesListPage() {
             valueGetter: params => params.data?.serviceDueDate ?? "",
             cellRenderer: (params: CustomCellRendererProps<AmcServiceDetail>) =>
                 params.data?.serviceDueDate ? (
-                    <DueDateCell value={params.data.serviceDueDate} />
+                    <DueDateCell value={params.data.serviceDueDate} status={params.data.status} />
                 ) : (
                     <span className="text-muted-foreground">—</span>
                 ),
