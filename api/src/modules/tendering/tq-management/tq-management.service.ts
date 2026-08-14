@@ -794,7 +794,7 @@ export class TqManagementService {
         let newStatus = prevStatus;
 
         //finding the tq_status for Result Entry 
-        let tqStatus = qualified ? 'Qualified, No TQ Recieved' : 'Disqualified, No TQ Recieved';
+        let tqStatus = qualified ? 'Qualified, No TQ received' : 'Disqualified, No TQ received';
 
         // AUTO STATUS CHANGE: Update tender status based on qualification
         // Status 37 (Qualified, No TQ received) or Status 38 (Disqualified, No TQ received)
@@ -881,7 +881,7 @@ export class TqManagementService {
         }
         
         //finding the tq_status for Result Entry 
-        let tqStatus = qualified ? 'Qualified, TQ Replied' : 'Disqualified, TQ Missed';
+        let tqStatus = qualified ? 'Qualified, TQ replied' : 'Disqualified, TQ missed';
 
         const result = await this.db.transaction(async (tx) => {
             // Update TQ record status based on qualification

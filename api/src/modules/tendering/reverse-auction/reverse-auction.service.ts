@@ -724,7 +724,7 @@ export class ReverseAuctionService {
             // AUTO STATUS CHANGE: Update tender status to 23 (RA scheduled)
             newStatus = 23; // Status ID for "RA scheduled"
             statusComment = 'RA Scheduled';
-            // raStatus = 'Qualified, RA Scheduled'; 
+            raStatus = 'RA Scheduled';
         }
 
         const result = await this.db.transaction(async (tx) => {
@@ -733,12 +733,14 @@ export class ReverseAuctionService {
                 .values({
                     tenderId: tenderId,
                     tenderNo: currentTender?.tenderNo ?? '',
+                    status: updateData.status,
                     technicallyQualified: dto.technicallyQualified,
                     disqualificationReason: dto.disqualificationReason,
                     qualifiedPartiesCount: dto.qualifiedPartiesCount,
                     qualifiedPartiesNames: dto.qualifiedPartiesNames,
                     raStartTime: dto.raStartTime ? new Date(dto.raStartTime) : null,
                     raEndTime: dto.raEndTime ? new Date(dto.raEndTime) : null,
+                    scheduledAt: updateData.scheduledAt,
                 })
                 .returning();
 
@@ -898,6 +900,11 @@ export class ReverseAuctionService {
                 changedBy,
                 mappedDto,
                 [{
+                    result: dto.raResult,
+                    l1Price: dto.raClosePrice?.toString() ?? null,
+                    l2Price: dto.raClosePriceL2?.toString() ?? null,
+                    ourPrice: dto.raOurPrice?.toString() ?? null,
+                    resultReason: dto.resultReason ?? null,
                     qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ? [dto.screenshotQualifiedParties] : null,
                     finalResultScreenshot: dto.finalResultScreenshot ? [dto.finalResultScreenshot] : null,
                 }]
@@ -996,7 +1003,6 @@ export class ReverseAuctionService {
             updatePayload.technicallyQualified = raRecord.technicallyQualified;
             updatePayload.disqualificationReason = raRecord.disqualificationReason;
             updatePayload.raStatus= raStatus ? raStatus : 'pending';
-            updatePayload.status = status;
         }
 
         // Check if tender_result exists
@@ -1170,6 +1176,7 @@ export class ReverseAuctionService {
         // Build CC recipients
         const ccRecipients: RecipientSource[] = [
             { type: 'role', role: 'Coordinator', teamId: tender.team },
+            { type: 'role', role: 'Team Leader', teamId: tender.team },
         ];
 
         await this.sendEmail(
@@ -1180,7 +1187,10 @@ export class ReverseAuctionService {
             'ra-scheduled',
             emailData,
             {
-                to: [{ type: 'emails', emails: bothAdminsEmails }],
+                to: [
+                    { type: 'emails', emails: bothAdminsEmails }, 
+                    { type: 'user', userId: scheduledBy }
+                ],
                 cc: ccRecipients,
             }
         );

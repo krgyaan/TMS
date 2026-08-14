@@ -1082,6 +1082,7 @@ export class TenderResultService {
         const overallResult = details.find((d: any) => d.result === 'Won')?.result
             || details.find((d: any) => d.result === 'Cancelled')?.result
             || details.find((d: any) => d.result === 'Lost')?.result
+            || dto.result
             || 'Not specified';
 
         const fileBaseUrl = this.configService.get<string>('app.apiUrl') || '';
@@ -1099,10 +1100,10 @@ export class TenderResultService {
             tender_no: tender.tenderNo,
             tender_name: tender.tenderName,
             result: overallResult,
-            l1_price_formatted: formatCurrency(firstDetail.l1Price ?? null),
-            l2_price_formatted: formatCurrency(firstDetail.l2Price ?? null),
-            our_price_formatted: formatCurrency(firstDetail.ourPrice ?? null),
-            result_reason: firstDetail.resultReason || 'Not specified',
+            l1_price_formatted: formatCurrency(firstDetail.l1Price ?? dto.l1Price ?? null),
+            l2_price_formatted: formatCurrency(firstDetail.l2Price ?? dto.l2Price ?? null),
+            our_price_formatted: formatCurrency(firstDetail.ourPrice ?? dto.ourPrice ?? null),
+            result_reason: firstDetail.resultReason || dto.resultReason || 'Not specified',
             costing_receipt_formatted: formatCurrency(costingDetail[0]?.submittedReceiptPrice || null),
             costing_budget_formatted: formatCurrency(costingDetail[0]?.submittedBudgetPrice || null),
             costing_gross_margin: costingDetail[0]?.submittedGrossMargin ? `${Number(costingDetail[0].submittedGrossMargin).toFixed(2)}%` : '0%',
