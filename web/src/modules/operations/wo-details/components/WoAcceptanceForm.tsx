@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { SelectField } from '@/components/form/SelectField';
-import { TenderFileUploader } from '@/components/tender-file-upload/TenderFileUploader';
+import { FileUploader } from '@/components/file-upload/FileUploader';
 import { useGetTeamMembers } from '@/hooks/api/useUsers';
 import { WoAcceptanceFormSchema } from '../helpers/wo-acceptance.schema';
 import type { WoAcceptanceFormValues } from '../helpers/wo-acceptance.types';
@@ -230,7 +230,7 @@ export const WoAcceptanceForm: React.FC<WoAcceptanceFormProps> = ({
                                             <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                                                 Signed Work Order Upload
                                             </label>
-                                            <TenderFileUploader
+                                            <FileUploader
                                                 context="wo-signed-copy"
                                                 disabled={isSubmitting}
                                             />

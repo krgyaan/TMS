@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWoDetailWithRelations } from "@/hooks/api/useWoDetails";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 import { AlertCircle, ArrowLeft, Calculator, FileCheck, FileEdit, Loader2, MapPinned, Package, Send, ShieldCheck, SkipForward, TrendingUp, Users } from "lucide-react";
 import { useState } from "react";
 import type { WoBillingAddress, WoBillingBoq, WoContact, WoShippingAddress } from "../../../types/wo.types";
@@ -251,7 +251,7 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
                         <span className="text-sm font-medium text-right">
                             {detail.filledBgFormat?.length > 0
                                 ? detail.filledBgFormat.map((f, i) => (
-                                    <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline block text-xs">
+                                    <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline block text-xs">
                                         File {i + 1}
                                     </a>
                                 ))
@@ -266,7 +266,7 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
                         <span className="text-sm font-medium text-right">
                             {detail.contractAgreementFormat?.length > 0
                                 ? detail.contractAgreementFormat.map((f, i) => (
-                                    <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline block text-xs">
+                                    <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline block text-xs">
                                         File {i + 1}
                                     </a>
                                 ))

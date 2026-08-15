@@ -9,7 +9,7 @@ import { getShortId } from "@/lib/id-utils";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { usePaymentRequestDetails } from "@/hooks/api/useProjectPaymentRequests";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
@@ -94,7 +94,7 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                             {detail.poFile && (
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">PO File:</span>
-                                    <a href={tenderFilesService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download PO</a>
+                                    <a href={fileUploadService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download PO</a>
                                 </div>
                             )}
                             <div className="flex justify-between">
@@ -254,7 +254,7 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                             {detail.piInvoiceFile && (
                                 <div>
                                     <span className="text-muted-foreground">Invoice File:</span>
-                                    <a href={tenderFilesService.getFileUrl(detail.piInvoiceFile)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline block">
+                                    <a href={fileUploadService.getFileUrl(detail.piInvoiceFile)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline block">
                                         View
                                     </a>
                                 </div>
@@ -299,12 +299,12 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                         <Label className="text-muted-foreground text-xs">Uploaded Files</Label>
                         <div className="flex gap-2 mt-1">
                             {detail.poFile && (
-                                <a href={tenderFilesService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">
+                                <a href={fileUploadService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">
                                     PO File
                                 </a>
                             )}
                             {detail.uploadedInvoiceFile && (
-                                <a href={tenderFilesService.getFileUrl(detail.uploadedInvoiceFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">
+                                <a href={fileUploadService.getFileUrl(detail.uploadedInvoiceFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">
                                     Invoice File
                                 </a>
                             )}
@@ -316,7 +316,7 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                         <Label className="text-muted-foreground text-xs">Bill / Proof Files</Label>
                         <div className="flex flex-wrap gap-2 mt-1">
                             {detail.billFiles.map((f, i) => (
-                                <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
                             ))}
                         </div>
                     </div>
@@ -326,7 +326,7 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                         <Label className="text-muted-foreground text-xs">Upload Invoice</Label>
                         <div className="flex flex-wrap gap-2 mt-1">
                             {detail.uploadInvoice.map((f, i) => (
-                                <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
                             ))}
                         </div>
                     </div>
@@ -336,7 +336,7 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                         <Label className="text-muted-foreground text-xs">Upload PI</Label>
                         <div className="flex flex-wrap gap-2 mt-1">
                             {detail.uploadPI.map((f, i) => (
-                                <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
                             ))}
                         </div>
                     </div>
@@ -346,7 +346,7 @@ export const PaymentRequestDetailDialog: React.FC<PaymentRequestDetailDialogProp
                         <Label className="text-muted-foreground text-xs">Upload Invoice after Payment</Label>
                         <div className="flex flex-wrap gap-2 mt-1">
                             {detail.uploadInvoiceAfterPayment.map((f, i) => (
-                                <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
                             ))}
                         </div>
                     </div>

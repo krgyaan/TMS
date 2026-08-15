@@ -9,7 +9,7 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/form/DateInput";
-import { TenderFileUploader } from "@/components/tender-file-upload";
+import { FileUploader } from "@/components/file-upload";
 import { ArrowLeft, Save, Plus, Trash2, Check, HashIcon, TrendingUp, Calculator } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { WoBasicDetailFormSchema } from "../helpers/basiDetail.schema";
@@ -381,7 +381,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
 
                             <FieldWrapper control={form.control} name="woDraft" label="Upload LOA/GEM PO/LOI/Draft WO">
                                 {field => (
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="wo-draft"
                                         value={field.value ?? []}
                                         onChange={paths => field.onChange(paths)}

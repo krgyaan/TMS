@@ -1,7 +1,7 @@
 import { ConditionalSection } from "@/components/form/ConditionalSection";
 import { DateInput } from "@/components/form/DateInput";
 import { SelectField } from "@/components/form/SelectField";
-import { TenderFileUploader } from "@/components/tender-file-upload/TenderFileUploader";
+import { FileUploader } from "@/components/file-upload/FileUploader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -193,7 +193,7 @@ export function Page2Compliance({
                                 <ConditionalSection show={watchPbgApplicable === "true"}>
                                     <div className="space-y-1">
                                         <label className="text-sm font-medium">BG Format / Instrument File</label>
-                                        <TenderFileUploader
+                                        <FileUploader
                                             context="tender-documents"
                                             value={form.watch("filledBgFormat") || []}
                                             onChange={(paths) => form.setValue("filledBgFormat", paths, { shouldValidate: true })}
@@ -210,7 +210,7 @@ export function Page2Compliance({
                                 <ConditionalSection show={watchContractAgreement === "true"}>
                                     <div className="space-y-1">
                                         <label className="text-sm font-medium">Contract Agreement File</label>
-                                        <TenderFileUploader
+                                        <FileUploader
                                             context="tender-documents"
                                             value={form.watch("contractAgreementFormat") || []}
                                             onChange={(paths) => form.setValue("contractAgreementFormat", paths, { shouldValidate: true })}

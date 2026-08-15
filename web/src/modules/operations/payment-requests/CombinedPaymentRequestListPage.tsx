@@ -19,11 +19,11 @@ import { useAllPaymentRequests, usePaymentRequestDetails, useUpdatePaymentReques
 import { useTeamFilter } from "@/hooks/useTeamFilter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "react-router-dom";
-import { TenderFileUploader } from "@/components/tender-file-upload";
+import { FileUploader } from "@/components/file-upload";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
@@ -446,7 +446,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                                     <Label className="text-muted-foreground text-xs">Bill / Proof Files</Label>
                                     <div className="flex flex-wrap gap-2 mt-1">
                                         {detail.billFiles.map((f: string, i: number) => (
-                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                            <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
                                         ))}
                                     </div>
                                 </div>
@@ -456,7 +456,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                                     <Label className="text-muted-foreground text-xs">Upload Invoice</Label>
                                     <div className="flex flex-wrap gap-2 mt-1">
                                         {detail.uploadInvoice.map((f: string, i: number) => (
-                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                            <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
                                         ))}
                                     </div>
                                 </div>
@@ -466,7 +466,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                                     <Label className="text-muted-foreground text-xs">Upload PI</Label>
                                     <div className="flex flex-wrap gap-2 mt-1">
                                         {detail.uploadPI.map((f: string, i: number) => (
-                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                            <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
                                         ))}
                                     </div>
                                 </div>
@@ -476,7 +476,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                                     <Label className="text-muted-foreground text-xs">Upload Invoice after Payment</Label>
                                     <div className="flex flex-wrap gap-2 mt-1">
                                         {detail.uploadInvoiceAfterPayment.map((f: string, i: number) => (
-                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                            <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
                                         ))}
                                     </div>
                                 </div>
@@ -492,7 +492,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                                         {detail.poFile && (
                                             <div className="flex justify-between">
                                                 <span className="text-muted-foreground">PO File:</span>
-                                                <a href={tenderFilesService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download PO</a>
+                                                <a href={fileUploadService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download PO</a>
                                             </div>
                                         )}
                                         <div className="flex justify-between"><span className="text-muted-foreground">Grand Total:</span><span>{formatINR(detail.poGrandTotal || 0)}</span></div>
@@ -632,7 +632,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                                 <p className="text-sm"><strong>Amount:</strong> {formatINR(uploadInvoiceRow.amount)}</p>
                             </div>
                             <div className="space-y-1">
-                                <TenderFileUploader
+                                <FileUploader
                                     label="Upload Invoice"
                                     context="tender-documents"
                                     value={uploadInvoiceFiles}

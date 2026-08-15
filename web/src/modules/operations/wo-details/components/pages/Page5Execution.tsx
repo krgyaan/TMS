@@ -16,7 +16,7 @@ import { WizardNavigation } from "@/modules/operations/wo-details/components/Wiz
 import { WIZARD_CONFIG, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
 import { formToApi } from "@/modules/operations/wo-details/helpers/woDetail.mapper";
 import { Page5FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 
 import type { Page5FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
 
@@ -241,7 +241,7 @@ export function Page5Execution({
                                                         <button
                                                             type="button"
                                                             className="hover:underline"
-                                                            onClick={() => window.open(tenderFilesService.getFileUrl(doc), "_blank")}
+                                                            onClick={() => window.open(fileUploadService.getFileUrl(doc), "_blank")}
                                                         >
                                                             {doc.split("/").pop() || doc}
                                                         </button>
@@ -261,7 +261,7 @@ export function Page5Execution({
                                                         <button
                                                             type="button"
                                                             className="hover:underline"
-                                                            onClick={() => window.open(tenderFilesService.getFileUrl(doc), "_blank")}
+                                                            onClick={() => window.open(fileUploadService.getFileUrl(doc), "_blank")}
                                                         >
                                                             {doc.split("/").pop() || doc}
                                                         </button>

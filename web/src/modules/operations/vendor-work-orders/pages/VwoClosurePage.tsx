@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 
 const BUDGET_CATEGORIES = ["Service", "Freight", "Warranty"];
@@ -99,7 +99,7 @@ function FileUploadCell({ value, onChange }: { value: string[]; onChange: (paths
 
     setUploading(true);
     try {
-      const result = await tenderFilesService.upload([file], "tender-documents");
+      const result = await fileUploadService.upload([file], "tender-documents");
       if (result?.files?.length) {
         onChange([...value, result.files[0].path]);
       }
@@ -127,7 +127,7 @@ function FileUploadCell({ value, onChange }: { value: string[]; onChange: (paths
       {value.map((p) => (
         <a
           key={p}
-          href={tenderFilesService.getFileUrl(p)}
+          href={fileUploadService.getFileUrl(p)}
           target="_blank"
           rel="noopener noreferrer"
           className="text-xs text-primary underline truncate max-w-[110px]"

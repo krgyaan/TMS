@@ -16,7 +16,7 @@ import type { CustomCellRendererProps } from "ag-grid-react";
 import { Edit, ExternalLink, Plus } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 
 interface PurchaseInvoicesSectionProps {
     projectId: number | null;
@@ -40,7 +40,7 @@ export const PurchaseInvoicesSection: React.FC<PurchaseInvoicesSectionProps> = (
         {
             label: "View File",
             icon: <ExternalLink className="h-4 w-4" />,
-            onClick: (row) => row.invoiceFile && window.open(tenderFilesService.getFileUrl(row.invoiceFile), '_blank'),
+            onClick: (row) => row.invoiceFile && window.open(fileUploadService.getFileUrl(row.invoiceFile), '_blank'),
         },
     ], [navigate, projectId]);
 

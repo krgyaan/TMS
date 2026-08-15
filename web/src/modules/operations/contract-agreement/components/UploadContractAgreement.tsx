@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 import { toast } from 'sonner';
 import { ContractAgreementFormSchema, type ContractAgreementFormValues } from '../helpers/contractAgreement.schema';
 import { useSaveContractAgreement } from '@/hooks/api/useContractAgreement';
@@ -73,7 +73,7 @@ export function UploadContractAgreementDialog({ isOpen, onOpenChange, woDetail }
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                         <FieldWrapper control={form.control} name="veSigned" label="VE Signed">
                             {(field) => (
-                                <TenderFileUploader
+                                <FileUploader
                                     context="contract-agreement"
                                     value={field.value}
                                     onChange={field.onChange}
@@ -83,7 +83,7 @@ export function UploadContractAgreementDialog({ isOpen, onOpenChange, woDetail }
                         </FieldWrapper>
                         <FieldWrapper control={form.control} name="clientAndVeSigned" label="Client and VE Signed">
                             {(field) => (
-                                <TenderFileUploader
+                                <FileUploader
                                     context="contract-agreement"
                                     value={field.value}
                                     onChange={field.onChange}

@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TenderFileUploader } from "@/components/tender-file-upload";
+import { FileUploader } from "@/components/file-upload";
 import { useUpdateSaleInvoice } from "@/hooks/api/useSaleInvoices";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { SaleInvoiceListRow } from "@/modules/operations/sale-invoices/helpers/saleInvoice.types";
@@ -72,7 +72,7 @@ const UploadInvoiceDialog = ({ row, open, onClose }: Props) => {
                         <p className="text-sm font-medium">Invoice Total: {formatINR(total)}</p>
                         <div className="space-y-1">
                             <Label>Invoice Documents</Label>
-                            <TenderFileUploader context="tender-documents" value={uploadedPaths} onChange={setUploadedPaths} />
+                            <FileUploader context="tender-documents" value={uploadedPaths} onChange={setUploadedPaths} />
                         </div>
                     </div>
                 )}

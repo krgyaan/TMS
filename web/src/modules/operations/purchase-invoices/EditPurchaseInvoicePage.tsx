@@ -1,27 +1,25 @@
 import { paths } from "@/app/routes/paths";
+import { FileUploader } from "@/components/file-upload";
 import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
-import { TenderFileUploader } from "@/components/tender-file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
+import { usePurchaseInvoiceDetails, useUpdatePurchaseInvoice } from "@/hooks/api/usePurchaseInvoices";
 import { useProjectPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
 import { useProjectVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
-import { usePurchaseInvoiceDetails, useUpdatePurchaseInvoice } from "@/hooks/api/usePurchaseInvoices";
+import { formatINR } from "@/hooks/useINRFormatter";
 import { PoDetailsCard } from "@/modules/operations/payment-requests/components/PoDetailsCard";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Calendar, Info, Loader2, ShoppingCart } from "lucide-react";
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { formatINR } from "@/hooks/useINRFormatter";
 import { mapPurchaseInvoiceFormToUpdateDTO } from "./helpers/purchaseInvoice.mapper";
 import { purchaseInvoiceFormSchema, type PurchaseInvoiceFormValues } from "./helpers/purchaseInvoice.schema";
 
@@ -39,8 +37,6 @@ export default function EditPurchaseInvoicePage() {
     const { projectId: projectIdParam, piId: piIdParam } = useParams<{ projectId: string; piId: string }>();
     const projectId = Number(projectIdParam);
     const piId = Number(piIdParam);
-
-    const { data: overview } = useProjectOverview(projectId);
     const { data: invoice, isLoading } = usePurchaseInvoiceDetails(piId);
     const { data: poData } = useProjectPurchaseOrders(projectId);
     const { data: vwoData } = useProjectVendorWorkOrders(projectId);
@@ -221,7 +217,7 @@ export default function EditPurchaseInvoicePage() {
                         </div>
 
                         <div>
-                            <TenderFileUploader
+                            <FileUploader
                                 label="Upload Invoice"
                                 context="tender-documents"
                                 value={form.watch("invoiceFile")}

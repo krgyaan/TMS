@@ -27,7 +27,7 @@ const getFileUrl = (filePath: string): string => {
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
     
     // Always serve under 'wo-draft' context as requested
-    return `${baseUrl}/tender-files/serve/wo-draft/${encodeURIComponent(fileName)}`;
+    return `${baseUrl}/files/serve/wo-draft/${encodeURIComponent(fileName)}`;
 };
 
 

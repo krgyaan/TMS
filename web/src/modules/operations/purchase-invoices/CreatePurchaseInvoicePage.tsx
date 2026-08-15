@@ -2,7 +2,7 @@ import { paths } from "@/app/routes/paths";
 import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
-import { TenderFileUploader } from "@/components/tender-file-upload";
+import { FileUploader } from "@/components/file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -223,7 +223,7 @@ export default function CreatePurchaseInvoicePage() {
                         </div>
 
                         <div className="max-w-xl">
-                            <TenderFileUploader
+                            <FileUploader
                                 label="Upload Invoice"
                                 context="tender-documents"
                                 value={form.watch("invoiceFile")}

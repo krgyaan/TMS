@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TenderFileUploader } from "@/components/tender-file-upload";
+import { FileUploader } from "@/components/file-upload";
 import { useUpdateSaleInvoice } from "@/hooks/api/useSaleInvoices";
 import type { SaleInvoiceListRow } from "@/modules/operations/sale-invoices/helpers/saleInvoice.types";
 import { useCallback, useState } from "react";
@@ -60,7 +60,7 @@ const PaymentReceivedDialog = ({ row, open, onClose }: Props) => {
 
                         <div className="space-y-1">
                             <Label>Payment Advice Documents</Label>
-                            <TenderFileUploader context="tender-documents" value={paymentAdvicePaths} onChange={setPaymentAdvicePaths} />
+                            <FileUploader context="tender-documents" value={paymentAdvicePaths} onChange={setPaymentAdvicePaths} />
                             <Button variant="outline" size="sm" className="mt-2" onClick={handleRequestPaymentAdvice}>
                                 Request Payment Advice from OE
                             </Button>
@@ -68,7 +68,7 @@ const PaymentReceivedDialog = ({ row, open, onClose }: Props) => {
 
                         <div className="space-y-1">
                             <Label>Buyback Invoice (if available)</Label>
-                            <TenderFileUploader context="tender-documents" value={buybackPaths} onChange={setBuybackPaths} />
+                            <FileUploader context="tender-documents" value={buybackPaths} onChange={setBuybackPaths} />
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">

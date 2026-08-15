@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 import { AlertCircle, CheckCircle2, Loader2, Plus, Save, Trash2, Upload } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -105,7 +105,7 @@ function FileUploadCell({ value, onChange }: { value: string[]; onChange: (paths
         if (!file) return;
         setUploading(true);
         try {
-            const result = await tenderFilesService.upload([file], "tender-documents");
+            const result = await fileUploadService.upload([file], "tender-documents");
             if (result?.files?.length) {
                 onChange([...value, result.files[0].path]);
             }
@@ -140,7 +140,7 @@ function FileUploadCell({ value, onChange }: { value: string[]; onChange: (paths
             {value.map((p) => (
                 <a
                     key={p}
-                    href={tenderFilesService.getFileUrl(p)}
+                    href={fileUploadService.getFileUrl(p)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-primary underline truncate max-w-[110px]"

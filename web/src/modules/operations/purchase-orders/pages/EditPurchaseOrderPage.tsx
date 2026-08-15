@@ -3,7 +3,7 @@ import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { MultiSelectField } from "@/components/form/MultiSelectField";
-import { TenderFileUploader } from "@/components/tender-file-upload";
+import { FileUploader } from "@/components/file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -615,13 +615,13 @@ export default function EditPurchaseOrderPage() {
                             <TermsField control={form.control} />
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-                                <TenderFileUploader
+                                <FileUploader
                                     label="Technical Specifications Attachments"
                                     context="tender-documents"
                                     value={form.watch("technicalSpecsAttachments")}
                                     onChange={(paths) => form.setValue("technicalSpecsAttachments", paths)}
                                 />
-                                <TenderFileUploader
+                                <FileUploader
                                     label="Accessories / Packaging List Attachments"
                                     context="tender-documents"
                                     value={form.watch("accessoriesPackagingListAttachments")}

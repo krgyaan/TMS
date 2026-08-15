@@ -10,7 +10,7 @@ import { formatINR } from "@/hooks/useINRFormatter";
 import { AlertCircle, ArrowLeft, Banknote, Calculator, ExternalLink, FileText, History, IndianRupee, Lock, Package } from "lucide-react";
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "default" | "outline" | "success" | "destructive" }> = {
     oe_request: { label: "OE Request", variant: "outline" },
@@ -26,7 +26,7 @@ function DocLinks({ paths }: Readonly<{ paths: string[] }>) {
         <div className="flex flex-wrap gap-2">
             {paths.map((path, idx) => (
                 <Button key={idx} variant="outline" size="sm" className="h-7 text-xs gap-1" asChild>
-                    <a href={tenderFilesService.getFileUrl(path)} target="_blank" rel="noopener noreferrer">
+                    <a href={fileUploadService.getFileUrl(path)} target="_blank" rel="noopener noreferrer">
                         <ExternalLink className="h-3 w-3" />
                         Doc {idx + 1}
                     </a>

@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 import { toast } from 'sonner';
 
 import { useUpdateKickoffMom } from '@/hooks/api/useKickoffMeeting';
@@ -79,7 +79,7 @@ export function WoUploadMomDialog({
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                         <FieldWrapper control={form.control} name="momFilePath" label="MOM File">
                             {(field) => (
-                                <TenderFileUploader
+                                <FileUploader
                                     context="kickoff-mom"
                                     value={field.value}
                                     onChange={field.onChange}

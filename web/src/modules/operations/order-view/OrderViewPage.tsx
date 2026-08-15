@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { PaymentRequestDetailDialog } from "@/modules/operations/payment-requests/components/PaymentRequestDetailDialog";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 import { AlertCircle, ArrowLeft, Calculator, ExternalLink, Eye, FileText } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -87,7 +87,7 @@ function AttachmentGroup({ title, paths }: Readonly<{ title: string; paths: stri
             <div className="flex flex-wrap gap-2">
                 {paths.map(path => (
                     <Button key={path} variant="outline" size="sm" className="h-7 text-xs gap-1" asChild>
-                        <a href={tenderFilesService.getFileUrl(path)} target="_blank" rel="noopener noreferrer">
+                        <a href={fileUploadService.getFileUrl(path)} target="_blank" rel="noopener noreferrer">
                             <FileText className="h-3 w-3" />
                             {getFileLabel(path)}
                         </a>
@@ -424,7 +424,7 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                                     <TableCell>
                                                         {pi.invoiceFile ? (
                                                             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" asChild>
-                                                                <a href={tenderFilesService.getFileUrl(pi.invoiceFile)} target="_blank" rel="noopener noreferrer">
+                                                                <a href={fileUploadService.getFileUrl(pi.invoiceFile)} target="_blank" rel="noopener noreferrer">
                                                                     <ExternalLink className="h-4 w-4" />
                                                                 </a>
                                                             </Button>

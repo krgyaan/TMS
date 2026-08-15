@@ -1,6 +1,6 @@
 import { paths } from '@/app/routes/paths';
-import { TenderFileUploader } from '@/components/tender-file-upload/TenderFileUploader';
-import type { TenderFileContext } from '@/components/tender-file-upload/types';
+import { FileUploader } from '@/components/file-upload/FileUploader';
+import type { FileContext } from '@/components/file-upload/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 interface WoDocumentUploaderProps {
     woDetailId: number;
     type: DocumentType;
-    context: TenderFileContext;
+    context: FileContext;
     label: string;
 }
 
@@ -52,7 +52,7 @@ const WoDocumentUploader = ({ woDetailId, type, context, label }: WoDocumentUplo
     if (isLoading) return <Skeleton className="h-32 w-full" />;
 
     return (
-        <TenderFileUploader
+        <FileUploader
             context={context}
             label={label}
             value={filePaths}
@@ -64,7 +64,7 @@ const WoDocumentUploader = ({ woDetailId, type, context, label }: WoDocumentUplo
 const getFileUrl = (filePath: string): string => {
     const fileName = filePath.split('/').pop() || filePath;
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-    return `${baseUrl}/tender-files/serve/wo-draft/${encodeURIComponent(fileName)}`;
+    return `${baseUrl}/files/serve/wo-draft/${encodeURIComponent(fileName)}`;
 };
 
 const WoUploadPage = () => {

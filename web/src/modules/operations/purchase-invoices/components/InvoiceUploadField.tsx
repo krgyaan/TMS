@@ -1,6 +1,6 @@
 import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
-import { TenderFileUploader } from "@/components/tender-file-upload";
+import { FileUploader } from "@/components/file-upload";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -67,7 +67,7 @@ export const InvoiceUploadField: React.FC<InvoiceUploadFieldProps> = ({ control 
                         )}
                     </FieldWrapper>
                     <div className="space-y-1">
-                        <TenderFileUploader
+                        <FileUploader
                             label="Upload Invoice *"
                             context="tender-documents"
                             value={invoiceFile || []}
