@@ -17,7 +17,7 @@ import {
 import type { DbInstance } from '@/db';
 import { normalize } from 'path';
 import { basename } from 'path';
-import { TenderFilesService } from '@/modules/tendering/tender-files/tender-files.service';
+import { FileUploadService } from '@/modules/file-upload/file-upload.service';
 
 @Injectable()
 export class EmailService {
@@ -31,7 +31,7 @@ export class EmailService {
         private readonly gmail: GmailClient,
         private readonly recipientResolver: RecipientResolver,
         private readonly config: ConfigService,
-        private readonly tenderFilesService: TenderFilesService,
+        private readonly fileUploadService: FileUploadService,
     ) {
         this.isProd = this.config.get('NODE_ENV') === 'production';
         const rootDir = this.isProd ? 'dist' : 'src';
@@ -106,8 +106,8 @@ export class EmailService {
                 }
             }
 
-            // Delegate to TenderFilesService for absolute path resolution
-            const absolutePath = this.tenderFilesService.getAbsolutePath(finalRelative);
+            // Delegate to FileUploadService for absolute path resolution
+            const absolutePath = this.fileUploadService.getAbsolutePath(finalRelative);
 
             if (!fs.existsSync(absolutePath)) {
                 this.logger.warn(`Attachment not found on disk for RFQ/tender email: ${finalRelative}`);
