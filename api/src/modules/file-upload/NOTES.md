@@ -12,8 +12,8 @@ limits (max files, max size, allowed types) and its own **storage directory** un
 - Stored paths are **relative** (`{context}/{fileName}`, e.g. `emds/1723456789012_scan.pdf`) and
   persisted on domain tables (e.g. `rfqs.path`, `payment_requests.cheque_image_path`,
   `tender_document_checklists.extra_documents`).
-- `storageDir` defaults to `tendering` (see `DEFAULT_STORAGE_DIR` in `config/file-configs.ts`);
-  contexts can override it per-entry. This keeps all legacy data resolving correctly.
+- `storageDir` is applied per module in `config/index.ts` (see the table below). DB paths stay
+  context-relative, so they resolve automatically regardless of the on-disk folder.
 - AMC contexts (`amc-*`) use a readable filename `{userId}_{ddmmyy}_{hhmmss}_{name}.ext` so the
   uploader + time can be recovered (see `web/src/components/file-upload/helpers/fileMeta.ts`).
 
@@ -27,34 +27,82 @@ limits (max files, max size, allowed types) and its own **storage directory** un
 | GET | `/files/serve/:context/:fileName` | JWT | Stream file with correct MIME |
 | DELETE | `/files/:context/:fileName` | JWT | Delete file from disk |
 
+## Config structure (single registration point)
+
+```
+config/
+├── index.ts               # merges all module configs → FILE_CONFIGS; FileContext = keyof typeof FILE_CONFIGS
+├── common.ts              # MIME consts, FileConfig, DEFAULT_STORAGE_DIR, formatBytes/isImage/isPdf
+├── tendering.config.ts    # storageDir: tendering
+├── bi-dashboard.config.ts # storageDir: bi-dashboard
+├── operations.config.ts   # storageDir: operations
+├── services.config.ts     # storageDir: services
+├── shared.config.ts       # storageDir: shared
+├── accounts.config.ts     # storageDir: accounts
+├── insurance.config.ts    # storageDir: insurance
+└── crm.config.ts          # storageDir: crm
+```
+
+`FileContext` is derived from the merged map keys, and the controller's zod enum derives from the
+same keys — **the union can never drift from the config again**. Compression rules
+(`compressImages: true, imageQuality: 80, compressPdf: true, pdfQuality: 80`) come from
+`DEFAULT_COMPRESSION` in `common.ts` and are applied to every context at merge time; per-entry
+values override the defaults.
+
 ## Adding a new upload context (usage guide)
 
-1. Add the context name to the `FileContext` union in `api/src/modules/file-upload/config/file-configs.ts`
-   **and** `web/src/components/file-upload/types.ts` (keep both in sync).
-2. Add a `FILE_CONFIGS` entry in `file-configs.ts`:
+1. Add one entry to the module's config file in `config/` (e.g. `operations.config.ts`):
    ```ts
    "my-module-doc": {
-       storageDir: "my-module",        // optional; defaults to "tendering"
        maxFiles: 3,
        maxSizeBytes: MB(10),
        allowedMimeTypes: [...DOCS, ...OFFICE],
        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"],
-       compressImages: true,
-       imageQuality: 80,
-       compressPdf: true,
-       pdfQuality: 80,
    },
    ```
-3. The directory `uploads/{storageDir}/{context}` is created automatically on startup.
-4. Render the uploader in the form:
+   The context inherits the module's `storageDir` **and** the default compression
+   rules from `DEFAULT_COMPRESSION` in `common.ts` (images+PDFs compressed at
+   quality 80). Only add compression fields when a context needs different
+   behavior (e.g. `compressImages: false`). **No type registration needed** —
+   neither backend nor frontend.
+2. The directory `uploads/{storageDir}/{context}` is created automatically on startup.
+3. Render the uploader in the form:
    ```tsx
    import { FileUploader, CompactFileUploader } from "@/components/file-upload";
    ```
    - `FileUploader` — multi-file dropzone; `value: string[]`, `onChange(paths)`.
    - `CompactFileUploader` — single-file; `value: string | undefined`, `onChange(path | undefined)`.
-5. Build display/download URLs with `fileUploadService.getFileUrl(path)` →
-   `${base}/files/serve/${path}` (guarded, requires login). Do **not** hardcode `/uploads/...`
-   for contexts whose `storageDir` is not `tendering`.
+4. Build display/download URLs with `fileUploadService.getFileUrl(path)` →
+   `${base}/files/serve/${path}` (guarded, requires login). Do **not** hardcode `/uploads/...`.
+
+> Frontend note: `FileContext` (`web/src/components/file-upload/types.ts`) is a loose
+> `string`-accepting type with a `KNOWN_CONTEXTS` suggestion list for autocomplete. The backend
+> validates contexts at runtime (unknown → 400 + uploader fallback banner).
+
+## Storage dirs (one folder per module)
+
+| Module | storageDir | Contexts |
+|---|---|---|
+| tendering | `tendering` | tender-*, rfq-*, bid-*, emds, checklists, tq, result screenshots, … |
+| bi-dashboard | `bi-dashboard` | bg-*, fdr-*, dd-*, cheque-* |
+| operations | `operations` | wo-*, mcaClosure, kickoff-mom, contract-agreement, payment-proof |
+| services | `services` | amc-*, customer-attachments |
+| shared | `shared` | pqr-*, finance-document |
+| accounts | `accounts` | bankLoanSchedule, sanctionLetter, tdsDocument, bankNoc |
+| insurance | `insurance` | insurances |
+| crm | `crm` | followups |
+
+## Migrating existing files (live server)
+
+All contexts previously lived under `uploads/tendering/{context}`. After deploying, run once:
+
+```
+pnpm run migrate:uploads            # in api/
+pnpm run migrate:uploads -- --dry-run   # preview first
+```
+
+Idempotent script: `api/scripts/migrate-file-upload-dirs.ts`. Full old→new folder mapping in
+`docs/uploads-storage-migration.md`.
 
 ## Frontend files
 
@@ -106,8 +154,8 @@ limits (max files, max size, allowed types) and its own **storage directory** un
 - `uploads/tendering/` is shared with non-uploader features that must not be moved:
   `tender-result.controller.ts` (multer `result-screenshots`), `pdf/config/pdf-config.ts`
   (`payment-pdfs` output), `vendor-work-order` / `purchase-order` PDF rename + serve, and
-  `payment-requests-notification.service.ts` static `/uploads/tendering/...` URLs.
+  `payment-requests-notification.service.ts` static `/uploads/bi-dashboard/...` URLs (updated).
 - Some legacy view pages build **static** `/uploads/tendering/...` links (e.g. `RfqView`,
-  `RfqResponseDetailAccordion`, `SentRfqsResponsesHistory`, `RfqResponsesViewer`, `BankGuaranteeView`).
-  These only work for contexts that still use the default `storageDir` (`tendering`) — prefer
+  `RfqResponseDetailAccordion`, `SentRfqsResponsesHistory`, `RfqResponsesViewer`). These only
+  work for contexts that still use the default `storageDir` (`tendering`) — prefer
   `fileUploadService.getFileUrl()` in new code.

@@ -8,7 +8,7 @@ import * as path from 'path';
 import sharp from 'sharp';
 import { PDFDocument } from 'pdf-lib';
 import { AppLogger } from '@/logger/app-logger.service';
-import { getFileConfig, getStorageDir, formatBytes, isImage, type FileContext, type FileConfig, FILE_CONFIGS } from './config/file-configs';
+import { getFileConfig, getStorageDir, formatBytes, isImage, type FileContext, type FileConfig, type ResolvedFileConfig, FILE_CONFIGS } from './config';
 
 export interface UploadedFile {
     originalName: string;
@@ -201,7 +201,7 @@ export class FileUploadService implements OnModuleInit {
     private async processAndSave(
         file: Express.Multer.File,
         context: FileContext,
-        config: FileConfig,
+        config: ResolvedFileConfig,
         userId: number,
     ): Promise<UploadedFile> {
         // Generate unique filename. AMC contexts use a readable timestamp so the

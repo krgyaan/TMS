@@ -24,6 +24,7 @@
         "drizzle:generate": "drizzle-kit generate --config ./drizzle.config.ts",
         "drizzle:migrate": "drizzle-kit migrate --config ./drizzle.config.ts",
         "db:seed": "tsx src/db/seed.ts",
+        "migrate:uploads": "ts-node -r tsconfig-paths/register scripts/migrate-file-upload-dirs.ts",
         "postinstall": "npx puppeteer browsers install chrome"
     },
     "dependencies": {

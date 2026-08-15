@@ -22,7 +22,7 @@ const FileLink = ({ file }: { file?: string }) => {
         const nameParts = fileName.split('.');
         const nameWithoutExt = nameParts.length > 1 ? nameParts.slice(0, -1).join('.') : fileName;
         if (nameWithoutExt.endsWith('_te_')) {
-            return `/uploads/tendering/bg-po-files/${fileName}`;
+            return `/uploads/bi-dashboard/bg-po-files/${fileName}`;
         }
 
         return fileUploadService.getFileUrl(filePath);

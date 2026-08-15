@@ -1,0 +1,179 @@
+import { MB, DOCS, OFFICE, ARCHIVES, MIME, type FileConfig } from './common';
+
+/**
+ * Tendering module contexts. All files stored under uploads/tendering/.
+ */
+export const tenderingConfigs: Record<string, FileConfig> = {
+    "tender-documents": {
+        maxFiles: 5,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx"],
+    },
+    emds: {
+        maxFiles: 1,
+        maxSizeBytes: MB(5),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
+    "tender-fees": {
+        maxFiles: 1,
+        maxSizeBytes: MB(5),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
+    "physical-docs": {
+        maxFiles: 10,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
+    rfqs: {
+        maxFiles: 10,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar"],
+    },
+    "rfq-scope-of-work": {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar"],
+    },
+    "rfq-tech-specs": {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar"],
+    },
+    "rfq-detailed-boq": {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar"],
+    },
+    "rfq-maf-format": {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar"],
+    },
+    "rfq-mii-format": {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar"],
+    },
+    "rfq-response-quotation": {
+        maxFiles: 5,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar"],
+    },
+    "rfq-response-technical": {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar"],
+    },
+    "rfq-response-maf": {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar"],
+    },
+    "rfq-response-mii": {
+        maxFiles: 3,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE, ...ARCHIVES],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar"],
+    },
+    "info-sheets": {
+        maxFiles: 10,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx"],
+    },
+    "costing-sheets": {
+        maxFiles: 1,
+        maxSizeBytes: MB(15),
+        allowedMimeTypes: [MIME.PDF, MIME.XLS, MIME.XLSX],
+allowedExtensions: [".pdf", ".xls", ".xlsx"],
+        compressImages: false,
+    },
+    "bid-submitted-docs": {
+        maxFiles: 3,
+        maxSizeBytes: MB(8),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
+    "bid-submission-proof": {
+        maxFiles: 3,
+        maxSizeBytes: MB(8),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
+    "bid-final-price-ss": {
+        maxFiles: 3,
+        maxSizeBytes: MB(8),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
+    "tender-results": {
+        maxFiles: 1,
+        maxSizeBytes: MB(5),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
+    checklists: {
+        maxFiles: 10,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
+    "tq-management": {
+        maxFiles: 10,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, MIME.DOC, MIME.DOCX],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"],
+    },
+    screenshot_qualified_parties: {
+        maxFiles: 2,
+        maxSizeBytes: MB(8),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
+    screenshot_decrements: {
+        maxFiles: 2,
+        maxSizeBytes: MB(8),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
+    final_result_screenshot: {
+        maxFiles: 2,
+        maxSizeBytes: MB(8),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
+    "result-screenshots": {
+        maxFiles: 2,
+        maxSizeBytes: MB(8),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
+    "tender-rejection-proof": {
+        maxFiles: 5,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
+    "cancel-tender": {
+        maxFiles: 1,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+        imageQuality: 100,
+        compressPdf: false,
+        pdfQuality: 100,
+    },
+};

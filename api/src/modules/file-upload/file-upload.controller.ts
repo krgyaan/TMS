@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { Public } from '@/modules/auth/decorators/public.decorator';
 import { CurrentUser, type CurrentUserType } from '@/decorators/current-user.decorator';
 import { FileUploadService } from './file-upload.service';
-import { FILE_CONFIGS, type FileContext } from './config/file-configs';
+import { FILE_CONFIGS, type FileContext } from './config';
 
 // Validation schema
 const ContextSchema = z.enum(Object.keys(FILE_CONFIGS) as [FileContext, ...FileContext[]]);

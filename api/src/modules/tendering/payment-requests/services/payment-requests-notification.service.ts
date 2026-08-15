@@ -126,7 +126,7 @@ export class PaymentRequestsNotificationService {
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
 
         const softCopyChequeUrl = chequeDetails.chequeImagePath
-            ? `${apiUrl.replace('/api/v1', '')}/uploads/tendering/${chequeDetails.chequeImagePath}`
+            ? `${apiUrl.replace('/api/v1', '')}/uploads/bi-dashboard/${chequeDetails.chequeImagePath}`
             : '';
 
         let receivingChequeUrl = '';
@@ -228,7 +228,7 @@ export class PaymentRequestsNotificationService {
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
 
         const softCopyChequeUrl = chequeDetails.chequeImagePath
-            ? `${apiUrl.replace('/api/v1', '')}/uploads/tendering/${chequeDetails.chequeImagePath}`
+            ? `${apiUrl.replace('/api/v1', '')}/uploads/bi-dashboard/${chequeDetails.chequeImagePath}`
             : '';
 
         let receivingChequeUrl = '';
@@ -569,7 +569,7 @@ export class PaymentRequestsNotificationService {
         const baseUrl = apiUrl.replace('/api/v1', '');
 
         const chequePdfUrl = chequeDetails?.chequeImagePath
-            ? `${baseUrl}/uploads/tendering/${chequeDetails.chequeImagePath}`
+            ? `${baseUrl}/uploads/bi-dashboard/${chequeDetails.chequeImagePath}`
             : '';
 
         const receivingPdfUrl = instrument.generatedPdf
@@ -1397,7 +1397,7 @@ export class PaymentRequestsNotificationService {
             const apiUrl = this.configService.get<string>('app.apiUrl') || '';
             const baseUrl = apiUrl.replace('/api/v1', '');
             const softCopyUrl = bg.bgDetails.bgSoftCopy
-                ? `${baseUrl}/uploads/tendering/${bg.bgDetails.bgSoftCopy}`
+                ? `${baseUrl}/uploads/bi-dashboard/${bg.bgDetails.bgSoftCopy}`
                 : '';
 
             const data = {
@@ -1525,7 +1525,7 @@ export class PaymentRequestsNotificationService {
             const apiUrl = this.configService.get<string>('app.apiUrl') || '';
             const baseUrl = apiUrl.replace('/api/v1', '');
             const softCopyUrl = bg.bgDetails.bgSoftCopy
-                ? `${baseUrl}/uploads/tendering/${bg.bgDetails.bgSoftCopy}`
+                ? `${baseUrl}/uploads/bi-dashboard/${bg.bgDetails.bgSoftCopy}`
                 : '';
 
             const data = {
