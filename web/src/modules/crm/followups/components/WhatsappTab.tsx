@@ -6,8 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Loader2, MessageCircle, Edit, Save, X, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
-import { TenderFileUploader } from "@/components/tender-file-upload";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { FileUploader } from "@/components/file-upload";
+import { fileUploadService } from "@/services/api/file-upload.service";
 import { format } from "date-fns";
 import { paths } from "@/app/routes/paths";
 import {
@@ -80,7 +80,7 @@ function WhatsappCreateForm({ leadId }: { leadId: number }) {
                 </FieldWrapper>
 
                 <div className="space-y-2">
-                    <TenderFileUploader
+                    <FileUploader
                         context="followups"
                         value={attachmentPaths}
                         onChange={setAttachmentPaths}
@@ -207,7 +207,7 @@ function WhatsappFollowupCard({ followup, leadId }: { followup: BaseFollowup; le
                             {followup.attachments.map((path, idx) => (
                                 <a
                                     key={idx}
-                                    href={tenderFilesService.getFileUrl(path)}
+                                    href={fileUploadService.getFileUrl(path)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="flex items-center gap-2 text-sm text-blue-500 hover:underline"

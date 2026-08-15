@@ -7,8 +7,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Loader2, Send, Edit, Save, X, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
-import { TenderFileUploader } from "@/components/tender-file-upload";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { FileUploader } from "@/components/file-upload";
+import { fileUploadService } from "@/services/api/file-upload.service";
 import { format } from "date-fns";
 import { paths } from "@/app/routes/paths";
 import {
@@ -116,7 +116,7 @@ Write your mail body here..."
                 </div>
 
                 <div className="space-y-2">
-                    <TenderFileUploader
+                    <FileUploader
                         context="followups"
                         value={attachmentPaths}
                         onChange={setAttachmentPaths}
@@ -271,7 +271,7 @@ function MailFollowupCard({
                             {followup.attachments.map((path: string, idx: number) => (
                                 <a
                                     key={idx}
-                                    href={tenderFilesService.getFileUrl(path)}
+                                    href={fileUploadService.getFileUrl(path)}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="flex items-center gap-2 text-sm text-blue-500 hover:underline"

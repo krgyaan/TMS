@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Loader2, FileText, Edit, Save, X, ChevronDown, ChevronUp, Mail, User, MapPin, Phone, Briefcase, Eye } from "lucide-react";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
-import { TenderFileUploader } from "@/components/tender-file-upload";
+import { FileUploader } from "@/components/file-upload";
 import { useUsers } from "@/hooks/api/useUsers";
 import { format } from "date-fns";
 import { paths } from "@/app/routes/paths";
@@ -151,7 +151,7 @@ function LetterCreateForm({ leadId }: { leadId: number }) {
                     </FieldWrapper>
 
                     <div className="col-span-full">
-                        <TenderFileUploader
+                        <FileUploader
                             context="followups"
                             value={attachmentPaths}
                             onChange={setAttachmentPaths}
