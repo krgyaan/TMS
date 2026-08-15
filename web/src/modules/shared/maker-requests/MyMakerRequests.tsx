@@ -18,10 +18,10 @@ import { formatINR } from "@/hooks/useINRFormatter";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { getShortId } from "@/lib/id-utils";
 import type { MakerRequestRow } from "@/modules/shared/maker-requests/helpers/makerRequest.types";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
-import { TenderFileUploader } from "@/components/tender-file-upload";
+import { FileUploader } from "@/components/file-upload";
 import { useUploadMakerInvoiceAfterPayment } from "@/hooks/api/useMakerRequests";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
@@ -331,7 +331,7 @@ const MyMakerRequests: React.FC = () => {
                                     <Label className="text-muted-foreground text-xs">Bill / Proof Files</Label>
                                     <div className="flex flex-wrap gap-2 mt-1">
                                         {detail.billFiles.map((f, i) => (
-                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                            <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
                                         ))}
                                     </div>
                                 </div>
@@ -341,7 +341,7 @@ const MyMakerRequests: React.FC = () => {
                                     <Label className="text-muted-foreground text-xs">Upload Invoice</Label>
                                     <div className="flex flex-wrap gap-2 mt-1">
                                         {detail.uploadInvoice.map((f, i) => (
-                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                            <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
                                         ))}
                                     </div>
                                 </div>
@@ -351,7 +351,7 @@ const MyMakerRequests: React.FC = () => {
                                     <Label className="text-muted-foreground text-xs">Upload PI</Label>
                                     <div className="flex flex-wrap gap-2 mt-1">
                                         {detail.uploadPI.map((f, i) => (
-                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                            <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
                                         ))}
                                     </div>
                                 </div>
@@ -361,7 +361,7 @@ const MyMakerRequests: React.FC = () => {
                                     <Label className="text-muted-foreground text-xs">Upload Invoice after Payment</Label>
                                     <div className="flex flex-wrap gap-2 mt-1">
                                         {detail.uploadInvoiceAfterPayment.map((f, i) => (
-                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                            <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
                                         ))}
                                     </div>
                                 </div>
@@ -377,7 +377,7 @@ const MyMakerRequests: React.FC = () => {
                                         {detail.poFile && (
                                             <div className="flex justify-between">
                                                 <span className="text-muted-foreground">PO File:</span>
-                                                <a href={tenderFilesService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download PO</a>
+                                                <a href={fileUploadService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download PO</a>
                                             </div>
                                         )}
                                         <div className="flex justify-between">
@@ -411,7 +411,7 @@ const MyMakerRequests: React.FC = () => {
                                         {detail.uploadedInvoiceFile && (
                                             <div className="flex justify-between">
                                                 <span className="text-muted-foreground">Uploaded Invoice:</span>
-                                                <a href={tenderFilesService.getFileUrl(detail.uploadedInvoiceFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download Invoice</a>
+                                                <a href={fileUploadService.getFileUrl(detail.uploadedInvoiceFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download Invoice</a>
                                             </div>
                                         )}
                                         <div className="pt-2">
@@ -488,7 +488,7 @@ const MyMakerRequests: React.FC = () => {
                                 <p className="text-sm"><strong>Amount:</strong> {formatINR(uploadInvoiceRow.amount)}</p>
                             </div>
                             <div className="space-y-1">
-                                <TenderFileUploader
+                                <FileUploader
                                     label="Upload Invoice"
                                     context="tender-documents"
                                     value={uploadInvoiceFiles}

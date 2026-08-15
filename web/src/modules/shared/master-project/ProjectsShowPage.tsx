@@ -127,7 +127,7 @@ const ProjectsShowPage = () => {
                                 <td className="py-3 text-foreground">
                                     {poUploads.length > 0 ? (
                                         poUploads.map((file, index) => {
-                                            const url = `/api/v1/tender-files/serve/${file}`;
+                                            const url = `/api/v1/files/serve/${file}`;
                                             return (
                                                 <div key={`${file}-${index}`}>
                                                     <a
@@ -180,7 +180,7 @@ const ProjectsShowPage = () => {
                                 <td className="py-3 text-foreground">
                                     {performanceProof.length > 0 ? (
                                         performanceProof.map((file, index) => {
-                                            const url = `/api/v1/tender-files/serve/${file}`;
+                                            const url = `/api/v1/files/serve/${file}`;
                                             return (
                                                 <div key={`${file}-${index}`}>
                                                     <a
@@ -217,7 +217,7 @@ const ProjectsShowPage = () => {
                                 <td className="py-3 text-foreground">
                                     {completionProof.length > 0 ? (
                                         completionProof.map((file, index) => {
-                                            const url = `/api/v1/tender-files/serve/${file}`;
+                                            const url = `/api/v1/files/serve/${file}`;
                                             return (
                                                 <div key={`${file}-${index}`}>
                                                     <a

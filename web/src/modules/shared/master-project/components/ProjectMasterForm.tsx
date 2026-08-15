@@ -9,7 +9,7 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/form/DateInput";
-import { TenderFileUploader } from "@/components/tender-file-upload";
+import { FileUploader } from "@/components/file-upload";
 import { ArrowLeft, Save } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { ProjectMasterFormSchema } from "../helpers/projectMaster.schema";
@@ -344,7 +344,7 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
                                 label="Upload PO"
                             >
                                 {field => (
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="pqr-po"
                                         value={field.value ?? []}
                                         onChange={paths => field.onChange(paths)}
@@ -359,7 +359,7 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
                                 label="Performance Certificate"
                             >
                                 {field => (
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="pqr-performance-certificate"
                                         value={field.value ?? []}
                                         onChange={paths => field.onChange(paths)}
@@ -374,7 +374,7 @@ export function MasterProjectForm({ mode, existingData }: MasterProjectFormProps
                                 label="Completion Document"
                             >
                                 {field => (
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="pqr-completion"
                                         value={field.value ?? []}
                                         onChange={paths => field.onChange(paths)}

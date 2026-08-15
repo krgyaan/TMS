@@ -8,7 +8,7 @@ import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
 import { SelectField } from '@/components/form/SelectField';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 import { ArrowLeft, Save } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { FinanceDocumentFormSchema } from '../helpers/financeDocument.schema';
@@ -129,7 +129,7 @@ export function FinanceDocumentForm({ mode, existingData }: FinanceDocumentFormP
                             />
                             <FieldWrapper control={form.control} name="uploadFile" label="Upload File">
                                 {(field) => (
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="finance-document"
                                         value={field.value ?? []}
                                         onChange={(paths) => field.onChange(paths)}

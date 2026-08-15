@@ -9,7 +9,7 @@ import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
 import { SelectField } from '@/components/form/SelectField';
 import { DateInput } from '@/components/form/DateInput';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 import { Textarea } from '@/components/ui/textarea';
 import { NumberInput } from '@/components/form/NumberInput';
 import { ArrowLeft, Save } from 'lucide-react';
@@ -175,7 +175,7 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="uploadPo" label="Upload PO">
                                 {(field) => (
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="pqr-po"
                                         value={field.value ?? []}
                                         onChange={(paths) => field.onChange(paths)}
@@ -185,7 +185,7 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="uploadSapGemPo" label="Upload SAP/GEM PO">
                                 {(field) => (
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="pqr-sap-gem-po"
                                         value={field.value ?? []}
                                         onChange={(paths) => field.onChange(paths)}
@@ -195,7 +195,7 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="uploadCompletion" label="Upload Completion">
                                 {(field) => (
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="pqr-completion"
                                         value={field.value ?? []}
                                         onChange={(paths) => field.onChange(paths)}
@@ -205,7 +205,7 @@ export function PqrForm({ mode, existingData }: PqrFormProps) {
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="performanceCertificate" label="Upload Performance Certificate">
                                 {(field) => (
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="pqr-performance-certificate"
                                         value={field.value ?? []}
                                         onChange={(paths) => field.onChange(paths)}

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SelectField } from "@/components/form/SelectField";
-import { TenderFileUploader } from "@/components/tender-file-upload";
+import { FileUploader } from "@/components/file-upload";
 import { useBeneficiaries, useCreateBeneficiary } from "@/hooks/api/useProjectPaymentRequests";
 import { useCreateMakerRequest } from "@/hooks/api/useMakerRequests";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -393,7 +393,7 @@ export default function CreateMakerRequestPage() {
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
                                 {selectedCategoryConfig?.uploadInvoice && (
                                     <div>
-                                        <TenderFileUploader
+                                        <FileUploader
                                             label="Upload Invoice"
                                             context="tender-documents"
                                             value={form.watch("uploadInvoice")}
@@ -406,7 +406,7 @@ export default function CreateMakerRequestPage() {
                                 )}
                                 {selectedCategoryConfig?.uploadPI && (
                                     <div>
-                                        <TenderFileUploader
+                                        <FileUploader
                                             label="Upload PI"
                                             context="tender-documents"
                                             value={form.watch("uploadPI")}

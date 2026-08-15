@@ -149,7 +149,7 @@ const PqrShowPage = () => {
                                 <td className="py-3 text-foreground space-y-1">
                                     {poFiles.length > 0 ? (
                                         poFiles.map((file, index) => {
-                                            const url = `/api/v1/tender-files/serve/${file}`;
+                                            const url = `/api/v1/files/serve/${file}`;
                                             return (
                                                 <div key={`${file}-${index}`}>
                                                     <a
@@ -176,7 +176,7 @@ const PqrShowPage = () => {
                                 <td className="py-3 text-foreground space-y-1">
                                     {sapGemPoFiles.length > 0 ? (
                                         sapGemPoFiles.map((file, index) => {
-                                            const url = `/api/v1/tender-files/serve/${file}`;
+                                            const url = `/api/v1/files/serve/${file}`;
                                             return (
                                                 <div key={`${file}-${index}`}>
                                                     <a
@@ -205,7 +205,7 @@ const PqrShowPage = () => {
                                 <td className="py-3 text-foreground space-y-1">
                                     {completionFiles.length > 0 ? (
                                         completionFiles.map((file, index) => {
-                                            const url = `/api/v1/tender-files/serve/${file}`;
+                                            const url = `/api/v1/files/serve/${file}`;
                                             return (
                                                 <div key={`${file}-${index}`}>
                                                     <a
@@ -234,7 +234,7 @@ const PqrShowPage = () => {
                                 <td className="py-3 text-foreground space-y-1">
                                     {performanceCertFiles.length > 0 ? (
                                         performanceCertFiles.map((file, index) => {
-                                            const url = `/api/v1/tender-files/serve/${file}`;
+                                            const url = `/api/v1/files/serve/${file}`;
                                             return (
                                                 <div key={`${file}-${index}`}>
                                                     <a

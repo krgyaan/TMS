@@ -140,7 +140,7 @@ const FinanceDocumentShowPage = () => {
                                 <td className="py-3 text-foreground space-y-1">
                                     {documentFiles.length > 0 ? (
                                         documentFiles.map((fileName, index) => {
-                                            const url = `/api/v1/tender-files/serve/${fileName}`;
+                                            const url = `/api/v1/files/serve/${fileName}`;
                                             return (
                                                 <div key={`${fileName}-${index}`}>
                                                     <a
