@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
-import { TenderFileUploader } from "@/components/tender-file-upload/TenderFileUploader";
+import { FileUploader } from "@/components/file-upload/FileUploader";
 import { paths } from "@/app/routes/paths";
 import { useConference, useCreateConference, useUpdateConference } from "@/hooks/api/useConference";
 import {
@@ -144,7 +144,7 @@ export function ConferenceForm({ complaintId, conferenceId }: ConferenceFormProp
                             <Image className="h-4 w-4 text-muted-foreground" />
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Additional Photos/Videos</p>
                         </div>
-                        <TenderFileUploader
+                        <FileUploader
                             context="customer-attachments"
                             value={attachmentPaths.map(p => p.path)}
                             onChange={paths => setAttachmentPaths(paths.map(p => ({ path: p })))}
@@ -159,7 +159,7 @@ export function ConferenceForm({ complaintId, conferenceId }: ConferenceFormProp
                             <Mic className="h-4 w-4 text-muted-foreground" />
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Phone Voice Recording</p>
                         </div>
-                        <TenderFileUploader
+                        <FileUploader
                             context="customer-attachments"
                             value={voiceRecordingPath ? [voiceRecordingPath] : []}
                             onChange={handleVoiceRecordingChange}

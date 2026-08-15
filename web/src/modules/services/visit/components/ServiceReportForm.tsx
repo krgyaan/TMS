@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { DateTimeInput } from "@/components/form/DateTimeInput";
-import { TenderFileUploader } from "@/components/tender-file-upload/TenderFileUploader";
+import { FileUploader } from "@/components/file-upload/FileUploader";
 import { paths } from "@/app/routes/paths";
 import { useServiceVisit, useCreateServiceVisit, useUpdateServiceVisit } from "@/hooks/api/useServiceVisit";
 import {
@@ -152,7 +152,7 @@ export function ServiceReportForm({ complaintId, reportId }: ServiceReportFormPr
                             <ImageIcon className="h-4 w-4 text-muted-foreground" />
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Photo After Resolution</p>
                         </div>
-                        <TenderFileUploader
+                        <FileUploader
                             context="customer-attachments"
                             value={resolvedPhotoPaths.map(p => p.path)}
                             onChange={paths => setResolvedPhotoPaths(paths.map(p => ({ path: p })))}
@@ -167,7 +167,7 @@ export function ServiceReportForm({ complaintId, reportId }: ServiceReportFormPr
                             <FileText className="h-4 w-4 text-muted-foreground" />
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer-Signed Visit Report</p>
                         </div>
-                        <TenderFileUploader
+                        <FileUploader
                             context="customer-attachments"
                             value={signedPhotoPaths.map(p => p.path)}
                             onChange={paths => setSignedPhotoPaths(paths.map(p => ({ path: p })))}

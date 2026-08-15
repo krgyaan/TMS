@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 
 export interface ConferenceAttachment {
     path: string;
@@ -73,4 +73,4 @@ export const conferenceFormDefaultValues: ConferenceFormValues = {
 };
 
 export const conferenceAttachmentUrl = (value?: string | null): string =>
-    value ? tenderFilesService.getFileUrl(value) : "";
+    value ? fileUploadService.getFileUrl(value) : "";

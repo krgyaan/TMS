@@ -12,7 +12,7 @@ import { Loader2, FileText, FileUp, FileSignature } from "lucide-react";
 import { useAmcService, useAmcServiceFileUpload } from "@/hooks/api/useAmcServices";
 import type { ServicePathField } from "@/modules/services/amc/helpers/amc.types";
 import { serviceFileUrl } from "@/modules/services/amc/helpers/amc.types";
-import { TenderFileUploader } from "@/components/tender-file-upload/TenderFileUploader";
+import { FileUploader } from "@/components/file-upload/FileUploader";
 
 interface UploadServiceReportModalProps {
     open: boolean;
@@ -87,7 +87,7 @@ export function UploadServiceReportModal({
                             </a>
                         </div>
                     )}
-                    <TenderFileUploader
+                    <FileUploader
                         context="amc-service-reports"
                         value={paths}
                         onChange={setPaths}

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
-import { TenderFileUploader } from "@/components/tender-file-upload/TenderFileUploader";
+import { FileUploader } from "@/components/file-upload/FileUploader";
 import { paths } from "@/app/routes/paths";
 import { useCustomer, useCreateCustomer, useUpdateCustomer } from "@/hooks/api/useCustomer";
 import {
@@ -281,7 +281,7 @@ export function CustomerCreateForm({ complaintId }: { complaintId?: number }) {
                                 <FileText className="h-3.5 w-3.5" /> Current attachment
                             </a>
                         )}
-                        <TenderFileUploader
+                        <FileUploader
                             context="customer-attachments"
                             value={attachmentPaths}
                             onChange={setAttachmentPaths}

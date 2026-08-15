@@ -21,7 +21,7 @@ import { useProjectsMaster } from "@/hooks/api/useProjects";
 import { useItems } from "@/hooks/api/useItems";
 import { useUsers } from "@/hooks/api/useUsers";
 import { useAmc, useCreateAmc, useUpdateAmc } from "@/hooks/api/useAmc";
-import { TenderFileUploader } from "@/components/tender-file-upload/TenderFileUploader";
+import { FileUploader } from "@/components/file-upload/FileUploader";
 import {
     AmcFormSchema,
     amcFormDefaultValues,
@@ -900,7 +900,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                                         <FileText className="h-3.5 w-3.5" /> Current format file
                                     </a>
                                 )}
-                                <TenderFileUploader
+                                <FileUploader
                                     context="amc-service-report"
                                     value={reportFormatPaths}
                                     onChange={setReportFormatPaths}
@@ -921,7 +921,7 @@ export function AmcCreateForm({ amcId }: { amcId?: number }) {
                                         <FileText className="h-3.5 w-3.5" /> Current PO file
                                     </a>
                                 )}
-                                <TenderFileUploader
+                                <FileUploader
                                     context="amc-po"
                                     value={amcPoPaths}
                                     onChange={setAmcPoPaths}

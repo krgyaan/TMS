@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 
 export interface CustomerServiceEngineer {
     id?: number;
@@ -86,4 +86,4 @@ export const customerFormDefaultValues: CustomerFormValues = {
 };
 
 export const customerAttachmentUrl = (value?: string | null): string =>
-    value ? tenderFilesService.getFileUrl(value) : "";
+    value ? fileUploadService.getFileUrl(value) : "";

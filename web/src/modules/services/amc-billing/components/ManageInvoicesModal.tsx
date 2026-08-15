@@ -13,7 +13,7 @@ import { useAmcBilling, useAddInvoices, useRemoveInvoice } from "@/hooks/api/use
 import { billFileUrl } from "@/modules/services/amc/helpers/amc.types";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { cn } from "@/lib/utils";
-import { TenderFileUploader } from "@/components/tender-file-upload/TenderFileUploader";
+import { FileUploader } from "@/components/file-upload/FileUploader";
 
 interface ManageInvoicesModalProps {
     open: boolean;
@@ -173,7 +173,7 @@ export function ManageInvoicesModal({ open, onOpenChange, billingId }: ManageInv
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Invoice Files
                         </p>
-                        <TenderFileUploader
+                        <FileUploader
                             context="amc-invoices"
                             value={paths}
                             onChange={setPaths}

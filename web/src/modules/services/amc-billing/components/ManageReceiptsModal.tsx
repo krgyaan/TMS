@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Banknote, Trash2 } from "lucide-react";
 import { useAmcBilling, useAddReceipts, useRemoveReceipt } from "@/hooks/api/useAmcBilling";
 import { billFileUrl } from "@/modules/services/amc/helpers/amc.types";
-import { TenderFileUploader } from "@/components/tender-file-upload/TenderFileUploader";
+import { FileUploader } from "@/components/file-upload/FileUploader";
 
 interface ManageReceiptsModalProps {
     open: boolean;
@@ -110,7 +110,7 @@ export function ManageReceiptsModal({ open, onOpenChange, billingId }: ManageRec
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Receipt Files
                         </p>
-                        <TenderFileUploader
+                        <FileUploader
                             context="amc-receipts"
                             value={paths}
                             onChange={setPaths}

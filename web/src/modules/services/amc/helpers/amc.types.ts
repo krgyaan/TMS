@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 
 // ============================================
 // AMC ENTITY TYPES
@@ -107,7 +107,7 @@ export const filledReport = (entries?: string[] | null): string | null =>
 
 const fileServeUrl = (value?: string | null, legacyDir?: string): string => {
     if (!value) return "";
-    if (value.includes("/") || value.includes("\\")) return tenderFilesService.getFileUrl(value);
+    if (value.includes("/") || value.includes("\\")) return fileUploadService.getFileUrl(value);
     return legacyDir ? `/uploads/${legacyDir}/${value}` : "";
 };
 

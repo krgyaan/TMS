@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 
 export interface ServiceVisitAttachment {
     path: string;
@@ -80,4 +80,4 @@ export const serviceVisitFormDefaultValues: ServiceVisitFormValues = {
 };
 
 export const serviceVisitAttachmentUrl = (value?: string | null): string =>
-    value ? tenderFilesService.getFileUrl(value) : "";
+    value ? fileUploadService.getFileUrl(value) : "";
