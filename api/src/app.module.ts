@@ -89,7 +89,7 @@ import { ReverseAuctionModule } from "@/modules/tendering/reverse-auction/revers
 import { RfqResponseModule } from "@/modules/tendering/rfq-response/rfq-response.module";
 import { RfqsModule } from "@/modules/tendering/rfqs/rfq.module";
 import { TenderApprovalModule } from "@/modules/tendering/tender-approval/tender-approval.module";
-import { TenderFilesModule } from "@/modules/tendering/tender-files/tender-files.module";
+import { FileUploadModule } from "@/modules/file-upload/file-upload.module";
 import { TenderResultModule } from "@/modules/tendering/tender-result/tender-result.module";
 import { TendersModule } from "@/modules/tendering/tenders/tenders.module";
 import { TqManagementModule } from "@/modules/tendering/tq-management/tq-management.module";
@@ -215,7 +215,7 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         ReverseAuctionModule,
         TenderResultModule,
         ImprestAdminModule,
-        TenderFilesModule,
+        FileUploadModule,
         EmailModule,
         EmdResponsibilitiesModule,
         FinancialYearModule,
