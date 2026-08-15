@@ -9,7 +9,7 @@ import { Save, IndianRupee, ArrowLeft } from 'lucide-react';
 import { TdsRecoveredFormSchema, type TdsRecoveredFormValues } from '../helpers/loanAdvance.schema';
 import { useCreateTdsRecovery } from '@/hooks/api/useLoanAdvance';
 import DateInput from '@/components/form/DateInput';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 import { formatINR } from '@/hooks/useINRFormatter';
 
 interface TdsRecoveredFormProps {
@@ -108,7 +108,7 @@ export function TdsRecoveredForm({
 
                             {/* TDS Return Document */}
                             <div className="md:col-span-2 lg:col-span-1">
-                                <TenderFileUploader
+                                <FileUploader
                                     context="tdsDocument"
                                     value={tdsDocument}
                                     onChange={(paths) => form.setValue('tdsDocument', paths)}

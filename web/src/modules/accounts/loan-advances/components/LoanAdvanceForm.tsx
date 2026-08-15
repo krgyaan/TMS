@@ -17,7 +17,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import SelectField from '@/components/form/SelectField';
 import { useLoanPartyOptions } from '@/hooks/useSelectOptions';
 import DateInput from '@/components/form/DateInput';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 
 interface LoanAdvanceFormProps {
     mode: 'create' | 'edit';
@@ -209,7 +209,7 @@ export function LoanAdvanceForm({ mode, existingData }: LoanAdvanceFormProps) {
                         <div className="space-y-4">
                             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 items-start">
                                 {/* Sanction Letter Upload */}
-                                <TenderFileUploader
+                                <FileUploader
                                     context="sanctionLetter"
                                     value={sanctionLetter}
                                     onChange={(paths) => form.setValue("sanctionLetter", paths)}
@@ -218,7 +218,7 @@ export function LoanAdvanceForm({ mode, existingData }: LoanAdvanceFormProps) {
                                 />
 
                                 {/* Bank Loan Schedule Upload */}
-                                <TenderFileUploader
+                                <FileUploader
                                     context="bankLoanSchedule"
                                     value={bankLoanSchedule}
                                     onChange={(paths) => form.setValue("bankLoanSchedule", paths)}

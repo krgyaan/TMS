@@ -6,7 +6,7 @@ import { Form } from '@/components/ui/form';
 import { Save, FileCheck, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { LoanClosureFormSchema, type LoanClosureFormValues } from '../helpers/loanAdvance.schema';
 import { useCloseLoanAdvance } from '@/hooks/api/useLoanAdvance';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { LoanAdvanceResponse } from '../helpers/loanAdvance.types';
 
@@ -93,7 +93,7 @@ export function LoanClosureForm({ loan, onSuccess, onCancel }: LoanClosureFormPr
                         <div className="grid gap-4 md:grid-cols-2">
                             {/* Bank NOC Document */}
                             <div>
-                                <TenderFileUploader
+                                <FileUploader
                                     context="bankNoc"
                                     value={bankNocDocument}
                                     onChange={(paths) => form.setValue('bankNocDocument', paths)}
@@ -105,7 +105,7 @@ export function LoanClosureForm({ loan, onSuccess, onCancel }: LoanClosureFormPr
                             {/* MCA Closure Document (only if charge created on MCA) */}
                             {requiresMcaClosure && (
                                 <div>
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="mcaClosure"
                                         value={closureCreatedMca}
                                         onChange={(paths) => form.setValue('closureCreatedMca', paths)}

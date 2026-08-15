@@ -9,7 +9,7 @@ import { paths } from '@/app/routes/paths';
 import { formatDate, formatDateTime } from '@/hooks/useFormatedDate';
 import type { BankContactResponse, DueEmiResponse, LoanAdvanceFullDetails, TdsRecoveryResponse } from '../helpers/loanAdvance.types';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { tenderFilesService } from '@/services/api/tender-files.service';
+import { fileUploadService } from '@/services/api/file-upload.service';
 
 // Helper component for displaying label-value pairs
 interface DetailItemProps {
@@ -62,7 +62,7 @@ const FileDownloadButtons = ({
                     asChild
                 >
                     <a
-                        href={tenderFilesService.getFileUrl(file)}
+                        href={fileUploadService.getFileUrl(file)}
                         target="_blank"
                         rel="noopener noreferrer"
                     >
@@ -485,7 +485,7 @@ const LoanAdvanceView = ({ loanAdvance }: LoanAdvanceViewProps) => {
                                                         {recovery.tdsDocument.map((doc, idx) => (
                                                             <Button key={idx} variant="ghost" size="sm" asChild>
                                                                 <a
-                                                                    href={tenderFilesService.getFileUrl(doc)}
+                                                                    href={fileUploadService.getFileUrl(doc)}
                                                                     target="_blank"
                                                                     rel="noopener noreferrer"
                                                                 >
