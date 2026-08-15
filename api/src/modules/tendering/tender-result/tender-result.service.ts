@@ -1093,7 +1093,7 @@ export class TenderResultService {
 
         const screenshotLinks = allScreenshotPaths.map(path => ({
             name: path.split('/').pop() || path,
-            url: `${fileBaseUrl}/tender-files/serve/${path}`,
+            url: `${fileBaseUrl}/files/serve/${path}`,
         }));
 
         const emailData = {
@@ -1133,7 +1133,7 @@ export class TenderResultService {
         uploadedBy: number){
         const fileBaseUrl = this.configService.get<string>('app.apiUrl') || '';
         const cancelledUrl = tender.finalScreenshot
-            ? `${fileBaseUrl}/tender-files/serve/${tender.finalScreenshot}`
+            ? `${fileBaseUrl}/files/serve/${tender.finalScreenshot}`
             : null;
 
         const emailData = {

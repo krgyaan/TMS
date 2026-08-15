@@ -864,7 +864,7 @@ export class TenderInfosService {
                   : JSON.parse(data.documents);
 
                 if (Array.isArray(docPaths)) {
-                    documentUrls = docPaths.map(path => `${apiUrl}/tender-files/serve/${path}`);
+                    documentUrls = docPaths.map(path => `${apiUrl}/files/serve/${path}`);
                 }
             } catch (e) {
                 this.logger.error(`Failed to parse tender documents: ${e}`);
@@ -1013,7 +1013,7 @@ export class TenderInfosService {
                   : JSON.parse(documentsString);
 
                 if (Array.isArray(docPaths)) {
-                    documentUrls = docPaths.map(path => `${apiUrl}/tender-files/serve/${path}`);
+                    documentUrls = docPaths.map(path => `${apiUrl}/files/serve/${path}`);
                 }
             } catch (e) {
                 this.logger.error(`Failed to parse tender documents for update: ${e}`);

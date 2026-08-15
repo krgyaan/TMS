@@ -1450,7 +1450,7 @@ export class TenderInfoSheetsService {
                     name: doc.projectName || `Document ${doc.id}`,
                     path: doc.poDocument?.[0] || null,
                     url: doc.poDocument?.[0]
-                        ? `${this.configService.get<string>('app.apiUrl') || ''}/tender-files/serve/${doc.poDocument[0]}`
+                        ? `${this.configService.get<string>('app.apiUrl') || ''}/files/serve/${doc.poDocument[0]}`
                         : null
                 })
             ),
@@ -1459,19 +1459,19 @@ export class TenderInfoSheetsService {
                     name: doc.documentName || `Document ${doc.id}`,
                     path: doc.documentPath?.[0] || null,
                     url: doc.documentPath?.[0]
-                        ? `${this.configService.get<string>('app.apiUrl') || ''}/tender-files/serve/${doc.documentPath[0]}`
+                        ? `${this.configService.get<string>('app.apiUrl') || ''}/files/serve/${doc.documentPath[0]}`
                         : null
                 })
             ),
             tender_docs: tenderDocsList,
             tender_docs_urls: tenderDocsList.map(
-                (file) => `${this.configService.get<string>('app.apiUrl') || ''}/tender-files/serve/${file}`
+                (file) => `${this.configService.get<string>('app.apiUrl') || ''}/files/serve/${file}`
             ),
 
             // ── Rejection Proofs ─
             rejection_proofs: (infoSheet.teRejectionProof ?? []).map((path) => ({
                 path,
-                url: `${this.configService.get<string>('app.apiUrl') || ''}/tender-files/serve/${path}`
+                url: `${this.configService.get<string>('app.apiUrl') || ''}/files/serve/${path}`
             })),
 
             // ── File Base URL for email links ─

@@ -1095,7 +1095,7 @@ export class TqManagementService {
             tqData,
             coordinator: coordinatorName,
             tq_document_url: tqRecord.tqDocumentReceived
-                ? `${this.configService.get<string>('app.apiUrl') || ''}/tender-files/serve/${tqRecord.tqDocumentReceived}`
+                ? `${this.configService.get<string>('app.apiUrl') || ''}/files/serve/${tqRecord.tqDocumentReceived}`
                 : null,
             tq_document_name: tqRecord.tqDocumentReceived
                 ? tqRecord.tqDocumentReceived.split('/').pop()
@@ -1188,13 +1188,13 @@ export class TqManagementService {
             timeBeforeDeadline,
             teName: teUser.name,
             replied_document_url: tqRecord.repliedDocument
-                ? `${fileBaseUrl}/tender-files/serve/${tqRecord.repliedDocument}`
+                ? `${fileBaseUrl}/files/serve/${tqRecord.repliedDocument}`
                 : null,
             replied_document_name: tqRecord.repliedDocument
                 ? tqRecord.repliedDocument.split('/').pop()
                 : null,
             proof_of_submission_url: tqRecord.proofOfSubmission
-                ? `${fileBaseUrl}/tender-files/serve/${tqRecord.proofOfSubmission}`
+                ? `${fileBaseUrl}/files/serve/${tqRecord.proofOfSubmission}`
                 : null,
             proof_of_submission_name: tqRecord.proofOfSubmission
                 ? tqRecord.proofOfSubmission.split('/').pop()

@@ -1247,19 +1247,19 @@ export class ReverseAuctionService {
             ra_close_price: formatCurrency(raRecord.raClosePrice),
             ra_duration: raDuration,
             qualified_parties_url: raRecord.screenshotQualifiedParties
-                ? `${fileBaseUrl}/tender-files/serve/${raRecord.screenshotQualifiedParties}`
+                ? `${fileBaseUrl}/files/serve/${raRecord.screenshotQualifiedParties}`
                 : null,
             qualified_parties_name: raRecord.screenshotQualifiedParties
                 ? raRecord.screenshotQualifiedParties.split('/').pop()
                 : null,
             decrements_url: raRecord.screenshotDecrements
-                ? `${fileBaseUrl}/tender-files/serve/${raRecord.screenshotDecrements}`
+                ? `${fileBaseUrl}/files/serve/${raRecord.screenshotDecrements}`
                 : null,
             decrements_name: raRecord.screenshotDecrements
                 ? raRecord.screenshotDecrements.split('/').pop()
                 : null,
             final_result_url: raRecord.finalResultScreenshot
-                ? `${fileBaseUrl}/tender-files/serve/${raRecord.finalResultScreenshot}`
+                ? `${fileBaseUrl}/files/serve/${raRecord.finalResultScreenshot}`
                 : null,
             final_result_name: raRecord.finalResultScreenshot
                 ? raRecord.finalResultScreenshot.split('/').pop()

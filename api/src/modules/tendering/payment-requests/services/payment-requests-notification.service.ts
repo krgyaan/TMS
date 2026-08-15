@@ -1046,7 +1046,7 @@ export class PaymentRequestsNotificationService {
         const legacyData = instrument.legacyData as Record<string, any> | null;
         const paymentProofPath = legacyData?.payment_proof || instrument.generatedPdf || undefined;
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
-        const paymentProofUrl = paymentProofPath ? `${apiUrl}/tender-files/serve/${paymentProofPath}` : '';
+        const paymentProofUrl = paymentProofPath ? `${apiUrl}/files/serve/${paymentProofPath}` : '';
 
         const tenderTeamId = await this.getTenderTeamId(instrument.tenderId || 0, instrument.requestedBy || 0);
 

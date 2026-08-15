@@ -1001,7 +1001,7 @@ export class BidSubmissionsService {
         // Build document links
         const fileBaseUrl = this.configService.get<string>('app.apiUrl') || '';
         const buildUrl = (path?: string | null) =>
-            path ? `${fileBaseUrl}/tender-files/serve/${path}` : null;
+            path ? `${fileBaseUrl}/files/serve/${path}` : null;
 
         const submittedDocs = bidSubmission.documents?.submittedDocs ?? [];
         const document_urls = submittedDocs.map(path => ({

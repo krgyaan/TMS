@@ -1024,7 +1024,7 @@ export class TenderApprovalService {
             const apiUrl = this.configService.get<string>("app.apiUrl") || "";
             infoSheet.teRejectionProof.forEach((path: string) => {
                 if (path) {
-                    rejectionProofs.push(`${apiUrl}/tender-files/serve/${path}`);
+                    rejectionProofs.push(`${apiUrl}/files/serve/${path}`);
                 }
             });
         }
@@ -1103,7 +1103,7 @@ export class TenderApprovalService {
                 if (doc.poDocument?.[0]) {
                     technicalDocUrls.push({
                         name: doc.projectName || `PQR ${doc.id}`,
-                        url: `${apiUrl}/tender-files/serve/${doc.poDocument[0]}`,
+                        url: `${apiUrl}/files/serve/${doc.poDocument[0]}`,
                     });
                 }
             });
@@ -1115,7 +1115,7 @@ export class TenderApprovalService {
                 if (doc.documentPath?.[0]) {
                     financialDocUrls.push({
                         name: doc.documentName || `Finance Doc ${doc.id}`,
-                        url: `${apiUrl}/tender-files/serve/${doc.documentPath[0]}`,
+                        url: `${apiUrl}/files/serve/${doc.documentPath[0]}`,
                     });
                 }
             });
@@ -1125,7 +1125,7 @@ export class TenderApprovalService {
         if (payload.quotationFiles && payload.quotationFiles.length > 0) {
             payload.quotationFiles.forEach((file: string) => {
                 if (file) {
-                    quotationFileUrls.push(`${apiUrl}/tender-files/serve/${file}`);
+                    quotationFileUrls.push(`${apiUrl}/files/serve/${file}`);
                 }
             });
         }

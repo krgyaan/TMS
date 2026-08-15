@@ -453,7 +453,7 @@ export class DocumentChecklistsService {
         // Build extra documents with file URLs
         const extraDocuments = (checklist.extraDocuments || []).map(doc => ({
             name: doc.name,
-            url: doc.path ? `${apiUrl}/tender-files/serve/${doc.path}` : null,
+            url: doc.path ? `${apiUrl}/files/serve/${doc.path}` : null,
         }));
 
         const emailData = {
