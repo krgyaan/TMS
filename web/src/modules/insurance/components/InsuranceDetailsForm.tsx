@@ -2,7 +2,7 @@ import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { NumberInput } from "@/components/form/NumberInput";
 import { SelectField } from "@/components/form/SelectField";
-import { TenderFileUploader } from "@/components/tender-file-upload";
+import { FileUploader } from "@/components/file-upload";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { useFormContext } from "react-hook-form";
@@ -72,7 +72,7 @@ export function InsuranceDetailsForm() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                 <div className="space-y-2">
                     <Label>Upload Policy <span className="text-destructive">*</span></Label>
-                    <TenderFileUploader
+                    <FileUploader
                         context={INSURANCES_CONTEXT}
                         value={policyDocument}
                         onChange={v => setValue("policyDocument", v, { shouldValidate: true })}
@@ -81,7 +81,7 @@ export function InsuranceDetailsForm() {
                 {insuranceType === "Transit" && (
                     <div className="space-y-2">
                         <Label>LR Copy</Label>
-                        <TenderFileUploader
+                        <FileUploader
                             context={INSURANCES_CONTEXT}
                             value={lrCopy}
                             onChange={v => setValue("lrCopy", v, { shouldValidate: true })}

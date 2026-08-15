@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { useInsurancePolicy } from "@/hooks/api/useInsurancePolicies";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
-import { tenderFilesService } from "@/services/api/tender-files.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 import { paths } from "@/app/routes/paths";
 import { AlertCircle, ArrowLeft, Download } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -37,7 +37,7 @@ const FileList = ({ files }: { files?: string[] | null }) => {
             <div className="flex flex-wrap gap-2">
                 {files.map((filePath, i) => (
                     <Button key={i} variant="outline" size="sm" asChild>
-                        <a href={tenderFilesService.getFileUrl(filePath)} target="_blank" rel="noreferrer">
+                        <a href={fileUploadService.getFileUrl(filePath)} target="_blank" rel="noreferrer">
                             <Download className="h-4 w-4" /> File {i + 1}
                         </a>
                     </Button>
