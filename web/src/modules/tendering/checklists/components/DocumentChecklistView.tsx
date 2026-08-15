@@ -6,7 +6,7 @@ import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { FileText, ExternalLink, Download } from 'lucide-react';
 import type { TenderDocumentChecklist } from '../helpers/documentChecklist.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import { tenderFilesService } from '@/services/api/tender-files.service';
+import { fileUploadService } from '@/services/api/file-upload.service';
 
 interface DocumentChecklistViewProps {
     checklist?: TenderDocumentChecklist | null;
@@ -81,7 +81,7 @@ export function DocumentChecklistView({ checklist }: DocumentChecklistViewProps)
                                                             size="sm"
                                                             className="flex-1 h-8 text-xs gap-1"
                                                             disabled={!doc.path}
-                                                            onClick={() => doc.path && window.open(tenderFilesService.getFileUrl(doc.path), '_blank')}
+                                                            onClick={() => doc.path && window.open(fileUploadService.getFileUrl(doc.path), '_blank')}
                                                         >
                                                             <ExternalLink className="h-3 w-3" />
                                                         </Button>
@@ -93,7 +93,7 @@ export function DocumentChecklistView({ checklist }: DocumentChecklistViewProps)
                                                             onClick={() => {
                                                                 if (doc.path) {
                                                                     const a = document.createElement('a');
-                                                                    a.href = tenderFilesService.getFileUrl(doc.path);
+                                                                    a.href = fileUploadService.getFileUrl(doc.path);
                                                                     a.download = doc.path.split('/').pop() || doc.name;
                                                                     a.click();
                                                                 }

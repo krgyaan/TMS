@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Save, IndianRupee } from 'lucide-react';
 import { useUploadRaResult } from '@/hooks/api/useReverseAuctions';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 import { showErrorToast } from '@/utils/errorToast';
 
 const UploadRaResultSchema = z.object({
@@ -230,21 +230,21 @@ export default function RAResultForm({
                                 Upload Screenshots
                             </h4>
                             <div className="grid gap-4 md:grid-cols-2">
-                                <TenderFileUploader
+                                <FileUploader
                                     context="ra-screenshots"
                                     value={screenshotQualifiedParties}
                                     onChange={(paths) => form.setValue('screenshotQualifiedParties', paths)}
                                     label="Screenshot of Qualified Parties"
                                     disabled={isSubmitting}
                                 />
-                                <TenderFileUploader
+                                <FileUploader
                                     context="ra-screenshots"
                                     value={screenshotDecrements}
                                     onChange={(paths) => form.setValue('screenshotDecrements', paths)}
                                     label="Screenshot of Decrements"
                                     disabled={isSubmitting}
                                 />
-                                <TenderFileUploader
+                                <FileUploader
                                     context="ra-screenshots"
                                     value={finalResultScreenshot}
                                     onChange={(paths) => form.setValue('finalResultScreenshot', paths)}

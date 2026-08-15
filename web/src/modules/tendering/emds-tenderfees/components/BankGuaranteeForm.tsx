@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { BG_PURPOSE_OPTIONS, BG_NEEDED_IN_OPTIONS, BANKS } from '../constants';
 import DateInput from '@/components/form/DateInput';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 
 interface PaymentFormBaseProps {
     amount?: number;
@@ -94,13 +94,13 @@ export function BankGuaranteeForm({ amount, prefix = 'emd.details', readOnly = f
             </div>
 
             <div className="grid grid-cols-3 md:grid-cols-3 gap-4">
-                <TenderFileUploader
+                <FileUploader
                     context="bg-format-files"
                     label="BG Format (Max 5 files)"
                     value={bgFormatFiles}
                     onChange={(paths) => setValue(`${prefix}.bgFormatFiles`, paths)}
                 />
-                <TenderFileUploader
+                <FileUploader
                     context="bg-po-files"
                     label="PO/Tender/Request Letter"
                     value={bgPoFiles}

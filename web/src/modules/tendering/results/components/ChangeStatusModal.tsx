@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { type SubmitHandler, useForm, useWatch } from 'react-hook-form';
+import { FileUploader } from '@/components/file-upload';
+import { FieldWrapper } from '@/components/form/FieldWrapper';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -10,17 +9,16 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
-import { FieldWrapper } from '@/components/form/FieldWrapper';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { TenderFileUploader } from '@/components/tender-file-upload';
 import { uploadChangeStatusResult } from '@/hooks/api/useTenderResults';
-import { XCircle, AlertTriangle, ArrowLeft, CheckCircle2 } from 'lucide-react';
-import { ChangeStatusSchema } from "../helpers/tenderResult.schema" 
-import type {ChangeStatusDto as FormValues} from "../helpers/tenderResult.schema";
+import { zodResolver } from '@hookform/resolvers/zod';
+import { AlertTriangle, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { type SubmitHandler, useForm, useWatch } from 'react-hook-form';
+import type { ChangeStatusDto as FormValues } from "../helpers/tenderResult.schema";
+import { ChangeStatusSchema } from "../helpers/tenderResult.schema";
 
 interface ChangeStatusModalProps {
     open: boolean;
@@ -203,7 +201,7 @@ export function ChangeStatusModal({
                                         Upload relevant official document, notice, or portal screenshot.
                                     </p>
                                     <div className="border border-dashed border-destructive/20 rounded-xl p-3 bg-destructive/5 mt-2">
-                                        <TenderFileUploader
+                                        <FileUploader
                                             context="cancel-tender"
                                             value={finalResultScreenshot ? [finalResultScreenshot] : []}
                                             onChange={(paths) => form.setValue('finalResultScreenshot', paths[0] || '')}

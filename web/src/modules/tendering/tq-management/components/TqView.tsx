@@ -105,7 +105,7 @@ export function TqView({
 
         // Get base URL from axios instance
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-        return `${baseUrl}/tender-files/serve/${context}/${encodeURIComponent(fileName)}`;
+        return `${baseUrl}/files/serve/${context}/${encodeURIComponent(fileName)}`;
     };
 
     return (

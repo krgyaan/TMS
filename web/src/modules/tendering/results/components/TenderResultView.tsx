@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 
 import { useTenderResultByTenderId } from '@/hooks/api/useTenderResults';
 
-import { tenderFilesService } from '@/services/api/tender-files.service';
+import { fileUploadService } from '@/services/api/file-upload.service';
 import { BI_STATUSES, getReadableStatusName, getStatusBadgeVariant } from '../../emds-tenderfees/constants';
 
 import type { TenderResult } from '../helpers/tenderResult.types';
@@ -23,16 +23,16 @@ interface TenderResultViewProps {
 const getFileUrl = (filePath: string): string => {
     if (!filePath) return '';
     if (!filePath.includes('/')) {
-        return tenderFilesService.getFileUrl(`result-screenshots/${filePath}`);
+        return fileUploadService.getFileUrl(`result-screenshots/${filePath}`);
     }
     const parts = filePath.split('/');
     if (parts.length >= 2) {
         const context = parts[0];
         const fileName = parts.slice(1).join('/');
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-        return `${baseUrl}/tender-files/serve/${context}/${encodeURIComponent(fileName)}`;
+        return `${baseUrl}/files/serve/${context}/${encodeURIComponent(fileName)}`;
     }
-    return tenderFilesService.getFileUrl(filePath);
+    return fileUploadService.getFileUrl(filePath);
 };
 
 const toScreenshotArray = (v: string | string[] | null | undefined): string[] => {

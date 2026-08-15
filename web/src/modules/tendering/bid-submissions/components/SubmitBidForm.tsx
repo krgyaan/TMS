@@ -12,7 +12,7 @@ import { useEffect } from 'react';
 import { useSubmitBid, useUpdateBidSubmission } from '@/hooks/api/useBidSubmissions';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 import { SubmitBidFormSchema, type SubmitBidFormValues } from '../helpers/bidSubmission.schema';
 import type { SubmitBidFormProps } from '../helpers/bidSubmission.types';
 
@@ -69,7 +69,7 @@ export default function SubmitBidForm({
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         try {
-            // File paths are already arrays of strings from TenderFileUploader
+            // File paths are already arrays of strings from FileUploader
             // proofOfSubmission and finalPriceSs are arrays, but backend expects single string
             // Take the first file path if array has items
             const proofOfSubmissionPath = data.proofOfSubmission.length > 0 ? data.proofOfSubmission[0] : '';
@@ -214,21 +214,21 @@ export default function SubmitBidForm({
                                 </FieldWrapper>
                             </div>
                             <div className="grid gap-4 md:grid-cols-3">
-                                <TenderFileUploader
+                                <FileUploader
                                     context="bid-submitted-docs"
                                     value={submittedDocs}
                                     onChange={(paths) => form.setValue('submittedDocs', paths)}
                                     label="Submitted Bid Documents (Optional)"
                                     disabled={isSubmitting}
                                 />
-                                <TenderFileUploader
+                                <FileUploader
                                     context="bid-submission-proof"
                                     value={proofOfSubmission}
                                     onChange={(paths) => form.setValue('proofOfSubmission', paths)}
                                     label="Proof of Submission"
                                     disabled={isSubmitting}
                                 />
-                                <TenderFileUploader
+                                <FileUploader
                                     context="bid-final-price-ss"
                                     value={finalPriceSs}
                                     onChange={(paths) => form.setValue('finalPriceSs', paths)}

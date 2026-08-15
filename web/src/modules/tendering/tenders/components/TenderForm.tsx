@@ -13,7 +13,7 @@ import { NumberInput } from "@/components/form/NumberInput";
 import { SelectField } from "@/components/form/SelectField";
 import { DateTimeInput } from "@/components/form/DateTimeInput";
 import { DateInput } from "@/components/form/DateInput";
-import { TenderFileUploader } from "@/components/tender-file-upload";
+import { FileUploader } from "@/components/file-upload";
 import { useCreateTender, useUpdateTender, useGenerateTenderName } from "@/hooks/api/useTenders";
 import type { TenderInfoWithNames } from "../helpers/tenderInfo.types";
 import { paths } from "@/app/routes/paths";
@@ -339,7 +339,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                 </div>
 
                                 <div className="w-full md:w-1/2">
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="tender-documents"
                                         value={aiFiles}
                                         onChange={(paths) => aiForm.setValue("files", paths)}
@@ -503,7 +503,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="tender-documents"
                                         value={documents}
                                         onChange={(paths) => manualForm.setValue("documents", paths)}

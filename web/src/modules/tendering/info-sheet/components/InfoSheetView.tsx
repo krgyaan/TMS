@@ -15,7 +15,7 @@ import { physicalDocTypeOptions } from "@/modules/tendering/info-sheet/helpers/t
 import { formatDateTime } from "@/hooks/useFormatedDate"
 import { formatINR } from "@/hooks/useINRFormatter"
 import { useDnbStatusOptions } from "@/hooks/useSelectOptions"
-import { tenderFilesService } from "@/services/api/tender-files.service"
+import { fileUploadService } from "@/services/api/file-upload.service"
 
 interface InfoSheetViewProps {
     infoSheet?: TenderInfoSheet | null
@@ -740,7 +740,7 @@ const AllFieldsTable = ({ infoSheet }: { infoSheet: TenderInfoSheet }) => {
                                         className="text-xs hover:bg-primary/10"
                                     >
                                         <a
-                                            href={tenderFilesService.getFileUrl(
+                                            href={fileUploadService.getFileUrl(
                                                 filePath!
                                             )}
                                             target="_blank"
@@ -769,7 +769,7 @@ const AllFieldsTable = ({ infoSheet }: { infoSheet: TenderInfoSheet }) => {
                                         className="text-xs hover:bg-primary/10"
                                     >
                                         <a
-                                            href={tenderFilesService.getFileUrl(filePath!)}
+                                            href={fileUploadService.getFileUrl(filePath!)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >
@@ -938,7 +938,7 @@ export const InfoSheetView = ({ infoSheet, isLoading }: InfoSheetViewProps) => {
                                                             {infoSheet.teRejectionProof.map(
                                                                 (path, idx) => (
                                                                     <Badge key={idx} variant="outline" className="text-xs hover:bg-primary/10">
-                                                                        <a href={tenderFilesService.getFileUrl(path)} target="_blank" rel="noopener noreferrer">
+                                                                        <a href={fileUploadService.getFileUrl(path)} target="_blank" rel="noopener noreferrer">
                                                                             View Proof {" "}
                                                                             {infoSheet.teRejectionProof!.length > 1 ? idx + 1 : ""}
                                                                         </a>

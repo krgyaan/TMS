@@ -9,7 +9,7 @@ import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/te
 import { usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
 import { paths } from '@/app/routes/paths';
 import { useAuth } from '@/contexts/AuthContext';
-import { tenderFilesService } from '@/services/api/tender-files.service';
+import { fileUploadService } from '@/services/api/file-upload.service';
 
 // Helper function to map document IDs to names
 const mapDocumentIdsToNames = (ids: string[] | null | undefined, documentList: Array<{ value: string; label: string }>): string[] => {
@@ -243,7 +243,7 @@ export function TenderApprovalView({
                                                 {approval?.quotationFiles.map((doc, i) => {
                                                     return (
                                                         <Badge key={i} variant="outline" className="text-xs hover:bg-primary/10">
-                                                            <a href={tenderFilesService.getFileUrl(doc)} target="_blank" rel="noopener noreferrer">
+                                                            <a href={fileUploadService.getFileUrl(doc)} target="_blank" rel="noopener noreferrer">
                                                                 View File
                                                             </a>
                                                         </Badge>

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { NumberInput } from "@/components/form/NumberInput";
 import { SelectField } from "@/components/form/SelectField";
-import { TenderFileUploader } from "@/components/tender-file-upload";
+import { FileUploader } from "@/components/file-upload";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useUploadResult, useTenderResultByTenderId } from "@/hooks/api/useTenderResults";
 import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
@@ -403,14 +403,14 @@ export default function UploadResultFormPage({ tenderId, tenderDetails, isEditMo
                                             </div>
                                             {!isCancelled && (
                                                 <>
-                                                    <TenderFileUploader
+                                                    <FileUploader
                                                         context="result-screenshots"
                                                         value={detailValues?.qualifiedPartiesScreenshot || []}
                                                         onChange={(paths) => setValue(`details.${index}.qualifiedPartiesScreenshot`, paths)}
                                                         label="Screenshot of Qualified Parties"
                                                         disabled={submitting}
                                                     />
-                                                    <TenderFileUploader
+                                                    <FileUploader
                                                         context="result-screenshots"
                                                         value={detailValues?.finalResultScreenshot || []}
                                                         onChange={(paths) => setValue(`details.${index}.finalResultScreenshot`, paths)}

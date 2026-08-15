@@ -1,20 +1,20 @@
-import { useEffect, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { type Resolver, type SubmitHandler, useForm, useFieldArray } from 'react-hook-form';
+import { Save, Trash2 } from 'lucide-react';
+import { useEffect, useMemo } from 'react';
+import { type Resolver, type SubmitHandler, useFieldArray, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, Save, ArrowLeft } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Form } from '@/components/ui/form';
-import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { FieldWrapper } from '@/components/form/FieldWrapper';
+import { FileUploader } from '@/components/file-upload';
 import { DateTimeInput } from '@/components/form/DateTimeInput';
-import { TenderFileUploader } from '@/components/tender-file-upload';
-import { SelectField } from '@/components/form/SelectField';
+import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { NumberInput } from '@/components/form/NumberInput';
+import { SelectField } from '@/components/form/SelectField';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 
 
@@ -407,28 +407,28 @@ export function RfqResponseForm({ rfqId, rfqData, orgs, responseStatus }: RfqRes
                                         </AlertDescription>
                                     </Alert>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                        <TenderFileUploader
+                                        <FileUploader
                                             context="rfq-response-quotation"
                                             value={quotationPaths}
                                             onChange={(paths) => form.setValue('quotationPaths', paths)}
                                             label="Quotation Document"
                                             disabled={isSubmitting}
                                         />
-                                        <TenderFileUploader
+                                        <FileUploader
                                             context="rfq-response-technical"
                                             value={technicalPaths}
                                             onChange={(paths) => form.setValue('technicalPaths', paths)}
                                             label="Technical Documents"
                                             disabled={isSubmitting}
                                         />
-                                        <TenderFileUploader
+                                        <FileUploader
                                             context="rfq-response-maf"
                                             value={mafPaths}
                                             onChange={(paths) => form.setValue('mafPaths', paths)}
                                             label="MAF Document"
                                             disabled={isSubmitting}
                                         />
-                                        <TenderFileUploader
+                                        <FileUploader
                                             context="rfq-response-mii"
                                             value={miiPaths}
                                             onChange={(paths) => form.setValue('miiPaths', paths)}

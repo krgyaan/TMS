@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Save, AlertCircle, Plus, Trash2, FileText } from 'lucide-react';
-import { CompactTenderFileUploader } from '@/components/tender-file-upload';
+import { CompactFileUploader } from '@/components/file-upload';
 import { paths } from '@/app/routes/paths';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { useEffect } from 'react';
@@ -251,7 +251,7 @@ export default function DocumentChecklistForm({
                                                             label=""
                                                         >
                                                             {(field) => (
-                                                                <CompactTenderFileUploader
+                                                                <CompactFileUploader
                                                                     context="checklists"
                                                                     value={field.value || undefined}
                                                                     onChange={(path) => field.onChange(path || '')}

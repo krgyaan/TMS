@@ -5,7 +5,7 @@ import { Gavel, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import type { RaDashboardRow } from '../helpers/reverseAuction.types';
-import { tenderFilesService } from '@/services/api/tender-files.service';
+import { fileUploadService } from '@/services/api/file-upload.service';
 
 import { useReverseAuctionByTender } from '@/hooks/api/useReverseAuctions';
 
@@ -351,7 +351,7 @@ export function RaShow({
                                             </td>
                                             <td className="px-4 py-3 text-sm" colSpan={3}>
                                                 <a
-                                                    href={tenderFilesService.getFileUrl(ra.screenshotQualifiedParties)}
+                                                    href={fileUploadService.getFileUrl(ra.screenshotQualifiedParties)}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="text-primary hover:underline"
@@ -368,7 +368,7 @@ export function RaShow({
                                             </td>
                                             <td className="px-4 py-3 text-sm" colSpan={3}>
                                                 <a
-                                                    href={tenderFilesService.getFileUrl(ra.screenshotDecrements)}
+                                                    href={fileUploadService.getFileUrl(ra.screenshotDecrements)}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="text-primary hover:underline"
@@ -385,7 +385,7 @@ export function RaShow({
                                             </td>
                                             <td className="px-4 py-3 text-sm" colSpan={3}>
                                                 <a
-                                                    href={tenderFilesService.getFileUrl(ra.finalResultScreenshot)}
+                                                    href={fileUploadService.getFileUrl(ra.finalResultScreenshot)}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="text-primary hover:underline"

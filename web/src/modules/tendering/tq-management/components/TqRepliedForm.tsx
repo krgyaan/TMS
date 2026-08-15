@@ -14,7 +14,7 @@ import { useUpdateTqReplied, useTqItems } from '@/hooks/api/useTqManagement';
 import { useTqTypes } from '@/hooks/api/useTqTypes';
 import { Badge } from '@/components/ui/badge';
 import type { TenderQuery } from '../helpers/tqManagement.types';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 
 const TqRepliedFormSchema = z.object({
     repliedDatetime: z.string().min(1, 'TQ reply date and time is required'),
@@ -163,14 +163,14 @@ export default function TqRepliedForm({ tqData, mode }: TqRepliedFormProps) {
                                         />
                                     )}
                                 </FieldWrapper>
-                                <TenderFileUploader
+                                <FileUploader
                                     context="tq-management"
                                     value={repliedDocument}
                                     onChange={(paths) => form.setValue('repliedDocument', paths)}
                                     label="Submitted TQ Documents"
                                     disabled={isSubmitting}
                                 />
-                                <TenderFileUploader
+                                <FileUploader
                                     context="tq-management"
                                     value={proofOfSubmission}
                                     onChange={(paths) => form.setValue('proofOfSubmission', paths)}

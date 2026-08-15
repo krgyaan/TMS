@@ -11,7 +11,7 @@ import { useUploadRaResult } from '@/hooks/api/useReverseAuctions';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { SelectField } from '@/components/form/SelectField';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 import DateTimeInput from '@/components/form/DateTimeInput';
 import { Textarea } from '@/components/ui/textarea';
 import { showErrorToast } from '@/utils/errorToast';
@@ -256,21 +256,21 @@ export default function RAResultFormPage({
                                 Upload Screenshots
                             </h4>
                             <div className="grid gap-4 md:grid-cols-3">
-                                <TenderFileUploader
+                                <FileUploader
                                     context="screenshot_qualified_parties"
                                     value={screenshotQualifiedParties}
                                     onChange={(paths) => form.setValue('screenshotQualifiedParties', paths)}
                                     label="Screenshot of Qualified Parties"
                                     disabled={isSubmitting}
                                 />
-                                <TenderFileUploader
+                                <FileUploader
                                     context="screenshot_decrements"
                                     value={screenshotDecrements}
                                     onChange={(paths) => form.setValue('screenshotDecrements', paths)}
                                     label="Screenshot of Decrements"
                                     disabled={isSubmitting}
                                 />
-                                <TenderFileUploader
+                                <FileUploader
                                     context="final_result_screenshot"
                                     value={finalResultScreenshot}
                                     onChange={(paths) => form.setValue('finalResultScreenshot', paths)}

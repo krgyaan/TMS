@@ -7,7 +7,7 @@ import { FileText, ExternalLink, Download } from 'lucide-react';
 import type { TenderInfoWithNames } from '../helpers/tenderInfo.types'
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import { tenderFilesService } from '@/services/api/tender-files.service';
+import { fileUploadService } from '@/services/api/file-upload.service';
 
 import { useTender } from '@/hooks/api/useTenders';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
@@ -262,7 +262,7 @@ export function TenderView({
                                                         variant="ghost"
                                                         size="sm"
                                                         className="flex-1 h-8 text-xs gap-1"
-                                                        onClick={() => window.open(tenderFilesService.getFileUrl(filePath), '_blank')}
+                                                        onClick={() => window.open(fileUploadService.getFileUrl(filePath), '_blank')}
                                                     >
                                                         <ExternalLink className="h-3 w-3" />
                                                     </Button>
@@ -272,7 +272,7 @@ export function TenderView({
                                                         className="flex-1 h-8 text-xs gap-1"
                                                         onClick={() => {
                                                             const a = document.createElement('a');
-                                                            a.href = tenderFilesService.getFileUrl(filePath);
+                                                            a.href = fileUploadService.getFileUrl(filePath);
                                                             a.download = getFileName(filePath);
                                                             a.click();
                                                         }}

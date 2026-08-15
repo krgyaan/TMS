@@ -24,8 +24,7 @@ import { TenderApprovalFormSchema } from '../helpers/tenderApproval.schema';
 import type { TenderApprovalFormValues } from '../helpers/tenderApproval.types';
 import { getInitialValues, mapFormToPayload } from '../helpers/tenderApproval.mappers';
 import { usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
-// import { TenderFileUploader } from '@/components/tender-file-upload/TenderFileUploader';
-import { tenderFilesService } from '@/services/api/tender-files.service';
+import { fileUploadService } from '@/services/api/file-upload.service';
 import { formatINR } from '@/hooks/useINRFormatter';
 
 interface TenderApprovalFormProps {
@@ -505,7 +504,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
 
                                     {/* {rfqRequired === 'no' && (
                                         <div className="space-y-2">
-                                            <TenderFileUploader
+                                            <FileUploader
                                                 context="rfq-response-quotation"
                                                 value={form.watch('quotationFiles') || []}
                                                 onChange={(paths) => form.setValue('quotationFiles', paths)}
@@ -614,7 +613,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                                     const filePath = order.poDocument?.[0];
                                                     return (
                                                         <Badge key={order.id} variant="outline" className="text-xs hover:bg-primary/10">
-                                                            <a href={tenderFilesService.getFileUrl(filePath!)} target="_blank" rel="noopener noreferrer">
+                                                            <a href={fileUploadService.getFileUrl(filePath!)} target="_blank" rel="noopener noreferrer">
                                                                 {order.projectName}
                                                             </a>
                                                         </Badge>
@@ -651,7 +650,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                                     const filePath = doc.documentPath?.[0];
                                                     return (
                                                         <Badge key={doc.id} variant="outline" className="text-xs hover:bg-primary/10">
-                                                            <a href={tenderFilesService.getFileUrl(filePath!)} target="_blank" rel="noopener noreferrer">
+                                                            <a href={fileUploadService.getFileUrl(filePath!)} target="_blank" rel="noopener noreferrer">
                                                                 {doc.documentName}
                                                             </a>
                                                         </Badge>

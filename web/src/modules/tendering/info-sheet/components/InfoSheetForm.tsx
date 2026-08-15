@@ -12,7 +12,7 @@ import { NumberInput } from '@/components/form/NumberInput';
 import { SelectField } from '@/components/form/SelectField';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { DateTimeInput } from '@/components/form/DateTimeInput';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
@@ -324,7 +324,7 @@ export function TenderInformationForm({
                                         )}
                                     </div>
                                     <div>
-                                        <TenderFileUploader
+                                        <FileUploader
                                             context="tender-rejection-proof"
                                             value={teRejectionProof}
                                             onChange={(paths) =>

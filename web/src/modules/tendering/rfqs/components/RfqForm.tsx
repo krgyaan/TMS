@@ -22,7 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 // Custom Form Components
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { DateTimeInput } from '@/components/form/DateTimeInput';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 import { SelectField } from '@/components/form/SelectField';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { NumberInput } from '@/components/form/NumberInput';
@@ -505,35 +505,35 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                                     </AlertDescription>
                                 </Alert>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="rfq-scope-of-work"
                                         value={scopeOfWorkPaths}
                                         onChange={(paths) => form.setValue("scopeOfWorkPaths", paths)}
                                         label="Scope of Work"
                                         disabled={isSubmitting}
                                     />
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="rfq-tech-specs"
                                         value={techSpecsPaths}
                                         onChange={(paths) => form.setValue("techSpecsPaths", paths)}
                                         label="Technical Specifications"
                                         disabled={isSubmitting}
                                     />
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="rfq-detailed-boq"
                                         value={detailedBoqPaths}
                                         onChange={(paths) => form.setValue("detailedBoqPaths", paths)}
                                         label="Detailed BOQ"
                                         disabled={isSubmitting}
                                     />
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="rfq-maf-format"
                                         value={mafFormatPaths}
                                         onChange={(paths) => form.setValue("mafFormatPaths", paths)}
                                         label="MAF Format"
                                         disabled={isSubmitting}
                                     />
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="rfq-mii-format"
                                         value={miiFormatPaths}
                                         onChange={(paths) => form.setValue("miiFormatPaths", paths)}

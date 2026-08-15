@@ -1,7 +1,7 @@
 import { paths } from '@/app/routes/paths';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import SelectField from '@/components/form/SelectField';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -198,7 +198,7 @@ export default function TqReceivedForm({
                                     )}
                                 </FieldWrapper>
 
-                                <TenderFileUploader
+                                <FileUploader
                                     context="tq-management"
                                     value={tqDocumentReceived}
                                     onChange={(paths) => form.setValue('tqDocumentReceived', paths)}
