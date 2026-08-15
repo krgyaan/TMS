@@ -707,7 +707,7 @@ export class BankGuaranteeService {
     }
 
     /**
-     * Get file path from body if it's a string (from TenderFileUploader)
+     * Get file path from body if it's a string (from FileUploader)
      */
     private getFilePathFromBody(fieldname: string, body: any): string | null {
         if (body[fieldname] && typeof body[fieldname] === 'string') {
@@ -1005,7 +1005,7 @@ export class BankGuaranteeService {
                 const filePaths = prefilledFiles.map(f => `bi-dashboard/${f.filename}`);
                 bgDetailsUpdate.prefilledSignedBg = JSON.stringify(filePaths);
             } else if (prefilledPath) {
-                // If it's a string path (from TenderFileUploader), parse it if it's JSON array or use as single path
+                // If it's a string path (from FileUploader), parse it if it's JSON array or use as single path
                 try {
                     const parsed = JSON.parse(prefilledPath);
                     if (Array.isArray(parsed)) {

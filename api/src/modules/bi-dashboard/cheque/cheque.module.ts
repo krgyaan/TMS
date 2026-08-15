@@ -9,13 +9,13 @@ import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-hi
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { GmailClient } from '@/modules/email/gmail.client';
-import { TenderFilesService } from '@/modules/tendering/tender-files/tender-files.service';
+import { FileUploadService } from '@/modules/file-upload/file-upload.service';
 import { EmailModule } from '@/modules/email/email.module';
 
 @Module({
     imports: [DatabaseModule, FollowUpModule, PaymentRequestsModule, EmailModule],
     controllers: [ChequeController],
-    providers: [ChequeService, TenderInfosService, TenderStatusHistoryService, EmailService, RecipientResolver, GmailClient, TenderFilesService],
+    providers: [ChequeService, TenderInfosService, TenderStatusHistoryService, EmailService, RecipientResolver, GmailClient, FileUploadService],
     exports: [ChequeService],
 })
 export class ChequeModule {}

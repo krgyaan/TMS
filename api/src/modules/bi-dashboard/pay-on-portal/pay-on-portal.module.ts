@@ -9,12 +9,12 @@ import { EmailModule } from '@/modules/email/email.module';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { GmailClient } from '@/modules/email/gmail.client';
-import { TenderFilesService } from '@/modules/tendering/tender-files/tender-files.service';
+import { FileUploadService } from '@/modules/file-upload/file-upload.service';
 
 @Module({
     imports: [DatabaseModule, FollowUpModule, EmailModule],
     controllers: [PayOnPortalController],
-    providers: [PayOnPortalService, PaymentRequestsNotificationService, EmailService, PdfGeneratorService, RecipientResolver, GmailClient, TenderFilesService],
+    providers: [PayOnPortalService, PaymentRequestsNotificationService, EmailService, PdfGeneratorService, RecipientResolver, GmailClient, FileUploadService],
     exports: [PayOnPortalService],
 })
 export class PayOnPortalModule { }

@@ -359,7 +359,7 @@ export class PayOnPortalService {
     }
 
     /**
-     * Get file path from body if it's a string (from TenderFileUploader)
+     * Get file path from body if it's a string (from FileUploader)
      * Supports single string path, JSON string of array, and actual array of paths
      */
     private getFilePathFromBody(fieldname: string, body: any): string | null {

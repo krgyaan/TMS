@@ -493,7 +493,7 @@ export class ChequeService {
 
         const actionNumber = this.mapActionToNumber(body.action);
 
-        // Get file path from body (set by TenderFileUploader prior to form submission)
+        // Get file path from body (set by FileUploader prior to form submission)
         const getFilePathFromBody = (fieldname: string, body: any): string | null => {
             const val = body[fieldname];
             if (!val) return null;

@@ -1,7 +1,7 @@
 import { FollowUpModule } from '@/modules/follow-up/follow-up.module';
 import { EmailModule } from '@/modules/email/email.module';
 import { PaymentRequestsModule } from '@/modules/tendering/payment-requests/payment-requests.module';
-import { TenderFilesService } from '@/modules/tendering/tender-files/tender-files.service';
+import { FileUploadService } from '@/modules/file-upload/file-upload.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { DatabaseModule } from '@db/database.module';
@@ -12,7 +12,7 @@ import { DemandDraftService } from './demand-draft.service';
 @Module({
     imports: [DatabaseModule, FollowUpModule, EmailModule, PaymentRequestsModule],
     controllers: [DemandDraftController],
-    providers: [DemandDraftService, TenderInfosService, TenderStatusHistoryService, TenderFilesService],
+    providers: [DemandDraftService, TenderInfosService, TenderStatusHistoryService, FileUploadService],
     exports: [DemandDraftService],
 })
 export class DemandDraftModule { }
