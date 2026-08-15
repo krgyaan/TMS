@@ -22,7 +22,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { FileText, Users, Banknote, CheckCircle, CheckCircle2, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 import { ALL_ACTION_OPTIONS, type PayOnPortalActionFormProps } from '../helpers/payOnPortal.types';
 
 export function PayOnPortalActionForm({ instrumentId, action, formHistory, tenderId, instrumentData }: PayOnPortalActionFormProps) {
@@ -298,7 +298,7 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory, tende
                                 </div>
                                 <FieldWrapper control={form.control} name="payment_proof" label="Payment Proof (Screenshot)">
                                     {(field) => (
-                                        <TenderFileUploader
+                                        <FileUploader
                                             context="payment-proof"
                                             value={field.value || []}
                                             onChange={field.onChange}

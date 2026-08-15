@@ -25,7 +25,7 @@ import { FileText, Users, Package, Banknote, CheckCircle2, XCircle, CheckSquare,
 import { Badge } from '@/components/ui/badge';
 import { ALL_FDR_ACTION_OPTIONS, type FDRActionFormProps } from '../helpers/fdr.types';
 import { useCreateCourier } from '@/modules/shared/courier/courier.hooks';
-import { TenderFileUploader } from '@/components/tender-file-upload';
+import { FileUploader } from '@/components/file-upload';
 
 export function FdrActionForm({ instrumentId, action: propAction, tenderId, formHistory, instrumentData, linkedCheque, linkedBg }: FDRActionFormProps) {
     const navigate = useNavigate();
@@ -627,7 +627,7 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="docket_slip" label="Upload Docket Slip">
                                 {(field) => (
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="fdr-docket-slip"
                                         value={field.value ? [field.value] : []}
                                         onChange={(paths) => field.onChange(paths[0] || '')}
@@ -684,7 +684,7 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FieldWrapper control={form.control} name="covering_letter" label="Upload Signed Stamped Covering Letter from the Client">
                                 {(field) => (
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="fdr-covering-letter"
                                         value={field.value ? [field.value] : []}
                                         onChange={(paths) => field.onChange(paths[0] || '')}
@@ -693,7 +693,7 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="req_receive" label="Upload the Bank FDR cancellation request receiving from the Bank">
                                 {(field) => (
-                                    <TenderFileUploader
+                                    <FileUploader
                                         context="fdr-req-receive"
                                         value={field.value ? [field.value] : []}
                                         onChange={(paths) => field.onChange(paths[0] || '')}

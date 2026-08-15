@@ -7,8 +7,7 @@ import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { SelectField } from '@/components/form/SelectField';
-import { CompactTenderFileUploader, TenderFileUploader } from '@/components/tender-file-upload';
+import { CompactFileUploader, FileUploader } from '@/components/file-upload';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { ContactPersonFields } from '@/components/form/ContactPersonFields';
@@ -333,7 +332,7 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <FieldWrapper control={form.control} name="receiving_cheque_handed_over" label="Receiving of the cheque handed over">
                                         {(field) => (
-                                            <CompactTenderFileUploader
+                                            <CompactFileUploader
                                                 context="cheque-receiving-handed-over"
                                                 value={field.value}
                                                 onChange={field.onChange}
@@ -343,7 +342,7 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
 
                                     <FieldWrapper control={form.control} name="cheque_images" label="Upload soft copy of Cheque (both sides)">
                                         {(field) => (
-                                            <TenderFileUploader
+                                            <FileUploader
                                                 context="cheque-images"
                                                 value={field.value || []}
                                                 onChange={field.onChange}
@@ -353,7 +352,7 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
 
                                     <FieldWrapper control={form.control} name="positive_pay_confirmation" label="Upload Positive pay confirmation copy">
                                         {(field) => (
-                                            <CompactTenderFileUploader
+                                            <CompactFileUploader
                                                 context="cheque-positive-pay-confirmation"
                                                 value={field.value}
                                                 onChange={field.onChange}
@@ -441,7 +440,7 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
 
                             <FieldWrapper control={form.control} name="proof_image" label="Upload Proof Image *">
                                 {(field) => (
-                                    <CompactTenderFileUploader
+                                    <CompactFileUploader
                                         context="cheque-stop-proof-image"
                                         value={field.value}
                                         onChange={field.onChange}
@@ -513,7 +512,7 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FieldWrapper control={form.control} name="cancelled_image_path" label="Upload Photo/confirmation from Beneficiary *">
                                 {(field) => (
-                                    <CompactTenderFileUploader
+                                    <CompactFileUploader
                                         context="cheque-cancelled-image"
                                         value={field.value}
                                         onChange={field.onChange}

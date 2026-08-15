@@ -7,7 +7,7 @@ import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { SelectField } from '@/components/form/SelectField';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { CompactTenderFileUploader, TenderFileUploader } from '@/components/tender-file-upload';
+import { CompactFileUploader, FileUploader } from '@/components/file-upload';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { ContactPersonFields } from '@/components/form/ContactPersonFields';
@@ -176,7 +176,7 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
                                     />
                                     <FieldWrapper control={form.control} name="prefilled_signed_bg" label="Prefilled Bank Formats">
                                         {(field) => (
-                                            <TenderFileUploader
+                                            <FileUploader
                                                 context="bg-prefilled-signed"
                                                 value={field.value || []}
                                                 onChange={field.onChange}
@@ -188,7 +188,7 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
                             {approveBg === 'Upload by Imran' && (
                                 <FieldWrapper control={form.control} name="bg_format_imran" label="Upload Documents *">
                                     {(field) => (
-                                        <TenderFileUploader
+                                        <FileUploader
                                             context="bg-format-imran"
                                             value={field.value}
                                             onChange={field.onChange}
@@ -256,7 +256,7 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="fdr_copy" label="FDR Copy">
                                 {(field) => (
-                                    <CompactTenderFileUploader
+                                    <CompactFileUploader
                                         context="bg-fdr-copy"
                                         value={field.value}
                                         onChange={field.onChange}
@@ -265,7 +265,7 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="sfms_conf" label="SFMS Confirmation">
                                 {(field) => (
-                                    <CompactTenderFileUploader
+                                    <CompactFileUploader
                                         context="bg-sfms-conf"
                                         value={field.value}
                                         onChange={field.onChange}
@@ -358,7 +358,7 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
                             <FieldWrapper control={form.control} name="ext_letter" label="Request Letter/email from Client">
                                 {(field) => (
-                                    <CompactTenderFileUploader
+                                    <CompactFileUploader
                                         context="bg-ext-letter"
                                         value={field.value}
                                         onChange={field.onChange}
@@ -425,7 +425,7 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
                             </FieldWrapper>
                             <FieldWrapper control={form.control} name="docket_slip" label="Upload Docket Slip">
                                 {(field) => (
-                                    <CompactTenderFileUploader
+                                    <CompactFileUploader
                                         context="bg-docket-slip"
                                         value={field.value}
                                         onChange={field.onChange}
@@ -444,7 +444,7 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
                             <FieldWrapper control={form.control} name="stamp_covering_letter" label="Upload a Signed, Stamped Covering Letter">
                                 {(field) => (
-                                    <CompactTenderFileUploader
+                                    <CompactFileUploader
                                         context="bg-stamp-covering-letter"
                                         value={field.value}
                                         onChange={field.onChange}
@@ -468,7 +468,7 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
                             <FieldWrapper control={form.control} name="cancell_confirm" label="Upload the Bank BG cancellation request">
                                 {(field) => (
-                                    <CompactTenderFileUploader
+                                    <CompactFileUploader
                                         context="bg-cancell-confirm"
                                         value={field.value}
                                         onChange={field.onChange}

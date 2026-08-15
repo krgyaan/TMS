@@ -74,7 +74,7 @@ function CourierDetailsBlock({ details }: { details: any }) {
             {details.docketSlip && (
                 <div>
                     <span className="font-medium">Docket Slip:</span>{' '}
-                    <a href={`${apiUrl}/tender-files/serve/${details.docketSlip}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                    <a href={`${apiUrl}/files/serve/${details.docketSlip}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
                         <Eye className="h-3 w-3" /> View
                     </a>
                 </div>
@@ -82,7 +82,7 @@ function CourierDetailsBlock({ details }: { details: any }) {
             {details.deliveryPod && (
                 <div>
                     <span className="font-medium">Proof of Delivery:</span>{' '}
-                    <a href={`${apiUrl}/tender-files/serve/${details.deliveryPod}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                    <a href={`${apiUrl}/files/serve/${details.deliveryPod}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
                         <Eye className="h-3 w-3" /> View
                     </a>
                 </div>

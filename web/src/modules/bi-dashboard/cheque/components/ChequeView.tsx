@@ -5,7 +5,7 @@ import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Receipt, Eye } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate, formatDateTime } from '@/hooks/useFormatedDate';
-import { tenderFilesService } from '@/services/api/tender-files.service';
+import { fileUploadService } from '@/services/api/file-upload.service';
 
 interface ChequeViewProps {
     data: any;
@@ -19,7 +19,7 @@ const FileLink = ({ file }: { file?: string }) => {
     return (
         <div className="flex gap-3 items-center">
             <a
-                href={tenderFilesService.getFileUrl(file)}
+                href={fileUploadService.getFileUrl(file)}
                 target="_blank"
                 className="flex items-center gap-1 text-primary hover:underline"
             >

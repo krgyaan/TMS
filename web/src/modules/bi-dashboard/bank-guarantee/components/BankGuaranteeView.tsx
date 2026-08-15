@@ -5,7 +5,7 @@ import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Shield, Eye } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate } from '@/hooks/useFormatedDate';
-import { tenderFilesService } from '@/services/api/tender-files.service';
+import { fileUploadService } from '@/services/api/file-upload.service';
 
 const FileLink = ({ file }: { file?: string }) => {
     if (!file) return <span className="text-muted-foreground">Not Uploaded</span>;
@@ -25,7 +25,7 @@ const FileLink = ({ file }: { file?: string }) => {
             return `/uploads/tendering/bg-po-files/${fileName}`;
         }
 
-        return tenderFilesService.getFileUrl(filePath);
+        return fileUploadService.getFileUrl(filePath);
     };
 
     return (
