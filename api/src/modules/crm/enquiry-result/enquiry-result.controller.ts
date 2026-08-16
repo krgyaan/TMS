@@ -77,7 +77,7 @@ export class EnquiryResultController {
     @Post(':id/upload-screenshots')
     @UseInterceptors(FilesInterceptor('files', 10, {
         storage: diskStorage({
-            destination: './uploads/enquiry-results',
+            destination: './uploads/crm/enquiry-results',
             filename: (req, file, callback) => {
                 const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
                 const ext = extname(file.originalname);
@@ -98,7 +98,7 @@ export class EnquiryResultController {
     @Post(':id/upload-documents')
     @UseInterceptors(FilesInterceptor('files', 10, {
         storage: diskStorage({
-            destination: './uploads/enquiry-results',
+            destination: './uploads/crm/enquiry-results',
             filename: (req, file, callback) => {
                 const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
                 const ext = extname(file.originalname);

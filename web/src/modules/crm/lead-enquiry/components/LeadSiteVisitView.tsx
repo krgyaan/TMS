@@ -97,7 +97,7 @@ export function LeadSiteVisitView({ siteVisit, isLoading = false, className = ""
                                                 {documents.map((doc, i) => (
                                                     <a
                                                         key={i}
-                                                        href={`/uploads/site-visit/${doc}`}
+                                                        href={`/uploads/crm/site-visit/${doc}`}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-muted text-blue-600 hover:text-blue-800 hover:underline"

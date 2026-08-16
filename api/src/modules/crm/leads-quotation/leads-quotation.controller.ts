@@ -74,7 +74,7 @@ export class LeadsQuotationController {
     @Post(':id/upload-docs')
     @UseInterceptors(FilesInterceptor('documents', 10, {
         storage: diskStorage({
-            destination: './uploads/leads-quotations',
+            destination: './uploads/crm/leads-quotations',
             filename: (req, file, callback) => {
                 const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
                 const ext = extname(file.originalname);

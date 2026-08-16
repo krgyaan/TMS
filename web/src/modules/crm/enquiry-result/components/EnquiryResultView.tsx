@@ -247,7 +247,7 @@ export function EnquiryResultView({ result, className }: { result: EnquiryResult
                                             {result.uploadScreenshot.split(",").map(s => s.trim()).filter(Boolean).map((doc, i) => (
                                                 <a
                                                     key={i}
-                                                    href={`/uploads/enquiry-results/${doc}`}
+                                                    href={`/uploads/crm/enquiry-results/${doc}`}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-muted text-blue-600 hover:text-blue-800 hover:underline"
@@ -268,7 +268,7 @@ export function EnquiryResultView({ result, className }: { result: EnquiryResult
                                             {result.uploadDocuments.split(",").map(s => s.trim()).filter(Boolean).map((doc, i) => (
                                                 <a
                                                     key={i}
-                                                    href={`/uploads/enquiry-results/${doc}`}
+                                                    href={`/uploads/crm/enquiry-results/${doc}`}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-muted text-blue-600 hover:text-blue-800 hover:underline"

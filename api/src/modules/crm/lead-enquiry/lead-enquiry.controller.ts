@@ -149,7 +149,7 @@ export class LeadEnquiryController {
     @Post('site-visits/:id/upload-docs')
     @UseInterceptors(FilesInterceptor('documents', 10, {
         storage: diskStorage({
-            destination: './uploads/site-visit',
+            destination: './uploads/crm/site-visit',
             filename: (req, file, callback) => {
                 const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
                 const ext = extname(file.originalname);
