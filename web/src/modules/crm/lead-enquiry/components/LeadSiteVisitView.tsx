@@ -6,7 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { MapPin, User, ClipboardList, FileText, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { leadEnquiryService } from "@/services/api/lead-enquiry.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 import type { SiteVisit } from "../helpers/lead-enquiry.type";
+
+const docUrl = (doc: string): string =>
+    doc.includes("/") ? fileUploadService.getFileUrl(doc) : `/uploads/crm/site-visit/${doc}`;
 
 interface SiteVisitWithEnquiry extends SiteVisit {
     enqName?: string | null;
@@ -97,7 +101,7 @@ export function LeadSiteVisitView({ siteVisit, isLoading = false, className = ""
                                                 {documents.map((doc, i) => (
                                                     <a
                                                         key={i}
-                                                        href={`/uploads/crm/site-visit/${doc}`}
+                                                        href={docUrl(doc)}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-muted text-blue-600 hover:text-blue-800 hover:underline"

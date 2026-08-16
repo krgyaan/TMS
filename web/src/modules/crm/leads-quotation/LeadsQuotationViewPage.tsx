@@ -9,7 +9,11 @@ import { useLeadsQuotation, useUpdateQuote } from "@/hooks/api/useLeadsQuotation
 import { useLeadStepStatuses } from "@/hooks/api/useLeadStepStatuses";
 import { useLeadEnquiry } from "@/hooks/api/useLeadEnquiry";
 import { leadsQuotationService } from "@/services/api/leads-quotation.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 import { ExternalLink } from "lucide-react";
+
+const docUrl = (doc: string): string =>
+    doc.includes("/") ? fileUploadService.getFileUrl(doc) : `/uploads/crm/leads-quotations/${doc}`;
 import { cn } from "@/lib/utils";
 import type { PrivateQuote, ContactEntry } from "./helpers/leads-quotation.type";
 import { LeadDetailsSection } from "../leads/components/LeadView";
@@ -126,7 +130,7 @@ export function QuotationView({ quote, className }: { quote: PrivateQuote; class
                                     {quote.submittedDocuments.split(",").map(d => d.trim()).filter(Boolean).map((doc, i) => (
                                         <a
                                             key={i}
-                                            href={`/uploads/crm/leads-quotations/${doc}`}
+                                            href={docUrl(doc)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-muted text-blue-600 hover:text-blue-800 hover:underline"

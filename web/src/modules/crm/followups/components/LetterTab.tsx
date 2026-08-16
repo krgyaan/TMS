@@ -10,6 +10,7 @@ import { Loader2, FileText, Edit, Save, X, ChevronDown, ChevronUp, Mail, User, M
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { FileUploader } from "@/components/file-upload";
+import { fileUploadService } from "@/services/api/file-upload.service";
 import { useUsers } from "@/hooks/api/useUsers";
 import { format } from "date-fns";
 import { paths } from "@/app/routes/paths";
@@ -20,6 +21,9 @@ import {
     type LetterFormValues
 } from "@/hooks/api/useFollowups";
 import type { BaseFollowup } from "../helpers/followup.types";
+
+const docUrl = (doc: string): string =>
+    doc.includes("/") ? fileUploadService.getFileUrl(doc) : `/uploads/courier/${doc}`;
 
 const URGENCY_OPTIONS = [
     { value: '1', label: 'Very Low' },
@@ -294,7 +298,7 @@ function LetterFollowupCard({ followup, leadId }: { followup: BaseFollowup; lead
                                                 {courierDocs.map((doc, idx) => (
                                                     <a
                                                         key={idx}
-                                                        href={`/uploads/courier/${doc}`}
+                                                        href={docUrl(doc)}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-muted text-blue-600 hover:text-blue-800 hover:underline"

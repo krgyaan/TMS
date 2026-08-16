@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
     Dialog,
     DialogContent,
@@ -15,9 +15,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import NumberInput from "@/components/form/NumberInput";
-import { Loader2, Upload, Plus, X, FileText } from "lucide-react";
-import { enquiryResultService } from "@/services/api/enquiry-result.service";
+import { Loader2, Upload, Plus, X } from "lucide-react";
+import { FileUploader } from "@/components/file-upload";
 import type { EnquiryResultWithDetails, UpdateEnquiryResultRequest } from "../helpers/enquiry-result.type";
+
+const normalizePath = (value: string): string =>
+    value.includes("/") ? value : `enquiry-results/${value}`;
 
 interface UploadResultModalProps {
     open: boolean;
@@ -48,8 +51,6 @@ export function UploadResultModal({ open, onOpenChange, result, onSubmit }: Uplo
     const [screenshots, setScreenshots] = useState<string[]>([]);
     const [documents, setDocuments] = useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const screenshotInputRef = useRef<HTMLInputElement>(null);
-    const documentInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (!open) return;
@@ -62,27 +63,9 @@ export function UploadResultModal({ open, onOpenChange, result, onSubmit }: Uplo
         setL1Price(result?.l1Price ? Number(result.l1Price) : null);
         setL2Price(result?.l2Price ? Number(result.l2Price) : null);
         setOurPrice(result?.ourPrice ? Number(result.ourPrice) : null);
-        setScreenshots((result?.uploadScreenshot ?? "").split(",").map(s => s.trim()).filter(Boolean));
-        setDocuments((result?.uploadDocuments ?? "").split(",").map(s => s.trim()).filter(Boolean));
+        setScreenshots((result?.uploadScreenshot ?? "").split(",").map(s => s.trim()).filter(Boolean).map(normalizePath));
+        setDocuments((result?.uploadDocuments ?? "").split(",").map(s => s.trim()).filter(Boolean).map(normalizePath));
     }, [open, result]);
-
-    const uploadFiles = async (files: FileList | null, kind: 'screenshots' | 'documents') => {
-        if (!result || !files || files.length === 0) return;
-        const fileArray = Array.from(files);
-        try {
-            if (kind === 'screenshots') {
-                const filenames = await enquiryResultService.uploadScreenshots(result.id, fileArray);
-                setScreenshots(prev => [...prev, ...filenames]);
-            } else {
-                const filenames = await enquiryResultService.uploadDocuments(result.id, fileArray);
-                setDocuments(prev => [...prev, ...filenames]);
-            }
-        } catch {
-        } finally {
-            if (kind === 'screenshots' && screenshotInputRef.current) screenshotInputRef.current.value = '';
-            if (kind === 'documents' && documentInputRef.current) documentInputRef.current.value = '';
-        }
-    };
 
     const addParty = () => {
         setParties(prev => [...prev, { id: `p_${++idCounter}`, name: "" }]);
@@ -278,58 +261,24 @@ export function UploadResultModal({ open, onOpenChange, result, onSubmit }: Uplo
 
                             <div className="space-y-2">
                                 <Label>Upload Screenshot</Label>
-                                <input
-                                    ref={screenshotInputRef}
-                                    type="file"
-                                    multiple
-                                    onChange={(e) => uploadFiles(e.target.files, 'screenshots')}
-                                    className="hidden"
-                                    accept=".jpg,.jpeg,.png,.gif,.webp,.pdf"
+                                <FileUploader
+                                    context="enquiry-results"
+                                    value={screenshots}
+                                    onChange={setScreenshots}
+                                    disabled={isSubmitting}
+                                    label="Screenshots"
                                 />
-                                <Button type="button" variant="outline" size="sm" onClick={() => screenshotInputRef.current?.click()} disabled={isSubmitting}>
-                                    <Plus className="h-4 w-4 mr-1" /> Add Screenshot
-                                </Button>
-                                {screenshots.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 mt-2">
-                                        {screenshots.map(name => (
-                                            <div key={name} className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border bg-muted">
-                                                <FileText className="h-3 w-3 shrink-0" />
-                                                <span className="max-w-[140px] truncate">{name}</span>
-                                                <button type="button" onClick={() => setScreenshots(prev => prev.filter(n => n !== name))} className="ml-1 text-muted-foreground hover:text-destructive" disabled={isSubmitting}>
-                                                    <X className="h-3 w-3" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
                             </div>
 
                             <div className="space-y-2">
                                 <Label>Final Result</Label>
-                                <input
-                                    ref={documentInputRef}
-                                    type="file"
-                                    multiple
-                                    onChange={(e) => uploadFiles(e.target.files, 'documents')}
-                                    className="hidden"
-                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                                <FileUploader
+                                    context="enquiry-results"
+                                    value={documents}
+                                    onChange={setDocuments}
+                                    disabled={isSubmitting}
+                                    label="Documents"
                                 />
-                                <Button type="button" variant="outline" size="sm" onClick={() => documentInputRef.current?.click()} disabled={isSubmitting}>
-                                    <Plus className="h-4 w-4 mr-1" /> Add Document
-                                </Button>
-                                {documents.length > 0 && (
-                                    <div className="flex flex-wrap gap-2 mt-2">
-                                        {documents.map(name => (
-                                            <div key={name} className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border bg-muted">
-                                                <FileText className="h-3 w-3 shrink-0" />
-                                                <span className="max-w-[140px] truncate">{name}</span>
-                                                <button type="button" onClick={() => setDocuments(prev => prev.filter(n => n !== name))} className="ml-1 text-muted-foreground hover:text-destructive" disabled={isSubmitting}>
-                                                    <X className="h-3 w-3" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
                             </div>
                         </>
                     )}

@@ -32,10 +32,8 @@ class LeadsQuotationService extends BaseApiService {
         return this.patch<PrivateQuote>(`/${id}`, data);
     }
 
-    async uploadDocs(quoteId: number, files: File[]): Promise<string[]> {
-        const formData = new FormData();
-        files.forEach(f => formData.append('documents', f));
-        const res = await this.post<{ filenames: string[] }>(`/${quoteId}/upload-docs`, formData);
+    async uploadDocs(quoteId: number, filenames: string[]): Promise<string[]> {
+        const res = await this.post<{ filenames: string[] }>(`/${quoteId}/upload-docs`, { filenames });
         return res.filenames;
     }
 }

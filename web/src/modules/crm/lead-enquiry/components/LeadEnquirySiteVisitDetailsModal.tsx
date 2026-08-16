@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, MapPin, Plus, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FileUploader } from "@/components/file-upload";
 import { leadEnquiryService } from "@/services/api/lead-enquiry.service";
 
 interface ContactEntry {
@@ -48,7 +49,7 @@ export function LeadEnquirySiteVisitDetailsModal({
     onSave,
 }: LeadEnquirySiteVisitDetailsModalProps) {
     const [information, setInformation] = useState("");
-    const [documents, setDocuments] = useState<File[]>([]);
+    const [documents, setDocuments] = useState<string[]>([]);
     const [documentsStr, setDocumentsStr] = useState("");
     const [conductedAt, setConductedAt] = useState("");
     const [contacts, setContacts] = useState<ContactEntry[]>([
@@ -61,7 +62,9 @@ export function LeadEnquirySiteVisitDetailsModal({
             setInformation(initialData.information || "");
             setConductedAt(initialData.conductedAt ? initialData.conductedAt.slice(0, 16) : "");
             setDocumentsStr(initialData.documents || "");
-            setDocuments([]);
+            setDocuments((initialData.documents || "")
+                .split(",").map(s => s.trim()).filter(Boolean)
+                .map(v => v.includes("/") ? v : `site-visit/${v}`));
             if (initialData.contacts && initialData.contacts.length > 0) {
                 setContacts(initialData.contacts.map(c => ({
                     name: c.name,
@@ -71,13 +74,7 @@ export function LeadEnquirySiteVisitDetailsModal({
                 })));
             }
         }
-    }, [open, initialData]);
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            setDocuments(Array.from(e.target.files));
-        }
-    };
+}, [open, initialData]);
 
     const addContact = () => {
         setContacts([...contacts, { name: "", designation: "", phone: "", email: "" }]);
@@ -93,15 +90,15 @@ export function LeadEnquirySiteVisitDetailsModal({
         setContacts(updated);
     };
 
-    const handleSave = async () => {
+const handleSave = async () => {
         if (!siteVisitId) return;
         setIsSaving(true);
         try {
             let finalDocs = documentsStr;
             if (documents.length > 0) {
-                const serverFilenames = await leadEnquiryService.uploadSiteVisitDocs(siteVisitId, documents);
+                await leadEnquiryService.uploadSiteVisitDocs(siteVisitId, documents);
                 const existingList = documentsStr ? documentsStr.split(",").map(s => s.trim()).filter(Boolean) : [];
-                finalDocs = [...existingList, ...serverFilenames].join(",");
+                finalDocs = [...existingList, ...documents].join(",");
             }
             await onSave({
                 information,
@@ -171,22 +168,13 @@ export function LeadEnquirySiteVisitDetailsModal({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="documents">Upload Documents/Photos/Videos</Label>
-                        <div className="flex items-center gap-3">
-                            <Input
-                                id="documents"
-                                type="file"
-                                multiple
-                                onChange={handleFileChange}
-                                disabled={isSaving}
-                                className="flex-1"
-                            />
-                        </div>
-                        {documents.length > 0 && (
-                            <div className="mt-2 text-sm text-muted-foreground">
-                                {documents.length} file(s) selected: {documents.map((f) => f.name).join(", ")}
-                            </div>
-                        )}
+                        <Label>Upload Documents/Photos/Videos</Label>
+                        <FileUploader
+                            context="site-visit"
+                            value={documents}
+                            onChange={setDocuments}
+                            disabled={isSaving}
+                        />
                         {documentsStr && documents.length === 0 && (
                             <div className="mt-2 flex flex-wrap gap-1">
                                 {documentsStr.split(",").map((doc, i) => (
@@ -197,7 +185,7 @@ export function LeadEnquirySiteVisitDetailsModal({
                             </div>
                         )}
                         <p className="text-xs text-muted-foreground">
-                            Max file size: 10MB each
+                            Max file size: 25MB each
                         </p>
                     </div>
 

@@ -61,10 +61,8 @@ class LeadEnquiryService extends BaseApiService {
         return this.patch<SiteVisit>(`/site-visits/details/${id}`, data);
     }
 
-    async uploadSiteVisitDocs(siteVisitId: number, files: File[]): Promise<string[]> {
-        const formData = new FormData();
-        files.forEach(f => formData.append('documents', f));
-        const res = await this.post<{ filenames: string[] }>(`/site-visits/${siteVisitId}/upload-docs`, formData);
+    async uploadSiteVisitDocs(siteVisitId: number, filenames: string[]): Promise<string[]> {
+        const res = await this.post<{ filenames: string[] }>(`/site-visits/${siteVisitId}/upload-docs`, { filenames });
         return res.filenames;
     }
 

@@ -1,27 +1,8 @@
-import {
-    Controller,
-    Get,
-    Post,
-    Patch,
-    Delete,
-    Param,
-    ParseIntPipe,
-    Query,
-    HttpCode,
-    HttpStatus,
-    UseInterceptors,
-    UploadedFiles,
-} from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
-import { LeadsQuotationService } from './leads-quotation.service';
-import {
-    CreatePrivateQuoteSchema,
-    UpdatePrivateQuoteSchema,
-} from './dto/leads-quotation.dto';
 import { ValidatedBody } from '@/decorators/validated-body.decorator';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import type { CreatePrivateQuoteDto, UpdatePrivateQuoteDto } from './dto/leads-quotation.dto';
+import { CreatePrivateQuoteSchema, UpdatePrivateQuoteSchema } from './dto/leads-quotation.dto';
+import { LeadsQuotationService } from './leads-quotation.service';
 
 @Controller('leads-quotations')
 export class LeadsQuotationController {
@@ -72,23 +53,12 @@ export class LeadsQuotationController {
     }
 
     @Post(':id/upload-docs')
-    @UseInterceptors(FilesInterceptor('documents', 10, {
-        storage: diskStorage({
-            destination: './uploads/crm/leads-quotations',
-            filename: (req, file, callback) => {
-                const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-                const ext = extname(file.originalname);
-                callback(null, `${uniqueSuffix}${ext}`);
-            },
-        }),
-        limits: { fileSize: 25 * 1024 * 1024 },
-    }))
     @HttpCode(HttpStatus.OK)
     async uploadDocs(
         @Param('id', ParseIntPipe) id: number,
-        @UploadedFiles() files: Express.Multer.File[],
+        @Body() body: { filenames: string[] },
     ) {
-        const filenames = files.map(f => f.filename);
+        const filenames = Array.isArray(body?.filenames) ? body.filenames : [];
         await this.leadsQuotationService.appendQuoteDocs(id, filenames);
         return { filenames };
     }

@@ -1,43 +1,27 @@
-import {
-    Controller,
-    Delete,
-    Get,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-    Query,
-    HttpCode,
-    HttpStatus,
-    UseInterceptors,
-    UploadedFiles,
-} from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
-import { LeadEnquiryService } from './lead-enquiry.service';
-import {
-    CreateLeadEnquirySchema,
-    UpdateLeadEnquirySchema,
-    CreateSiteVisitSchema,
-    UpdateSiteVisitSchema,
-    UpdateSiteVisitDetailsSchema,
-    CreateSiteVisitContactArraySchema,
-    CreateCostingSheetSchema,
-} from './dto/lead-enquiry.dto';
 import { ValidatedBody } from '@/decorators/validated-body.decorator';
-import type {
-    CreateLeadEnquiryDto,
-    UpdateLeadEnquiryDto,
-    CreateSiteVisitDto,
-    UpdateSiteVisitDto,
-    UpdateSiteVisitDetailsDto,
-    CreateSiteVisitContactArrayDto,
-    CreateCostingSheetDto,
-} from './dto/lead-enquiry.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import type { SiteVisitContact } from '@db/schemas/crm/site-visit-contacts.schema';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import type {
+    CreateCostingSheetDto,
+    CreateLeadEnquiryDto,
+    CreateSiteVisitContactArrayDto,
+    CreateSiteVisitDto,
+    UpdateLeadEnquiryDto,
+    UpdateSiteVisitDetailsDto,
+    UpdateSiteVisitDto,
+} from './dto/lead-enquiry.dto';
+import {
+    CreateCostingSheetSchema,
+    CreateLeadEnquirySchema,
+    CreateSiteVisitContactArraySchema,
+    CreateSiteVisitSchema,
+    UpdateLeadEnquirySchema,
+    UpdateSiteVisitDetailsSchema,
+    UpdateSiteVisitSchema,
+} from './dto/lead-enquiry.dto';
+import { LeadEnquiryService } from './lead-enquiry.service';
 
 @Controller('lead-enquiries')
 export class LeadEnquiryController {
@@ -147,23 +131,12 @@ export class LeadEnquiryController {
     }
 
     @Post('site-visits/:id/upload-docs')
-    @UseInterceptors(FilesInterceptor('documents', 10, {
-        storage: diskStorage({
-            destination: './uploads/crm/site-visit',
-            filename: (req, file, callback) => {
-                const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-                const ext = extname(file.originalname);
-                callback(null, `${uniqueSuffix}${ext}`);
-            },
-        }),
-        limits: { fileSize: 25 * 1024 * 1024 },
-    }))
     @HttpCode(HttpStatus.OK)
     async uploadSiteVisitDocs(
         @Param('id', ParseIntPipe) id: number,
-        @UploadedFiles() files: Express.Multer.File[],
+        @Body() body: { filenames: string[] },
     ) {
-        const filenames = files.map(f => f.filename);
+        const filenames = Array.isArray(body?.filenames) ? body.filenames : [];
         await this.leadEnquiryService.appendSiteVisitDocs(id, filenames);
         return { filenames };
     }
