@@ -13,13 +13,17 @@ interface ChequeViewProps {
     className?: string;
 }
 
-const FileLink = ({ file }: { file?: string }) => {
+const FileLink = ({ file, instrumentId }: { file?: string; instrumentId?: number }) => {
     if (!file) return <span className="text-muted-foreground">Not Uploaded</span>;
+
+    const href = instrumentId
+        ? `/payment-requests/instruments/${instrumentId}/pdf`
+        : fileUploadService.getFileUrl(file);
 
     return (
         <div className="flex gap-3 items-center">
             <a
-                href={fileUploadService.getFileUrl(file)}
+                href={href}
                 target="_blank"
                 className="flex items-center gap-1 text-primary hover:underline"
             >
@@ -214,7 +218,7 @@ export function ChequeView({
                                         Receiving PDF
                                     </TableCell>
                                     <TableCell className="text-sm">
-                                        <FileLink file={data.generatedPdf} />
+                                        <FileLink file={data.generatedPdf} instrumentId={data.instrumentId ?? data.id} />
                                     </TableCell>
                                     <TableCell colSpan={2} />
                                 </TableRow>
