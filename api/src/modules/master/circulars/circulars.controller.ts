@@ -1,51 +1,17 @@
-import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    HttpCode,
-    HttpStatus,
-    NotFoundException,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-    UploadedFile,
-    UseInterceptors,
-} from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
-import { z } from 'zod';
-import { CircularsService } from './circulars.service';
 import { CurrentUser } from '@/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { existsSync, mkdirSync } from 'fs';
-
-// Multer configuration for Circular documents
-const circularMulterConfig = {
-    storage: diskStorage({
-        destination: (req, file, cb) => {
-            const dir = './uploads/master/circulars';
-            if (!existsSync(dir)) {
-                mkdirSync(dir, { recursive: true });
-            }
-            cb(null, dir);
-        },
-        filename: (req, file, cb) => {
-            const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-            const ext = extname(file.originalname);
-            cb(null, `circular-${uniqueSuffix}${ext}`);
-        },
-    }),
-    limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB limit
-};
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
+import { existsSync, unlinkSync } from 'fs';
+import { join, resolve } from 'path';
+import { z } from 'zod';
+import { CircularsService } from './circulars.service';
 
 const CreateCircularSchema = z.object({
     title: z.string().min(1, 'Title is required').max(255, 'Title too long'),
     valid_from: z.string().min(1, 'Valid from date is required'),
     expires_on: z.string().min(1, 'Expires on date is required'),
     status: z.preprocess((val) => val === 'true' || val === true, z.boolean()).default(true),
+    file: z.string().min(1, 'Circular file is required'),
 });
 
 const UpdateCircularSchema = CreateCircularSchema.partial();
@@ -75,20 +41,15 @@ export class CircularsController {
     }
 
     @Post()
-    @UseInterceptors(FileInterceptor('file', circularMulterConfig))
     async create(
-        @UploadedFile() file: Express.Multer.File,
         @Body() body: unknown,
         @CurrentUser() user: ValidatedUser,
     ) {
-        if (!file) {
-            throw new NotFoundException('Circular file is required');
-        }
         const parsed = CreateCircularSchema.parse(body);
 
         return this.service.create({
             title: parsed.title,
-            file: file.path.replace(/\\/g, '/'), // Normalize path separators
+            file: parsed.file,
             status: parsed.status,
             valid_from: new Date(parsed.valid_from),
             expires_on: new Date(parsed.expires_on),
@@ -97,10 +58,8 @@ export class CircularsController {
     }
 
     @Patch(':id')
-    @UseInterceptors(FileInterceptor('file', circularMulterConfig))
     async update(
         @Param('id', ParseIntPipe) id: number,
-        @UploadedFile() file: Express.Multer.File,
         @Body() body: unknown,
     ) {
         const circular = await this.service.findById(id);
@@ -108,7 +67,7 @@ export class CircularsController {
             throw new NotFoundException(`Circular with ID ${id} not found`);
         }
 
-        const parsed = UpdateCircularSchema.parse(body);
+        const parsed = UpdateCircularSchema.extend({ file: z.string().optional() }).parse(body);
 
         const payload: any = {};
         if (parsed.title !== undefined) payload.title = parsed.title;
@@ -116,10 +75,9 @@ export class CircularsController {
         if (parsed.valid_from !== undefined) payload.valid_from = new Date(parsed.valid_from);
         if (parsed.expires_on !== undefined) payload.expires_on = new Date(parsed.expires_on);
 
-        if (file) {
-            // Delete old file
+        if (parsed.file) {
             this.deleteFileOnDisk(circular.file);
-            payload.file = file.path.replace(/\\/g, '/');
+            payload.file = parsed.file;
         }
 
         return this.service.update(id, payload);
@@ -141,11 +99,11 @@ export class CircularsController {
 
     private deleteFileOnDisk(filePath: string) {
         try {
-            const fs = require('fs');
-            const path = require('path');
-            const fullPath = path.resolve(filePath);
-            if (fs.existsSync(fullPath)) {
-                fs.unlinkSync(fullPath);
+            const fullPath = filePath.startsWith('/')
+                ? resolve(filePath)
+                : resolve(join(process.cwd(), 'uploads', filePath));
+            if (existsSync(fullPath)) {
+                unlinkSync(fullPath);
             }
         } catch (err) {
             console.error(`Error deleting file ${filePath}:`, err);

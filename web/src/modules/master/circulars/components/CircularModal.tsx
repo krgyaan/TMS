@@ -13,8 +13,9 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCreateCircular, useUpdateCircular } from "@/hooks/api/useCirculars";
+import { FileUploader } from "@/components/file-upload";
 import type { Circular } from "@/types/api.types";
-import { AlertCircle, HelpCircle, Loader2, Pencil, Plus, FileText, Calendar, ToggleLeft, Upload } from "lucide-react";
+import { AlertCircle, HelpCircle, Loader2, Pencil, Plus, FileText, Calendar, ToggleLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const CircularFormSchema = z.object({
@@ -44,7 +45,7 @@ export const CircularModal = ({ open, onOpenChange, circular, onSuccess }: Circu
     const createCircular = useCreateCircular();
     const updateCircular = useUpdateCircular();
     const isEdit = !!circular;
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [files, setFiles] = useState<string[]>([]);
     const [fileError, setFileError] = useState<string | null>(null);
 
     const form = useForm<CircularFormValues>({
@@ -59,7 +60,7 @@ export const CircularModal = ({ open, onOpenChange, circular, onSuccess }: Circu
 
     useEffect(() => {
         if (open) {
-            setSelectedFile(null);
+            setFiles([]);
             setFileError(null);
             if (isEdit && circular) {
                 form.reset({
@@ -84,51 +85,28 @@ export const CircularModal = ({ open, onOpenChange, circular, onSuccess }: Circu
     const saving = createCircular.isPending || updateCircular.isPending;
     const mutationError = createCircular.error || updateCircular.error;
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const allowedExtensions = ["pdf", "doc", "docx", "jpg", "jpeg", "png"];
-            const fileExt = file.name.split(".").pop()?.toLowerCase();
-            
-            if (!fileExt || !allowedExtensions.includes(fileExt)) {
-                setFileError(`Invalid file type. Allowed: ${allowedExtensions.join(", ")}`);
-                setSelectedFile(null);
-                return;
-            }
-
-            if (file.size > 20 * 1024 * 1024) {
-                setFileError("File size exceeds 20MB limit");
-                setSelectedFile(null);
-                return;
-            }
-
-            setFileError(null);
-            setSelectedFile(file);
-        }
-    };
-
     const handleSubmit = async (values: CircularFormValues) => {
-        // Validate file presence on create
-        if (!isEdit && !selectedFile) {
+        if (!isEdit && files.length === 0) {
             setFileError("Circular document file is required");
             return;
         }
 
         try {
-            const formData = new FormData();
-            formData.append("title", values.title.trim());
-            formData.append("valid_from", new Date(values.valid_from).toISOString());
-            formData.append("expires_on", new Date(values.expires_on).toISOString());
-            formData.append("status", String(values.status));
-            
-            if (selectedFile) {
-                formData.append("file", selectedFile);
+            const payload: Partial<Circular> = {
+                title: values.title.trim(),
+                valid_from: new Date(values.valid_from).toISOString(),
+                expires_on: new Date(values.expires_on).toISOString(),
+                status: values.status,
+            };
+
+            if (files.length > 0) {
+                payload.file = files[0];
             }
 
             if (isEdit && circular) {
-                await updateCircular.mutateAsync({ id: circular.id, data: formData });
+                await updateCircular.mutateAsync({ id: circular.id, data: payload });
             } else {
-                await createCircular.mutateAsync(formData);
+                await createCircular.mutateAsync(payload);
             }
             onOpenChange(false);
             onSuccess?.();
@@ -209,23 +187,13 @@ export const CircularModal = ({ open, onOpenChange, circular, onSuccess }: Circu
                                     Circular Document
                                     {!isEdit && <span className="text-destructive">*</span>}
                                 </Label>
-                                <div className="border border-dashed rounded-lg p-4 flex flex-col items-center justify-center bg-muted/20 hover:bg-muted/40 transition duration-200 relative">
-                                    <input
-                                        type="file"
-                                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                        onChange={handleFileChange}
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                        disabled={saving}
-                                    />
-                                    <Upload className="h-8 w-8 text-muted-foreground/60 mb-2" />
-                                    <span className="text-xs font-medium text-foreground text-center">
-                                        {selectedFile ? selectedFile.name : isEdit ? "Choose file to replace current document" : "Drag and drop or click to upload"}
-                                    </span>
-                                    <span className="text-[10px] text-muted-foreground text-center mt-1">
-                                        Supported: PDF, DOC, DOCX, JPG, PNG (Max 20MB)
-                                    </span>
-                                </div>
-                                {isEdit && circular && !selectedFile && (
+                                <FileUploader
+                                    context="master/circulars"
+                                    value={files}
+                                    onChange={setFiles}
+                                    disabled={saving}
+                                />
+                                {isEdit && circular && files.length === 0 && (
                                     <div className="text-xs text-muted-foreground truncate">
                                         Current: <span className="font-mono">{circular.file.split("/").pop()}</span>
                                     </div>
