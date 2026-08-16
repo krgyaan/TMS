@@ -100,6 +100,11 @@ controller — note: separate from the module's `bi-dashboard` folder), `uploads
 ## After deploying
 
 1. Deploy code, then run `pnpm run migrate:uploads` in `api/` on the live server.
+   > The script now supports **merge**: if a destination folder already exists
+   > (the app creates module dirs at startup, and new uploads may have landed
+   > there after deploy), source items are moved into it item-by-item — same-volume
+   > renames, no copying. Names that already exist in the destination are left
+   > untouched (logged as `[skip-collision]`). Safe to re-run.
 2. Verify: `ls uploads/bi-dashboard uploads/operations uploads/services uploads/shared uploads/accounts uploads/insurance uploads/crm` shows the moved folders.
 3. Sanity-check a few old records: open a cheque/BG/wo/pqr record and confirm its file links still open
    (DB paths are context-relative, so they resolve automatically after the move).
