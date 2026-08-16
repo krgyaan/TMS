@@ -404,10 +404,10 @@ const buildFileUrl = (value?: unknown): string => {
     // already a full URL (S3, CDN, etc.)
     if (value.startsWith("http")) return value;
 
-    // already has a directory prefix (e.g. "accounts/file.pdf" or "courier/file.docx")
+    // already has a directory prefix (e.g. "accounts/follow-ups/file.pdf" or "courier/file.docx")
     if (value.includes('/')) return `/uploads/${value}`;
 
-    return `/uploads/accounts/${value}`;
+    return `/uploads/accounts/follow-ups/${value}`;
 };
 
 function AttachmentCard({ url, index }: { url: unknown; index: number }) {

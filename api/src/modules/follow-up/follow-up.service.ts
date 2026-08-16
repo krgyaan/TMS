@@ -50,7 +50,7 @@ export const STOP_REASON_LABELS: Record<number, string> = {
     4: "Other",
 };
 
-const UPLOAD_DIR = path.join(process.cwd(), "uploads", "accounts");
+const UPLOAD_DIR = path.join(process.cwd(), "uploads", "accounts", "follow-ups");
 
 @Injectable()
 export class FollowUpService {

@@ -27,7 +27,7 @@ import type { CreateFollowUpDto, UpdateFollowUpDto, UpdateFollowUpStatusDto, Fol
 
 const followUpAttachmentsMulterConfig = {
     storage: diskStorage({
-        destination: "./uploads/accounts",
+        destination: "./uploads/accounts/follow-ups",
         filename: (req, file, callback) => {
             const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
             const ext = extname(file.originalname);
@@ -38,7 +38,7 @@ const followUpAttachmentsMulterConfig = {
 
 const proofImageMulterConfig = {
     storage: diskStorage({
-        destination: "./uploads/accounts",
+        destination: "./uploads/accounts/follow-ups",
         filename: (req, file, callback) => {
             const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
             const ext = extname(file.originalname);
