@@ -117,7 +117,7 @@ const fileFilter = (
 
 const checklistFileConfig = {
     storage: diskStorage({
-        destination: "./uploads/checklist",
+        destination: "./uploads/accounts/checklist",
         filename: (req: any, file, callback) => {
             const userName = req.user?.name || "user";
             const taskId = req.params?.id || "new";

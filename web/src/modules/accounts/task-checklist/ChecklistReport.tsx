@@ -367,7 +367,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
                         )}
                         {task.result_file && (
                             <a
-                                href={`/uploads/checklist/${task.result_file}`}
+                                href={`/uploads/accounts/checklist/${task.result_file}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-1 text-primary hover:underline"

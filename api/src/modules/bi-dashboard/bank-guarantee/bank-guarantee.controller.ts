@@ -6,7 +6,7 @@ import { BankGuaranteeService } from './bank-guarantee.service';
 
 const biDashboardMulterConfig = {
     storage: diskStorage({
-        destination: './uploads/bi-dashboard',
+        destination: './uploads/bi-dashboard/bank-guarantee',
         filename: (req, file, callback) => {
             const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
             const ext = extname(file.originalname);

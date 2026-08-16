@@ -79,7 +79,7 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, type, onViewDetails, onOpenRema
             <td className="p-4 text-sm">
                 {task.respResultFile ? (
                     <a
-                        href={`/uploads/checklist/${task.respResultFile}`}
+                        href={`/uploads/accounts/checklist/${task.respResultFile}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline inline-flex items-center gap-1"
