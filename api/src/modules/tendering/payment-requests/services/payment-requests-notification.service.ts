@@ -1397,7 +1397,7 @@ export class PaymentRequestsNotificationService {
             const apiUrl = this.configService.get<string>('app.apiUrl') || '';
             const baseUrl = apiUrl.replace('/api/v1', '');
             const softCopyUrl = bg.bgDetails.bgSoftCopy
-                ? `${baseUrl}/uploads/bi-dashboard/${bg.bgDetails.bgSoftCopy}`
+                ? `${baseUrl}/uploads/bi-dashboard/bank-guarantee/${bg.bgDetails.bgSoftCopy}`
                 : '';
 
             const data = {
@@ -1525,7 +1525,7 @@ export class PaymentRequestsNotificationService {
             const apiUrl = this.configService.get<string>('app.apiUrl') || '';
             const baseUrl = apiUrl.replace('/api/v1', '');
             const softCopyUrl = bg.bgDetails.bgSoftCopy
-                ? `${baseUrl}/uploads/bi-dashboard/${bg.bgDetails.bgSoftCopy}`
+                ? `${baseUrl}/uploads/bi-dashboard/bank-guarantee/${bg.bgDetails.bgSoftCopy}`
                 : '';
 
             const data = {

@@ -1621,7 +1621,7 @@ export class PaymentRequestsQueryService {
             throw new NotFoundException('No generated PDF found for this instrument');
         }
 
-        const absolutePath = path.join(process.cwd(), 'uploads', 'tendering', instrument.generatedPdf);
+        const absolutePath = path.join(process.cwd(), 'uploads', instrument.generatedPdf);
 
         if (!existsSync(absolutePath)) {
             throw new NotFoundException('PDF file not found on disk');

@@ -14,11 +14,6 @@ export const PDF_CONFIG = {
     templatesBasePath: path.join(process.cwd(), rootDir, 'modules', 'pdf', 'templates'),
 
     /**
-     * Base directory for storing generated PDFs
-     */
-    outputBasePath: path.join(process.cwd(), 'uploads', 'tendering', 'payment-pdfs'),
-
-    /**
      * Puppeteer PDF generation options
      */
     puppeteerOptions: {
@@ -42,6 +37,7 @@ export const PDF_CONFIG = {
             directory: 'dd', // DD and FDR use same templates
             templates: ['receiving'],
             storagePath: 'chqcreate',
+            baseDir: 'bi-dashboard/chqcreate',
             margin: {
                 top: '0mm',
                 right: '0mm',
@@ -111,6 +107,7 @@ export const PDF_CONFIG = {
             directory: '.',
             templates: ['po-template'],
             storagePath: 'po',
+            baseDir: 'operations/po',
             margin: {
                 top: '10mm',
                 right: '7.5mm',
@@ -122,6 +119,7 @@ export const PDF_CONFIG = {
             directory: '.',
             templates: ['vendor-wo-template'],
             storagePath: 'vwo',
+            baseDir: 'operations/vwo',
             margin: {
                 top: '10mm',
                 right: '7.5mm',
@@ -167,6 +165,20 @@ export function getStoragePath(templateType: string): string {
         throw new Error(`Unknown template type: ${templateType}`);
     }
     return typeConfig.storagePath || templateType.toLowerCase();
+}
+
+/**
+ * Get the directory (relative to uploads/) where a template type's PDFs are
+ * stored. Defaults to tendering/payment-pdfs/<storagePath>; template types
+ * with an explicit baseDir (po, vwo, chqcreate) live under their module dir.
+ */
+export function getOutputBaseDir(templateType: string): string {
+    const typeConfig = PDF_CONFIG.templateTypes[templateType as keyof typeof PDF_CONFIG.templateTypes];
+    if (!typeConfig) {
+        throw new Error(`Unknown template type: ${templateType}`);
+    }
+    const storagePath = typeConfig.storagePath || templateType.toLowerCase();
+    return (typeConfig as { baseDir?: string }).baseDir ?? path.posix.join('tendering', 'payment-pdfs', storagePath);
 }
 
 /**
@@ -224,7 +236,7 @@ export function getOutputPath(
         fileName = `${prefix}_${templateName}_${s}.pdf`;
     }
 
-    return path.join(PDF_CONFIG.outputBasePath, storagePath, fileName);
+    return path.join(process.cwd(), 'uploads', getOutputBaseDir(templateType), fileName);
 }
 
 /**
@@ -247,5 +259,5 @@ export function getRelativePath(
         fileName = `${prefix}_${templateName}_${s}.pdf`;
     }
 
-    return `payment-pdfs/${storagePath}/${fileName}`;
+    return path.posix.join(getOutputBaseDir(templateType), fileName);
 }

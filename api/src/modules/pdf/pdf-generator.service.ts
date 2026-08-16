@@ -4,7 +4,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as Handlebars from 'handlebars';
 import puppeteer, { Browser, Page } from 'puppeteer';
-import { PDF_CONFIG, getOutputPath, getRelativePath, getPaperSize, getPdfMargins } from './config/pdf-config';
+import { PDF_CONFIG, getOutputBaseDir, getOutputPath, getRelativePath, getPaperSize, getPdfMargins } from './config/pdf-config';
 
 @Injectable()
 export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
@@ -122,8 +122,7 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
         const templateDir = typeConfig.directory === 'dd' && instrumentType === 'FDR' ? 'fdr' : typeConfig.directory;
 
         // Ensure output directory exists (using template-specific storage path)
-        const storagePath = typeConfig.storagePath || templateType.toLowerCase();
-        const outputDir = path.join(PDF_CONFIG.outputBasePath, storagePath);
+        const outputDir = path.join(process.cwd(), 'uploads', getOutputBaseDir(templateType));
         await fs.mkdir(outputDir, { recursive: true });
 
         // Generate each template

@@ -26,7 +26,7 @@ import { existsSync, mkdirSync } from 'fs';
 const circularMulterConfig = {
     storage: diskStorage({
         destination: (req, file, cb) => {
-            const dir = './uploads/circulars';
+            const dir = './uploads/master/circulars';
             if (!existsSync(dir)) {
                 mkdirSync(dir, { recursive: true });
             }
