@@ -31,7 +31,7 @@ export class WoAcceptanceController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: './uploads/wo-documents',
+        destination: './uploads/operations/wo-documents',
         filename: (req, file, cb) => {
           const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
           cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
@@ -44,7 +44,7 @@ export class WoAcceptanceController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     return {
-      filePath: `wo-documents/${file.filename}`,
+      filePath: `operations/wo-documents/${file.filename}`,
       originalName: file.originalname,
     };
   }

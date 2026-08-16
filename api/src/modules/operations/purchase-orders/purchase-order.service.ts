@@ -420,10 +420,10 @@ export class PurchaseOrderService {
                 const poSeq = po.poNumber?.split('/').pop() || `PO${po.id}`;
                 const rand = randomUUID().split('-')[0];
                 const newFileName = `${poSeq}-${rand}.pdf`;
-                const storageDir = 'payment-pdfs/po';
+                const storageDir = 'operations/po';
 
-                const oldPath = join(process.cwd(), 'uploads', 'tendering', pdfPaths[0]);
-                const newPath = join(process.cwd(), 'uploads', 'tendering', storageDir, newFileName);
+                const oldPath = join(process.cwd(), 'uploads', pdfPaths[0]);
+                const newPath = join(process.cwd(), 'uploads', storageDir, newFileName);
 
                 for (let attempt = 0; attempt < 3; attempt++) {
                     try { await rename(oldPath, newPath); break; }

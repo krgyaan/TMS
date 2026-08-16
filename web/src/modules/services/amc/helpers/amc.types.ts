@@ -105,23 +105,23 @@ export const sampleReport = (entries?: string[] | null): string | null =>
 export const filledReport = (entries?: string[] | null): string | null =>
     entries?.find(e => e.startsWith("filled:"))?.slice("filled:".length) ?? null;
 
-const fileServeUrl = (value?: string | null, legacyDir?: string): string => {
+const fileServeUrl = (value?: string | null): string => {
     if (!value) return "";
     if (value.includes("/") || value.includes("\\")) return fileUploadService.getFileUrl(value);
-    return legacyDir ? `/uploads/${legacyDir}/${value}` : "";
+    return "";
 };
 
 /** File URL helper for AMC-level documents (PO / service report / signed report) */
-export const amcDocUrl = (value?: string | null): string =>
-    fileServeUrl(value, "amc");
+export const amcDocUrl = (value?: string | null): string => fileServeUrl(value);
 
 /** File URL helper for per-service filled/signed reports */
-export const serviceFileUrl = (value?: string | null): string =>
-    fileServeUrl(value, "amc-services");
+export const serviceFileUrl = (value?: string | null): string => fileServeUrl(value);
 
 /** File URL helper for bill invoices / payment receipts */
-export const billFileUrl = (value?: string | null): string =>
-    fileServeUrl(value, "amc-billing");
+export const billFileUrl = (value?: string | null): string => fileServeUrl(value);
+
+/** File URL helper for sample service report files */
+export const amcSampleUrl = (value?: string | null): string => fileServeUrl(value);
 
 // ============================================
 // AMC SERVICES (per-visit schedule) TYPES

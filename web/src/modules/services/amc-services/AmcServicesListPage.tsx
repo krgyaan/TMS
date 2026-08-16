@@ -37,7 +37,7 @@ import type {
     AmcSiteContact,
     AmcServiceEngineer,
 } from "@/modules/services/amc/helpers/amc.types";
-import { sampleReport } from "@/modules/services/amc/helpers/amc.types";
+import { sampleReport, amcSampleUrl } from "@/modules/services/amc/helpers/amc.types";
 import { UploadServiceReportModal } from "./components/UploadServiceReportModal";
 import type { ServicePathField } from "@/modules/services/amc/helpers/amc.types";
 
@@ -137,7 +137,11 @@ export default function AmcServicesListPage() {
             toast.error("No sample service report uploaded for this AMC");
             return;
         }
-        const url = `/uploads/amc/${sample}`;
+        const url = amcSampleUrl(sample);
+        if (!url) {
+            toast.error("Sample service report file not available for this AMC");
+            return;
+        }
         const anchor = document.createElement("a");
         anchor.href = url;
         anchor.download = sample;

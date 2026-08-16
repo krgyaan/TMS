@@ -9,6 +9,10 @@ under `uploads/tendering/{context}`. They are now stored per module:
 > `pnpm run migrate:uploads -- --dry-run` first to preview). The script moves every
 > `uploads/tendering/{context}` folder listed below to its new module folder. It is idempotent —
 > safe to re-run, and skips contexts that are already in place.
+>
+> Then run `pnpm run migrate:uploads:v2` (preview with `-- --dry-run` first) for the
+> **Stage B** mapping below: module-root upload folders moved into `uploads/<module>/<feature>/`,
+> database paths rewritten, and empty legacy dirs (`amc/`, `amc-billing/`, `assets/`) removed.
 
 ## Folder moves (old → new)
 
@@ -82,13 +86,48 @@ Tendering-module contexts keep their current location — nothing to do:
 `screenshot_qualified_parties`, `screenshot_decrements`, `final_result_screenshot`,
 `result-screenshots`, `tender-rejection-proof`, `cancel-tender`.
 
+## Stage B — legacy module dirs moved into `uploads/<module>/<feature>/` (`migrate:uploads:v2`)
+
+Run **after** `migrate:uploads` (needs the new code deployed so module dirs exist).
+All moves are same-volume renames; skips collisions; idempotent. Also rewrites DB paths.
+
+### Folder moves
+
+| Old folder | New folder | Module |
+|---|---|---|
+| `uploads/employeeimprest` | `uploads/employee-imprest` | employee-imprest |
+| `uploads/enquiry-results` | `uploads/crm/enquiry-results` | crm |
+| `uploads/leads-quotations` | `uploads/crm/leads-quotations` | crm |
+| `uploads/site-visit` | `uploads/crm/site-visit` | crm |
+| `uploads/checklist` | `uploads/accounts/checklist` | accounts |
+| `uploads/circulars` | `uploads/master/circulars` | master |
+| `uploads/wo-documents` | `uploads/operations/wo-documents` | operations |
+| `uploads/payment-pdfs/po` | `uploads/operations/po` | operations |
+| `uploads/payment-pdfs/vwo` | `uploads/operations/vwo` | operations |
+| `uploads/payment-pdfs/chqcreate` | `uploads/bi-dashboard/chqcreate` | bi-dashboard |
+| `uploads/accounts/<file>` (root files) | `uploads/accounts/follow-ups/` | accounts |
+| `uploads/bi-dashboard/<file>` (root files) | `uploads/bi-dashboard/bank-guarantee/` | bi-dashboard |
+
+Legacy empty dirs removed: `uploads/amc`, `uploads/amc-billing`, `uploads/assets`,
+`uploads/payment-pdfs` (after its subdirs move).
+
+### DB rewrites
+
+| Table | Column | Old prefix | New prefix |
+|---|---|---|---|
+| `lead_followups` | `attachments` (JSON) | `accounts/<file>` | `accounts/follow-ups/<file>` |
+| `circulars` | `file` | `uploads/circulars/` | `uploads/master/circulars/` |
+| `purchase_orders` | `generated_pdf_versions` (JSON) | `payment-pdfs/po/` | `operations/po/` |
+| `vendor_work_orders` | `generated_pdf_versions` (JSON) | `payment-pdfs/vwo/` | `operations/vwo/` |
+| `payment_instruments` | `generated_pdf` | `payment-pdfs/chqcreate/` | `bi-dashboard/chqcreate/` |
+| `wo_acceptance` | `signed_wo_file_path` | `wo-documents/` | `operations/wo-documents/` |
+| `wo_documents` | `file_path` | `wo-documents/` | `operations/wo-documents/` |
+
 ## Unrelated uploads dirs (not part of this module — do NOT touch)
 
-`uploads/courier`, `uploads/hrms/*`, `uploads/employeeimprest`, `uploads/enquiry-results`,
-`uploads/leads-quotations`, `uploads/site-visit`, `uploads/checklist`, `uploads/circulars`,
-`uploads/wo-documents`, `uploads/bi-dashboard` (multer diskStorage from bank-guarantee
-controller — note: separate from the module's `bi-dashboard` folder), `uploads/accounts`
-(follow-up controller diskStorage — separate from the module's `accounts` folder).
+`uploads/courier`, `uploads/hrms/*` (incl. `hrms/training/thumbnails` — stays as-is),
+`uploads/tendering` (contains other service-level folders, e.g. `tender-documents`-adjacent
+contexts that remain under `tendering/`).
 
 ## Code references updated in this change
 
@@ -105,6 +144,8 @@ controller — note: separate from the module's `bi-dashboard` folder), `uploads
    > there after deploy), source items are moved into it item-by-item — same-volume
    > renames, no copying. Names that already exist in the destination are left
    > untouched (logged as `[skip-collision]`). Safe to re-run.
-2. Verify: `ls uploads/bi-dashboard uploads/operations uploads/services uploads/shared uploads/accounts uploads/insurance uploads/crm` shows the moved folders.
-3. Sanity-check a few old records: open a cheque/BG/wo/pqr record and confirm its file links still open
-   (DB paths are context-relative, so they resolve automatically after the move).
+2. Run `pnpm run migrate:uploads:v2 -- --dry-run`, then the real run
+   `pnpm run migrate:uploads:v2` (folder moves + DB rewrites; idempotent).
+3. Verify: `ls uploads/bi-dashboard uploads/operations uploads/services uploads/shared uploads/accounts uploads/insurance uploads/crm uploads/master uploads/employee-imprest` shows the moved folders, and `uploads/amc uploads/amc-billing uploads/assets uploads/payment-pdfs` are gone.
+4. Sanity-check a few old records: open a cheque/BG/wo/pqr/circular/follow-up record and confirm its file links still open
+   (DB paths are rewritten by v2, so they resolve automatically after the move).

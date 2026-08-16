@@ -39,7 +39,7 @@ import type {
     AmcSiteContact,
     AmcServiceEngineer,
 } from "./helpers/amc.types";
-import { sampleReport } from "./helpers/amc.types";
+import { sampleReport, amcSampleUrl } from "./helpers/amc.types";
 
 type AmcTeamTab = "AC" | "DC";
 type StatusTab = "pending" | "done";
@@ -178,7 +178,11 @@ export default function AmcListPage() {
             toast.error("No sample service report uploaded for this AMC");
             return;
         }
-        const url = `/uploads/amc/${sample}`;
+        const url = amcSampleUrl(sample);
+        if (!url) {
+            toast.error("Sample service report file not available for this AMC");
+            return;
+        }
         const anchor = document.createElement("a");
         anchor.href = url;
         anchor.download = sample;

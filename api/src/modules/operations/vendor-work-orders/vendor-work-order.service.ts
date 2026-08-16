@@ -1187,10 +1187,10 @@ export class VendorWorkOrderService {
                 const woSeq = wo.woNumber?.split('/').pop() || `WO${wo.id}`;
                 const rand = randomUUID().split('-')[0];
                 const newFileName = `${woSeq}-${rand}.pdf`;
-                const storageDir = 'payment-pdfs/vwo';
+                const storageDir = 'operations/vwo';
 
-                const oldPath = join(process.cwd(), 'uploads', 'tendering', pdfPaths[0]);
-                const newPath = join(process.cwd(), 'uploads', 'tendering', storageDir, newFileName);
+                const oldPath = join(process.cwd(), 'uploads', pdfPaths[0]);
+                const newPath = join(process.cwd(), 'uploads', storageDir, newFileName);
 
                 for (let attempt = 0; attempt < 3; attempt++) {
                     try { await rename(oldPath, newPath); break; }

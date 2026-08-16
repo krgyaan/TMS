@@ -140,7 +140,7 @@ export class VendorWorkOrderController {
     @Res() res: Response,
   ) {
     const { path: relPath, filename } = await this.service.getPdf(id, version);
-    const absolutePath = join(process.cwd(), "uploads", "tendering", relPath);
+    const absolutePath = join(process.cwd(), "uploads", relPath);
 
     if (!existsSync(absolutePath)) {
       throw new NotFoundException("PDF file not found on disk");
