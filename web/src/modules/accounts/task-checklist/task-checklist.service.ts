@@ -53,29 +53,19 @@ export const checklistApi = {
     },
 
     // Store responsibility remark
-    storeResponsibilityRemark: async (id: number, data: ResponsibilityRemarkInput, file?: File): Promise<any> => {
-        const formData = new FormData();
-        formData.append("respRemark", data.respRemark);
-        if (file) {
-            formData.append("resp_result_file", file);
-        }
-
-        const response = await api.post(`${ENDPOINT}/reports/${id}/responsibility-remark`, formData, {
-            headers: { "Content-Type": "multipart/form-data" },
+    storeResponsibilityRemark: async (id: number, data: ResponsibilityRemarkInput, filenames: string[] = []): Promise<any> => {
+        const response = await api.post(`${ENDPOINT}/reports/${id}/responsibility-remark`, {
+            ...data,
+            respResultFile: filenames[0] || null,
         });
         return response.data;
     },
 
     // Store accountability remark
-    storeAccountabilityRemark: async (id: number, data: AccountabilityRemarkInput, file?: File): Promise<any> => {
-        const formData = new FormData();
-        formData.append("accRemark", data.accRemark);
-        if (file) {
-            formData.append("acc_result_file", file);
-        }
-
-        const response = await api.post(`${ENDPOINT}/reports/${id}/accountability-remark`, formData, {
-            headers: { "Content-Type": "multipart/form-data" },
+    storeAccountabilityRemark: async (id: number, data: AccountabilityRemarkInput, filenames: string[] = []): Promise<any> => {
+        const response = await api.post(`${ENDPOINT}/reports/${id}/accountability-remark`, {
+            ...data,
+            accResultFile: filenames[0] || null,
         });
         return response.data;
     },

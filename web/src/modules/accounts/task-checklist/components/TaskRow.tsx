@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Badge, CheckCircle2, Clock, Eye } from "lucide-react";
 import Timer from "./Timer";
 import type { Checklist, ChecklistReport } from "@/modules/accounts/task-checklist/task-checklist.types";
+import { fileUploadService } from "@/services/api/file-upload.service";
 import { format } from "date-fns";
 
 
@@ -79,7 +80,9 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, type, onViewDetails, onOpenRema
             <td className="p-4 text-sm">
                 {task.respResultFile ? (
                     <a
-                        href={`/uploads/accounts/checklist/${task.respResultFile}`}
+                        href={task.respResultFile.includes("/")
+                            ? fileUploadService.getFileUrl(task.respResultFile)
+                            : `/uploads/accounts/checklist/${task.respResultFile}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline inline-flex items-center gap-1"

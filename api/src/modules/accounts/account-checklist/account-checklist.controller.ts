@@ -1,32 +1,14 @@
-// src/modules/accounts/checklist/checklist.controller.ts
-import {
-    Controller,
-    Get,
-    Post,
-    Put,
-    Delete,
-    Param,
-    Body,
-    Query,
-    ParseIntPipe,
-    UseInterceptors,
-    UploadedFile,
-    BadRequestException,
-    Inject,
-} from "@nestjs/common";
-import { FileInterceptor } from "@nestjs/platform-express";
-import { diskStorage } from "multer";
-import { extname } from "path";
+import { Body, Controller, Delete, Get, Inject, Param, ParseIntPipe, Post, Put, Query } from "@nestjs/common";
 import { ZodValidationPipe } from "nestjs-zod";
 
 import { Logger } from "winston";
 
-import { AccountChecklistService } from "./account-checklist.service";
 import { CurrentUser } from "@/decorators/current-user.decorator";
 import { CanDelete } from "@/modules/auth/decorators";
+import { AccountChecklistService } from "./account-checklist.service";
 
-import { z } from "zod";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
+import { z } from "zod";
 
 // ✅ 1. Base schema (NO refine)
 const BaseChecklistSchema = z.object({
@@ -84,53 +66,6 @@ export const GetTasksSchema = z.object({
 });
 
 export type GetTasksDto = z.infer<typeof GetTasksSchema>;
-
-// File upload configuration
-const ALLOWED_MIME_TYPES = [
-    "image/jpeg",
-    "image/png",
-    "application/pdf",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "text/csv",
-    "text/plain",
-];
-
-const fileFilter = (
-    req: any,
-    file: Express.Multer.File,
-    callback: (error: Error | null, acceptFile: boolean) => void
-) => {
-    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-        callback(null, true);
-    } else {
-        callback(
-            new BadRequestException(
-                `Invalid file type: ${file.mimetype}. Allowed types: images, PDF, Word, Excel, CSV, TXT.`
-            ),
-            false
-        );
-    }
-};
-
-const checklistFileConfig = {
-    storage: diskStorage({
-        destination: "./uploads/accounts/checklist",
-        filename: (req: any, file, callback) => {
-            const userName = req.user?.name || "user";
-            const taskId = req.params?.id || "new";
-            const random = Math.floor(Math.random() * 900) + 100;
-            const ext = extname(file.originalname);
-            callback(null, `${userName}_task_${taskId}_${random}${ext}`);
-        },
-    }),
-    limits: {
-        fileSize: 10 * 1024 * 1024, // 10MB
-    },
-    fileFilter,
-};
 
 @Controller("accounts/checklists")
 export class AccountChecklistController {
@@ -201,30 +136,26 @@ export class AccountChecklistController {
      * Store responsibility remark
      */
     @Post("reports/:id/responsibility-remark")
-    @UseInterceptors(FileInterceptor("resp_result_file", checklistFileConfig))
     storeResponsibilityRemark(
         @Param("id", ParseIntPipe) id: number,
-        @Body(new ZodValidationPipe(ResponsibilityRemarkSchema))
-        dto: ResponsibilityRemarkDto,
-        @UploadedFile() file: Express.Multer.File | undefined,
+        @Body(new ZodValidationPipe(ResponsibilityRemarkSchema.extend({ respResultFile: z.string().nullable().optional() })))
+        dto: ResponsibilityRemarkDto & { respResultFile?: string | null },
         @CurrentUser() user: any
     ) {
-        return this.service.storeResponsibilityRemark(id, dto, file, user.sub);
+        return this.service.storeResponsibilityRemark(id, dto, user.sub);
     }
 
     /**
      * Store accountability remark
      */
     @Post("reports/:id/accountability-remark")
-    @UseInterceptors(FileInterceptor("acc_result_file", checklistFileConfig))
     storeAccountabilityRemark(
         @Param("id", ParseIntPipe) id: number,
-        @Body(new ZodValidationPipe(AccountabilityRemarkSchema))
-        dto: AccountabilityRemarkDto,
-        @UploadedFile() file: Express.Multer.File | undefined,
+        @Body(new ZodValidationPipe(AccountabilityRemarkSchema.extend({ accResultFile: z.string().nullable().optional() })))
+        dto: AccountabilityRemarkDto & { accResultFile?: string | null },
         @CurrentUser() user: any
     ) {
-        return this.service.storeAccountabilityRemark(id, dto, file, user.sub);
+        return this.service.storeAccountabilityRemark(id, dto, user.sub);
     }
 
     /**

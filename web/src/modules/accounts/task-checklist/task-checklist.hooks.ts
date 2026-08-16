@@ -112,8 +112,8 @@ export const useStoreResponsibilityRemark = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data, file }: { id: number; data: ResponsibilityRemarkInput; file?: File }) =>
-            checklistApi.storeResponsibilityRemark(id, data, file),
+        mutationFn: ({ id, data, filenames }: { id: number; data: ResponsibilityRemarkInput; filenames?: string[] }) =>
+            checklistApi.storeResponsibilityRemark(id, data, filenames),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: checklistKeys.all });
             toast.success("Responsibility remark saved successfully");
@@ -131,8 +131,8 @@ export const useStoreAccountabilityRemark = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data, file }: { id: number; data: AccountabilityRemarkInput; file?: File }) =>
-            checklistApi.storeAccountabilityRemark(id, data, file),
+        mutationFn: ({ id, data, filenames }: { id: number; data: AccountabilityRemarkInput; filenames?: string[] }) =>
+            checklistApi.storeAccountabilityRemark(id, data, filenames),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: checklistKeys.all });
             toast.success("Accountability remark saved successfully");

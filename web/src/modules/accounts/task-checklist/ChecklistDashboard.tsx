@@ -44,6 +44,7 @@ import {
     useStoreAccountabilityRemark,
 } from "@/modules/accounts/task-checklist/task-checklist.hooks";
 import type { Checklist, ChecklistReport } from "@/modules/accounts/task-checklist/task-checklist.types";
+import { FileUploader } from "@/components/file-upload";
 import { paths } from "@/app/routes/paths";
 import AdminChecklistView from "./components/AdminChecklistView";
 import UserChecklistView from "./components/UserChecklistView";
@@ -214,7 +215,7 @@ export const safeFormat = (date?: string | Date) => {
 
 export const RemarkModal: React.FC<RemarkModalProps> = ({ open, onOpenChange, type, reportId, taskName }) => {
     const [remark, setRemark] = useState("");
-    const [file, setFile] = useState<File | null>(null);
+    const [files, setFiles] = useState<string[]>([]);
 
     const respMutation = useStoreResponsibilityRemark();
     const accMutation = useStoreAccountabilityRemark();
@@ -228,27 +229,20 @@ export const RemarkModal: React.FC<RemarkModalProps> = ({ open, onOpenChange, ty
                 await respMutation.mutateAsync({
                     id: reportId,
                     data: { respRemark: remark },
-                    file: file || undefined,
+                    filenames: files,
                 });
             } else {
                 await accMutation.mutateAsync({
                     id: reportId,
                     data: { accRemark: remark },
-                    file: file || undefined,
+                    filenames: files,
                 });
             }
             setRemark("");
-            setFile(null);
+            setFiles([]);
             onOpenChange(false);
         } catch (error) {
             // Error handled by mutation
-        }
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const selectedFile = e.target.files?.[0];
-        if (selectedFile) {
-            setFile(selectedFile);
         }
     };
 
@@ -285,28 +279,13 @@ export const RemarkModal: React.FC<RemarkModalProps> = ({ open, onOpenChange, ty
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="file">Result File (Optional)</Label>
-                        <Input
-                            id="file"
-                            type="file"
-                            accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
-                            onChange={handleFileChange}
+                        <Label>Result File (Optional)</Label>
+                        <FileUploader
+                            context="checklist"
+                            value={files}
+                            onChange={setFiles}
                             disabled={isSubmitting}
                         />
-                        {file && (
-                            <div className="flex items-center justify-between p-2 border rounded bg-muted/50">
-                                <span className="text-sm truncate">{file.name}</span>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setFile(null)}
-                                    disabled={isSubmitting}
-                                >
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        )}
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">

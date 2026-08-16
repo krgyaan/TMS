@@ -1,21 +1,20 @@
-// src/modules/accounts/checklist/checklist.service.ts
-import { Inject, Injectable, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common";
-import { eq, and, desc, or, gte, lte, isNull, inArray, sql } from "drizzle-orm";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { format } from "date-fns";
+import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
-import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
+import { DRIZZLE } from "@/db/database.module";
 import { accountChecklist } from "@/db/schemas/accounts/account-checklist";
 import { accountChecklistReport } from "@/db/schemas/accounts/account-checklist-report";
 import { users } from "@/db/schemas/auth/users.schema";
 
-import type { CreateChecklistDto, UpdateChecklistInput, ResponsibilityRemarkDto, GetTasksDto, AccountabilityRemarkDto } from "./account-checklist.controller";
+import type { AccountabilityRemarkDto, CreateChecklistDto, GetTasksDto, ResponsibilityRemarkDto, UpdateChecklistInput } from "./account-checklist.controller";
 
+import { MailAudienceService } from "@/core/mail/mail-audience.service";
 import { MailerService } from "@/mailer/mailer.service";
 import { GoogleService } from "@/modules/integrations/google/google.service";
-import { MailAudienceService } from "@/core/mail/mail-audience.service";
 
 
 // Helper types
@@ -392,22 +391,17 @@ export class AccountChecklistService {
      */
     async storeResponsibilityRemark(
         id: number,
-        data: ResponsibilityRemarkDto,
-        file: Express.Multer.File | undefined,
+        data: ResponsibilityRemarkDto & { respResultFile?: string | null },
         userId: number
     ) {
         this.logger.info("Storing responsibility remark", {
             reportId: id,
             userId,
-            hasFile: !!file,
+            hasFile: !!data.respResultFile,
         });
 
         try {
-            let fileName: string | null = null;
-
-            if (file) {
-                fileName = file.filename;
-            }
+            const fileName = data.respResultFile || null;
 
             // Find the report
             const [report] = await this.db
@@ -462,22 +456,17 @@ export class AccountChecklistService {
      */
     async storeAccountabilityRemark(
         id: number,
-        data: AccountabilityRemarkDto,
-        file: Express.Multer.File | undefined,
+        data: AccountabilityRemarkDto & { accResultFile?: string | null },
         userId: number
     ) {
         this.logger.info("Storing accountability remark", {
             reportId: id,
             userId,
-            hasFile: !!file,
+            hasFile: !!data.accResultFile,
         });
 
         try {
-            let fileName: string | null = null;
-
-            if (file) {
-                fileName = file.filename;
-            }
+            const fileName = data.accResultFile || null;
 
             // Find the report
             const [report] = await this.db
