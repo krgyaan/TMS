@@ -20,7 +20,8 @@ import { useCurrentUser } from "@/hooks/api/useAuth";
 import { useCreateHrmsAsset, useHrmsAssetView, useUpdateHrmsAsset } from "@/hooks/api/useHrmsAssets";
 import { ASSET_CATEGORY, ASSET_CONDITION, ASSET_TYPE, CATEGORY_TYPES, getTypesForCategory, toOptions } from "../constants";
 import { createAssetSchema, editAssetSchema } from "../helpers/asset.schema";
-import { buildCreateFormData, buildEditFormData, getAssetFileUrl, toDateInput } from "../helpers/asset.mappers";
+import { buildCreatePayload, buildEditPayload, getAssetFileUrl, toDateInput } from "../helpers/asset.mappers";
+import { FileUploader } from "@/components/file-upload";
 import { BRANDLESS_TYPES, MOBILE_TYPES } from "../helpers/asset.types";
 import { getTypeSpecFields } from "../helpers/typeSpecs";
 
@@ -40,11 +41,12 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
   const [accessoryInput, setAccessoryInput] = useState("");
   const [existingFiles, setExistingFiles] = useState({ purchaseInvoice: "", warrantyCard: "", assignmentForm: "", assetPhotos: [] as string[] });
   const [removedFiles, setRemovedFiles] = useState<string[]>([]);
-
-  const purchaseInvoiceRef = useRef<HTMLInputElement>(null);
-  const warrantyCardRef = useRef<HTMLInputElement>(null);
-  const assetPhotosRef = useRef<HTMLInputElement>(null);
-  const assignmentFormRef = useRef<HTMLInputElement>(null);
+  const [newFiles, setNewFiles] = useState<{
+    purchaseInvoice: string[];
+    warrantyCard: string[];
+    assignmentForm: string[];
+    assetPhotos: string[];
+  }>({ purchaseInvoice: [], warrantyCard: [], assignmentForm: [], assetPhotos: [] });
   const initialRender = useRef(true);
 
   const schema = mode === "create" ? createAssetSchema : editAssetSchema;
@@ -159,19 +161,12 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
   const onSubmit = async (data: any) => {
     try {
       if (mode === "create") {
-        const fileRefs = { purchaseInvoiceRef, warrantyCardRef, assetPhotosRef, assignmentFormRef };
-        const formData = buildCreateFormData(data, fileRefs, accessories, currentUser?.id);
-        await createAssetMutation.mutateAsync(formData);
+        const payload = buildCreatePayload(data, newFiles, accessories, currentUser?.id);
+        await createAssetMutation.mutateAsync(payload);
         navigate(paths.hrms.assets.list);
       } else {
-        const newFiles = {
-          purchaseInvoice: purchaseInvoiceRef.current?.files?.[0] ?? null,
-          warrantyCard: warrantyCardRef.current?.files?.[0] ?? null,
-          assignmentForm: assignmentFormRef.current?.files?.[0] ?? null,
-          assetPhotos: Array.from(assetPhotosRef.current?.files || []) as File[],
-        };
-        const formData = buildEditFormData(data, removedFiles, newFiles, currentUser?.id);
-        await updateAssetMutation.mutateAsync({ id: assetId!, data: formData });
+        const payload = buildEditPayload(data, removedFiles, newFiles, currentUser?.id);
+        await updateAssetMutation.mutateAsync({ id: assetId!, data: payload });
         navigate(paths.hrms.assets.show(assetId!));
       }
     } catch (e) {
@@ -427,14 +422,19 @@ const AssetForm: React.FC<AssetFormProps> = ({ mode, assetId }) => {
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {[
-                  { ref: purchaseInvoiceRef, id: "purchaseInvoice", label: "Purchase Invoice", accept: ".pdf,image/*" },
-                  { ref: warrantyCardRef, id: "warrantyCard", label: "Warranty Card", accept: ".pdf,image/*" },
-                  { ref: assetPhotosRef, id: "assetPhotos", label: "Asset Photos", accept: "image/*", multiple: true },
-                  { ref: assignmentFormRef, id: "assignmentForm", label: "Assignment Form", accept: ".pdf,image/*" },
+                  { key: "purchaseInvoice", label: "Purchase Invoice" },
+                  { key: "warrantyCard", label: "Warranty Card" },
+                  { key: "assetPhotos", label: "Asset Photos" },
+                  { key: "assignmentForm", label: "Assignment Form" },
                 ].map(item => (
-                  <div key={item.id} className="border border-dashed rounded-lg p-4 text-center">
-                    <Label htmlFor={item.id} className="text-sm font-medium cursor-pointer">{item.label}</Label>
-                    <Input id={item.id} ref={item.ref as any} type="file" accept={item.accept} multiple={item.multiple} disabled={isSubmittingForm} className="mt-2 max-w-xs mx-auto" />
+                  <div key={item.key} className="border border-dashed rounded-lg p-4 text-center space-y-2">
+                    <Label className="text-sm font-medium">{item.label}</Label>
+                    <FileUploader
+                      context="assets"
+                      value={newFiles[item.key as keyof typeof newFiles]}
+                      onChange={(paths) => setNewFiles(prev => ({ ...prev, [item.key]: paths }))}
+                      disabled={isSubmittingForm}
+                    />
                   </div>
                 ))}
               </div>

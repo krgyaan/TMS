@@ -1,41 +1,7 @@
 import { Public } from '@/modules/auth/decorators';
-import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Req } from '@nestjs/common';
 import { z } from 'zod';
 import { EmployeeOnboardingService } from './employee-onboarding.service';
-
-// ─── Multer Config ────────────────────────────────────────────────────────────
-
-const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'];
-
-const documentStorage = diskStorage({
-  destination: './uploads/hrms/employee-documents',
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext = extname(file.originalname).toLowerCase();
-    cb(null, `doc-${uniqueSuffix}${ext}`);
-  },
-});
-
-const documentMulter = {
-  storage: documentStorage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
-  fileFilter: (_req: any, file: Express.Multer.File, cb: any) => {
-    const ext = extname(file.originalname).toLowerCase();
-    if (ALLOWED_EXT.includes(ext)) {
-      cb(null, true);
-    } else {
-      cb(
-        new BadRequestException(
-          `File type not allowed. Accepted: ${ALLOWED_EXT.join(', ')}`,
-        ),
-        false,
-      );
-    }
-  },
-};
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -218,14 +184,11 @@ export class EmployeeOnboardingController {
    * Upload a new draft onboarding document.
    */
   @Post('documents')
-
-  @UseInterceptors(FileInterceptor('file', documentMulter))
   async uploadOnboardingDocument(
     @Req() req: any,
-    @UploadedFile() file: Express.Multer.File,
     @Body() body: any,
   ) {
-    if (!file) {
+    if (!body.filename) {
       throw new BadRequestException('File is required');
     }
     if (!body.docType) {
@@ -235,7 +198,7 @@ export class EmployeeOnboardingController {
       throw new BadRequestException('docCategory is required');
     }
 
-    return this.employeeOnboardingService.uploadOnboardingDocument(req.user.id, file, {
+    return this.employeeOnboardingService.uploadOnboardingDocument(req.user.id, body.filename, {
       docType: body.docType,
       docCategory: body.docCategory,
       issueDate: body.issueDate || null,
@@ -248,19 +211,16 @@ export class EmployeeOnboardingController {
    * Re-upload a rejected draft onboarding document.
    */
   @Patch('documents/:id')
-
-  @UseInterceptors(FileInterceptor('file', documentMulter))
   async reuploadOnboardingDocument(
     @Req() req: any,
     @Param('id', ParseIntPipe) docId: number,
-    @UploadedFile() file: Express.Multer.File,
     @Body() body: any,
   ) {
-    if (!file) {
+    if (!body.filename) {
       throw new BadRequestException('File is required');
     }
 
-    return this.employeeOnboardingService.reuploadOnboardingDocument(req.user.id, docId, file, {
+    return this.employeeOnboardingService.reuploadOnboardingDocument(req.user.id, docId, body.filename, {
       issueDate: body.issueDate || null,
       expiryDate: body.expiryDate || null,
     });

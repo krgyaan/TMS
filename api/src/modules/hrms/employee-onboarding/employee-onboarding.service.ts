@@ -1444,7 +1444,7 @@ export class EmployeeOnboardingService {
 
   async uploadOnboardingDocument(
     userId: number,
-    file: Express.Multer.File,
+    filename: string,
     dto: {
       docType: string;
       docCategory: string;
@@ -1463,7 +1463,6 @@ export class EmployeeOnboardingService {
     const onboardingId = isOnboarding ? activeReqs[0].id : null;
 
     if (!isOnboarding) {
-      try { fs.unlinkSync(file.path); } catch (_) {}
       throw new BadRequestException('Documents can only be uploaded during onboarding.');
     }
 
@@ -1477,11 +1476,10 @@ export class EmployeeOnboardingService {
     );
 
     if (duplicate) {
-      try { fs.unlinkSync(file.path); } catch (_) {}
       throw new ConflictException(`A document of type "${dto.docType}" already exists. Use re-upload instead.`);
     }
 
-    const fileUrl = `/uploads/hrms/employee-documents/${file.filename}`;
+    const fileUrl = `/uploads/hrms/employee-documents/${filename.split('/').pop()}`;
 
     const [inserted] = await this.db
       .insert(onboardingDocuments)
@@ -1520,7 +1518,7 @@ export class EmployeeOnboardingService {
       docType: inserted.docType,
       docCategory: inserted.docCategory,
       fileUrl: inserted.fileUrl,
-      fileName: file.filename,
+      fileName: filename.split('/').pop() || filename,
       issueDate: inserted.issueDate || null,
       expiryDate: inserted.expiryDate || null,
       verificationStatus: inserted.status,
@@ -1532,7 +1530,7 @@ export class EmployeeOnboardingService {
   async reuploadOnboardingDocument(
     userId: number,
     docId: number,
-    file: Express.Multer.File,
+    filename: string,
     dto: {
       issueDate: string | null;
       expiryDate: string | null;
@@ -1548,7 +1546,6 @@ export class EmployeeOnboardingService {
     const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
 
     if (!isOnboarding) {
-      try { fs.unlinkSync(file.path); } catch (_) {}
       throw new BadRequestException('Documents can only be modified during onboarding.');
     }
 
@@ -1559,17 +1556,14 @@ export class EmployeeOnboardingService {
       .limit(1);
 
     if (!existing) {
-      try { fs.unlinkSync(file.path); } catch (_) {}
       throw new NotFoundException('Document not found');
     }
 
     if (existing.hrStatus === 'approved') {
-      try { fs.unlinkSync(file.path); } catch (_) {}
       throw new BadRequestException('Approved documents cannot be re-uploaded.');
     }
 
     if (existing.onboardingId !== activeReqs[0].id) {
-      try { fs.unlinkSync(file.path); } catch (_) {}
       throw new ForbiddenException('You do not own this document');
     }
 
@@ -1581,7 +1575,7 @@ export class EmployeeOnboardingService {
       }
     }
 
-    const newFileUrl = `/uploads/hrms/employee-documents/${file.filename}`;
+    const newFileUrl = `/uploads/hrms/employee-documents/${filename.split('/').pop()}`;
 
     const [updated] = await this.db
       .update(onboardingDocuments)
@@ -1620,7 +1614,7 @@ export class EmployeeOnboardingService {
       docType: updated.docType,
       docCategory: updated.docCategory,
       fileUrl: updated.fileUrl,
-      fileName: file.filename,
+      fileName: filename.split('/').pop() || filename,
       issueDate: updated.issueDate || null,
       expiryDate: updated.expiryDate || null,
       verificationStatus: updated.status,

@@ -1,5 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +59,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
+import { FileUploader } from "@/components/file-upload";
 import api from "@/lib/axios";
 import { useProfileContext } from "../contexts/ProfileContext";
 import { useOnboardingContext } from "./onboarding/contexts/OnboardingContext";
@@ -169,63 +169,35 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
   isOnboarding = false,
 }) => {
   const [dragActive, setDragActive] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<string[]>([]);
   const [docNumber, setDocNumber] = useState(existingDoc?.docNumber || "");
   const [issueDate, setIssueDate] = useState(existingDoc?.issueDate || "");
   const [expiryDate, setExpiryDate] = useState(existingDoc?.expiryDate || "");
   const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
-    else if (e.type === "dragleave") setDragActive(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setSelectedFile(e.dataTransfer.files[0]);
-    }
-  }, []);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-    }
-  };
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (!files[0]) return;
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      if (issueDate) formData.append("issueDate", issueDate);
-      if (expiryDate) formData.append("expiryDate", expiryDate);
+      const payload: Record<string, unknown> = {
+        filename: files[0],
+        issueDate: issueDate || undefined,
+        expiryDate: expiryDate || undefined,
+      };
 
       const urlPrefix = isOnboarding ? "/hrms/employee-onboarding" : "/profile";
       if (isReupload && existingDoc) {
         // PATCH /profile/documents/:id or /hrms/onboarding/documents/:id
-        formData.append("docType", existingDoc.docType);
-        formData.append("docCategory", existingDoc.docCategory);
-        await api.patch(`${urlPrefix}/documents/${existingDoc.id}`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await api.patch(`${urlPrefix}/documents/${existingDoc.id}`, payload);
       } else if (documentType) {
         // POST /profile/documents or /hrms/onboarding/documents
-        formData.append("docType", documentType.docType);
-        formData.append("docCategory", documentType.docCategory);
-        await api.post(`${urlPrefix}/documents`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        payload.docType = documentType.docType;
+        payload.docCategory = documentType.docCategory;
+        await api.post(`${urlPrefix}/documents`, payload);
       }
 
       onSuccess();
-      setSelectedFile(null);
+      setFiles([]);
       setDocNumber("");
       setIssueDate("");
       setExpiryDate("");
@@ -239,7 +211,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
   };
 
   const handleReset = () => {
-    setSelectedFile(null);
+    setFiles([]);
     setDocNumber("");
     setIssueDate("");
     setExpiryDate("");
@@ -284,96 +256,13 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
             </div>
           )}
 
-          {/* Drop Zone */}
-          <div
-            className={cn(
-              "relative border-2 border-dashed rounded-2xl transition-all duration-300 cursor-pointer",
-              dragActive
-                ? "border-primary bg-primary/5 scale-[1.01]"
-                : selectedFile
-                ? "border-emerald-500/30 bg-emerald-500/5"
-                : "border-border/50 hover:border-primary/30 hover:bg-muted/30"
-            )}
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-            onClick={() => !selectedFile && fileInputRef.current?.click()}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-              onChange={handleFileSelect}
-            />
-
-            <AnimatePresence mode="wait">
-              {selectedFile ? (
-                <motion.div
-                  key="file-selected"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="p-5"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-                      {React.createElement(getFileIcon(selectedFile.name), {
-                        className: "h-7 w-7 text-emerald-600",
-                      })}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold truncate">{selectedFile.name}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {formatFileSize(selectedFile.size)}
-                      </p>
-                      <div className="flex items-center gap-1.5 mt-1.5">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                        <span className="text-[10px] text-emerald-600 font-semibold uppercase tracking-wider">
-                          Ready to upload
-                        </span>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="shrink-0 h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedFile(null);
-                      }}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="drop-zone"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="p-8 text-center"
-                >
-                  <motion.div
-                    animate={dragActive ? { scale: 1.1, y: -4 } : { scale: 1, y: 0 }}
-                    transition={{ type: "spring", stiffness: 300 }}
-                    className="h-16 w-16 rounded-2xl bg-primary/5 flex items-center justify-center mx-auto mb-4"
-                  >
-                    <CloudUpload className={cn("h-8 w-8 transition-colors", dragActive ? "text-primary" : "text-primary/40")} />
-                  </motion.div>
-                  <p className="text-sm font-semibold mb-1">
-                    {dragActive ? "Drop your file here" : "Drag & drop your file here"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mb-3">or click to browse</p>
-                  <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">
-                    PDF, JPG, PNG, DOC • Max 10MB
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          {/* File Upload */}
+          <FileUploader
+            context="employee-documents"
+            value={files}
+            onChange={setFiles}
+            disabled={uploading}
+          />
 
           {/* Document Details */}
           <div className="grid grid-cols-1 gap-4">
@@ -420,7 +309,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
             <Button
               className="flex-1 h-11 rounded-xl font-semibold gap-2 shadow-lg shadow-primary/20"
               onClick={handleUpload}
-              disabled={!selectedFile || uploading}
+              disabled={!files[0] || uploading}
             >
               {uploading ? (
                 <>

@@ -1,8 +1,6 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req, UploadedFiles, UseInterceptors } from "@nestjs/common";
-import { AnyFilesInterceptor } from "@nestjs/platform-express";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req } from "@nestjs/common";
 import * as fs from "fs";
-import { diskStorage } from "multer";
-import { extname, join } from "path";
+import { join } from "path";
 import { z } from "zod";
 import { AssetsService, StatusUpdateDto } from "./assets.service";
 
@@ -113,18 +111,6 @@ function toDateString(date?: Date | null): string | null {
   return date ? date.toISOString().split("T")[0] : null;
 }
 
-const multerConfig = {
-  storage: diskStorage({
-    destination: "./uploads/hrms/assets",
-    filename: (req, file, callback) => {
-      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-      const ext = extname(file.originalname);
-      callback(null, `asset-${uniqueSuffix}${ext}`);
-    },
-  }),
-  limits: { fileSize: 25 * 1024 * 1024 },
-};
-
 @Controller("assets")
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) { }
@@ -155,33 +141,13 @@ export class AssetsController {
   }
 
   @Post()
-  @UseInterceptors(AnyFilesInterceptor(multerConfig))
   async create(
     @Body() body: any,
-    @UploadedFiles() incomingFiles: Express.Multer.File[]
   ) {
-    const files = incomingFiles || [];
-    const assetPhotos = files.filter(f => f.fieldname === 'assetPhotos' || f.fieldname === 'assetPhotos[]').map(f => f.filename);
-    const purchaseInvoice = files.find(f => f.fieldname === 'purchaseInvoice' || f.fieldname === 'purchaseInvoice[]')?.filename || null;
-    const warrantyCard = files.find(f => f.fieldname === 'warrantyCard' || f.fieldname === 'warrantyCard[]')?.filename || null;
-    const assignmentForm = files.find(f => f.fieldname === 'assignmentForm' || f.fieldname === 'assignmentForm[]')?.filename || null;
-
-    if (typeof body.userId === "string") body.userId = Number.parseInt(body.userId, 10);
-    if (typeof body.accessories === "string") {
-      try {
-        body.accessories = JSON.parse(body.accessories);
-      } catch {
-        body.accessories = [];
-      }
-    }
-
-    if (typeof body.typeSpecs === "string") {
-      try {
-        body.typeSpecs = JSON.parse(body.typeSpecs);
-      } catch {
-        body.typeSpecs = {};
-      }
-    }
+    const assetPhotos = Array.isArray(body.assetPhotos) ? body.assetPhotos : [];
+    const purchaseInvoice = body.purchaseInvoice || null;
+    const warrantyCard = body.warrantyCard || null;
+    const assignmentForm = body.assignmentForm || null;
 
     delete body.assetPhotos;
     delete body.purchaseInvoice;
@@ -221,49 +187,29 @@ export class AssetsController {
   }
 
   @Patch(":id")
-  @UseInterceptors(AnyFilesInterceptor(multerConfig))
   async update(
     @Param("id", ParseIntPipe) id: number,
     @Body() body: any,
-    @UploadedFiles() incomingFiles: Express.Multer.File[]
   ) {
-    const files = incomingFiles || [];
-
-    if (typeof body.accessories === "string") {
-      try {
-        body.accessories = JSON.parse(body.accessories);
-      } catch {
-        body.accessories = [];
-      }
-    }
-
-    if (typeof body.typeSpecs === "string") {
-      try {
-        body.typeSpecs = JSON.parse(body.typeSpecs);
-      } catch {
-        body.typeSpecs = {};
-      }
-    }
-
     // 🔹 Extract uploaded files (store filename only, like courier module)
-    const newPhotos = files
-      .filter((f) => f.fieldname === "assetPhotos")
-      .map((f) => f.filename);
+    const newPhotos = Array.isArray(body.assetPhotos) ? body.assetPhotos : [];
 
-    const newPurchaseInvoice =
-      files.find((f) => f.fieldname === "purchaseInvoice")?.filename || null;
+    const newPurchaseInvoice = body.purchaseInvoice || null;
 
-    const newWarrantyCard =
-      files.find((f) => f.fieldname === "warrantyCard")?.filename || null;
+    const newWarrantyCard = body.warrantyCard || null;
 
-    const newAssignmentForm =
-      files.find((f) => f.fieldname === "assignmentForm")?.filename || null;
+    const newAssignmentForm = body.assignmentForm || null;
+
+    delete body.assetPhotos;
+    delete body.purchaseInvoice;
+    delete body.warrantyCard;
+    delete body.assignmentForm;
 
     // 🔹 Parse removed files
     let removedFiles: string[] = [];
     if (body.removedFiles) {
       try {
-        removedFiles = JSON.parse(body.removedFiles);
+        removedFiles = typeof body.removedFiles === "string" ? JSON.parse(body.removedFiles) : body.removedFiles;
       } catch {
         removedFiles = [];
       }

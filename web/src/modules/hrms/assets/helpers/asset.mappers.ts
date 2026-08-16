@@ -1,3 +1,5 @@
+import { fileUploadService } from "@/services/api/file-upload.service";
+
 export const toDateInput = (date: string | null | undefined): string => {
   if (!date) return "";
   try {
@@ -10,86 +12,63 @@ export const toDateInput = (date: string | null | undefined): string => {
 export const getAssetFileUrl = (storedValue: string | null | undefined): string => {
   if (!storedValue) return "";
   if (storedValue.startsWith("uploads/")) return `/${storedValue}`;
+  if (storedValue.includes("/")) return fileUploadService.getFileUrl(storedValue);
   return `/uploads/hrms/assets/${storedValue}`;
 };
 
-export const buildCreateFormData = (
+export const buildCreatePayload = (
   data: Record<string, any>,
-  fileRefs: Record<string, any>,
+  files: { purchaseInvoice: string[]; warrantyCard: string[]; assignmentForm: string[]; assetPhotos: string[] },
   selectedAccessories: string[],
   currentUserId?: number,
-): FormData => {
-  const formData = new FormData();
+): Record<string, any> => {
+  const payload: Record<string, any> = {};
 
   Object.entries(data).forEach(([key, val]) => {
     if (val === undefined || val === null || val === "") return;
     if (key === "accessories" || key === "typeSpecs") return;
-    formData.append(key, String(val));
+    payload[key] = val;
   });
 
-  formData.append("accessories", JSON.stringify(selectedAccessories));
+  payload.accessories = selectedAccessories;
   if (data.typeSpecs && Object.keys(data.typeSpecs).length > 0) {
-    formData.append("typeSpecs", JSON.stringify(data.typeSpecs));
+    payload.typeSpecs = data.typeSpecs;
   }
 
-  const purchaseInvoice = fileRefs.purchaseInvoiceRef?.current?.files?.[0];
-  if (purchaseInvoice) formData.append("purchaseInvoice", purchaseInvoice);
+  payload.assetPhotos = files.assetPhotos;
+  payload.purchaseInvoice = files.purchaseInvoice[0] || null;
+  payload.warrantyCard = files.warrantyCard[0] || null;
+  payload.assignmentForm = files.assignmentForm[0] || null;
 
-  const warrantyCard = fileRefs.warrantyCardRef?.current?.files?.[0];
-  if (warrantyCard) formData.append("warrantyCard", warrantyCard);
-
-  const assignmentForm = fileRefs.assignmentFormRef?.current?.files?.[0];
-  if (assignmentForm) formData.append("assignmentForm", assignmentForm);
-
-  const assetPhotos = fileRefs.assetPhotosRef?.current?.files;
-  if (assetPhotos) {
-    Array.from(assetPhotos).forEach((photo) =>
-      formData.append("assetPhotos", photo),
-    );
-  }
-
-  return formData;
+  return payload;
 };
 
-export const buildEditFormData = (
+export const buildEditPayload = (
   data: Record<string, any>,
   removedFiles: string[],
-  newFiles: Record<string, any>,
+  files: { purchaseInvoice: string[]; warrantyCard: string[]; assignmentForm: string[]; assetPhotos: string[] },
   currentUserId?: number,
-): FormData => {
-  const formData = new FormData();
+): Record<string, any> => {
+  const payload: Record<string, any> = {};
 
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "" && value !== "null") {
       if (key === "typeSpecs") return;
-      if (Array.isArray(value)) {
-        formData.append(key, JSON.stringify(value));
-      } else {
-        formData.append(key, String(value));
-      }
+      payload[key] = value;
     }
   });
 
   if (data.typeSpecs && Object.keys(data.typeSpecs).length > 0) {
-    formData.append("typeSpecs", JSON.stringify(data.typeSpecs));
+    payload.typeSpecs = data.typeSpecs;
   }
 
-  formData.append("removedFiles", JSON.stringify(removedFiles));
+  payload.removedFiles = removedFiles;
+  payload.assetPhotos = files.assetPhotos;
+  if (files.purchaseInvoice[0]) payload.purchaseInvoice = files.purchaseInvoice[0];
+  if (files.warrantyCard[0]) payload.warrantyCard = files.warrantyCard[0];
+  if (files.assignmentForm[0]) payload.assignmentForm = files.assignmentForm[0];
 
-  if (newFiles.purchaseInvoice)
-    formData.append("purchaseInvoice", newFiles.purchaseInvoice);
-
-  if (newFiles.warrantyCard)
-    formData.append("warrantyCard", newFiles.warrantyCard);
-
-  if (newFiles.assignmentForm)
-    formData.append("assignmentForm", newFiles.assignmentForm);
-
-  newFiles.assetPhotos.forEach((file: any) => {
-    formData.append("assetPhotos", file);
-  });
-
-  return formData;
+  return payload;
 };
 
 export const formatAssetDate = (dateValue: string | null | undefined): string => {
