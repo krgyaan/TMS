@@ -360,14 +360,14 @@ const ImprestVoucherView: React.FC = () => {
 
                         <tr>
                             <th>Checked By:</th>
-                            <td>{voucher.accountsSignedBy ? <img src={`/uploads/signs/${voucher.accountsSignedBy}`} alt="Accounts Sign" /> : <i>to be signed</i>}</td>
+                            <td>{voucher.accountsSignedBy ? "—" : <i>to be signed</i>}</td>
                             <th>Date:</th>
                             <td>{formatDate(voucher.accountsSignedAt)}</td>
                         </tr>
 
                         <tr>
                             <th>Approved By:</th>
-                            <td>{voucher.adminSignedBy ? <img src={`/uploads/signs/${voucher.adminSignedBy}`} alt="Admin Sign" /> : <i>to be signed</i>}</td>
+                            <td>{voucher.adminSignedBy ? "—" : <i>to be signed</i>}</td>
                             <th>Date:</th>
                             <td>{formatDate(voucher.adminSignedAt)}</td>
                         </tr>

@@ -11,7 +11,7 @@ import { ZodValidationPipe } from "nestjs-zod";
 // Multer config
 const multerConfig = {
     storage: diskStorage({
-        destination: "./uploads/employeeimprest",
+        destination: "./uploads/employee-imprest",
         filename: (req, file, callback) => {
             const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
             const ext = extname(file.originalname);

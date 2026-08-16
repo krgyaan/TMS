@@ -1,6 +1,6 @@
 import type { ImprestProof, ProofItem } from "./imprest.types";
 
-const UPLOADS_BASE_URL = (import.meta.env.VITE_UPLOADS_URL as string | undefined) || "/uploads/employeeimprest";
+const UPLOADS_BASE_URL = (import.meta.env.VITE_UPLOADS_URL as string | undefined) || "/uploads/employee-imprest";
 
 /** Build the full URL for an uploaded imprest proof file. */
 export const imprestFileUrl = (file: string): string => `${UPLOADS_BASE_URL}/${file}`;
