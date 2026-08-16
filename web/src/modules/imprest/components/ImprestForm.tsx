@@ -16,20 +16,15 @@ import { useUsers } from "@/hooks/api/useUsers";
 import { useProjectOptions } from "@/hooks/useSelectOptions";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import type { FilePondFile } from "filepond";
-import FilePondPluginFileValidateType from "filepond-plugin-file-validate-type";
-import FilePondPluginImagePreview from "filepond-plugin-image-preview";
+import { FileUploader } from "@/components/file-upload";
 import { AlertCircle, User } from "lucide-react";
 import { useEffect, useState } from "react";
-import { FilePond, registerPlugin } from "react-filepond";
 import { useForm, type Resolver } from "react-hook-form";
 import { useNavigate, useLocation } from "react-router-dom";
 import { imprestFormSchema, INSURANCE_CATEGORY_ID, type ImprestFormValues } from "../helpers/imprest.schema";
 import type { ImprestRow } from "../helpers/imprest.types";
 import { InsuranceDetailsForm } from "@/modules/insurance/components/InsuranceDetailsForm";
 import { buildInsurancePayload } from "@/modules/insurance/helpers/insurance.mapper";
-
-registerPlugin(FilePondPluginFileValidateType, FilePondPluginImagePreview);
 
 const TEAM_MEMBER_CATEGORY_ID = 22;
 const toTitleCase = (name: string): string => name.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
@@ -51,7 +46,7 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
     const createMutation = useCreateImprest();
     const updateMutation = useUpdateImprest();
     const uploadMutation = useUploadImprestProofs();
-    const [pondFiles, setPondFiles] = useState<File[]>([]);
+    const [files, setFiles] = useState<string[]>([]);
     const [submitError, setSubmitError] = useState<string | null>(null);
 
     const categoryOptions = imprestCategories.map(i => ({
@@ -147,10 +142,6 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
 
     const imprestId = imprest?.id ?? 0;
 
-    const handlePondProcess = (items: FilePondFile[]) => {
-        setPondFiles(items.map(fi => fi.file as File));
-    };
-
     const extractServerError = (err: unknown): string => {
         const message = (err as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
         if (Array.isArray(message)) {
@@ -183,10 +174,10 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
                     },
                 });
 
-                if (pondFiles.length > 0) {
+                if (files.length > 0) {
                     await uploadMutation.mutateAsync({
                         id: imprestId,
-                        files: pondFiles,
+                        filenames: files,
                     });
                 }
 
@@ -202,7 +193,7 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
                         transferToId: isTransferMode ? data.transferToId : null,
                         insurance,
                     },
-                    files: pondFiles,
+                    filenames: files,
                 });
 
                 navigate(isAccountsSection ? paths.accounts.imprests : paths.shared.imprest);
@@ -326,19 +317,10 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
                             <div className="space-y-3 md:col-span-1">
                                 <div className="space-y-2">
                                     <Label>Invoice / Proof</Label>
-                                    <FilePond
-                                        files={pondFiles}
-                                        onupdatefiles={handlePondProcess}
-                                        allowMultiple
-                                        acceptedFileTypes={[
-                                            "image/*",
-                                            "application/pdf",
-                                            "application/msword",
-                                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                            "text/plain",
-                                        ]}
-                                        labelIdle='Drag & drop files or <span class="filepond--label-action">Browse</span>'
-                                        className="cursor-pointer"
+                                    <FileUploader
+                                        context="employee-imprest"
+                                        value={files}
+                                        onChange={setFiles}
                                     />
                                 </div>
                             </div>

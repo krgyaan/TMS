@@ -40,18 +40,8 @@ class ImprestService extends BaseApiService {
         return this.get<EmployeeImprestTransactionRow[]>(`/employee/user/${userId}/transactions`);
     }
 
-    async create({ data, files }: { data: Record<string, unknown>; files: File[] }): Promise<ImprestRow> {
-        const formData = new FormData();
-
-        Object.entries(data).forEach(([key, value]) => {
-            if (value !== undefined && value !== null) {
-                formData.append(key, String(value));
-            }
-        });
-
-        files.forEach(file => formData.append('files', file));
-
-        return this.post<ImprestRow>('/employee', formData);
+    async create({ data, filenames }: { data: Record<string, unknown>; filenames?: string[] }): Promise<ImprestRow> {
+        return this.post<ImprestRow>('/employee', { ...data, files: filenames ?? [] });
     }
 
     async update(id: number, data: Partial<ImprestRow>): Promise<ImprestRow> {
@@ -82,10 +72,8 @@ class ImprestService extends BaseApiService {
         return this.patch(`/employee/${id}/account-remark`, { remark });
     }
 
-    async uploadProofs(id: number, files: File[]): Promise<unknown> {
-        const formData = new FormData();
-        files.forEach(file => formData.append('files', file));
-        return this.post(`/employee/${id}/upload`, formData);
+    async uploadProofs(id: number, filenames: string[]): Promise<unknown> {
+        return this.post(`/employee/${id}/upload`, { files: filenames });
     }
 
     async deleteProof(id: number, filename: string): Promise<unknown> {

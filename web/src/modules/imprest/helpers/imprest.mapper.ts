@@ -1,9 +1,13 @@
 import type { ImprestProof, ProofItem } from "./imprest.types";
+import { fileUploadService } from "@/services/api/file-upload.service";
 
 const UPLOADS_BASE_URL = (import.meta.env.VITE_UPLOADS_URL as string | undefined) || "/uploads/employee-imprest";
 
 /** Build the full URL for an uploaded imprest proof file. */
-export const imprestFileUrl = (file: string): string => `${UPLOADS_BASE_URL}/${file}`;
+export const imprestFileUrl = (file: string): string => {
+    if (file.includes("/")) return fileUploadService.getFileUrl(file);
+    return `${UPLOADS_BASE_URL}/${file}`;
+};
 
 export const isPdfFile = (file: string): boolean => file.toLowerCase().endsWith(".pdf");
 

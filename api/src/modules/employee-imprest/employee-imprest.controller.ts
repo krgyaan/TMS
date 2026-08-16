@@ -1,42 +1,26 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req, UploadedFiles, UseInterceptors } from "@nestjs/common";
-import { FilesInterceptor } from "@nestjs/platform-express";
-import { diskStorage } from "multer";
-import { extname } from "path";
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req } from "@nestjs/common";
 import { CurrentUser } from "@/decorators/current-user.decorator";
 import { EmployeeImprestService, type ImprestActorUser } from "@/modules/employee-imprest/employee-imprest.service";
 import { CreateEmployeeImprestSchema } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
 import { UpdateEmployeeImprestSchema, type UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
 import { ZodValidationPipe } from "nestjs-zod";
 
-// Multer config
-const multerConfig = {
-    storage: diskStorage({
-        destination: "./uploads/employee-imprest",
-        filename: (req, file, callback) => {
-            const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-            const ext = extname(file.originalname);
-            callback(null, `imp-${uniqueSuffix}${ext}`);
-        },
-    }),
-    limits: {
-        fileSize: 25 * 1024 * 1024,
-    },
-};
 @Controller("imprest/employee")
 export class EmployeeImprestController {
     constructor(private readonly service: EmployeeImprestService) {}
 
     @Post()
-    @UseInterceptors(FilesInterceptor("files", 10, multerConfig))
-    create(@Req() req, @UploadedFiles() files: Express.Multer.File[]) {
+    create(@Req() req) {
         const parsed = CreateEmployeeImprestSchema.safeParse(req.body);
 
         if (!parsed.success) {
             throw new BadRequestException(parsed.error.flatten());
         }
 
+        const filenames = Array.isArray(req.body?.files) ? req.body.files : [];
+
         // Pass sender's userId from JWT — service resolves name from DB
-        return this.service.createWithTransfer(parsed.data, files ?? [], req.user as ImprestActorUser);
+        return this.service.createWithTransfer(parsed.data, filenames, req.user as ImprestActorUser);
     }
 
     @Get()
@@ -116,11 +100,10 @@ export class EmployeeImprestController {
 
     // File upload code
     @Post(":id/upload")
-    @UseInterceptors(FilesInterceptor("files", 10, multerConfig))
-    uploadDocs(@Param("id", ParseIntPipe) id: number, @UploadedFiles() files: Express.Multer.File[], @CurrentUser("id") userId: number) {
+    uploadDocs(@Param("id", ParseIntPipe) id: number, @Body() body: { files?: string[] }, @CurrentUser("id") userId: number) {
         console.log("file upload begins");
-        console.log("Files received:", files);
-        return this.service.uploadDocs(id, files, userId);
+        console.log("Files received:", body?.files);
+        return this.service.uploadDocs(id, body?.files ?? [], userId);
     }
 
     @Patch(":id/account-remark")

@@ -72,7 +72,7 @@ export const useCreateImprest = () => {
     const qc = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ data, files }: { data: Record<string, unknown>; files: File[] }) => imprestService.create({ data, files }),
+        mutationFn: ({ data, filenames }: { data: Record<string, unknown>; filenames?: string[] }) => imprestService.create({ data, filenames }),
         onSuccess: () => {
             toast.success("Imprest created successfully");
             qc.invalidateQueries({ queryKey: imprestKeys.root });
@@ -178,7 +178,7 @@ export const useUploadImprestProofs = () => {
     const qc = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, files }: { id: number; files: File[] }) => imprestService.uploadProofs(id, files),
+        mutationFn: ({ id, filenames }: { id: number; filenames: string[] }) => imprestService.uploadProofs(id, filenames),
 
         onSuccess: () => {
             toast.success("Proofs uploaded");

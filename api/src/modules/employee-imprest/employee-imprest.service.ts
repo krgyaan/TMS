@@ -1,19 +1,19 @@
+import type { DataScope } from "@/common/constants/roles.constant";
+import { DRIZZLE } from "@/db/database.module";
+import { imprestCategories, users } from "@/db/schemas";
+import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-voucher";
+import { PermissionService } from "@/modules/auth/services/permission.service";
+import type { CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
+import type { UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
+import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
+import { insurancePayloadSchema, type InsurancePayload } from "@/modules/insurance/zod/insurance-policy.schema";
+import { wrapPaginatedResponse } from "@/utils/responseWrapper";
+import type { DbInstance } from "@db";
+import { employeeImprests, employeeImprestTransactions } from "@db/schemas/shared";
 import { BadRequestException, ForbiddenException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
-import { DRIZZLE } from "@/db/database.module";
-import type { DbInstance } from "@db";
-import { employeeImprests, employeeImprestTransactions } from "@db/schemas/shared";
-import type { DataScope } from "@/common/constants/roles.constant";
-import { imprestCategories, users } from "@/db/schemas";
-import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-voucher";
-import { wrapPaginatedResponse } from "@/utils/responseWrapper";
-import { PermissionService } from "@/modules/auth/services/permission.service";
-import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
-import { insurancePayloadSchema, type InsurancePayload } from "@/modules/insurance/zod/insurance-policy.schema";
-import type { CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
-import type { UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
 const TRANSFER_CATEGORY_ID = 22;
 const INSURANCE_CATEGORY_ID = 8;
 const WEEK_LOCK_EXEMPT_PERMISSION = { module: "shared.imprests", action: "week-lock-exempt" } as const;
@@ -93,7 +93,7 @@ export class EmployeeImprestService {
     }
 
     /* ----------------------------- CREATE ----------------------------- */
-    async createWithTransfer(data: CreateEmployeeImprestDto, files: Express.Multer.File[], actorUser?: ImprestActorUser) {
+    async createWithTransfer(data: CreateEmployeeImprestDto, files: string[], actorUser?: ImprestActorUser) {
         const isTransfer = Number(data.categoryId) === TRANSFER_CATEGORY_ID;
 
         this.logger.debug("Logging the dto", {
@@ -141,7 +141,7 @@ export class EmployeeImprestService {
                         projectName: null, // always null for cat 22
                         amount: data.amount,
                         remark: data.remark,
-                        invoiceProof: files.map(f => f.filename),
+                        invoiceProof: files,
                         dateOfExpense: data.dateOfExpense,
                     })
                     .returning();
@@ -173,7 +173,7 @@ export class EmployeeImprestService {
                     projectName: data.projectName,
                     amount: data.amount,
                     remark: data.remark,
-                    invoiceProof: files.map(f => f.filename),
+                    invoiceProof: files,
                     dateOfExpense: data.dateOfExpense,
                 })
                 .returning();
@@ -534,7 +534,7 @@ export class EmployeeImprestService {
     }
 
     /* ------------------------- UPLOAD DOCUMENTS ------------------------ */
-    async uploadDocs(id: number, files: Express.Multer.File[], userId: number) {
+    async uploadDocs(id: number, files: string[], userId: number) {
         const existing = await this.findOne(id);
         if (!existing) {
             throw new NotFoundException("Employee imprest not found");
@@ -549,7 +549,7 @@ export class EmployeeImprestService {
             throw new InternalServerErrorException("invoiceProof is corrupted (expected JSON array)");
         }
 
-        const updatedDocs = [...existing.invoiceProof, ...files.map(f => f.filename)];
+        const updatedDocs = [...existing.invoiceProof, ...files];
 
         const [updated] = await this.db
             .update(employeeImprests)
