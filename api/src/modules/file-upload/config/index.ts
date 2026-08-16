@@ -7,6 +7,10 @@ import { sharedConfigs } from './shared.config';
 import { accountsConfigs } from './accounts.config';
 import { insuranceConfigs } from './insurance.config';
 import { crmConfigs } from './crm.config';
+import { masterConfigs } from './master.config';
+import { employeeImprestConfigs } from './employee-imprest.config';
+import { courierConfigs } from './courier.config';
+import { hrmsConfigs } from './hrms.config';
 
 /**
  * Apply module-level storageDir + the default compression rules to every
@@ -39,6 +43,10 @@ export const FILE_CONFIGS: Record<string, ResolvedFileConfig> = {
     ...applyModuleDefaults(accountsConfigs, 'accounts'),
     ...applyModuleDefaults(insuranceConfigs, 'insurance'),
     ...applyModuleDefaults(crmConfigs, 'crm'),
+    ...applyModuleDefaults(masterConfigs, 'master'),
+    ...applyModuleDefaults(employeeImprestConfigs, ''),
+    ...applyModuleDefaults(courierConfigs, ''),
+    ...applyModuleDefaults(hrmsConfigs, 'hrms'),
 };
 
 export type FileContext = keyof typeof FILE_CONFIGS;

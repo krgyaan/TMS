@@ -29,4 +29,17 @@ export const accountsConfigs: Record<string, FileConfig> = {
         allowedMimeTypes: [...DOCS, ...OFFICE],
         allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx"],
     },
+    checklist: {
+        maxFiles: 1,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx"],
+    },
+    "follow-ups": {
+        maxFiles: 10,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx"],
+        imageQuality: 85,
+    },
 };

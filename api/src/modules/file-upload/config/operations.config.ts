@@ -56,4 +56,10 @@ export const operationsConfigs: Record<string, FileConfig> = {
         compressPdf: false,
         pdfQuality: 100,
     },
+    "wo-documents": {
+        maxFiles: 1,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
 };

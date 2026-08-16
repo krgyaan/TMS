@@ -36,6 +36,7 @@ export const KNOWN_CONTEXTS = [
     'finance-document',
     // accounts
     'bankLoanSchedule', 'sanctionLetter', 'tdsDocument', 'bankNoc',
+    'follow-ups',
     // insurance
     'insurances',
     // crm
