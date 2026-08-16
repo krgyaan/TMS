@@ -469,7 +469,7 @@ export class ImprestAdminService {
                     file,
                     ext,
                     type: ext === "pdf" ? "pdf" : "image",
-                    url: `/uploads/employeeimprest/${file}`,
+                    url: `/uploads/employee-imprest/${file}`,
                 };
             }),
 
@@ -514,7 +514,7 @@ export class ImprestAdminService {
                 file,
                 ext,
                 type: ext === "pdf" ? "pdf" : "image",
-                url: `/uploads/employeeimprest/${file}`,
+                url: `/uploads/employee-imprest/${file}`,
             };
         });
 
