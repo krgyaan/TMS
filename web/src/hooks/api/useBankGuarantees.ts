@@ -116,8 +116,8 @@ export const useUpdateBankGuarantee = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
-            bankGuaranteesService.update(id, formData),
+        mutationFn: ({ id, payload }: { id: number; payload: Record<string, unknown> }) =>
+            bankGuaranteesService.update(id, payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.all });
             queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.counts() });
@@ -129,8 +129,8 @@ export const useUpdateBankGuaranteeAction = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
-            bankGuaranteesService.updateAction(id, formData),
+        mutationFn: ({ id, payload }: { id: number; payload: Record<string, unknown> }) =>
+            bankGuaranteesService.updateAction(id, payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.all });
             queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.counts() });

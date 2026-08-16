@@ -85,37 +85,31 @@ export function BankGuaranteeEditForm({ instrumentId, initialData }: BankGuarant
 
     const handleSubmit = async (values: BankGuaranteeEditFormValues) => {
         try {
-            const formData = new FormData();
+            const payload: Record<string, unknown> = {};
 
             Object.entries(values).forEach(([key, value]) => {
-                // Handle File objects
-                if (value instanceof File) {
-                    formData.append(key, value);
-                    return;
-                }
+                // Handle File objects (shouldn't happen - FileUploader returns paths)
+                if (value instanceof File) return;
 
                 // Handle arrays of Files
-                if (Array.isArray(value) && value.length > 0 && value[0] instanceof File) {
-                    value.forEach((file) => formData.append(key, file));
-                    return;
-                }
+                if (Array.isArray(value) && value.length > 0 && value[0] instanceof File) return;
 
                 // Handle all other values
                 if (value === undefined || value === null) return;
 
                 if (value instanceof Date) {
-                    formData.append(key, value.toISOString());
+                    payload[key] = value.toISOString();
                 } else if (typeof value === 'object' && !Array.isArray(value)) {
                     // For single file paths that are already strings, don't stringify
-                    formData.append(key, String(value));
+                    payload[key] = String(value);
                 } else if (Array.isArray(value)) {
-                    formData.append(key, JSON.stringify(value));
+                    payload[key] = JSON.stringify(value);
                 } else {
-                    formData.append(key, String(value));
+                    payload[key] = String(value);
                 }
             });
 
-            await updateMutation.mutateAsync({ id: instrumentId, formData });
+            await updateMutation.mutateAsync({ id: instrumentId, payload });
             toast.success('Bank Guarantee updated successfully');
             navigate(-1);
         } catch (error: any) {

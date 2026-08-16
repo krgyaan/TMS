@@ -26,6 +26,7 @@
         "db:seed": "tsx src/db/seed.ts",
         "migrate:uploads": "ts-node -r tsconfig-paths/register scripts/migrate-file-upload-dirs.ts",
         "migrate:uploads:v2": "ts-node -r tsconfig-paths/register scripts/migrate-upload-dirs-v2.ts",
+        "backfill:uploads-paths": "ts-node -r tsconfig-paths/register scripts/backfill-file-uploader-paths.ts",
         "postinstall": "npx puppeteer browsers install chrome"
     },
     "dependencies": {

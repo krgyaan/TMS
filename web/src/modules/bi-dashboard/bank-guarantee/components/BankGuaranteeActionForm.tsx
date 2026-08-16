@@ -66,7 +66,7 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
 
     const handleSubmit = async (values: BankGuaranteeActionFormValues) => {
         try {
-            const formData = new FormData();
+            const payload: Record<string, unknown> = {};
 
             Object.entries(values).forEach(([key, value]) => {
                 // Skip follow-up fields - handled by different service
@@ -81,30 +81,24 @@ export function BankGuaranteeActionForm({ instrumentId }: BankGuaranteeActionFor
                     return;
                 }
 
-                // Handle File objects (non-followup files)
-                if (value instanceof File) {
-                    formData.append(key, value);
-                    return;
-                }
+                // Handle File objects (shouldn't happen - FileUploader returns paths)
+                if (value instanceof File) return;
 
                 // Handle arrays of Files
-                if (Array.isArray(value) && value.length > 0 && value[0] instanceof File) {
-                    value.forEach((file) => formData.append(key, file));
-                    return;
-                }
+                if (Array.isArray(value) && value.length > 0 && value[0] instanceof File) return;
 
                 // Handle all other values (strings, numbers, dates, file paths, etc.)
                 if (value === undefined || value === null || value === '') return;
                 if (value instanceof Date) {
-                    formData.append(key, value.toISOString());
+                    payload[key] = value.toISOString();
                 } else if (typeof value === 'object') {
-                    formData.append(key, JSON.stringify(value));
+                    payload[key] = JSON.stringify(value);
                 } else {
-                    formData.append(key, String(value));
+                    payload[key] = String(value);
                 }
             });
 
-            await updateMutation.mutateAsync({ id: instrumentId, formData });
+            await updateMutation.mutateAsync({ id: instrumentId, payload });
             toast.success('Action submitted successfully');
             navigate(-1);
             form.reset();

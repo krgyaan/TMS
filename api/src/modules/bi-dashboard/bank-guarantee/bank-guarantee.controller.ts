@@ -1,22 +1,5 @@
-import { Controller, Get, Query, Put, Param, ParseIntPipe, UseInterceptors, UploadedFiles, Body, Req, BadRequestException, NotFoundException } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Put, Query, Req } from '@nestjs/common';
 import { BankGuaranteeService } from './bank-guarantee.service';
-
-const biDashboardMulterConfig = {
-    storage: diskStorage({
-        destination: './uploads/bi-dashboard/bank-guarantee',
-        filename: (req, file, callback) => {
-            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-            const ext = extname(file.originalname);
-            callback(null, `bg-${uniqueSuffix}${ext}`);
-        },
-    }),
-    limits: {
-        fileSize: 25 * 1024 * 1024, // 25MB
-    },
-};
 
 @Controller('bank-guarantees')
 export class BankGuaranteeController {
@@ -73,27 +56,23 @@ export class BankGuaranteeController {
     }
 
     @Put(':id')
-    @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
     async update(
         @Param('id', ParseIntPipe) id: number,
         @Body() body: any,
-        @UploadedFiles() files: Express.Multer.File[],
         @Req() req: any,
     ) {
-        return this.bankGuaranteeService.update(id, body, files || [], req.user);
+        return this.bankGuaranteeService.update(id, body, [], req.user);
     }
 
     @Put('instruments/:id/action')
-    @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
     async updateAction(
         @Param('id', ParseIntPipe) id: number,
         @Body() body: any,
-        @UploadedFiles() files: Express.Multer.File[],
         @Req() req: any,
     ) {
         if (!body.action) {
             throw new BadRequestException('Action is required');
         }
-        return this.bankGuaranteeService.updateAction(id, body, files || [], req.user);
+        return this.bankGuaranteeService.updateAction(id, body, [], req.user);
     }
 }

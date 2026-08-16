@@ -4,7 +4,11 @@ import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { FileText, Receipt, Users, Eye } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate } from '@/hooks/useFormatedDate';
+import { fileUploadService } from '@/services/api/file-upload.service';
 import type { DDFollowupData } from '../helpers/demandDraft.types';
+
+const docUrl = (doc: string): string =>
+    doc.includes("/") ? fileUploadService.getFileUrl(doc) : `/uploads/courier/${doc}`;
 
 function SectionHeader({ title, icon: Icon }: { title: string; icon?: React.ComponentType<{ className?: string }> }) {
     return (
@@ -73,7 +77,7 @@ function CourierDetailsBlock({ details }: { details: any }) {
             {details.docketSlip && (
                 <div>
                     <span className="font-medium">Docket Slip:</span>{' '}
-                    <a href={`/uploads/courier/${details.docketSlip}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                    <a href={docUrl(details.docketSlip)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
                         <Eye className="h-3 w-3" /> View
                     </a>
                 </div>
@@ -81,7 +85,7 @@ function CourierDetailsBlock({ details }: { details: any }) {
             {details.deliveryPod && (
                 <div>
                     <span className="font-medium">Proof of Delivery:</span>{' '}
-                    <a href={`/uploads/courier/${details.deliveryPod}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                    <a href={docUrl(details.deliveryPod)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
                         <Eye className="h-3 w-3" /> View
                     </a>
                 </div>
@@ -95,7 +99,7 @@ function CourierDetailsBlock({ details }: { details: any }) {
                         {details.courierDocs.map((doc: string, i: number) => (
                             <div key={i} className="flex items-center gap-2">
                                 <span className="text-sm text-muted-foreground">{doc}</span>
-                                <a href={`/uploads/courier/${doc}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                                <a href={docUrl(doc)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
                                     <Eye className="h-3 w-3" /> View
                                 </a>
                             </div>

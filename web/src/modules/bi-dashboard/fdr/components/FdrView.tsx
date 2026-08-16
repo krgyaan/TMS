@@ -4,7 +4,11 @@ import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Wallet, Receipt, Shield, Users, FileText, Eye } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate } from '@/hooks/useFormatedDate';
+import { fileUploadService } from '@/services/api/file-upload.service';
 import type { FDRFollowupData } from '../helpers/fdr.types';
+
+const docUrl = (doc: string): string =>
+    doc.includes("/") ? fileUploadService.getFileUrl(doc) : `/uploads/courier/${doc}`;
 
 function SectionHeader({ title, icon: Icon }: { title: string; icon?: React.ComponentType<{ className?: string }> }) {
     return (
@@ -74,7 +78,7 @@ function CourierDetailsBlock({ details }: { details: any }) {
             {details.docketSlip && (
                 <div>
                     <span className="font-medium">Docket Slip:</span>{' '}
-                    <a href={`${apiUrl}/files/serve/${details.docketSlip}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                    <a href={docUrl(details.docketSlip)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
                         <Eye className="h-3 w-3" /> View
                     </a>
                 </div>
@@ -82,7 +86,7 @@ function CourierDetailsBlock({ details }: { details: any }) {
             {details.deliveryPod && (
                 <div>
                     <span className="font-medium">Proof of Delivery:</span>{' '}
-                    <a href={`${apiUrl}/files/serve/${details.deliveryPod}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                    <a href={docUrl(details.deliveryPod)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
                         <Eye className="h-3 w-3" /> View
                     </a>
                 </div>
