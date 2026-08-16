@@ -14,6 +14,7 @@ import { RefreshCw, FileEdit, Eye, Trash, Loader2, Plus } from "lucide-react";
 import type { ColDef } from "ag-grid-community";
 import { paths } from "@/app/routes/paths";
 import { toast } from "sonner";
+import { FileUploader } from "@/components/file-upload";
 
 // API & Hooks
 import { useCourierDashboard, useUpdateCourierStatus, useDeleteCourier, useUploadDeliveryPod } from "@/modules/shared/courier/courier.hooks";
@@ -81,7 +82,7 @@ const CourierDashboard: React.FC = () => {
 
     // Delivery fields (for Delivered status)
     const [deliveryDate, setDeliveryDate] = useState<string>("");
-    const [deliveryPod, setDeliveryPod] = useState<File | null>(null);
+    const [deliveryPod, setDeliveryPod] = useState<string[]>([]);
     const [withinTime, setWithinTime] = useState<string>("1");
 
     // Open status modal
@@ -89,7 +90,7 @@ const CourierDashboard: React.FC = () => {
         setSelectedCourier(courier);
         setNewStatus(courier.status.toString());
         setDeliveryDate("");
-        setDeliveryPod(null);
+        setDeliveryPod([]);
         setWithinTime("1");
         setStatusModalOpen(true);
     }, []);
@@ -110,7 +111,7 @@ const CourierDashboard: React.FC = () => {
                     status: statusNum,
                     delivery_date: statusNum === COURIER_STATUS.DELIVERED ? deliveryDate : undefined,
                     within_time: statusNum === COURIER_STATUS.DELIVERED ? withinTime === "1" : undefined,
-                    podDoc: deliveryPod ? deliveryPod : undefined,
+                    podDoc: deliveryPod[0],
                 },
             });
 
@@ -134,10 +135,6 @@ const CourierDashboard: React.FC = () => {
     );
 
     // Handle POD file change
-    const handlePodChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0] ?? null;
-        setDeliveryPod(file);
-    };
 
     // Action items
     const courierActions = useMemo(
@@ -425,7 +422,12 @@ const CourierDashboard: React.FC = () => {
 
                                 <div className="grid gap-2">
                                     <label className="text-sm font-medium">Delivery POD Upload</label>
-                                    <Input type="file" accept="image/*,.pdf" onChange={handlePodChange} />
+                                    <FileUploader
+                                        context="courier"
+                                        value={deliveryPod}
+                                        onChange={setDeliveryPod}
+                                        disabled={updateStatusMutation.isPending}
+                                    />
                                 </div>
 
                                 <div className="grid gap-2">

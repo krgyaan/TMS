@@ -82,14 +82,14 @@ export type UpdateStatusInput = {
     status: number;
     deliveryDate?: string;
     withinTime?: boolean;
-    podDoc?: File;
+    podDoc?: string;
 };
 
 export type CreateDispatchInput = {
     courierProvider: string;
     docketNo: string;
     pickupDate: string;
-    docketSlip?: File;
+    docketSlip?: string;
 };
 
 export type UpdateDispatchInput = {

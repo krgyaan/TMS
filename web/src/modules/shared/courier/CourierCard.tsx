@@ -4,6 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Eye, Package } from "lucide-react";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { COURIER_STATUS_LABELS } from "@/modules/shared/courier/courier.types";
+import { fileUploadService } from "@/services/api/file-upload.service";
+
+const docUrl = (doc: string): string =>
+    doc.includes("/") ? fileUploadService.getFileUrl(doc) : `/uploads/courier/${doc}`;
 
 interface CourierCardProps {
     courierId: number | null | undefined;
@@ -56,7 +60,7 @@ export function CourierCard({ courierId, title }: CourierCardProps) {
                     {courier.docketSlip && (
                         <div>
                             <span className="font-medium text-muted-foreground">Docket Slip:</span>{' '}
-                            <a href={`/uploads/courier/${courier.docketSlip}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                            <a href={docUrl(courier.docketSlip)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
                                 <Eye className="h-3 w-3" /> View
                             </a>
                         </div>
@@ -64,7 +68,7 @@ export function CourierCard({ courierId, title }: CourierCardProps) {
                     {courier.deliveryPod && (
                         <div>
                             <span className="font-medium text-muted-foreground">Proof of Delivery:</span>{' '}
-                            <a href={`/uploads/courier/${courier.deliveryPod}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                            <a href={docUrl(courier.deliveryPod)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
                                 <Eye className="h-3 w-3" /> View
                             </a>
                         </div>
@@ -78,7 +82,7 @@ export function CourierCard({ courierId, title }: CourierCardProps) {
                                 {courier.courierDocs.map((doc: string, i: number) => (
                                     <div key={i} className="flex items-center gap-2">
                                         <span className="text-sm text-muted-foreground">{doc}</span>
-                                        <a href={`/uploads/courier/${doc}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                                        <a href={docUrl(doc)} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
                                             <Eye className="h-3 w-3" /> View
                                         </a>
                                     </div>

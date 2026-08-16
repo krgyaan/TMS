@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { createZodDto } from "nestjs-zod";
 
 export const CreateCourierSchema = z.object({
     toOrg: z.string().min(1, "Organization name is required").max(255),
@@ -14,6 +13,8 @@ export const CreateCourierSchema = z.object({
     delDate: z.coerce.date(),
 
     urgency: z.coerce.number().int().min(1).max(2),
+
+    courierDocs: z.array(z.string()).optional().default([]),
 });
 
 export type CreateCourierDto = z.infer<typeof CreateCourierSchema>;

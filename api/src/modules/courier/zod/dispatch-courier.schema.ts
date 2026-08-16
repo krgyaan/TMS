@@ -20,6 +20,7 @@ export const CreateDispatchSchema = z.object({
     courierProvider: z.string().min(1),
     docketNo: z.string().min(1),
     pickupDate: z.coerce.date(), // expects YYYY-MM-DD
+    docketSlip: z.string().optional(),
 });
 
 export type CreateDispatchInput = z.infer<typeof CreateDispatchSchema>;

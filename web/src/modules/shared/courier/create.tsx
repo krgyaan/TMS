@@ -12,8 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form } from "@/components/ui/form";
-import { ArrowLeft, Upload, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
+import { FileUploader } from "@/components/file-upload";
 
 // API & Hooks
 import { useCreateCourier } from "@/modules/shared/courier/courier.hooks";
@@ -43,29 +44,13 @@ const courierFormSchema = z.object({
 type CourierFormData = z.infer<typeof courierFormSchema>;
 
 // =====================
-// File validation
-// =====================
-const ALLOWED_FILE_TYPES = [
-    "image/jpeg",
-    "image/png",
-    "image/gif",
-    "text/plain",
-    "application/pdf",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-];
-
-const MAX_TOTAL_SIZE = 25 * 1024 * 1024; // 25MB
-
-// =====================
 // Component
 // =====================
 const CourierForm = () => {
     const navigate = useNavigate();
 
     // Files state
-    const [files, setFiles] = useState<File[]>([]);
+    const [files, setFiles] = useState<string[]>([]);
 
     // API hooks
     const createMutation = useCreateCourier();
@@ -109,7 +94,7 @@ const CourierForm = () => {
         hasSubmittedRef.current = true;
 
         try {
-            const created = await createMutation.mutateAsync({ data, files });
+            const created = await createMutation.mutateAsync({ data, filenames: files });
             console.log("Courier created:", created);
             navigate(paths.shared.couriers ?? "/courier");
         } catch (error) {
@@ -136,54 +121,9 @@ const CourierForm = () => {
     };
 
     // File handlers
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const selectedFiles = Array.from(event.target.files || []);
-
-        if (selectedFiles.length === 0) return;
-
-        // Validate file types
-        const invalidFiles = selectedFiles.filter(file => !ALLOWED_FILE_TYPES.includes(file.type));
-
-        if (invalidFiles.length > 0) {
-            toast.error("Invalid file type", {
-                description: "Please select valid files (images, PDF, Word, PowerPoint, or text files).",
-            });
-            return;
-        }
-
-        // Validate total size
-        const currentSize = files.reduce((total, file) => total + file.size, 0);
-        const newSize = selectedFiles.reduce((total, file) => total + file.size, 0);
-
-        if (currentSize + newSize > MAX_TOTAL_SIZE) {
-            toast.error("Files too large", {
-                description: "Total file size must be less than 25MB.",
-            });
-            return;
-        }
-
-        setFiles(prev => [...prev, ...selectedFiles]);
-        toast.success(`${selectedFiles.length} file(s) added`);
-
-        // Reset input
-        event.target.value = "";
-    };
-
     const removeFile = (index: number) => {
         setFiles(prev => prev.filter((_, i) => i !== index));
         toast.info("File removed");
-    };
-
-    const getFileIcon = (file: File) => {
-        if (file.type.startsWith("image/")) return "🖼️";
-        if (file.type === "application/pdf") return "📄";
-        if (file.type.includes("word") || file.type.includes("document")) return "📝";
-        if (file.type.includes("presentation")) return "📊";
-        return "📎";
-    };
-
-    const formatFileSize = (bytes: number) => {
-        return (bytes / (1024 * 1024)).toFixed(2) + " MB";
     };
 
     return (
@@ -316,46 +256,16 @@ const CourierForm = () => {
                         <div className="space-y-4">
                             <Label>Soft Copy of the documents</Label>
 
-                            {/* Upload Area */}
-                            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-muted-foreground/50 transition-colors">
-                                <Input
-                                    id="courier_docs"
-                                    type="file"
-                                    className="hidden"
-                                    accept=".jpg,.jpeg,.png,.gif,.txt,.pdf,.doc,.docx,.ppt,.pptx"
-                                    multiple
-                                    onChange={handleFileChange}
-                                    disabled={isSubmitting}
-                                />
-                                <Label htmlFor="courier_docs" className="cursor-pointer flex flex-col items-center justify-center space-y-2">
-                                    <Upload className="h-8 w-8 text-muted-foreground" />
-                                    <div className="text-sm text-muted-foreground">
-                                        <span className="font-medium">Click to upload</span> or drag and drop
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">Images, PDF, Word, PowerPoint, Text files (Max 25MB total)</div>
-                                </Label>
-                            </div>
+                            <FileUploader
+                                context="courier"
+                                value={files}
+                                onChange={setFiles}
+                                disabled={isSubmitting}
+                            />
 
-                            {/* File List */}
                             {files.length > 0 && (
                                 <div className="space-y-2">
                                     <Label>Selected Files ({files.length})</Label>
-                                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                                        {files.map((file, index) => (
-                                            <div key={index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
-                                                <div className="flex items-center space-x-3">
-                                                    <span className="text-lg">{getFileIcon(file)}</span>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="font-medium text-sm truncate">{file.name}</p>
-                                                        <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
-                                                    </div>
-                                                </div>
-                                                <Button type="button" variant="ghost" size="sm" onClick={() => removeFile(index)} disabled={isSubmitting} className="h-8 w-8 p-0">
-                                                    <X className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
                                 </div>
                             )}
                         </div>

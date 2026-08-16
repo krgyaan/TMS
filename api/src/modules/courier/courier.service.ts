@@ -1,31 +1,19 @@
-// src/modules/courier/courier.service.ts
-import { Inject, Injectable, ForbiddenException, NotFoundException, BadRequestException, LoggerService } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { eq, and, desc } from "drizzle-orm";
-
+import { desc, eq } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
-
-import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
-import { couriers } from "@/db/schemas/shared/couriers.schema";
+import { DRIZZLE } from "@/db/database.module";
 import { users } from "@/db/schemas/auth/users.schema";
-
+import { couriers } from "@/db/schemas/shared/couriers.schema";
 import type { CreateCourierDto } from "@/modules/courier/zod/create-courier.schema";
-import type { UpdateCourierDto, UpdateCourierInput } from "@/modules/courier/zod/update-courier.schema";
 import type { CreateDispatchInput, DispatchCourierDto } from "@/modules/courier/zod/dispatch-courier.schema";
-
-import { CreateCourierSchema } from "@/modules/courier/zod/create-courier.schema";
-
+import type { UpdateCourierInput } from "@/modules/courier/zod/update-courier.schema";
 import { MailerService } from "@/mailer/mailer.service";
 import { GoogleService } from "@/modules/integrations/google/google.service";
-
-import { CourierMailTemplates } from "./courier.mail";
-import { fi } from "zod/v4/locales";
-import { stat } from "fs";
 import { format } from "date-fns";
-import { from } from "rxjs";
-
+import { CourierMailTemplates } from "./courier.mail";
 import { MailAudienceService } from "@/core/mail/mail-audience.service";
 import { UpdateCourierStatusInput } from "./zod/update-courier-status.schema";
 
@@ -40,12 +28,6 @@ export const COURIER_STATUS = {
 } as const;
 
 const COURIER_STATUS_LABELS: string[] = ["Pending", "In Transit", "Dispatched", "Not Delivered", "Delivered", "Rejected"];
-
-interface CourierDoc {
-    url: string;
-    name: string;
-    type: "image" | "file";
-}
 
 @Injectable()
 export class CourierService {
@@ -284,11 +266,11 @@ export class CourierService {
     }
 
     //Actual business logic begins from here
-    async create(data: CreateCourierDto, files: Express.Multer.File[], userId: number) {
+    async create(data: CreateCourierDto, userId: number) {
         this.logger.info("Courier DTO", { data });
 
         try {
-            const courierDocs = Array.isArray(files) ? files.map(file => file.filename).filter(Boolean) : [];
+            const courierDocs = Array.isArray(data.courierDocs) ? data.courierDocs.filter(Boolean) : [];
 
             if (!data.empFrom) {
                 this.logger.warn("empFrom not provided, falling back to userId", { userId });
@@ -437,8 +419,8 @@ export class CourierService {
     }
 
     // Update status (delivery info)
-    async updateStatus(id: number, statusData: UpdateCourierStatusInput, file: Express.Multer.File | undefined) {
-        this.logger.info("Updating courier status", { courierId: id, status: statusData.status, hasFile: !!file });
+    async updateStatus(id: number, statusData: UpdateCourierStatusInput) {
+        this.logger.info("Updating courier status", { courierId: id, status: statusData.status, hasFile: !!statusData.podDoc });
 
         try {
             const courierCheck = await this.findOne(id);
@@ -447,7 +429,7 @@ export class CourierService {
             const updateData: Record<string, any> = { status: statusData.status, updatedAt: new Date() };
 
             if (statusData.status === COURIER_STATUS.DELIVERED) {
-                if (file) updateData.deliveryPod = file.filename;
+                if (statusData.podDoc) updateData.deliveryPod = statusData.podDoc;
                 if (statusData.delivery_date) updateData.deliveryDate = statusData.delivery_date;
                 if (statusData.within_time !== undefined) updateData.withinTime = statusData.within_time;
             }
@@ -499,7 +481,7 @@ export class CourierService {
                                 to: [recipientUser.email],
                                 cc: Array.isArray(ccMail) ? ccMail : [ccMail],
                                 subject: `Courier sent to ${updated.toOrg}`,
-                                attachments: file ? { files: file.filename, baseDir: "courier" } : undefined,
+                                attachments: statusData.podDoc ? { files: statusData.podDoc.split('/').pop() ?? statusData.podDoc, baseDir: "courier" } : undefined,
                             },
                             googleConnection
                         );
@@ -521,11 +503,11 @@ export class CourierService {
     /**
      * Dispatch with optional docket slip file (POST endpoint)
      */
-    async createDispatch(id: number, dispatchData: CreateDispatchInput, file: Express.Multer.File | undefined, userId: number) {
+    async createDispatch(id: number, dispatchData: CreateDispatchInput, userId: number) {
         this.logger.info("Creating courier dispatch", {
             courierId: id,
             userId,
-            hasFile: !!file,
+            hasFile: !!dispatchData.docketSlip,
         });
 
         try {
@@ -540,7 +522,7 @@ export class CourierService {
                 updatedAt: new Date(),
             };
 
-            if (file) updateData.docketSlip = file.filename;
+            if (dispatchData.docketSlip) updateData.docketSlip = dispatchData.docketSlip;
 
             const [courier] = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
 
@@ -595,7 +577,7 @@ export class CourierService {
                             // [CHANGED] ccMail now comes from getAdmin() instead of getEmailsByRoleId(2)
                             cc: Array.isArray(ccMail) ? ccMail : [ccMail],
                             subject: `Courier sent to ${courier.toOrg}`,
-                            attachments: file ? { files: file.filename, baseDir: "courier" } : undefined,
+                            attachments: dispatchData.docketSlip ? { files: dispatchData.docketSlip.split('/').pop() ?? dispatchData.docketSlip, baseDir: "courier" } : undefined,
                         },
                         googleConnection
                     );
@@ -678,10 +660,10 @@ export class CourierService {
         }
     }
 
-    async uploadDocs(id: number, files: Express.Multer.File[], userId: number) {
+    async uploadDocs(id: number, filenames: string[], userId: number) {
         this.logger.info("Uploading courier docs", {
             courierId: id,
-            filesCount: files.length,
+            filesCount: filenames.length,
         });
 
         try {
@@ -690,7 +672,7 @@ export class CourierService {
 
             const existingDocs: string[] = Array.isArray(existing.courierDocs) ? (existing.courierDocs as string[]) : [];
 
-            const updatedDocs = [...existingDocs, ...files.map(f => f.filename)];
+            const updatedDocs = [...existingDocs, ...filenames];
 
             const [updated] = await this.db.update(couriers).set({ courierDocs: updatedDocs, updatedAt: new Date() }).where(eq(couriers.id, id)).returning();
 
@@ -707,10 +689,10 @@ export class CourierService {
     }
 
     // Upload delivery POD
-    async uploadDeliveryPod(id: number, file: Express.Multer.File, userId: number) {
+    async uploadDeliveryPod(id: number, filename: string, userId: number) {
         this.logger.info("Uploading delivery POD", {
             courierId: id,
-            file: file.filename,
+            file: filename,
         });
 
         try {
@@ -720,7 +702,7 @@ export class CourierService {
             const [updated] = await this.db
                 .update(couriers)
                 .set({
-                    deliveryPod: `pod/${file.filename}`,
+                    deliveryPod: `pod/${filename}`,
                     updatedAt: new Date(),
                 })
                 .where(eq(couriers.id, id))

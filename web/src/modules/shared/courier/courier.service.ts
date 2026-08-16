@@ -51,28 +51,13 @@ export const courierApi = {
     },
 
     // Create courier
-    create: async ({ data, files }: { data: CreateCourierInput; files: File[] }): Promise<Courier> => {
+    create: async ({ data, filenames }: { data: CreateCourierInput; filenames?: string[] }): Promise<Courier> => {
         console.log("Sending dto from frontend", { data: data });
-        const formData = new FormData();
 
-        // Append form fields
-        Object.entries(data).forEach(([key, value]) => {
-            if (value !== undefined && value !== null) {
-                formData.append(key, String(value));
-            }
-        });
-
-        // Append files
-        files.forEach(file => {
-            formData.append("courierDocs[]", file);
-        });
-
-        console.log("Sending data from frontend", { data: formData });
-
-        const response = await api.post(ENDPOINT, formData, {
-            headers: {
-                "Content-Type": "multipart/form-data",
-            },
+        const response = await api.post(ENDPOINT, {
+            ...data,
+            courierDocs: filenames || [],
+        }, {
             timeout: 120000,
         });
 
@@ -88,33 +73,15 @@ export const courierApi = {
     // Update status
     updateStatus: async (id: number, data: UpdateStatusInput): Promise<Courier> => {
         console.log("Updating status with data:", data);
-        const response = await api.patch(`${ENDPOINT}/${id}/status`, data, {
-            headers: {
-                "Content-Type": "multipart/form-data",
-            },
-        });
+        const response = await api.patch(`${ENDPOINT}/${id}/status`, data);
         return response.data;
     },
 
     // Create dispatch info
     createDispatch: async (id: number, data: CreateDispatchInput): Promise<Courier> => {
         console.log("Creating dispatch with data:", data);
-        const formData = new FormData();
 
-        formData.append("courierProvider", data.courierProvider);
-        formData.append("docketNo", data.docketNo);
-        formData.append("pickupDate", data.pickupDate);
-
-        if (data.docketSlip) {
-            formData.append("docketSlip", data.docketSlip);
-        }
-
-        const response = await api.post(`${ENDPOINT}/${id}/dispatch`, formData, {
-            headers: {
-                "Content-Type": "multipart/form-data",
-            },
-        });
-
+        const response = await api.post(`${ENDPOINT}/${id}/dispatch`, data);
         console.log("Dispatch created, response data:", response.data);
 
         return response.data;
@@ -133,24 +100,14 @@ export const courierApi = {
     },
 
     // Upload documents
-    uploadDocs: async (id: number, files: File[]): Promise<Courier> => {
-        const formData = new FormData();
-        files.forEach(file => formData.append("courierDocs[]", file));
-
-        const response = await api.post(`${ENDPOINT}/${id}/upload`, formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-        });
+    uploadDocs: async (id: number, filenames: string[]): Promise<Courier> => {
+        const response = await api.post(`${ENDPOINT}/${id}/upload`, { filenames });
         return response.data;
     },
 
     // Upload delivery POD
-    uploadDeliveryPod: async (id: number, file: File): Promise<Courier> => {
-        const formData = new FormData();
-        formData.append("deliveryPod", file);
-
-        const response = await api.post(`${ENDPOINT}/${id}/upload-pod`, formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-        });
+    uploadDeliveryPod: async (id: number, filename: string): Promise<Courier> => {
+        const response = await api.post(`${ENDPOINT}/${id}/upload-pod`, { filename });
         return response.data;
     },
 };

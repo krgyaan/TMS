@@ -27,6 +27,10 @@ import {
 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { useCourier } from "@/modules/shared/courier/courier.hooks";
+import { fileUploadService } from "@/services/api/file-upload.service";
+
+const docUrl = (doc: string): string =>
+    doc.includes("/") ? fileUploadService.getFileUrl(doc) : `/uploads/courier/${doc}`;
 
 // Modern styling constants
 const MODERN_STYLES = {
@@ -389,7 +393,7 @@ const CourierViewPage: React.FC = () => {
                                         {courier.docketSlip ? (
                                             <div className="space-y-4">
                                                 <DocumentCard
-                                                    url={"/uploads/courier/" + courier.docketSlip}
+                                                    url={docUrl(courier.docketSlip)}
                                                     title="Docket Slip"
                                                     description="Official shipping documentation with tracking details"
                                                     icon={Package}
@@ -404,7 +408,7 @@ const CourierViewPage: React.FC = () => {
                                         {courier.deliveryPod ? (
                                             <div className="space-y-4">
                                                 <DocumentCard
-                                                    url={"/uploads/courier/" + courier.deliveryPod}
+                                                    url={docUrl(courier.deliveryPod)}
                                                     title="Proof of Delivery"
                                                     description="Signed confirmation of successful delivery"
                                                     icon={CheckCircle}
@@ -425,7 +429,7 @@ const CourierViewPage: React.FC = () => {
                                                 {documents.map((d, i) => (
                                                     <DocumentCard
                                                         key={i}
-                                                        url={"/uploads/courier/" + d}
+                                                        url={docUrl(d)}
                                                         title={`Supporting Document ${i + 1}`}
                                                         description="Additional shipping documentation"
                                                         icon={FileText}

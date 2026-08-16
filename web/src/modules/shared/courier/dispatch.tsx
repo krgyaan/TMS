@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Upload, FileText, Package, MapPin, User, Calendar } from "lucide-react";
+import { ArrowLeft, Package, MapPin, User, Calendar } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { paths } from "@/app/routes/paths";
+import { FileUploader } from "@/components/file-upload";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import * as z from "zod";
@@ -25,26 +26,13 @@ const courierDispatchSchema = z.object({
 
 type CourierDispatchFormData = z.infer<typeof courierDispatchSchema>;
 
-// Allowed file types
-const ALLOWED_FILE_TYPES = [
-    "image/jpeg",
-    "image/png",
-    "image/gif",
-    "image/webp",
-    "application/pdf",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-];
-
-const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
-
 const CourierDispatchForm = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const courierId = id ? parseInt(id, 10) : 0;
 
     // File state
-    const [file, setFile] = useState<File | null>(null);
+    const [files, setFiles] = useState<string[]>([]);
 
     // API hooks
     const { data: courier, isLoading: courierLoading, error: courierError } = useCourier(courierId);
@@ -88,7 +76,7 @@ const CourierDispatchForm = () => {
                     courierProvider: data.courierProvider,
                     docketNo: data.docketNo,
                     pickupDate: data.pickupDate,
-                    docketSlip: file || undefined,
+                    docketSlip: files[0],
                 },
             });
 
@@ -106,50 +94,10 @@ const CourierDispatchForm = () => {
         }
     };
 
-    // Handle file selection
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const selectedFile = event.target.files?.[0];
-
-        if (!selectedFile) return;
-
-        // Validate file type
-        if (!ALLOWED_FILE_TYPES.includes(selectedFile.type)) {
-            toast.error("Invalid file type", {
-                description: "Please select an image, PDF, or Word document.",
-            });
-            event.target.value = "";
-            return;
-        }
-
-        // Validate file size
-        if (selectedFile.size > MAX_FILE_SIZE) {
-            toast.error("File too large", {
-                description: "File size must be less than 25MB.",
-            });
-            event.target.value = "";
-            return;
-        }
-
-        setFile(selectedFile);
-        toast.success("File selected", {
-            description: `${selectedFile.name} ready for upload.`,
-        });
-    };
-
     // Remove selected file
     const removeFile = () => {
-        setFile(null);
-        // Reset file input
-        const fileInput = document.getElementById("docket_slip") as HTMLInputElement;
-        if (fileInput) fileInput.value = "";
+        setFiles([]);
         toast.info("File removed");
-    };
-
-    // Format file size
-    const formatFileSize = (bytes: number): string => {
-        if (bytes < 1024) return `${bytes} B`;
-        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
     };
 
     // Loading state
@@ -282,51 +230,16 @@ const CourierDispatchForm = () => {
 
                         {/* Docket Slip File Upload */}
                         <div className="space-y-4">
-                            <Label htmlFor="docket_slip">
+                            <Label>
                                 Docket Slip <span className="text-muted-foreground">(Optional)</span>
                             </Label>
 
-                            {!file ? (
-                                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-muted-foreground/50 transition-colors">
-                                    <Input
-                                        id="docket_slip"
-                                        type="file"
-                                        className="hidden"
-                                        accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx"
-                                        onChange={handleFileChange}
-                                        disabled={isSubmitting}
-                                    />
-                                    <Label htmlFor="docket_slip" className="cursor-pointer flex flex-col items-center justify-center space-y-2">
-                                        <Upload className="h-8 w-8 text-muted-foreground" />
-                                        <div className="text-sm text-muted-foreground">
-                                            <span className="font-medium text-primary">Click to upload</span> or drag and drop
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">Images, PDF, or Word documents (Max 25MB)</div>
-                                    </Label>
-                                </div>
-                            ) : (
-                                <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-                                    <div className="flex items-center space-x-3">
-                                        <div className="p-2 bg-blue-100 rounded-lg">
-                                            <FileText className="h-6 w-6 text-blue-600" />
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-sm">{file.name}</p>
-                                            <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
-                                        </div>
-                                    </div>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={removeFile}
-                                        disabled={isSubmitting}
-                                        className="text-destructive hover:text-destructive"
-                                    >
-                                        Remove
-                                    </Button>
-                                </div>
-                            )}
+                            <FileUploader
+                                context="courier"
+                                value={files}
+                                onChange={setFiles}
+                                disabled={isSubmitting}
+                            />
                         </div>
 
                         {/* Submit Button */}
