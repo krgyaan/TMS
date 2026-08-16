@@ -20,7 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import { Label } from '@/components/ui/label';
 import { useUsers } from '@/hooks/api/useUsers';
 import { useCreateCourier, useCourierOptions } from '@/modules/shared/courier/courier.hooks';
-import { Upload, X } from 'lucide-react';
+import { FileUploader } from '@/components/file-upload';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { buildDefaultValues, mapFormToCreatePayload, mapFormToUpdatePayload, mapResponseToForm } from '../helpers/physicalDocs.mappers';
@@ -58,7 +58,7 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
     const createCourierMutation = useCreateCourier();
     const { data: employees = [] } = useUsers();
 
-    const [files, setFiles] = useState<File[]>([]);
+    const [files, setFiles] = useState<string[]>([]);
     const hasSubmittedRef = useRef(false);
 
     // Compute initial values
@@ -92,17 +92,6 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
         append({ name: '', email: '', phone: '' });
     };
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const selectedFiles = Array.from(event.target.files || []);
-        if (selectedFiles.length === 0) return;
-        setFiles(prev => [...prev, ...selectedFiles]);
-        event.target.value = '';
-    };
-
-    const removeFile = (index: number) => {
-        setFiles(prev => prev.filter((_, i) => i !== index));
-    };
-
     const handleSubmit: SubmitHandler<PhysicalDocsFormValues> = async (values) => {
         console.log("Form Values: ", values);
         
@@ -124,7 +113,7 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
                     delDate: values.delDate!,
                     urgency: values.urgency!,
                 };
-                const createdCourier = await createCourierMutation.mutateAsync({ data: courierData, files });
+                const createdCourier = await createCourierMutation.mutateAsync({ data: courierData, filenames: files });
                 courierId = createdCourier.id;
             }
 
@@ -266,32 +255,12 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
                                     {/* File Upload Section */}
                                     <div className="space-y-2">
                                         <Label>Soft Copy of the documents</Label>
-                                        <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center hover:border-muted-foreground/50 transition-colors">
-                                            <Input
-                                                id="courier_docs"
-                                                type="file"
-                                                className="hidden"
-                                                multiple
-                                                onChange={handleFileChange}
-                                                disabled={isSubmitting}
-                                            />
-                                            <Label htmlFor="courier_docs" className="cursor-pointer flex flex-col items-center justify-center space-y-1">
-                                                <Upload className="h-6 w-6 text-muted-foreground" />
-                                                <div className="text-sm text-muted-foreground">Click to upload or drag and drop</div>
-                                            </Label>
-                                        </div>
-                                        {files.length > 0 && (
-                                            <div className="flex flex-wrap gap-2 mt-2">
-                                                {files.map((file, index) => (
-                                                    <div key={index} className="flex items-center gap-2 bg-muted px-2 py-1 rounded text-xs">
-                                                        <span className="truncate max-w-[150px]">{file.name}</span>
-                                                        <button type="button" onClick={() => removeFile(index)} className="text-destructive">
-                                                            <X className="h-3 w-3" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
+                                        <FileUploader
+                                            context="courier"
+                                            value={files}
+                                            onChange={setFiles}
+                                            disabled={isSubmitting}
+                                        />
                                     </div>
                                 </div>
                             )}

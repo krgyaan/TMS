@@ -149,3 +149,51 @@ contexts that remain under `tendering/`).
 3. Verify: `ls uploads/bi-dashboard uploads/operations uploads/services uploads/shared uploads/accounts uploads/insurance uploads/crm uploads/master uploads/employee-imprest` shows the moved folders, and `uploads/amc uploads/amc-billing uploads/assets uploads/payment-pdfs` are gone.
 4. Sanity-check a few old records: open a cheque/BG/wo/pqr/circular/follow-up record and confirm its file links still open
    (DB paths are rewritten by v2, so they resolve automatically after the move).
+---
+
+## Phase 4 — FileUploader backfill for multer-migrated endpoints
+
+Endpoints previously handled by multer (`@UseInterceptors(FilesInterceptor/FileInterceptor…)`)
+were migrated to the File Upload module (JSON bodies + `FileUploader` contexts). Legacy rows
+store bare filenames (e.g. `fu-1712345678900.pdf`) that the new display helpers resolve only
+after being rewritten to the FileUploader format `<context>/<file>`.
+
+### Run after deploying the migration
+
+```bash
+cd api
+pnpm run backfill:uploads-paths -- --dry-run   # preview affected row counts
+pnpm run backfill:uploads-paths                # apply (idempotent — safe to re-run)
+```
+
+### Columns rewritten (table → column → prefix)
+
+| Table | Column(s) | Prefix |
+|---|---|---|
+| `account_checklist_report` | `resp_result_file`, `acc_result_file` | `checklist/` |
+| `circulars` | `file` (bare values only) | `circulars/` |
+| `couriers` | `docket_slip`, `courier_docs` (jsonb array) | `courier/` |
+| `couriers` | `delivery_pod` — bare **and** legacy `pod/<file>` → `courier/<file>` | `courier/` |
+| `hrms_employee_assets` | `purchase_invoice_url`, `warranty_card_url`, `assignment_form_url`, `asset_photos` (jsonb array) | `assets/` |
+| `hrms_onboarding_documents` | `file_url` | `employee-documents/` |
+| `follow_ups` | `proof_image_path`, `attachments` (jsonb array) | `follow-ups/` |
+| `private_quotes` | `submitted_documents` (CSV — only bare-filename elements; JSON-fragment elements are left untouched) | `leads-quotations/` |
+| `site_visits` | `documents` (CSV — same guard as above) | `site-visit/` |
+
+Rules: values already containing `/` or starting with `http` are never touched; CSV/array
+elements that look like JSON fragments (contain `"`, `{` or `}`) are left untouched.
+
+### Endpoints migrated to FileUploader/JSON (this phase)
+
+- `leads-quotations/:id/upload-docs`, `site-visits/:id/upload-docs`,
+  `checklist/:id/resp-remark` + `/:id/acc-remark` (via `storeResponsibilityRemark` /
+  `storeAccountabilityRemark`), `circulars` create/update (`file`),
+  `couriers` create / `:id/upload-docs` / `:id/upload-pod` / dispatch + status updates,
+  `hrms/assets` create/update, `hrms/employee-onboarding` documents upload/re-upload,
+  `follow-up/:id` + `follow-up/:id/status` (attachments + proofImage),
+  `bank-guarantees/:id` + `bank-guarantees/instruments/:id/action` (JSON),
+  `imprest/employee` create + `imprest/employee/:id/upload` (JSON).
+
+### Remaining legacy multer endpoints (intentionally left)
+
+- `operations/wo-details/:woDetailId/upload-signed` — **no web caller** (dead endpoint).

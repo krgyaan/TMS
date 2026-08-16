@@ -1,29 +1,11 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query, UseInterceptors, UploadedFiles, Req, BadRequestException } from '@nestjs/common';
-import { TenderResultService } from '@/modules/tendering/tender-result/tender-result.service';
-import type { ResultDashboardType } from '@/modules/tendering/types/shared.types';
-import type { UploadResultDto, UploadChangeStatusResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
-import { UploadResultSchema, UploadChangeStatusResultSchema } from '@/modules/tendering/tender-result/dto/tender-result.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { FilesInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import type { UploadChangeStatusResultDto, UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
+import { UploadResultSchema } from '@/modules/tendering/tender-result/dto/tender-result.dto';
+import { TenderResultService } from '@/modules/tendering/tender-result/tender-result.service';
+import type { ResultDashboardType } from '@/modules/tendering/types/shared.types';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { ZodValidationPipe } from 'nestjs-zod';
-
-//defining the multer config
-const multerConfig = {
-    storage: diskStorage({
-        destination : './uploads/tendering/result-screenshots',
-        filename: (req, file, callback) => {
-            const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-            const ext = extname(file.originalname);
-            callback(null, `imp-${uniqueSuffix}${ext}`);
-        },
-    }),
-    limits: {
-        fileSize : 10 * 1024 * 1024,
-    }
-}
 
 @Controller('tender-results')
 export class TenderResultController {

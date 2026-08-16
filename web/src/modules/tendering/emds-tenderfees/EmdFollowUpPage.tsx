@@ -18,6 +18,7 @@ import { bankTransfersService } from "@/services/api/bank-transfers.service";
 import { chequesService } from "@/services/api/cheques.service";
 import { demandDraftsService } from "@/services/api/demand-drafts.service";
 import { fdrsService } from "@/services/api/fdrs.service";
+import { fileUploadService } from "@/services/api/file-upload.service";
 import { payOnPortalsService } from "@/services/api/pay-on-portals.service";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, FileText, Users, X } from "lucide-react";
@@ -153,7 +154,10 @@ const EmdFollowUpPage = () => {
         if (docs?.length) {
             setAttachments(prev => [
                 ...prev,
-                ...docs.map((f: string) => ({ fileName: f, baseDir: 'courier' })),
+                ...docs.map((f: string) => ({
+                    fileName: f.includes('/') ? f : f,
+                    baseDir: f.includes('/') ? '' : 'courier',
+                })),
             ]);
         }
     }, [actionFormData]);
@@ -330,7 +334,7 @@ const EmdFollowUpPage = () => {
                                         <div key={file.fileName + file.baseDir} className="flex items-center gap-2 text-sm">
                                             <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                                             <a
-                                                href={`/uploads/${file.baseDir}/${file.fileName}`}
+                                                href={file.baseDir ? `/uploads/${file.baseDir}/${file.fileName}` : fileUploadService.getFileUrl(file.fileName)}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="flex-1 truncate text-blue-600 hover:underline"
