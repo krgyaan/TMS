@@ -1,26 +1,24 @@
-import { Injectable, NotFoundException, BadRequestException, Inject, LoggerService, InternalServerErrorException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { eq, ne, and, or, isNull, sql, desc, asc, like, SQL, inArray, ilike, lte, gt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, ilike, inArray, isNull, lte, ne, or, sql, SQL } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
-import { followUps, FollowUp, FollowUpContact, FollowUpHistoryEntry } from "@/db/schemas/shared/follow-ups.schema";
-import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
-import { followUpPersons } from "@/db/schemas/shared/follow-up-persons.schema";
 import { users } from "@/db/schemas/auth/users.schema";
+import { followUpPersons } from "@/db/schemas/shared/follow-up-persons.schema";
+import { FollowUp, followUps } from "@/db/schemas/shared/follow-ups.schema";
+import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
 import * as fs from "fs";
 
+import type { DbInstance } from "@/db";
+import { DRIZZLE } from "@/db/database.module";
 import {
     type CreateFollowUpDto,
-    type UpdateFollowUpDto,
-    type UpdateFollowUpStatusDto,
-    type FollowUpQueryDto,
     type FollowUpDetailsDto,
+    type FollowUpQueryDto,
     updateFollowUpSchema,
-    updateFollowUpStatusSchema,
+    updateFollowUpStatusSchema
 } from "@/modules/follow-up/zod";
-import { DRIZZLE } from "@/db/database.module";
-import type { DbInstance } from "@/db";
 import path from "path";
 
 import { MailerService } from "@/mailer/mailer.service";
@@ -28,7 +26,6 @@ import { GoogleService } from "@/modules/integrations/google/google.service";
 
 import { FollowupMailTemplates } from "./follow-up.mail";
 import { FollowupMailDataBuilder } from "./follow-up.mail-data";
-import { FollowupMailBase } from "./zod/mail.dto";
 
 import { MailAudienceService } from "@/core/mail/mail-audience.service";
 
@@ -430,11 +427,11 @@ export class FollowUpService {
     // UPDATE
     // ========================
 
-    async update(id: number, dto: any, files: Express.Multer.File[], proofImage: Express.Multer.File | null, currentUser: { id: number; name: string }): Promise<FollowUp> {
+    async update(id: number, dto: any, newAttachments: string[], proofImage: string | null, currentUser: { id: number; name: string }): Promise<FollowUp> {
         this.logger.info("Updating follow-up", {
             followUpId: id,
             userId: currentUser.id,
-            filesUploaded: files?.length ?? 0,
+            filesUploaded: newAttachments?.length ?? 0,
         });
 
         try {
@@ -467,7 +464,9 @@ export class FollowUpService {
                 frequency: dto.frequency !== undefined ? Number(dto.frequency) : undefined,
                 stopReason: dto.stopReason !== undefined ? Number(dto.stopReason) : undefined,
                 amount: dto.amount !== undefined ? Number(dto.amount) : undefined,
-                contacts: dto.contacts ? JSON.parse(Array.isArray(dto.contacts) ? dto.contacts[dto.contacts.length - 1] : dto.contacts) : [],
+                contacts: dto.contacts
+                    ? (Array.isArray(dto.contacts) ? dto.contacts : JSON.parse(dto.contacts))
+                    : [],
                 removedAttachments: dto.removedAttachments ? (Array.isArray(dto.removedAttachments) ? dto.removedAttachments : [dto.removedAttachments]) : [],
             };
 
@@ -506,7 +505,7 @@ export class FollowUpService {
             updateData.assignmentStatus = "initiated";
 
             if (proofImage) {
-                updateData.proofImagePath = proofImage.filename;
+                updateData.proofImagePath = proofImage;
             }
 
             // ========================
@@ -522,7 +521,9 @@ export class FollowUpService {
             });
 
             for (const file of removedAttachments) {
-                const filePath = path.join(UPLOAD_DIR, file);
+                const filePath = file.includes("/")
+                    ? path.join(process.cwd(), "uploads", file)
+                    : path.join(UPLOAD_DIR, file);
                 if (fs.existsSync(filePath)) {
                     fs.unlinkSync(filePath);
                 }
@@ -530,7 +531,7 @@ export class FollowUpService {
 
             const remainingAttachments = existingAttachments.filter(f => !removedAttachments.includes(f));
 
-            const newFiles = Array.isArray(files) ? files.map(f => f.filename) : [];
+            const newFiles = Array.isArray(newAttachments) ? newAttachments : [];
 
             updateData.attachments = Array.from(new Set([...remainingAttachments, ...newFiles]));
 
@@ -622,7 +623,7 @@ export class FollowUpService {
                         };
 
                         // ✅ Now correctly uses proofImage from param
-                        const attachments = proofImage ? { files: [proofImage.filename], baseDir: "accounts" } : undefined;
+                        const attachments = proofImage ? { files: [proofImage.split('/').pop() ?? proofImage], baseDir: "accounts" } : undefined;
 
                         await this.mailerService.sendMail(
                             FollowupMailTemplates.STOP,
@@ -719,7 +720,7 @@ export class FollowUpService {
     // UPDATE STATUS (QUICK MODAL)
     // ========================
 
-    async updateStatus(id: number, dto: any, currentUser: { id: number; name: string }, proofImage: Express.Multer.File): Promise<FollowUp> {
+    async updateStatus(id: number, dto: any, currentUser: { id: number; name: string }, proofImage: string | null): Promise<FollowUp> {
         this.logger.info("Updating follow-up status", {
             followUpId: id,
             userId: currentUser.id,
@@ -761,7 +762,7 @@ export class FollowUpService {
             updateData.nextFollowUpDate = data.nextFollowUpDate;
             updateData.startFrom = data.nextFollowUpDate;
         }
-        if (proofImage) updateData.proofImagePath = proofImage.filename;
+        if (proofImage) updateData.proofImagePath = proofImage;
 
         const [updated] = await this.db.update(followUps).set(updateData).where(eq(followUps.id, id)).returning();
 
@@ -805,7 +806,7 @@ export class FollowUpService {
                         teamMember: assigneeUser?.name ?? "Team Member",
                     };
 
-                    const attachments = proofImage ? { files: [proofImage.filename], baseDir: "accounts" } : undefined;
+                    const attachments = proofImage ? { files: [proofImage.split('/').pop() ?? proofImage], baseDir: "accounts" } : undefined;
 
                     await this.mailerService.sendMail(
                         FollowupMailTemplates.STOP,

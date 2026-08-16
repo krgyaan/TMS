@@ -1,79 +1,27 @@
-import {
-    Controller,
-    Get,
-    Post,
-    Put,
-    Delete,
-    Param,
-    Body,
-    Query,
-    ParseIntPipe,
-    Req,
-    NotFoundException,
-    UseInterceptors,
-    UploadedFiles,
-    ConsoleLogger,
-    UploadedFile,
-} from "@nestjs/common";
-
-import { FollowUpService } from "@/modules/follow-up/follow-up.service";
+import { Body, Controller, Delete, Get, NotFoundException, Param, ParseIntPipe, Post, Put, Query, Req } from "@nestjs/common";
 import { CurrentUser } from "@/decorators/current-user.decorator";
-
-import { FilesInterceptor, FileInterceptor, FileFieldsInterceptor } from "@nestjs/platform-express";
-import { diskStorage } from "multer";
-import { extname } from "path";
-
-import type { CreateFollowUpDto, UpdateFollowUpDto, UpdateFollowUpStatusDto, FollowUpQueryDto } from "@/modules/follow-up/zod";
-
-const followUpAttachmentsMulterConfig = {
-    storage: diskStorage({
-        destination: "./uploads/accounts/follow-ups",
-        filename: (req, file, callback) => {
-            const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-            const ext = extname(file.originalname);
-            callback(null, `fu-${uniqueSuffix}${ext}`);
-        },
-    }),
-};
-
-const proofImageMulterConfig = {
-    storage: diskStorage({
-        destination: "./uploads/accounts/follow-ups",
-        filename: (req, file, callback) => {
-            const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-            const ext = extname(file.originalname);
-            callback(null, `fu-pi-${uniqueSuffix}${ext}`);
-        },
-    }),
-};
+import { FollowUpService } from "@/modules/follow-up/follow-up.service";
+import type { CreateFollowUpDto, FollowUpQueryDto, UpdateFollowUpStatusDto } from "@/modules/follow-up/zod";
 
 @Controller("follow-up")
 export class FollowUpController {
     constructor(private readonly service: FollowUpService) {}
 
-    // ========================
     // CREATE
-    // ========================
-
     @Post()
     async create(@Body() dto: CreateFollowUpDto, @CurrentUser() user: any) {
         console.log("Follow up called. User ID:", user?.sub);
         return this.service.create(dto, user.sub);
     }
 
-    // ========================
     // FIND ALL (WITH FILTERS)
-    // ========================
-
     @Get()
     async findAll(@Query() query: FollowUpQueryDto, @CurrentUser() user) {
         let data = await this.service.findAll(query, user);
         return data;
     }
 
-    // ========================
     // FIND ONE
-    // ========================
     @Get(":id")
     async findOne(@Param("id", ParseIntPipe) id: number) {
         const followUp = await this.service.findOne(id);
@@ -85,56 +33,37 @@ export class FollowUpController {
         return followUp;
     }
 
-    // ========================
     // UPDATE (FULL FORM)
-    // ========================
-
     @Put(":id")
-    @UseInterceptors(
-        FileFieldsInterceptor(
-            [
-                { name: "attachments", maxCount: 10 },
-                { name: "proofImage", maxCount: 1 },
-            ],
-            followUpAttachmentsMulterConfig // same storage config works for both
-        )
-    )
     async update(
         @Param("id", ParseIntPipe) id: number,
         @Body() dto: any,
         @Req() req,
-        @UploadedFiles() files: { attachments?: Express.Multer.File[]; proofImage?: Express.Multer.File[] }
     ) {
-        const attachments = files?.attachments ?? [];
-        const proofImage = files?.proofImage?.[0] ?? null;
+        const attachments = Array.isArray(dto.attachments) ? dto.attachments : [];
+        const proofImage = dto.proofImage ?? null;
+        delete dto.attachments;
+        delete dto.proofImage;
 
         return this.service.update(id, dto, attachments, proofImage, req.user);
     }
 
-    // ========================
     // UPDATE STATUS (QUICK MODAL)
-    // ========================
-
     @Put(":id/status")
-    @UseInterceptors(FileInterceptor("proofImage", proofImageMulterConfig))
-    async updateStatus(@Param("id", ParseIntPipe) id: number, @Body() dto: UpdateFollowUpStatusDto, @Req() req, @UploadedFile() proofImage: Express.Multer.File) {
+    async updateStatus(@Param("id", ParseIntPipe) id: number, @Body() dto: UpdateFollowUpStatusDto, @Req() req) {
+        const proofImage = req.body?.proofImage ?? null;
         console.log(req.user);
         return this.service.updateStatus(id, dto, req.user, proofImage);
     }
 
-    // ========================
     // DELETE (SOFT DELETE)
-    // ========================
     @Delete(":id")
     async remove(@Param("id", ParseIntPipe) id: number, @CurrentUser() user) {
         // return this.service.delete(id, user.sub);
         return;
     }
 
-    // ========================
     // MAILING AND PREVIEWS
-    // ========================
-
     @Get("preview-mail/:emdId")
     async previewEmdMail(@Param("emdId", ParseIntPipe) emdId: number) {
         return this.service.getPreviewHtml(emdId);
@@ -146,10 +75,7 @@ export class FollowUpController {
         return "Triggered";
     }
 
-    // ========================
     // AMOUNT SUMMARY (DASHBOARD)
-    // ========================
-
     @Get("dashboard/amount-summary")
     async getAmountSummary(@CurrentUser() currentUser: { id: number; role: string }) {
         return this.service.getAmountSummary(currentUser);

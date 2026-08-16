@@ -70,7 +70,7 @@ export const useUpdateFollowUp = () => {
     const qc = useQueryClient();
 
     return useMutation({
-        mutationFn: (payload: { id: number; data: FormData }) => updateFollowUp(payload),
+        mutationFn: (payload: { id: number; data: Record<string, unknown> }) => updateFollowUp(payload),
         onSuccess: () => qc.invalidateQueries({ queryKey: ["follow-ups"] }),
     });
 };
@@ -82,7 +82,7 @@ export const useUpdateFollowUpStatus = () => {
     const qc = useQueryClient();
 
     return useMutation({
-        mutationFn: (payload: { id: number; data: UpdateFollowUpStatusDto }) => updateFollowUpStatus(payload),
+        mutationFn: (payload: { id: number; data: UpdateFollowUpStatusDto & { proofImage?: string } }) => updateFollowUpStatus(payload),
         onSuccess: () => qc.invalidateQueries({ queryKey: ["follow-ups"] }),
     });
 };

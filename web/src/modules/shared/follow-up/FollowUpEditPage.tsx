@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 /* ShadCN / Radix style components */
@@ -10,10 +10,6 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { TiptapEditor } from "@/components/tiptapeditor";
-import { MockUploadDropzone } from "@/components/mock-uploadthing";
-import { FilePond, registerPlugin } from "react-filepond";
-import FilePondPluginFileValidateType from "filepond-plugin-file-validate-type";
-import FilePondPluginImagePreview from "filepond-plugin-image-preview";
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,7 +24,7 @@ import { useFollowUp, useUpdateFollowUp } from "./follow-up.hooks";
 import { toast } from "sonner";
 import { useUsers } from "@/hooks/api/useUsers";
 import { paths } from "@/app/routes/paths";
-import { FileUploadField } from "@/components/form/FileUploadField";
+import { FileUploader } from "@/components/file-upload/FileUploader";
 
 export const FREQUENCY_LABELS: Record<number, string> = {
     1: "Daily",
@@ -72,8 +68,8 @@ const FollowUpEditPage: React.FC = () => {
     const [existingPersons, setExistingPersons] = useState<any[]>([]);
     const [existingAttachments, setExistingAttachments] = useState<string[]>([]);
     const [removedAttachments, setRemovedAttachments] = useState<string[]>([]);
-    const [newFiles, setNewFiles] = useState<File[]>([]);
-    const [proofImage, setProofImage] = useState<File | null>(null);
+    const [newFiles, setNewFiles] = useState<string[]>([]);
+    const [proofImage, setProofImage] = useState<string[]>([]);
 
     /* ✅ HYDRATE FORM FROM API */
     useEffect(() => {
@@ -115,33 +111,17 @@ const FollowUpEditPage: React.FC = () => {
         setExistingPersons(prev => prev.filter((_, i) => i !== idx));
     };
 
-    const handleFiles = (items: any[]) => {
-        items.forEach(item => {
-            console.log({
-                name: item.file?.name,
-                type: item.file?.type,
-            });
-        });
-
-        setNewFiles(items.map(item => item.file).filter(Boolean));
-    };
-
     /* ✅ SUBMIT HANDLER */
     const onSubmit = () => {
         const values = form.getValues();
 
-        const formData = new FormData();
+        const payload: Record<string, unknown> = {};
 
         // 1️⃣ Append scalar fields
         Object.entries(values).forEach(([key, value]) => {
             if (key === "contacts" || key === "attachments") return;
             if (value === undefined || value === null) return;
-
-            if (typeof value === "object") {
-                formData.append(key, JSON.stringify(value));
-            } else {
-                formData.append(key, String(value));
-            }
+            payload[key] = value;
         });
 
         // 2️⃣ Clean, trim, and filter contacts (existing + new)
@@ -168,21 +148,21 @@ const FollowUpEditPage: React.FC = () => {
             }
         }
 
-        formData.append("contacts", JSON.stringify(cleanedContacts));
+        payload.contacts = cleanedContacts;
 
         // 3️⃣ Removed attachments
-        removedAttachments.forEach(file => formData.append("removedAttachments[]", file));
+        payload.removedAttachments = removedAttachments;
 
         // 4️⃣ New files
-        newFiles.forEach(file => formData.append("attachments", file));
+        payload.attachments = newFiles;
 
         // 5️⃣ Proof image (only when stop reason is Objective Achieved)
-        if (proofImage) {
-            formData.append("proofImage", proofImage);
+        if (proofImage[0]) {
+            payload.proofImage = proofImage[0];
         }
 
         updateMutation.mutateAsync(
-            { id: followupId, data: formData },
+            { id: followupId, data: payload },
             {
                 onSuccess: () => {
                     toast.success("Followup updated successfully!");
@@ -443,8 +423,11 @@ const FollowUpEditPage: React.FC = () => {
                                                     {stopReason === 2 && (
                                                         <div className="space-y-1 mt-2">
                                                             <Label>Proof Image</Label>
-                                                            <Input type="file" accept="image/*" onChange={e => setProofImage(e.target.files?.[0] ?? null)} />
-                                                            {proofImage && <p className="text-xs text-muted-foreground">{proofImage.name}</p>}
+                                                            <FileUploader
+                                                                context="follow-ups"
+                                                                value={proofImage}
+                                                                onChange={setProofImage}
+                                                            />
                                                         </div>
                                                     )}
                                                 </>
@@ -471,53 +454,10 @@ const FollowUpEditPage: React.FC = () => {
                                 Attachments
                             </h3>
 
-                            <FilePond
-                                files={newFiles}
-                                onupdatefiles={handleFiles}
-                                allowMultiple
-                                instantUpload={false}
-                                acceptedFileTypes={[
-                                    /* ===== Images ===== */
-                                    "image/*",
-
-                                    /* ===== PDFs ===== */
-                                    "application/pdf",
-
-                                    /* ===== Word ===== */
-                                    "application/msword",
-                                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-
-                                    /* ===== PowerPoint ===== */
-                                    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-
-                                    /* ===== Excel (ALL formats) ===== */
-                                    "application/vnd.ms-excel",
-                                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    "application/vnd.ms-excel.sheet.macroEnabled.12",
-                                    "application/vnd.ms-excel.template.macroEnabled.12",
-                                    "application/vnd.ms-excel.addin.macroEnabled.12",
-                                    "application/vnd.ms-excel.sheet.binary.macroEnabled.12",
-
-                                    /* ===== Text / Data Excel formats ===== */
-                                    "text/csv",
-                                    "text/tab-separated-values",
-                                    "text/plain",
-
-                                    /* ===== Browser fallbacks ===== */
-                                    "application/octet-stream",
-
-                                    /* ===== Extension-based safety net ===== */
-                                    ".xls",
-                                    ".xlsx",
-                                    ".xlsm",
-                                    ".xlsb",
-                                    ".xltx",
-                                    ".xltm",
-                                    ".xlam",
-                                    ".csv",
-                                    ".tsv",
-                                    ".txt",
-                                ]}
+                            <FileUploader
+                                context="follow-ups"
+                                value={newFiles}
+                                onChange={setNewFiles}
                             />
                         </div>
 

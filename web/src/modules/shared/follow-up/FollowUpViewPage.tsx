@@ -405,7 +405,11 @@ const buildFileUrl = (value?: unknown): string => {
     if (value.startsWith("http")) return value;
 
     // already has a directory prefix (e.g. "accounts/follow-ups/file.pdf" or "courier/file.docx")
-    if (value.includes('/')) return `/uploads/${value}`;
+    if (value.includes('/')) {
+        // FileUploader context paths are stored as "follow-ups/<file>" but physically live under uploads/accounts/follow-ups/
+        if (value.startsWith("follow-ups/")) return `/uploads/accounts/${value}`;
+        return `/uploads/${value}`;
+    }
 
     return `/uploads/accounts/follow-ups/${value}`;
 };

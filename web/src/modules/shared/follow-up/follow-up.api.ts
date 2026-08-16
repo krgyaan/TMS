@@ -28,24 +28,16 @@ export const createFollowUp = async (payload: CreateFollowUpDto) => {
 };
 
 // ✅ UPDATE
-export const updateFollowUp = async ({ id, data }: { id: number; data: FormData }) => {
+export const updateFollowUp = async ({ id, data }: { id: number; data: Record<string, unknown> }) => {
     console.log("API called from frontend", { id, data });
-    const res = await api.put(`/follow-up/${id}`, data, {
-        headers: {
-            "Content-type": "multipart/form-data",
-        },
-    });
+    const res = await api.put(`/follow-up/${id}`, data);
     return res.data;
 };
 
 // ✅ UPDATE STATUS
-export const updateFollowUpStatus = async ({ id, data }: { id: number; data: UpdateFollowUpStatusDto }) => {
+export const updateFollowUpStatus = async ({ id, data }: { id: number; data: UpdateFollowUpStatusDto & { proofImage?: string } }) => {
     console.log("Making the API call");
-    const res = await api.put(`/follow-up/${id}/status`, data, {
-        headers: {
-            "content-type": "multipart/form-data",
-        },
-    });
+    const res = await api.put(`/follow-up/${id}/status`, data);
     console.log("THIS IS MY API RESPONSE");
     console.log(res);
     return res.data;

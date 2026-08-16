@@ -32,8 +32,6 @@ import {
     CheckCircle,
     FileCheck,
     Upload,
-    ImagePlus,
-    X,
     Trash,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -154,7 +152,7 @@ const FollowupPage: React.FC = () => {
     const [stopReason, setStopReason] = useState<number | null>(null);
 
     const [proofText, setProofText] = useState("");
-    const [proofImage, setProofImage] = useState<File | null>(null);
+    const [proofImage, setProofImage] = useState<string[]>([]);
     const [stopRemarks, setStopRemarks] = useState("");
 
     const deferedSearchQuery = useDeferredValue(searchQuery);
@@ -229,29 +227,29 @@ const FollowupPage: React.FC = () => {
         // ========================
         // BUILD PAYLOAD
         // ========================
-        const formData = new FormData();
+        const payload: Record<string, unknown> = {};
 
-        formData.append("latestComment", comment || "");
-        formData.append("frequency", String(frequency));
+        payload.latestComment = comment || "";
+        payload.frequency = String(frequency);
 
         if (frequency !== 6 && date) {
-            formData.append("nextFollowUpDate", date.toISOString().split("T")[0]);
+            payload.nextFollowUpDate = date.toISOString().split("T")[0];
         }
 
         if (frequency === 6) {
-            formData.append("stopReason", String(stopReason));
+            payload.stopReason = String(stopReason);
 
             if (stopReason === 2 && proofText) {
-                formData.append("proofText", proofText);
+                payload.proofText = proofText;
             }
 
             if ([1, 3, 4].includes(stopReason ?? 0)) {
-                formData.append("stopRemarks", stopRemarks);
+                payload.stopRemarks = stopRemarks;
             }
         }
 
-        if (proofImage && stopReason === 2) {
-            formData.append("proofImage", proofImage);
+        if (proofImage[0] && stopReason === 2) {
+            payload.proofImage = proofImage[0];
         }
 
         try {
@@ -260,7 +258,7 @@ const FollowupPage: React.FC = () => {
             // ========================
             await updateStatusMutation.mutateAsync({
                 id: selectedId,
-                data: formData,
+                data: payload as UpdateFollowUpStatusDto & { proofImage?: string },
             });
 
             // ========================
@@ -674,63 +672,12 @@ const FollowupPage: React.FC = () => {
                                                 <span className="text-xs text-muted-foreground font-normal">(optional)</span>
                                             </label>
 
-                                            {!proofImage ? (
-                                                <label
-                                                    htmlFor="proof-upload"
-                                                    className={cn(
-                                                        "flex flex-col items-center justify-center gap-2 p-6 rounded-lg border-2 border-dashed",
-                                                        "bg-background cursor-pointer transition-colors",
-                                                        "hover:border-primary/50 hover:bg-primary/5"
-                                                    )}
-                                                >
-                                                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                                                        <ImagePlus className="h-5 w-5 text-muted-foreground" />
-                                                    </div>
-                                                    <div className="text-center">
-                                                        <p className="text-sm font-medium">Click to upload</p>
-                                                        <p className="text-xs text-muted-foreground mt-0.5">PNG, JPG, PDF up to 10MB</p>
-                                                    </div>
-                                                    <Input
-                                                        id="proof-upload"
-                                                        type="file"
-                                                        accept="image/*,.pdf"
-                                                        onChange={e => setProofImage(e.target.files?.[0] || null)}
-                                                        className="hidden"
-                                                    />
-                                                </label>
-                                            ) : (
-                                                <div className="flex items-center gap-3 p-3 rounded-lg border bg-background">
-                                                    <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                                        {proofImage.type.startsWith("image/") ? (
-                                                            <ImagePlus className="h-5 w-5 text-primary" />
-                                                        ) : (
-                                                            <FileCheck className="h-5 w-5 text-primary" />
-                                                        )}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-medium truncate">{proofImage.name}</p>
-                                                        <p className="text-xs text-muted-foreground">{(proofImage.size / 1024 / 1024).toFixed(2)} MB</p>
-                                                    </div>
-                                                    <TooltipProvider delayDuration={100}>
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                                                    onClick={() => setProofImage(null)}
-                                                                >
-                                                                    <X className="h-4 w-4" />
-                                                                </Button>
-                                                            </TooltipTrigger>
-                                                            <TooltipContent side="top" className="text-xs">
-                                                                Remove file
-                                                            </TooltipContent>
-                                                        </Tooltip>
-                                                    </TooltipProvider>
-                                                </div>
-                                            )}
+                                            <FileUploader
+                                                context="follow-ups"
+                                                value={proofImage}
+                                                onChange={setProofImage}
+                                                disabled={updateStatusMutation.isPending}
+                                            />
                                         </div>
                                     </div>
                                 )}
