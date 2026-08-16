@@ -166,7 +166,7 @@ const UserImprestsPage: React.FC = () => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [addProofOpen, setAddProofOpen] = useState(false);
     const [currentProofRowId, setCurrentProofRowId] = useState<number | null>(null);
-    const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
+    const [filesToUpload, setFilesToUpload] = useState<string[]>([]);
 
     const [remarkOpen, setRemarkOpen] = useState(false);
     const [remarkRow, setRemarkRow] = useState<ImprestRow | null>(null);
@@ -200,7 +200,7 @@ const UserImprestsPage: React.FC = () => {
         if (!currentProofRowId || filesToUpload.length === 0) return;
         // console.log("data", filesToUpload);
         uploadProofsMutation.mutate(
-            { id: currentProofRowId, files: filesToUpload },
+            { id: currentProofRowId, filenames: filesToUpload },
             {
                 onSuccess: () => {
                     setAddProofOpen(false);

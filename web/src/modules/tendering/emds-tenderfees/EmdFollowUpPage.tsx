@@ -220,7 +220,7 @@ const EmdFollowUpPage = () => {
                 frequency: values.frequency,
                 amount: rawAmount ?? 0,
                 emailBody,
-                attachments: attachments.map(a => `${a.baseDir}/${a.fileName}`),
+                attachments: attachments.map(a => (a.baseDir ? `${a.baseDir}/${a.fileName}` : a.fileName)),
             };
 
             await service.updateAction(instrumentId, payload);
