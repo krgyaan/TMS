@@ -1,5 +1,8 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { eq, desc, sql } from "drizzle-orm";
+import { and, eq, desc, inArray, sql } from "drizzle-orm";
+import { createHash, randomUUID } from "node:crypto";
+import { rename } from "node:fs/promises";
+import { join } from "node:path";
 
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
@@ -8,6 +11,9 @@ import { projects } from "@/db/schemas/operations/projects.schema";
 import { users } from "@/db/schemas/auth/users.schema";
 import { woBasicDetails, woDetails, woBillingBoq, woBuybackBoq, woBillingAddresses, woShippingAddresses } from "@/db/schemas/operations/work-order.schema";
 import { saleInvoices, saleInvoiceItems } from "@/db/schemas/operations/sale-invoices.schema";
+import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
+import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
+import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -16,6 +22,7 @@ export class SaleInvoiceService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
+        private readonly pdfGenerator: PdfGeneratorService,
     ) {}
 
     async getWoBillingData(projectId: number) {
@@ -115,6 +122,41 @@ export class SaleInvoiceService {
 
         const invoiceNumber = await this.generateInvoiceNumber(project.projectName || undefined);
 
+        const linkedIds = (body.items || [])
+            .filter((i: any) => i.purchaseOrderProductId)
+            .map((i: any) => Number(i.purchaseOrderProductId));
+        const poProductMap = new Map<number, any>();
+        if (linkedIds.length > 0) {
+            const poProducts = await this.db
+                .select({
+                    id: purchaseOrderProducts.id,
+                    poId: purchaseOrders.id,
+                    poNumber: purchaseOrders.poNumber,
+                    projectId: purchaseOrders.projectId,
+                    poApproved: purchaseOrders.poApproved,
+                    description: purchaseOrderProducts.description,
+                    hsnSac: purchaseOrderProducts.hsnSac,
+                    unit: purchaseOrderProducts.unit,
+                    rate: purchaseOrderProducts.rate,
+                    gstRate: purchaseOrderProducts.gstRate,
+                })
+                .from(purchaseOrderProducts)
+                .innerJoin(purchaseOrders, eq(purchaseOrders.id, purchaseOrderProducts.purchaseOrderId))
+                .where(inArray(purchaseOrderProducts.id, linkedIds));
+
+            poProducts.forEach((p) => poProductMap.set(p.id, p));
+
+            for (const item of body.items) {
+                if (!item.purchaseOrderProductId) continue;
+                const prod = poProductMap.get(Number(item.purchaseOrderProductId));
+                if (!prod || prod.projectId !== projectId || prod.poApproved !== true) {
+                    throw new BadRequestException(
+                        `Item "${item.itemDescription || "unknown"}" is not linked to an approved PO of this project`,
+                    );
+                }
+            }
+        }
+
         let totalPreGst = 0;
         let totalGst = 0;
         let grandTotal = 0;
@@ -134,6 +176,14 @@ export class SaleInvoiceService {
                     shippingCustomerName: body.shippingCustomerName,
                     shippingAddress: body.shippingAddress,
                     shippingGst: body.shippingGst || null,
+                    dispatchFromName: body.dispatchFromName || null,
+                    dispatchFromAddress: body.dispatchFromAddress || null,
+                    dispatchFromGst: body.dispatchFromGst || null,
+                    dispatchVehicleNo: body.dispatchVehicleNo || null,
+                    dispatchLrNo: body.dispatchLrNo || null,
+                    dispatchToName: body.dispatchToName || null,
+                    dispatchToAddress: body.dispatchToAddress || null,
+                    dispatchToGst: body.dispatchToGst || null,
                     status: "oe_request",
                     raisedBy: userId,
                     team: teamId,
@@ -155,8 +205,13 @@ export class SaleInvoiceService {
                 totalGst += gstAmount;
                 grandTotal += totalAmount;
 
+                const prod = item.purchaseOrderProductId ? poProductMap.get(Number(item.purchaseOrderProductId)) : null;
+
                 await this.db.insert(saleInvoiceItems).values({
                     saleInvoiceId: si.id,
+                    purchaseOrderProductId: item.purchaseOrderProductId ? Number(item.purchaseOrderProductId) : null,
+                    unit: item.unit || prod?.unit || null,
+                    hsnSac: item.hsnSac || prod?.hsnSac || null,
                     srNo: item.srNo || null,
                     itemDescription: item.itemDescription,
                     quantity: item.qty.toString(),
@@ -181,6 +236,394 @@ export class SaleInvoiceService {
         this.logger.info(`Sale Invoice created: ${invoiceNumber}`);
 
         return this.getById(si.id);
+    }
+
+    async createDraft(id: number, userId: number) {
+        const [si] = await this.db.select().from(saleInvoices).where(eq(saleInvoices.id, id));
+        if (!si) throw new NotFoundException("Sale invoice not found");
+
+        if (si.status !== "oe_request" && si.status !== "changes_requested") {
+            throw new BadRequestException(`Cannot create draft from "${si.status}" status`);
+        }
+
+        const items = await this.db
+            .select()
+            .from(saleInvoiceItems)
+            .where(eq(saleInvoiceItems.saleInvoiceId, id));
+
+        const actionEntry = {
+            action: "status_changed_to_draft",
+            data: { draftCreatedBy: userId },
+            updatedBy: userId,
+            updatedAt: new Date().toISOString(),
+        };
+
+        const [updated] = await this.db
+            .update(saleInvoices)
+            .set({
+                status: "draft",
+                changesRemark: null,
+                updatedAt: new Date(),
+                actionLogs: [...(si.actionLogs ?? []), actionEntry],
+            })
+            .where(eq(saleInvoices.id, id))
+            .returning();
+
+        this.generateSiPdf(updated, items).catch((err) => {
+            this.logger.error(`Failed to generate SI draft PDF for #${id}: ${err instanceof Error ? err.message : String(err)}`);
+        });
+
+        this.logger.info(`Draft created for Sale Invoice #${id} by user ${userId}`);
+        return this.getById(id);
+    }
+
+    async approve(id: number, userId: number) {
+        const [si] = await this.db.select().from(saleInvoices).where(eq(saleInvoices.id, id));
+        if (!si) throw new NotFoundException("Sale invoice not found");
+
+        if (si.status !== "draft") {
+            throw new BadRequestException(`Cannot approve invoice in "${si.status}" status. Only drafts can be approved.`);
+        }
+
+        const items = await this.db
+            .select()
+            .from(saleInvoiceItems)
+            .where(eq(saleInvoiceItems.saleInvoiceId, id));
+
+        const actionEntry = {
+            action: "status_changed_to_approved",
+            data: { approvedBy: userId },
+            updatedBy: userId,
+            updatedAt: new Date().toISOString(),
+        };
+
+        const [updated] = await this.db
+            .update(saleInvoices)
+            .set({
+                status: "approved",
+                approvedBy: userId,
+                approvedAt: new Date(),
+                updatedAt: new Date(),
+                actionLogs: [...(si.actionLogs ?? []), actionEntry],
+            })
+            .where(eq(saleInvoices.id, id))
+            .returning();
+
+        this.generateSiPdf(updated, items).catch((err) => {
+            this.logger.error(`Failed to generate SI final PDF for #${id}: ${err instanceof Error ? err.message : String(err)}`);
+        });
+
+        this.logger.info(`Sale Invoice #${id} approved by user ${userId}`);
+        return this.getById(id);
+    }
+
+    async requestChanges(id: number, remark: string, userId: number) {
+        const [si] = await this.db.select().from(saleInvoices).where(eq(saleInvoices.id, id));
+        if (!si) throw new NotFoundException("Sale invoice not found");
+
+        if (si.status !== "draft") {
+            throw new BadRequestException(`Cannot request changes on invoice in "${si.status}" status. Only drafts can be sent back.`);
+        }
+        if (!remark || !remark.trim()) {
+            throw new BadRequestException("A change request remark is required");
+        }
+
+        const actionEntry = {
+            action: "status_changed_to_changes_requested",
+            data: { requestedBy: userId, remark: remark.trim() },
+            updatedBy: userId,
+            updatedAt: new Date().toISOString(),
+        };
+
+        const [updated] = await this.db
+            .update(saleInvoices)
+            .set({
+                status: "changes_requested",
+                changesRemark: remark.trim(),
+                updatedAt: new Date(),
+                actionLogs: [...(si.actionLogs ?? []), actionEntry],
+            })
+            .where(eq(saleInvoices.id, id))
+            .returning();
+
+        this.logger.info(`Changes requested for Sale Invoice #${id} by user ${userId}`);
+        return updated;
+    }
+
+    async finalize(id: number, userId: number) {
+        const [si] = await this.db.select().from(saleInvoices).where(eq(saleInvoices.id, id));
+        if (!si) throw new NotFoundException("Sale invoice not found");
+
+        if (si.status !== "approved") {
+            throw new BadRequestException(`Cannot finalize invoice in "${si.status}" status. Only approved drafts can be finalized.`);
+        }
+
+        const items = await this.db
+            .select()
+            .from(saleInvoiceItems)
+            .where(eq(saleInvoiceItems.saleInvoiceId, id));
+
+        const linkedItems = items.filter((it) => it.purchaseOrderProductId != null);
+        for (const item of linkedItems) {
+            const [prod] = await this.db
+                .select({ qty: purchaseOrderProducts.qty })
+                .from(purchaseOrderProducts)
+                .where(eq(purchaseOrderProducts.id, item.purchaseOrderProductId!));
+            if (!prod) continue;
+
+            const invoicedQty = await this.getInvoicedQtyForProduct(item.purchaseOrderProductId!);
+            const remaining = Number(prod.qty) - invoicedQty;
+            if (Number(item.quantity) > remaining) {
+                throw new BadRequestException(
+                    `Cannot finalize invoice: "${item.itemDescription}" quantity ${item.quantity} exceeds remaining PO quantity ${Math.max(0, remaining)}`
+                );
+            }
+        }
+
+        const actionEntry = {
+            action: "status_changed_to_invoiced",
+            data: { finalizedBy: userId },
+            updatedBy: userId,
+            updatedAt: new Date().toISOString(),
+        };
+
+        const [updated] = await this.db
+            .update(saleInvoices)
+            .set({
+                status: "invoiced",
+                updatedAt: new Date(),
+                actionLogs: [...(si.actionLogs ?? []), actionEntry],
+            })
+            .where(eq(saleInvoices.id, id))
+            .returning();
+
+        this.logger.info(`Sale Invoice #${id} finalized as invoiced by user ${userId}`);
+        return updated;
+    }
+
+    private async getInvoicedQtyForProduct(productId: number): Promise<number> {
+        const [row] = await this.db
+            .select({
+                qty: sql<string>`
+                    COALESCE(SUM(
+                        CASE
+                            WHEN ${saleInvoices.status} IN ('invoiced', 'payment_received', 'completed') THEN ${saleInvoiceItems.quantity}::numeric
+                            WHEN ${saleInvoices.status} = 'credit_note' THEN -${saleInvoiceItems.quantity}::numeric
+                            ELSE 0
+                        END
+                    ), 0)`,
+            })
+            .from(saleInvoiceItems)
+            .innerJoin(saleInvoices, eq(saleInvoices.id, saleInvoiceItems.saleInvoiceId))
+            .where(eq(saleInvoiceItems.purchaseOrderProductId, productId));
+        return Number(row?.qty || 0);
+    }
+
+    private computeSIHash(si: any, items: any[]): string {
+        const fields = {
+            invoiceNumber: si.invoiceNumber,
+            invoiceDate: si.invoiceDate,
+            billingCustomerName: si.billingCustomerName,
+            billingAddress: si.billingAddress,
+            billingGst: si.billingGst,
+            shippingCustomerName: si.shippingCustomerName,
+            shippingAddress: si.shippingAddress,
+            shippingGst: si.shippingGst,
+            dispatchFromName: si.dispatchFromName,
+            dispatchFromAddress: si.dispatchFromAddress,
+            dispatchFromGst: si.dispatchFromGst,
+            dispatchVehicleNo: si.dispatchVehicleNo,
+            dispatchLrNo: si.dispatchLrNo,
+            dispatchToName: si.dispatchToName,
+            dispatchToAddress: si.dispatchToAddress,
+            dispatchToGst: si.dispatchToGst,
+            remarks: si.remarks,
+            items: (items || []).map((it: any) => ({
+                srNo: it.srNo,
+                itemDescription: it.itemDescription,
+                quantity: it.quantity,
+                rate: it.rate,
+                gstRate: it.gstRate,
+                unit: it.unit,
+                hsnSac: it.hsnSac,
+            })),
+        };
+        return createHash("sha256").update(JSON.stringify(fields)).digest("hex");
+    }
+
+    private async generateSiPdf(si: any, items: any[]) {
+        const contentHash = this.computeSIHash(si, items);
+
+        const versions = (si.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
+        const existingVersion = Object.values(versions).find((v) => v.hash === contentHash);
+        if (existingVersion) {
+            this.logger.info(`SI ${si.id}: no changes detected, reusing existing PDF`);
+            return;
+        }
+
+        const linkedProductIds = (items || [])
+            .filter((it: any) => it.purchaseOrderProductId != null)
+            .map((it: any) => Number(it.purchaseOrderProductId));
+
+        let poNumbers: string[] = [];
+        if (linkedProductIds.length > 0) {
+            const poRows = await this.db
+                .select({ poNumber: purchaseOrders.poNumber })
+                .from(purchaseOrderProducts)
+                .innerJoin(purchaseOrders, eq(purchaseOrders.id, purchaseOrderProducts.purchaseOrderId))
+                .where(inArray(purchaseOrderProducts.id, linkedProductIds));
+            poNumbers = [...new Set(poRows.map((r) => r.poNumber).filter((n): n is string => Boolean(n)))];
+        }
+
+        const [project] = await this.db
+            .select({ projectName: projects.projectName })
+            .from(projects)
+            .where(eq(projects.id, si.projectId));
+
+        const rows = (items || []).map((it: any, i: number) => {
+            const qty = Number(it.quantity);
+            const rate = Number(it.rate);
+            const gstRate = Number(it.gstRate);
+            const amount = qty * rate;
+            const gstAmount = (amount * gstRate) / 100;
+            const total = amount + gstAmount;
+            return {
+                sr_no: it.srNo ?? i + 1,
+                description: it.itemDescription || "",
+                unit: it.unit || "",
+                quantity: qty,
+                rate,
+                amount,
+                gst_rate: gstRate,
+                gst_amount: gstAmount,
+                total,
+                hsn_sac: it.hsnSac || "",
+            };
+        });
+
+        const totalAmount = rows.reduce((s: number, i: any) => s + i.amount, 0);
+        const totalGstAmt = rows.reduce((s: number, i: any) => s + i.gst_amount, 0);
+        const grandTotal = totalAmount + totalGstAmt;
+
+        const data = {
+            invoice_number: si.invoiceNumber || "",
+            invoice_date: si.invoiceDate || "",
+            project_name: project?.projectName || "",
+            po_number: poNumbers.join(", "),
+            billing_name: si.billingCustomerName || "",
+            billing_address: si.billingAddress || "",
+            billing_gst: si.billingGst || "",
+            shipping_name: si.shippingCustomerName || "",
+            shipping_address: si.shippingAddress || "",
+            shipping_gst: si.shippingGst || "",
+            dispatch_from_name: si.dispatchFromName || "",
+            dispatch_from_address: si.dispatchFromAddress || "",
+            dispatch_from_gst: si.dispatchFromGst || "",
+            dispatch_vehicle_no: si.dispatchVehicleNo || "",
+            dispatch_lr_no: si.dispatchLrNo || "",
+            dispatch_to_name: si.dispatchToName || "",
+            dispatch_to_address: si.dispatchToAddress || "",
+            dispatch_to_gst: si.dispatchToGst || "",
+            items: rows,
+            total_amount: totalAmount,
+            total_gst_amt: totalGstAmt,
+            grand_total: grandTotal,
+            grand_total_in_words: this.pdfGenerator.grandTotalInWords(grandTotal),
+            is_draft: si.status !== "approved" && si.status !== "invoiced",
+            revision: Object.keys(versions).length + 1,
+            remarks: si.remarks || "",
+        };
+
+        try {
+            const pdfPaths = await this.pdfGenerator.generatePdfs('si', data, si.id, 'SI');
+            if (pdfPaths.length > 0) {
+                const siSeq = si.invoiceNumber?.split('/').pop() || `SI${si.id}`;
+                const rand = randomUUID().split('-')[0];
+                const newFileName = `${siSeq}-${rand}.pdf`;
+                const storageDir = 'operations/si';
+
+                const oldPath = join(process.cwd(), 'uploads', pdfPaths[0]);
+                const newPath = join(process.cwd(), 'uploads', storageDir, newFileName);
+
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    try { await rename(oldPath, newPath); break; }
+                    catch (e) {
+                        if ((e as NodeJS.ErrnoException).code !== 'ENOENT' || attempt === 2) throw e;
+                        await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
+                    }
+                }
+
+                const finalPath = `${storageDir}/${newFileName}`;
+
+                const now = new Date();
+                const label = `v-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
+
+                const updatedVersions = { ...versions, [label]: { path: finalPath, hash: contentHash } };
+
+                await this.db
+                    .update(saleInvoices)
+                    .set({ generatedPdfVersions: updatedVersions })
+                    .where(eq(saleInvoices.id, si.id));
+            }
+        } catch (error) {
+            this.logger.error(`PDF generation failed for SI ${si.id}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    async getSaleInvoicePdf(id: number, version?: string): Promise<{ path: string; filename: string }> {
+        const [si] = await this.db.select().from(saleInvoices).where(eq(saleInvoices.id, id));
+        if (!si) throw new NotFoundException("Sale invoice not found");
+
+        const versions = (si.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
+
+        if (version) {
+            const entry = versions[version];
+            if (!entry) throw new NotFoundException(`PDF version "${version}" not found`);
+            return {
+                path: entry.path,
+                filename: `SI_${si.invoiceNumber?.replace(/\//g, "_") || id}_${version}.pdf`,
+            };
+        }
+
+        const sorted = Object.entries(versions).sort((a, b) =>
+            this.parseLabelDate(b[0]).getTime() - this.parseLabelDate(a[0]).getTime()
+        );
+        if (sorted.length === 0) throw new NotFoundException("No PDF versions found for this Sale Invoice");
+        const [latestLabel, latestEntry] = sorted[0];
+        return {
+            path: latestEntry.path,
+            filename: `SI_${si.invoiceNumber?.replace(/\//g, "_") || id}_${latestLabel}.pdf`,
+        };
+    }
+
+    async getSaleInvoicePdfVersions(id: number): Promise<Record<string, { path: string; hash: string }>> {
+        const [si] = await this.db.select().from(saleInvoices).where(eq(saleInvoices.id, id));
+        if (!si) throw new NotFoundException("Sale invoice not found");
+        return (si.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
+    }
+
+    async deletePdfVersion(id: number, version: string): Promise<void> {
+        const [si] = await this.db.select().from(saleInvoices).where(eq(saleInvoices.id, id));
+        if (!si) throw new NotFoundException("Sale invoice not found");
+
+        const versions = (si.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
+        if (!versions[version]) throw new NotFoundException(`PDF version "${version}" not found`);
+
+        delete versions[version];
+
+        await this.db
+            .update(saleInvoices)
+            .set({ generatedPdfVersions: versions })
+            .where(eq(saleInvoices.id, id));
+    }
+
+    private parseLabelDate(label: string): Date {
+        const match = label.match(/^v-(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$/);
+        if (match) {
+            const [, y, m, d, h, min, s] = match.map(Number);
+            return new Date(y, m - 1, d, h, min, s);
+        }
+        return new Date(0);
     }
 
     async getAll() {
@@ -215,7 +658,6 @@ export class SaleInvoiceService {
         if (!existing) throw new NotFoundException("Sale invoice not found");
 
         const validTransitions: Record<string, string[]> = {
-            oe_request: ["invoiced"],
             invoiced: ["credit_note", "payment_received"],
             credit_note: ["payment_received"],
             payment_received: ["completed"],
@@ -261,7 +703,6 @@ export class SaleInvoiceService {
 
         if (body.status && body.status !== currentStatus) {
             const validTransitions: Record<string, string[]> = {
-                oe_request: ["invoiced"],
                 invoiced: ["credit_note", "payment_received"],
                 credit_note: ["payment_received"],
                 payment_received: ["completed"],
@@ -389,6 +830,14 @@ export class SaleInvoiceService {
                 shippingCustomerName: saleInvoices.shippingCustomerName,
                 shippingAddress: saleInvoices.shippingAddress,
                 shippingGst: saleInvoices.shippingGst,
+                dispatchFromName: saleInvoices.dispatchFromName,
+                dispatchFromAddress: saleInvoices.dispatchFromAddress,
+                dispatchFromGst: saleInvoices.dispatchFromGst,
+                dispatchVehicleNo: saleInvoices.dispatchVehicleNo,
+                dispatchLrNo: saleInvoices.dispatchLrNo,
+                dispatchToName: saleInvoices.dispatchToName,
+                dispatchToAddress: saleInvoices.dispatchToAddress,
+                dispatchToGst: saleInvoices.dispatchToGst,
                 totalPreGst: saleInvoices.totalPreGst,
                 totalGst: saleInvoices.totalGst,
                 grandTotal: saleInvoices.grandTotal,
@@ -428,6 +877,10 @@ export class SaleInvoiceService {
                 raisedByName: users.name,
                 team: saleInvoices.team,
                 remarks: saleInvoices.remarks,
+                approvedBy: saleInvoices.approvedBy,
+                approvedAt: saleInvoices.approvedAt,
+                changesRemark: saleInvoices.changesRemark,
+                generatedPdfVersions: saleInvoices.generatedPdfVersions,
                 actionLogs: saleInvoices.actionLogs,
                 createdAt: saleInvoices.createdAt,
                 updatedAt: saleInvoices.updatedAt,
@@ -437,12 +890,35 @@ export class SaleInvoiceService {
             .where(eq(saleInvoices.id, id));
         if (!row) throw new NotFoundException("Sale invoice not found");
 
+        const [approvedByNameRow] = row.approvedBy
+            ? await this.db.select({ name: users.name }).from(users).where(eq(users.id, row.approvedBy))
+            : [];
+
         const items = await this.db
-            .select()
+            .select({
+                id: saleInvoiceItems.id,
+                saleInvoiceId: saleInvoiceItems.saleInvoiceId,
+                purchaseOrderProductId: saleInvoiceItems.purchaseOrderProductId,
+                unit: saleInvoiceItems.unit,
+                hsnSac: saleInvoiceItems.hsnSac,
+                srNo: saleInvoiceItems.srNo,
+                itemDescription: saleInvoiceItems.itemDescription,
+                quantity: saleInvoiceItems.quantity,
+                rate: saleInvoiceItems.rate,
+                amount: saleInvoiceItems.amount,
+                gstRate: saleInvoiceItems.gstRate,
+                gstAmount: saleInvoiceItems.gstAmount,
+                totalAmount: saleInvoiceItems.totalAmount,
+                createdAt: saleInvoiceItems.createdAt,
+                updatedAt: saleInvoiceItems.updatedAt,
+                poNumber: purchaseOrders.poNumber,
+            })
             .from(saleInvoiceItems)
+            .leftJoin(purchaseOrderProducts, eq(purchaseOrderProducts.id, saleInvoiceItems.purchaseOrderProductId))
+            .leftJoin(purchaseOrders, eq(purchaseOrders.id, purchaseOrderProducts.purchaseOrderId))
             .where(eq(saleInvoiceItems.saleInvoiceId, id))
             .orderBy(saleInvoiceItems.srNo);
 
-        return { ...row, items };
+        return { ...row, approvedByName: approvedByNameRow?.name ?? null, items };
     }
 }
