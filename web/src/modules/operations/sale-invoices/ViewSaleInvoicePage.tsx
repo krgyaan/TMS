@@ -21,6 +21,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { toast } from "sonner";
 import RequestChangesDialog from "./components/RequestChangesDialog";
+import RejectDialog from "./components/RejectDialog";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "default" | "outline" | "success" | "destructive" }> = {
     oe_request: { label: "OE Request", variant: "outline" },
@@ -31,6 +32,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "def
     credit_note: { label: "Credit Note", variant: "default" },
     payment_received: { label: "Payment Received", variant: "success" },
     completed: { label: "Completed", variant: "success" },
+    rejected: { label: "Rejected", variant: "destructive" },
 };
 
 function DocLinks({ paths }: Readonly<{ paths: string[] }>) {
@@ -70,6 +72,7 @@ const ViewSaleInvoicePage = () => {
     const createDraftMutation = useCreateSaleInvoiceDraft();
     const deletePdfVersionMutation = useDeleteSaleInvoicePdfVersion();
     const [isRequestChangesOpen, setIsRequestChangesOpen] = useState(false);
+    const [isRejectOpen, setIsRejectOpen] = useState(false);
 
     const isAccountsSection = location.pathname.includes("/accounts/");
 
@@ -176,10 +179,16 @@ const ViewSaleInvoicePage = () => {
                 </div>
                 <div className="ml-auto flex items-center gap-2">
                     {isAccountsSection && si.status === "oe_request" && (
-                        <Button size="sm" onClick={handleCreateDraft} disabled={createDraftMutation.isPending}>
-                            <FileText className="mr-2 h-4 w-4" />
-                            {createDraftMutation.isPending ? "Creating..." : "Create Draft"}
-                        </Button>
+                        <>
+                            <Button size="sm" onClick={handleCreateDraft} disabled={createDraftMutation.isPending}>
+                                <FileText className="mr-2 h-4 w-4" />
+                                {createDraftMutation.isPending ? "Creating..." : "Create Draft"}
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => setIsRejectOpen(true)}>
+                                <AlertCircle className="mr-2 h-4 w-4" />
+                                Reject Request
+                            </Button>
+                        </>
                     )}
                     {isAccountsSection && si.status === "changes_requested" && (
                         <Button size="sm" onClick={handleCreateDraft} disabled={createDraftMutation.isPending}>
@@ -271,7 +280,7 @@ const ViewSaleInvoicePage = () => {
                                 )}
                                 {si.changesRemark && (
                                     <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">Changes Remark</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">{si.status === "rejected" ? "Rejection Reason" : "Changes Remark"}</TableCell>
                                         <TableCell className="text-sm break-words" colSpan={3}>{si.changesRemark}</TableCell>
                                     </TableRow>
                                 )}
@@ -642,6 +651,11 @@ const ViewSaleInvoicePage = () => {
                 row={si ? { id: si.id, invoiceNumber: si.invoiceNumber, billingCustomerName: si.billingCustomerName } : null}
                 open={isRequestChangesOpen}
                 onClose={() => setIsRequestChangesOpen(false)}
+            />
+            <RejectDialog
+                row={si ? { id: si.id, invoiceNumber: si.invoiceNumber, billingCustomerName: si.billingCustomerName } : null}
+                open={isRejectOpen}
+                onClose={() => setIsRejectOpen(false)}
             />
         </Card>
     );

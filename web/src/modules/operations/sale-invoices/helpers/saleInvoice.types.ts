@@ -58,7 +58,8 @@ export type SaleInvoiceStatus =
     | "invoiced"
     | "credit_note"
     | "payment_received"
-    | "completed";
+    | "completed"
+    | "rejected";
 
 export interface SaleInvoiceRow {
     id: number;

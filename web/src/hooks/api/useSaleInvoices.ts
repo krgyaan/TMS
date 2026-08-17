@@ -109,6 +109,17 @@ export const useRequestSaleInvoiceChanges = () => {
     });
 };
 
+export const useRejectSaleInvoice = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, remark }: { id: number; remark: string }) => saleInvoiceApi.reject(id, remark),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: saleInvoiceKeys.all });
+        },
+    });
+};
+
 export const useFinalizeSaleInvoice = () => {
     const queryClient = useQueryClient();
 

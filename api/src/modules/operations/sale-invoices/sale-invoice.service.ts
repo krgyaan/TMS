@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { and, eq, desc, inArray, sql } from "drizzle-orm";
+import { and, eq, desc, inArray, ne, sql } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { rename } from "node:fs/promises";
 import { join } from "node:path";
@@ -355,6 +355,39 @@ export class SaleInvoiceService {
         return updated;
     }
 
+    async reject(id: number, remark: string, userId: number) {
+        const [si] = await this.db.select().from(saleInvoices).where(eq(saleInvoices.id, id));
+        if (!si) throw new NotFoundException("Sale invoice not found");
+
+        if (si.status !== "oe_request") {
+            throw new BadRequestException(`Cannot reject invoice in "${si.status}" status. Only raised requests can be rejected.`);
+        }
+        if (!remark || !remark.trim()) {
+            throw new BadRequestException("A rejection remark is required");
+        }
+
+        const actionEntry = {
+            action: "status_changed_to_rejected",
+            data: { rejectedBy: userId, remark: remark.trim() },
+            updatedBy: userId,
+            updatedAt: new Date().toISOString(),
+        };
+
+        const [updated] = await this.db
+            .update(saleInvoices)
+            .set({
+                status: "rejected",
+                changesRemark: remark.trim(),
+                updatedAt: new Date(),
+                actionLogs: [...(si.actionLogs ?? []), actionEntry],
+            })
+            .where(eq(saleInvoices.id, id))
+            .returning();
+
+        this.logger.info(`Sale Invoice #${id} rejected by user ${userId}`);
+        return updated;
+    }
+
     async finalize(id: number, userId: number) {
         const [si] = await this.db.select().from(saleInvoices).where(eq(saleInvoices.id, id));
         if (!si) throw new NotFoundException("Sale invoice not found");
@@ -376,7 +409,7 @@ export class SaleInvoiceService {
                 .where(eq(purchaseOrderProducts.id, item.purchaseOrderProductId!));
             if (!prod) continue;
 
-            const invoicedQty = await this.getInvoicedQtyForProduct(item.purchaseOrderProductId!);
+            const invoicedQty = await this.getInvoicedQtyForProduct(item.purchaseOrderProductId!, id);
             const remaining = Number(prod.qty) - invoicedQty;
             if (Number(item.quantity) > remaining) {
                 throw new BadRequestException(
@@ -406,13 +439,13 @@ export class SaleInvoiceService {
         return updated;
     }
 
-    private async getInvoicedQtyForProduct(productId: number): Promise<number> {
+    private async getInvoicedQtyForProduct(productId: number, excludeInvoiceId?: number): Promise<number> {
         const [row] = await this.db
             .select({
                 qty: sql<string>`
                     COALESCE(SUM(
                         CASE
-                            WHEN ${saleInvoices.status} IN ('invoiced', 'payment_received', 'completed') THEN ${saleInvoiceItems.quantity}::numeric
+                            WHEN ${saleInvoices.status} IN ('oe_request', 'draft', 'changes_requested', 'approved', 'invoiced', 'payment_received', 'completed') THEN ${saleInvoiceItems.quantity}::numeric
                             WHEN ${saleInvoices.status} = 'credit_note' THEN -${saleInvoiceItems.quantity}::numeric
                             ELSE 0
                         END
@@ -420,7 +453,10 @@ export class SaleInvoiceService {
             })
             .from(saleInvoiceItems)
             .innerJoin(saleInvoices, eq(saleInvoices.id, saleInvoiceItems.saleInvoiceId))
-            .where(eq(saleInvoiceItems.purchaseOrderProductId, productId));
+            .where(and(
+                eq(saleInvoiceItems.purchaseOrderProductId, productId),
+                excludeInvoiceId != null ? ne(saleInvoiceItems.saleInvoiceId, excludeInvoiceId) : undefined,
+            ));
         return Number(row?.qty || 0);
     }
 

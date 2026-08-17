@@ -16,7 +16,7 @@ import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import type { SaleInvoiceListRow } from "@/modules/operations/sale-invoices/helpers/saleInvoice.types";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { Banknote, CheckCircle2, Eye, HandCoins, LampCeiling, Lock, PencilLine, Search, Upload } from "lucide-react";
+import { Banknote, CheckCircle2, Eye, HandCoins, LampCeiling, Lock, PencilLine, Search, Upload, XCircle } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -27,6 +27,7 @@ import HoldAmountDialog from "./components/HoldAmountDialog";
 import HoldReleasedDialog from "./components/HoldReleasedDialog";
 import PaymentReceivedDialog from "./components/PaymentReceivedDialog";
 import RequestChangesDialog from "./components/RequestChangesDialog";
+import RejectDialog from "./components/RejectDialog";
 import UploadInvoiceDialog from "./components/UploadInvoiceDialog";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "default" | "outline" | "success" | "destructive" }> = {
@@ -38,6 +39,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "def
     credit_note: { label: "Credit Note", variant: "default" },
     payment_received: { label: "Payment Received", variant: "success" },
     completed: { label: "Completed", variant: "success" },
+    rejected: { label: "Rejected", variant: "destructive" },
 };
 
 const SUBTABS = [
@@ -49,6 +51,7 @@ const SUBTABS = [
     { key: "payment_received", label: "Payment Received" },
     { key: "completed", label: "Completed" },
     { key: "credit_note", label: "Credit Note" },
+    { key: "rejected", label: "Rejected" },
 ] as const;
 
 type SubTabKey = (typeof SUBTABS)[number]["key"];
@@ -71,6 +74,7 @@ const SaleInvoiceListPage: React.FC = () => {
     const [holdReleasedRow, setHoldReleasedRow] = useState<SaleInvoiceListRow | null>(null);
     const [requestChangesRow, setRequestChangesRow] = useState<SaleInvoiceListRow | null>(null);
     const [finalizeRow, setFinalizeRow] = useState<SaleInvoiceListRow | null>(null);
+    const [rejectRow, setRejectRow] = useState<SaleInvoiceListRow | null>(null);
 
     const saleInvoices = useMemo(() => (data?.saleInvoices ?? []) as SaleInvoiceListRow[], [data]);
 
@@ -112,6 +116,7 @@ const SaleInvoiceListPage: React.FC = () => {
         setHoldReleasedRow(null);
         setRequestChangesRow(null);
         setFinalizeRow(null);
+        setRejectRow(null);
     }, []);
 
     const approveMutation = useApproveSaleInvoice();
@@ -141,6 +146,12 @@ const SaleInvoiceListPage: React.FC = () => {
                     label: "Create Draft",
                     icon: <Upload className="h-4 w-4" />,
                     onClick: (row) => setUploadRow(row),
+                    visible: (row) => row.status === "oe_request",
+                },
+                {
+                    label: "Reject Request",
+                    icon: <XCircle className="h-4 w-4" />,
+                    onClick: (row) => setRejectRow(row),
                     visible: (row) => row.status === "oe_request",
                 },
                 {
@@ -339,6 +350,7 @@ const SaleInvoiceListPage: React.FC = () => {
             <HoldReleasedDialog row={holdReleasedRow} open={holdReleasedRow !== null} onClose={closeAll} />
             <RequestChangesDialog row={requestChangesRow} open={requestChangesRow !== null} onClose={closeAll} />
             <FinalizeDialog row={finalizeRow} open={finalizeRow !== null} onClose={closeAll} />
+            <RejectDialog row={rejectRow} open={rejectRow !== null} onClose={closeAll} />
         </>
     );
 };

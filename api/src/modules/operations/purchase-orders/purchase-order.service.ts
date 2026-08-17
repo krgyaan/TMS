@@ -87,7 +87,7 @@ export class PurchaseOrderService {
                         SELECT SUM(sii.quantity::numeric) FROM sale_invoice_items sii
                         JOIN sale_invoices si ON si.id = sii.sale_invoice_id
                         WHERE sii.purchase_order_product_id = ${purchaseOrderProducts.id}
-                          AND si.status IN ('invoiced', 'payment_received', 'completed')
+                          AND si.status IN ('oe_request', 'draft', 'changes_requested', 'approved', 'invoiced', 'payment_received', 'completed')
                     ), 0)
                     -
                     COALESCE((

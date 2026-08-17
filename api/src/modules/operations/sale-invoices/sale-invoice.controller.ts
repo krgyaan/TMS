@@ -53,6 +53,16 @@ export class SaleInvoiceController {
         return this.service.requestChanges(id, body.remark ?? "", user.id);
     }
 
+    @Post(":id/reject")
+    @HttpCode(HttpStatus.OK)
+    reject(
+        @Param("id", ParseIntPipe) id: number,
+        @Body() body: { remark?: string },
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        return this.service.reject(id, body.remark ?? "", user.id);
+    }
+
     @Post(":id/finalize")
     @HttpCode(HttpStatus.OK)
     finalize(@Param("id", ParseIntPipe) id: number, @CurrentUser() user: ValidatedUser) {

@@ -47,6 +47,10 @@ class SaleInvoiceApiService extends BaseApiService {
         return this.post(`/${id}/request-changes`, { remark });
     }
 
+    async reject(id: number, remark: string): Promise<any> {
+        return this.post(`/${id}/reject`, { remark });
+    }
+
     async finalize(id: number): Promise<any> {
         return this.post(`/${id}/finalize`, {});
     }
