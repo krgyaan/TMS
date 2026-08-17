@@ -1,11 +1,11 @@
-import { MB, DOCS, OFFICE, type FileConfig } from './common';
+import { MB, DOCS, OFFICE, type FileConfig } from "./common";
 
 /**
  * Operations module contexts (work orders, purchase orders, contracts, payments).
  * All files stored under uploads/operations/.
  */
 export const operationsConfigs: Record<string, FileConfig> = {
-    "mcaClosure": {
+    mcaClosure: {
         maxFiles: 2,
         maxSizeBytes: MB(10),
         allowedMimeTypes: [...DOCS, ...OFFICE],
