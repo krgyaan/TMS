@@ -62,4 +62,10 @@ export const operationsConfigs: Record<string, FileConfig> = {
         allowedMimeTypes: [...DOCS],
         allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
     },
+    "project-closure": {
+        maxFiles: 10,
+        maxSizeBytes: MB(25),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".jpg", ".jpeg", ".png", ".webp"],
+    },
 };

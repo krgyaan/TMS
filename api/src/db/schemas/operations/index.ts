@@ -1,3 +1,4 @@
+export * from "./project-closure.schema";
 export * from "./work-order.schema";
 export * from "./kick-off-meetings.schema";
 export * from "./vendor-work-orders.schema";
