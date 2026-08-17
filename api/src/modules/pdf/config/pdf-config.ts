@@ -127,6 +127,18 @@ export const PDF_CONFIG = {
                 left: '7.5mm',
             },
         },
+        si: {
+            directory: '.',
+            templates: ['si-template'],
+            storagePath: 'si',
+            baseDir: 'operations/si',
+            margin: {
+                top: '10mm',
+                right: '7.5mm',
+                bottom: '10mm',
+                left: '7.5mm',
+            },
+        },
     },
 
     /**

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Tax Invoice</title>
+</head>
+<body style="font-family: Arial, sans-serif; font-size: 12px; color: #000; margin: 20px;">
+
+    {{#if is_draft}}
+    <div style="text-align: center; border: 2px solid #b91c1c; color: #b91c1c; padding: 4px; font-weight: bold; font-size: 14px; margin-bottom: 10px;">
+        DRAFT — REVISION {{revision}}
+    </div>
+    {{else}}
+    <div style="text-align: center; border: 2px solid #166534; color: #166534; padding: 4px; font-weight: bold; font-size: 14px; margin-bottom: 10px;">
+        FINAL INVOICE
+    </div>
+    {{/if}}
+
+    <!-- Header -->
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 10px; border: 1px solid #000;">
+      <thead>
+        <tr>
+            <th colspan="3" style="border: 1px solid #000; padding: 8px; text-align: center; font-size: 16px;">
+                TAX INVOICE
+            </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+            <td style="width: 15%; vertical-align: top; border: 1px solid #000; padding: 8px;">
+                <img src="data:image/png;base64,{{ img_logo_base64 }}" alt="Volks Energie Logo" style="height: 60px;">
+            </td>
+
+            <td style="width: 40%; vertical-align: top; border: 1px solid #000; padding: 8px;">
+                <strong>Volks Energie Pvt. Ltd.</strong><br>
+                B-1/D8, 2nd floor, Mohan Cooperative Industrial Estate,<br>
+                New Delhi - 110044<br>
+                PAN No.: AADCV9396C<br>
+                GST No.: 07AADCV9396C1ZZ
+            </td>
+
+            <td style="width: 45%; vertical-align: top; border: 1px solid #000; padding: 8px;">
+                <strong>Invoice No.:</strong> {{invoice_number}}<br>
+                <strong>Invoice Date:</strong> {{formatDate invoice_date}}<br>
+                <strong>Project Name:</strong> {{project_name}}<br>
+                <strong>PO Ref.:</strong> {{po_number}}
+            </td>
+        </tr>
+
+        <tr>
+            <td style="vertical-align: top; border: 1px solid #000; padding: 8px;">
+                <strong>Billing To:</strong><br>
+                {{billing_name}}<br>
+                {{billing_address}}<br>
+                {{#if billing_gst}}
+                GST No.: {{billing_gst}}
+                {{/if}}
+            </td>
+
+            <td style="vertical-align: top; border: 1px solid #000; padding: 8px;">
+                <strong>Ship To:</strong><br>
+                {{shipping_name}}<br>
+                {{shipping_address}}<br>
+                {{#if shipping_gst}}
+                GST No.: {{shipping_gst}}
+                {{/if}}
+            </td>
+
+            <td style="vertical-align: top; border: 1px solid #000; padding: 8px;">
+                <strong>Dispatch From:</strong><br>
+                {{#if dispatch_from_name}}{{dispatch_from_name}}<br>{{/if}}
+                {{#if dispatch_from_address}}{{dispatch_from_address}}<br>{{/if}}
+                {{#if dispatch_from_gst}}GST No.: {{dispatch_from_gst}}<br>{{/if}}
+                {{#if dispatch_vehicle_no}}Vehicle No.: {{dispatch_vehicle_no}}<br>{{/if}}
+                {{#if dispatch_lr_no}}LR No.: {{dispatch_lr_no}}{{/if}}
+                {{#unless dispatch_from_name}}{{#unless dispatch_from_address}}{{#unless dispatch_vehicle_no}}{{#unless dispatch_lr_no}}—{{/unless}}{{/unless}}{{/unless}}{{/unless}}
+                <br><br>
+                <strong>Dispatch To:</strong><br>
+                {{#if dispatch_to_name}}{{dispatch_to_name}}<br>{{/if}}
+                {{#if dispatch_to_address}}{{dispatch_to_address}}<br>{{/if}}
+                {{#if dispatch_to_gst}}GST No.: {{dispatch_to_gst}}{{/if}}
+                {{#unless dispatch_to_name}}{{#unless dispatch_to_address}}—{{/unless}}{{/unless}}
+            </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Items Table -->
+    <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; margin-bottom: 10px;">
+        <tr>
+            <th style="border: 1px solid #000; padding: 5px;">Sr. No</th>
+            <th style="border: 1px solid #000; padding: 5px;">Item Description</th>
+            <th style="border: 1px solid #000; padding: 5px;">HSN/SAC</th>
+            <th style="border: 1px solid #000; padding: 5px;">Quantity</th>
+            <th style="border: 1px solid #000; padding: 5px;">Rate</th>
+            <th style="border: 1px solid #000; padding: 5px;">Amount</th>
+            <th style="border: 1px solid #000; padding: 5px;">GST Rate</th>
+            <th style="border: 1px solid #000; padding: 5px;">GST Amount</th>
+            <th style="border: 1px solid #000; padding: 5px;">Total</th>
+        </tr>
+
+        {{#each items}}
+        <tr>
+            <td style="border: 1px solid #000; padding: 5px;">{{sr_no}}</td>
+            <td style="border: 1px solid #000; padding: 5px;">{{description}}</td>
+            <td style="border: 1px solid #000; padding: 5px;">{{hsn_sac}}</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{quantity}} {{unit}}</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency rate}}</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency amount}}</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{gst_rate}}%</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency gst_amount}}</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency total}}</td>
+        </tr>
+        {{/each}}
+
+        <!-- Totals -->
+        <tr>
+            <td colspan="5" style="border: 1px solid #000; padding: 5px; text-align: right;">
+                <strong>Total Amount</strong>
+            </td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency total_amount}}</td>
+            <td></td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency total_gst_amt}}</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency grand_total}}</td>
+        </tr>
+    </table>
+
+    <p><strong>Total Amount (In Words):</strong> {{grand_total_in_words}}</p>
+
+    {{#if remarks}}
+    <div>
+        <strong>Remarks:</strong> {{remarks}}
+    </div>
+    {{/if}}
+
+    <!-- Footer -->
+    <p style="margin-top: 20px; text-align: center;">
+        *** This is electronically generated document. It does not require any signature from M/s. Volks Energie Pvt. Ltd. ***
+    </p>
+
+    <table style="width: 100%; margin-top: 40px;">
+        <tr>
+            <td style="text-align: left;">
+                For M/s Volks Energie Pvt Ltd<br><br><br><br><br><br>
+                Authorized Signatory
+            </td>
+            <td style="text-align: right;">
+                For M/s {{billing_name}}<br><br><br><br><br><br>
+                Authorized Signatory
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>
