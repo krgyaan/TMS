@@ -1,12 +1,9 @@
-import { useForm, useWatch } from "react-hook-form";
-import { FileUploader, parseFileMeta } from "@/components/file-upload";
-import { SelectField } from "@/components/form/SelectField";
+import { parseFileMeta } from "@/components/file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
     useAddProjectClosureDocument,
     useDeleteProjectClosureDocument,
@@ -14,17 +11,17 @@ import {
 } from "@/hooks/api/useProjectClosure";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { fileUploadService } from "@/services/api/file-upload.service";
-import { FileText, Save, Trash2, Upload } from "lucide-react";
 import type { ColDef } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import { FileText, Plus } from "lucide-react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
     CLOSURE_DOCUMENTS,
     CLOSURE_DOCUMENT_CATEGORIES,
     TOTAL_CLOSURE_DOCUMENTS,
     type ProjectClosureDocumentRow,
 } from "../helpers/projectClosure.types";
+import { ProjectClosureUploadDialog } from "./ProjectClosureUploadDialog";
 
 interface ProjectClosureSectionProps {
     projectId: number | null;
@@ -34,6 +31,11 @@ interface ClosureChecklistRow {
     documentName: string;
     category: string;
     row: ProjectClosureDocumentRow | null;
+}
+
+interface UploadPrefill {
+    documentName?: string;
+    files?: string[];
 }
 
 const DOCUMENT_CATEGORY: Record<string, string> = Object.entries(CLOSURE_DOCUMENT_CATEGORIES).reduce(
@@ -49,29 +51,8 @@ export const ProjectClosureSection: React.FC<ProjectClosureSectionProps> = ({ pr
     const addMutation = useAddProjectClosureDocument(projectId);
     const deleteMutation = useDeleteProjectClosureDocument(projectId);
 
-    const form = useForm<{ documentName: string | undefined }>({
-        defaultValues: { documentName: undefined },
-    });
-    const { control, handleSubmit, setValue, reset } = form;
-    const documentName = useWatch({ control, name: "documentName" });
-
-    const [files, setFiles] = useState<string[]>([]);
-    const prevDocumentNameRef = useRef<string | undefined>(undefined);
-
-    useEffect(() => {
-        if (documentName && documentName !== prevDocumentNameRef.current) {
-            setFiles(data?.find(r => r.documentName === documentName)?.files ?? []);
-        }
-        prevDocumentNameRef.current = documentName;
-    }, [documentName, data]);
-
-    const documentOptions = useMemo(
-        () =>
-            Object.entries(CLOSURE_DOCUMENT_CATEGORIES).flatMap(([category, documents]) =>
-                documents.map(document => ({ value: document, label: document, description: category }))
-            ),
-        []
-    );
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [uploadPrefill, setUploadPrefill] = useState<UploadPrefill>({});
 
     const checklistRows = useMemo<ClosureChecklistRow[]>(() => {
         const rowsByName = new Map((data ?? []).map(r => [r.documentName, r]));
@@ -84,30 +65,19 @@ export const ProjectClosureSection: React.FC<ProjectClosureSectionProps> = ({ pr
 
     const uploadedCount = useMemo(() => (data ?? []).length, [data]);
 
-    const onSubmit = handleSubmit(values => {
-        if (!values.documentName) {
-            toast.error("Please select a document type");
-            return;
-        }
-        if (files.length === 0) {
-            toast.error("Please upload at least one file");
-            return;
-        }
-        addMutation.mutate(
-            { documentName: values.documentName, files },
-            {
-                onSuccess: () => {
-                    setFiles([]);
-                    reset();
-                },
-            }
-        );
-    });
+    const openUploadDialog = useCallback((prefill: UploadPrefill = {}) => {
+        setUploadPrefill(prefill);
+        setDialogOpen(true);
+    }, []);
 
-    const handlePrefill = useCallback((row: ClosureChecklistRow) => {
-        setValue("documentName", row.documentName);
-        setFiles(row.row?.files ?? []);
-    }, [setValue]);
+    const handleDialogSubmit = useCallback(
+        (payload: { documentName: string; files: string[] }) => {
+            addMutation.mutate(payload, {
+                onSuccess: () => setDialogOpen(false),
+            });
+        },
+        [addMutation]
+    );
 
     const handleDelete = useCallback((row: ClosureChecklistRow) => {
         if (!row.row) return;
@@ -192,45 +162,8 @@ export const ProjectClosureSection: React.FC<ProjectClosureSectionProps> = ({ pr
                     <span className="text-sm">{formatDateTime(p.data?.row?.updatedAt)}</span>
                 ),
             },
-            {
-                headerName: "Actions",
-                filter: false,
-                sortable: false,
-                width: 150,
-                pinned: "right" as "right" | "left",
-                cellRenderer: (p: CustomCellRendererProps<ClosureChecklistRow>) => (
-                    <div className="flex items-center gap-1">
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-7"
-                                        onClick={() => handlePrefill(p.data!)}
-                                    >
-                                        <Upload className="h-3.5 w-3.5" />
-                                        Upload
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>{p.data?.row ? "Add more files" : "Upload files"}</TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                        {p.data?.row && (
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 text-destructive hover:text-destructive"
-                                onClick={() => handleDelete(p.data!)}
-                            >
-                                <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                        )}
-                    </div>
-                ),
-            },
         ],
-        [handlePrefill, handleDelete]
+        [openUploadDialog, handleDelete]
     );
 
     if (!projectId) return null;
@@ -259,40 +192,20 @@ export const ProjectClosureSection: React.FC<ProjectClosureSectionProps> = ({ pr
                             {uploadedCount} of {TOTAL_CLOSURE_DOCUMENTS} required documents uploaded
                         </CardDescription>
                     </div>
-                    <Badge variant={uploadedCount === TOTAL_CLOSURE_DOCUMENTS ? "success" : "secondary"}>
-                        {uploadedCount}/{TOTAL_CLOSURE_DOCUMENTS}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                        <Badge variant={uploadedCount === TOTAL_CLOSURE_DOCUMENTS ? "success" : "secondary"}>
+                            {uploadedCount}/{TOTAL_CLOSURE_DOCUMENTS}
+                        </Badge>
+                        <CardAction>
+                            <Button size="sm" variant="default" onClick={() => openUploadDialog()}>
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                Upload Documents
+                            </Button>
+                        </CardAction>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent className="space-y-4 pt-0">
-                <form onSubmit={onSubmit} className="rounded-lg border bg-muted/30">
-                    <div className="grid grid-cols-12 gap-4 p-4 items-start">
-                        <div className="col-span-12 md:col-span-4">
-                            <SelectField
-                                control={control}
-                                name="documentName"
-                                label="File Type Selector"
-                                options={documentOptions}
-                                placeholder="Select Required Document Name"
-                            />
-                        </div>
-                        <div className="col-span-12 md:col-span-6">
-                            <FileUploader
-                                context="project-closure"
-                                value={files}
-                                onChange={setFiles}
-                                label="Upload Files"
-                            />
-                        </div>
-                        <div className="col-span-12 md:col-span-2 md:pt-7">
-                            <Button type="submit" className="w-full gap-2" disabled={addMutation.isPending}>
-                                <Save className="h-4 w-4" />
-                                {addMutation.isPending ? "Saving..." : "Save"}
-                            </Button>
-                        </div>
-                    </div>
-                </form>
-
                 <DataTable
                     data={checklistRows}
                     columnDefs={columns}
@@ -301,6 +214,16 @@ export const ProjectClosureSection: React.FC<ProjectClosureSectionProps> = ({ pr
                     }}
                 />
             </CardContent>
+            <ProjectClosureUploadDialog
+                open={dialogOpen}
+                onOpenChange={setDialogOpen}
+                projectId={projectId}
+                initialDocumentName={uploadPrefill.documentName}
+                initialFiles={uploadPrefill.files}
+                documents={data ?? []}
+                isSubmitting={addMutation.isPending}
+                onSubmit={handleDialogSubmit}
+            />
         </Card>
     );
 };
