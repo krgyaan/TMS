@@ -3,12 +3,10 @@ import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { NumberInput } from "@/components/form/NumberInput";
 import { SelectField } from "@/components/form/SelectField";
-import { Combobox } from "@/components/form/SelectField";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,12 +17,13 @@ import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useProjectInventory } from "@/hooks/api/usePurchaseOrders";
 import { useCreateSaleInvoice, useWoBillingData } from "@/hooks/api/useSaleInvoices";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, ArrowLeft, Building2, ChevronDown, Copy, Eye, FileText, ListChecks, MapPin, Package, Plus, Trash2, Truck, Warehouse } from "lucide-react";
+import { AlertCircle, ArrowLeft, Building2, Copy, Eye, FileText, ListChecks, MapPin, Plus, Trash2, Truck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { AddAddressDialog } from "./components/AddAddressDialog";
+import { InventoryItemCombobox } from "./components/InventoryItemCombobox";
 import { SIFormPreview } from "./components/SIFormPreview";
 import { formatCurrency, formatDateForInput, mapSaleInvoiceFormToCreateDTO } from "./helpers/saleInvoice.mapper";
 import { saleInvoiceFormSchema, type SaleInvoiceFormValues } from "./helpers/saleInvoice.schema";
@@ -84,13 +83,11 @@ export default function CreateSaleInvoicePage() {
 
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
     const { data: woBillingData, isLoading: isWoDataLoading } = useWoBillingData(projectId);
-    const { data: inventoryData, isLoading: isInventoryLoading } = useProjectInventory(projectId);
+    const { data: inventoryData } = useProjectInventory(projectId);
     const createSIMutation = useCreateSaleInvoice();
 
     const [showPreview, setShowPreview] = useState(false);
-    const [selectedInventoryId, setSelectedInventoryId] = useState("");
     const [dispatchSameAsShipping, setDispatchSameAsShipping] = useState(false);
-    const [showReference, setShowReference] = useState(false);
 
     const [isBillingAddrOpen, setIsBillingAddrOpen] = useState(false);
     const [isShippingAddrOpen, setIsShippingAddrOpen] = useState(false);
@@ -145,15 +142,6 @@ export default function CreateSaleInvoicePage() {
         return { subtotal, totalGst, grandTotal: subtotal + totalGst };
     }, [items]);
 
-    const inventoryOptions = useMemo(
-        () =>
-            availableInventory.map((i) => ({
-                value: String(i.id),
-                label: `${i.description} — ${i.remainingQty - (addedQtyByProduct.get(i.id) || 0)} ${i.unit || "NOS"} left`,
-            })),
-        [availableInventory, addedQtyByProduct],
-    );
-
     const appendFromInventory = (item: ProjectInventoryItem) => {
         const remaining = remainingForItem(item);
         if (remaining <= 0) return;
@@ -166,13 +154,6 @@ export default function CreateSaleInvoicePage() {
             unit: item.unit || "NOS",
             hsnSac: item.hsnSac || undefined,
         } as any);
-    };
-
-    const handleAddSelected = () => {
-        if (!selectedInventoryId) return;
-        const item = inventoryItems.find((i) => String(i.id) === selectedInventoryId);
-        if (item) appendFromInventory(item);
-        setSelectedInventoryId("");
     };
 
     const handleAddAll = () => {
@@ -315,17 +296,7 @@ export default function CreateSaleInvoicePage() {
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle>Request for Sale Invoice (OE)</CardTitle>
-                        <CardDescription className="mt-2">
-                            <div className="flex items-center gap-3">
-                                <Badge variant="outline">
-                                    {overview?.tender?.tenderNumber || "N/A"}
-                                </Badge>
-                                <Badge variant="secondary">
-                                    {overview?.project?.projectName || "N/A"}
-                                </Badge>
-                            </div>
-                        </CardDescription>
+                        <CardTitle>Request for Sale Invoice</CardTitle>
                     </div>
                     <CardAction>
                         <Button variant="outline" size="sm" type="button" onClick={() => navigate(-1)} className="flex items-center space-x-2">
@@ -338,99 +309,6 @@ export default function CreateSaleInvoicePage() {
             <CardContent className="space-y-8">
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)}>
-                        {/* Reference panels: BOQ + PO Inventory */}
-                        <Collapsible open={showReference} onOpenChange={setShowReference} className="mb-6">
-                            <div className="rounded-md border">
-                                <CollapsibleTrigger asChild>
-                                    <button type="button" className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-muted/30">
-                                        <span className="text-sm font-semibold flex items-center gap-2">
-                                            <ListChecks className="h-4 w-4" />
-                                            Show Work Order Line Items & PO Inventory
-                                        </span>
-                                        <ChevronDown className={`h-4 w-4 transition-transform ${showReference ? "rotate-180" : ""}`} />
-                                    </button>
-                                </CollapsibleTrigger>
-                                <CollapsibleContent>
-                                    <div className="px-4 pb-4 space-y-4">
-                                        <div>
-                                            <h4 className="text-sm font-medium mb-2 flex items-center gap-1.5">
-                                                <Package className="h-4 w-4 text-orange-500" /> WO Billing BOQ Line Items
-                                            </h4>
-                                            <Table className="border rounded">
-                                                <TableHeader>
-                                                    <TableRow className="bg-muted/50">
-                                                        <TableHead className="w-16">Sr</TableHead>
-                                                        <TableHead>Description</TableHead>
-                                                        <TableHead className="text-right">Qty</TableHead>
-                                                        <TableHead className="text-right">Rate</TableHead>
-                                                        <TableHead className="text-right">Amount</TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {(woBillingData?.billingBoq ?? []).map((item: any, idx: number) => (
-                                                        <TableRow key={idx}>
-                                                            <TableCell>{item.srNo ?? idx + 1}</TableCell>
-                                                            <TableCell className="whitespace-normal [overflow-wrap:anywhere]">{item.itemDescription}</TableCell>
-                                                            <TableCell className="text-right">{item.quantity}</TableCell>
-                                                            <TableCell className="text-right">{formatCurrency(Number(item.rate || 0))}</TableCell>
-                                                            <TableCell className="text-right">{formatCurrency(Number(item.amount || 0))}</TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                    {(woBillingData?.billingBoq ?? []).length === 0 && (
-                                                        <TableRow>
-                                                            <TableCell colSpan={5} className="text-center py-4 text-muted-foreground italic">No BOQ line items</TableCell>
-                                                        </TableRow>
-                                                    )}
-                                                </TableBody>
-                                            </Table>
-                                        </div>
-                                        <div>
-                                            <h4 className="text-sm font-medium mb-2 flex items-center gap-1.5">
-                                                <Warehouse className="h-4 w-4 text-emerald-500" /> PO Items (from Approved POs)
-                                            </h4>
-                                            {isInventoryLoading ? (
-                                                <Skeleton className="h-32 w-full rounded-lg" />
-                                            ) : (
-                                                <Table className="border rounded">
-                                                    <TableHeader>
-                                                        <TableRow className="bg-muted/50">
-                                                            <TableHead className="w-16">Sr</TableHead>
-                                                            <TableHead>Description</TableHead>
-                                                            <TableHead>PO No.</TableHead>
-                                                            <TableHead className="text-right">Qty</TableHead>
-                                                            <TableHead>Unit</TableHead>
-                                                            <TableHead className="text-right">Rate</TableHead>
-                                                            <TableHead className="text-right">Invoiced</TableHead>
-                                                            <TableHead className="text-right">Remaining</TableHead>
-                                                        </TableRow>
-                                                    </TableHeader>
-                                                    <TableBody>
-                                                        {(inventoryData?.items ?? []).map((item: ProjectInventoryItem, idx: number) => (
-                                                            <TableRow key={item.id}>
-                                                                <TableCell>{idx + 1}</TableCell>
-                                                                <TableCell className="whitespace-normal [overflow-wrap:anywhere]">{item.description}</TableCell>
-                                                                <TableCell><Badge variant="outline" className="font-mono text-xs">{item.poNumber}</Badge></TableCell>
-                                                                <TableCell className="text-right">{item.qty}</TableCell>
-                                                                <TableCell>{item.unit || "NOS"}</TableCell>
-                                                                <TableCell className="text-right">{formatCurrency(item.rate)}</TableCell>
-                                                                <TableCell className="text-right">{item.invoicedQty}</TableCell>
-                                                                <TableCell className={`text-right font-medium ${item.remainingQty <= 0 ? "text-destructive" : ""}`}>{item.remainingQty}</TableCell>
-                                                            </TableRow>
-                                                        ))}
-                                                        {(inventoryData?.items ?? []).length === 0 && (
-                                                            <TableRow>
-                                                                <TableCell colSpan={8} className="text-center py-4 text-muted-foreground italic">No items from approved POs yet</TableCell>
-                                                            </TableRow>
-                                                        )}
-                                                    </TableBody>
-                                                </Table>
-                                            )}
-                                        </div>
-                                    </div>
-                                </CollapsibleContent>
-                            </div>
-                        </Collapsible>
-
                         <FieldWrapper control={form.control} name="invoiceDate" label={<>Invoice Date <span className="text-destructive">*</span></>}>
                             {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                         </FieldWrapper>
@@ -446,7 +324,7 @@ export default function CreateSaleInvoicePage() {
                                         </Badge>
                                     </h4>
                                     <p className="text-sm text-muted-foreground">
-                                        Select items from project inventory (approved POs). Each item can be added only once per invoice.
+                                        Click an item below to add it to the invoice instantly. Items can be added only once per invoice.
                                     </p>
                                 </div>
                             </div>
@@ -454,18 +332,12 @@ export default function CreateSaleInvoicePage() {
                             <div className="flex flex-wrap items-end gap-3 rounded-md border p-3 bg-muted/30">
                                 <div className="min-w-[320px] flex-1 space-y-1.5">
                                     <label className="text-sm font-medium">Select line item from PO inventory</label>
-                                    <Combobox
-                                        value={selectedInventoryId}
-                                        onChange={setSelectedInventoryId}
-                                        options={inventoryOptions}
-                                        placeholder={availableInventory.length > 0 ? "Choose an item..." : "No items available"}
+                                    <InventoryItemCombobox
+                                        items={availableInventory}
+                                        onSelect={(item) => appendFromInventory(item)}
                                         disabled={availableInventory.length === 0}
                                     />
                                 </div>
-                                <Button type="button" variant="secondary" size="sm" onClick={handleAddSelected} disabled={!selectedInventoryId}>
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Add Item
-                                </Button>
                                 <Button type="button" variant="outline" size="sm" onClick={handleAddAll} disabled={availableInventory.length === 0}>
                                     <ListChecks className="mr-2 h-4 w-4" />
                                     Add All
