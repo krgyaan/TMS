@@ -87,7 +87,7 @@ export const ProjectClosureUploadDialog: React.FC<ProjectClosureUploadDialogProp
                         <SelectField
                             control={control}
                             name="documentName"
-                            label="File Type Selector"
+                            label="File Type"
                             options={documentOptions}
                             placeholder="Select Required Document Name"
                         />

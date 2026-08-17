@@ -1,4 +1,3 @@
-import { parseFileMeta } from "@/components/file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -127,18 +126,23 @@ export const ProjectClosureSection: React.FC<ProjectClosureSectionProps> = ({ pr
                     const files = p.data?.row?.files ?? [];
                     if (files.length === 0) return <span className="text-muted-foreground text-sm">—</span>;
                     return (
-                        <div className="flex flex-col gap-0.5">
-                            {files.map(filePath => (
-                                <a
-                                    key={filePath}
-                                    href={fileUploadService.getFileUrl(filePath)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-1.5 text-sm text-primary hover:underline truncate"
-                                >
-                                    <FileText className="h-3.5 w-3.5 shrink-0" />
-                                    {parseFileMeta(filePath).displayName}
-                                </a>
+                        <div className="flex flex-wrap gap-1.5">
+                            {files.map((filePath, index) => (
+                                <span key={filePath}>
+                                    <a
+                                        href={fileUploadService.getFileUrl(filePath)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        <Badge
+                                            variant="secondary"
+                                            className="gap-1 cursor-pointer hover:bg-primary/20"
+                                        >
+                                            <FileText className="h-3 w-3" />
+                                            file-{index + 1}
+                                        </Badge>
+                                    </a>
+                                </span>
                             ))}
                         </div>
                     );
@@ -161,7 +165,7 @@ export const ProjectClosureSection: React.FC<ProjectClosureSectionProps> = ({ pr
                 cellRenderer: (p: CustomCellRendererProps<ClosureChecklistRow>) => (
                     <span className="text-sm">{formatDateTime(p.data?.row?.updatedAt)}</span>
                 ),
-            },
+            }
         ],
         [openUploadDialog, handleDelete]
     );
