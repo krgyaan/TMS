@@ -6,6 +6,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { EmployeeImprestsSection } from "./sections/EmployeeImprestsSection";
 import { PaymentRequestsSection } from "./sections/PaymentRequestsSection";
+import { ProjectClosureSection } from "./sections/ProjectClosureSection";
 import { ProjectOverviewSection } from "./sections/ProjectOverviewSection";
 import { ProjectSummarySheetSection } from "./sections/ProjectSummarySheetSection";
 import { PurchaseInvoicesSection } from "./sections/PurchaseInvoicesSection";
@@ -58,6 +59,7 @@ export default function ProjectDashboardPage() {
             <PurchaseInvoicesSection projectId={projectId} />
             <PaymentRequestsSection projectId={projectId} />
             <EmployeeImprestsSection projectId={projectId} />
+            <ProjectClosureSection projectId={projectId} />
         </div>
     );
 }

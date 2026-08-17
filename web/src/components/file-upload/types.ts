@@ -27,7 +27,7 @@ export const KNOWN_CONTEXTS = [
     'cheque-positive-pay-confirmation',
     // operations
     'mcaClosure', 'wo-draft', 'wo-signed-copy', 'final-wo', 'detailed-wo',
-    'kickoff-mom', 'contract-agreement', 'payment-proof',
+    'kickoff-mom', 'contract-agreement', 'payment-proof', 'project-closure',
     // services
     'amc-po', 'amc-service-report', 'amc-invoices', 'amc-receipts',
     'amc-service-reports', 'customer-attachments',
