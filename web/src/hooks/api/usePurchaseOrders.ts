@@ -7,6 +7,15 @@ export const purchaseOrderKeys = {
     poParties: () => [...purchaseOrderKeys.all, "po-parties"] as const,
     purchaseOrder: (id: number) => [...purchaseOrderKeys.all, "purchase-order", id] as const,
     projectPurchaseOrders: (projectId: number) => [...purchaseOrderKeys.all, "project", projectId] as const,
+    projectInventory: (projectId: number) => [...purchaseOrderKeys.all, "project-inventory", projectId] as const,
+};
+
+export const useProjectInventory = (projectId: number | null) => {
+    return useQuery({
+        queryKey: purchaseOrderKeys.projectInventory(projectId!),
+        queryFn: () => purchaseOrderApi.getProjectInventory(projectId!),
+        enabled: !!projectId,
+    });
 };
 
 export const useProjectPurchaseOrders = (projectId: number) => {

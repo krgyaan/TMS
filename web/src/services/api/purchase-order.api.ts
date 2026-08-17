@@ -17,6 +17,10 @@ class PurchaseOrderApiService extends BaseApiService {
         return this.get(`/project/${projectId}`);
     }
 
+    async getProjectInventory(projectId: number): Promise<{ items: any[] }> {
+        return this.get(`/project/${projectId}/inventory`);
+    }
+
     async getPoParties(): Promise<any> {
         return this.get('/parties');
     }

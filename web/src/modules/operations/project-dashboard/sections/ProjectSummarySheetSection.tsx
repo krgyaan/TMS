@@ -3,10 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ChevronDown, MapPin, Package, Receipt, Truck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ChevronDown, MapPin, Package, Receipt, Truck, Warehouse } from "lucide-react";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useWoDetailByBasicDetail, useWoDetailWithRelations } from "@/hooks/api/useWoDetails";
+import { useProjectInventory } from "@/hooks/api/usePurchaseOrders";
+import type { ProjectInventoryItem } from "@/modules/operations/sale-invoices/helpers/saleInvoice.types";
 
 interface ProjectSummarySheetSectionProps {
     projectId: number | null;
@@ -92,6 +95,63 @@ function AddressCard({ address }: { address: { customerName: string; address: st
     );
 }
 
+function InventoryTable({ items }: { items: ProjectInventoryItem[] }) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                    <Warehouse className="h-4 w-4 text-emerald-500" />
+                    Project Inventory (from Approved POs)
+                </CardTitle>
+                <CardDescription>Items purchased through approved POs. Invoiced qty is tracked from sale invoices.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow className="bg-muted/50">
+                            <TableHead className="w-16">Sr. No.</TableHead>
+                            <TableHead>Item Description</TableHead>
+                            <TableHead>PO Number</TableHead>
+                            <TableHead>Unit</TableHead>
+                            <TableHead className="text-right">PO Qty</TableHead>
+                            <TableHead className="text-right">Rate</TableHead>
+                            <TableHead className="text-right">Invoiced Qty</TableHead>
+                            <TableHead className="text-right">Remaining Qty</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {items.map((item, idx) => (
+                            <TableRow key={item.id} className="hover:bg-muted/30 transition-colors">
+                                <TableCell>{idx + 1}</TableCell>
+                                <TableCell>{item.description}</TableCell>
+                                <TableCell>
+                                    <Badge variant="outline" className="font-mono text-xs">
+                                        {item.poNumber}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>{item.unit || "NOS"}</TableCell>
+                                <TableCell className="text-right">{item.qty}</TableCell>
+                                <TableCell className="text-right">{formatINR(item.rate)}</TableCell>
+                                <TableCell className="text-right">{item.invoicedQty}</TableCell>
+                                <TableCell className={`text-right font-semibold ${item.remainingQty <= 0 ? "text-destructive" : item.remainingQty < item.qty ? "text-amber-600" : ""}`}>
+                                    {item.remainingQty}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                        {items.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={8} className="text-center py-6 text-muted-foreground italic">
+                                    No items from approved POs yet
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
+}
+
 export const ProjectSummarySheetSection: React.FC<ProjectSummarySheetSectionProps> = ({ projectId }) => {
     const [isOpen, setIsOpen] = useState(false);
 
@@ -102,6 +162,8 @@ export const ProjectSummarySheetSection: React.FC<ProjectSummarySheetSectionProp
     const woDetailId = woDetailLookup?.id ?? null;
 
     const { data: woDetail, isLoading: isDetailLoading } = useWoDetailWithRelations(woDetailId ?? 0);
+
+    const { data: inventoryData, isLoading: isInventoryLoading } = useProjectInventory(projectId);
 
     const isLoading = isOverviewLoading || isLookupLoading || isDetailLoading;
 
@@ -167,6 +229,13 @@ export const ProjectSummarySheetSection: React.FC<ProjectSummarySheetSectionProp
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                     <CardContent className="space-y-6 pt-0">
+                {/* Project Inventory (from Approved POs) */}
+                {isInventoryLoading ? (
+                    <Skeleton className="h-40 w-full rounded-lg" />
+                ) : (
+                    <InventoryTable items={inventoryData?.items ?? []} />
+                )}
+
                 {/* Billing BOQ */}
                 <BoqTable
                     title="Billing BOQ"
