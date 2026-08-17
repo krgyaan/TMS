@@ -1,4 +1,5 @@
-import { bigint, bigserial, date, integer, jsonb, numeric, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { bigint, bigserial, date, index, integer, jsonb, numeric, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { purchaseOrderProducts } from "./purchase-order-products.schema";
 
 export const saleInvoices = pgTable("sale_invoices", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
@@ -17,6 +18,15 @@ export const saleInvoices = pgTable("sale_invoices", {
     shippingCustomerName: varchar("shipping_customer_name", { length: 255 }),
     shippingAddress: text("shipping_address"),
     shippingGst: varchar("shipping_gst", { length: 15 }),
+
+    dispatchFromName: varchar("dispatch_from_name", { length: 255 }),
+    dispatchFromAddress: text("dispatch_from_address"),
+    dispatchFromGst: varchar("dispatch_from_gst", { length: 15 }),
+    dispatchVehicleNo: varchar("dispatch_vehicle_no", { length: 50 }),
+    dispatchLrNo: varchar("dispatch_lr_no", { length: 100 }),
+    dispatchToName: varchar("dispatch_to_name", { length: 255 }),
+    dispatchToAddress: text("dispatch_to_address"),
+    dispatchToGst: varchar("dispatch_to_gst", { length: 15 }),
 
     totalPreGst: numeric("total_pre_gst", { precision: 20, scale: 2 }),
     totalGst: numeric("total_gst", { precision: 20, scale: 2 }),
@@ -64,6 +74,12 @@ export const saleInvoices = pgTable("sale_invoices", {
     team: bigint("team", { mode: "number" }),
     remarks: text("remarks"),
 
+    approvedBy: bigint("approved_by", { mode: "number" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    changesRemark: text("changes_remark"),
+
+    generatedPdfVersions: jsonb("generated_pdf_versions").notNull().default({}),
+
     actionLogs: jsonb("action_logs").$type<ActionLogEntry[]>().default([]),
 
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -74,6 +90,10 @@ export const saleInvoiceItems = pgTable("sale_invoice_items", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     saleInvoiceId: bigint("sale_invoice_id", { mode: "number" }).notNull()
         .references(() => saleInvoices.id, { onDelete: "cascade" }),
+    purchaseOrderProductId: bigint("purchase_order_product_id", { mode: "number" })
+        .references(() => purchaseOrderProducts.id, { onDelete: "set null" }),
+    unit: varchar("unit", { length: 20 }),
+    hsnSac: varchar("hsn_sac", { length: 100 }),
 
     srNo: integer("sr_no"),
     itemDescription: text("item_description"),
@@ -86,8 +106,10 @@ export const saleInvoiceItems = pgTable("sale_invoice_items", {
 
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
+},
+(table) => ([{
+    siiPoProductIdx: index("idx_sii_purchase_order_product_id").on(table.purchaseOrderProductId),
+}]));
 export type SaleInvoice = typeof saleInvoices.$inferSelect;
 export type NewSaleInvoice = typeof saleInvoices.$inferInsert;
 export type SaleInvoiceItem = typeof saleInvoiceItems.$inferSelect;
