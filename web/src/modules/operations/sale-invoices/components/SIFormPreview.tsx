@@ -75,6 +75,18 @@ export function SIFormPreview({
                         {formValues.billingGst && (
                             <p className="text-sm font-mono">GST: {formValues.billingGst}</p>
                         )}
+                        {formValues.billingEmail && (
+                            <p className="text-sm">Email: {formValues.billingEmail}</p>
+                        )}
+                        {formValues.billingPanNo && (
+                            <p className="text-sm font-mono">PAN: {formValues.billingPanNo}</p>
+                        )}
+                        {formValues.billingMsmeNo && (
+                            <p className="text-sm font-mono">MSME: {formValues.billingMsmeNo}</p>
+                        )}
+                        {formValues.billingCinNo && (
+                            <p className="text-sm font-mono">CIN: {formValues.billingCinNo}</p>
+                        )}
                     </div>
                     <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
@@ -85,6 +97,9 @@ export function SIFormPreview({
                         <p className="text-sm text-muted-foreground whitespace-pre-wrap">{formValues.shippingAddress}</p>
                         {formValues.shippingGst && (
                             <p className="text-sm font-mono">GST: {formValues.shippingGst}</p>
+                        )}
+                        {formValues.shippingPanNo && (
+                            <p className="text-sm font-mono">PAN: {formValues.shippingPanNo}</p>
                         )}
                     </div>
                 </div>

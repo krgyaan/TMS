@@ -14,31 +14,38 @@ import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, Table
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
-import { useProjectInventory } from "@/hooks/api/usePurchaseOrders";
+import { usePoParties, useCreatePoParty, useProjectInventory } from "@/hooks/api/usePurchaseOrders";
 import { useCreateSaleInvoice, useWoBillingData } from "@/hooks/api/useSaleInvoices";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, ArrowLeft, Building2, Copy, Eye, FileText, ListChecks, MapPin, Plus, Trash2, Truck } from "lucide-react";
+import { AlertCircle, ArrowLeft, Building2, Copy, Eye, FileText, ListChecks, Mail, MapPin, Trash2, Truck, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { AddAddressDialog } from "./components/AddAddressDialog";
 import { InventoryItemCombobox } from "./components/InventoryItemCombobox";
 import { SIFormPreview } from "./components/SIFormPreview";
 import { formatCurrency, formatDateForInput, mapSaleInvoiceFormToCreateDTO } from "./helpers/saleInvoice.mapper";
 import { saleInvoiceFormSchema, type SaleInvoiceFormValues } from "./helpers/saleInvoice.schema";
-import type { ProjectInventoryItem, WoBillingAddress, WoShippingAddress } from "./helpers/saleInvoice.types";
+import type { ProjectInventoryItem } from "./helpers/saleInvoice.types";
+import { PartyFormDialog, type CreatePartyPayload } from "@/modules/operations/vendor-master/PartyFormDialog";
 
 const defaultFormValues: SaleInvoiceFormValues = {
     invoiceDate: formatDateForInput(new Date()),
     billingCustomerName: "",
     billingAddress: "",
     billingGst: "",
+    billingEmail: "",
+    billingPanNo: "",
+    billingMsmeNo: "",
+    billingCinNo: "",
     shippingCustomerName: "",
     shippingAddress: "",
     shippingGst: "",
+    shippingPanNo: "",
     selectedBillingAddressId: "",
     selectedShippingAddressId: "",
+    sellerId: "",
+    partyId: "",
     dispatchFromName: "",
     dispatchFromAddress: "",
     dispatchFromGst: "",
@@ -84,15 +91,17 @@ export default function CreateSaleInvoicePage() {
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
     const { data: woBillingData, isLoading: isWoDataLoading } = useWoBillingData(projectId);
     const { data: inventoryData } = useProjectInventory(projectId);
+    const { data: partiesData } = usePoParties();
+    const createPartyMutation = useCreatePoParty();
     const createSIMutation = useCreateSaleInvoice();
+
+    const parties = partiesData || [];
+    const [partyCreationType, setPartyCreationType] = useState<"seller" | "ship_to">("seller");
+    const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
+    const [isShipToPartyOpen, setIsShipToPartyOpen] = useState(false);
 
     const [showPreview, setShowPreview] = useState(false);
     const [dispatchSameAsShipping, setDispatchSameAsShipping] = useState(false);
-
-    const [isBillingAddrOpen, setIsBillingAddrOpen] = useState(false);
-    const [isShippingAddrOpen, setIsShippingAddrOpen] = useState(false);
-    const [newBillingAddr, setNewBillingAddr] = useState({ customerName: "", address: "", gst: "" });
-    const [newShippingAddr, setNewShippingAddr] = useState({ customerName: "", address: "", gst: "" });
 
     const form = useForm<SaleInvoiceFormValues>({
         resolver: zodResolver(saleInvoiceFormSchema) as any,
@@ -167,50 +176,42 @@ export default function CreateSaleInvoicePage() {
 
     const itemRow = (index: number) => items[index] ?? {};
 
-    const billingAddressOptions = useMemo(() => {
-        return (woBillingData?.billingAddresses || []).map((addr: WoBillingAddress) => ({
-            label: addr.customerName,
-            value: String(addr.id),
-            address: addr.address,
-            gst: addr.gst || "",
-        }));
-    }, [woBillingData]);
+    const sellerOptions = useMemo(() => [
+        ...(parties || [])
+            .filter((p: any) => !p.type || p.type === "seller")
+            .map((p: any) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
+    ], [parties]);
 
-    const shippingAddressOptions = useMemo(() => {
-        return (woBillingData?.shippingAddresses || []).map((addr: WoShippingAddress) => ({
-            label: addr.customerName,
-            value: String(addr.id),
-            address: addr.address,
-            gst: addr.gst || "",
-        }));
-    }, [woBillingData]);
+    const partyOptions = useMemo(() => [
+        ...(parties || [])
+            .filter((p: any) => p.type === "ship_to")
+            .map((p: any) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
+    ], [parties]);
 
-    const selectedBillingId = form.watch("selectedBillingAddressId");
-    const selectedShippingId = form.watch("selectedShippingAddressId");
+    const selectedSellerId = form.watch("sellerId");
+    const selectedPartyId = form.watch("partyId");
 
     useEffect(() => {
-        if (!selectedBillingId) return;
-        const addr = (woBillingData?.billingAddresses || []).find(
-            (a: WoBillingAddress) => String(a.id) === selectedBillingId
-        );
-        if (addr) {
-            form.setValue("billingCustomerName", addr.customerName);
-            form.setValue("billingAddress", addr.address);
-            form.setValue("billingGst", addr.gst || "");
-        }
-    }, [selectedBillingId, woBillingData, form]);
+        if (!selectedSellerId) return;
+        const party = parties.find((p: any) => String(p.id) === selectedSellerId);
+        if (!party) return;
+        form.setValue("billingCustomerName", party.name || "");
+        form.setValue("billingAddress", party.address || "");
+        form.setValue("billingGst", party.gstNo || "");
+        form.setValue("billingEmail", party.email || "");
+        form.setValue("billingPanNo", party.pan || "");
+        form.setValue("billingMsmeNo", party.msme || "");
+    }, [selectedSellerId, parties, form]);
 
     useEffect(() => {
-        if (!selectedShippingId) return;
-        const addr = (woBillingData?.shippingAddresses || []).find(
-            (a: WoShippingAddress) => String(a.id) === selectedShippingId
-        );
-        if (addr) {
-            form.setValue("shippingCustomerName", addr.customerName);
-            form.setValue("shippingAddress", addr.address);
-            form.setValue("shippingGst", addr.gst || "");
-        }
-    }, [selectedShippingId, woBillingData, form]);
+        if (!selectedPartyId) return;
+        const party = parties.find((p: any) => String(p.id) === selectedPartyId);
+        if (!party) return;
+        form.setValue("shippingCustomerName", party.name || "");
+        form.setValue("shippingAddress", party.address || "");
+        form.setValue("shippingGst", party.gstNo || "");
+        form.setValue("shippingPanNo", party.pan || "");
+    }, [selectedPartyId, parties, form]);
 
     const handleDispatchSameAsShipping = (checked: boolean) => {
         setDispatchSameAsShipping(checked);
@@ -221,30 +222,30 @@ export default function CreateSaleInvoicePage() {
         }
     };
 
-    const handleAddBillingAddress = () => {
-        if (!newBillingAddr.customerName.trim() || !newBillingAddr.address.trim()) {
-            toast.error("Customer name and address are required");
+    const handleAddNewParty = async (partyData: CreatePartyPayload) => {
+        if (!partyData.name.trim()) {
+            toast.error("Party name is required");
             return;
         }
-        form.setValue("billingCustomerName", newBillingAddr.customerName);
-        form.setValue("billingAddress", newBillingAddr.address);
-        form.setValue("billingGst", newBillingAddr.gst);
-        setNewBillingAddr({ customerName: "", address: "", gst: "" });
-        setIsBillingAddrOpen(false);
-        toast.success("Billing address added");
-    };
-
-    const handleAddShippingAddress = () => {
-        if (!newShippingAddr.customerName.trim() || !newShippingAddr.address.trim()) {
-            toast.error("Customer name and address are required");
-            return;
+        try {
+            await createPartyMutation.mutateAsync({
+                name: partyData.name,
+                alias: partyData.alias || undefined,
+                email: partyData.email || undefined,
+                address: partyData.address || undefined,
+                gstNo: partyData.gstNo || undefined,
+                pan: partyData.pan || undefined,
+                msme: partyData.msme || undefined,
+                type: partyCreationType,
+                contact_person: partyData.contact_person || undefined,
+                mobile_number: partyData.mobile_number || undefined,
+            });
+            toast.success(`Party "${partyData.name}" has been added successfully.`);
+            setIsAddPartyOpen(false);
+            setIsShipToPartyOpen(false);
+        } catch (error: any) {
+            toast.error(error?.message || "Failed to add party. Please try again.");
         }
-        form.setValue("shippingCustomerName", newShippingAddr.customerName);
-        form.setValue("shippingAddress", newShippingAddr.address);
-        form.setValue("shippingGst", newShippingAddr.gst);
-        setNewShippingAddr({ customerName: "", address: "", gst: "" });
-        setIsShippingAddrOpen(false);
-        toast.success("Shipping address added");
     };
 
     const handlePreview = async () => {
@@ -532,100 +533,153 @@ export default function CreateSaleInvoicePage() {
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-semibold flex items-center gap-2">
                                         <Building2 className="h-5 w-5" />
-                                        Billing Address
+                                        Billing Party
                                     </h3>
+                                    <Button variant="outline" size="sm" type="button" onClick={() => { setPartyCreationType("seller"); setIsAddPartyOpen(true); }}>
+                                        <UserPlus className="mr-2 h-4 w-4" />
+                                        Add New Billing Party
+                                    </Button>
                                 </div>
-                                <p className="text-sm text-muted-foreground mb-4">Billing address from work order</p>
-                                <div className="mb-4">
+                                <PartyFormDialog
+                                    title="Add New Billing Party"
+                                    description="Add a new party to use as the billing party."
+                                    open={isAddPartyOpen}
+                                    onOpenChange={(open) => { setIsAddPartyOpen(open); if (open) setPartyCreationType("seller"); }}
+                                    onSubmit={handleAddNewParty}
+                                    isLoading={createPartyMutation.isPending}
+                                />
+                                <p className="text-sm text-muted-foreground mb-4">Select or enter the billing party details</p>
+                                <div className="mb-6">
                                     <SelectField
                                         control={form.control}
-                                        name="selectedBillingAddressId"
-                                        label="Select Existing Billing Address"
-                                        options={billingAddressOptions}
-                                        placeholder="Choose billing address..."
+                                        name="sellerId"
+                                        label="Select Billing Party"
+                                        options={sellerOptions}
+                                        placeholder="Choose a billing party..."
                                     />
                                 </div>
-                                <div className="space-y-4">
-                                    <FieldWrapper control={form.control} name="billingCustomerName" label={<><Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Customer Name <span className="text-destructive">*</span></>}>
-                                        {(field) => <Input {...field} placeholder="Enter customer name" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="billingAddress" label={<><MapPin className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Address <span className="text-destructive">*</span></>}>
-                                        {(field) => <Textarea {...field} placeholder="Enter billing address" rows={3} />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="billingGst" label="GST Number">
-                                        {(field) => (
-                                            <Input
-                                                {...field}
-                                                placeholder="e.g. 27ABCDE1234F1Z5"
-                                                className="font-mono"
-                                                maxLength={15}
-                                                onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                    <Button type="button" variant="outline" size="sm" onClick={() => setIsBillingAddrOpen(true)}>
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Add New Billing Address
-                                    </Button>
-                                    <AddAddressDialog
-                                        open={isBillingAddrOpen}
-                                        onOpenChange={setIsBillingAddrOpen}
-                                        address={newBillingAddr}
-                                        setAddress={setNewBillingAddr}
-                                        onSubmit={handleAddBillingAddress}
-                                        title="Add New Billing Address"
-                                    />
-                                </div>
+                                {selectedSellerId && selectedSellerId !== "" && (
+                                    <div className="space-y-4">
+                                        <FieldWrapper control={form.control} name="billingCustomerName" label={<><Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Customer Name <span className="text-destructive">*</span></>}>
+                                            {(field) => <Input {...field} placeholder="Enter customer name" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="billingAddress" label={<><MapPin className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Address <span className="text-destructive">*</span></>}>
+                                            {(field) => <Textarea {...field} placeholder="Enter billing address" rows={3} />}
+                                        </FieldWrapper>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <FieldWrapper control={form.control} name="billingGst" label="GST Number">
+                                                {(field) => (
+                                                    <Input
+                                                        {...field}
+                                                        placeholder="e.g. 27ABCDE1234F1Z5"
+                                                        className="font-mono"
+                                                        maxLength={15}
+                                                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="billingEmail" label={<><Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Email</>}>
+                                                {(field) => <Input {...field} type="email" placeholder="billing@example.com" />}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="billingPanNo" label="PAN Number">
+                                                {(field) => (
+                                                    <Input
+                                                        {...field}
+                                                        placeholder="e.g. ABCDE1234F"
+                                                        className="font-mono"
+                                                        maxLength={10}
+                                                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="billingMsmeNo" label="MSME Number">
+                                                {(field) => (
+                                                    <Input
+                                                        {...field}
+                                                        placeholder="e.g. UDYAM-XX-00-0000000"
+                                                        className="font-mono"
+                                                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="billingCinNo" label={<><Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />CIN Number</>}>
+                                                {(field) => (
+                                                    <Input
+                                                        {...field}
+                                                        placeholder="e.g. U74999KA2020PTC123456"
+                                                        className="font-mono"
+                                                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="border rounded-lg border-sidebar-primary-foreground border-dashed p-4 w-full md:w-1/2">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-semibold flex items-center gap-2">
                                         <MapPin className="h-5 w-5" />
-                                        Shipping Address
+                                        Ship To Details
                                     </h3>
+                                    <Button variant="outline" size="sm" type="button" onClick={() => { setPartyCreationType("ship_to"); setIsShipToPartyOpen(true); }}>
+                                        <UserPlus className="mr-2 h-4 w-4" />
+                                        Add New Ship To
+                                    </Button>
                                 </div>
-                                <p className="text-sm text-muted-foreground mb-4">Shipping address from work order</p>
-                                <div className="mb-4">
+                                <PartyFormDialog
+                                    title="Add New Ship To"
+                                    description="Add a new party to use as a shipping destination."
+                                    open={isShipToPartyOpen}
+                                    onOpenChange={(open) => { setIsShipToPartyOpen(open); if (open) setPartyCreationType("ship_to"); }}
+                                    onSubmit={handleAddNewParty}
+                                    isLoading={createPartyMutation.isPending}
+                                />
+                                <p className="text-sm text-muted-foreground mb-4">Delivery destination information</p>
+                                <div className="mb-6">
                                     <SelectField
                                         control={form.control}
-                                        name="selectedShippingAddressId"
-                                        label="Select Existing Shipping Address"
-                                        options={shippingAddressOptions}
-                                        placeholder="Choose shipping address..."
+                                        name="partyId"
+                                        label="Select Shipping Destination"
+                                        options={partyOptions}
+                                        placeholder="Choose shipping destination..."
                                     />
                                 </div>
-                                <div className="space-y-4">
-                                    <FieldWrapper control={form.control} name="shippingCustomerName" label={<><Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Customer Name <span className="text-destructive">*</span></>}>
-                                        {(field) => <Input {...field} placeholder="Enter customer name" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="shippingAddress" label={<><MapPin className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Address <span className="text-destructive">*</span></>}>
-                                        {(field) => <Textarea {...field} placeholder="Enter shipping address" rows={3} />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="shippingGst" label="GST Number">
-                                        {(field) => (
-                                            <Input
-                                                {...field}
-                                                placeholder="e.g. 27ABCDE1234F1Z5"
-                                                className="font-mono"
-                                                maxLength={15}
-                                                onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                    <Button type="button" variant="outline" size="sm" onClick={() => setIsShippingAddrOpen(true)}>
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Add New Shipping Address
-                                    </Button>
-                                    <AddAddressDialog
-                                        open={isShippingAddrOpen}
-                                        onOpenChange={setIsShippingAddrOpen}
-                                        address={newShippingAddr}
-                                        setAddress={setNewShippingAddr}
-                                        onSubmit={handleAddShippingAddress}
-                                        title="Add New Shipping Address"
-                                    />
-                                </div>
+                                {selectedPartyId && selectedPartyId !== "" && (
+                                    <div className="space-y-4">
+                                        <FieldWrapper control={form.control} name="shippingCustomerName" label={<><Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Customer Name <span className="text-destructive">*</span></>}>
+                                            {(field) => <Input {...field} placeholder="Enter customer name" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="shippingAddress" label={<><MapPin className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Address <span className="text-destructive">*</span></>}>
+                                            {(field) => <Textarea {...field} placeholder="Enter shipping address" rows={3} />}
+                                        </FieldWrapper>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <FieldWrapper control={form.control} name="shippingGst" label="GST Number">
+                                                {(field) => (
+                                                    <Input
+                                                        {...field}
+                                                        placeholder="e.g. 27ABCDE1234F1Z5"
+                                                        className="font-mono"
+                                                        maxLength={15}
+                                                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="shippingPanNo" label="PAN Number">
+                                                {(field) => (
+                                                    <Input
+                                                        {...field}
+                                                        placeholder="e.g. ABCDE1234F"
+                                                        className="font-mono"
+                                                        maxLength={10}
+                                                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

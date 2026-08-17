@@ -228,6 +228,18 @@ const ViewSaleInvoicePage = () => {
                                     <TableCell className="text-sm">{si.billingGst || '—'}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Billing Email</TableCell>
+                                    <TableCell className="text-sm">{si.billingEmail || '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Billing PAN</TableCell>
+                                    <TableCell className="text-sm font-mono">{si.billingPanNo || '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Billing MSME</TableCell>
+                                    <TableCell className="text-sm font-mono">{si.billingMsmeNo || '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Billing CIN</TableCell>
+                                    <TableCell className="text-sm font-mono">{si.billingCinNo || '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Billing Address</TableCell>
                                     <TableCell className="text-sm" colSpan={3}>{si.billingAddress || '—'}</TableCell>
                                 </TableRow>
@@ -236,6 +248,12 @@ const ViewSaleInvoicePage = () => {
                                     <TableCell className="text-sm">{si.shippingCustomerName || '—'}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Shipping GST</TableCell>
                                     <TableCell className="text-sm">{si.shippingGst || '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Shipping PAN</TableCell>
+                                    <TableCell className="text-sm font-mono">{si.shippingPanNo || '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground" />
+                                    <TableCell className="text-sm" />
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Shipping Address</TableCell>

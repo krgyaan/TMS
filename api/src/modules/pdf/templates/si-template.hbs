@@ -52,18 +52,19 @@
                 <strong>Billing To:</strong><br>
                 {{billing_name}}<br>
                 {{billing_address}}<br>
-                {{#if billing_gst}}
-                GST No.: {{billing_gst}}
-                {{/if}}
+                {{#if billing_email}}Email: {{billing_email}}<br>{{/if}}
+                {{#if billing_gst}}GST No.: {{billing_gst}}<br>{{/if}}
+                {{#if billing_pan_no}}PAN No.: {{billing_pan_no}}<br>{{/if}}
+                {{#if billing_msme_no}}MSME No.: {{billing_msme_no}}<br>{{/if}}
+                {{#if billing_cin_no}}CIN No.: {{billing_cin_no}}{{/if}}
             </td>
 
             <td style="vertical-align: top; border: 1px solid #000; padding: 8px;">
                 <strong>Ship To:</strong><br>
                 {{shipping_name}}<br>
                 {{shipping_address}}<br>
-                {{#if shipping_gst}}
-                GST No.: {{shipping_gst}}
-                {{/if}}
+                {{#if shipping_gst}}GST No.: {{shipping_gst}}<br>{{/if}}
+                {{#if shipping_pan_no}}PAN No.: {{shipping_pan_no}}{{/if}}
             </td>
 
             <td style="vertical-align: top; border: 1px solid #000; padding: 8px;">

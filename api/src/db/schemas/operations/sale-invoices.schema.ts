@@ -14,10 +14,15 @@ export const saleInvoices = pgTable("sale_invoices", {
     billingCustomerName: varchar("billing_customer_name", { length: 255 }),
     billingAddress: text("billing_address"),
     billingGst: varchar("billing_gst", { length: 15 }),
+    billingEmail: varchar("billing_email", { length: 255 }),
+    billingPanNo: varchar("billing_pan_no", { length: 50 }),
+    billingMsmeNo: varchar("billing_msme_no", { length: 50 }),
+    billingCinNo: varchar("billing_cin_no", { length: 50 }),
 
     shippingCustomerName: varchar("shipping_customer_name", { length: 255 }),
     shippingAddress: text("shipping_address"),
     shippingGst: varchar("shipping_gst", { length: 15 }),
+    shippingPanNo: varchar("shipping_pan_no", { length: 50 }),
 
     dispatchFromName: varchar("dispatch_from_name", { length: 255 }),
     dispatchFromAddress: text("dispatch_from_address"),
