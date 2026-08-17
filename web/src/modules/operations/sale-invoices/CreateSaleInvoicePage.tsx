@@ -3,9 +3,12 @@ import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { NumberInput } from "@/components/form/NumberInput";
 import { SelectField } from "@/components/form/SelectField";
+import { Combobox } from "@/components/form/SelectField";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,9 +16,10 @@ import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, Table
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
+import { useProjectInventory } from "@/hooks/api/usePurchaseOrders";
 import { useCreateSaleInvoice, useWoBillingData } from "@/hooks/api/useSaleInvoices";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, ArrowLeft, Building2, Copy, Eye, FileText, MapPin, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, Building2, ChevronDown, Copy, Eye, FileText, ListChecks, MapPin, Package, Plus, Trash2, Truck, Warehouse } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
@@ -24,7 +28,7 @@ import { AddAddressDialog } from "./components/AddAddressDialog";
 import { SIFormPreview } from "./components/SIFormPreview";
 import { formatCurrency, formatDateForInput, mapSaleInvoiceFormToCreateDTO } from "./helpers/saleInvoice.mapper";
 import { saleInvoiceFormSchema, type SaleInvoiceFormValues } from "./helpers/saleInvoice.schema";
-import type { WoBillingAddress, WoShippingAddress } from "./helpers/saleInvoice.types";
+import type { ProjectInventoryItem, WoBillingAddress, WoShippingAddress } from "./helpers/saleInvoice.types";
 
 const defaultFormValues: SaleInvoiceFormValues = {
     invoiceDate: formatDateForInput(new Date()),
@@ -36,6 +40,14 @@ const defaultFormValues: SaleInvoiceFormValues = {
     shippingGst: "",
     selectedBillingAddressId: "",
     selectedShippingAddressId: "",
+    dispatchFromName: "",
+    dispatchFromAddress: "",
+    dispatchFromGst: "",
+    dispatchVehicleNo: "",
+    dispatchLrNo: "",
+    dispatchToName: "",
+    dispatchToAddress: "",
+    dispatchToGst: "",
     items: [],
     remarks: "",
 };
@@ -72,9 +84,13 @@ export default function CreateSaleInvoicePage() {
 
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
     const { data: woBillingData, isLoading: isWoDataLoading } = useWoBillingData(projectId);
+    const { data: inventoryData, isLoading: isInventoryLoading } = useProjectInventory(projectId);
     const createSIMutation = useCreateSaleInvoice();
 
     const [showPreview, setShowPreview] = useState(false);
+    const [selectedInventoryId, setSelectedInventoryId] = useState("");
+    const [dispatchSameAsShipping, setDispatchSameAsShipping] = useState(false);
+    const [showReference, setShowReference] = useState(false);
 
     const [isBillingAddrOpen, setIsBillingAddrOpen] = useState(false);
     const [isShippingAddrOpen, setIsShippingAddrOpen] = useState(false);
@@ -93,6 +109,28 @@ export default function CreateSaleInvoicePage() {
 
     const items = useWatch({ control: form.control, name: "items" as any }) || [];
 
+    const inventoryItems = useMemo(
+        () => (inventoryData?.items ?? []).filter((i: ProjectInventoryItem) => i.remainingQty > 0),
+        [inventoryData],
+    );
+
+    const addedQtyByProduct = useMemo(() => {
+        const map = new Map<number, number>();
+        items.forEach((it: any) => {
+            if (it.purchaseOrderProductId) {
+                map.set(it.purchaseOrderProductId, (map.get(it.purchaseOrderProductId) || 0) + Number(it.qty || 0));
+            }
+        });
+        return map;
+    }, [items]);
+
+    const availableInventory = useMemo(() => {
+        return inventoryItems.filter((i) => (addedQtyByProduct.get(i.id) || 0) < i.remainingQty);
+    }, [inventoryItems, addedQtyByProduct]);
+
+    const remainingForItem = (item: ProjectInventoryItem) =>
+        item.remainingQty - (addedQtyByProduct.get(item.id) || 0);
+
     const calculations = useMemo(() => {
         let subtotal = 0;
         let totalGst = 0;
@@ -107,29 +145,46 @@ export default function CreateSaleInvoicePage() {
         return { subtotal, totalGst, grandTotal: subtotal + totalGst };
     }, [items]);
 
-    useEffect(() => {
-        if (!woBillingData?.billingBoq?.length) return;
-        if (fields.length > 0) return;
+    const inventoryOptions = useMemo(
+        () =>
+            availableInventory.map((i) => ({
+                value: String(i.id),
+                label: `${i.description} — ${i.remainingQty - (addedQtyByProduct.get(i.id) || 0)} ${i.unit || "NOS"} left`,
+            })),
+        [availableInventory, addedQtyByProduct],
+    );
 
-        const boqItems = (woBillingData.billingBoq || []).map((item: any) => ({
-            srNo: item.srNo,
-            itemDescription: item.itemDescription,
-            qty: Number(item.quantity),
-            rate: Number(item.rate),
-            gstRate: 18,
-        }));
-        boqItems.forEach((item: any) => append(item));
-    }, [woBillingData]);
-
-    const addItem = () => {
-        append({ itemDescription: "", qty: null, rate: null, gstRate: 18 });
+    const appendFromInventory = (item: ProjectInventoryItem) => {
+        const remaining = remainingForItem(item);
+        if (remaining <= 0) return;
+        append({
+            itemDescription: item.description,
+            qty: remaining,
+            rate: item.rate,
+            gstRate: item.gstRate,
+            purchaseOrderProductId: item.id,
+            unit: item.unit || "NOS",
+            hsnSac: item.hsnSac || undefined,
+        } as any);
     };
 
-    const duplicateItem = (index: number) => {
-        const source = items[index];
-        if (!source) return;
-        append({ ...source } as any);
+    const handleAddSelected = () => {
+        if (!selectedInventoryId) return;
+        const item = inventoryItems.find((i) => String(i.id) === selectedInventoryId);
+        if (item) appendFromInventory(item);
+        setSelectedInventoryId("");
     };
+
+    const handleAddAll = () => {
+        if (availableInventory.length === 0) return;
+        availableInventory.forEach((item) => appendFromInventory(item));
+    };
+
+    const handleRemoveItem = (index: number) => {
+        remove(index);
+    };
+
+    const itemRow = (index: number) => items[index] ?? {};
 
     const billingAddressOptions = useMemo(() => {
         return (woBillingData?.billingAddresses || []).map((addr: WoBillingAddress) => ({
@@ -176,6 +231,15 @@ export default function CreateSaleInvoicePage() {
         }
     }, [selectedShippingId, woBillingData, form]);
 
+    const handleDispatchSameAsShipping = (checked: boolean) => {
+        setDispatchSameAsShipping(checked);
+        if (checked) {
+            form.setValue("dispatchToName", form.getValues("shippingCustomerName"));
+            form.setValue("dispatchToAddress", form.getValues("shippingAddress"));
+            form.setValue("dispatchToGst", form.getValues("shippingGst"));
+        }
+    };
+
     const handleAddBillingAddress = () => {
         if (!newBillingAddr.customerName.trim() || !newBillingAddr.address.trim()) {
             toast.error("Customer name and address are required");
@@ -213,8 +277,8 @@ export default function CreateSaleInvoicePage() {
         try {
             const siData = mapSaleInvoiceFormToCreateDTO(values, projectId, woBillingData?.woDetailId);
             const result = await createSIMutation.mutateAsync(siData);
-            toast.success(`Sale Invoice #${result.invoiceNumber} has been created successfully.`);
-            navigate(paths.operations.projectDashboard(projectId));
+            toast.success(`Sale Invoice #${result.invoiceNumber} request created. Account team will prepare the draft.`);
+            navigate(paths.operations.saleInvoices);
         } catch (error: any) {
             toast.error(error?.message || "Failed to create sale invoice. Please try again.");
         }
@@ -274,6 +338,99 @@ export default function CreateSaleInvoicePage() {
             <CardContent className="space-y-8">
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)}>
+                        {/* Reference panels: BOQ + PO Inventory */}
+                        <Collapsible open={showReference} onOpenChange={setShowReference} className="mb-6">
+                            <div className="rounded-md border">
+                                <CollapsibleTrigger asChild>
+                                    <button type="button" className="w-full text-left px-4 py-3 flex items-center justify-between hover:bg-muted/30">
+                                        <span className="text-sm font-semibold flex items-center gap-2">
+                                            <ListChecks className="h-4 w-4" />
+                                            Show Work Order Line Items & PO Inventory
+                                        </span>
+                                        <ChevronDown className={`h-4 w-4 transition-transform ${showReference ? "rotate-180" : ""}`} />
+                                    </button>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                    <div className="px-4 pb-4 space-y-4">
+                                        <div>
+                                            <h4 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                                                <Package className="h-4 w-4 text-orange-500" /> WO Billing BOQ Line Items
+                                            </h4>
+                                            <Table className="border rounded">
+                                                <TableHeader>
+                                                    <TableRow className="bg-muted/50">
+                                                        <TableHead className="w-16">Sr</TableHead>
+                                                        <TableHead>Description</TableHead>
+                                                        <TableHead className="text-right">Qty</TableHead>
+                                                        <TableHead className="text-right">Rate</TableHead>
+                                                        <TableHead className="text-right">Amount</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {(woBillingData?.billingBoq ?? []).map((item: any, idx: number) => (
+                                                        <TableRow key={idx}>
+                                                            <TableCell>{item.srNo ?? idx + 1}</TableCell>
+                                                            <TableCell className="whitespace-normal [overflow-wrap:anywhere]">{item.itemDescription}</TableCell>
+                                                            <TableCell className="text-right">{item.quantity}</TableCell>
+                                                            <TableCell className="text-right">{formatCurrency(Number(item.rate || 0))}</TableCell>
+                                                            <TableCell className="text-right">{formatCurrency(Number(item.amount || 0))}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                    {(woBillingData?.billingBoq ?? []).length === 0 && (
+                                                        <TableRow>
+                                                            <TableCell colSpan={5} className="text-center py-4 text-muted-foreground italic">No BOQ line items</TableCell>
+                                                        </TableRow>
+                                                    )}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-medium mb-2 flex items-center gap-1.5">
+                                                <Warehouse className="h-4 w-4 text-emerald-500" /> PO Items (from Approved POs)
+                                            </h4>
+                                            {isInventoryLoading ? (
+                                                <Skeleton className="h-32 w-full rounded-lg" />
+                                            ) : (
+                                                <Table className="border rounded">
+                                                    <TableHeader>
+                                                        <TableRow className="bg-muted/50">
+                                                            <TableHead className="w-16">Sr</TableHead>
+                                                            <TableHead>Description</TableHead>
+                                                            <TableHead>PO No.</TableHead>
+                                                            <TableHead className="text-right">Qty</TableHead>
+                                                            <TableHead>Unit</TableHead>
+                                                            <TableHead className="text-right">Rate</TableHead>
+                                                            <TableHead className="text-right">Invoiced</TableHead>
+                                                            <TableHead className="text-right">Remaining</TableHead>
+                                                        </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                        {(inventoryData?.items ?? []).map((item: ProjectInventoryItem, idx: number) => (
+                                                            <TableRow key={item.id}>
+                                                                <TableCell>{idx + 1}</TableCell>
+                                                                <TableCell className="whitespace-normal [overflow-wrap:anywhere]">{item.description}</TableCell>
+                                                                <TableCell><Badge variant="outline" className="font-mono text-xs">{item.poNumber}</Badge></TableCell>
+                                                                <TableCell className="text-right">{item.qty}</TableCell>
+                                                                <TableCell>{item.unit || "NOS"}</TableCell>
+                                                                <TableCell className="text-right">{formatCurrency(item.rate)}</TableCell>
+                                                                <TableCell className="text-right">{item.invoicedQty}</TableCell>
+                                                                <TableCell className={`text-right font-medium ${item.remainingQty <= 0 ? "text-destructive" : ""}`}>{item.remainingQty}</TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                        {(inventoryData?.items ?? []).length === 0 && (
+                                                            <TableRow>
+                                                                <TableCell colSpan={8} className="text-center py-4 text-muted-foreground italic">No items from approved POs yet</TableCell>
+                                                            </TableRow>
+                                                        )}
+                                                    </TableBody>
+                                                </Table>
+                                            )}
+                                        </div>
+                                    </div>
+                                </CollapsibleContent>
+                            </div>
+                        </Collapsible>
+
                         <FieldWrapper control={form.control} name="invoiceDate" label={<>Invoice Date <span className="text-destructive">*</span></>}>
                             {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                         </FieldWrapper>
@@ -289,12 +446,29 @@ export default function CreateSaleInvoicePage() {
                                         </Badge>
                                     </h4>
                                     <p className="text-sm text-muted-foreground">
-                                        Select line items from the work order or add new ones
+                                        Select items from project inventory (approved POs). Each item can be added only once per invoice.
                                     </p>
                                 </div>
-                                <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                            </div>
+
+                            <div className="flex flex-wrap items-end gap-3 rounded-md border p-3 bg-muted/30">
+                                <div className="min-w-[320px] flex-1 space-y-1.5">
+                                    <label className="text-sm font-medium">Select line item from PO inventory</label>
+                                    <Combobox
+                                        value={selectedInventoryId}
+                                        onChange={setSelectedInventoryId}
+                                        options={inventoryOptions}
+                                        placeholder={availableInventory.length > 0 ? "Choose an item..." : "No items available"}
+                                        disabled={availableInventory.length === 0}
+                                    />
+                                </div>
+                                <Button type="button" variant="secondary" size="sm" onClick={handleAddSelected} disabled={!selectedInventoryId}>
                                     <Plus className="mr-2 h-4 w-4" />
                                     Add Item
+                                </Button>
+                                <Button type="button" variant="outline" size="sm" onClick={handleAddAll} disabled={availableInventory.length === 0}>
+                                    <ListChecks className="mr-2 h-4 w-4" />
+                                    Add All
                                 </Button>
                             </div>
 
@@ -303,7 +477,7 @@ export default function CreateSaleInvoicePage() {
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead className="w-[5%]">#</TableHead>
-                                            <TableHead className="w-[45%]">Description *</TableHead>
+                                            <TableHead className="w-[40%]">Description *</TableHead>
                                             <TableHead className="w-[10%]">Qty *</TableHead>
                                             <TableHead className="w-[12%]">Rate (₹) *</TableHead>
                                             <TableHead className="w-[8%]">GST %</TableHead>
@@ -313,7 +487,13 @@ export default function CreateSaleInvoicePage() {
                                     </TableHeader>
                                     <TableBody>
                                         {fields.map((field, index) => {
-                                            const item = items[index];
+                                            const item = itemRow(index);
+                                            const linkedItem = item.purchaseOrderProductId
+                                                ? (inventoryData?.items ?? []).find((i: ProjectInventoryItem) => i.id === item.purchaseOrderProductId)
+                                                : undefined;
+                                            const maxQty = linkedItem
+                                                ? linkedItem.remainingQty - (addedQtyByProduct.get(linkedItem.id) || 0) + Number(item.qty || 0)
+                                                : undefined;
                                             const qty = Number(item?.qty ?? 0);
                                             const rate = Number(item?.rate ?? 0);
                                             const amount = qty * rate;
@@ -328,13 +508,30 @@ export default function CreateSaleInvoicePage() {
                                                                 <Textarea readOnly {...fieldProps} placeholder="Enter description" rows={2} className="min-h-[36px]" />
                                                             )}
                                                         </FieldWrapper>
+                                                        {linkedItem && (
+                                                            <div className="flex items-center gap-1.5 mt-1">
+                                                                <Badge variant="secondary" className="text-[10px] font-mono">
+                                                                    PO: {linkedItem.poNumber}
+                                                                </Badge>
+                                                                <span className="text-[10px] text-muted-foreground">
+                                                                    Remaining: {Math.max(0, maxQty ?? 0)} {linkedItem.unit || "NOS"}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className="p-1 align-top pt-2">
                                                         <FieldWrapper control={form.control} name={`items.${index}.qty` as any} label="">
                                                             {(fieldProps) => (
                                                                 <NumberInput
                                                                     value={fieldProps.value}
-                                                                    onChange={fieldProps.onChange}
+                                                                    onChange={(v) => {
+                                                                        const next = Number(v ?? 0);
+                                                                        if (maxQty !== undefined && next > maxQty) {
+                                                                            toast.error(`Quantity cannot exceed remaining PO qty (${maxQty})`);
+                                                                            return;
+                                                                        }
+                                                                        fieldProps.onChange(v);
+                                                                    }}
                                                                     min={0}
                                                                     step={0.01}
                                                                     placeholder="0"
@@ -385,7 +582,7 @@ export default function CreateSaleInvoicePage() {
                                                                             variant="ghost"
                                                                             size="icon"
                                                                             className="h-8 w-8"
-                                                                            onClick={() => duplicateItem(index)}
+                                                                            onClick={() => append({ ...item } as any)}
                                                                         >
                                                                             <Copy className="h-4 w-4" />
                                                                         </Button>
@@ -402,7 +599,7 @@ export default function CreateSaleInvoicePage() {
                                                                                 variant="ghost"
                                                                                 size="icon"
                                                                                 className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                                                                onClick={() => remove(index)}
+                                                                                onClick={() => handleRemoveItem(index)}
                                                                             >
                                                                                 <Trash2 className="h-4 w-4" />
                                                                             </Button>
@@ -420,7 +617,7 @@ export default function CreateSaleInvoicePage() {
                                             <TableRow>
                                                 <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                                                     <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                                                    No items added yet. Click "Add Item" or they will be pre-filled from the work order.
+                                                    No items added yet. Pick items from the PO inventory dropdown above.
                                                 </TableCell>
                                             </TableRow>
                                         )}
@@ -556,6 +753,79 @@ export default function CreateSaleInvoicePage() {
                                         onSubmit={handleAddShippingAddress}
                                         title="Add New Shipping Address"
                                     />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Dispatch From / To */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                            <div className="border rounded-lg border-dashed p-4">
+                                <h3 className="text-lg font-semibold flex items-center gap-2 mb-1">
+                                    <Truck className="h-5 w-5" />
+                                    Dispatch From <span className="text-sm font-normal text-muted-foreground">(optional)</span>
+                                </h3>
+                                <div className="space-y-4 mt-4">
+                                    <FieldWrapper control={form.control} name="dispatchFromName" label="Name">
+                                        {(field) => <Input {...field} placeholder="Dispatch from name" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="dispatchFromAddress" label="Address">
+                                        {(field) => <Textarea {...field} placeholder="Dispatch from address" rows={2} />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="dispatchFromGst" label="GST">
+                                        {(field) => (
+                                            <Input
+                                                {...field}
+                                                placeholder="e.g. 27ABCDE1234F1Z5"
+                                                className="font-mono"
+                                                maxLength={15}
+                                                onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <FieldWrapper control={form.control} name="dispatchVehicleNo" label="Vehicle No.">
+                                            {(field) => <Input {...field} placeholder="Vehicle number" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="dispatchLrNo" label="LR No.">
+                                            {(field) => <Input {...field} placeholder="LR number" />}
+                                        </FieldWrapper>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="border rounded-lg border-dashed p-4">
+                                <h3 className="text-lg font-semibold flex items-center gap-2 mb-1">
+                                    <Truck className="h-5 w-5" />
+                                    Dispatch To <span className="text-sm font-normal text-muted-foreground">(optional)</span>
+                                </h3>
+                                <div className="flex items-center gap-2 mt-3 mb-4">
+                                    <Checkbox
+                                        id="dispatch-same-as-shipping"
+                                        checked={dispatchSameAsShipping}
+                                        onCheckedChange={(v) => handleDispatchSameAsShipping(v === true)}
+                                    />
+                                    <label htmlFor="dispatch-same-as-shipping" className="text-sm cursor-pointer">
+                                        Same as Shipping Address
+                                    </label>
+                                </div>
+                                <div className="space-y-4">
+                                    <FieldWrapper control={form.control} name="dispatchToName" label="Name">
+                                        {(field) => <Input {...field} placeholder="Dispatch to name" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="dispatchToAddress" label="Address">
+                                        {(field) => <Textarea {...field} placeholder="Dispatch to address" rows={2} />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="dispatchToGst" label="GST">
+                                        {(field) => (
+                                            <Input
+                                                {...field}
+                                                placeholder="e.g. 27ABCDE1234F1Z5"
+                                                className="font-mono"
+                                                maxLength={15}
+                                                onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                            />
+                                        )}
+                                    </FieldWrapper>
                                 </div>
                             </div>
                         </div>

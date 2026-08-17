@@ -1,5 +1,6 @@
 import { BaseApiService } from './base.service';
 import type { CreateSaleInvoiceDTO } from '@/modules/operations/sale-invoices/helpers/saleInvoice.types';
+import axiosInstance from '@/lib/axios';
 
 class SaleInvoiceApiService extends BaseApiService {
     constructor() {
@@ -32,6 +33,37 @@ class SaleInvoiceApiService extends BaseApiService {
 
     async updateSaleInvoice(id: number, data: Record<string, any>): Promise<any> {
         return this.patch(`/${id}`, data);
+    }
+
+    async createDraft(id: number): Promise<any> {
+        return this.post(`/${id}/create-draft`, {});
+    }
+
+    async approve(id: number): Promise<any> {
+        return this.post(`/${id}/approve`, {});
+    }
+
+    async requestChanges(id: number, remark: string): Promise<any> {
+        return this.post(`/${id}/request-changes`, { remark });
+    }
+
+    async finalize(id: number): Promise<any> {
+        return this.post(`/${id}/finalize`, {});
+    }
+
+    getSaleInvoicePdfUrl(id: number, version?: string): string {
+        const baseUrl = axiosInstance.defaults.baseURL || '';
+        let url = `${baseUrl}/sale-invoices/${id}/pdf`;
+        if (version) url += `?version=${encodeURIComponent(version)}`;
+        return url;
+    }
+
+    async getPdfVersions(id: number): Promise<Record<string, { path: string; hash: string }>> {
+        return this.get(`/${id}/pdf/versions`);
+    }
+
+    async deletePdfVersion(id: number, version: string): Promise<void> {
+        return this.delete(`/${id}/pdf/versions/${encodeURIComponent(version)}`);
     }
 }
 

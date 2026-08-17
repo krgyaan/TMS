@@ -4,16 +4,29 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useSaleInvoice } from "@/hooks/api/useSaleInvoices";
+import {
+    useApproveSaleInvoice,
+    useCreateSaleInvoiceDraft,
+    useDeleteSaleInvoicePdfVersion,
+    useFinalizeSaleInvoice,
+    useSaleInvoice,
+    useSaleInvoicePdfVersions,
+} from "@/hooks/api/useSaleInvoices";
+import { saleInvoiceApi } from "@/services/api/sale-invoice.api";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
-import { AlertCircle, ArrowLeft, Banknote, Calculator, ExternalLink, FileText, History, IndianRupee, Lock, Package } from "lucide-react";
-import { useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { AlertCircle, ArrowLeft, Banknote, Calculator, CheckCircle2, Download, ExternalLink, FileText, History, IndianRupee, Lock, Package, PencilLine, Trash2, Truck } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { fileUploadService } from "@/services/api/file-upload.service";
+import { toast } from "sonner";
+import RequestChangesDialog from "./components/RequestChangesDialog";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "default" | "outline" | "success" | "destructive" }> = {
     oe_request: { label: "OE Request", variant: "outline" },
+    draft: { label: "Draft", variant: "secondary" },
+    changes_requested: { label: "Changes Requested", variant: "default" },
+    approved: { label: "Approved", variant: "success" },
     invoiced: { label: "Invoiced", variant: "secondary" },
     credit_note: { label: "Credit Note", variant: "default" },
     payment_received: { label: "Payment Received", variant: "success" },
@@ -47,9 +60,57 @@ function SectionHeader({ title }: Readonly<{ title: string }>) {
 const ViewSaleInvoicePage = () => {
     const { siId: siIdParam } = useParams<{ siId: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const siId = Number(siIdParam);
 
     const { data: si, isLoading, isError, error } = useSaleInvoice(siId);
+    const { data: pdfVersions, isLoading: isPdfVersionsLoading } = useSaleInvoicePdfVersions(siId);
+    const approveMutation = useApproveSaleInvoice();
+    const finalizeMutation = useFinalizeSaleInvoice();
+    const createDraftMutation = useCreateSaleInvoiceDraft();
+    const deletePdfVersionMutation = useDeleteSaleInvoicePdfVersion();
+    const [isRequestChangesOpen, setIsRequestChangesOpen] = useState(false);
+
+    const isAccountsSection = location.pathname.includes("/accounts/");
+
+    const handleCreateDraft = async () => {
+        try {
+            await createDraftMutation.mutateAsync(siId);
+            toast.success("Draft created. PDF generated.");
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to create draft");
+        }
+    };
+
+    const handleApprove = async () => {
+        if (!window.confirm(`Approve draft for invoice ${si?.invoiceNumber}?`)) return;
+        try {
+            await approveMutation.mutateAsync(siId);
+            toast.success("Draft approved");
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to approve draft");
+        }
+    };
+
+    const handleFinalize = async () => {
+        if (!window.confirm(`Finalize invoice ${si?.invoiceNumber} and mark as Invoiced?`)) return;
+        try {
+            await finalizeMutation.mutateAsync(siId);
+            toast.success("Invoice finalized");
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to finalize invoice");
+        }
+    };
+
+    const handleDeletePdfVersion = async (version: string) => {
+        if (!window.confirm(`Delete PDF version ${version}?`)) return;
+        try {
+            await deletePdfVersionMutation.mutateAsync({ id: siId, version });
+            toast.success("PDF version deleted");
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to delete PDF version");
+        }
+    };
 
     const values = useMemo(() => {
         if (!si) return { netReceived: 0, holdRemaining: 0, holdReleased: 0, cnTotal: 0, grandTotal: 0 };
@@ -109,9 +170,41 @@ const ViewSaleInvoicePage = () => {
                 <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
-                <div className="flex gap-4">
+                <div className="flex gap-4 items-center">
                     <h1 className="text-xl font-semibold">{si.invoiceNumber || `SI #${si.id}`}</h1>
                     <Badge variant={statusCfg.variant}>{statusCfg.label}</Badge>
+                </div>
+                <div className="ml-auto flex items-center gap-2">
+                    {isAccountsSection && si.status === "oe_request" && (
+                        <Button size="sm" onClick={handleCreateDraft} disabled={createDraftMutation.isPending}>
+                            <FileText className="mr-2 h-4 w-4" />
+                            {createDraftMutation.isPending ? "Creating..." : "Create Draft"}
+                        </Button>
+                    )}
+                    {isAccountsSection && si.status === "changes_requested" && (
+                        <Button size="sm" onClick={handleCreateDraft} disabled={createDraftMutation.isPending}>
+                            <PencilLine className="mr-2 h-4 w-4" />
+                            {createDraftMutation.isPending ? "Correcting..." : "Correct Draft"}
+                        </Button>
+                    )}
+                    {isAccountsSection && si.status === "approved" && (
+                        <Button size="sm" onClick={handleFinalize} disabled={finalizeMutation.isPending}>
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                            {finalizeMutation.isPending ? "Finalizing..." : "Finalize"}
+                        </Button>
+                    )}
+                    {!isAccountsSection && si.status === "draft" && (
+                        <>
+                            <Button size="sm" onClick={handleApprove} disabled={approveMutation.isPending}>
+                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                                {approveMutation.isPending ? "Approving..." : "Approve Draft"}
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setIsRequestChangesOpen(true)}>
+                                <PencilLine className="mr-2 h-4 w-4" />
+                                Request Changes
+                            </Button>
+                        </>
+                    )}
                 </div>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -158,10 +251,111 @@ const ViewSaleInvoicePage = () => {
                                         <TableCell className="text-sm break-words" colSpan={3}>{si.remarks}</TableCell>
                                     </TableRow>
                                 )}
+                                {si.changesRemark && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Changes Remark</TableCell>
+                                        <TableCell className="text-sm break-words" colSpan={3}>{si.changesRemark}</TableCell>
+                                    </TableRow>
+                                )}
+                                {si.approvedBy && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Approved By</TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {si.approvedByName || si.approvedBy}{si.approvedAt ? ` on ${formatDate(si.approvedAt)}` : ""}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
                             </TableBody>
                         </Table>
                     </CardContent>
                 </Card>
+                {/* Dispatch Details */}
+                {(si.dispatchFromName || si.dispatchFromAddress || si.dispatchToName || si.dispatchToAddress || si.dispatchVehicleNo || si.dispatchLrNo) && (
+                    <Card>
+                        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><Truck className="h-5 w-5" />Dispatch Details</CardTitle></CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableBody>
+                                    <SectionHeader title="Dispatch From" />
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Name</TableCell>
+                                        <TableCell className="text-sm w-1/4">{si.dispatchFromName || '—'}</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">GST</TableCell>
+                                        <TableCell className="text-sm w-1/4">{si.dispatchFromGst || '—'}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Address</TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>{si.dispatchFromAddress || '—'}</TableCell>
+                                    </TableRow>
+                                    <SectionHeader title="Dispatch To" />
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Name</TableCell>
+                                        <TableCell className="text-sm">{si.dispatchToName || '—'}</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">GST</TableCell>
+                                        <TableCell className="text-sm">{si.dispatchToGst || '—'}</TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Address</TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>{si.dispatchToAddress || '—'}</TableCell>
+                                    </TableRow>
+                                    <SectionHeader title="Transport" />
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Vehicle No.</TableCell>
+                                        <TableCell className="text-sm">{si.dispatchVehicleNo || '—'}</TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">LR No.</TableCell>
+                                        <TableCell className="text-sm">{si.dispatchLrNo || '—'}</TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                )}
+                {/* PDF Versions */}
+                {(si.status === "draft" || si.status === "changes_requested" || si.status === "approved") && (
+                    <Card>
+                        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><FileText className="h-5 w-5" />Invoice PDF</CardTitle></CardHeader>
+                        <CardContent>
+                            <div className="flex items-center gap-3 mb-3">
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={saleInvoiceApi.getSaleInvoicePdfUrl(siId)} target="_blank" rel="noopener noreferrer">
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Download PDF
+                                    </a>
+                                </Button>
+                            </div>
+                            {isPdfVersionsLoading ? (
+                                <Skeleton className="h-16 w-full rounded-lg" />
+                            ) : pdfVersions && Object.keys(pdfVersions).length > 0 ? (
+                                <div className="space-y-2">
+                                    {Object.entries(pdfVersions).map(([version]) => (
+                                        <div key={version} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                                            <span className="font-mono text-xs">{version}</span>
+                                            <div className="flex items-center gap-2">
+                                                <Button size="sm" variant="ghost" className="h-7" asChild>
+                                                    <a href={saleInvoiceApi.getSaleInvoicePdfUrl(siId, version)} target="_blank" rel="noopener noreferrer">
+                                                        <ExternalLink className="h-3 w-3 mr-1" />
+                                                        Open
+                                                    </a>
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-7 text-muted-foreground hover:text-destructive"
+                                                    onClick={() => handleDeletePdfVersion(version)}
+                                                    disabled={deletePdfVersionMutation.isPending}
+                                                >
+                                                    <Trash2 className="h-3 w-3" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground italic">No PDF generated yet.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
                 {/* Invoice-level GSTs (shown when invoiced+) */}
                 {Number(si.invoiceTaxableAmount) > 0 && (
                     <Card>
@@ -329,6 +523,7 @@ const ViewSaleInvoicePage = () => {
                                         <TableRow className="bg-muted/50">
                                             <TableHead className="text-xs uppercase font-semibold">Sr No</TableHead>
                                             <TableHead className="text-xs uppercase font-semibold">Description</TableHead>
+                                            <TableHead className="text-xs uppercase font-semibold">PO Ref</TableHead>
                                             <TableHead className="text-xs uppercase font-semibold text-right">Qty</TableHead>
                                             <TableHead className="text-xs uppercase font-semibold text-right">Rate</TableHead>
                                             <TableHead className="text-xs uppercase font-semibold text-right">Amount</TableHead>
@@ -341,7 +536,17 @@ const ViewSaleInvoicePage = () => {
                                         {items.map((item: any, idx: number) => (
                                             <TableRow key={idx} className="hover:bg-muted/30">
                                                 <TableCell className="text-sm">{item.srNo ?? idx + 1}</TableCell>
-                                                <TableCell className="text-sm">{item.itemDescription}</TableCell>
+                                                <TableCell className="text-sm">
+                                                    {item.itemDescription}
+                                                    {item.unit && <span className="ml-1 text-xs text-muted-foreground">({item.unit})</span>}
+                                                </TableCell>
+                                                <TableCell className="text-sm">
+                                                    {item.poNumber ? (
+                                                        <Badge variant="outline" className="font-mono text-xs">{item.poNumber}</Badge>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">—</span>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell className="text-sm text-right">{item.quantity}</TableCell>
                                                 <TableCell className="text-sm text-right">{formatINR(Number(item.rate || 0))}</TableCell>
                                                 <TableCell className="text-sm text-right">{formatINR(Number(item.amount || 0))}</TableCell>
@@ -415,6 +620,11 @@ const ViewSaleInvoicePage = () => {
                     </Card>
                 )}
             </CardContent>
+            <RequestChangesDialog
+                row={si ? { id: si.id, invoiceNumber: si.invoiceNumber, billingCustomerName: si.billingCustomerName } : null}
+                open={isRequestChangesOpen}
+                onClose={() => setIsRequestChangesOpen(false)}
+            />
         </Card>
     );
 };

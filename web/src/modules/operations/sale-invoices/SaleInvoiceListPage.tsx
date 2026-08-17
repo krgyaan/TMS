@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAllSaleInvoices } from "@/hooks/api/useSaleInvoices";
+import { useAllSaleInvoices, useApproveSaleInvoice } from "@/hooks/api/useSaleInvoices";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
@@ -16,18 +16,24 @@ import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import type { SaleInvoiceListRow } from "@/modules/operations/sale-invoices/helpers/saleInvoice.types";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { Banknote, Eye, HandCoins, LampCeiling, Lock, Search, Upload } from "lucide-react";
+import { Banknote, CheckCircle2, Eye, HandCoins, LampCeiling, Lock, PencilLine, Search, Upload } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { useLocation, useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import CreditNoteDialog from "./components/CreditNoteDialog";
+import FinalizeDialog from "./components/FinalizeDialog";
 import HoldAmountDialog from "./components/HoldAmountDialog";
 import HoldReleasedDialog from "./components/HoldReleasedDialog";
 import PaymentReceivedDialog from "./components/PaymentReceivedDialog";
+import RequestChangesDialog from "./components/RequestChangesDialog";
 import UploadInvoiceDialog from "./components/UploadInvoiceDialog";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "default" | "outline" | "success" | "destructive" }> = {
     oe_request: { label: "OE Request", variant: "outline" },
+    draft: { label: "Draft", variant: "secondary" },
+    changes_requested: { label: "Changes Requested", variant: "default" },
+    approved: { label: "Approved", variant: "success" },
     invoiced: { label: "Invoiced", variant: "secondary" },
     credit_note: { label: "Credit Note", variant: "default" },
     payment_received: { label: "Payment Received", variant: "success" },
@@ -36,6 +42,9 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "def
 
 const SUBTABS = [
     { key: "oe_request", label: "OE Request" },
+    { key: "draft", label: "Draft" },
+    { key: "changes_requested", label: "Changes Requested" },
+    { key: "approved", label: "Approved" },
     { key: "invoiced", label: "Invoiced" },
     { key: "payment_received", label: "Payment Received" },
     { key: "completed", label: "Completed" },
@@ -60,6 +69,8 @@ const SaleInvoiceListPage: React.FC = () => {
     const [paymentReceivedRow, setPaymentReceivedRow] = useState<SaleInvoiceListRow | null>(null);
     const [holdAmountRow, setHoldAmountRow] = useState<SaleInvoiceListRow | null>(null);
     const [holdReleasedRow, setHoldReleasedRow] = useState<SaleInvoiceListRow | null>(null);
+    const [requestChangesRow, setRequestChangesRow] = useState<SaleInvoiceListRow | null>(null);
+    const [finalizeRow, setFinalizeRow] = useState<SaleInvoiceListRow | null>(null);
 
     const saleInvoices = useMemo(() => (data?.saleInvoices ?? []) as SaleInvoiceListRow[], [data]);
 
@@ -99,7 +110,21 @@ const SaleInvoiceListPage: React.FC = () => {
         setPaymentReceivedRow(null);
         setHoldAmountRow(null);
         setHoldReleasedRow(null);
+        setRequestChangesRow(null);
+        setFinalizeRow(null);
     }, []);
+
+    const approveMutation = useApproveSaleInvoice();
+
+    const approveDraft = useCallback(async (row: SaleInvoiceListRow) => {
+        if (!window.confirm(`Approve draft for invoice ${row.invoiceNumber}?`)) return;
+        try {
+            await approveMutation.mutateAsync(row.id);
+            toast.success(`Draft ${row.invoiceNumber} approved`);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to approve draft");
+        }
+    }, [approveMutation]);
 
     const siActions: ActionItem<SaleInvoiceListRow>[] = useMemo(() => {
         const base: ActionItem<SaleInvoiceListRow>[] = [
@@ -113,10 +138,22 @@ const SaleInvoiceListPage: React.FC = () => {
         if (isAccountsSection) {
             return [
                 {
-                    label: "Upload Invoice",
+                    label: "Create Draft",
                     icon: <Upload className="h-4 w-4" />,
                     onClick: (row) => setUploadRow(row),
                     visible: (row) => row.status === "oe_request",
+                },
+                {
+                    label: "Correct Draft",
+                    icon: <Upload className="h-4 w-4" />,
+                    onClick: (row) => setUploadRow(row),
+                    visible: (row) => row.status === "changes_requested",
+                },
+                {
+                    label: "Finalize",
+                    icon: <CheckCircle2 className="h-4 w-4" />,
+                    onClick: (row) => setFinalizeRow(row),
+                    visible: (row) => row.status === "approved",
                 },
                 {
                     label: "Credit Note",
@@ -144,8 +181,22 @@ const SaleInvoiceListPage: React.FC = () => {
             ];
         }
 
-        return base;
-    }, [isAccountsSection, handleView]);
+        return [
+            {
+                label: "Approve Draft",
+                icon: <CheckCircle2 className="h-4 w-4" />,
+                onClick: (row) => approveDraft(row),
+                visible: (row) => row.status === "draft",
+            },
+            {
+                label: "Request Changes",
+                icon: <PencilLine className="h-4 w-4" />,
+                onClick: (row) => setRequestChangesRow(row),
+                visible: (row) => row.status === "draft",
+            },
+            ...base,
+        ];
+    }, [isAccountsSection, handleView, approveDraft]);
 
     const statusBadge = (status: string) => {
         const cfg = STATUS_CONFIG[status] || { label: status, variant: "outline" as const };
@@ -286,6 +337,8 @@ const SaleInvoiceListPage: React.FC = () => {
             <PaymentReceivedDialog row={paymentReceivedRow} open={paymentReceivedRow !== null} onClose={closeAll} />
             <HoldAmountDialog row={holdAmountRow} open={holdAmountRow !== null} onClose={closeAll} />
             <HoldReleasedDialog row={holdReleasedRow} open={holdReleasedRow !== null} onClose={closeAll} />
+            <RequestChangesDialog row={requestChangesRow} open={requestChangesRow !== null} onClose={closeAll} />
+            <FinalizeDialog row={finalizeRow} open={finalizeRow !== null} onClose={closeAll} />
         </>
     );
 };

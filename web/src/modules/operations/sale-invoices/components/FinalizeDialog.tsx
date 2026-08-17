@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useCreateSaleInvoiceDraft } from "@/hooks/api/useSaleInvoices";
+import { useFinalizeSaleInvoice } from "@/hooks/api/useSaleInvoices";
+import { formatINR } from "@/hooks/useINRFormatter";
 import type { SaleInvoiceListRow } from "@/modules/operations/sale-invoices/helpers/saleInvoice.types";
 import { useCallback } from "react";
 import { toast } from "sonner";
@@ -11,44 +12,38 @@ interface Props {
     onClose: () => void;
 }
 
-const UploadInvoiceDialog = ({ row, open, onClose }: Props) => {
-    const createDraftMutation = useCreateSaleInvoiceDraft();
+const FinalizeDialog = ({ row, open, onClose }: Props) => {
+    const finalizeMutation = useFinalizeSaleInvoice();
 
     const handleSubmit = useCallback(async () => {
         if (!row) return;
         try {
-            await createDraftMutation.mutateAsync(row.id);
-            toast.success(`Draft created for ${row.invoiceNumber}. PDF generated.`);
+            await finalizeMutation.mutateAsync(row.id);
+            toast.success(`Invoice ${row.invoiceNumber} finalized and marked as Invoiced`);
             onClose();
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Failed to create draft");
+            toast.error(error instanceof Error ? error.message : "Failed to finalize invoice");
         }
-    }, [row, createDraftMutation, onClose]);
+    }, [row, finalizeMutation, onClose]);
 
     return (
         <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Create Draft</DialogTitle>
-                    <DialogDescription>
-                        Generate the account draft for this OE request. A draft PDF will be created for Operations approval.
-                    </DialogDescription>
+                    <DialogTitle>Finalize Invoice</DialogTitle>
+                    <DialogDescription>Confirm and mark this invoice as Invoiced. This cannot be undone.</DialogDescription>
                 </DialogHeader>
                 {row && (
                     <div className="space-y-4 py-2">
                         <p className="text-sm"><strong>Invoice:</strong> {row.invoiceNumber}</p>
                         <p className="text-sm"><strong>Customer:</strong> {row.billingCustomerName}</p>
-                        {row.status === "changes_requested" && (
-                            <p className="text-sm text-muted-foreground">
-                                This will regenerate the draft as a new PDF revision incorporating the requested changes.
-                            </p>
-                        )}
+                        <p className="text-sm"><strong>Grand Total:</strong> {formatINR(Number(row.grandTotal || 0))}</p>
                     </div>
                 )}
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleSubmit} disabled={createDraftMutation.isPending}>
-                        {createDraftMutation.isPending ? "Creating..." : "Create Draft"}
+                    <Button onClick={handleSubmit} disabled={finalizeMutation.isPending}>
+                        {finalizeMutation.isPending ? "Finalizing..." : "Finalize Invoice"}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -56,4 +51,4 @@ const UploadInvoiceDialog = ({ row, open, onClose }: Props) => {
     );
 };
 
-export default UploadInvoiceDialog;
+export default FinalizeDialog;

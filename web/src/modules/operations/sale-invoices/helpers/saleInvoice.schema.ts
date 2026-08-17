@@ -6,6 +6,9 @@ const saleInvoiceItemSchema = z.object({
     qty: z.number().nullable().refine(v => v !== null && v > 0, "Qty must be greater than 0"),
     rate: z.number().nullable().refine(v => v !== null && v >= 0, "Rate is required"),
     gstRate: z.coerce.number().default(18),
+    purchaseOrderProductId: z.number().optional(),
+    unit: z.string().optional(),
+    hsnSac: z.string().optional(),
 });
 
 export const saleInvoiceFormSchema = z.object({
@@ -18,6 +21,14 @@ export const saleInvoiceFormSchema = z.object({
     shippingGst: z.string().default(""),
     selectedBillingAddressId: z.string().optional(),
     selectedShippingAddressId: z.string().optional(),
+    dispatchFromName: z.string().default(""),
+    dispatchFromAddress: z.string().default(""),
+    dispatchFromGst: z.string().default(""),
+    dispatchVehicleNo: z.string().default(""),
+    dispatchLrNo: z.string().default(""),
+    dispatchToName: z.string().default(""),
+    dispatchToAddress: z.string().default(""),
+    dispatchToGst: z.string().default(""),
     items: z.array(saleInvoiceItemSchema).min(1, "At least one item is required"),
     remarks: z.string().default(""),
 });

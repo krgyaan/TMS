@@ -24,6 +24,14 @@ export function mapSaleInvoiceFormToCreateDTO(
         shippingCustomerName: values.shippingCustomerName,
         shippingAddress: values.shippingAddress,
         shippingGst: values.shippingGst || undefined,
+        dispatchFromName: values.dispatchFromName || undefined,
+        dispatchFromAddress: values.dispatchFromAddress || undefined,
+        dispatchFromGst: values.dispatchFromGst || undefined,
+        dispatchVehicleNo: values.dispatchVehicleNo || undefined,
+        dispatchLrNo: values.dispatchLrNo || undefined,
+        dispatchToName: values.dispatchToName || undefined,
+        dispatchToAddress: values.dispatchToAddress || undefined,
+        dispatchToGst: values.dispatchToGst || undefined,
         items: values.items
             .filter(item => item.itemDescription && item.qty !== null && item.rate !== null && item.qty > 0)
             .map(item => ({
@@ -32,6 +40,9 @@ export function mapSaleInvoiceFormToCreateDTO(
                 qty: item.qty!,
                 rate: item.rate!,
                 gstRate: item.gstRate,
+                purchaseOrderProductId: item.purchaseOrderProductId,
+                unit: item.unit,
+                hsnSac: item.hsnSac,
             })),
         remarks: values.remarks || undefined,
     };

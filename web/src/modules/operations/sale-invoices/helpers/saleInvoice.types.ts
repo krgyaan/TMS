@@ -8,6 +8,14 @@ export interface CreateSaleInvoiceDTO {
     shippingCustomerName: string;
     shippingAddress: string;
     shippingGst?: string;
+    dispatchFromName?: string;
+    dispatchFromAddress?: string;
+    dispatchFromGst?: string;
+    dispatchVehicleNo?: string;
+    dispatchLrNo?: string;
+    dispatchToName?: string;
+    dispatchToAddress?: string;
+    dispatchToGst?: string;
     items: SaleInvoiceItemDTO[];
     remarks?: string;
 }
@@ -18,7 +26,34 @@ export interface SaleInvoiceItemDTO {
     qty: number;
     rate: number;
     gstRate: number;
+    purchaseOrderProductId?: number;
+    unit?: string;
+    hsnSac?: string;
 }
+
+export interface ProjectInventoryItem {
+    id: number;
+    poId: number;
+    poNumber: string;
+    description: string;
+    hsnSac: string | null;
+    unit: string;
+    qty: number;
+    rate: number;
+    gstRate: number;
+    invoicedQty: number;
+    remainingQty: number;
+}
+
+export type SaleInvoiceStatus =
+    | "oe_request"
+    | "draft"
+    | "changes_requested"
+    | "approved"
+    | "invoiced"
+    | "credit_note"
+    | "payment_received"
+    | "completed";
 
 export interface SaleInvoiceRow {
     id: number;
@@ -39,6 +74,14 @@ export interface SaleInvoiceRow {
     createdAt: string;
     remarks?: string;
     invoiceDocPaths?: string[];
+    dispatchFromName?: string;
+    dispatchFromAddress?: string;
+    dispatchFromGst?: string;
+    dispatchVehicleNo?: string;
+    dispatchLrNo?: string;
+    dispatchToName?: string;
+    dispatchToAddress?: string;
+    dispatchToGst?: string;
 }
 
 export interface SaleInvoiceListRow {
