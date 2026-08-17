@@ -87,13 +87,6 @@ export const ProjectClosureSection: React.FC<ProjectClosureSectionProps> = ({ pr
     const columns = useMemo<ColDef<ClosureChecklistRow>[]>(
         () => [
             {
-                field: "category",
-                headerName: "Category",
-                sortable: true,
-                filter: true,
-                width: 130,
-            },
-            {
                 field: "documentName",
                 headerName: "Document Name",
                 sortable: true,
