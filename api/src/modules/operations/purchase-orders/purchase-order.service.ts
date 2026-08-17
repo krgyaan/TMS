@@ -8,7 +8,7 @@ import { DRIZZLE } from "@/db/database.module";
 import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
 import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
 import { users } from "@/db/schemas";
-import { paymentRequests, purchaseInvoices } from "@/db/schemas/operations";
+import { paymentRequests, purchaseInvoices, saleInvoiceItems, saleInvoices } from "@/db/schemas/operations";
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
 import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
@@ -68,6 +68,58 @@ export class PurchaseOrderService {
                 .where(eq(purchaseOrders.projectId, projectId));
 
         return { purchaseOrders: purchaseOrdersData };
+    }
+
+    async getProjectInventory(projectId: number) {
+        const items = await this.db
+            .select({
+                id: purchaseOrderProducts.id,
+                poId: purchaseOrders.id,
+                poNumber: purchaseOrders.poNumber,
+                description: purchaseOrderProducts.description,
+                hsnSac: purchaseOrderProducts.hsnSac,
+                unit: purchaseOrderProducts.unit,
+                qty: purchaseOrderProducts.qty,
+                rate: purchaseOrderProducts.rate,
+                gstRate: purchaseOrderProducts.gstRate,
+                invoicedQty: sql<number>`
+                    COALESCE((
+                        SELECT SUM(sii.quantity::numeric) FROM sale_invoice_items sii
+                        JOIN sale_invoices si ON si.id = sii.sale_invoice_id
+                        WHERE sii.purchase_order_product_id = ${purchaseOrderProducts.id}
+                          AND si.status IN ('invoiced', 'payment_received', 'completed')
+                    ), 0)
+                    -
+                    COALESCE((
+                        SELECT SUM(sii.quantity::numeric) FROM sale_invoice_items sii
+                        JOIN sale_invoices si ON si.id = sii.sale_invoice_id
+                        WHERE sii.purchase_order_product_id = ${purchaseOrderProducts.id}
+                          AND si.status = 'credit_note'
+                    ), 0)`,
+            })
+            .from(purchaseOrderProducts)
+            .innerJoin(purchaseOrders, eq(purchaseOrders.id, purchaseOrderProducts.purchaseOrderId))
+            .where(and(
+                eq(purchaseOrders.projectId, projectId),
+                eq(purchaseOrders.poApproved, true),
+            ))
+            .orderBy(desc(purchaseOrders.createdAt), purchaseOrderProducts.id);
+
+        const inventory = items.map((item) => {
+            const qty = Number(item.qty);
+            const invoicedQty = Number(item.invoicedQty || 0);
+            const remainingQty = Math.min(qty, Math.max(0, qty - invoicedQty));
+            return {
+                ...item,
+                qty,
+                rate: Number(item.rate),
+                gstRate: Number(item.gstRate),
+                invoicedQty,
+                remainingQty,
+            };
+        });
+
+        return { items: inventory };
     }
 
     async getAllPurchaseOrders(status?: string, section?: string, user?: any) {

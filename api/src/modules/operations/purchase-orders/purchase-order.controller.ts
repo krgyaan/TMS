@@ -16,6 +16,11 @@ export class PurchaseOrderController {
     return this.service.getPurchaseOrders(projectId);
   }
 
+  @Get("project/:projectId/inventory")
+  getProjectInventory(@Param("projectId", ParseIntPipe) projectId: number) {
+    return this.service.getProjectInventory(projectId);
+  }
+
   @Post()
   @HttpCode(HttpStatus.CREATED)
   createPurchaseOrder(@Body() body: any, @CurrentUser() user: ValidatedUser) {
