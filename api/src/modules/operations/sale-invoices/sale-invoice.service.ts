@@ -85,7 +85,7 @@ export class SaleInvoiceService {
             .select({ num: saleInvoices.invoiceNumber })
             .from(saleInvoices)
             .where(
-                sql`${saleInvoices.invoiceNumber} LIKE ${`SI/${sanitizedName}/${fyString}/%`}`
+                sql`${saleInvoices.invoiceNumber} LIKE ${`VE/${sanitizedName}/${fyString}/%`}`
             )
             .orderBy(desc(saleInvoices.id))
             .limit(1);
