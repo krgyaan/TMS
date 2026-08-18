@@ -17,9 +17,13 @@ export type ClientDirectoryListFilters = {
 export type ClientDirectoryRow = {
     id: number;
     name: string;
+    designation: string | null;
+    address: { personal?: string | null; official?: string | null } | null;
     email: string | null;
     phone: string | null;
     organization: string | null;
+    giftingTier: string | null;
+    remarks: { text: string; by: string; byId: number; at: string }[] | null;
     createdAt: Date;
     updatedAt: Date;
 };
@@ -42,13 +46,17 @@ export class ClientDirectoryService {
         const orderColumn =
             sortBy === 'name'
                 ? clientDirectory.name
-                : sortBy === 'email'
-                  ? clientDirectory.email
-                  : sortBy === 'phone'
-                    ? clientDirectory.phone
-                    : sortBy === 'organization'
-                      ? clientDirectory.organization
-                      : clientDirectory.createdAt;
+                : sortBy === 'designation'
+                  ? clientDirectory.designation
+                  : sortBy === 'email'
+                    ? clientDirectory.email
+                    : sortBy === 'phone'
+                      ? clientDirectory.phone
+                      : sortBy === 'organization'
+                        ? clientDirectory.organization
+                        : sortBy === 'giftingTier'
+                          ? clientDirectory.giftingTier
+                          : clientDirectory.createdAt;
         const orderFn = sortOrder === 'desc' ? desc : asc;
 
         const conditions: (SQL | undefined)[] = [];
@@ -56,6 +64,7 @@ export class ClientDirectoryService {
             conditions.push(
                 or(
                     ilike(clientDirectory.name, `%${search}%`),
+                    ilike(clientDirectory.designation, `%${search}%`),
                     ilike(clientDirectory.email, `%${search}%`),
                     ilike(clientDirectory.phone, `%${search}%`),
                     ilike(clientDirectory.organization, `%${search}%`),
@@ -104,27 +113,49 @@ export class ClientDirectoryService {
         return row;
     }
 
-    async create(data: CreateClientDirectoryDto) {
+    async create(data: CreateClientDirectoryDto, user?: { id: number; name: string }) {
+        const stampedRemarks = this.stampRemarks(data.remarks, user);
         const [inserted] = await this.db
             .insert(clientDirectory)
             .values({
                 name: data.name,
+                designation: data.designation ?? null,
+                address: data.address ?? null,
                 email: data.email ?? null,
                 phone: data.phone ?? null,
                 organization: data.organization ?? null,
+                giftingTier: data.giftingTier ?? null,
+                remarks: stampedRemarks,
             })
             .returning({ id: clientDirectory.id });
 
         return this.findById(inserted.id);
     }
 
-    async update(id: number, data: UpdateClientDirectoryDto) {
+    async update(id: number, data: UpdateClientDirectoryDto, user?: { id: number; name: string }) {
+        const [existing] = await this.db
+            .select()
+            .from(clientDirectory)
+            .where(eq(clientDirectory.id, id))
+            .limit(1);
+
+        if (!existing) {
+            throw new NotFoundException(`Client directory entry with ID ${id} not found`);
+        }
+
         const updateValues: Record<string, unknown> = { updatedAt: new Date() };
 
         if (data.name !== undefined) updateValues.name = data.name;
+        if (data.designation !== undefined) updateValues.designation = data.designation;
+        if (data.address !== undefined) updateValues.address = data.address;
         if (data.email !== undefined) updateValues.email = data.email;
         if (data.phone !== undefined) updateValues.phone = data.phone;
         if (data.organization !== undefined) updateValues.organization = data.organization;
+        if (data.giftingTier !== undefined) updateValues.giftingTier = data.giftingTier;
+        if (data.remarks !== undefined) {
+            const current = Array.isArray(existing.remarks) ? existing.remarks : [];
+            updateValues.remarks = [...current, ...this.stampRemarks(data.remarks, user)];
+        }
 
         await this.db
             .update(clientDirectory)
@@ -132,6 +163,16 @@ export class ClientDirectoryService {
             .where(eq(clientDirectory.id, id));
 
         return this.findById(id);
+    }
+
+    private stampRemarks(texts: string[] | null | undefined, user?: { id: number; name: string }) {
+        if (!texts || texts.length === 0) return [];
+        return texts.map((text) => ({
+            text,
+            by: user?.name ?? 'System',
+            byId: user?.id ?? 0,
+            at: new Date().toISOString(),
+        }));
     }
 
     async syncAll(): Promise<{ synced: number }> {

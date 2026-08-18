@@ -14,6 +14,7 @@ import {
 import { ClientDirectoryService } from './client-directory.service';
 import { CreateClientDirectorySchema, UpdateClientDirectorySchema } from './dto/client-directory.dto';
 import type { CreateClientDirectoryDto, UpdateClientDirectoryDto } from './dto/client-directory.dto';
+import { CurrentUser } from '@/decorators/current-user.decorator';
 
 @Controller('client-directory')
 export class ClientDirectoryController {
@@ -44,15 +45,19 @@ export class ClientDirectoryController {
 
     @Post()
     @HttpCode(HttpStatus.CREATED)
-    async create(@Body() body: unknown) {
+    async create(@Body() body: unknown, @CurrentUser() user: { id: number; name: string }) {
         const parsed = CreateClientDirectorySchema.parse(body) as CreateClientDirectoryDto;
-        return this.clientDirectoryService.create(parsed);
+        return this.clientDirectoryService.create(parsed, user);
     }
 
     @Patch(':id')
-    async update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
+    async update(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() body: unknown,
+        @CurrentUser() user: { id: number; name: string },
+    ) {
         const parsed = UpdateClientDirectorySchema.parse(body) as UpdateClientDirectoryDto;
-        return this.clientDirectoryService.update(id, parsed);
+        return this.clientDirectoryService.update(id, parsed, user);
     }
 
     @Post('sync-all')

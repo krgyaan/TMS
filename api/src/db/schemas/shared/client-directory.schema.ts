@@ -1,4 +1,4 @@
-import { pgTable, bigserial, varchar, timestamp, index, unique } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, varchar, timestamp, index, unique, jsonb } from "drizzle-orm/pg-core";
 
 export const clientDirectory = pgTable(
     "client_directory",
@@ -6,9 +6,13 @@ export const clientDirectory = pgTable(
         id: bigserial("id", { mode: "number" }).primaryKey(),
 
         name: varchar("name", { length: 255 }).notNull(),
+        designation: varchar("designation", { length: 255 }),
+        address: jsonb("address").$type<{ personal?: string | null; official?: string | null }>(),
         email: varchar("email", { length: 255 }),
         phone: varchar("phone", { length: 200 }),
         organization: varchar("organization", { length: 255 }),
+        giftingTier: varchar("gifting_tier", { length: 10 }),
+        remarks: jsonb("remarks").$type<{ text: string; by: string; byId: number; at: string }[]>(),
 
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true })
