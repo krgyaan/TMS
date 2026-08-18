@@ -296,6 +296,9 @@ export const paths = {
         enquiryResults: "/crm/enquiry-results",
         enquiryResultView: (id: number | string) => `/crm/enquiry-results/${id}`,
         enquiryResultFollowup: (id: number | string) => `/crm/enquiry-results/followup/${id}`,
+
+        happyCalling: "/crm/happy-calling",
+        happyCallingFollowup: (clientId: number | string) => `/crm/happy-calling/followup/${clientId}`,
     },
 
     // ==================== PERFORMANCE ====================

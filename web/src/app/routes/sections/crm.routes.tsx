@@ -19,6 +19,8 @@ const CRM_LeadsQuotationView  = lazy(() => import('@/modules/crm/leads-quotation
 const CRM_EnquiryResults      = lazy(() => import('@/modules/crm/enquiry-result/EnquiryResultListPage'));
 const CRM_EnquiryResultView   = lazy(() => import('@/modules/crm/enquiry-result/EnquiryResultShowPage'));
 const CRM_EnquiryResultFollowup = lazy(() => import('@/modules/crm/enquiry-result/QuotationFollowupPage'));
+const CRM_HappyCalling       = lazy(() => import('@/modules/crm/happy-calling/HappyCallingListPage'));
+const CRM_HappyCallingFollowup = lazy(() => import('@/modules/crm/happy-calling/HappyCallingFollowupPage'));
 
 export default function CRMRoutes() {
     return (
@@ -42,6 +44,9 @@ export default function CRMRoutes() {
             <Route path="enquiry-results"          element={<RouteWrapper><CRM_EnquiryResults /></RouteWrapper>} />
             <Route path="enquiry-results/followup/:id" element={<RouteWrapper><CRM_EnquiryResultFollowup /></RouteWrapper>} />
             <Route path="enquiry-results/:id"      element={<RouteWrapper><CRM_EnquiryResultView /></RouteWrapper>} />
+
+            <Route path="happy-calling"            element={<RouteWrapper><CRM_HappyCalling /></RouteWrapper>} />
+            <Route path="happy-calling/followup/:clientId" element={<RouteWrapper><CRM_HappyCallingFollowup /></RouteWrapper>} />
         </Routes>
     );
 }
