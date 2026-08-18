@@ -105,6 +105,7 @@ export class HappyCallingService {
         const [inserted] = await this.db
             .insert(happyCalling)
             .values({
+                cDId: data.cDId ?? null,
                 organization: data.organization ?? null,
                 name: data.name,
                 designation: data.designation ?? null,
@@ -114,6 +115,7 @@ export class HappyCallingService {
                 status: data.status ?? null,
                 nextFollowupDate: data.nextFollowupDate ? new Date(data.nextFollowupDate) : null,
                 broadcast: data.broadcast,
+                details: data.details ?? null,
             })
             .returning({ id: happyCalling.id });
 
@@ -133,6 +135,7 @@ export class HappyCallingService {
 
         const updateValues: Record<string, unknown> = { updatedAt: new Date() };
 
+        if (data.cDId !== undefined) updateValues.cDId = data.cDId;
         if (data.organization !== undefined) updateValues.organization = data.organization;
         if (data.name !== undefined) updateValues.name = data.name;
         if (data.designation !== undefined) updateValues.designation = data.designation;
@@ -143,6 +146,7 @@ export class HappyCallingService {
         if (data.nextFollowupDate !== undefined)
             updateValues.nextFollowupDate = data.nextFollowupDate ? new Date(data.nextFollowupDate) : null;
         if (data.broadcast !== undefined) updateValues.broadcast = data.broadcast;
+        if (data.details !== undefined) updateValues.details = data.details;
 
         await this.db
             .update(happyCalling)

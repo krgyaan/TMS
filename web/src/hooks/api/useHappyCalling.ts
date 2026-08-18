@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { happyCallingService } from '@/services/api/happy-calling.service';
 import { broadcastService } from '@/services/api/broadcast.service';
-import type { HappyCallingRow, HappyCallingListParams, UpdateHappyCallingDto, BroadcastRow } from '@/modules/crm/happy-calling/helpers/happy-calling.types';
+import type { HappyCallingRow, HappyCallingListParams, CreateHappyCallingDto, UpdateHappyCallingDto, BroadcastRow } from '@/modules/crm/happy-calling/helpers/happy-calling.types';
 import type { PaginatedResult } from '@/types/api.types';
 import { toast } from 'sonner';
 
@@ -53,6 +53,20 @@ export const useHappyCalling = (id: number | null) => {
         queryKey: happyCallingKey.detail(id ?? 0),
         queryFn: () => happyCallingService.getById(id!),
         enabled: !!id,
+    });
+};
+
+export const useCreateHappyCalling = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: CreateHappyCallingDto) => happyCallingService.create(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: happyCallingKey.lists() });
+        },
+        onError: (error: unknown) => {
+            const err = error as { response?: { data?: { message?: string } }; message?: string };
+            toast.error(err?.response?.data?.message || err?.message || 'Failed to create');
+        },
     });
 };
 

@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
 import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { CustomCellRendererProps } from 'ag-grid-react';
 import type { ColDef, SortChangedEvent } from 'ag-grid-community';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
@@ -15,10 +16,10 @@ import { useHappyCallings } from '@/hooks/api/useHappyCalling';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import type { HappyCallingRow } from '@/modules/crm/happy-calling/helpers/happy-calling.types';
-import { HappyCallingModal } from '@/modules/crm/happy-calling/components/HappyCallingModal';
-import { HappyCallingViewModal } from '@/modules/crm/happy-calling/components/HappyCallingViewModal';
+import { paths } from '@/app/routes/paths';
 
 const HappyCallingListPage = () => {
+    const navigate = useNavigate();
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState('');
@@ -41,7 +42,7 @@ const HappyCallingListPage = () => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
     }, []);
 
-    const { data: apiResponse, isLoading: loading, error, refetch } = useHappyCallings(
+    const { data: apiResponse, isLoading: loading, error } = useHappyCallings(
         {
             page: pagination.pageIndex + 1,
             limit: pagination.pageSize,
@@ -53,25 +54,16 @@ const HappyCallingListPage = () => {
     const rows = apiResponse?.data ?? [];
     const totalRows = apiResponse?.meta?.total ?? 0;
 
-    const [modalState, setModalState] = useState<{ open: boolean; recordId: number | null }>({
-        open: false,
-        recordId: null,
-    });
-    const [viewState, setViewState] = useState<{ open: boolean; record: HappyCallingRow | null }>({
-        open: false,
-        record: null,
-    });
-
     const actions: ActionItem<HappyCallingRow>[] = useMemo(
         () => [
             {
                 label: 'View',
-                onClick: (row) => setViewState({ open: true, record: row }),
+                onClick: (row) => navigate(paths.crm.happyCallingView(row.id)),
                 icon: <Eye className="h-4 w-4" />,
             },
             {
                 label: 'Edit',
-                onClick: (row) => setModalState({ open: true, recordId: row.id }),
+                onClick: (row) => navigate(paths.crm.happyCallingEdit(row.id)),
                 icon: <Edit className="h-4 w-4" />,
             },
             {
@@ -80,7 +72,7 @@ const HappyCallingListPage = () => {
                 icon: <PhoneCall className="h-4 w-4" />,
             },
         ],
-        [],
+        [navigate],
     );
 
     const colDefs = useMemo<ColDef<HappyCallingRow>[]>(
@@ -162,9 +154,10 @@ const HappyCallingListPage = () => {
                 cellRenderer: (params: CustomCellRendererProps<HappyCallingRow>) => {
                     const status = params.data?.status;
                     if (!status) return <span className="text-muted-foreground">—</span>;
+                    const label = status.charAt(0).toUpperCase() + status.slice(1);
                     return (
                         <Badge variant={status === 'done' ? 'default' : 'secondary'}>
-                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                            {label}
                         </Badge>
                     );
                 },
@@ -218,8 +211,7 @@ const HappyCallingListPage = () => {
     }
 
     return (
-        <>
-            <Card>
+        <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <div>
@@ -276,20 +268,6 @@ const HappyCallingListPage = () => {
                     )}
                 </CardContent>
             </Card>
-
-            <HappyCallingModal
-                open={modalState.open}
-                onOpenChange={(open) => setModalState((s) => ({ ...s, open }))}
-                recordId={modalState.recordId}
-                onSuccess={refetch}
-            />
-
-            <HappyCallingViewModal
-                open={viewState.open}
-                onOpenChange={(open) => setViewState((s) => ({ ...s, open }))}
-                record={viewState.record}
-            />
-        </>
     );
 };
 

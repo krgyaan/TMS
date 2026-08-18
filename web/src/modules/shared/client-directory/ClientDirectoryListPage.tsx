@@ -86,7 +86,7 @@ const ClientDirectoryListPage = () => {
             },
             {
                 label: 'Happy Calling',
-                onClick: (row) => navigate(paths.crm.happyCallingFollowup(row.id)),
+                onClick: (row) => navigate(paths.crm.happyCallingCreate(row.id)),
                 icon: <PhoneCall className="h-4 w-4" />,
             },
         ],

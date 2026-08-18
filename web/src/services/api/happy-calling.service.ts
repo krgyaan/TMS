@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service';
-import type { HappyCallingRow, HappyCallingListParams, UpdateHappyCallingDto } from '@/modules/crm/happy-calling/helpers/happy-calling.types';
+import type { HappyCallingRow, HappyCallingListParams, CreateHappyCallingDto, UpdateHappyCallingDto } from '@/modules/crm/happy-calling/helpers/happy-calling.types';
 import type { PaginatedResult } from '@/types/api.types';
 
 class HappyCallingService extends BaseApiService {
@@ -20,6 +20,10 @@ class HappyCallingService extends BaseApiService {
 
     async getById(id: number): Promise<HappyCallingRow> {
         return this.get<HappyCallingRow>(`/${id}`);
+    }
+
+    async create(data: CreateHappyCallingDto): Promise<HappyCallingRow> {
+        return this.post<HappyCallingRow>('', data);
     }
 
     async update(id: number, data: UpdateHappyCallingDto): Promise<HappyCallingRow> {
