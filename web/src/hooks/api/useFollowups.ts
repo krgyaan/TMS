@@ -31,10 +31,10 @@ export const followupsKey = {
 
 // ─── Source Helpers ───────────────────────────────────────────────────────────
 
-export const sourceHistoryPath = (source: FollowupSource): string =>
+export const sourceViewPath = (source: FollowupSource): string =>
     source.sourceType === 'lead'
-        ? paths.crm.leadFollowupHistory(source.sourceId)
-        : paths.crm.happyCallingFollowupHistory(source.sourceId);
+        ? paths.crm.leadView(source.sourceId)
+        : paths.crm.happyCallingView(source.sourceId);
 
 export const sourceFollowupPath = (source: FollowupSource): string =>
     source.sourceType === 'lead'
@@ -226,16 +226,16 @@ export const useVisitForm = (source: FollowupSource) => {
 
     const followupIdParam = searchParams.get("followupId");
     const followupId = followupIdParam ? Number(followupIdParam) : null;
-    const isEditMode = !!followupId;
 
     const createFollowup = useCreateFollowup(source);
     const updateFollowup = useUpdateFollowup(source);
     const sourceRecord = useSourceRecord(source);
     const { data: allFollowups = [] } = useFollowups(source);
 
-    const existingFollowup = isEditMode
-        ? allFollowups.find(f => f.id === followupId) ?? null
+    const existingFollowup = followupId
+        ? allFollowups.find(f => f.id === followupId && f.type === 'visit') ?? null
         : null;
+    const isEditMode = !!existingFollowup;
 
     const [contacts, setContacts] = useState<ContactPerson[]>([]);
     const [lockedCount, setLockedCount] = useState(0);
@@ -286,7 +286,7 @@ export const useVisitForm = (source: FollowupSource) => {
                     followupId,
                     data: payload,
                 });
-                navigate(sourceHistoryPath(source));
+                navigate(sourceViewPath(source));
             } else {
                 await createFollowup.mutateAsync(payload);
                 form.reset();
@@ -303,7 +303,7 @@ export const useVisitForm = (source: FollowupSource) => {
     };
 
     const handleCancelEdit = () => {
-        navigate(sourceHistoryPath(source));
+        navigate(sourceViewPath(source));
     };
 
     return {
@@ -327,16 +327,16 @@ export const useCallForm = (source: FollowupSource) => {
 
     const followupIdParam = searchParams.get("followupId");
     const followupId = followupIdParam ? Number(followupIdParam) : null;
-    const isEditMode = !!followupId;
 
     const createFollowup = useCreateFollowup(source);
     const updateFollowup = useUpdateFollowup(source);
     const sourceRecord = useSourceRecord(source);
     const { data: allFollowups = [] } = useFollowups(source);
 
-    const existingFollowup = isEditMode
-        ? allFollowups.find(f => f.id === followupId) ?? null
+    const existingFollowup = followupId
+        ? allFollowups.find(f => f.id === followupId && f.type === 'call') ?? null
         : null;
+    const isEditMode = !!existingFollowup;
 
     const [contacts, setContacts] = useState<ContactPerson[]>([]);
     const [lockedCount, setLockedCount] = useState(0);
@@ -387,7 +387,7 @@ export const useCallForm = (source: FollowupSource) => {
                     followupId,
                     data: payload,
                 });
-                navigate(sourceHistoryPath(source));
+                navigate(sourceViewPath(source));
             } else {
                 await createFollowup.mutateAsync(payload);
                 form.reset();
@@ -404,7 +404,7 @@ export const useCallForm = (source: FollowupSource) => {
     };
 
     const handleCancelEdit = () => {
-        navigate(sourceHistoryPath(source));
+        navigate(sourceViewPath(source));
     };
 
     return {
@@ -428,15 +428,15 @@ export const useMailForm = (source: FollowupSource) => {
 
     const followupIdParam = searchParams.get("followupId");
     const followupId = followupIdParam ? Number(followupIdParam) : null;
-    const isEditMode = !!followupId;
 
     const createFollowup = useCreateFollowup(source);
     const updateFollowup = useUpdateFollowup(source);
     const { data: allFollowups = [] } = useFollowups(source);
 
-    const existingFollowup = isEditMode
-        ? allFollowups.find(f => f.id === followupId) ?? null
+    const existingFollowup = followupId
+        ? allFollowups.find(f => f.id === followupId && f.type === 'mail') ?? null
         : null;
+    const isEditMode = !!existingFollowup;
 
     const [attachmentPaths, setAttachmentPaths] = useState<string[]>([]);
 
@@ -475,7 +475,7 @@ export const useMailForm = (source: FollowupSource) => {
                     followupId,
                     data: payload,
                 });
-                navigate(sourceHistoryPath(source));
+                navigate(sourceViewPath(source));
             } else {
                 await createFollowup.mutateAsync(payload);
                 form.reset();
@@ -487,7 +487,7 @@ export const useMailForm = (source: FollowupSource) => {
     };
 
     const handleCancelEdit = () => {
-        navigate(sourceHistoryPath(source));
+        navigate(sourceViewPath(source));
     };
 
     return {
@@ -510,15 +510,15 @@ export const useWhatsappForm = (source: FollowupSource) => {
 
     const followupIdParam = searchParams.get("followupId");
     const followupId = followupIdParam ? Number(followupIdParam) : null;
-    const isEditMode = !!followupId;
 
     const createFollowup = useCreateFollowup(source);
     const updateFollowup = useUpdateFollowup(source);
     const { data: allFollowups = [] } = useFollowups(source);
 
-    const existingFollowup = isEditMode
-        ? allFollowups.find(f => f.id === followupId) ?? null
+    const existingFollowup = followupId
+        ? allFollowups.find(f => f.id === followupId && f.type === 'whatsapp') ?? null
         : null;
+    const isEditMode = !!existingFollowup;
 
     const [attachmentPaths, setAttachmentPaths] = useState<string[]>([]);
 
@@ -554,7 +554,7 @@ export const useWhatsappForm = (source: FollowupSource) => {
                     followupId,
                     data: payload,
                 });
-                navigate(sourceHistoryPath(source));
+                navigate(sourceViewPath(source));
             } else {
                 await createFollowup.mutateAsync(payload);
                 form.reset();
@@ -566,7 +566,7 @@ export const useWhatsappForm = (source: FollowupSource) => {
     };
 
     const handleCancelEdit = () => {
-        navigate(sourceHistoryPath(source));
+        navigate(sourceViewPath(source));
     };
 
     return {
@@ -589,15 +589,15 @@ export const useLetterForm = (source: FollowupSource) => {
 
     const followupIdParam = searchParams.get("followupId");
     const followupId = followupIdParam ? Number(followupIdParam) : null;
-    const isEditMode = !!followupId;
 
     const createFollowup = useCreateFollowup(source);
     const updateFollowup = useUpdateFollowup(source);
     const { data: allFollowups = [] } = useFollowups(source);
 
-    const existingFollowup = isEditMode
-        ? allFollowups.find(f => f.id === followupId) ?? null
+    const existingFollowup = followupId
+        ? allFollowups.find(f => f.id === followupId && f.type === 'letter') ?? null
         : null;
+    const isEditMode = !!existingFollowup;
 
     const [attachmentPaths, setAttachmentPaths] = useState<string[]>([]);
 
@@ -666,7 +666,7 @@ export const useLetterForm = (source: FollowupSource) => {
                     followupId,
                     data: payload,
                 });
-                navigate(sourceHistoryPath(source));
+                navigate(sourceViewPath(source));
             } else {
                 await createFollowup.mutateAsync(payload);
                 form.reset();
@@ -678,7 +678,7 @@ export const useLetterForm = (source: FollowupSource) => {
     };
 
     const handleCancelEdit = () => {
-        navigate(sourceHistoryPath(source));
+        navigate(sourceViewPath(source));
     };
 
     return {

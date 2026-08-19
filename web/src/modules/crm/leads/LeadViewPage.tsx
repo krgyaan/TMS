@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { LeadDetailsSection } from "./components/LeadView";
 import { FollowupViewPage } from "../followups/FollowupViewPage";
 import { ShowPageLayout, type StepConfig } from "@/components/layout/ShowPageLayout";
@@ -17,6 +18,8 @@ interface LeadViewPageProps {
 
 export function LeadViewPage({ leadId, onBack, backLabel }: LeadViewPageProps) {
     const stepStatuses = useLeadStepStatuses(leadId);
+    const [searchParams] = useSearchParams();
+    const initialSection = searchParams.get("section");
 
     const steps = useMemo<StepConfig[]>(() => stepStatuses.map(s => ({
         id: s.id,
@@ -29,7 +32,7 @@ export function LeadViewPage({ leadId, onBack, backLabel }: LeadViewPageProps) {
     })), [stepStatuses]);
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(
-        new Set(["lead-details"])
+        () => new Set(initialSection === "followups" ? ["followups"] : ["lead-details"])
     );
 
     const toggleSection = useCallback((id: string) => {

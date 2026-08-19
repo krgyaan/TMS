@@ -17,7 +17,6 @@ import {
     FileText,
     MessageCircle,
     AlertCircle,
-    History, 
 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { useLead } from "@/hooks/api/useLeads";
@@ -127,17 +126,14 @@ export default function FollowupListPage() {
                             <ArrowLeft className="h-4 w-4 mr-1" />
                             Back to Leads
                         </Button>
-                        
                     </div>
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={() => navigate(paths.crm.leadFollowupHistory(leadIdNum))}
-                        >
-                            <History className="h-4 w-4 mr-1" />
-                            View History
-                        </Button>
-                    </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`${paths.crm.leadView(leadIdNum)}?section=followups`)}
+                    >
+                        View History
+                    </Button>
                 </div>
             </CardHeader>
 
@@ -160,23 +156,23 @@ export default function FollowupListPage() {
                         ))}
                     </TabsList>
 
-                    <TabsContent value="mail">
+                    <TabsContent value="mail" forceMount className={activeTab === 'mail' ? '' : 'hidden'}>
                         <MailTab source={{ sourceType: 'lead', sourceId: leadIdNum }} />
                     </TabsContent>
 
-                    <TabsContent value="call">
+                    <TabsContent value="call" forceMount className={activeTab === 'call' ? '' : 'hidden'}>
                         <CallTab source={{ sourceType: 'lead', sourceId: leadIdNum }} />
                     </TabsContent>
 
-                    <TabsContent value="visit">
+                    <TabsContent value="visit" forceMount className={activeTab === 'visit' ? '' : 'hidden'}>
                         <VisitTab source={{ sourceType: 'lead', sourceId: leadIdNum }} />
                     </TabsContent>
 
-                    <TabsContent value="letter">
+                    <TabsContent value="letter" forceMount className={activeTab === 'letter' ? '' : 'hidden'}>
                         <LetterTab source={{ sourceType: 'lead', sourceId: leadIdNum }} />
                     </TabsContent>
 
-                    <TabsContent value="whatsapp">
+                    <TabsContent value="whatsapp" forceMount className={activeTab === 'whatsapp' ? '' : 'hidden'}>
                         <WhatsappTab source={{ sourceType: 'lead', sourceId: leadIdNum }} />
                     </TabsContent>
                 </Tabs>
