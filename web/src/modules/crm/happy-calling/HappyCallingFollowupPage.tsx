@@ -17,15 +17,15 @@ import {
     FileText,
     MessageCircle,
     AlertCircle,
-    History, 
+    History,
 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { useLead } from "@/hooks/api/useLeads";
-import { MailTab }     from "./components/MailTab";
-import { CallTab }     from "./components/CallTab";
-import { VisitTab }    from "./components/VisitTab";
-import { LetterTab }   from "./components/LetterTab";
-import { WhatsappTab } from "./components/WhatsappTab";
+import { useHappyCalling } from "@/hooks/api/useHappyCalling";
+import { MailTab }     from "../followups/components/MailTab";
+import { CallTab }     from "../followups/components/CallTab";
+import { VisitTab }    from "../followups/components/VisitTab";
+import { LetterTab }   from "../followups/components/LetterTab";
+import { WhatsappTab } from "../followups/components/WhatsappTab";
 
 type FollowupTabType = 'mail' | 'call' | 'visit' | 'letter' | 'whatsapp';
 
@@ -43,8 +43,6 @@ const FOLLOWUP_TABS: {
     { key: 'whatsapp', label: 'WhatsApp',  icon: <MessageCircle className="h-4 w-4" /> },
 ];
 
-const LAST_TAB_KEY = 'crm_followup_last_tab';
-
 const getValidTab = (tab: string | null): FollowupTabType => {
     if (tab && VALID_TABS.includes(tab as FollowupTabType)) {
         return tab as FollowupTabType;
@@ -52,24 +50,15 @@ const getValidTab = (tab: string | null): FollowupTabType => {
     return 'mail';
 };
 
-export default function FollowupListPage() {
-    const { leadId } = useParams<{ leadId: string }>();
+export default function HappyCallingFollowupPage() {
+    const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    const getInitialTab = (): FollowupTabType => {
-        const urlTab = searchParams.get('tab');
-        if (urlTab && VALID_TABS.includes(urlTab as FollowupTabType)) {
-            return urlTab as FollowupTabType;
-        }
-        const savedTab = localStorage.getItem(LAST_TAB_KEY);
-        return getValidTab(savedTab);
-    };
+    const [activeTab, setActiveTab] = useState<FollowupTabType>(getValidTab(searchParams.get('tab')));
 
-    const [activeTab, setActiveTab] = useState<FollowupTabType>(getInitialTab);
-
-    const leadIdNum = leadId ? Number(leadId) : null;
-    const { data: lead, isLoading: leadLoading } = useLead(leadIdNum);
+    const happyCallingId = id ? Number(id) : null;
+    const { data: happyCalling, isLoading } = useHappyCalling(happyCallingId);
 
     useEffect(() => {
         if (!searchParams.get('tab')) {
@@ -81,10 +70,9 @@ export default function FollowupListPage() {
         const newTab = value as FollowupTabType;
         setActiveTab(newTab);
         setSearchParams({ tab: newTab });
-        localStorage.setItem(LAST_TAB_KEY, newTab);
     };
 
-    if (leadLoading) {
+    if (isLoading) {
         return (
             <div className="space-y-4">
                 <Skeleton className="h-8 w-64" />
@@ -94,24 +82,26 @@ export default function FollowupListPage() {
         );
     }
 
-    if (!leadIdNum || isNaN(leadIdNum) || !lead) {
+    if (!happyCallingId || isNaN(happyCallingId) || !happyCalling) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                    Lead not found or invalid ID.
+                    Happy Calling record not found or invalid ID.
                     <Button
                         variant="outline"
                         size="sm"
                         className="ml-4"
-                        onClick={() => navigate(paths.crm.leads)}
+                        onClick={() => navigate(paths.crm.happyCalling)}
                     >
-                        Back to Leads
+                        Back to Happy Calling
                     </Button>
                 </AlertDescription>
             </Alert>
         );
     }
+
+    const source = { sourceType: 'happy_calling' as const, sourceId: happyCallingId };
 
     return (
         <Card className="min-h-[calc(100vh-2rem)] flex flex-col border-0 shadow-none">
@@ -122,17 +112,20 @@ export default function FollowupListPage() {
                             variant="ghost"
                             size="sm"
                             className="mb-1 -ml-2"
-                            onClick={() => navigate(paths.crm.leads)}
+                            onClick={() => navigate(paths.crm.happyCalling)}
                         >
                             <ArrowLeft className="h-4 w-4 mr-1" />
-                            Back to Leads
+                            Back to Happy Calling
                         </Button>
-                        
+                        <h2 className="text-lg font-semibold">
+                            Follow-up: {happyCalling.name}
+                            {happyCalling.organization ? ` — ${happyCalling.organization}` : ''}
+                        </h2>
                     </div>
                     <div className="flex gap-2">
                         <Button
                             variant="outline"
-                            onClick={() => navigate(paths.crm.leadFollowupHistory(leadIdNum))}
+                            onClick={() => navigate(paths.crm.happyCallingFollowupHistory(happyCallingId))}
                         >
                             <History className="h-4 w-4 mr-1" />
                             View History
@@ -161,23 +154,23 @@ export default function FollowupListPage() {
                     </TabsList>
 
                     <TabsContent value="mail">
-                        <MailTab source={{ sourceType: 'lead', sourceId: leadIdNum }} />
+                        <MailTab source={source} />
                     </TabsContent>
 
                     <TabsContent value="call">
-                        <CallTab source={{ sourceType: 'lead', sourceId: leadIdNum }} />
+                        <CallTab source={source} />
                     </TabsContent>
 
                     <TabsContent value="visit">
-                        <VisitTab source={{ sourceType: 'lead', sourceId: leadIdNum }} />
+                        <VisitTab source={source} />
                     </TabsContent>
 
                     <TabsContent value="letter">
-                        <LetterTab source={{ sourceType: 'lead', sourceId: leadIdNum }} />
+                        <LetterTab source={source} />
                     </TabsContent>
 
                     <TabsContent value="whatsapp">
-                        <WhatsappTab source={{ sourceType: 'lead', sourceId: leadIdNum }} />
+                        <WhatsappTab source={source} />
                     </TabsContent>
                 </Tabs>
             </CardContent>

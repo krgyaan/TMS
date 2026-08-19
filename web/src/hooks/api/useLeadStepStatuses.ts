@@ -26,7 +26,7 @@ export interface LeadStepStatus {
 
 export function useLeadStepStatuses(leadId: number | null) {
     const { data: lead, isLoading: l1 } = useLead(leadId);
-    const { data: followups, isLoading: l2 } = useFollowups(leadId ?? 0);
+    const { data: followups, isLoading: l2 } = useFollowups({ sourceType: 'lead', sourceId: leadId ?? 0 });
 
     const { data: enquiriesResponse, isLoading: l3 } = useLeadEnquiries(
         { page: 1, limit: 1, leadId: leadId ?? undefined },

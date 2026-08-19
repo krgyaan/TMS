@@ -5,8 +5,9 @@ import { leadFollowups, type NewLeadFollowup } from '@db/schemas/crm/lead-follow
 import { leadContacts } from '@db/schemas/crm/lead-contacts.schema';
 import { couriers } from '@db/schemas/shared/couriers.schema';
 import { leads } from '@db/schemas/crm/leads.schema';
+import { happyCalling } from '@db/schemas/crm/happy-calling.schema';
 import { users } from '@db/schemas/auth/users.schema';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, sql, and } from 'drizzle-orm';
 
 import type {
     CreateFollowupDto,
@@ -16,25 +17,47 @@ import type {
     ContactDto,
 } from './dto/followup.dto';
 
+export type FollowupSourceType = 'lead' | 'happy_calling';
+
 @Injectable()
 export class FollowupsService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
     ) {}
 
-    // ─── Find All Followups for a Lead ────────────────────────────────
+    // ─── Resolve which id column + entity to verify ───────────────────
 
-    async findAllByLead(leadId: number) {
-        // Verify lead exists
+    private sourceCondition(sourceType: FollowupSourceType, sourceId: number) {
+        if (sourceType === 'happy_calling') {
+            return and(eq(leadFollowups.sourceType, 'happy_calling'), eq(leadFollowups.happyCallingId, sourceId));
+        }
+        return and(eq(leadFollowups.sourceType, 'lead'), eq(leadFollowups.leadId, sourceId));
+    }
+
+    private async verifySource(sourceType: FollowupSourceType, sourceId: number) {
+        if (sourceType === 'happy_calling') {
+            const row = await this.db
+                .select({ id: happyCalling.id })
+                .from(happyCalling)
+                .where(eq(happyCalling.id, sourceId))
+                .limit(1);
+            if (!row[0]) {
+                throw new NotFoundException(`Happy calling entry with ID ${sourceId} not found`);
+            }
+            return;
+        }
         const lead = await this.db
             .select({ id: leads.id })
             .from(leads)
-            .where(eq(leads.id, leadId))
+            .where(eq(leads.id, sourceId))
             .limit(1);
-
         if (!lead[0]) {
-            throw new NotFoundException(`Lead with ID ${leadId} not found`);
+            throw new NotFoundException(`Lead with ID ${sourceId} not found`);
         }
+    }
+
+    async findAllBySource(sourceType: FollowupSourceType, sourceId: number) {
+        await this.verifySource(sourceType, sourceId);
 
         const followups = await this.db
             .select({
@@ -43,7 +66,7 @@ export class FollowupsService {
             })
             .from(leadFollowups)
             .leftJoin(users, eq(users.id, leadFollowups.createdBy))
-            .where(eq(leadFollowups.leadId, leadId))
+            .where(this.sourceCondition(sourceType, sourceId))
             .orderBy(desc(leadFollowups.createdAt));
 
         // For each followup, fetch related data
@@ -151,20 +174,12 @@ export class FollowupsService {
     // ── UNCHANGED ────────────────────────────────────────────────────
 
     async create(
-        leadId: number,
+        sourceType: FollowupSourceType,
+        sourceId: number,
         data: CreateFollowupDto,
         createdBy: number,
     ) {
-        // Verify lead exists
-        const lead = await this.db
-            .select({ id: leads.id })
-            .from(leads)
-            .where(eq(leads.id, leadId))
-            .limit(1);
-
-        if (!lead[0]) {
-            throw new NotFoundException(`Lead with ID ${leadId} not found`);
-        }
+        await this.verifySource(sourceType, sourceId);
 
         return this.db.transaction(async (tx) => {
 
@@ -197,7 +212,10 @@ export class FollowupsService {
             // ── Build followup payload ─────────────────────────────────
 
             const followupPayload: NewLeadFollowup = {
-                leadId,
+                sourceType,
+                ...(sourceType === 'happy_calling'
+                    ? { happyCallingId: sourceId }
+                    : { leadId: sourceId }),
                 type: data.type,
                 createdBy,
                 courierId,
@@ -231,7 +249,9 @@ export class FollowupsService {
                 const contactsPayload = (data as CallFollowupDto | VisitFollowupDto)
                     .contacts
                     .map((contact: ContactDto) => ({
-                        leadId,
+                        ...(sourceType === 'happy_calling'
+                            ? { leadId: null }
+                            : { leadId: sourceId }),
                         followupId: followup.id,
                         name: contact.name,
                         designation: contact.designation ?? null,
@@ -243,40 +263,42 @@ export class FollowupsService {
                 await tx.insert(leadContacts).values(contactsPayload);
             }
 
-            // ── Update lead counters ───────────────────────────────────
+            // ── Update lead counters (only for lead source) ───────────
 
-            const leadUpdate: any = {
-                updatedAt: new Date(),
-                recentFollowUp: data.type,
-            };
+            if (sourceType === 'lead') {
+                const leadUpdate: any = {
+                    updatedAt: new Date(),
+                    recentFollowUp: data.type,
+                };
 
-            switch (data.type) {
-                case 'mail':
-                    leadUpdate.mailFollowupCount = sql`${leads.mailFollowupCount} + 1`;
-                    leadUpdate.lastMailSentAt    = new Date();
-                    break;
-                case 'call':
-                    leadUpdate.callFollowupCount = sql`${leads.callFollowupCount} + 1`;
-                    leadUpdate.lastCallAt         = new Date();
-                    break;
-                case 'visit':
-                    leadUpdate.visitFollowupCount = sql`${leads.visitFollowupCount} + 1`;
-                    leadUpdate.lastVisitAt         = new Date();
-                    break;
-                case 'letter':
-                    leadUpdate.letterSentCount   = sql`${leads.letterSentCount} + 1`;
-                    leadUpdate.lastLetterSentAt  = new Date();
-                    break;
-                case 'whatsapp':
-                    leadUpdate.whatsappFollowupCount = sql`${leads.whatsappFollowupCount} + 1`;
-                    leadUpdate.lastWhatsappSentAt    = new Date();
-                    break;
+                switch (data.type) {
+                    case 'mail':
+                        leadUpdate.mailFollowupCount = sql`${leads.mailFollowupCount} + 1`;
+                        leadUpdate.lastMailSentAt    = new Date();
+                        break;
+                    case 'call':
+                        leadUpdate.callFollowupCount = sql`${leads.callFollowupCount} + 1`;
+                        leadUpdate.lastCallAt         = new Date();
+                        break;
+                    case 'visit':
+                        leadUpdate.visitFollowupCount = sql`${leads.visitFollowupCount} + 1`;
+                        leadUpdate.lastVisitAt         = new Date();
+                        break;
+                    case 'letter':
+                        leadUpdate.letterSentCount   = sql`${leads.letterSentCount} + 1`;
+                        leadUpdate.lastLetterSentAt  = new Date();
+                        break;
+                    case 'whatsapp':
+                        leadUpdate.whatsappFollowupCount = sql`${leads.whatsappFollowupCount} + 1`;
+                        leadUpdate.lastWhatsappSentAt    = new Date();
+                        break;
+                }
+
+                await tx
+                    .update(leads)
+                    .set(leadUpdate)
+                    .where(eq(leads.id, sourceId));
             }
-
-            await tx
-                .update(leads)
-                .set(leadUpdate)
-                .where(eq(leads.id, leadId));
 
             return followup;
         });
@@ -385,7 +407,7 @@ export class FollowupsService {
                     const contactsPayload = (data as CallFollowupDto | VisitFollowupDto)
                         .contacts
                         .map((contact: ContactDto) => ({
-                            leadId: updatedFollowup.leadId,
+                            leadId: updatedFollowup.leadId ?? null,
                             followupId: id,
                             name: contact.name,
                             designation: contact.designation ?? null,
@@ -419,28 +441,30 @@ export class FollowupsService {
                 .delete(leadFollowups)
                 .where(eq(leadFollowups.id, id));
 
-            // Decrement lead counter
+            // Decrement lead counter (only for lead source)
             const decrementMap: any = {};
 
-            switch (followup.type) {
-                case 'mail':
-                    decrementMap.mailFollowupCount = sql`GREATEST(${leads.mailFollowupCount} - 1, 0)`;
-                    break;
-                case 'call':
-                    decrementMap.callFollowupCount = sql`GREATEST(${leads.callFollowupCount} - 1, 0)`;
-                    break;
-                case 'visit':
-                    decrementMap.visitFollowupCount = sql`GREATEST(${leads.visitFollowupCount} - 1, 0)`;
-                    break;
-                case 'letter':
-                    decrementMap.letterSentCount = sql`GREATEST(${leads.letterSentCount} - 1, 0)`;
-                    break;
-                case 'whatsapp':
-                    decrementMap.whatsappFollowupCount = sql`GREATEST(${leads.whatsappFollowupCount} - 1, 0)`;
-                    break;
+            if (followup.sourceType === 'lead') {
+                switch (followup.type) {
+                    case 'mail':
+                        decrementMap.mailFollowupCount = sql`GREATEST(${leads.mailFollowupCount} - 1, 0)`;
+                        break;
+                    case 'call':
+                        decrementMap.callFollowupCount = sql`GREATEST(${leads.callFollowupCount} - 1, 0)`;
+                        break;
+                    case 'visit':
+                        decrementMap.visitFollowupCount = sql`GREATEST(${leads.visitFollowupCount} - 1, 0)`;
+                        break;
+                    case 'letter':
+                        decrementMap.letterSentCount = sql`GREATEST(${leads.letterSentCount} - 1, 0)`;
+                        break;
+                    case 'whatsapp':
+                        decrementMap.whatsappFollowupCount = sql`GREATEST(${leads.whatsappFollowupCount} - 1, 0)`;
+                        break;
+                }
             }
 
-            if (Object.keys(decrementMap).length > 0) {
+            if (Object.keys(decrementMap).length > 0 && followup.leadId != null) {
                 await tx
                     .update(leads)
                     .set({ ...decrementMap, updatedAt: new Date() })

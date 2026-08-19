@@ -17,7 +17,7 @@ export default function FollowupShowPage() {
 
     return (
         <FollowupViewPage
-            leadId={leadIdNum}
+            source={{ sourceType: 'lead', sourceId: leadIdNum }}
             onBack={() => navigate(paths.crm.leadFollowup(leadIdNum))}
             backLabel="Back to Add Follow-up"
         />

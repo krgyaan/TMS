@@ -301,6 +301,8 @@ export const paths = {
         happyCallingCreate: (clientId: number | string) => `/crm/happy-calling/create/${clientId}`,
         happyCallingView: (id: number | string) => `/crm/happy-calling/${id}`,
         happyCallingEdit: (id: number | string) => `/crm/happy-calling/${id}/edit`,
+        happyCallingFollowup: (id: number | string) => `/crm/happy-calling/followup/${id}`,
+        happyCallingFollowupHistory: (id: number | string) => `/crm/happy-calling/followup/${id}/history`,
     },
 
     // ==================== PERFORMANCE ====================

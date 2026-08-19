@@ -17,8 +17,7 @@ export const contactSourceEnum = pgEnum('contact_source', [
 export const leadContacts = pgTable("lead_contacts", {
     id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
 
-    leadId: bigint("lead_id", { mode: "number" })
-        .notNull(),
+    leadId: bigint("lead_id", { mode: "number" }),
 
     // ✅ Links contact to a specific follow-up
     followupId: bigint("followup_id", { mode: "number" })

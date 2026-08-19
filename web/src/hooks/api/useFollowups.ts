@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useForm } from "react-hook-form";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,6 +8,7 @@ import { followupsService } from '@/services/api/followups.service';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/utils/errorToast';
 import { useLead } from './useLeads';
+import { useHappyCalling } from './useHappyCalling';
 import { paths } from '@/app/routes/paths';
 import type {
     CreateFollowupRequest,
@@ -16,15 +17,66 @@ import type {
     CallFollowupRequest,
     MailFollowupRequest,
     WhatsappFollowupRequest,
-    LetterFollowupRequest
+    LetterFollowupRequest,
+    FollowupSource,
 } from '@/modules/crm/followups/helpers/followup.types';
 
 // ─── Query Keys ───────────────────────────────────────────────────────────────
 
 export const followupsKey = {
     all: ['followups'] as const,
-    byLead: (leadId: number) => [...followupsKey.all, 'lead', leadId] as const,
-    detail: (leadId: number, id: number) => [...followupsKey.byLead(leadId), id] as const,
+    bySource: (sourceType: string, sourceId: number) => [...followupsKey.all, sourceType, sourceId] as const,
+    detail: (sourceType: string, sourceId: number, id: number) => [...followupsKey.bySource(sourceType, sourceId), id] as const,
+};
+
+// ─── Source Helpers ───────────────────────────────────────────────────────────
+
+export const sourceHistoryPath = (source: FollowupSource): string =>
+    source.sourceType === 'lead'
+        ? paths.crm.leadFollowupHistory(source.sourceId)
+        : paths.crm.happyCallingFollowupHistory(source.sourceId);
+
+export const sourceFollowupPath = (source: FollowupSource): string =>
+    source.sourceType === 'lead'
+        ? paths.crm.leadFollowup(source.sourceId)
+        : paths.crm.happyCallingFollowup(source.sourceId);
+
+export interface SourceRecordLike {
+    leadContacts?: ContactPerson[] | null;
+    name?: string | null;
+    designation?: string | null;
+    phone?: string | null;
+    email?: string | null;
+}
+
+export const seedContactsFromSource = (record: SourceRecordLike | undefined): ContactPerson[] => {
+    if (!record) return [];
+    const leadContacts = 'leadContacts' in record ? record.leadContacts : null;
+    if (Array.isArray(leadContacts) && leadContacts.length > 0) {
+        return leadContacts.map((c: ContactPerson) => ({
+            name: c.name || "",
+            designation: c.designation || "",
+            phone: c.phone || "",
+            email: c.email || "",
+        }));
+    }
+    if (record.name || record.designation || record.phone || record.email) {
+        return [{
+            name: record.name || "",
+            designation: record.designation || "",
+            phone: record.phone || "",
+            email: record.email || "",
+        }];
+    }
+    return [];
+};
+
+export const useSourceRecord = (source: FollowupSource): SourceRecordLike | undefined => {
+    const { data: lead } = useLead(source.sourceType === 'lead' ? source.sourceId : null);
+    const { data: happyCalling } = useHappyCalling(source.sourceType === 'happy_calling' ? source.sourceId : null);
+    return source.sourceType === 'lead'
+        ? (lead as unknown as SourceRecordLike | undefined)
+        : (happyCalling as unknown as SourceRecordLike | undefined);
 };
 
 // ─── Utility Functions ────────────────────────────────────────────────────────
@@ -101,58 +153,64 @@ export type LetterFormValues = z.infer<typeof LetterSchema>;
 
 // ─── Basic CRUD Hooks ─────────────────────────────────────────────────────────
 
-export const useFollowups = (leadId: number) => {
+export const useFollowups = (source: FollowupSource) => {
     return useQuery({
-        queryKey: followupsKey.byLead(leadId),
-        queryFn: () => followupsService.getAll(leadId),
-        enabled: !!leadId,
+        queryKey: followupsKey.bySource(source.sourceType, source.sourceId),
+        queryFn: () => followupsService.getAll(source),
+        enabled: !!source.sourceId,
     });
 };
 
-export const useFollowup = (leadId: number, followupId: number) => {
+export const useFollowup = (source: FollowupSource, followupId: number) => {
     return useQuery({
-        queryKey: followupsKey.detail(leadId, followupId),
-        queryFn: () => followupsService.getById(leadId, followupId),
-        enabled: !!leadId && !!followupId,
+        queryKey: followupsKey.detail(source.sourceType, source.sourceId, followupId),
+        queryFn: () => followupsService.getById(source, followupId),
+        enabled: !!source.sourceId && !!followupId,
     });
 };
 
-export const useCreateFollowup = (leadId: number) => {
+const invalidateSource = (queryClient: QueryClient, source: FollowupSource) => {
+    queryClient.invalidateQueries({ queryKey: followupsKey.bySource(source.sourceType, source.sourceId) });
+    if (source.sourceType === 'lead') {
+        queryClient.invalidateQueries({ queryKey: ['leads', 'detail', source.sourceId] });
+    } else {
+        queryClient.invalidateQueries({ queryKey: ['happy-calling', 'detail', source.sourceId] });
+    }
+};
+
+export const useCreateFollowup = (source: FollowupSource) => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (data: CreateFollowupRequest) =>
-            followupsService.create(leadId, data),
+            followupsService.create(source, data),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: followupsKey.byLead(leadId) });
-            queryClient.invalidateQueries({ queryKey: ['leads', 'detail', leadId] });
+            invalidateSource(queryClient, source);
             toast.success('Follow-up saved successfully');
         },
         onError: showErrorToast,
     });
 };
 
-export const useUpdateFollowup = (leadId: number) => {
+export const useUpdateFollowup = (source: FollowupSource) => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: ({ followupId, data }: { followupId: number; data: CreateFollowupRequest }) =>
-            followupsService.update(leadId, followupId, data),
+            followupsService.update(source, followupId, data),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: followupsKey.byLead(leadId) });
-            queryClient.invalidateQueries({ queryKey: ['leads', 'detail', leadId] });
+            invalidateSource(queryClient, source);
             toast.success('Follow-up updated successfully');
         },
         onError: showErrorToast,
     });
 };
 
-export const useDeleteFollowup = (leadId: number) => {
+export const useDeleteFollowup = (source: FollowupSource) => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (followupId: number) =>
-            followupsService.remove(leadId, followupId),
+            followupsService.remove(source, followupId),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: followupsKey.byLead(leadId) });
-            queryClient.invalidateQueries({ queryKey: ['leads', 'detail', leadId] });
+            invalidateSource(queryClient, source);
             toast.success('Follow-up deleted successfully');
         },
         onError: showErrorToast,
@@ -162,7 +220,7 @@ export const useDeleteFollowup = (leadId: number) => {
 // ─── Visit Form Hook ──────────────────────────────────────────────────────────
 // ── UNCHANGED ────────────────────────────────────────────────────────────────
 
-export const useVisitForm = (leadId: number) => {
+export const useVisitForm = (source: FollowupSource) => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
 
@@ -170,10 +228,10 @@ export const useVisitForm = (leadId: number) => {
     const followupId = followupIdParam ? Number(followupIdParam) : null;
     const isEditMode = !!followupId;
 
-    const createFollowup = useCreateFollowup(leadId);
-    const updateFollowup = useUpdateFollowup(leadId);
-    const { data: lead } = useLead(leadId);
-    const { data: allFollowups = [] } = useFollowups(leadId);
+    const createFollowup = useCreateFollowup(source);
+    const updateFollowup = useUpdateFollowup(source);
+    const sourceRecord = useSourceRecord(source);
+    const { data: allFollowups = [] } = useFollowups(source);
 
     const existingFollowup = isEditMode
         ? allFollowups.find(f => f.id === followupId) ?? null
@@ -206,32 +264,12 @@ export const useVisitForm = (leadId: number) => {
     useEffect(() => {
         if (isEditMode) return;
 
-        if (lead) {
-            const leadData = lead as any;
-            if (
-                leadData.leadContacts &&
-                Array.isArray(leadData.leadContacts) &&
-                leadData.leadContacts.length > 0
-            ) {
-                const existingContacts = leadData.leadContacts.map((contact: any) => ({
-                    name: contact.name || "",
-                    designation: contact.designation || "",
-                    phone: contact.phone || "",
-                    email: contact.email || "",
-                }));
-                setContacts(existingContacts);
-                setLockedCount(existingContacts.length);
-            } else if (lead.name || lead.designation || lead.phone || lead.email) {
-                setContacts([{
-                    name: lead.name || "",
-                    designation: lead.designation || "",
-                    phone: lead.phone || "",
-                    email: lead.email || "",
-                }]);
-                setLockedCount(1);
-            }
+        const seeded = seedContactsFromSource(sourceRecord);
+        if (seeded.length > 0) {
+            setContacts(seeded);
+            setLockedCount(seeded.length);
         }
-    }, [lead, isEditMode]);
+    }, [sourceRecord, isEditMode]);
 
     const handleSubmit = async (values: VisitFormValues) => {
         const payload: VisitFollowupRequest = {
@@ -248,35 +286,15 @@ export const useVisitForm = (leadId: number) => {
                     followupId,
                     data: payload,
                 });
-                navigate(paths.crm.leadFollowupHistory(leadId));
+                navigate(sourceHistoryPath(source));
             } else {
                 await createFollowup.mutateAsync(payload);
                 form.reset();
 
-                if (lead) {
-                    const leadData = lead as any;
-                    if (
-                        leadData.leadContacts &&
-                        Array.isArray(leadData.leadContacts) &&
-                        leadData.leadContacts.length > 0
-                    ) {
-                        const existingContacts = leadData.leadContacts.map((c: any) => ({
-                            name: c.name || "",
-                            designation: c.designation || "",
-                            phone: c.phone || "",
-                            email: c.email || "",
-                        }));
-                        setContacts(existingContacts);
-                        setLockedCount(existingContacts.length);
-                    } else if (lead.name || lead.designation || lead.phone || lead.email) {
-                        setContacts([{
-                            name: lead.name || "",
-                            designation: lead.designation || "",
-                            phone: lead.phone || "",
-                            email: lead.email || "",
-                        }]);
-                        setLockedCount(1);
-                    }
+                const seeded = seedContactsFromSource(sourceRecord);
+                if (seeded.length > 0) {
+                    setContacts(seeded);
+                    setLockedCount(seeded.length);
                 }
             }
         } catch {
@@ -285,7 +303,7 @@ export const useVisitForm = (leadId: number) => {
     };
 
     const handleCancelEdit = () => {
-        navigate(paths.crm.leadFollowupHistory(leadId));
+        navigate(sourceHistoryPath(source));
     };
 
     return {
@@ -303,7 +321,7 @@ export const useVisitForm = (leadId: number) => {
 // ─── Call Form Hook ───────────────────────────────────────────────────────────
 // ── UNCHANGED ────────────────────────────────────────────────────────────────
 
-export const useCallForm = (leadId: number) => {
+export const useCallForm = (source: FollowupSource) => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
 
@@ -311,10 +329,10 @@ export const useCallForm = (leadId: number) => {
     const followupId = followupIdParam ? Number(followupIdParam) : null;
     const isEditMode = !!followupId;
 
-    const createFollowup = useCreateFollowup(leadId);
-    const updateFollowup = useUpdateFollowup(leadId);
-    const { data: lead } = useLead(leadId);
-    const { data: allFollowups = [] } = useFollowups(leadId);
+    const createFollowup = useCreateFollowup(source);
+    const updateFollowup = useUpdateFollowup(source);
+    const sourceRecord = useSourceRecord(source);
+    const { data: allFollowups = [] } = useFollowups(source);
 
     const existingFollowup = isEditMode
         ? allFollowups.find(f => f.id === followupId) ?? null
@@ -347,32 +365,12 @@ export const useCallForm = (leadId: number) => {
     useEffect(() => {
         if (isEditMode) return;
 
-        if (lead) {
-            const leadData = lead as any;
-            if (
-                leadData.leadContacts &&
-                Array.isArray(leadData.leadContacts) &&
-                leadData.leadContacts.length > 0
-            ) {
-                const existingContacts = leadData.leadContacts.map((contact: any) => ({
-                    name: contact.name || "",
-                    designation: contact.designation || "",
-                    phone: contact.phone || "",
-                    email: contact.email || "",
-                }));
-                setContacts(existingContacts);
-                setLockedCount(existingContacts.length);
-            } else if (lead.name || lead.designation || lead.phone || lead.email) {
-                setContacts([{
-                    name: lead.name || "",
-                    designation: lead.designation || "",
-                    phone: lead.phone || "",
-                    email: lead.email || "",
-                }]);
-                setLockedCount(1);
-            }
+        const seeded = seedContactsFromSource(sourceRecord);
+        if (seeded.length > 0) {
+            setContacts(seeded);
+            setLockedCount(seeded.length);
         }
-    }, [lead, isEditMode]);
+    }, [sourceRecord, isEditMode]);
 
     const handleSubmit = async (values: CallFormValues) => {
         const payload: CallFollowupRequest = {
@@ -389,35 +387,15 @@ export const useCallForm = (leadId: number) => {
                     followupId,
                     data: payload,
                 });
-                navigate(paths.crm.leadFollowupHistory(leadId));
+                navigate(sourceHistoryPath(source));
             } else {
                 await createFollowup.mutateAsync(payload);
                 form.reset();
 
-                if (lead) {
-                    const leadData = lead as any;
-                    if (
-                        leadData.leadContacts &&
-                        Array.isArray(leadData.leadContacts) &&
-                        leadData.leadContacts.length > 0
-                    ) {
-                        const existingContacts = leadData.leadContacts.map((c: any) => ({
-                            name: c.name || "",
-                            designation: c.designation || "",
-                            phone: c.phone || "",
-                            email: c.email || "",
-                        }));
-                        setContacts(existingContacts);
-                        setLockedCount(existingContacts.length);
-                    } else if (lead.name || lead.designation || lead.phone || lead.email) {
-                        setContacts([{
-                            name: lead.name || "",
-                            designation: lead.designation || "",
-                            phone: lead.phone || "",
-                            email: lead.email || "",
-                        }]);
-                        setLockedCount(1);
-                    }
+                const seeded = seedContactsFromSource(sourceRecord);
+                if (seeded.length > 0) {
+                    setContacts(seeded);
+                    setLockedCount(seeded.length);
                 }
             }
         } catch {
@@ -426,7 +404,7 @@ export const useCallForm = (leadId: number) => {
     };
 
     const handleCancelEdit = () => {
-        navigate(paths.crm.leadFollowupHistory(leadId));
+        navigate(sourceHistoryPath(source));
     };
 
     return {
@@ -444,7 +422,7 @@ export const useCallForm = (leadId: number) => {
 // ─── Mail Form Hook ───────────────────────────────────────────────────────────
 // ── UNCHANGED ────────────────────────────────────────────────────────────────
 
-export const useMailForm = (leadId: number) => {
+export const useMailForm = (source: FollowupSource) => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
 
@@ -452,9 +430,9 @@ export const useMailForm = (leadId: number) => {
     const followupId = followupIdParam ? Number(followupIdParam) : null;
     const isEditMode = !!followupId;
 
-    const createFollowup = useCreateFollowup(leadId);
-    const updateFollowup = useUpdateFollowup(leadId);
-    const { data: allFollowups = [] } = useFollowups(leadId);
+    const createFollowup = useCreateFollowup(source);
+    const updateFollowup = useUpdateFollowup(source);
+    const { data: allFollowups = [] } = useFollowups(source);
 
     const existingFollowup = isEditMode
         ? allFollowups.find(f => f.id === followupId) ?? null
@@ -475,7 +453,7 @@ export const useMailForm = (leadId: number) => {
         if (isEditMode && existingFollowup) {
             form.reset({
                 body: existingFollowup.body || "",
-                frequency: (existingFollowup.frequency as any) || "daily",
+                frequency: existingFollowup.frequency || "daily",
                 nextFollowupDate: formatDateForInput(existingFollowup.nextFollowupDate),
             });
             setAttachmentPaths(existingFollowup.attachments || []);
@@ -497,7 +475,7 @@ export const useMailForm = (leadId: number) => {
                     followupId,
                     data: payload,
                 });
-                navigate(paths.crm.leadFollowupHistory(leadId));
+                navigate(sourceHistoryPath(source));
             } else {
                 await createFollowup.mutateAsync(payload);
                 form.reset();
@@ -509,7 +487,7 @@ export const useMailForm = (leadId: number) => {
     };
 
     const handleCancelEdit = () => {
-        navigate(paths.crm.leadFollowupHistory(leadId));
+        navigate(sourceHistoryPath(source));
     };
 
     return {
@@ -526,7 +504,7 @@ export const useMailForm = (leadId: number) => {
 // ─── WhatsApp Form Hook ───────────────────────────────────────────────────────
 // ── UNCHANGED ────────────────────────────────────────────────────────────────
 
-export const useWhatsappForm = (leadId: number) => {
+export const useWhatsappForm = (source: FollowupSource) => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
 
@@ -534,9 +512,9 @@ export const useWhatsappForm = (leadId: number) => {
     const followupId = followupIdParam ? Number(followupIdParam) : null;
     const isEditMode = !!followupId;
 
-    const createFollowup = useCreateFollowup(leadId);
-    const updateFollowup = useUpdateFollowup(leadId);
-    const { data: allFollowups = [] } = useFollowups(leadId);
+    const createFollowup = useCreateFollowup(source);
+    const updateFollowup = useUpdateFollowup(source);
+    const { data: allFollowups = [] } = useFollowups(source);
 
     const existingFollowup = isEditMode
         ? allFollowups.find(f => f.id === followupId) ?? null
@@ -576,7 +554,7 @@ export const useWhatsappForm = (leadId: number) => {
                     followupId,
                     data: payload,
                 });
-                navigate(paths.crm.leadFollowupHistory(leadId));
+                navigate(sourceHistoryPath(source));
             } else {
                 await createFollowup.mutateAsync(payload);
                 form.reset();
@@ -588,7 +566,7 @@ export const useWhatsappForm = (leadId: number) => {
     };
 
     const handleCancelEdit = () => {
-        navigate(paths.crm.leadFollowupHistory(leadId));
+        navigate(sourceHistoryPath(source));
     };
 
     return {
@@ -605,7 +583,7 @@ export const useWhatsappForm = (leadId: number) => {
 // ─── Letter Form Hook ─────────────────────────────────────────────────────────
 // ── CHANGED: useEffect block updated to read from existingFollowup.courier ───
 
-export const useLetterForm = (leadId: number) => {
+export const useLetterForm = (source: FollowupSource) => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
 
@@ -613,14 +591,12 @@ export const useLetterForm = (leadId: number) => {
     const followupId = followupIdParam ? Number(followupIdParam) : null;
     const isEditMode = !!followupId;
 
-    const createFollowup = useCreateFollowup(leadId);
-    const updateFollowup = useUpdateFollowup(leadId);
-    const { data: allFollowups = [] } = useFollowups(leadId);
+    const createFollowup = useCreateFollowup(source);
+    const updateFollowup = useUpdateFollowup(source);
+    const { data: allFollowups = [] } = useFollowups(source);
 
-    // Cast to any because the base type does not include the nested `courier`
-    // object that the API now returns. The backend embeds it for letter type.
     const existingFollowup = isEditMode
-        ? (allFollowups.find(f => f.id === followupId) as any) ?? null
+        ? allFollowups.find(f => f.id === followupId) ?? null
         : null;
 
     const [attachmentPaths, setAttachmentPaths] = useState<string[]>([]);
@@ -690,7 +666,7 @@ export const useLetterForm = (leadId: number) => {
                     followupId,
                     data: payload,
                 });
-                navigate(paths.crm.leadFollowupHistory(leadId));
+                navigate(sourceHistoryPath(source));
             } else {
                 await createFollowup.mutateAsync(payload);
                 form.reset();
@@ -702,7 +678,7 @@ export const useLetterForm = (leadId: number) => {
     };
 
     const handleCancelEdit = () => {
-        navigate(paths.crm.leadFollowupHistory(leadId));
+        navigate(sourceHistoryPath(source));
     };
 
     return {

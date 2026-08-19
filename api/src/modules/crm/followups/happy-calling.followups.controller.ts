@@ -2,7 +2,7 @@ import {
     Controller,
     Get,
     Post,
-    Patch, 
+    Patch,
     Delete,
     Param,
     ParseIntPipe,
@@ -16,40 +16,39 @@ import type { CreateFollowupDto } from './dto/followup.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
-@Controller('leads/followups')
-export class FollowupsController {
+@Controller('happy-calling/followups')
+export class HappyCallingFollowupsController {
     constructor(private readonly followupsService: FollowupsService) {}
 
-    @Get(':leadId')
+    @Get(':happyCallingId')
     async findAll(
-        @Param('leadId', ParseIntPipe) leadId: number,
+        @Param('happyCallingId', ParseIntPipe) happyCallingId: number,
     ) {
-        return this.followupsService.findAllBySource('lead', leadId);
+        return this.followupsService.findAllBySource('happy_calling', happyCallingId);
     }
 
-    @Get(':leadId/:id')
+    @Get(':happyCallingId/:id')
     async findOne(
-        @Param('leadId', ParseIntPipe) leadId: number,
+        @Param('happyCallingId', ParseIntPipe) happyCallingId: number,
         @Param('id', ParseIntPipe) id: number,
     ) {
         return this.followupsService.findById(id);
     }
 
-    @Post(':leadId')
+    @Post(':happyCallingId')
     @HttpCode(HttpStatus.CREATED)
     async create(
-        @Param('leadId', ParseIntPipe) leadId: number,
+        @Param('happyCallingId', ParseIntPipe) happyCallingId: number,
         @ValidatedBody(CreateFollowupSchema) body: CreateFollowupDto,
         @CurrentUser() user: ValidatedUser,
     ) {
-        return this.followupsService.create('lead', leadId, body, user.sub);
+        return this.followupsService.create('happy_calling', happyCallingId, body, user.sub);
     }
 
-    // ✅ ADD THIS ROUTE
-    @Patch(':leadId/:id')
+    @Patch(':happyCallingId/:id')
     @HttpCode(HttpStatus.OK)
     async update(
-        @Param('leadId', ParseIntPipe) leadId: number,
+        @Param('happyCallingId', ParseIntPipe) happyCallingId: number,
         @Param('id', ParseIntPipe) id: number,
         @ValidatedBody(CreateFollowupSchema) body: CreateFollowupDto,
         @CurrentUser() user: ValidatedUser,
@@ -57,10 +56,10 @@ export class FollowupsController {
         return this.followupsService.update(id, body, user.sub);
     }
 
-    @Delete(':leadId/:id')
+    @Delete(':happyCallingId/:id')
     @HttpCode(HttpStatus.NO_CONTENT)
     async delete(
-        @Param('leadId', ParseIntPipe) leadId: number,
+        @Param('happyCallingId', ParseIntPipe) happyCallingId: number,
         @Param('id', ParseIntPipe) id: number,
     ) {
         await this.followupsService.delete(id);

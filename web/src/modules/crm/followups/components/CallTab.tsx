@@ -8,30 +8,30 @@ import { Loader2, Phone, Edit, Save, X, ChevronDown, ChevronUp, User } from "luc
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { ContactPersonFields } from "./ContactPersonFields";
 import { format } from "date-fns";
-import { paths } from "@/app/routes/paths";
 import {
     useFollowups,
     useCallForm,
     isToday,
+    sourceFollowupPath,
     type CallFormValues
 } from "@/hooks/api/useFollowups";
-import type { BaseFollowup } from "../helpers/followup.types";
+import type { BaseFollowup, FollowupSource } from "../helpers/followup.types";
 
 interface CallTabProps {
-    leadId: number;
+    source: FollowupSource;
     mode?: 'create' | 'view';
 }
 
-export function CallTab({ leadId, mode = 'create' }: CallTabProps) {
+export function CallTab({ source, mode = 'create' }: CallTabProps) {
     if (mode === 'view') {
-        return <CallFollowupList leadId={leadId} />;
+        return <CallFollowupList source={source} />;
     }
-    return <CallCreateForm leadId={leadId} />;
+    return <CallCreateForm source={source} />;
 }
 
 // ─── Create / Edit Form ───────────────────────────────────────────────────────
 
-function CallCreateForm({ leadId }: { leadId: number }) {
+function CallCreateForm({ source }: { source: FollowupSource }) {
     const {
         form,
         contacts,
@@ -41,7 +41,7 @@ function CallCreateForm({ leadId }: { leadId: number }) {
         saving,
         handleSubmit,
         handleCancelEdit,
-    } = useCallForm(leadId);
+    } = useCallForm(source);
 
     return (
         <Form {...form}>
@@ -149,8 +149,8 @@ function CallCreateForm({ leadId }: { leadId: number }) {
 
 // ─── List View ────────────────────────────────────────────────────────────────
 
-function CallFollowupList({ leadId }: { leadId: number }) {
-    const { data: allFollowups = [] } = useFollowups(leadId);
+function CallFollowupList({ source }: { source: FollowupSource }) {
+    const { data: allFollowups = [] } = useFollowups(source);
 
     const callFollowups = useMemo(
         () => allFollowups
@@ -170,7 +170,7 @@ function CallFollowupList({ leadId }: { leadId: number }) {
     return (
         <div className="space-y-3">
             {callFollowups.map(followup => (
-                <CallFollowupCard key={followup.id} followup={followup} leadId={leadId} />
+                <CallFollowupCard key={followup.id} followup={followup} source={source} />
             ))}
         </div>
     );
@@ -178,7 +178,7 @@ function CallFollowupList({ leadId }: { leadId: number }) {
 
 // ─── Followup Card ────────────────────────────────────────────────────────────
 
-function CallFollowupCard({ followup, leadId }: { followup: BaseFollowup; leadId: number }) {
+function CallFollowupCard({ followup, source }: { followup: BaseFollowup; source: FollowupSource }) {
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
 
@@ -283,7 +283,7 @@ function CallFollowupCard({ followup, leadId }: { followup: BaseFollowup; leadId
                         size="sm"
                         onClick={() =>
                             navigate(
-                                `${paths.crm.leadFollowup(leadId)}?tab=call&followupId=${followup.id}`
+                                `${sourceFollowupPath(source)}?tab=call&followupId=${followup.id}`
                             )
                         }
                     >

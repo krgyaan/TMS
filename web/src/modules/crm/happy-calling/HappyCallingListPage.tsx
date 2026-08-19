@@ -11,7 +11,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Eye, Edit, PhoneCall, FileX2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
 import { useHappyCallings } from '@/hooks/api/useHappyCalling';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -68,7 +67,7 @@ const HappyCallingListPage = () => {
             },
             {
                 label: 'Followup',
-                onClick: () => toast.info('Followup coming soon'),
+                onClick: (row) => navigate(paths.crm.happyCallingFollowup(row.id)),
                 icon: <PhoneCall className="h-4 w-4" />,
             },
         ],

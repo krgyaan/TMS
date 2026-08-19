@@ -216,7 +216,7 @@ export function LeadEnquiryViewPage({ enquiryId, onBack, backLabel }: LeadEnquir
             case "lead-details":
                 return <LeadDetailsSection leadId={leadId} />;
             case "followups":
-                return <FollowupViewPage leadId={leadId} />;
+                return <FollowupViewPage source={{ sourceType: 'lead', sourceId: leadId }} />;
             case "enquiries":
                 return <EnquiryDetailsSection enquiryId={enquiryId} />;
             case "site-visits":

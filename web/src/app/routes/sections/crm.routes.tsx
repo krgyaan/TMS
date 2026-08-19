@@ -23,6 +23,8 @@ const CRM_HappyCalling       = lazy(() => import('@/modules/crm/happy-calling/Ha
 const CRM_HappyCallingCreate = lazy(() => import('@/modules/crm/happy-calling/HappyCallingCreatePage'));
 const CRM_HappyCallingShow   = lazy(() => import('@/modules/crm/happy-calling/HappyCallingShowPage'));
 const CRM_HappyCallingEdit   = lazy(() => import('@/modules/crm/happy-calling/HappyCallingEditPage'));
+const CRM_HappyCallingFollowup = lazy(() => import('@/modules/crm/happy-calling/HappyCallingFollowupPage'));
+const CRM_HappyCallingFollowupHistory = lazy(() => import('@/modules/crm/happy-calling/HappyCallingFollowupHistoryPage'));
 
 export default function CRMRoutes() {
     return (
@@ -49,6 +51,8 @@ export default function CRMRoutes() {
 
             <Route path="happy-calling"            element={<RouteWrapper><CRM_HappyCalling /></RouteWrapper>} />
             <Route path="happy-calling/create/:clientId" element={<RouteWrapper><CRM_HappyCallingCreate /></RouteWrapper>} />
+            <Route path="happy-calling/followup/:id/history" element={<RouteWrapper><CRM_HappyCallingFollowupHistory /></RouteWrapper>} />
+            <Route path="happy-calling/followup/:id" element={<RouteWrapper><CRM_HappyCallingFollowup /></RouteWrapper>} />
             <Route path="happy-calling/:id"         element={<RouteWrapper><CRM_HappyCallingShow /></RouteWrapper>} />
             <Route path="happy-calling/:id/edit"    element={<RouteWrapper><CRM_HappyCallingEdit /></RouteWrapper>} />
         </Routes>
