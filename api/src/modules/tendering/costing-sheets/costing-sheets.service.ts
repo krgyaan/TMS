@@ -537,6 +537,7 @@ export class CostingSheetsService {
                 entityId: data.tenderId,
                 stage: 'costing_sheet_approval',
                 userId: data.submittedBy,
+                assignedUserId: currentTender?.teamMember ?? data.submittedBy,
             };
             if (currentTender?.dueDate) {
                 const dueDate = new Date(currentTender.dueDate);
@@ -681,6 +682,7 @@ export class CostingSheetsService {
                 entityId: sheet.tenderId,
                 stage: 'costing_sheet_approval',
                 userId: changedBy,
+                assignedUserId: currentTender?.teamMember ?? changedBy,
             };
             if (currentTender?.dueDate) {
                 const dueDate = new Date(currentTender.dueDate);

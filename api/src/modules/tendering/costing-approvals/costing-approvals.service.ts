@@ -485,6 +485,7 @@ export class CostingApprovalsService {
                         entityId: tenderId,
                         stage: 'bid_submission',
                         userId,
+                        assignedUserId: currentTender?.teamMember ?? userId,
                     };
                     if (currentTender?.dueDate) {
                         const dueDate = new Date(currentTender.dueDate);
@@ -594,6 +595,7 @@ export class CostingApprovalsService {
                 entityId: tenderId,
                 stage: 'bid_submission',
                 userId,
+                assignedUserId: currentTender?.teamMember ?? userId,
             };
             if (currentTender?.dueDate) {
                 const dueDate = new Date(currentTender.dueDate);
@@ -871,6 +873,7 @@ export class CostingApprovalsService {
                 entityId: tenderId,
                 stage: 'bid_submission',
                 userId,
+                assignedUserId: currentTender?.teamMember ?? userId,
             };
             if (currentTender?.dueDate) {
                 const dueDate = new Date(currentTender.dueDate);

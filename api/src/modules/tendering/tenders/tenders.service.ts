@@ -638,6 +638,7 @@ export class TenderInfosService {
                 entityId: newTender.id as number,
                 stage: 'tender_info_sheet',
                 userId: createdBy,
+                assignedUserId: newTender.teamMember ?? createdBy,
                 timerConfig: {
                     type: 'FIXED_DURATION',
                     durationHours: 72

@@ -616,6 +616,7 @@ export class TenderApprovalService {
                         entityId: tenderId,
                         stage: item.stage,
                         userId: changedBy,
+                        assignedUserId: tender.teamMember ?? changedBy,
                         timerConfig: item.timerConfig || {
                             type: "FIXED_DURATION",
                             durationHours: 24,
