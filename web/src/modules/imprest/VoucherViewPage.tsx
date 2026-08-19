@@ -47,7 +47,7 @@ const ImprestVoucherView: React.FC = () => {
     let proofs: InvoiceProof[] = [];
     if (stateProofs && stateProofs.length > 0) {
         proofs = stateProofs;
-    } else if (voucher && voucher.proofs.length > 0) {
+    } else if (voucher && (voucher.proofs?.length ?? 0) > 0) {
         proofs = voucher.proofs;
     }
 
@@ -353,7 +353,7 @@ const ImprestVoucherView: React.FC = () => {
                     <tbody>
                         <tr>
                             <th>Prepared By:</th>
-                            <td>{voucher.employeeName}</td>
+                            <td>{voucher.beneficiaryName}</td>
                             <th>Date:</th>
                             <td></td>
                         </tr>

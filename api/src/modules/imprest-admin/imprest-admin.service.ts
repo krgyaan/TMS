@@ -591,6 +591,7 @@ export class ImprestAdminService {
 
                 remark: employeeImprests.remark,
                 amount: employeeImprests.amount,
+                invoiceProof: employeeImprests.invoiceProof,
             })
             .from(employeeImprests)
             .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
@@ -619,6 +620,21 @@ export class ImprestAdminService {
             )
             .orderBy(sql`COALESCE(${employeeImprests.approvedDate})`);
 
+        const proofFiles = items
+            .flatMap(item => (Array.isArray(item.invoiceProof) ? item.invoiceProof : []))
+            .filter(Boolean);
+
+        const proofs = proofFiles.map((file: string, index: number) => {
+            const ext = file.split(".").pop()?.toLowerCase() ?? "";
+            return {
+                id: index + 1,
+                file,
+                ext,
+                type: ext === "pdf" ? "pdf" : "image",
+                url: `/uploads/employee-imprest/${file}`,
+            };
+        });
+
         return {
             voucher: {
                 id: voucher.id,
@@ -626,6 +642,7 @@ export class ImprestAdminService {
 
                 beneficiaryId: Number(voucher.beneficiaryId),
                 beneficiaryName: voucher.employeeName,
+                employeeName: voucher.employeeName,
                 teamName: voucher.teamName,
 
                 validFrom: voucher.validFrom,
@@ -640,6 +657,8 @@ export class ImprestAdminService {
                 adminSignedBy: voucher.adminSignedBy,
                 adminSignedAt: voucher.adminSignedAt,
                 adminRemark: voucher.adminRemark,
+
+                proofs,
             },
 
             items: items.map(item => ({
