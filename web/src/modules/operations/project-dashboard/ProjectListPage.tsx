@@ -107,13 +107,15 @@ export default function ProjectListPage() {
     });
 
     const { teamId } = useTeamFilter();
+    console.log({teamId});
+    
     const navigate = useNavigate();
 
     const { data: apiResponse, isLoading, error } = useProjectList({
         page: pagination.pageIndex + 1,
         limit: pagination.pageSize,
         search: debouncedSearch || undefined,
-        teamId: teamId ?? undefined,
+        teamId: teamId ? (teamId != 5 ? teamId : 0) : undefined,
     });
 
     const rows = apiResponse?.data ?? [];
