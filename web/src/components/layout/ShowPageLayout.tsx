@@ -3,8 +3,6 @@ import { cn } from "@/lib/utils";
 import { Check, ChevronDown, Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// ─── Types ──────────────────────────────────────────────────────────────────────
-
 export type StepStatus = "completed" | "in-progress" | "pending" | "loading";
 
 export interface StepConfig {
@@ -16,8 +14,6 @@ export interface StepConfig {
     hasData: boolean;
     isLoading: boolean;
 }
-
-// ─── Step Status Dot ────────────────────────────────────────────────────────────
 
 export function StepDot({
     status,
@@ -88,8 +84,6 @@ export function StepDot({
     );
 }
 
-// ─── Status Badge ───────────────────────────────────────────────────────────────
-
 export function StepStatusBadge({ status }: { status: StepStatus }) {
     if (status === "loading") {
         return (
@@ -125,8 +119,6 @@ export function StepStatusBadge({ status }: { status: StepStatus }) {
         </span>
     );
 }
-
-// ─── Accordion Section Wrapper ──────────────────────────────────────────────────
 
 export function AccordionSection({
     step,
@@ -184,8 +176,6 @@ export function AccordionSection({
         </div>
     );
 }
-
-// ─── Main Layout Component ──────────────────────────────────────────────────────
 
 interface ShowPageLayoutProps {
     steps: StepConfig[];
@@ -248,10 +238,10 @@ export function ShowPageLayout({
     }, [steps, onSectionVisible]);
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8 relative">
+        <div className="space-y-8">
             {/* Sticky Header */}
-            <div className="sticky top-[-1rem] z-30 bg-background py-4 -mt-4 border-b border-border shadow-md transition-all">
-                <div className="flex items-center justify-between">
+            <div className="sticky top-[-1rem] z-30 bg-background py-4 -mt-4 border rounded-2xl border-primary transition-all">
+                <div className="flex items-center justify-between px-4">
                     {onBack && (
                         <Button
                             variant="ghost"
