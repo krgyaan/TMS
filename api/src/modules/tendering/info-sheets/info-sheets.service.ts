@@ -676,11 +676,13 @@ export class TenderInfoSheetsService {
                     }
                 }
                 try {
+                    const tenderForTimer = await this.tenderInfosService.findById(tenderId);
                     await this.timersService.startTimer({
                         entityType: 'TENDER',
                         entityId: tenderId,
                         stage: 'tender_approval',
                         userId: changedBy,
+                        assignedUserId: tenderForTimer?.teamMember ?? changedBy,
                         timerConfig: {
                             type: 'FIXED_DURATION',
                             durationHours: 24,
