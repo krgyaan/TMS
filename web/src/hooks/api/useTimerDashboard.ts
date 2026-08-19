@@ -6,6 +6,7 @@ import { handleQueryError } from "@/lib/react-query";
 export const timerDashboardKeys = {
     all: ["timer-dashboard"] as const,
     search: (by: string, value: string) => [...timerDashboardKeys.all, "search", by, value] as const,
+    expiringSoon: (hours: number, includeOverdue: boolean) => [...timerDashboardKeys.all, "expiring-soon", hours, includeOverdue] as const,
 };
 
 export const useTimerDashboardSearch = (by: string | null, value: string | null) => {
@@ -14,6 +15,14 @@ export const useTimerDashboardSearch = (by: string | null, value: string | null)
         queryFn: () => timerDashboardService.search(by!, value!),
         enabled: !!by && !!value && by.length > 0 && value.length > 0,
         retry: false,
+    });
+};
+
+export const useExpiringSoonTimers = (hours: number = 12, includeOverdue: boolean = false) => {
+    return useQuery({
+        queryKey: timerDashboardKeys.expiringSoon(hours, includeOverdue),
+        queryFn: () => timerDashboardService.expiringSoon(hours, includeOverdue),
+        refetchInterval: 60000,
     });
 };
 
