@@ -58,6 +58,7 @@ export interface InsurancePayload {
     location?: string | null;
     itemsCovered?: string | null;
     lrCopy?: string[] | null;
+    insurancePolicyId?: number | null;
 }
 
 export interface InsuranceCreatePayload extends InsurancePayload {
@@ -79,6 +80,7 @@ export interface LinkedImprestDetails {
     amount: number | null;
     dateOfExpense: string | null;
     approvalStatus: number | null;
+    linkType: string;
 }
 
 export interface LinkedMakerRequestDetails {
@@ -92,14 +94,16 @@ export interface LinkedMakerRequestDetails {
     requestedByName: string | null;
     createdAt: string | null;
     projectId: number | null;
+    projectName: string | null;
     utrNumber: string | null;
     rejectionReason: string | null;
+    linkType: string;
 }
 
 export interface InsurancePolicyDetail extends InsurancePolicyRow {
-    linkedImprest: LinkedImprestDetails | null;
-    linkedMakerRequest: LinkedMakerRequestDetails | null;
-    linkedPaymentRequest: LinkedPaymentRequestDetails | null;
+    linkedImprests: LinkedImprestDetails[];
+    linkedMakerRequests: LinkedMakerRequestDetails[];
+    linkedPaymentRequests: LinkedPaymentRequestDetails[];
 }
 
 export interface LinkedPaymentRequestDetails {
@@ -113,6 +117,8 @@ export interface LinkedPaymentRequestDetails {
     requestedByName: string | null;
     createdAt: string | null;
     projectId: number | null;
+    projectName: string | null;
     utrNumber: string | null;
     rejectionReason: string | null;
+    linkType: string;
 }

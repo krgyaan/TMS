@@ -5,11 +5,21 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { useInsurancePolicy } from "@/hooks/api/useInsurancePolicies";
+import { useImprestDetail } from "@/hooks/api/imprest.hooks";
+import { useMakerRequestDetails } from "@/hooks/api/useMakerRequests";
+import { usePaymentRequestDetails } from "@/hooks/api/useProjectPaymentRequests";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { paths } from "@/app/routes/paths";
 import { STATUS_CONFIG } from "@/modules/operations/payment-requests/constants";
+import { PaymentRequestDetailFields } from "@/modules/operations/payment-requests/components/PaymentRequestDetailFields";
+import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
+import type {
+    LinkedImprestDetails,
+    LinkedMakerRequestDetails,
+    LinkedPaymentRequestDetails,
+} from "@/modules/insurance/helpers/insurance.types";
 import { AlertCircle, ArrowLeft, Download } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -36,12 +46,11 @@ const SectionTitle = ({ children }: { children: React.ReactNode }) => (
     <h3 className="mt-6 mb-2 text-lg font-semibold text-muted-foreground">{children}</h3>
 );
 
-const DetailRow = ({ label, value }: { label: string; value?: React.ReactNode }) => (
-    <TableRow className="hover:bg-muted/30 transition-colors">
-        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">{label}</TableCell>
-        <TableCell className="w-1/4">{value ?? '—'}</TableCell>
-        <TableCell className="w-1/2" />
-    </TableRow>
+const Field = ({ label, value }: { label: string; value?: React.ReactNode }) => (
+    <div>
+        <div className="text-xs font-medium text-muted-foreground">{label}</div>
+        <div className="mt-0.5">{value ?? '—'}</div>
+    </div>
 );
 
 const FileList = ({ files }: { files?: string[] | null }) => {
@@ -58,6 +67,162 @@ const FileList = ({ files }: { files?: string[] | null }) => {
                 ))}
             </div>
         </div>
+    );
+};
+
+const EntryCard = ({ badge, title, action, children }: {
+    badge: string;
+    title: React.ReactNode;
+    action?: React.ReactNode;
+    children: React.ReactNode;
+}) => (
+    <div className="rounded-2xl border bg-card p-4 space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+                <Badge variant="outline" className="capitalize">{badge}</Badge>
+                <span className="font-medium">{title}</span>
+            </div>
+            {action}
+        </div>
+        {children}
+    </div>
+);
+
+const LinkedImprestEntry = ({ entry }: { entry: LinkedImprestDetails }) => {
+    const { data: detail, isLoading } = useImprestDetail(entry.imprestId);
+    return (
+        <EntryCard
+            badge={entry.linkType}
+            title={`Imprest #${entry.imprestId}`}
+            action={
+                <a className="text-blue-600 hover:underline text-sm" href={paths.accounts.imprestsEdit(entry.imprestId)}>
+                    View Imprest
+                </a>
+            }
+        >
+            {isLoading ? (
+                <Skeleton className="h-32 w-full" />
+            ) : detail ? (
+                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                    <Field label="Party Name" value={detail.partyName} />
+                    <Field label="Project" value={detail.projectName} />
+                    <Field label="Category" value={detail.categoryName} />
+                    <Field label="Amount" value={detail.amount != null ? formatINR(String(detail.amount)) : undefined} />
+                    <Field label="Date of Expense" value={detail.dateOfExpense ? formatDate(detail.dateOfExpense) : undefined} />
+                    <Field label="Remark" value={detail.remark} />
+                    <Field label="Accounts Remark" value={detail.accRemark} />
+                    <Field
+                        label="Approval Status"
+                        value={
+                            <Badge variant={detail.approvalStatus === 1 ? "default" : "secondary"}>
+                                {detail.approvalStatus === 1 ? "Approved" : "Approval Pending"}
+                            </Badge>
+                        }
+                    />
+                    <Field
+                        label="Tally Status"
+                        value={
+                            <Badge variant={detail.tallyStatus === 1 ? "default" : "secondary"}>
+                                {detail.tallyStatus === 1 ? "Tallied" : "Not Tallied"}
+                            </Badge>
+                        }
+                    />
+                    <Field
+                        label="Proof Status"
+                        value={
+                            <Badge variant={detail.proofStatus === 1 ? "default" : "secondary"}>
+                                {detail.proofStatus === 1 ? "Proof Verified" : "Proof Pending"}
+                            </Badge>
+                        }
+                    />
+                    {detail.invoiceProof && detail.invoiceProof.length > 0 && (
+                        <div className="col-span-2">
+                            <div className="text-xs font-medium text-muted-foreground mb-1">Invoice / Proof Files</div>
+                            <div className="flex flex-wrap gap-2">
+                                {detail.invoiceProof.map((p, i) => (
+                                    <Button key={i} variant="outline" size="sm" asChild>
+                                        <a href={p.url} target="_blank" rel="noreferrer">
+                                            <Download className="h-4 w-4" /> {p.name || `File ${i + 1}`}
+                                        </a>
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <p className="text-muted-foreground text-sm">No details found.</p>
+            )}
+        </EntryCard>
+    );
+};
+
+const LinkedMakerRequestEntry = ({ entry }: { entry: LinkedMakerRequestDetails }) => {
+    const { data: detail, isLoading } = useMakerRequestDetails(entry.makerRequestId);
+    return (
+        <EntryCard
+            badge={entry.linkType}
+            title={<span className="font-mono">{detail?.requestNo ?? entry.requestNo}</span>}
+            action={<RequestStatusBadge status={entry.status} />}
+        >
+            {isLoading ? (
+                <Skeleton className="h-32 w-full" />
+            ) : detail ? (
+                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                    <Field label="Party Name" value={detail.partyName} />
+                    <Field label="Amount" value={detail.amount != null ? formatINR(detail.amount) : undefined} />
+                    <Field label="Category" value={detail.category} />
+                    <Field label="Payment Mode" value={detail.paymentMode?.replaceAll('_', ' ').toLowerCase()} />
+                    <Field label="Account Number" value={detail.accountNumber} />
+                    <Field label="Bank Name" value={detail.bankName} />
+                    <Field label="IFSC" value={detail.ifsc} />
+                    <Field label="Requested By" value={detail.requestedByName} />
+                    <Field label="Created At" value={formatDate(detail.createdAt)} />
+                    <Field label="UTR Number" value={detail.utrNumber} />
+                    {detail.rejectionReason && (
+                        <div className="col-span-2">
+                            <div className="text-xs font-medium text-muted-foreground">Rejection Reason</div>
+                            <div className="mt-0.5 text-red-600">{detail.rejectionReason}</div>
+                        </div>
+                    )}
+                    {detail.remark && <Field label="Remark" value={detail.remark} />}
+                    {detail.portalLink && (
+                        <div className="col-span-2">
+                            <div className="text-xs font-medium text-muted-foreground">Portal Link</div>
+                            <div className="mt-0.5 text-blue-600 underline break-all">{detail.portalLink}</div>
+                        </div>
+                    )}
+                    {detail.billFiles?.length > 0 && (
+                        <div className="col-span-2">
+                            <div className="text-xs font-medium text-muted-foreground mb-1">Bill / Proof Files</div>
+                            <FileList files={detail.billFiles} />
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <p className="text-muted-foreground text-sm">No details found.</p>
+            )}
+        </EntryCard>
+    );
+};
+
+const LinkedPaymentRequestEntry = ({ entry }: { entry: LinkedPaymentRequestDetails }) => {
+    const { data: detailData, isLoading } = usePaymentRequestDetails(entry.paymentRequestId);
+    const detail = detailData as PaymentRequestRow | undefined;
+    return (
+        <EntryCard
+            badge={entry.linkType}
+            title={<span className="font-mono">{detail?.requestNo ?? entry.requestNo}</span>}
+            action={<RequestStatusBadge status={entry.status} />}
+        >
+            {isLoading ? (
+                <Skeleton className="h-32 w-full" />
+            ) : detail ? (
+                <PaymentRequestDetailFields detail={detail} />
+            ) : (
+                <p className="text-muted-foreground text-sm">No details found.</p>
+            )}
+        </EntryCard>
     );
 };
 
@@ -241,126 +406,36 @@ const InsuranceViewPage = () => {
                     </TableBody>
                 </Table>
 
-                {policy.linkedImprest && (
+                {policy.linkedImprests && policy.linkedImprests.length > 0 && (
                     <>
-                        <SectionTitle>Linked Imprest Details</SectionTitle>
-                        <Table>
-                            <TableBody className="border rounded-2xl">
-                                <DetailRow
-                                    label="Imprest ID"
-                                    value={
-                                        <a
-                                            className="text-blue-600 hover:underline"
-                                            href={paths.accounts.imprestsEdit(policy.linkedImprest.imprestId)}
-                                        >
-                                            Imprest #{policy.linkedImprest.imprestId}
-                                        </a>
-                                    }
-                                />
-                                <DetailRow label="Employee Name" value={policy.linkedImprest.userName} />
-                                <DetailRow label="Category" value={policy.linkedImprest.categoryName} />
-                                <DetailRow label="Project Name" value={policy.linkedImprest.projectName} />
-                                <DetailRow
-                                    label="Amount"
-                                    value={policy.linkedImprest.amount != null ? formatINR(String(policy.linkedImprest.amount)) : undefined}
-                                />
-                                <DetailRow
-                                    label="Date of Expense"
-                                    value={policy.linkedImprest.dateOfExpense ? formatDate(policy.linkedImprest.dateOfExpense) : undefined}
-                                />
-                                <DetailRow
-                                    label="Approval Status"
-                                    value={
-                                        policy.linkedImprest.approvalStatus != null ? (
-                                            <Badge variant={policy.linkedImprest.approvalStatus === 1 ? "default" : "secondary"}>
-                                                {policy.linkedImprest.approvalStatus === 1 ? "Approved" : "Approval Pending"}
-                                            </Badge>
-                                        ) : undefined
-                                    }
-                                />
-                            </TableBody>
-                        </Table>
+                        <SectionTitle>Linked Imprests</SectionTitle>
+                        <div className="space-y-4">
+                            {policy.linkedImprests.map(e => (
+                                <LinkedImprestEntry key={e.imprestId} entry={e} />
+                            ))}
+                        </div>
                     </>
                 )}
 
-                {policy.linkedMakerRequest && (
+                {policy.linkedMakerRequests && policy.linkedMakerRequests.length > 0 && (
                     <>
-                        <SectionTitle>Linked Maker Request Details</SectionTitle>
-                        <Table>
-                            <TableBody className="border rounded-2xl">
-                                <DetailRow label="Request No" value={policy.linkedMakerRequest.requestNo} />
-                                <DetailRow label="Party Name" value={policy.linkedMakerRequest.partyName} />
-                                <DetailRow
-                                    label="Amount"
-                                    value={policy.linkedMakerRequest.amount != null ? formatINR(policy.linkedMakerRequest.amount) : undefined}
-                                />
-                                <DetailRow label="Payment Mode" value={policy.linkedMakerRequest.paymentMode} />
-                                <DetailRow
-                                    label="Status"
-                                    value={<RequestStatusBadge status={policy.linkedMakerRequest.status} />}
-                                />
-                                {policy.linkedMakerRequest.status === "rejected" && (
-                                    <DetailRow label="Rejection Reason" value={policy.linkedMakerRequest.rejectionReason} />
-                                )}
-                                {policy.linkedMakerRequest.utrNumber && (
-                                    <DetailRow label="UTR Number" value={policy.linkedMakerRequest.utrNumber} />
-                                )}
-                                <DetailRow label="Requested By" value={policy.linkedMakerRequest.requestedByName} />
-                                <DetailRow
-                                    label="Created At"
-                                    value={policy.linkedMakerRequest.createdAt ? formatDate(policy.linkedMakerRequest.createdAt) : undefined}
-                                />
-                            </TableBody>
-                        </Table>
+                        <SectionTitle>Linked Maker Requests</SectionTitle>
+                        <div className="space-y-4">
+                            {policy.linkedMakerRequests.map(e => (
+                                <LinkedMakerRequestEntry key={e.makerRequestId} entry={e} />
+                            ))}
+                        </div>
                     </>
                 )}
 
-                {policy.linkedPaymentRequest && (
+                {policy.linkedPaymentRequests && policy.linkedPaymentRequests.length > 0 && (
                     <>
-                        <SectionTitle>Linked Payment Request Details</SectionTitle>
-                        <Table>
-                            <TableBody className="border rounded-2xl">
-                                <DetailRow
-                                    label="Request No"
-                                    value={
-                                        policy.linkedPaymentRequest.projectId != null ? (
-                                            <a
-                                                className="text-blue-600 hover:underline"
-                                                href={paths.operations.editProjectPaymentRequestPage(
-                                                    policy.linkedPaymentRequest.paymentRequestId,
-                                                    policy.linkedPaymentRequest.projectId,
-                                                )}
-                                            >
-                                                {policy.linkedPaymentRequest.requestNo}
-                                            </a>
-                                        ) : (
-                                            policy.linkedPaymentRequest.requestNo
-                                        )
-                                    }
-                                />
-                                <DetailRow label="Party Name" value={policy.linkedPaymentRequest.partyName} />
-                                <DetailRow
-                                    label="Amount"
-                                    value={policy.linkedPaymentRequest.amount != null ? formatINR(policy.linkedPaymentRequest.amount) : undefined}
-                                />
-                                <DetailRow label="Payment Mode" value={policy.linkedPaymentRequest.paymentMode} />
-                                <DetailRow
-                                    label="Status"
-                                    value={<RequestStatusBadge status={policy.linkedPaymentRequest.status} />}
-                                />
-                                {policy.linkedPaymentRequest.status === "rejected" && (
-                                    <DetailRow label="Rejection Reason" value={policy.linkedPaymentRequest.rejectionReason} />
-                                )}
-                                {policy.linkedPaymentRequest.utrNumber && (
-                                    <DetailRow label="UTR Number" value={policy.linkedPaymentRequest.utrNumber} />
-                                )}
-                                <DetailRow label="Requested By" value={policy.linkedPaymentRequest.requestedByName} />
-                                <DetailRow
-                                    label="Created At"
-                                    value={policy.linkedPaymentRequest.createdAt ? formatDate(policy.linkedPaymentRequest.createdAt) : undefined}
-                                />
-                            </TableBody>
-                        </Table>
+                        <SectionTitle>Linked Payment Requests</SectionTitle>
+                        <div className="space-y-4">
+                            {policy.linkedPaymentRequests.map(e => (
+                                <LinkedPaymentRequestEntry key={e.paymentRequestId} entry={e} />
+                            ))}
+                        </div>
                     </>
                 )}
             </CardContent>
