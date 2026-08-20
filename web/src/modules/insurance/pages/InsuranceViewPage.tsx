@@ -9,6 +9,7 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { paths } from "@/app/routes/paths";
+import { STATUS_CONFIG } from "@/modules/operations/payment-requests/constants";
 import { AlertCircle, ArrowLeft, Download } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -16,6 +17,19 @@ const STATUS_BADGE_VARIANT: Record<string, 'default' | 'secondary' | 'destructiv
     Active: 'default',
     'Expiring Soon': 'secondary',
     Expired: 'destructive',
+};
+
+const RequestStatusBadge = ({ status }: { status?: string | null }) => {
+    if (!status) return null;
+    const config = STATUS_CONFIG[status];
+    if (!config) {
+        return <Badge variant="outline" className="capitalize">{status}</Badge>;
+    }
+    return (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
+            {config.label}
+        </span>
+    );
 };
 
 const SectionTitle = ({ children }: { children: React.ReactNode }) => (
@@ -283,18 +297,67 @@ const InsuranceViewPage = () => {
                                 <DetailRow label="Payment Mode" value={policy.linkedMakerRequest.paymentMode} />
                                 <DetailRow
                                     label="Status"
-                                    value={
-                                        policy.linkedMakerRequest.status ? (
-                                            <Badge variant="outline" className="capitalize">
-                                                {policy.linkedMakerRequest.status}
-                                            </Badge>
-                                        ) : undefined
-                                    }
+                                    value={<RequestStatusBadge status={policy.linkedMakerRequest.status} />}
                                 />
+                                {policy.linkedMakerRequest.status === "rejected" && (
+                                    <DetailRow label="Rejection Reason" value={policy.linkedMakerRequest.rejectionReason} />
+                                )}
+                                {policy.linkedMakerRequest.utrNumber && (
+                                    <DetailRow label="UTR Number" value={policy.linkedMakerRequest.utrNumber} />
+                                )}
                                 <DetailRow label="Requested By" value={policy.linkedMakerRequest.requestedByName} />
                                 <DetailRow
                                     label="Created At"
                                     value={policy.linkedMakerRequest.createdAt ? formatDate(policy.linkedMakerRequest.createdAt) : undefined}
+                                />
+                            </TableBody>
+                        </Table>
+                    </>
+                )}
+
+                {policy.linkedPaymentRequest && (
+                    <>
+                        <SectionTitle>Linked Payment Request Details</SectionTitle>
+                        <Table>
+                            <TableBody className="border rounded-2xl">
+                                <DetailRow
+                                    label="Request No"
+                                    value={
+                                        policy.linkedPaymentRequest.projectId != null ? (
+                                            <a
+                                                className="text-blue-600 hover:underline"
+                                                href={paths.operations.editProjectPaymentRequestPage(
+                                                    policy.linkedPaymentRequest.paymentRequestId,
+                                                    policy.linkedPaymentRequest.projectId,
+                                                )}
+                                            >
+                                                {policy.linkedPaymentRequest.requestNo}
+                                            </a>
+                                        ) : (
+                                            policy.linkedPaymentRequest.requestNo
+                                        )
+                                    }
+                                />
+                                <DetailRow label="Party Name" value={policy.linkedPaymentRequest.partyName} />
+                                <DetailRow
+                                    label="Amount"
+                                    value={policy.linkedPaymentRequest.amount != null ? formatINR(policy.linkedPaymentRequest.amount) : undefined}
+                                />
+                                <DetailRow label="Payment Mode" value={policy.linkedPaymentRequest.paymentMode} />
+                                <DetailRow
+                                    label="Status"
+                                    value={<RequestStatusBadge status={policy.linkedPaymentRequest.status} />}
+                                />
+                                {policy.linkedPaymentRequest.status === "rejected" && (
+                                    <DetailRow label="Rejection Reason" value={policy.linkedPaymentRequest.rejectionReason} />
+                                )}
+                                {policy.linkedPaymentRequest.utrNumber && (
+                                    <DetailRow label="UTR Number" value={policy.linkedPaymentRequest.utrNumber} />
+                                )}
+                                <DetailRow label="Requested By" value={policy.linkedPaymentRequest.requestedByName} />
+                                <DetailRow
+                                    label="Created At"
+                                    value={policy.linkedPaymentRequest.createdAt ? formatDate(policy.linkedPaymentRequest.createdAt) : undefined}
                                 />
                             </TableBody>
                         </Table>

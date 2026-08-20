@@ -47,6 +47,9 @@ export interface LinkedPaymentRequestDetails {
     requestedBy: number | null;
     requestedByName: string | null;
     createdAt: Date | null;
+    projectId: number | null;
+    utrNumber: string | null;
+    rejectionReason: string | null;
 }
 
 export interface LinkedImprestDetails {
@@ -70,6 +73,9 @@ export interface LinkedMakerRequestDetails {
     requestedBy: number | null;
     requestedByName: string | null;
     createdAt: Date | null;
+    projectId: number | null;
+    utrNumber: string | null;
+    rejectionReason: string | null;
 }
 
 export interface InsuranceDetailRow extends InsuranceListRow {
@@ -386,6 +392,9 @@ export class InsurancePolicyService {
                 mrRequestedBy: paymentRequests.requestedBy,
                 mrRequestedByName: this.makerRequestUser.name,
                 mrCreatedAt: paymentRequests.createdAt,
+                mrProjectId: paymentRequests.projectId,
+                mrUtrNumber: paymentRequests.utrNumber,
+                mrRejectionReason: paymentRequests.rejectionReason,
             })
             .from(insurancePolicies)
             .leftJoin(projects, eq(projects.id, insurancePolicies.projectId))
@@ -433,6 +442,9 @@ export class InsurancePolicyService {
                       requestedBy: row.mrRequestedBy,
                       requestedByName: row.mrRequestedByName,
                       createdAt: row.mrCreatedAt,
+                      projectId: row.mrProjectId,
+                      utrNumber: row.mrUtrNumber,
+                      rejectionReason: row.mrRejectionReason,
                   }
                 : null,
             linkedPaymentRequest: row.paymentRequestId
@@ -446,6 +458,9 @@ export class InsurancePolicyService {
                       requestedBy: row.mrRequestedBy,
                       requestedByName: row.mrRequestedByName,
                       createdAt: row.mrCreatedAt,
+                      projectId: row.mrProjectId,
+                      utrNumber: row.mrUtrNumber,
+                      rejectionReason: row.mrRejectionReason,
                   }
                 : null,
         };

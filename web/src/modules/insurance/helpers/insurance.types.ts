@@ -91,6 +91,9 @@ export interface LinkedMakerRequestDetails {
     requestedBy: number | null;
     requestedByName: string | null;
     createdAt: string | null;
+    projectId: number | null;
+    utrNumber: string | null;
+    rejectionReason: string | null;
 }
 
 export interface InsurancePolicyDetail extends InsurancePolicyRow {
@@ -109,4 +112,7 @@ export interface LinkedPaymentRequestDetails {
     requestedBy: number | null;
     requestedByName: string | null;
     createdAt: string | null;
+    projectId: number | null;
+    utrNumber: string | null;
+    rejectionReason: string | null;
 }
