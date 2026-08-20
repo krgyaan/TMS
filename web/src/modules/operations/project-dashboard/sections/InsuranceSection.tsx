@@ -12,7 +12,7 @@ import type { InsurancePolicyRow } from "@/modules/insurance/helpers/insurance.t
 import { format } from "date-fns";
 import type { ColDef } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { Eye, Plus } from "lucide-react";
+import { Eye, Plus, RefreshCcw } from "lucide-react";
 import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -39,7 +39,12 @@ export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ projectId })
             icon: <Eye className="h-4 w-4" />,
             onClick: (row) => navigate(paths.accounts.insuranceView(row.id)),
         },
-    ], [navigate]);
+        {
+            label: "Add Payment (Renewal)",
+            icon: <RefreshCcw className="h-4 w-4" />,
+            onClick: (row) => navigate(paths.operations.raiseProjectInsuranceRenewalForm(projectId!, row.id)),
+        },
+    ], [navigate, projectId]);
 
     const insuranceColumns = useMemo<ColDef<InsurancePolicyRow>[]>(() => [
         {

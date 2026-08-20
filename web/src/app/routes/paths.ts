@@ -158,6 +158,8 @@ export const paths = {
             `/operations/project-dashboard/${projectId}/project-payment-request/create${poId ? `?poId=${poId}` : vwoId ? `?vwoId=${vwoId}` : ''}`,
         editProjectPaymentRequestPage: (prId: number, projectId: number) => `/operations/project-dashboard/${projectId}/project-payment-request/${prId}/edit`,
         raiseProjectInsuranceForm: (projectId: number) => `/operations/project-dashboard/${projectId}/insurance/create`,
+        raiseProjectInsuranceRenewalForm: (projectId: number, policyId: number) =>
+            `/operations/project-dashboard/${projectId}/insurance/create?policyId=${policyId}`,
         paymentRequests: "/operations/payment-requests",
     },
 

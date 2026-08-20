@@ -16,7 +16,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Loader2, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { BeneficiaryFormDialog } from "@/modules/operations/vendor-master/components/BeneficiaryFormDialog";
 import type { BeneficiaryFormValues } from "@/modules/operations/vendor-master/vendor-master.types";
@@ -27,7 +27,10 @@ import { mapProjectInsuranceFormToCreateDTO } from "../helpers/projectInsurance.
 export default function CreateProjectInsurancePage() {
     const navigate = useNavigate();
     const { projectId: projectIdParam } = useParams<{ projectId: string }>();
+    const [searchParams] = useSearchParams();
     const projectId = Number(projectIdParam);
+    const insurancePolicyId = searchParams.get("policyId") ? Number(searchParams.get("policyId")) : null;
+    const isRenewal = insurancePolicyId != null && !Number.isNaN(insurancePolicyId);
 
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
     const projectName = overview?.project?.projectName;
@@ -75,9 +78,13 @@ export default function CreateProjectInsurancePage() {
 
     const handleSubmit = async (values: ProjectInsuranceFormValues) => {
         try {
-            const dto = mapProjectInsuranceFormToCreateDTO(values, projectId, projectName);
+            const dto = mapProjectInsuranceFormToCreateDTO(values, projectId, projectName, isRenewal ? insurancePolicyId : null);
             const result = await createMutation.mutateAsync(dto);
-            toast.success(`Insurance added. Payment Request #${result.requestNo} raised automatically.`);
+            if (isRenewal) {
+                toast.success(`Renewal payment raised. Request #${result.requestNo} linked to Policy #${insurancePolicyId}.`);
+            } else {
+                toast.success(`Insurance added. Payment Request #${result.requestNo} raised automatically.`);
+            }
             navigate(paths.operations.projectDashboard(projectId));
         } catch {
             toast.error("Failed to add insurance. Please try again.");
@@ -89,18 +96,37 @@ export default function CreateProjectInsurancePage() {
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle>Add Project Insurance</CardTitle>
-                        <CardDescription className="mt-2">
-                            Add insurance for this project. A project payment request will be raised automatically.
-                            <div className="flex items-center gap-3 mt-2">
-                                <Badge variant="outline">
-                                    {overview?.tender?.tenderNumber || "N/A"}
-                                </Badge>
-                                <Badge variant="secondary">
-                                    {overview?.project?.projectName || "N/A"}
-                                </Badge>
-                            </div>
-                        </CardDescription>
+                        {isRenewal ? (
+                            <>
+                                <CardTitle>Renew Insurance Policy #{insurancePolicyId}</CardTitle>
+                                <CardDescription className="mt-2">
+                                    Raise another payment against the existing policy. A project payment request will be raised and linked to Policy #{insurancePolicyId}.
+                                    <div className="flex items-center gap-3 mt-2">
+                                        <Badge variant="outline">
+                                            {overview?.tender?.tenderNumber || "N/A"}
+                                        </Badge>
+                                        <Badge variant="secondary">
+                                            {overview?.project?.projectName || "N/A"}
+                                        </Badge>
+                                    </div>
+                                </CardDescription>
+                            </>
+                        ) : (
+                            <>
+                                <CardTitle>Add Project Insurance</CardTitle>
+                                <CardDescription className="mt-2">
+                                    Add insurance for this project. A project payment request will be raised automatically.
+                                    <div className="flex items-center gap-3 mt-2">
+                                        <Badge variant="outline">
+                                            {overview?.tender?.tenderNumber || "N/A"}
+                                        </Badge>
+                                        <Badge variant="secondary">
+                                            {overview?.project?.projectName || "N/A"}
+                                        </Badge>
+                                    </div>
+                                </CardDescription>
+                            </>
+                        )}
                     </div>
                     <CardAction>
                         <Button variant="outline" size="sm" type="button" onClick={() => navigate(-1)} className="flex items-center space-x-2">
@@ -205,7 +231,9 @@ export default function CreateProjectInsurancePage() {
                                 </Button>
                                 <Button type="submit" className="min-w-40" disabled={createMutation.isPending || isProjectLoading}>
                                     {createMutation.isPending ? (
-                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Adding...</>
+                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</>
+                                    ) : isRenewal ? (
+                                        "Raise Renewal Payment"
                                     ) : (
                                         "Add Insurance & Raise Request"
                                     )}

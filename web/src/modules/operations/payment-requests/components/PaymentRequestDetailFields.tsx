@@ -1,0 +1,303 @@
+import React from "react";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getShortId } from "@/lib/id-utils";
+import { formatDate } from "@/hooks/useFormatedDate";
+import { formatINR } from "@/hooks/useINRFormatter";
+import { fileUploadService } from "@/services/api/file-upload.service";
+import { purchaseOrderApi } from "@/services/api/purchase-order.api";
+import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
+import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
+import { PAYMENT_AGAINST_LABELS, STATUS_CONFIG } from "../constants";
+
+interface PaymentRequestDetailFieldsProps {
+    detail: PaymentRequestRow;
+}
+
+export const PaymentRequestDetailFields: React.FC<PaymentRequestDetailFieldsProps> = ({ detail }) => (
+    <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-4">
+        <div className="col-span-2">
+            <Label className="text-muted-foreground text-xs">Request No</Label>
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <p className="font-mono font-medium">{getShortId(detail.requestNo)}</p>
+                    </TooltipTrigger>
+                    <TooltipContent>{detail.requestNo}</TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        </div>
+        <div>
+            <Label className="text-muted-foreground text-xs">Project</Label>
+            <p>{detail.projectName || "—"}</p>
+        </div>
+        <div>
+            <Label className="text-muted-foreground text-xs">Party Name</Label>
+            <p>{detail.partyName}</p>
+        </div>
+        <div>
+            <Label className="text-muted-foreground text-xs">Amount</Label>
+            <p className="font-medium">{formatINR(detail.amount)}</p>
+        </div>
+        <div>
+            <Label className="text-muted-foreground text-xs">Account Number</Label>
+            <p className="font-mono">{detail.accountNumber}</p>
+        </div>
+        <div>
+            <Label className="text-muted-foreground text-xs">Bank Name</Label>
+            <p>{detail.bankName || "—"}</p>
+        </div>
+        <div>
+            <Label className="text-muted-foreground text-xs">IFSC</Label>
+            <p className="font-mono">{detail.ifsc}</p>
+        </div>
+        <div>
+            <Label className="text-muted-foreground text-xs">Payment Against</Label>
+            <p>{PAYMENT_AGAINST_LABELS[detail.paymentAgainst] || detail.paymentAgainst}</p>
+        </div>
+        <div>
+            <Label className="text-muted-foreground text-xs">Payment Mode</Label>
+            <p className="capitalize">{detail.paymentMode?.replaceAll('_', ' ').toLowerCase() || "—"}</p>
+        </div>
+        {detail.portalLink && (
+            <div className="col-span-2">
+                <Label className="text-muted-foreground text-xs">Portal Link</Label>
+                <p className="text-blue-600 underline break-all">{detail.portalLink}</p>
+            </div>
+        )}
+        {detail.purchaseOrderId && (
+            <div className="col-span-2 space-y-2">
+                <Label className="text-muted-foreground text-xs">PO Details</Label>
+                <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">PO Number:</span>
+                        <span className="font-medium break-all">{detail.poNumber || `#${detail.purchaseOrderId}`}</span>
+                    </div>
+                    {detail.poFile && (
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">PO File:</span>
+                            <a href={fileUploadService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download PO</a>
+                        </div>
+                    )}
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total (Pre-GST):</span>
+                        <span>{formatINR(detail.poTotalAmount || 0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">GST Amount:</span>
+                        <span>{formatINR(detail.poTotalGstAmt || 0)}</span>
+                    </div>
+                    <div className="flex justify-between font-medium">
+                        <span>Grand Total:</span>
+                        <span>{formatINR(detail.poGrandTotal || 0)}</span>
+                    </div>
+                    {detail.poTdsPercentage && Number(detail.poTdsPercentage) > 0 && (
+                        <>
+                            <div className="border-t my-1.5" />
+                            <div className="flex justify-between text-destructive">
+                                <span>TDS @ {Number(detail.poTdsPercentage)}%:</span>
+                                <span>-{formatINR(detail.poTdsAmount || 0)}</span>
+                            </div>
+                            <div className="flex justify-between font-semibold">
+                                <span>Amount After TDS:</span>
+                                <span>{formatINR(detail.poAmountAfterTds || 0)}</span>
+                            </div>
+                        </>
+                    )}
+                    <div className="border-t my-1.5" />
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Payment Requested:</span>
+                        <span>{formatINR(detail.poTotalPaymentRequested || 0)}</span>
+                    </div>
+                    <div className="flex justify-between pl-2 text-muted-foreground">
+                        <span>Maker Done:</span>
+                        <span>{formatINR(detail.poTotalMakerDone || 0)}</span>
+                    </div>
+                    <div className="flex justify-between pl-2 text-muted-foreground">
+                        <span>Payment Done:</span>
+                        <span>{formatINR(detail.poTotalPaymentDone || 0)}</span>
+                    </div>
+                    {(() => {
+                        const cap = detail.poAmountAfterTds ? Number(detail.poAmountAfterTds) : Number(detail.poGrandTotal || 0);
+                        const remaining = cap - Number(detail.poTotalPaymentRequested || 0);
+                        return (
+                            <div className={`flex justify-between font-medium ${remaining < 0 ? "text-destructive" : ""}`}>
+                                <span>Remaining:</span>
+                                <span>{formatINR(remaining)}</span>
+                            </div>
+                        );
+                    })()}
+                    <div className="pt-2">
+                        <a
+                            href={purchaseOrderApi.getPurchaseOrderPdfUrl(detail.purchaseOrderId)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 underline text-xs"
+                        >
+                            View Latest PO PDF
+                        </a>
+                    </div>
+                </div>
+            </div>
+        )}
+        {detail.vendorWorkOrderId && (
+            <div className="col-span-2 space-y-2">
+                <Label className="text-muted-foreground text-xs">VWO Details</Label>
+                <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">VWO Number:</span>
+                        <span className="font-medium break-all">{detail.vwoNumber || `#${detail.vendorWorkOrderId}`}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total (Pre-GST):</span>
+                        <span>{formatINR(detail.vwoTotalAmount || 0)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">GST Amount:</span>
+                        <span>{formatINR(detail.vwoTotalGstAmt || 0)}</span>
+                    </div>
+                    <div className="flex justify-between font-medium">
+                        <span>Grand Total:</span>
+                        <span>{formatINR(detail.vwoGrandTotal || 0)}</span>
+                    </div>
+                    {detail.vwoTdsPercentage && Number(detail.vwoTdsPercentage) > 0 && (
+                        <>
+                            <div className="border-t my-1.5" />
+                            <div className="flex justify-between text-destructive">
+                                <span>TDS @ {Number(detail.vwoTdsPercentage)}%:</span>
+                                <span>-{formatINR(detail.vwoTdsAmount || 0)}</span>
+                            </div>
+                            <div className="flex justify-between font-semibold">
+                                <span>Amount After TDS:</span>
+                                <span>{formatINR(detail.vwoAmountAfterTds || 0)}</span>
+                            </div>
+                        </>
+                    )}
+                    <div className="border-t my-1.5" />
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Payment Requested:</span>
+                        <span>{formatINR(detail.vwoTotalPaymentRequested || 0)}</span>
+                    </div>
+                    <div className="flex justify-between pl-2 text-muted-foreground">
+                        <span>Maker Done:</span>
+                        <span>{formatINR(detail.vwoTotalMakerDone || 0)}</span>
+                    </div>
+                    <div className="flex justify-between pl-2 text-muted-foreground">
+                        <span>Payment Done:</span>
+                        <span>{formatINR(detail.vwoTotalPaymentDone || 0)}</span>
+                    </div>
+                    {(() => {
+                        const cap = Number(detail.vwoGrandTotal || 0);
+                        const remaining = cap - Number(detail.vwoTotalPaymentRequested || 0);
+                        return (
+                            <div className={`flex justify-between font-medium ${remaining < 0 ? "text-destructive" : ""}`}>
+                                <span>Remaining:</span>
+                                <span>{formatINR(remaining)}</span>
+                            </div>
+                        );
+                    })()}
+                    <div className="pt-2">
+                        <a
+                            href={vendorWorkOrderApi.getPdfDownloadUrl(detail.vendorWorkOrderId)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 underline text-xs"
+                        >
+                            View Latest VWO PDF
+                        </a>
+                    </div>
+                </div>
+            </div>
+        )}
+        <div>
+            <Label className="text-muted-foreground text-xs">Status</Label>
+            <Badge variant="outline" className={STATUS_CONFIG[detail.status]?.color || ""}>
+                {STATUS_CONFIG[detail.status]?.label || detail.status}
+            </Badge>
+        </div>
+        <div>
+            <Label className="text-muted-foreground text-xs">Requested By</Label>
+            <p>{detail.requestedByName || "—"}</p>
+        </div>
+        <div>
+            <Label className="text-muted-foreground text-xs">Created At</Label>
+            <p>{formatDate(detail.createdAt)}</p>
+        </div>
+        {detail.utrNumber && (
+            <div>
+                <Label className="text-muted-foreground text-xs">UTR Number</Label>
+                <p className="font-mono">{detail.utrNumber}</p>
+            </div>
+        )}
+        {detail.rejectionReason && (
+            <div className="col-span-2">
+                <Label className="text-muted-foreground text-xs">Rejection Reason</Label>
+                <p className="text-red-600">{detail.rejectionReason}</p>
+            </div>
+        )}
+        {detail.remark && (
+            <div className="col-span-2">
+                <Label className="text-muted-foreground text-xs">Remark</Label>
+                <p>{detail.remark}</p>
+            </div>
+        )}
+        {(detail.poFile || detail.uploadedInvoiceFile) && (
+            <div className="col-span-2">
+                <Label className="text-muted-foreground text-xs">Uploaded Files</Label>
+                <div className="flex gap-2 mt-1">
+                    {detail.poFile && (
+                        <a href={fileUploadService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">
+                            PO File
+                        </a>
+                    )}
+                    {detail.uploadedInvoiceFile && (
+                        <a href={fileUploadService.getFileUrl(detail.uploadedInvoiceFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">
+                            Invoice File
+                        </a>
+                    )}
+                </div>
+            </div>
+        )}
+        {detail.billFiles && detail.billFiles.length > 0 && (
+            <div className="col-span-2">
+                <Label className="text-muted-foreground text-xs">Bill / Proof Files</Label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                    {detail.billFiles.map((f, i) => (
+                        <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                    ))}
+                </div>
+            </div>
+        )}
+        {detail.uploadInvoice?.length > 0 && (
+            <div className="col-span-2">
+                <Label className="text-muted-foreground text-xs">Upload Invoice</Label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                    {detail.uploadInvoice.map((f, i) => (
+                        <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                    ))}
+                </div>
+            </div>
+        )}
+        {detail.uploadPI?.length > 0 && (
+            <div className="col-span-2">
+                <Label className="text-muted-foreground text-xs">Upload PI</Label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                    {detail.uploadPI.map((f, i) => (
+                        <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                    ))}
+                </div>
+            </div>
+        )}
+        {detail.uploadInvoiceAfterPayment?.length > 0 && (
+            <div className="col-span-2">
+                <Label className="text-muted-foreground text-xs">Upload Invoice after Payment</Label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                    {detail.uploadInvoiceAfterPayment.map((f, i) => (
+                        <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                    ))}
+                </div>
+            </div>
+        )}
+    </div>
+);

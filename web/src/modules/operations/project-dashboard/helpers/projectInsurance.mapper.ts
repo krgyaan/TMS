@@ -5,6 +5,7 @@ export function mapProjectInsuranceFormToCreateDTO(
     values: ProjectInsuranceFormValues,
     projectId: number,
     projectName?: string,
+    insurancePolicyId?: number | null,
 ) {
     const dto: Record<string, unknown> = {
         projectId,
@@ -28,6 +29,9 @@ export function mapProjectInsuranceFormToCreateDTO(
 
     const insurancePayload = buildInsurancePayload(values);
     if (insurancePayload) {
+        if (insurancePolicyId) {
+            insurancePayload.insurancePolicyId = insurancePolicyId;
+        }
         dto.insurance = JSON.stringify(insurancePayload);
     }
 
