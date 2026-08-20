@@ -25,6 +25,10 @@ class InsuranceApiService extends BaseApiService {
         return this.get<InsurancePolicyDetail>(`/${id}`);
     }
 
+    async getByProject(projectId: number): Promise<InsurancePolicyRow[]> {
+        return this.get<InsurancePolicyRow[]>(`/project/${projectId}`);
+    }
+
     async create(data: InsuranceCreatePayload): Promise<InsurancePolicyRow> {
         return this.post<InsurancePolicyRow>('', data);
     }
