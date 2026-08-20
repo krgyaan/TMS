@@ -32,6 +32,12 @@ export class InsurancePolicyController {
         });
     }
 
+    @Get("project/:projectId")
+    @CanRead("accounts.insurance")
+    getByProject(@Param("projectId", ParseIntPipe) projectId: number) {
+        return this.service.getByProject(projectId);
+    }
+
     @Get(":id")
     @CanRead("accounts.insurance")
     findOne(@Param("id", ParseIntPipe) id: number) {

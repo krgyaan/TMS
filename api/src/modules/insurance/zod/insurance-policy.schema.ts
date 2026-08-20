@@ -33,6 +33,8 @@ export const createInsurancePolicySchema = insurancePolicyBaseSchema
     .extend({
         imprestId: z.coerce.number().int().optional().nullable(),
         makerRequestId: z.coerce.number().int().optional().nullable(),
+        projectId: z.coerce.number().int().optional().nullable(),
+        paymentRequestId: z.coerce.number().int().optional().nullable(),
     })
     .superRefine(endDateAfterStart);
 

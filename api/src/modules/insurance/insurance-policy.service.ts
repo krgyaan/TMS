@@ -7,6 +7,7 @@ import { insurancePolicies } from "@/db/schemas/accounts/insurance-policy.schema
 import { imprestCategories } from "@/db/schemas/accounts/imprest-categories.schema";
 import { employeeImprests } from "@db/schemas/shared";
 import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
+import { projects } from "@/db/schemas/master/projects.schema";
 import { users } from "@/db/schemas";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import type { CreateInsurancePolicyDto, InsurancePayload, UpdateInsurancePolicyDto } from "./zod/insurance-policy.schema";
@@ -25,6 +26,8 @@ export interface InsuranceListRow {
     lrCopy: string[] | null;
     imprestId: number | null;
     makerRequestId: number | null;
+    projectId: number | null;
+    paymentRequestId: number | null;
     projectName: string | null;
     linkedRequest: string | null;
     createdBy: number | null;
@@ -32,6 +35,18 @@ export interface InsuranceListRow {
     createdAt: Date;
     status: InsuranceStatus;
     daysRemaining: number;
+}
+
+export interface LinkedPaymentRequestDetails {
+    paymentRequestId: number;
+    requestNo: string | null;
+    partyName: string | null;
+    amount: string | null;
+    paymentMode: string | null;
+    status: string | null;
+    requestedBy: number | null;
+    requestedByName: string | null;
+    createdAt: Date | null;
 }
 
 export interface LinkedImprestDetails {
@@ -60,6 +75,7 @@ export interface LinkedMakerRequestDetails {
 export interface InsuranceDetailRow extends InsuranceListRow {
     linkedImprest: LinkedImprestDetails | null;
     linkedMakerRequest: LinkedMakerRequestDetails | null;
+    linkedPaymentRequest: LinkedPaymentRequestDetails | null;
 }
 
 @Injectable()
@@ -99,7 +115,14 @@ export class InsurancePolicyService {
     /* ----------------------------- CREATE ----------------------------- */
 
     async create(dto: CreateInsurancePolicyDto, userId: number) {
-        const [policy] = await this.db.insert(insurancePolicies).values(this.toValues(dto, userId)).returning();
+        const [policy] = await this.db
+            .insert(insurancePolicies)
+            .values({
+                ...this.toValues(dto, userId),
+                projectId: dto.projectId ?? null,
+                paymentRequestId: dto.paymentRequestId ?? null,
+            })
+            .returning();
 
         await this.linkImprest(dto.imprestId ?? null, policy.id);
         return this.findOne(policy.id);
@@ -120,6 +143,15 @@ export class InsurancePolicyService {
         const [policy] = await tx
             .insert(insurancePolicies)
             .values({ ...this.toValues(dto, userId), makerRequestId })
+            .returning();
+
+        return policy;
+    }
+
+    async createFromPaymentRequest(tx: DbInstance, dto: InsurancePayload, paymentRequestId: number, projectId: number, userId: number) {
+        const [policy] = await tx
+            .insert(insurancePolicies)
+            .values({ ...this.toValues(dto, userId), projectId, paymentRequestId })
             .returning();
 
         return policy;
@@ -215,7 +247,7 @@ export class InsurancePolicyService {
             .select({ total: sql<number>`COUNT(*)`.as("total") })
             .from(insurancePolicies)
             .leftJoin(employeeImprests, eq(employeeImprests.id, insurancePolicies.imprestId))
-            .leftJoin(paymentRequests, eq(paymentRequests.id, insurancePolicies.makerRequestId))
+            .leftJoin(paymentRequests, eq(paymentRequests.id, insurancePolicies.paymentRequestId))
             .where(where);
 
         const rows = await this.db
@@ -235,15 +267,18 @@ export class InsurancePolicyService {
                 itemsCovered: insurancePolicies.itemsCovered,
                 imprestId: insurancePolicies.imprestId,
                 makerRequestId: insurancePolicies.makerRequestId,
-                projectName: employeeImprests.projectName,
+                projectId: insurancePolicies.projectId,
+                paymentRequestId: insurancePolicies.paymentRequestId,
+                projectName: sql<string>`COALESCE(${projects.projectName}, ${employeeImprests.projectName})`,
                 linkedRequest: sql<string>`COALESCE(${paymentRequests.requestNo}, NULL)`,
                 createdBy: insurancePolicies.createdBy,
                 createdByName: users.name,
                 createdAt: insurancePolicies.createdAt,
             })
             .from(insurancePolicies)
+            .leftJoin(projects, eq(projects.id, insurancePolicies.projectId))
             .leftJoin(employeeImprests, eq(employeeImprests.id, insurancePolicies.imprestId))
-            .leftJoin(paymentRequests, eq(paymentRequests.id, insurancePolicies.makerRequestId))
+            .leftJoin(paymentRequests, eq(paymentRequests.id, insurancePolicies.paymentRequestId))
             .leftJoin(users, eq(users.id, insurancePolicies.createdBy))
             .where(where)
             .orderBy(desc(insurancePolicies.createdAt))
@@ -253,13 +288,63 @@ export class InsurancePolicyService {
         const now = new Date();
         const data: InsuranceListRow[] = rows.map(row => ({
             ...row,
-            projectName: row.imprestId ? row.projectName : null,
-            linkedRequest: row.makerRequestId ? row.linkedRequest : row.imprestId ? `Imprest #${row.imprestId}` : null,
+            projectName: row.projectName || null,
+            linkedRequest: row.paymentRequestId ? row.linkedRequest : row.makerRequestId ? row.linkedRequest : row.imprestId ? `Imprest #${row.imprestId}` : null,
             status: this.getStatus(row.endDate, now),
             daysRemaining: this.getDaysRemaining(row.endDate, now),
         }));
 
         return wrapPaginatedResponse(data, Number(countRow?.total ?? 0), page, limit);
+    }
+
+    async getByProject(projectId: number) {
+        const [project] = await this.db.select({ id: projects.id, projectName: projects.projectName }).from(projects).where(eq(projects.id, projectId)).limit(1);
+
+        if (!project) {
+            return [];
+        }
+
+        const rows = await this.db
+            .select({
+                id: insurancePolicies.id,
+                insuranceType: insurancePolicies.insuranceType,
+                policyNumber: insurancePolicies.policyNumber,
+                insurerName: insurancePolicies.insurerName,
+                startDate: insurancePolicies.startDate,
+                endDate: insurancePolicies.endDate,
+                sumAssured: insurancePolicies.sumAssured,
+                policyDocument: insurancePolicies.policyDocument,
+                lrCopy: insurancePolicies.lrCopy,
+                noOfManpower: insurancePolicies.noOfManpower,
+                manpowerNames: insurancePolicies.manpowerNames,
+                location: insurancePolicies.location,
+                itemsCovered: insurancePolicies.itemsCovered,
+                imprestId: insurancePolicies.imprestId,
+                makerRequestId: insurancePolicies.makerRequestId,
+                projectId: insurancePolicies.projectId,
+                paymentRequestId: insurancePolicies.paymentRequestId,
+                projectName: sql<string>`COALESCE(${projects.projectName}, ${employeeImprests.projectName})`,
+                linkedRequest: sql<string>`COALESCE(${paymentRequests.requestNo}, NULL)`,
+                createdBy: insurancePolicies.createdBy,
+                createdByName: users.name,
+                createdAt: insurancePolicies.createdAt,
+            })
+            .from(insurancePolicies)
+            .leftJoin(projects, eq(projects.id, insurancePolicies.projectId))
+            .leftJoin(paymentRequests, eq(paymentRequests.id, insurancePolicies.paymentRequestId))
+            .leftJoin(employeeImprests, eq(employeeImprests.id, insurancePolicies.imprestId))
+            .leftJoin(users, eq(users.id, insurancePolicies.createdBy))
+            .where(or(eq(paymentRequests.projectId, projectId), sql`${employeeImprests.projectName} = ${project.projectName}`))
+            .orderBy(desc(insurancePolicies.createdAt));
+
+        const now = new Date();
+        return rows.map(row => ({
+            ...row,
+            projectName: row.projectName || null,
+            linkedRequest: row.paymentRequestId ? row.linkedRequest : row.makerRequestId ? row.linkedRequest : row.imprestId ? `Imprest #${row.imprestId}` : null,
+            status: this.getStatus(row.endDate, now),
+            daysRemaining: this.getDaysRemaining(row.endDate, now),
+        }));
     }
 
     async findOne(id: number) {
@@ -280,7 +365,9 @@ export class InsurancePolicyService {
                 itemsCovered: insurancePolicies.itemsCovered,
                 imprestId: insurancePolicies.imprestId,
                 makerRequestId: insurancePolicies.makerRequestId,
-                projectName: employeeImprests.projectName,
+                projectId: insurancePolicies.projectId,
+                paymentRequestId: insurancePolicies.paymentRequestId,
+                projectName: sql<string>`COALESCE(${projects.projectName}, ${employeeImprests.projectName})`,
                 linkedRequest: sql<string>`COALESCE(${paymentRequests.requestNo}, NULL)`,
                 createdBy: insurancePolicies.createdBy,
                 createdByName: users.name,
@@ -301,8 +388,9 @@ export class InsurancePolicyService {
                 mrCreatedAt: paymentRequests.createdAt,
             })
             .from(insurancePolicies)
+            .leftJoin(projects, eq(projects.id, insurancePolicies.projectId))
             .leftJoin(employeeImprests, eq(employeeImprests.id, insurancePolicies.imprestId))
-            .leftJoin(paymentRequests, eq(paymentRequests.id, insurancePolicies.makerRequestId))
+            .leftJoin(paymentRequests, eq(paymentRequests.id, insurancePolicies.paymentRequestId))
             .leftJoin(users, eq(users.id, insurancePolicies.createdBy))
             .leftJoin(this.imprestUser, eq(this.imprestUser.id, employeeImprests.userId))
             .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
@@ -318,8 +406,8 @@ export class InsurancePolicyService {
         const now = new Date();
         const detail: InsuranceDetailRow = {
             ...row,
-            projectName: row.imprestId ? row.projectName : null,
-            linkedRequest: row.makerRequestId ? row.linkedRequest : row.imprestId ? `Imprest #${row.imprestId}` : null,
+            projectName: row.projectName || null,
+            linkedRequest: row.paymentRequestId ? row.linkedRequest : row.makerRequestId ? row.linkedRequest : row.imprestId ? `Imprest #${row.imprestId}` : null,
             status: this.getStatus(row.endDate, now),
             daysRemaining: this.getDaysRemaining(row.endDate, now),
             linkedImprest: row.imprestId
@@ -337,6 +425,19 @@ export class InsurancePolicyService {
             linkedMakerRequest: row.makerRequestId
                 ? {
                       makerRequestId: row.makerRequestId,
+                      requestNo: row.linkedRequest,
+                      partyName: row.mrPartyName,
+                      amount: row.mrAmount,
+                      paymentMode: row.mrPaymentMode,
+                      status: row.mrStatus,
+                      requestedBy: row.mrRequestedBy,
+                      requestedByName: row.mrRequestedByName,
+                      createdAt: row.mrCreatedAt,
+                  }
+                : null,
+            linkedPaymentRequest: row.paymentRequestId
+                ? {
+                      paymentRequestId: row.paymentRequestId,
                       requestNo: row.linkedRequest,
                       partyName: row.mrPartyName,
                       amount: row.mrAmount,
