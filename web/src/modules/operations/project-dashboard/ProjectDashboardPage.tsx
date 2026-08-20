@@ -5,6 +5,7 @@ import { Eye } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { EmployeeImprestsSection } from "./sections/EmployeeImprestsSection";
+import { InsuranceSection } from "./sections/InsuranceSection";
 import { PaymentRequestsSection } from "./sections/PaymentRequestsSection";
 import { ProjectClosureSection } from "./sections/ProjectClosureSection";
 import { ProjectOverviewSection } from "./sections/ProjectOverviewSection";
@@ -58,6 +59,7 @@ export default function ProjectDashboardPage() {
             <SaleInvoicesSection projectId={projectId} />
             <PurchaseInvoicesSection projectId={projectId} />
             <PaymentRequestsSection projectId={projectId} />
+            <InsuranceSection projectId={projectId} />
             <EmployeeImprestsSection projectId={projectId} />
             <ProjectClosureSection projectId={projectId} />
         </div>

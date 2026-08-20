@@ -18,6 +18,8 @@ export interface InsurancePolicyRow {
     itemsCovered: string | null;
     imprestId: number | null;
     makerRequestId: number | null;
+    projectId: number | null;
+    paymentRequestId: number | null;
     projectName: string | null;
     linkedRequest: string | null;
     createdBy: number | null;
@@ -94,4 +96,17 @@ export interface LinkedMakerRequestDetails {
 export interface InsurancePolicyDetail extends InsurancePolicyRow {
     linkedImprest: LinkedImprestDetails | null;
     linkedMakerRequest: LinkedMakerRequestDetails | null;
+    linkedPaymentRequest: LinkedPaymentRequestDetails | null;
+}
+
+export interface LinkedPaymentRequestDetails {
+    paymentRequestId: number;
+    requestNo: string | null;
+    partyName: string | null;
+    amount: string | null;
+    paymentMode: string | null;
+    status: string | null;
+    requestedBy: number | null;
+    requestedByName: string | null;
+    createdAt: string | null;
 }

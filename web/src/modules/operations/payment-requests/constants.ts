@@ -34,6 +34,7 @@ export const PAYMENT_AGAINST_LABELS: Record<string, string> = {
     asset_purchase: 'Asset Purchase',
     portal_renewal_charges: 'Portal Renewal Charges',
     professional_charges: 'Professional Charges',
+    insurance: 'Insurance',
 };
 
 export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
