@@ -12,12 +12,15 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from "@nes
 import { and, desc, eq, like, ne, sql } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
+import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
+import { insurancePayloadSchema, insurancePolicySchema, type InsurancePayload } from "@/modules/insurance/zod/insurance-policy.schema";
 
 @Injectable()
 export class PaymentRequestService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
+        private readonly insurancePolicyService: InsurancePolicyService,
     ) {}
 
     async generateNumber(projectName?: string) {
@@ -125,8 +128,10 @@ export class PaymentRequestService {
             }
         }
 
-        const pr = (
-            await this.db
+        const insurance = this.parseInsurancePayload(body.insurance);
+
+        const pr = await this.db.transaction(async tx => {
+            const [created] = await tx
                 .insert(paymentRequests)
                 .values({
                     projectId: body.projectId || null,
@@ -149,11 +154,37 @@ export class PaymentRequestService {
                     remark: body.remark,
                     requestedBy: userId,
                 })
-                .returning()
-        )[0];
+                .returning();
+
+            if (insurance && body.paymentAgainst === "insurance" && body.projectId) {
+                await this.insurancePolicyService.createFromPaymentRequest(
+                    tx,
+                    insurance,
+                    created.id,
+                    body.projectId,
+                    userId,
+                );
+            }
+
+            return created;
+        });
 
         this.logger.info(`Payment Request created: ${requestNo}`);
         return pr;
+    }
+
+    private parseInsurancePayload(raw?: unknown): InsurancePayload | null {
+        if (!raw) {
+            return null;
+        }
+
+        const parsed = typeof raw === "string" ? insurancePayloadSchema.safeParse(raw) : insurancePolicySchema.safeParse(raw);
+
+        if (!parsed.success) {
+            throw new BadRequestException(parsed.error.flatten());
+        }
+
+        return parsed.data;
     }
 
     async update(id: number, body: any) {
