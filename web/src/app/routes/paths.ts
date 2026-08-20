@@ -157,6 +157,7 @@ export const paths = {
         raiseProjectPaymentRequestForm: (projectId: number, poId?: number, vwoId?: number) =>
             `/operations/project-dashboard/${projectId}/project-payment-request/create${poId ? `?poId=${poId}` : vwoId ? `?vwoId=${vwoId}` : ''}`,
         editProjectPaymentRequestPage: (prId: number, projectId: number) => `/operations/project-dashboard/${projectId}/project-payment-request/${prId}/edit`,
+        raiseProjectInsuranceForm: (projectId: number) => `/operations/project-dashboard/${projectId}/insurance/create`,
         paymentRequests: "/operations/payment-requests",
     },
 
