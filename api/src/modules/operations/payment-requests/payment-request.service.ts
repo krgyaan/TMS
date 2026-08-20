@@ -400,9 +400,9 @@ export class PaymentRequestService {
 
     async getAll(teamId?: number, type?: 'project' | 'maker') {
         const conditions: ReturnType<typeof eq>[] = [];
-        if (teamId !== undefined) {
-            conditions.push(eq(users.team, teamId));
-        }
+        // if (teamId !== undefined) {
+        //     conditions.push(eq(users.team, teamId));
+        // }
         if (type === 'project') {
             conditions.push(sql`${paymentRequests.projectId} IS NOT NULL`);
         } else if (type === 'maker') {
