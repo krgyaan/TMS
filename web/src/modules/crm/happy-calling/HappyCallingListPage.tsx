@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useHappyCallings } from '@/hooks/api/useHappyCalling';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
-import { formatDateTime } from '@/hooks/useFormatedDate';
+import { formatDate } from '@/hooks/useFormatedDate';
 import type { HappyCallingRow } from '@/modules/crm/happy-calling/helpers/happy-calling.types';
 import { paths } from '@/app/routes/paths';
 
@@ -136,7 +136,7 @@ const HappyCallingListPage = () => {
                 colId: 'date',
                 headerName: 'Date',
                 width: 150,
-                valueGetter: (params) => formatDateTime(params.data?.date ?? null),
+                valueGetter: (params) => formatDate(params.data?.date ?? null),
                 sortable: true,
                 filter: true,
             },
@@ -145,7 +145,7 @@ const HappyCallingListPage = () => {
                 colId: 'nextFollowupDate',
                 headerName: 'Next Follow Up Date',
                 width: 170,
-                valueGetter: (params) => formatDateTime(params.data?.nextFollowupDate ?? null),
+                valueGetter: (params) => formatDate(params.data?.nextFollowupDate ?? null),
                 sortable: true,
                 filter: true,
             },

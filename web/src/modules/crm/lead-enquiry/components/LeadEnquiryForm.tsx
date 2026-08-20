@@ -217,9 +217,9 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-                            {/* Row 1: Enquiry Name + Team */}
+                            {/* Row 1: Enquiry Name + Team + Organisation */}
                             <FieldWrapper control={form.control} name="enqName" label="Enquiry Name">
                                 {(field) => (
                                     <Input
@@ -239,7 +239,6 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                                 placeholder="-- Select Team --"
                             />
 
-                            {/* Row 2: Organisation + Org Abbreviation */}
                             <FieldWrapper control={form.control} name="organizationName" label="Organisation (End user)">
                                 {(field) => (
                                     <Input
@@ -251,11 +250,11 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                                 )}
                             </FieldWrapper>
 
+                            {/* Row 2: Org Abbreviation + Item + Location */}
                             <FieldWrapper control={form.control} name="orgAbbName" label="Organisation Abbreviation">
                                 {(field) => <Input placeholder="Enter abbreviation" {...field} />}
                             </FieldWrapper>
 
-                            {/* Row 3: Item + Location */}
                             <SelectField
                                 control={form.control}
                                 name="itemId"
@@ -272,7 +271,7 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                                 placeholder="-- Select Location --"
                             />
 
-                            {/* Row 4: Approx Value + Site Visit */}
+                            {/* Row 3: Approx Value + Enquiry Type + Site Visit */}
                             <FieldWrapper control={form.control} name="approxValue" label="Approx Value (₹)">
                                 {(field) => <Input placeholder="Enter approx value" {...field} />}
                             </FieldWrapper>

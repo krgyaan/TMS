@@ -300,6 +300,29 @@ export class FollowupsService {
                     .where(eq(leads.id, sourceId));
             }
 
+            // ── Update happy calling status (happy_calling source) ─────
+
+            if (sourceType === 'happy_calling') {
+                const statusMap: Record<string, string> = {
+                    mail: 'Mail',
+                    call: 'Call',
+                    visit: 'Visit',
+                    letter: 'Letter',
+                    whatsapp: 'Whatsapp',
+                };
+                const happyCallingUpdate: Record<string, unknown> = {
+                    status: statusMap[data.type] ?? data.type,
+                    updatedAt: new Date(),
+                };
+                if ('nextFollowupDate' in data && data.nextFollowupDate) {
+                    happyCallingUpdate.nextFollowupDate = new Date(data.nextFollowupDate);
+                }
+                await tx
+                    .update(happyCalling)
+                    .set(happyCallingUpdate)
+                    .where(eq(happyCalling.id, sourceId));
+            }
+
             return followup;
         });
     }

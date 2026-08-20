@@ -193,9 +193,9 @@ export function AddEnquiryForm() {
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-                            {/* Row 1: Enquiry Name + Team */}
+                            {/* Row 1: Enquiry Name + Team + Organisation */}
                             <FieldWrapper control={form.control} name="enqName" label="Enquiry Name">
                                 {(field) => (
                                     <Input
@@ -215,18 +215,17 @@ export function AddEnquiryForm() {
                                 placeholder="-- Select Team --"
                             />
 
-                            {/* Row 2: Organisation + Org Abbreviation */}
                             <FieldWrapper control={form.control} name="organizationName" label="Organisation (End user)">
                                 {(field) => (
                                     <Input placeholder="Enter organisation name" {...field} />
                                 )}
                             </FieldWrapper>
 
+                            {/* Row 2: Org Abbreviation + Item + Location */}
                             <FieldWrapper control={form.control} name="orgAbbName" label="Organisation Abbreviation">
                                 {(field) => <Input placeholder="Enter abbreviation" {...field} />}
                             </FieldWrapper>
 
-                            {/* Row 3: Item + Location */}
                             <SelectField
                                 control={form.control}
                                 name="itemId"
@@ -243,10 +242,24 @@ export function AddEnquiryForm() {
                                 placeholder="-- Select Location --"
                             />
 
-                            {/* Row 4: Approx Value + Site Visit */}
+                            {/* Row 3: Approx Value + Site Visit + Enquiry Type */}
                             <FieldWrapper control={form.control} name="approxValue" label="Approx Value (₹)">
                                 {(field) => <Input placeholder="Enter approx value" {...field} />}
                             </FieldWrapper>
+
+                            
+
+                            <SelectField
+                                control={form.control}
+                                name="enquiryType"
+                                label="Enquiry Type"
+                                options={[
+                                    { label: "Budgetary Quotation", value: "Budgetary Quotation" },
+                                    { label: "RFQ Received", value: "RFQ Received" },
+                                ]}
+                                placeholder="-- Select Enquiry Type --"
+                            />
+
 
                             <div className="space-y-2">
                                 <Label className="text-sm font-medium">Site Visit Required</Label>
@@ -266,19 +279,7 @@ export function AddEnquiryForm() {
                                 </RadioGroup>
                             </div>
 
-                            <SectionSeparator text="Enquiry Type" />
-
-                            <SelectField
-                                control={form.control}
-                                name="enquiryType"
-                                label="Enquiry Type"
-                                options={[
-                                    { label: "Budgetary Quotation", value: "Budgetary Quotation" },
-                                    { label: "RFQ Received", value: "RFQ Received" },
-                                ]}
-                                placeholder="-- Select Enquiry Type --"
-                            />
-
+                            {/* Location Details Section */}
                             <SectionSeparator text="Location Details" />
 
                             <SelectField
