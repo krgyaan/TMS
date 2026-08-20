@@ -8,7 +8,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, Edit, PhoneCall, FileX2, Search } from 'lucide-react';
+import { AlertCircle, Eye, Edit, PhoneCall, FileX2, Search, Mail } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useHappyCallings } from '@/hooks/api/useHappyCalling';
@@ -69,6 +69,11 @@ const HappyCallingListPage = () => {
                 label: 'Followup',
                 onClick: (row) => navigate(paths.crm.happyCallingFollowup(row.id)),
                 icon: <PhoneCall className="h-4 w-4" />,
+            },
+            {
+                label: 'Enquiry Received',
+                onClick: (row) => navigate(paths.crm.happyCallingEnquiryCreate(row.id)),
+                icon: <Mail className="h-4 w-4" />,
             },
         ],
         [navigate],

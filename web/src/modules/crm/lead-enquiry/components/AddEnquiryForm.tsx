@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SubmitHandler, useForm, useWatch, type Resolver } from "react-hook-form";
@@ -17,18 +17,23 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { useCreateLeadEnquiry, useUpdateLeadEnquiry } from "@/hooks/api/useLeadEnquiry";
+import { useCreateEnquiryWithLead } from "@/hooks/api/useLeadEnquiry";
 import { useLocations } from "@/hooks/api/useLocations";
-import { useLead } from "@/hooks/api/useLeads";
-import { useHappyCalling } from "@/hooks/api/useHappyCalling";
 import axiosInstance from "@/lib/axios";
 import type { Location } from "@/types/api.types";
-import type { LeadEnquiryWithNames } from "../helpers/lead-enquiry.type";
 
 type Option = { value: string; label: string };
 
-const LeadEnquiryFormSchema = z.object({
-    leadId: z.string().optional(),
+const COUNTRY_OPTIONS: Option[] = [
+    { label: "India", value: "India" },
+    { label: "Nepal", value: "Nepal" },
+    { label: "Sri Lanka", value: "Sri Lanka" },
+    { label: "UAE", value: "UAE" },
+    { label: "United States", value: "United States" },
+    { label: "United Kingdom", value: "United Kingdom" },
+];
+
+const AddEnquiryFormSchema = z.object({
     team: z.string().optional(),
     enqName: z.string().min(1, { message: "Enquiry name is required" }),
     organizationName: z.string().min(1, { message: "Organisation is required" }),
@@ -39,23 +44,18 @@ const LeadEnquiryFormSchema = z.object({
     siteVisitRequired: z.enum(["yes", "no"]),
     enquiryType: z.string().optional(),
     notes: z.string().optional(),
+    address: z.string().optional(),
+    country: z.string().min(1, { message: "Country is required" }),
+    state: z.string().min(1, { message: "State is required" }),
     contacts: z.array(z.object({
         name: z.string().min(1, { message: "Contact name is required" }),
         designation: z.string().optional(),
         phone: z.string().optional(),
         email: z.string().optional(),
-    })).optional(),
+    })).min(1, { message: "At least one contact person is required" }),
 });
 
-type LeadEnquiryFormValues = z.infer<typeof LeadEnquiryFormSchema>;
-
-interface LeadEnquiryFormProps {
-    mode: "create" | "edit";
-    enquiry?: LeadEnquiryWithNames;
-    defaultLeadId?: number | null;
-    defaultHappyCallingId?: number | null;
-    prefillOrganizationName?: string;
-}
+type AddEnquiryFormValues = z.infer<typeof AddEnquiryFormSchema>;
 
 const fetchItems = async (): Promise<Option[]> => {
     const res = await axiosInstance.get('/items');
@@ -72,87 +72,78 @@ const fetchTeams = async (): Promise<Option[]> => {
         }));
 };
 
-export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCallingId, prefillOrganizationName }: LeadEnquiryFormProps) {
+const fetchStates = async (): Promise<Option[]> => {
+    const res = await axiosInstance.get('/states');
+    return res.data.map((s: { id: number; name: string }) => ({
+        label: s.name,
+        value: s.name,
+    }));
+};
+
+const SectionSeparator = ({ text }: { text: string }) => (
+    <div className="col-span-full flex items-center gap-4 py-1">
+        <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap">
+            {text}
+        </span>
+        <Separator className="flex-1" />
+    </div>
+);
+
+export function AddEnquiryForm() {
     const navigate = useNavigate();
-    const createEnquiry = useCreateLeadEnquiry();
-    const updateEnquiry = useUpdateLeadEnquiry();
+    const createEnquiryWithLead = useCreateEnquiryWithLead();
 
     const { data: itemOptions = [] } = useQuery({ queryKey: ["items"], queryFn: fetchItems });
     const { data: teamOptions = [] } = useQuery({ queryKey: ["teams"], queryFn: fetchTeams });
+    const { data: stateOptions = [] } = useQuery({ queryKey: ["states"], queryFn: fetchStates });
     const { data: locations = [] } = useLocations();
-    const { data: leadData } = useLead(defaultLeadId ?? null);
-    const { data: happyCallingRecord } = useHappyCalling(defaultHappyCallingId ?? null);
 
     const locationOptions = locations.map((l: Location) => ({
         id: String(l.id),
         name: l.name,
     }));
 
-    const form = useForm<LeadEnquiryFormValues>({
-        resolver: zodResolver(LeadEnquiryFormSchema) as unknown as Resolver<LeadEnquiryFormValues>,
+    const form = useForm<AddEnquiryFormValues>({
+        resolver: zodResolver(AddEnquiryFormSchema) as unknown as Resolver<AddEnquiryFormValues>,
         defaultValues: {
-            leadId: enquiry?.leadId?.toString() || (defaultLeadId ? String(defaultLeadId) : ""),
-            team: enquiry?.team || "",
-            enqName: enquiry?.enqName || "",
-            organizationName: enquiry?.organizationName || "",
-            orgAbbName: enquiry?.orgAbbName || "",
-            itemId: enquiry?.itemId?.toString() || "",
-            locationCode: enquiry?.locationCode || "",
-            approxValue: enquiry?.approxValue || "",
-            siteVisitRequired: enquiry?.siteVisitRequired ? "yes" : "no",
-            enquiryType: enquiry?.enquiryType || "",
-            notes: enquiry?.notes || "",
-            contacts: enquiry?.contacts?.length
-                ? enquiry.contacts.map((c) => ({
-                    name: c.name,
-                    designation: c.designation ?? "",
-                    phone: c.phone ?? "",
-                    email: c.email ?? "",
-                }))
-                : [],
+            team: "",
+            enqName: "",
+            organizationName: "",
+            orgAbbName: "",
+            itemId: "",
+            locationCode: "",
+            approxValue: "",
+            siteVisitRequired: "no",
+            enquiryType: "",
+            notes: "",
+            address: "",
+            country: "",
+            state: "",
+            contacts: [],
         },
     });
 
     const orgAbb = useWatch({ control: form.control, name: "orgAbbName" });
     const itemIdVal = useWatch({ control: form.control, name: "itemId" });
     const locationVal = useWatch({ control: form.control, name: "locationCode" });
+    const country = useWatch({ control: form.control, name: "country" });
+    const isIndia = country === "India";
+
+    const isInitialLoad = useRef(true);
+    const previousCountry = useRef<string>("");
 
     useEffect(() => {
-        if (leadData) {
-            form.setValue("organizationName", leadData.companyName || "");
-            form.setValue("team", leadData.team || "");
-            if (mode === "create") {
-                const contact = {
-                    name: leadData.name || "",
-                    designation: leadData.designation || "",
-                    phone: leadData.phone || "",
-                    email: leadData.email || "",
-                };
-                const hasAny = contact.name || contact.designation || contact.phone || contact.email;
-                if (hasAny) {
-                    form.setValue("contacts", [contact]);
-                }
-            }
-        }
-    }, [leadData, form, mode]);
+        setTimeout(() => {
+            isInitialLoad.current = false;
+        }, 0);
+    }, []);
 
     useEffect(() => {
-        if (happyCallingRecord && mode === "create") {
-            if (happyCallingRecord.organization) {
-                form.setValue("organizationName", happyCallingRecord.organization);
-            }
-            const contact = {
-                name: happyCallingRecord.name || "",
-                designation: happyCallingRecord.designation || "",
-                phone: happyCallingRecord.phone || "",
-                email: happyCallingRecord.email || "",
-            };
-            const hasAny = contact.name || contact.designation || contact.phone || contact.email;
-            if (hasAny) {
-                form.setValue("contacts", [contact]);
-            }
-        }
-    }, [happyCallingRecord, form, mode]);
+        if (isInitialLoad.current) return;
+        if (previousCountry.current === country) return;
+        form.setValue("state", "", { shouldValidate: false });
+        previousCountry.current = country;
+    }, [country, form]);
 
     useEffect(() => {
         const itemName = itemIdVal ? itemOptions.find((o) => o.value === itemIdVal)?.label : "";
@@ -168,46 +159,31 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
         }
     }, [orgAbb, itemIdVal, locationVal, itemOptions, locationOptions, form]);
 
-    useEffect(() => {
-        if (mode === "edit" && enquiry?.locationCode && locations.length > 0) {
-            const loc = (locations as Location[]).find(
-                (l) => l.acronym === enquiry.locationCode
-            );
-            if (loc) {
-                form.setValue("locationCode", String(loc.id));
-            }
-        }
-    }, [mode, enquiry, locations, form]);
-
-    const handleSubmit: SubmitHandler<LeadEnquiryFormValues> = async (values) => {
+    const handleSubmit: SubmitHandler<AddEnquiryFormValues> = async (values) => {
         try {
             const payload = {
                 ...values,
-                leadId: values.leadId ? Number(values.leadId) : null,
-                happyCallingId: defaultHappyCallingId ? Number(defaultHappyCallingId) : null,
                 itemId: Number(values.itemId),
                 siteVisitRequired: values.siteVisitRequired === "yes",
                 enquiryType: values.enquiryType || null,
-                contacts: values.contacts?.length ? values.contacts : null,
+                contacts: values.contacts,
+                address: values.address || null,
+                state: values.state || null,
             };
 
-            if (mode === "create") {
-                await createEnquiry.mutateAsync(payload);
-            } else if (mode === "edit" && enquiry) {
-                await updateEnquiry.mutateAsync({ id: enquiry.id, data: payload });
-            }
+            await createEnquiryWithLead.mutateAsync(payload);
             navigate(paths.crm.enquiries);
         } catch (error) {
-            console.error("Enquiry form submission error:", error);
+            console.error("Add enquiry form submission error:", error);
         }
     };
 
-    const saving = createEnquiry.isPending || updateEnquiry.isPending;
+    const saving = createEnquiryWithLead.isPending;
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>{mode === "create" ? "Create New Enquiry" : "Edit Enquiry"}</CardTitle>
+                <CardTitle>Create New Enquiry</CardTitle>
                 <CardAction>
                     <Button variant="outline" onClick={() => navigate(paths.crm.enquiries)}>
                         <ArrowLeft className="mr-2 h-4 w-4" /> Return Back
@@ -242,12 +218,7 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                             {/* Row 2: Organisation + Org Abbreviation */}
                             <FieldWrapper control={form.control} name="organizationName" label="Organisation (End user)">
                                 {(field) => (
-                                    <Input
-                                        placeholder="Enter organisation name"
-                                        {...field}
-                                        readOnly={!!defaultLeadId || !!prefillOrganizationName}
-                                        className={defaultLeadId || prefillOrganizationName ? "bg-muted/30" : ""}
-                                    />
+                                    <Input placeholder="Enter organisation name" {...field} />
                                 )}
                             </FieldWrapper>
 
@@ -277,17 +248,6 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                                 {(field) => <Input placeholder="Enter approx value" {...field} />}
                             </FieldWrapper>
 
-                            <SelectField
-                                control={form.control}
-                                name="enquiryType"
-                                label="Enquiry Type"
-                                options={[
-                                    { label: "Budgetary Quotation", value: "Budgetary Quotation" },
-                                    { label: "RFQ Received", value: "RFQ Received" },
-                                ]}
-                                placeholder="-- Select Enquiry Type --"
-                            />
-
                             <div className="space-y-2">
                                 <Label className="text-sm font-medium">Site Visit Required</Label>
                                 <RadioGroup
@@ -305,6 +265,53 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                                     </div>
                                 </RadioGroup>
                             </div>
+
+                            <SectionSeparator text="Enquiry Type" />
+
+                            <SelectField
+                                control={form.control}
+                                name="enquiryType"
+                                label="Enquiry Type"
+                                options={[
+                                    { label: "Budgetary Quotation", value: "Budgetary Quotation" },
+                                    { label: "RFQ Received", value: "RFQ Received" },
+                                ]}
+                                placeholder="-- Select Enquiry Type --"
+                            />
+
+                            <SectionSeparator text="Location Details" />
+
+                            <SelectField
+                                control={form.control}
+                                name="country"
+                                label="Country"
+                                options={COUNTRY_OPTIONS}
+                                placeholder="Select Country"
+                            />
+
+                            {isIndia ? (
+                                <SelectField
+                                    control={form.control}
+                                    name="state"
+                                    label="State"
+                                    options={stateOptions}
+                                    placeholder="Select State"
+                                />
+                            ) : (
+                                <FieldWrapper control={form.control} name="state" label="State">
+                                    {(field) => (
+                                        <Input
+                                            placeholder="Enter state name"
+                                            disabled={!country}
+                                            {...field}
+                                        />
+                                    )}
+                                </FieldWrapper>
+                            )}
+
+                            <FieldWrapper control={form.control} name="address" label="Address">
+                                {(field) => <Input placeholder="Enter address" {...field} />}
+                            </FieldWrapper>
 
                             {/* Contact Persons */}
                             <div className="col-span-full">
@@ -329,10 +336,8 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                             <Button type="submit" disabled={saving}>
                                 {saving ? (
                                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
-                                ) : mode === "create" ? (
-                                    "Create Enquiry"
                                 ) : (
-                                    "Update Enquiry"
+                                    "Create Enquiry"
                                 )}
                             </Button>
                             <Button type="button" variant="outline" onClick={() => navigate(paths.crm.enquiries)} disabled={saving}>
