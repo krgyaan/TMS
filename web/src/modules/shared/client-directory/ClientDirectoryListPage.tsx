@@ -1,13 +1,14 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
 import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { CustomCellRendererProps } from 'ag-grid-react';
 import type { ColDef, SortChangedEvent } from 'ag-grid-community';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, Edit, FileX2, Search, RefreshCw, Plus } from 'lucide-react';
+import { AlertCircle, Eye, Edit, PhoneCall, FileX2, Search, RefreshCw, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -22,8 +23,10 @@ import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import type { ClientDirectoryRow } from '@/modules/shared/client-directory/helpers/client-directory.types';
 import { ClientDirectoryModal } from '@/modules/shared/client-directory/components/ClientDirectoryModal';
 import { ClientDirectoryViewModal } from '@/modules/shared/client-directory/components/ClientDirectoryViewModal';
+import { paths } from '@/app/routes/paths';
 
 const ClientDirectoryListPage = () => {
+    const navigate = useNavigate();
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState('');
@@ -81,8 +84,13 @@ const ClientDirectoryListPage = () => {
                 onClick: (row) => setModalState({ open: true, recordId: row.id }),
                 icon: <Edit className="h-4 w-4" />,
             },
+            {
+                label: 'Happy Calling',
+                onClick: (row) => navigate(paths.crm.happyCallingCreate(row.id)),
+                icon: <PhoneCall className="h-4 w-4" />,
+            },
         ],
-        [],
+        [navigate],
     );
 
     const colDefs = useMemo<ColDef<ClientDirectoryRow>[]>(

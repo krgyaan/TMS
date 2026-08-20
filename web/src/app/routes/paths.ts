@@ -282,7 +282,6 @@ export const paths = {
         leadEdit: (id: number | string) => `/crm/leads/${id}/edit`,
         leadView: (id: number | string) => `/crm/leads/${id}`,
         leadFollowup: (leadId: number | string) => `/crm/followup/${leadId}`,
-        leadFollowupHistory: (leadId: number | string) => `/crm/followup/${leadId}/history`,
 
         enquiries: "/crm/enquiries",
         enquiryCreate: "/crm/enquiries/create",
@@ -296,6 +295,13 @@ export const paths = {
         enquiryResults: "/crm/enquiry-results",
         enquiryResultView: (id: number | string) => `/crm/enquiry-results/${id}`,
         enquiryResultFollowup: (id: number | string) => `/crm/enquiry-results/followup/${id}`,
+
+        happyCalling: "/crm/happy-calling",
+        happyCallingCreate: (clientId: number | string) => `/crm/happy-calling/create/${clientId}`,
+        happyCallingView: (id: number | string) => `/crm/happy-calling/${id}`,
+        happyCallingEdit: (id: number | string) => `/crm/happy-calling/${id}/edit`,
+        happyCallingFollowup: (id: number | string) => `/crm/happy-calling/followup/${id}`,
+        happyCallingEnquiryCreate: (id: number | string) => `/crm/happy-calling/enquiry/create/${id}`,
     },
 
     // ==================== PERFORMANCE ====================

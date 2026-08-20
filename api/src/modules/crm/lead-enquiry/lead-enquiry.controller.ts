@@ -5,6 +5,7 @@ import type { SiteVisitContact } from '@db/schemas/crm/site-visit-contacts.schem
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import type {
     CreateCostingSheetDto,
+    CreateEnquiryWithLeadDto,
     CreateLeadEnquiryDto,
     CreateSiteVisitContactArrayDto,
     CreateSiteVisitDto,
@@ -14,6 +15,7 @@ import type {
 } from './dto/lead-enquiry.dto';
 import {
     CreateCostingSheetSchema,
+    CreateEnquiryWithLeadSchema,
     CreateLeadEnquirySchema,
     CreateSiteVisitContactArraySchema,
     CreateSiteVisitSchema,
@@ -153,6 +155,15 @@ export class LeadEnquiryController {
         @CurrentUser() user: ValidatedUser,
     ) {
         return this.leadEnquiryService.create(body, user.sub);
+    }
+
+    @Post('with-lead')
+    @HttpCode(HttpStatus.CREATED)
+    async createWithLead(
+        @ValidatedBody(CreateEnquiryWithLeadSchema) body: CreateEnquiryWithLeadDto,
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        return this.leadEnquiryService.createWithLead(body, user.sub);
     }
 
     @Patch(':id')

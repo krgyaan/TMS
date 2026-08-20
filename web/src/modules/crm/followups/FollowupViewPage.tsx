@@ -6,16 +6,17 @@ import { CallTab } from "./components/CallTab";
 import { VisitTab } from "./components/VisitTab";
 import { LetterTab } from "./components/LetterTab";
 import { WhatsappTab } from "./components/WhatsappTab";
+import type { FollowupSource } from "./helpers/followup.types";
 
 
 interface FollowupViewPageProps {
-    leadId: number;
+    source: FollowupSource;
     onBack?: () => void;
     backLabel?: string;
 }
 
-export function FollowupViewPage({ leadId, onBack, backLabel }: FollowupViewPageProps) {
-    const { data: followups = [], isLoading } = useFollowups(leadId);
+export function FollowupViewPage({ source, onBack, backLabel }: FollowupViewPageProps) {
+    const { data: followups = [], isLoading } = useFollowups(source);
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(
         new Set(["mail-followups"])
@@ -96,20 +97,20 @@ export function FollowupViewPage({ leadId, onBack, backLabel }: FollowupViewPage
         (stepId: string) => {
             switch (stepId) {
                 case "mail-followups":
-                    return <MailTab leadId={leadId} mode="view" />;
+                    return <MailTab source={source} mode="view" />;
                 case "call-followups":
-                    return <CallTab leadId={leadId} mode="view" />;
+                    return <CallTab source={source} mode="view" />;
                 case "visit-followups":
-                    return <VisitTab leadId={leadId} mode="view" />;
+                    return <VisitTab source={source} mode="view" />;
                 case "letter-followups":
-                    return <LetterTab leadId={leadId} mode="view" />;
+                    return <LetterTab source={source} mode="view" />;
                 case "whatsapp-followups":
-                    return <WhatsappTab leadId={leadId} mode="view" />;
+                    return <WhatsappTab source={source} mode="view" />;
                 default:
                     return null;
             }
         },
-        [leadId]
+        [source]
     );
 
     return (

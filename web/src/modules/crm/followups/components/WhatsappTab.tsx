@@ -9,30 +9,30 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { FileUploader } from "@/components/file-upload";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { format } from "date-fns";
-import { paths } from "@/app/routes/paths";
 import {
     useFollowups,
     useWhatsappForm,
     isToday,
+    sourceFollowupPath,
     type WhatsappFormValues
 } from "@/hooks/api/useFollowups";
-import type { BaseFollowup } from "../helpers/followup.types";
+import type { BaseFollowup, FollowupSource } from "../helpers/followup.types";
 
 interface WhatsappTabProps {
-    leadId: number;
+    source: FollowupSource;
     mode?: 'create' | 'view';
 }
 
-export function WhatsappTab({ leadId, mode = 'create' }: WhatsappTabProps) {
+export function WhatsappTab({ source, mode = 'create' }: WhatsappTabProps) {
     if (mode === 'view') {
-        return <WhatsappFollowupList leadId={leadId} />;
+        return <WhatsappFollowupList source={source} />;
     }
-    return <WhatsappCreateForm leadId={leadId} />;
+    return <WhatsappCreateForm source={source} />;
 }
 
 // ─── Create / Edit Form ───────────────────────────────────────────────────────
 
-function WhatsappCreateForm({ leadId }: { leadId: number }) {
+function WhatsappCreateForm({ source }: { source: FollowupSource }) {
     const {
         form,
         attachmentPaths,
@@ -41,7 +41,7 @@ function WhatsappCreateForm({ leadId }: { leadId: number }) {
         saving,
         handleSubmit,
         handleCancelEdit,
-    } = useWhatsappForm(leadId);
+    } = useWhatsappForm(source);
 
     return (
         <Form {...form}>
@@ -134,8 +134,8 @@ function WhatsappCreateForm({ leadId }: { leadId: number }) {
 
 // ─── List View ────────────────────────────────────────────────────────────────
 
-function WhatsappFollowupList({ leadId }: { leadId: number }) {
-    const { data: allFollowups = [] } = useFollowups(leadId);
+function WhatsappFollowupList({ source }: { source: FollowupSource }) {
+    const { data: allFollowups = [] } = useFollowups(source);
 
     const whatsappFollowups = useMemo(
         () => allFollowups
@@ -155,7 +155,7 @@ function WhatsappFollowupList({ leadId }: { leadId: number }) {
     return (
         <div className="space-y-3">
             {whatsappFollowups.map(followup => (
-                <WhatsappFollowupCard key={followup.id} followup={followup} leadId={leadId} />
+                <WhatsappFollowupCard key={followup.id} followup={followup} source={source} />
             ))}
         </div>
     );
@@ -163,7 +163,7 @@ function WhatsappFollowupList({ leadId }: { leadId: number }) {
 
 // ─── Followup Card ────────────────────────────────────────────────────────────
 
-function WhatsappFollowupCard({ followup, leadId }: { followup: BaseFollowup; leadId: number }) {
+function WhatsappFollowupCard({ followup, source }: { followup: BaseFollowup; source: FollowupSource }) {
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
 
@@ -236,7 +236,7 @@ function WhatsappFollowupCard({ followup, leadId }: { followup: BaseFollowup; le
                         size="sm"
                         onClick={() =>
                             navigate(
-                                `${paths.crm.leadFollowup(leadId)}?tab=whatsapp&followupId=${followup.id}`
+                                `${sourceFollowupPath(source)}?tab=whatsapp&followupId=${followup.id}`
                             )
                         }
                     >

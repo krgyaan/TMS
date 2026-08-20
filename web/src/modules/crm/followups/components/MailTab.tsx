@@ -10,14 +10,14 @@ import { SelectField } from "@/components/form/SelectField";
 import { FileUploader } from "@/components/file-upload";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { format } from "date-fns";
-import { paths } from "@/app/routes/paths";
 import {
     useFollowups,
     useMailForm,
     isToday,
+    sourceFollowupPath,
     type MailFormValues
 } from "@/hooks/api/useFollowups";
-import type { BaseFollowup } from "../helpers/followup.types";
+import type { BaseFollowup, FollowupSource } from "../helpers/followup.types";
 
 const FREQUENCY_OPTIONS = [
     { value: "daily", label: "Daily" },
@@ -27,20 +27,20 @@ const FREQUENCY_OPTIONS = [
 ];
 
 interface MailTabProps {
-    leadId: number;
+    source: FollowupSource;
     mode?: "create" | "view";
 }
 
-export function MailTab({ leadId, mode = "create" }: MailTabProps) {
+export function MailTab({ source, mode = "create" }: MailTabProps) {
     if (mode === "view") {
-        return <MailFollowupList leadId={leadId} />;
+        return <MailFollowupList source={source} />;
     }
-    return <MailCreateForm leadId={leadId} />;
+    return <MailCreateForm source={source} />;
 }
 
 // ─── Create / Edit Form ───────────────────────────────────────────────────────
 
-function MailCreateForm({ leadId }: { leadId: number }) {
+function MailCreateForm({ source }: { source: FollowupSource }) {
     const {
         form,
         attachmentPaths,
@@ -49,7 +49,7 @@ function MailCreateForm({ leadId }: { leadId: number }) {
         saving,
         handleSubmit,
         handleCancelEdit,
-    } = useMailForm(leadId);
+    } = useMailForm(source);
 
     return (
         <Form {...form}>
@@ -155,8 +155,8 @@ Write your mail body here..."
 
 // ─── List View ────────────────────────────────────────────────────────────────
 
-function MailFollowupList({ leadId }: { leadId: number }) {
-    const { data: allFollowups = [] } = useFollowups(leadId);
+function MailFollowupList({ source }: { source: FollowupSource }) {
+    const { data: allFollowups = [] } = useFollowups(source);
 
     const mailFollowups = useMemo(
         () =>
@@ -184,7 +184,7 @@ function MailFollowupList({ leadId }: { leadId: number }) {
                 <MailFollowupCard
                     key={followup.id}
                     followup={followup}
-                    leadId={leadId}
+                    source={source}
                 />
             ))}
         </div>
@@ -195,10 +195,10 @@ function MailFollowupList({ leadId }: { leadId: number }) {
 
 function MailFollowupCard({
     followup,
-    leadId,
+    source,
 }: {
     followup: BaseFollowup;
-    leadId: number;
+    source: FollowupSource;
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
@@ -289,7 +289,7 @@ function MailFollowupCard({
                         size="sm"
                         onClick={() =>
                             navigate(
-                                `${paths.crm.leadFollowup(leadId)}?tab=mail&followupId=${followup.id}`
+                                `${sourceFollowupPath(source)}?tab=mail&followupId=${followup.id}`
                             )
                         }
                     >

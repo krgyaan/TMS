@@ -24,7 +24,7 @@ export class FollowupsController {
     async findAll(
         @Param('leadId', ParseIntPipe) leadId: number,
     ) {
-        return this.followupsService.findAllByLead(leadId);
+        return this.followupsService.findAllBySource('lead', leadId);
     }
 
     @Get(':leadId/:id')
@@ -42,7 +42,7 @@ export class FollowupsController {
         @ValidatedBody(CreateFollowupSchema) body: CreateFollowupDto,
         @CurrentUser() user: ValidatedUser,
     ) {
-        return this.followupsService.create(leadId, body, user.sub);
+        return this.followupsService.create('lead', leadId, body, user.sub);
     }
 
     // ✅ ADD THIS ROUTE
