@@ -1,9 +1,9 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
-import { insurancePolicies } from "@/db/schemas/accounts/insurance-policy.schema";
+import { insurancePolicies, insurancePolicyLinks } from "@/db/schemas/accounts/insurance-policy.schema";
 import { imprestCategories } from "@/db/schemas/accounts/imprest-categories.schema";
 import { employeeImprests } from "@db/schemas/shared";
 import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
@@ -48,8 +48,10 @@ export interface LinkedPaymentRequestDetails {
     requestedByName: string | null;
     createdAt: Date | null;
     projectId: number | null;
+    projectName: string | null;
     utrNumber: string | null;
     rejectionReason: string | null;
+    linkType: string;
 }
 
 export interface LinkedImprestDetails {
@@ -61,6 +63,7 @@ export interface LinkedImprestDetails {
     amount: number | null;
     dateOfExpense: Date | null;
     approvalStatus: number | null;
+    linkType: string;
 }
 
 export interface LinkedMakerRequestDetails {
@@ -74,14 +77,16 @@ export interface LinkedMakerRequestDetails {
     requestedByName: string | null;
     createdAt: Date | null;
     projectId: number | null;
+    projectName: string | null;
     utrNumber: string | null;
     rejectionReason: string | null;
+    linkType: string;
 }
 
 export interface InsuranceDetailRow extends InsuranceListRow {
-    linkedImprest: LinkedImprestDetails | null;
-    linkedMakerRequest: LinkedMakerRequestDetails | null;
-    linkedPaymentRequest: LinkedPaymentRequestDetails | null;
+    linkedImprests: LinkedImprestDetails[];
+    linkedMakerRequests: LinkedMakerRequestDetails[];
+    linkedPaymentRequests: LinkedPaymentRequestDetails[];
 }
 
 @Injectable()
@@ -142,6 +147,13 @@ export class InsurancePolicyService {
 
         await tx.update(employeeImprests).set({ insurancePolicyId: policy.id, updatedAt: new Date() }).where(eq(employeeImprests.id, imprestId));
 
+        await tx.insert(insurancePolicyLinks).values({
+            insurancePolicyId: policy.id,
+            linkType: "purchase",
+            imprestId,
+            createdBy: userId,
+        });
+
         return policy;
     }
 
@@ -150,6 +162,13 @@ export class InsurancePolicyService {
             .insert(insurancePolicies)
             .values({ ...this.toValues(dto, userId), makerRequestId })
             .returning();
+
+        await tx.insert(insurancePolicyLinks).values({
+            insurancePolicyId: policy.id,
+            linkType: "purchase",
+            makerRequestId,
+            createdBy: userId,
+        });
 
         return policy;
     }
@@ -160,7 +179,57 @@ export class InsurancePolicyService {
             .values({ ...this.toValues(dto, userId), projectId, paymentRequestId })
             .returning();
 
+        await tx.insert(insurancePolicyLinks).values({
+            insurancePolicyId: policy.id,
+            linkType: "purchase",
+            paymentRequestId,
+            createdBy: userId,
+        });
+
         return policy;
+    }
+
+    /**
+     * Link an additional payment entry (renewal / repeat payment) to an existing policy.
+     * Payment requests carrying a projectId are stored as project payment request links,
+     * others (MR/... numbering) as maker request links.
+     */
+    async addPaymentLink(tx: DbInstance, policyId: number, paymentRequestId: number, linkType: string, userId: number) {
+        const [policy] = await tx.select({ id: insurancePolicies.id }).from(insurancePolicies).where(eq(insurancePolicies.id, policyId)).limit(1);
+        if (!policy) {
+            throw new NotFoundException("Insurance policy not found");
+        }
+
+        const [pr] = await tx
+            .select({ id: paymentRequests.id, projectId: paymentRequests.projectId })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, paymentRequestId))
+            .limit(1);
+        if (!pr) {
+            throw new NotFoundException("Payment request not found");
+        }
+
+        const [existing] = await tx
+            .select({ id: insurancePolicyLinks.id })
+            .from(insurancePolicyLinks)
+            .where(
+                and(
+                    eq(insurancePolicyLinks.insurancePolicyId, policyId),
+                    or(eq(insurancePolicyLinks.paymentRequestId, paymentRequestId), eq(insurancePolicyLinks.makerRequestId, paymentRequestId))
+                )
+            )
+            .limit(1);
+        if (existing) {
+            throw new BadRequestException("This payment request is already linked to the insurance policy");
+        }
+
+        await tx
+            .insert(insurancePolicyLinks)
+            .values(
+                pr.projectId != null
+                    ? { insurancePolicyId: policyId, linkType, paymentRequestId, createdBy: userId }
+                    : { insurancePolicyId: policyId, linkType, makerRequestId: paymentRequestId, createdBy: userId }
+            );
     }
 
     async upsertForImprest(tx: DbInstance, imprestId: number, dto: InsurancePayload, userId: number) {
@@ -419,52 +488,95 @@ export class InsurancePolicyService {
             linkedRequest: row.paymentRequestId ? row.linkedRequest : row.makerRequestId ? row.linkedRequest : row.imprestId ? `Imprest #${row.imprestId}` : null,
             status: this.getStatus(row.endDate, now),
             daysRemaining: this.getDaysRemaining(row.endDate, now),
-            linkedImprest: row.imprestId
-                ? {
-                      imprestId: row.imprestId,
-                      userId: row.imprestUserId,
-                      userName: row.imprestUserName,
-                      categoryName: row.categoryName,
-                      projectName: row.projectName,
-                      amount: row.imprestAmount,
-                      dateOfExpense: row.imprestDateOfExpense,
-                      approvalStatus: row.imprestApprovalStatus,
-                  }
-                : null,
-            linkedMakerRequest: row.makerRequestId
-                ? {
-                      makerRequestId: row.makerRequestId,
-                      requestNo: row.linkedRequest,
-                      partyName: row.mrPartyName,
-                      amount: row.mrAmount,
-                      paymentMode: row.mrPaymentMode,
-                      status: row.mrStatus,
-                      requestedBy: row.mrRequestedBy,
-                      requestedByName: row.mrRequestedByName,
-                      createdAt: row.mrCreatedAt,
-                      projectId: row.mrProjectId,
-                      utrNumber: row.mrUtrNumber,
-                      rejectionReason: row.mrRejectionReason,
-                  }
-                : null,
-            linkedPaymentRequest: row.paymentRequestId
-                ? {
-                      paymentRequestId: row.paymentRequestId,
-                      requestNo: row.linkedRequest,
-                      partyName: row.mrPartyName,
-                      amount: row.mrAmount,
-                      paymentMode: row.mrPaymentMode,
-                      status: row.mrStatus,
-                      requestedBy: row.mrRequestedBy,
-                      requestedByName: row.mrRequestedByName,
-                      createdAt: row.mrCreatedAt,
-                      projectId: row.mrProjectId,
-                      utrNumber: row.mrUtrNumber,
-                      rejectionReason: row.mrRejectionReason,
-                  }
-                : null,
+            linkedImprests: [],
+            linkedMakerRequests: [],
+            linkedPaymentRequests: [],
         };
+
+        const links = await this.db
+            .select({
+                linkType: insurancePolicyLinks.linkType,
+                paymentRequestId: insurancePolicyLinks.paymentRequestId,
+                makerRequestId: insurancePolicyLinks.makerRequestId,
+                imprestId: insurancePolicyLinks.imprestId,
+            })
+            .from(insurancePolicyLinks)
+            .where(eq(insurancePolicyLinks.insurancePolicyId, id));
+
+        if (row.paymentRequestId && !links.some(l => l.paymentRequestId === row.paymentRequestId)) {
+            links.push({ linkType: "purchase", paymentRequestId: row.paymentRequestId, makerRequestId: null, imprestId: null });
+        }
+        if (row.makerRequestId && !links.some(l => l.makerRequestId === row.makerRequestId)) {
+            links.push({ linkType: "purchase", paymentRequestId: null, makerRequestId: row.makerRequestId, imprestId: null });
+        }
+        if (row.imprestId && !links.some(l => l.imprestId === row.imprestId)) {
+            links.push({ linkType: "purchase", paymentRequestId: null, makerRequestId: null, imprestId: row.imprestId });
+        }
+
+        const prIds = links.filter(l => l.paymentRequestId != null).map(l => l.paymentRequestId as number);
+        const mrIds = links.filter(l => l.makerRequestId != null).map(l => l.makerRequestId as number);
+        const imprestIds = links.filter(l => l.imprestId != null).map(l => l.imprestId as number);
+
+        const [prDetails, mrDetails, imprestDetails] = await Promise.all([
+            prIds.length ? this.getPaymentEntryDetails(prIds) : new Map<number, LinkedPaymentRequestDetails>(),
+            mrIds.length ? this.getPaymentEntryDetails(mrIds) : new Map<number, LinkedPaymentRequestDetails>(),
+            imprestIds.length ? this.getImprestEntryDetails(imprestIds) : new Map<number, LinkedImprestDetails>(),
+        ]);
+
+        detail.linkedPaymentRequests = links
+            .filter(l => l.paymentRequestId != null)
+            .map(l => ({ ...(prDetails.get(l.paymentRequestId as number) as LinkedPaymentRequestDetails), linkType: l.linkType }));
+        detail.linkedMakerRequests = links
+            .filter(l => l.makerRequestId != null)
+            .map(l => ({ ...(mrDetails.get(l.makerRequestId as number) as unknown as LinkedMakerRequestDetails), linkType: l.linkType }));
+        detail.linkedImprests = links.filter(l => l.imprestId != null).map(l => ({ ...(imprestDetails.get(l.imprestId as number) as LinkedImprestDetails), linkType: l.linkType }));
+
         return detail;
+    }
+
+    private async getPaymentEntryDetails(ids: number[]): Promise<Map<number, LinkedPaymentRequestDetails>> {
+        const rows = await this.db
+            .select({
+                paymentRequestId: paymentRequests.id,
+                requestNo: paymentRequests.requestNo,
+                partyName: paymentRequests.partyName,
+                amount: paymentRequests.amount,
+                paymentMode: paymentRequests.paymentMode,
+                status: paymentRequests.status,
+                requestedBy: paymentRequests.requestedBy,
+                requestedByName: this.makerRequestUser.name,
+                createdAt: paymentRequests.createdAt,
+                projectId: paymentRequests.projectId,
+                projectName: projects.projectName,
+                utrNumber: paymentRequests.utrNumber,
+                rejectionReason: paymentRequests.rejectionReason,
+            })
+            .from(paymentRequests)
+            .leftJoin(projects, eq(projects.id, paymentRequests.projectId))
+            .leftJoin(this.makerRequestUser, eq(this.makerRequestUser.id, paymentRequests.requestedBy))
+            .where(inArray(paymentRequests.id, ids));
+
+        return new Map(rows.map(r => [r.paymentRequestId, { ...r, linkType: "purchase" }]));
+    }
+
+    private async getImprestEntryDetails(ids: number[]): Promise<Map<number, LinkedImprestDetails>> {
+        const rows = await this.db
+            .select({
+                imprestId: employeeImprests.id,
+                userId: employeeImprests.userId,
+                userName: this.imprestUser.name,
+                categoryName: imprestCategories.name,
+                projectName: employeeImprests.projectName,
+                amount: employeeImprests.amount,
+                dateOfExpense: employeeImprests.dateOfExpense,
+                approvalStatus: employeeImprests.approvalStatus,
+            })
+            .from(employeeImprests)
+            .leftJoin(this.imprestUser, eq(this.imprestUser.id, employeeImprests.userId))
+            .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
+            .where(inArray(employeeImprests.id, ids));
+
+        return new Map(rows.map(r => [r.imprestId, { ...r, linkType: "purchase" }]));
     }
 
     /* ----------------------------- DELETE ----------------------------- */

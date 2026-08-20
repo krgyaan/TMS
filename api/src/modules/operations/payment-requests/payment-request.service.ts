@@ -157,13 +157,11 @@ export class PaymentRequestService {
                 .returning();
 
             if (insurance && body.paymentAgainst === "insurance" && body.projectId) {
-                await this.insurancePolicyService.createFromPaymentRequest(
-                    tx,
-                    insurance,
-                    created.id,
-                    body.projectId,
-                    userId,
-                );
+                if (insurance.insurancePolicyId) {
+                    await this.insurancePolicyService.addPaymentLink(tx, insurance.insurancePolicyId, created.id, "renewal", userId);
+                } else {
+                    await this.insurancePolicyService.createFromPaymentRequest(tx, insurance, created.id, body.projectId, userId);
+                }
             }
 
             return created;

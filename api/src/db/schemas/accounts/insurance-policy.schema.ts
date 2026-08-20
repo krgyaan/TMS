@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, bigint, varchar, text, decimal, date, jsonb, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, bigint, varchar, text, decimal, date, jsonb, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { employeeImprests } from "@/db/schemas/shared/employee-imprest.schema";
 import { projects } from "@/db/schemas/master/projects.schema";
@@ -41,6 +41,23 @@ export const insurancePolicies = pgTable(
     ]
 );
 
+export const insurancePolicyLinks = pgTable(
+    "insurance_policy_links",
+    {
+        id: serial("id").primaryKey(),
+        insurancePolicyId: integer("insurance_policy_id")
+            .notNull()
+            .references(() => insurancePolicies.id, { onDelete: "cascade" }),
+        linkType: varchar("link_type", { length: 30 }).notNull().default("purchase"),
+        paymentRequestId: bigint("payment_request_id", { mode: "number" }).references(() => paymentRequests.id, { onDelete: "set null" }),
+        makerRequestId: bigint("maker_request_id", { mode: "number" }).references(() => paymentRequests.id, { onDelete: "set null" }),
+        imprestId: integer("imprest_id").references(() => employeeImprests.id, { onDelete: "set null" }),
+        createdBy: integer("created_by").notNull(),
+        createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    },
+    table => [index("idx_insurance_policy_links_policy").on(table.insurancePolicyId)]
+);
+
 export const insurancePoliciesRelations = relations(insurancePolicies, ({ one }) => ({
     imprest: one(employeeImprests, {
         fields: [insurancePolicies.imprestId],
@@ -56,6 +73,25 @@ export const insurancePoliciesRelations = relations(insurancePolicies, ({ one })
     }),
 }));
 
+export const insurancePolicyLinksRelations = relations(insurancePolicyLinks, ({ one }) => ({
+    insurancePolicy: one(insurancePolicies, {
+        fields: [insurancePolicyLinks.insurancePolicyId],
+        references: [insurancePolicies.id],
+    }),
+    paymentRequest: one(paymentRequests, {
+        fields: [insurancePolicyLinks.paymentRequestId],
+        references: [paymentRequests.id],
+    }),
+    makerRequest: one(paymentRequests, {
+        fields: [insurancePolicyLinks.makerRequestId],
+        references: [paymentRequests.id],
+    }),
+    imprest: one(employeeImprests, {
+        fields: [insurancePolicyLinks.imprestId],
+        references: [employeeImprests.id],
+    }),
+}));
+
 export const employeeImprestsRelations = relations(employeeImprests, ({ one }) => ({
     insurancePolicy: one(insurancePolicies, {
         fields: [employeeImprests.insurancePolicyId],
@@ -65,3 +101,5 @@ export const employeeImprestsRelations = relations(employeeImprests, ({ one }) =
 
 export type InsurancePolicy = typeof insurancePolicies.$inferSelect;
 export type NewInsurancePolicy = typeof insurancePolicies.$inferInsert;
+export type InsurancePolicyLink = typeof insurancePolicyLinks.$inferSelect;
+export type NewInsurancePolicyLink = typeof insurancePolicyLinks.$inferInsert;

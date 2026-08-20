@@ -27,7 +27,11 @@ const endDateAfterStart = (data: { startDate?: Date; endDate?: Date }, ctx: z.Re
     }
 };
 
-export const insurancePolicySchema = insurancePolicyBaseSchema.superRefine(endDateAfterStart);
+export const insurancePolicySchema = insurancePolicyBaseSchema
+    .extend({
+        insurancePolicyId: z.coerce.number().int().optional().nullable(),
+    })
+    .superRefine(endDateAfterStart);
 
 export const createInsurancePolicySchema = insurancePolicyBaseSchema
     .extend({

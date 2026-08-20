@@ -72,7 +72,11 @@ export class MakerRequestService {
                 .returning();
 
             if (body.category === INSURANCE_CATEGORY && insurance) {
-                await this.insurancePolicyService.createFromMakerRequest(tx, insurance, created.id, userId);
+                if (insurance.insurancePolicyId) {
+                    await this.insurancePolicyService.addPaymentLink(tx, insurance.insurancePolicyId, created.id, "renewal", userId);
+                } else {
+                    await this.insurancePolicyService.createFromMakerRequest(tx, insurance, created.id, userId);
+                }
             }
 
             return created;
