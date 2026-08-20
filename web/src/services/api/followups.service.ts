@@ -2,32 +2,38 @@ import { BaseApiService } from './base.service';
 import type {
     BaseFollowup,
     CreateFollowupRequest,
+    FollowupSource,
 } from '@/modules/crm/followups/helpers/followup.types';
 
 class FollowupsService extends BaseApiService {
     constructor() {
-        super('/leads/followups');
+        super('');
     }
 
-    async getAll(leadId: number): Promise<BaseFollowup[]> {
-        return this.get<BaseFollowup[]>(`/${leadId}`);
+    private sourceBase(source: FollowupSource): string {
+        return source.sourceType === 'lead'
+            ? `/leads/followups`
+            : `/happy-calling/followups`;
     }
 
-    async getById(leadId: number, followupId: number): Promise<BaseFollowup> {
-        return this.get<BaseFollowup>(`/${leadId}/${followupId}`);
+    async getAll(source: FollowupSource): Promise<BaseFollowup[]> {
+        return this.get<BaseFollowup[]>(`${this.sourceBase(source)}/${source.sourceId}`);
     }
 
-    async create(leadId: number, data: CreateFollowupRequest): Promise<BaseFollowup> {
-        return this.post<BaseFollowup>(`/${leadId}`, data);
+    async getById(source: FollowupSource, followupId: number): Promise<BaseFollowup> {
+        return this.get<BaseFollowup>(`${this.sourceBase(source)}/${source.sourceId}/${followupId}`);
     }
 
-    // ✅ UPDATED - removed Partial
-    async update(leadId: number, followupId: number, data: CreateFollowupRequest): Promise<BaseFollowup> {
-        return this.patch<BaseFollowup>(`/${leadId}/${followupId}`, data);
+    async create(source: FollowupSource, data: CreateFollowupRequest): Promise<BaseFollowup> {
+        return this.post<BaseFollowup>(`${this.sourceBase(source)}/${source.sourceId}`, data);
     }
 
-    async remove(leadId: number, followupId: number): Promise<void> {
-        return super.delete<void>(`/${leadId}/${followupId}`);
+    async update(source: FollowupSource, followupId: number, data: CreateFollowupRequest): Promise<BaseFollowup> {
+        return this.patch<BaseFollowup>(`${this.sourceBase(source)}/${source.sourceId}/${followupId}`, data);
+    }
+
+    async remove(source: FollowupSource, followupId: number): Promise<void> {
+        return super.delete<void>(`${this.sourceBase(source)}/${source.sourceId}/${followupId}`);
     }
 }
 

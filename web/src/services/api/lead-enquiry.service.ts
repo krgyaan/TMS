@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service';
-import type { LeadEnquiry, LeadEnquiryWithNames, CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, SiteVisit, CreateSiteVisitRequest, UpdateSiteVisitRequest, SiteVisitContact, CreateSiteVisitContactRequest, UpdateSiteVisitDetailsRequest, CreateCostingSheetResponse, SubmitCostingSheetRequest, SubmitCostingSheetResponse, DriveScopesResponse } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
+import type { LeadEnquiry, LeadEnquiryWithNames, CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, SiteVisit, CreateSiteVisitRequest, UpdateSiteVisitRequest, SiteVisitContact, CreateSiteVisitContactRequest, UpdateSiteVisitDetailsRequest, CreateCostingSheetResponse, SubmitCostingSheetRequest, SubmitCostingSheetResponse, DriveScopesResponse, CreateEnquiryWithLeadRequest } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
 import type { PaginatedResult } from '@/types/api.types';
 
 class LeadEnquiryService extends BaseApiService {
@@ -27,6 +27,10 @@ class LeadEnquiryService extends BaseApiService {
 
     async create(data: CreateLeadEnquiryRequest): Promise<LeadEnquiry> {
         return this.post<LeadEnquiry>('', data);
+    }
+
+    async createWithLead(data: CreateEnquiryWithLeadRequest): Promise<{ lead: { id: number }; enquiry: LeadEnquiry }> {
+        return this.post<{ lead: { id: number }; enquiry: LeadEnquiry }>('/with-lead', data);
     }
 
     async update(id: number, data: UpdateLeadEnquiryRequest): Promise<LeadEnquiry> {

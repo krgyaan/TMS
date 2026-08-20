@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadEnquiryService } from '@/services/api/lead-enquiry.service';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/utils/errorToast';
-import type { CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, LeadEnquiryWithNames, CreateSiteVisitRequest, UpdateSiteVisitRequest, SiteVisit, SiteVisitContact, CreateSiteVisitContactRequest, UpdateSiteVisitDetailsRequest, SubmitCostingSheetRequest, DriveScopesResponse } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
+import type { CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, LeadEnquiryWithNames, CreateSiteVisitRequest, UpdateSiteVisitRequest, SiteVisit, SiteVisitContact, CreateSiteVisitContactRequest, UpdateSiteVisitDetailsRequest, SubmitCostingSheetRequest, DriveScopesResponse, CreateEnquiryWithLeadRequest } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
 import type { PaginatedResult } from '@/types/api.types';
 
 export const leadEnquiryKey = {
@@ -55,6 +55,19 @@ export const useCreateLeadEnquiry = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: leadEnquiryKey.lists() });
             toast.success('Enquiry created successfully');
+        },
+        onError: showErrorToast,
+    });
+};
+
+export const useCreateEnquiryWithLead = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: CreateEnquiryWithLeadRequest) => leadEnquiryService.createWithLead(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: leadEnquiryKey.lists() });
+            queryClient.invalidateQueries({ queryKey: ['leads'] });
+            toast.success('Enquiry and lead created successfully');
         },
         onError: showErrorToast,
     });

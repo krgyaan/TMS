@@ -7,22 +7,27 @@ import {
     pgEnum,
 } from "drizzle-orm/pg-core";
 import { leadFollowups } from "./lead-followups.schema";
+import { leadEnquiries } from "./lead-enquiries.schema";
 
 export const contactSourceEnum = pgEnum('contact_source', [
     'call_followup',
     'visit_followup',
     'quotation',
+    'enquiry',
 ]);
 
 export const leadContacts = pgTable("lead_contacts", {
     id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
 
-    leadId: bigint("lead_id", { mode: "number" })
-        .notNull(),
+    leadId: bigint("lead_id", { mode: "number" }),
 
     // ✅ Links contact to a specific follow-up
     followupId: bigint("followup_id", { mode: "number" })
         .references(() => leadFollowups.id, { onDelete: "set null" }),
+
+    // ✅ Links contact to a specific enquiry
+    enquiryId: bigint("enquiry_id", { mode: "number" })
+        .references(() => leadEnquiries.id, { onDelete: "set null" }),
 
     name: varchar("name", { length: 255 }).notNull(),
     designation: varchar("designation", { length: 255 }),

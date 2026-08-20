@@ -83,16 +83,16 @@ export function LeadEnquiryView({ enquiry: manualEnquiry, enquiryId, isLoading: 
                             <TableCell className="text-sm">{enquiry.status || "—"}</TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">Enquiry Type</TableCell>
+                            <TableCell className="text-sm">{enquiry.enquiryType || "—"}</TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">Rejection Reason</TableCell>
                             <TableCell className="text-sm">{enquiry.rejectionReason || "—"}</TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">Site Visit Required</TableCell>
-                            <TableCell className="text-sm">{enquiry.siteVisitRequired ? "Yes" : "No"}</TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">Site Visit Required</TableCell>
+                            <TableCell className="text-sm">{enquiry.siteVisitRequired ? "Yes" : "No"}</TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">Lead</TableCell>
                             <TableCell className="text-sm">{enquiry.leadName || "—"}</TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">Team</TableCell>
-                            <TableCell className="text-sm">{enquiry.teamName || enquiry.team || "—"}</TableCell>
                         </TableRow>
 
                         <TableRow className="bg-muted/50">
@@ -216,7 +216,7 @@ export function LeadEnquiryViewPage({ enquiryId, onBack, backLabel }: LeadEnquir
             case "lead-details":
                 return <LeadDetailsSection leadId={leadId} />;
             case "followups":
-                return <FollowupViewPage leadId={leadId} />;
+                return <FollowupViewPage source={{ sourceType: 'lead', sourceId: leadId }} />;
             case "enquiries":
                 return <EnquiryDetailsSection enquiryId={enquiryId} />;
             case "site-visits":

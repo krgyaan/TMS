@@ -1,5 +1,11 @@
 export type FollowupType = 'mail' | 'call' | 'visit' | 'letter' | 'whatsapp';
 export type MailFrequency = 'daily' | 'weekly' | 'monthly' | 'custom';
+export type FollowupSourceType = 'lead' | 'happy_calling';
+
+export interface FollowupSource {
+    sourceType: FollowupSourceType;
+    sourceId: number;
+}
 
 export interface ContactPerson {
     name: string;
@@ -10,7 +16,9 @@ export interface ContactPerson {
 
 export interface BaseFollowup {
     id: number;
-    leadId: number;
+    leadId: number | null;
+    happyCallingId: number | null;
+    sourceType: FollowupSourceType;
     type: FollowupType;
     body: string | null;
     veResponsibility: string | null;

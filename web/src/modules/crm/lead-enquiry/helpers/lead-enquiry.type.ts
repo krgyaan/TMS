@@ -1,6 +1,7 @@
 export interface LeadEnquiry {
     id: number;
     leadId: number | null;
+    happyCallingId: number | null;
     team: string | null;
     enqName: string;
     organisationId: number | null;
@@ -17,6 +18,7 @@ export interface LeadEnquiry {
     enquiryNumber: string | null;
     rejectionReason: string | null;
     status: string | null;
+    enquiryType: string | null;
     costingDocument: string | null;
     notes: string | null;
     createdAt: string;
@@ -32,10 +34,19 @@ export interface LeadEnquiryWithNames extends LeadEnquiry {
     teamName?: string | null;
     hasSiteVisit?: boolean;
     costingSheetStatus?: string | null;
+    contacts?: EnquiryContact[] | null;
+}
+
+export interface EnquiryContact {
+    name: string;
+    designation?: string | null;
+    phone?: string | null;
+    email?: string | null;
 }
 
 export interface CreateLeadEnquiryRequest {
     leadId?: number | null;
+    happyCallingId?: number | null;
     team?: string | null;
     enqName: string;
     organisationId?: number | null;
@@ -50,11 +61,36 @@ export interface CreateLeadEnquiryRequest {
     enquiryNumber?: string | null;
     rejectionReason?: string | null;
     status?: string | null;
+    enquiryType?: string | null;
     notes?: string | null;
+    contacts?: EnquiryContact[] | null;
 }
 
 export interface UpdateLeadEnquiryRequest extends Partial<CreateLeadEnquiryRequest> {
     costingDocument?: string | null;
+}
+
+export interface CreateEnquiryWithLeadRequest {
+    team?: string | null;
+    enqName: string;
+    organisationId?: number | null;
+    itemId: number;
+    locationCode: string;
+    approxValue: string;
+    siteVisitRequired?: boolean;
+    orgAbbName?: string | null;
+    enquiryFile?: string | null;
+    enquiryPhotos?: string | null;
+    organizationName: string;
+    enquiryNumber?: string | null;
+    rejectionReason?: string | null;
+    status?: string | null;
+    enquiryType?: string | null;
+    notes?: string | null;
+    contacts: EnquiryContact[];
+    address?: string | null;
+    country?: string | null;
+    state?: string | null;
 }
 
 export interface SiteVisitContact {

@@ -5,7 +5,8 @@ import { leadEnquiries, type NewLeadEnquiry, type LeadEnquiry } from '@db/schema
 import { siteVisits, type SiteVisit, type NewSiteVisit } from '@db/schemas/crm/site-visits.schema';
 import { siteVisitContacts, type SiteVisitContact } from '@db/schemas/crm/site-visit-contacts.schema';
 import { privateCostingSheets } from '@db/schemas/crm/private-costing-sheets.schema';
-import { leads } from '@db/schemas/crm/leads.schema';
+import { leads, type NewLead } from '@db/schemas/crm/leads.schema';
+import { leadContacts } from '@db/schemas/crm/lead-contacts.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { organizations } from '@db/schemas/master/organizations.schema';
 import { teams } from '@db/schemas/master/teams.schema';
@@ -14,7 +15,7 @@ import { users } from '@db/schemas/auth/users.schema';
 import { and, asc, desc, eq, ilike, like, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { GoogleDriveService } from '@/modules/integrations/google/google-drive.service';
-import type { CreateLeadEnquiryDto, UpdateLeadEnquiryDto, CreateSiteVisitDto, UpdateSiteVisitDto, UpdateSiteVisitDetailsDto, CreateSiteVisitContactDto, CreateSiteVisitContactArrayDto } from './dto/lead-enquiry.dto';
+import type { CreateLeadEnquiryDto, UpdateLeadEnquiryDto, CreateSiteVisitDto, UpdateSiteVisitDto, UpdateSiteVisitDetailsDto, CreateSiteVisitContactDto, CreateSiteVisitContactArrayDto, EnquiryContactDto, CreateEnquiryWithLeadDto } from './dto/lead-enquiry.dto';
 
 export type LeadEnquiryListFilters = {
     page?: number;
@@ -36,6 +37,7 @@ export type LeadEnquiryWithNames = LeadEnquiry & {
     teamName?: string | null;
     hasSiteVisit?: boolean;
     costingSheetStatus?: string | null;
+    contacts?: EnquiryContactDto[] | null;
 };
 
 const createdByUser = alias(users, 'created_by_user');
@@ -169,6 +171,17 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
 
         if (!row) throw new NotFoundException(`Lead enquiry with ID ${id} not found`);
 
+        const contacts = await this.db
+            .select({
+                name: leadContacts.name,
+                designation: leadContacts.designation,
+                phone: leadContacts.phone,
+                email: leadContacts.email,
+            })
+            .from(leadContacts)
+            .where(eq(leadContacts.enquiryId, id))
+            .orderBy(asc(leadContacts.id));
+
         return {
             ...row.leadEnquiries,
             leadName: row.leadName ?? null,
@@ -179,6 +192,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             updatedByName: row.updatedByName ?? null,
             hasSiteVisit: row.hasSiteVisit ?? false,
             costingSheetStatus: row.costingSheetStatus ?? null,
+            contacts,
         };
     }
 
@@ -189,53 +203,47 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             .join('');
     }
 
-    async create(data: CreateLeadEnquiryDto, userId: number): Promise<LeadEnquiry> {
-        const db = this.db;
+    private async resolveOrganizationId(db: DbInstance, organizationName?: string | null): Promise<number | null> {
+        if (!organizationName) return null;
 
-        // 1. Resolve Organization
-        let organisationId: number | null = null;
-        if (data.organizationName) {
-            const [existingOrg] = await db
-                .select({ id: organizations.id })
-                .from(organizations)
-                .where(eq(organizations.name, data.organizationName))
-                .limit(1);
+        const [existingOrg] = await db
+            .select({ id: organizations.id })
+            .from(organizations)
+            .where(eq(organizations.name, organizationName))
+            .limit(1);
 
-            if (existingOrg) {
-                organisationId = existingOrg.id;
-            } else {
-                const acronym = this.generateAcronym(data.organizationName);
-                const [newOrg] = await db
-                    .insert(organizations)
-                    .values({
-                        name: data.organizationName,
-                        acronym,
-                        industryId: null,
-                        status: false,
-                    })
-                    .returning({ id: organizations.id });
-                organisationId = newOrg.id;
-            }
-        }
+        if (existingOrg) return existingOrg.id;
 
-        // 2. Resolve Location Code (id → acronym)
-        let locationCode = data.locationCode;
-        if (locationCode) {
-            const locId = Number(locationCode);
-            if (!isNaN(locId)) {
-                const [location] = await db
-                    .select({ acronym: locations.acronym })
-                    .from(locations)
-                    .where(eq(locations.id, locId))
-                    .limit(1);
+        const acronym = this.generateAcronym(organizationName);
+        const [newOrg] = await db
+            .insert(organizations)
+            .values({
+                name: organizationName,
+                acronym,
+                industryId: null,
+                status: false,
+            })
+            .returning({ id: organizations.id });
 
-                if (location?.acronym) {
-                    locationCode = location.acronym;
-                }
-            }
-        }
+        return newOrg.id;
+    }
 
-        // 3. Generate Enquiry Number
+    private async resolveLocationCode(db: DbInstance, locationCode: string): Promise<string> {
+        if (!locationCode) return locationCode;
+
+        const locId = Number(locationCode);
+        if (isNaN(locId)) return locationCode;
+
+        const [location] = await db
+            .select({ acronym: locations.acronym })
+            .from(locations)
+            .where(eq(locations.id, locId))
+            .limit(1);
+
+        return location?.acronym ?? locationCode;
+    }
+
+    private async generateEnquiryNumber(db: DbInstance): Promise<string> {
         const now = new Date();
         const mm = String(now.getMonth() + 1).padStart(2, '0');
         const yy = String(now.getFullYear()).slice(-2);
@@ -254,13 +262,27 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             const lastSeq = parseInt(lastEnquiry.enquiryNumber.slice(-3), 10);
             if (!isNaN(lastSeq)) seq = lastSeq + 1;
         }
-        const enquiryNumber = `${prefix}${String(seq).padStart(3, '0')}`;
+        return `${prefix}${String(seq).padStart(3, '0')}`;
+    }
+
+    async create(data: CreateLeadEnquiryDto, userId: number): Promise<LeadEnquiry> {
+        const db = this.db;
+
+        // 1. Resolve Organization
+        const organisationId = await this.resolveOrganizationId(db, data.organizationName);
+
+        // 2. Resolve Location Code (id → acronym)
+        const locationCode = await this.resolveLocationCode(db, data.locationCode);
+
+        // 3. Generate Enquiry Number
+        const enquiryNumber = await this.generateEnquiryNumber(db);
 
         // 4. Insert lead enquiry with resolved values
         const [newEnquiry] = await db
             .insert(leadEnquiries)
             .values({
                 leadId: data.leadId ?? null,
+                happyCallingId: data.happyCallingId ?? null,
                 team: data.team ?? null,
                 enqName: data.enqName,
                 organisationId,
@@ -275,10 +297,107 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 organizationName: data.organizationName ?? null,
                 enquiryNumber,
                 status: "New",
+                enquiryType: data.enquiryType ?? null,
                 notes: data.notes ?? null,
             })
             .returning();
+
+        // 5. Insert enquiry contacts
+        if (data.contacts && data.contacts.length > 0) {
+            await db
+                .insert(leadContacts)
+                .values(
+                    data.contacts.map((c) => ({
+                        enquiryId: newEnquiry.id,
+                        leadId: data.leadId ?? null,
+                        source: 'enquiry' as const,
+                        name: c.name,
+                        designation: c.designation ?? null,
+                        phone: c.phone ?? null,
+                        email: c.email ?? null,
+                    })),
+                );
+        }
+
         return newEnquiry;
+    }
+
+    async createWithLead(data: CreateEnquiryWithLeadDto, userId: number): Promise<{ lead: typeof leads.$inferSelect; enquiry: LeadEnquiry }> {
+        return this.db.transaction(async (tx) => {
+            const primaryContact = data.contacts[0] ?? null;
+
+            // 1. Create the lead row (companyName from the enquiry organisation)
+            const [lead] = await tx
+                .insert(leads)
+                .values({
+                    companyName: data.organizationName,
+                    name: primaryContact?.name ?? null,
+                    designation: primaryContact?.designation ?? null,
+                    phone: primaryContact?.phone ?? null,
+                    email: primaryContact?.email ?? null,
+                    address: data.address ?? null,
+                    country: data.country ?? null,
+                    state: data.state ?? null,
+                    team: data.team ?? null,
+                    bdPerson: userId,
+                    leadPriority: 'Cold',
+                    enquiryReceivedAt: new Date(),
+                } as NewLead)
+                .returning();
+
+            // 2. Resolve Organization
+            const organisationId = await this.resolveOrganizationId(tx, data.organizationName);
+
+            // 3. Resolve Location Code (id → acronym)
+            const locationCode = await this.resolveLocationCode(tx, data.locationCode);
+
+            // 4. Generate Enquiry Number
+            const enquiryNumber = await this.generateEnquiryNumber(tx);
+
+            // 5. Insert lead enquiry linked to the new lead
+            const [enquiry] = await tx
+                .insert(leadEnquiries)
+                .values({
+                    leadId: lead.id,
+                    team: data.team ?? null,
+                    enqName: data.enqName,
+                    organisationId,
+                    itemId: data.itemId,
+                    locationCode,
+                    approxValue: data.approxValue,
+                    siteVisitRequired: data.siteVisitRequired ?? false,
+                    createdBy: userId,
+                    orgAbbName: data.orgAbbName ?? null,
+                    enquiryFile: data.enquiryFile ?? null,
+                    enquiryPhotos: data.enquiryPhotos ?? null,
+                    organizationName: data.organizationName ?? null,
+                    enquiryNumber,
+                    status: "New",
+                    enquiryType: data.enquiryType ?? null,
+                    notes: data.notes ?? null,
+                })
+                .returning();
+
+            // 6. Insert additional enquiry contacts (first contact populates the lead)
+            const extraContacts = data.contacts.slice(1);
+            if (extraContacts.length > 0) {
+                await tx
+                    .insert(leadContacts)
+                    .values(
+                        extraContacts.map((c) => ({
+                            enquiryId: enquiry.id,
+                            leadId: lead.id,
+                            source: 'enquiry' as const,
+                            name: c.name,
+                            designation: c.designation ?? null,
+                            phone: c.phone ?? null,
+                            email: c.email ?? null,
+                        })),
+                    );
+            }
+
+            return { lead, enquiry };
+        });
     }
 
     async update(id: number, data: UpdateLeadEnquiryDto, userId: number): Promise<LeadEnquiry> {
@@ -298,7 +417,8 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             }
         }
 
-        const updateData = { ...data, locationCode, updatedBy: userId, updatedAt: new Date() };
+        const { contacts, ...restData } = data;
+        const updateData = { ...restData, locationCode, updatedBy: userId, updatedAt: new Date() };
 
         const [updated] = await this.db
             .update(leadEnquiries)
@@ -307,6 +427,30 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             .returning();
 
         if (!updated) throw new NotFoundException(`Lead enquiry with ID ${id} not found`);
+
+        // Replace enquiry contacts when provided
+        if (contacts) {
+            await this.db
+                .delete(leadContacts)
+                .where(eq(leadContacts.enquiryId, id));
+
+            if (contacts.length > 0) {
+                await this.db
+                    .insert(leadContacts)
+                    .values(
+                        contacts.map((c) => ({
+                            enquiryId: id,
+                            leadId: updated.leadId ?? null,
+                            source: 'enquiry' as const,
+                            name: c.name,
+                            designation: c.designation ?? null,
+                            phone: c.phone ?? null,
+                            email: c.email ?? null,
+                        })),
+                    );
+            }
+        }
+
         return updated;
     }
 

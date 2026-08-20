@@ -13,14 +13,14 @@ import { FileUploader } from "@/components/file-upload";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { useUsers } from "@/hooks/api/useUsers";
 import { format } from "date-fns";
-import { paths } from "@/app/routes/paths";
 import {
     useFollowups,
     useLetterForm,
     isToday,
+    sourceFollowupPath,
     type LetterFormValues
 } from "@/hooks/api/useFollowups";
-import type { BaseFollowup } from "../helpers/followup.types";
+import type { BaseFollowup, FollowupSource } from "../helpers/followup.types";
 
 const docUrl = (doc: string): string =>
     doc.includes("/") ? fileUploadService.getFileUrl(doc) : `/uploads/courier/${doc}`;
@@ -34,20 +34,20 @@ const URGENCY_OPTIONS = [
 ];
 
 interface LetterTabProps {
-    leadId: number;
+    source: FollowupSource;
     mode?: 'create' | 'view';
 }
 
-export function LetterTab({ leadId, mode = 'create' }: LetterTabProps) {
+export function LetterTab({ source, mode = 'create' }: LetterTabProps) {
     if (mode === 'view') {
-        return <LetterFollowupList leadId={leadId} />;
+        return <LetterFollowupList source={source} />;
     }
-    return <LetterCreateForm leadId={leadId} />;
+    return <LetterCreateForm source={source} />;
 }
 
 // ─── Create / Edit Form ───────────────────────────────────────────────────────
 
-function LetterCreateForm({ leadId }: { leadId: number }) {
+function LetterCreateForm({ source }: { source: FollowupSource }) {
     const {
         form,
         attachmentPaths,
@@ -56,7 +56,7 @@ function LetterCreateForm({ leadId }: { leadId: number }) {
         saving,
         handleSubmit,
         handleCancelEdit,
-    } = useLetterForm(leadId);
+    } = useLetterForm(source);
 
     const { data: allUsers = [] } = useUsers();
     const employeeOptions = allUsers.map(u => ({
@@ -192,8 +192,8 @@ function LetterCreateForm({ leadId }: { leadId: number }) {
 
 // ─── List View ────────────────────────────────────────────────────────────────
 
-function LetterFollowupList({ leadId }: { leadId: number }) {
-    const { data: allFollowups = [] } = useFollowups(leadId);
+function LetterFollowupList({ source }: { source: FollowupSource }) {
+    const { data: allFollowups = [] } = useFollowups(source);
 
     const letterFollowups = useMemo(
         () => allFollowups
@@ -213,7 +213,7 @@ function LetterFollowupList({ leadId }: { leadId: number }) {
     return (
         <div className="space-y-3">
             {letterFollowups.map(followup => (
-                <LetterFollowupCard key={followup.id} followup={followup} leadId={leadId} />
+                <LetterFollowupCard key={followup.id} followup={followup} source={source} />
             ))}
         </div>
     );
@@ -221,7 +221,7 @@ function LetterFollowupList({ leadId }: { leadId: number }) {
 
 // ─── Followup Card ────────────────────────────────────────────────────────────
 
-function LetterFollowupCard({ followup, leadId }: { followup: BaseFollowup; leadId: number }) {
+function LetterFollowupCard({ followup, source }: { followup: BaseFollowup; source: FollowupSource }) {
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
     const { data: allUsers = [] } = useUsers();
@@ -333,7 +333,7 @@ function LetterFollowupCard({ followup, leadId }: { followup: BaseFollowup; lead
                         size="sm"
                         onClick={() =>
                             navigate(
-                                `${paths.crm.leadFollowup(leadId)}?tab=letter&followupId=${followup.id}`
+                                `${sourceFollowupPath(source)}?tab=letter&followupId=${followup.id}`
                             )
                         }
                     >

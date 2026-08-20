@@ -8,34 +8,34 @@ import { Loader2, MapPin, Edit, Save, X, ChevronDown, ChevronUp, User } from "lu
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { ContactPersonFields } from "./ContactPersonFields";
 import { format } from "date-fns";
-import { paths } from "@/app/routes/paths";
 import { 
     useFollowups, 
     useVisitForm, 
     isToday,
+    sourceFollowupPath,
     type VisitFormValues 
 } from "@/hooks/api/useFollowups";
-import type { BaseFollowup } from "../helpers/followup.types";
+import type { BaseFollowup, FollowupSource } from "../helpers/followup.types";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface VisitTabProps {
-    leadId: number;
+    source: FollowupSource;
     mode?: 'create' | 'view';
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export function VisitTab({ leadId, mode = 'create' }: VisitTabProps) {
+export function VisitTab({ source, mode = 'create' }: VisitTabProps) {
     if (mode === 'view') {
-        return <VisitFollowupList leadId={leadId} />;
+        return <VisitFollowupList source={source} />;
     }
-    return <VisitCreateForm leadId={leadId} />;
+    return <VisitCreateForm source={source} />;
 }
 
 // ─── Create / Edit Form ───────────────────────────────────────────────────────
 
-function VisitCreateForm({ leadId }: { leadId: number }) {
+function VisitCreateForm({ source }: { source: FollowupSource }) {
     const {
         form,
         contacts,
@@ -45,7 +45,7 @@ function VisitCreateForm({ leadId }: { leadId: number }) {
         saving,
         handleSubmit,
         handleCancelEdit,
-    } = useVisitForm(leadId);
+    } = useVisitForm(source);
 
     return (
         <Form {...form}>
@@ -151,8 +151,8 @@ function VisitCreateForm({ leadId }: { leadId: number }) {
 
 // ─── List View ────────────────────────────────────────────────────────────────
 
-function VisitFollowupList({ leadId }: { leadId: number }) {
-    const { data: allFollowups = [] } = useFollowups(leadId);
+function VisitFollowupList({ source }: { source: FollowupSource }) {
+    const { data: allFollowups = [] } = useFollowups(source);
 
     const visitFollowups = useMemo(
         () => allFollowups
@@ -172,7 +172,7 @@ function VisitFollowupList({ leadId }: { leadId: number }) {
     return (
         <div className="space-y-3">
             {visitFollowups.map(followup => (
-                <VisitFollowupCard key={followup.id} followup={followup} leadId={leadId} />
+                <VisitFollowupCard key={followup.id} followup={followup} source={source} />
             ))}
         </div>
     );
@@ -180,7 +180,7 @@ function VisitFollowupList({ leadId }: { leadId: number }) {
 
 // ─── Followup Card ────────────────────────────────────────────────────────────
 
-function VisitFollowupCard({ followup, leadId }: { followup: BaseFollowup; leadId: number }) {
+function VisitFollowupCard({ followup, source }: { followup: BaseFollowup; source: FollowupSource }) {
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
 
@@ -284,7 +284,7 @@ function VisitFollowupCard({ followup, leadId }: { followup: BaseFollowup; leadI
                     <Button 
                         size="sm" 
                         onClick={() => navigate(
-                            `${paths.crm.leadFollowup(leadId)}?tab=visit&followupId=${followup.id}`
+                            `${sourceFollowupPath(source)}?tab=visit&followupId=${followup.id}`
                         )}
                     >
                         <Edit className="h-3 w-3 mr-1" />
