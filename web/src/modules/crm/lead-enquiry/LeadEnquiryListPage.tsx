@@ -356,6 +356,20 @@ const EnquiryListPage = () => {
             },
         },
         {
+            field: "tenderStage",
+            headerName: "Stage",
+            width: 140,
+            cellRenderer: (params: any) => {
+                const val: string | null | undefined = params.value;
+                if (!val) return "-";
+                return (
+                    <Badge variant="secondary" className="bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500/10">
+                        {val}
+                    </Badge>
+                );
+            },
+        },
+        {
             headerName: "Timer",
             width: 130,
             cellStyle: {

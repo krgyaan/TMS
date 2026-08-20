@@ -2,6 +2,7 @@ export interface LeadEnquiry {
     id: number;
     leadId: number | null;
     happyCallingId: number | null;
+    tenderId: number | null;
     team: string | null;
     enqName: string;
     organisationId: number | null;
@@ -34,6 +35,7 @@ export interface LeadEnquiryWithNames extends LeadEnquiry {
     teamName?: string | null;
     hasSiteVisit?: boolean;
     costingSheetStatus?: string | null;
+    tenderStage?: string | null;
     contacts?: EnquiryContact[] | null;
 }
 

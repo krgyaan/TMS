@@ -160,7 +160,7 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
             ? locationOptions.find((o) => o.id === locationVal)?.name
             : "";
         if (orgAbb && itemName && locationName) {
-            form.setValue("enqName", `${orgAbb} ${itemName} ${locationName}`);
+            form.setValue("enqName", `${orgAbb} ${locationName} ${itemName}`);
         } else if (orgAbb && itemName) {
             form.setValue("enqName", `${orgAbb} ${itemName}`);
         } else {
