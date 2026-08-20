@@ -59,7 +59,7 @@ export const mockDashboardData: DashboardData = {
         {
             id: "1",
             tender_name: "Road Construction Project",
-            due_date: "2024-02-15",
+            due_date: "2026-09-15",
             team_member: "user1",
             users: { name: "John Doe" },
             tq_received: [{ tq_submission_date: "2024-02-10" }],
@@ -67,7 +67,7 @@ export const mockDashboardData: DashboardData = {
         {
             id: "2",
             tender_name: "Building Maintenance",
-            due_date: "2024-02-20",
+            due_date: "2026-09-20",
             team_member: "user2",
             users: { name: "Jane Smith" },
             tq_received: [],
@@ -77,7 +77,7 @@ export const mockDashboardData: DashboardData = {
         {
             id: "1",
             party_name: "ABC Corporation",
-            created_at: "2024-02-05",
+            created_at: "2026-09-05",
             assigned_to: "user1",
         },
     ],
