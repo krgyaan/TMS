@@ -21,7 +21,6 @@ import { tenderResults } from '@db/schemas/tendering/tender-result.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { organizations } from '@db/schemas/master/organizations.schema';
 import { teams } from '@db/schemas/master/teams.schema';
-import { locations } from '@db/schemas/master/locations.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { TimersService } from '@/modules/timers/timers.service';
@@ -258,21 +257,6 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
         return newOrg.id;
     }
 
-    private async resolveLocationCode(db: DbInstance, locationCode: string): Promise<string> {
-        if (!locationCode) return locationCode;
-
-        const locId = Number(locationCode);
-        if (isNaN(locId)) return locationCode;
-
-        const [location] = await db
-            .select({ acronym: locations.acronym })
-            .from(locations)
-            .where(eq(locations.id, locId))
-            .limit(1);
-
-        return location?.acronym ?? locationCode;
-    }
-
     private async generateEnquiryNumber(db: DbInstance): Promise<string> {
         const now = new Date();
         const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -303,10 +287,16 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             organisationId?: number | null;
             itemId: number;
             enquiryNumber: string;
+            dueDate?: string | null;
+            locationCode?: string | null;
+            documents?: string | null;
+            approxValue?: string | null;
             userId: number;
         },
     ): Promise<TenderInfo> {
-        const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        const dueDate = params.dueDate
+            ? new Date(params.dueDate)
+            : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
         const [tender] = await db
             .insert(tenderInfos)
             .values({
@@ -315,7 +305,10 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 tenderName: params.enqName,
                 organization: params.organisationId ?? null,
                 item: params.itemId,
+                location: params.locationCode ? Number(params.locationCode) : null,
+                gstValues: params.approxValue ?? "0",
                 dueDate,
+                documents: params.documents ?? null,
                 teamMember: params.userId,
             })
             .returning();
@@ -411,8 +404,8 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
         // 1. Resolve Organization
         const organisationId = await this.resolveOrganizationId(db, data.organizationName);
 
-        // 2. Resolve Location Code (id → acronym)
-        const locationCode = await this.resolveLocationCode(db, data.locationCode);
+        // 2. Location Code stored directly as the location id
+        const locationCode = data.locationCode;
 
         // 3. Generate Enquiry Number
         const enquiryNumber = await this.generateEnquiryNumber(db);
@@ -429,6 +422,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 itemId: data.itemId,
                 locationCode,
                 approxValue: data.approxValue,
+                dueDate: data.dueDate ? new Date(data.dueDate) : null,
                 siteVisitRequired: data.siteVisitRequired ?? false,
                 createdBy: userId,
                 orgAbbName: data.orgAbbName ?? null,
@@ -466,6 +460,10 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             organisationId,
             itemId: data.itemId,
             enquiryNumber,
+            dueDate: data.dueDate ?? null,
+            locationCode: data.locationCode ?? null,
+            documents: data.enquiryFile ?? null,
+            approxValue: data.approxValue ?? null,
             userId,
         });
 
@@ -501,8 +499,8 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             // 2. Resolve Organization
             const organisationId = await this.resolveOrganizationId(tx, data.organizationName);
 
-            // 3. Resolve Location Code (id → acronym)
-            const locationCode = await this.resolveLocationCode(tx, data.locationCode);
+            // 3. Location Code stored directly as the location id
+            const locationCode = data.locationCode;
 
             // 4. Generate Enquiry Number
             const enquiryNumber = await this.generateEnquiryNumber(tx);
@@ -518,6 +516,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                     itemId: data.itemId,
                     locationCode,
                     approxValue: data.approxValue,
+                    dueDate: data.dueDate ? new Date(data.dueDate) : null,
                     siteVisitRequired: data.siteVisitRequired ?? false,
                     createdBy: userId,
                     orgAbbName: data.orgAbbName ?? null,
@@ -556,6 +555,10 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 organisationId,
                 itemId: data.itemId,
                 enquiryNumber,
+                dueDate: data.dueDate ?? null,
+                locationCode: data.locationCode ?? null,
+                documents: data.enquiryFile ?? null,
+                approxValue: data.approxValue ?? null,
                 userId,
             });
 
@@ -571,24 +574,17 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
     }
 
     async update(id: number, data: UpdateLeadEnquiryDto, userId: number): Promise<LeadEnquiry> {
-        let locationCode = data.locationCode;
-        if (locationCode) {
-            const locId = Number(locationCode);
-            if (!isNaN(locId)) {
-                const [location] = await this.db
-                    .select({ acronym: locations.acronym })
-                    .from(locations)
-                    .where(eq(locations.id, locId))
-                    .limit(1);
+        const locationCode = data.locationCode;
 
-                if (location?.acronym) {
-                    locationCode = location.acronym;
-                }
-            }
-        }
-
-        const { contacts, ...restData } = data;
-        const updateData = { ...restData, locationCode, updatedBy: userId, updatedAt: new Date() };
+        const { contacts, dueDate, enquiryFile, approxValue, ...restData } = data;
+        const updateData = {
+            ...restData,
+            locationCode,
+            dueDate: dueDate ? new Date(dueDate) : undefined,
+            enquiryFile: enquiryFile !== undefined ? enquiryFile : undefined,
+            updatedBy: userId,
+            updatedAt: new Date(),
+        };
 
         const [updated] = await this.db
             .update(leadEnquiries)
@@ -597,6 +593,29 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             .returning();
 
         if (!updated) throw new NotFoundException(`Lead enquiry with ID ${id} not found`);
+
+        // Keep the linked tender's due date, location and documents in sync
+        if (updated.tenderId) {
+            const tenderSync: {
+                dueDate?: Date;
+                location?: number | null;
+                documents?: string | null;
+                gstValues?: string;
+                updatedAt: Date;
+            } = { updatedAt: new Date() };
+
+            if (dueDate) tenderSync.dueDate = new Date(dueDate);
+            if (locationCode) tenderSync.location = Number(locationCode);
+            if (enquiryFile !== undefined) tenderSync.documents = enquiryFile;
+            if (approxValue !== undefined) tenderSync.gstValues = approxValue;
+
+            if (Object.keys(tenderSync).length > 1) {
+                await this.db
+                    .update(tenderInfos)
+                    .set(tenderSync)
+                    .where(eq(tenderInfos.id, updated.tenderId));
+            }
+        }
 
         // Replace enquiry contacts when provided
         if (contacts) {

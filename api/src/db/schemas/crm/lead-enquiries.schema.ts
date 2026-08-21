@@ -22,6 +22,7 @@ export const leadEnquiries = pgTable("lead_enquiries", {
     itemId: bigint("item_id", { mode: "number" }).notNull(),
     locationCode: varchar("location_code", { length: 255 }).notNull(),
     approxValue: varchar("approx_value", { length: 255 }).notNull(),
+    dueDate: timestamp("due_date", { withTimezone: true }),
     siteVisitRequired: boolean("site_visit_required").default(false).notNull(),
     createdBy: bigint("created_by", { mode: "number" }).notNull(),
     updatedBy: bigint("updated_by", { mode: "number" }),

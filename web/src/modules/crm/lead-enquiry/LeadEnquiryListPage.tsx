@@ -370,6 +370,16 @@ const EnquiryListPage = () => {
             },
         },
         {
+            field: "dueDate",
+            headerName: "Due Date",
+            width: 120,
+            cellRenderer: (params: any) => {
+                const val: string | null | undefined = params.value;
+                if (!val) return "-";
+                return new Date(val).toLocaleDateString("en-IN");
+            },
+        },
+        {
             headerName: "Timer",
             width: 130,
             cellStyle: {
