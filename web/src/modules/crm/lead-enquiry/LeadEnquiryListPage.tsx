@@ -415,7 +415,7 @@ const EnquiryListPage = () => {
     ], [enquiryActions]);
 
     return (
-        <Card className="min-h-[calc(100vh-2rem)] flex flex-col border-0 shadow-none">
+        <Card className="min-h-[calc(100vh-2rem)] flex flex-col">
             <CardHeader className="flex-none pb-4">
                 <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex-1">

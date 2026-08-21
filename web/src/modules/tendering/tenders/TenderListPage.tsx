@@ -349,7 +349,7 @@ const TenderListPage = () => {
     ], [activeTab]);
 
     return (
-        <Card className="min-h-[calc(100vh-2rem)] flex flex-col border-0 shadow-none">
+        <Card className="min-h-[calc(100vh-2rem)] flex flex-col">
 
             {/* 2. HEADER: Fixed height */}
             <CardHeader className="flex-none pb-4">
