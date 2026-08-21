@@ -1,36 +1,36 @@
-import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { Search, Eye, CheckCircle2, Ban, Banknote, Copy, Upload } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Skeleton } from "@/components/ui/skeleton";
-import DataTable from "@/components/ui/data-table";
-import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
-import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import type { ActionItem } from "@/components/ui/ActionMenu";
-import { useAllPaymentRequests, usePaymentRequestDetails, useUpdatePaymentRequestStatus, useUploadPaymentInvoiceAfterPayment } from "@/hooks/api/useProjectPaymentRequests";
-import { useTeamFilter } from "@/hooks/useTeamFilter";
-import { useAuth } from "@/contexts/AuthContext";
-import { useLocation } from "react-router-dom";
 import { FileUploader } from "@/components/file-upload";
-import { formatDate } from "@/hooks/useFormatedDate";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAllPaymentRequests, usePaymentRequestDetails, useUpdatePaymentRequestStatus, useUploadPaymentInvoiceAfterPayment } from "@/hooks/api/useProjectPaymentRequests";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
+import { formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
-import { getShortId } from "@/lib/id-utils";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
+import { useTeamFilter } from "@/hooks/useTeamFilter";
+import { referenceName } from "@/lib/id-utils";
+import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
-import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { PAYMENT_AGAINST_LABELS, STATUS_CONFIG } from "./constants";
+import { Ban, Banknote, CheckCircle2, Copy, Eye, Search, Upload } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
+import { PAYMENT_AGAINST_LABELS, STATUS_CONFIG } from "./constants";
 
 type SubTab = "all" | "pending" | "payment_done" | "rejected";
 
@@ -204,7 +204,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <span className="font-mono text-sm font-medium">{getShortId(p.value)}</span>
+                            <span className="font-mono">{referenceName(p.value)}</span>
                         </TooltipTrigger>
                         <TooltipContent>{p.value}</TooltipContent>
                     </Tooltip>
@@ -290,7 +290,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             sortable: true,
             filter: true,
             width: 130,
-            valueFormatter: (p: ValueFormatterParams<PaymentRequestRow>) => formatDate(p.value),
+            valueFormatter: (p: ValueFormatterParams<PaymentRequestRow>) => formatDateTime(p.value),
         },
         {
             headerName: "",
@@ -365,7 +365,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                                 <TooltipProvider>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
-                                            <p className="font-mono font-medium">{getShortId(detail.requestNo)}</p>
+                                            <p className="font-mono font-medium">{referenceName(detail.requestNo)}</p>
                                         </TooltipTrigger>
                                         <TooltipContent>{detail.requestNo}</TooltipContent>
                                     </Tooltip>
@@ -421,7 +421,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                             </div>
                             <div>
                                 <Label className="text-muted-foreground text-xs">Created At</Label>
-                                <p>{formatDate(detail.createdAt)}</p>
+                                <p>{formatDateTime(detail.createdAt)}</p>
                             </div>
                             {detail.utrNumber &&
                                 <div>

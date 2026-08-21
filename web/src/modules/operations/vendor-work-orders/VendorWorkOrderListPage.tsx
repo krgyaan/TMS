@@ -12,7 +12,7 @@ import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-g
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
-import { formatDate } from "@/hooks/useFormatedDate";
+import { formatDate, formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import type { VendorWorkOrderRow } from "./helpers/vwoForm.types";
@@ -346,6 +346,22 @@ const VendorWorkOrderListPage: React.FC<VendorWorkOrderListPageProps> = ({
             headerName: "Raised By",
             sortable: true,
             filter: true,
+            cellRenderer: (p: CustomCellRendererProps<VendorWorkOrderRow>)=> {
+                return (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Badge variant='outline' className="gap-1 cursor-pointer">
+                                    {p.data?.woRaisedBy}
+                                </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
+                                At {formatDateTime(p.data?.createdAt)}
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                );
+            }
         },
         {
             headerName: "Actions",

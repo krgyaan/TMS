@@ -1,23 +1,23 @@
-import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { CheckCircle, Eye, FileUp, History, Search, Lock } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import DataTable from "@/components/ui/data-table";
-import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
+import { paths } from "@/app/routes/paths";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import { OrderProgressCell } from "@/components/OrderProgressCell";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
-import type { CustomCellRendererProps } from "ag-grid-react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { paths } from "@/app/routes/paths";
-import { formatDate } from "@/hooks/useFormatedDate";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
+import { formatDate, formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import type { PurchaseOrderRow } from "@/modules/operations/purchase-orders/helpers/purchaseOrder.types";
+import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
+import type { CustomCellRendererProps } from "ag-grid-react";
+import { CheckCircle, Eye, FileUp, History, Lock, Search } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { SetTdsDialog } from "../components/SetTdsDialog";
-import { OrderProgressCell } from "@/components/OrderProgressCell";
 
 interface PurchaseOrderListPageProps {
     purchaseOrders?: PurchaseOrderRow[];
@@ -367,6 +367,22 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
             headerName: "PO Raised By",
             sortable: true,
             filter: true,
+            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>)=> {
+                return (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Badge variant='outline' className="gap-1 cursor-pointer">
+                                    {p.data?.poRaisedBy}
+                                </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" align="start" className="max-w-xs dark:bg-accent">
+                                At {formatDateTime(p.data?.createdAt)}
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                );
+            }
         },
         {
             headerName: "Actions",
