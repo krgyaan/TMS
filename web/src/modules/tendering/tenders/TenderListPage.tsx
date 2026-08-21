@@ -42,7 +42,7 @@ const TenderListPage = () => {
 
     const hasTenderingPermission = isAdmin || isSuperUser || isTeamLead;
 
-    const elligibleForRejection = (row): boolean => {
+    const elligibleForRejection = (row: TenderInfoWithNames): boolean => {
         if (row.statusName && row.statusName == 'Read Tender'){
             return true;
         } else {
@@ -50,7 +50,7 @@ const TenderListPage = () => {
         }  
     }
 
-    const elligibleForEditing = (row) => {
+    const elligibleForEditing = (row: TenderInfoWithNames) => {
         if([0,1,2,29].includes(row.status)){
             return true;
         } else {
@@ -154,7 +154,9 @@ const TenderListPage = () => {
         // },
         {
             label: "View Details",
-            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderView(row.id)),
+            onClick: (row: TenderInfoWithNames) => row.enquiryId
+                ? navigate(paths.crm.enquiryView(row.enquiryId))
+                : navigate(paths.tendering.tenderView(row.id)),
             icon: <Eye className="h-4 w-4" />,
         },
         {
@@ -169,7 +171,9 @@ const TenderListPage = () => {
         },
         {
             label: "Edit",
-            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderEdit(row.id)),
+            onClick: (row: TenderInfoWithNames) => row.enquiryId
+                ? navigate(paths.crm.enquiryEdit(row.enquiryId))
+                : navigate(paths.tendering.tenderEdit(row.id)),
             icon: <Pencil className="h-4 w-4" />,
         },
         {
