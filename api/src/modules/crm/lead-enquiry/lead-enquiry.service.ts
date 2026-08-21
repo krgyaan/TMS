@@ -309,7 +309,8 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 gstValues: params.approxValue ?? "0",
                 dueDate,
                 documents: params.documents ?? null,
-                teamMember: params.userId,
+                teamMember: null,
+                status: 0,
             })
             .returning();
 
@@ -328,7 +329,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             .where(eq(leadEnquiries.id, enquiryId));
 
         await this.tenderStatusHistoryService.trackStatusChange(
-            tenderId, 1, userId, null, 'Tender created from enquiry', db,
+            tenderId, 0, userId, null, 'Tender created from enquiry', db,
         );
     }
 

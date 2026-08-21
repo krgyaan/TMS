@@ -120,7 +120,8 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
 
     // Role-based locking flags (create mode only)
     const lockTeam = mode === "create" && roleId !== 1 && roleId !== 2;
-    const lockUser = mode === "create" && roleId !== 3 && roleId !== 4;
+    const canAssignTeamMember = roleId != null && [1, 2, 3, 4].includes(roleId);
+    const lockUser = !canAssignTeamMember;
 
     const currentTeamId = effectiveTeamId ?? null;
     const currentUserId = user?.id ?? null;
@@ -217,13 +218,13 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
         if (isInitialLoad.current) return;
 
         if (previousValues.current.team !== team) {
-            // If user field is not locked, reset team member on team change
-            if (!lockUser) {
+            // If user field is not locked and a member other than the current user was chosen, reset on team change
+            if (!lockUser && manualForm.getValues("teamMember") !== currentUserId) {
                 manualForm.setValue("teamMember", null, { shouldValidate: false });
             }
             previousValues.current.team = team;
         }
-    }, [team, manualForm, lockUser]);
+    }, [team, manualForm, lockUser, currentUserId]);
 
     // Auto-select team for restricted roles in create mode
     useEffect(() => {
@@ -234,14 +235,13 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
         manualForm.setValue("team", currentTeamId, { shouldValidate: true });
     }, [mode, lockTeam, currentTeamId, manualForm]);
 
-    // Auto-select team member (current user) for restricted roles in create mode
+    // Auto-select team member (current user) in create mode
     useEffect(() => {
         if (mode !== "create") return;
-        if (!lockUser) return;
         if (!currentUserId) return;
 
         manualForm.setValue("teamMember", currentUserId, { shouldValidate: true });
-    }, [mode, lockUser, currentUserId, manualForm]);
+    }, [mode, currentUserId, manualForm]);
 
     const handleManualSubmit: SubmitHandler<ManualFormValues> = async values => {
         try {
@@ -474,7 +474,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                         label="Team Member"
                                         options={userOptions}
                                         placeholder="Select User"
-                                        disabled={!team}
+                                        disabled={!team || lockUser}
                                     />
 
                                     {/* Due Date & Time */}
