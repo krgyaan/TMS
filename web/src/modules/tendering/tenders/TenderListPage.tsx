@@ -8,8 +8,9 @@ import type { ActionItem } from "@/components/ui/ActionMenu";
 import { NavLink, useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { useDeleteTender, useTenders, useTendersDashboardCounts } from "@/hooks/api/useTenders";
+import { useUpdateLeadEnquiry } from "@/hooks/api/useLeadEnquiry";
 import type { TenderInfoWithNames, TenderWithRelations, TenderWithTimer } from "./helpers/tenderInfo.types";
-import { Eye, FilePlus, Pencil, Plus, Search, Clock, Archive, XCircle } from "lucide-react";
+import { Eye, FilePlus, Pencil, Plus, Search, Clock, Archive, XCircle, UserPlus } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,8 @@ import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { QuickFilter } from "@/components/ui/quick-filter";
 import { TenderRejectionModal } from "./components/TenderRejectionModal";
+import { LeadEnquiryRejectModal } from "@/modules/crm/lead-enquiry/components/LeadEnquiryRejectModal";
+import { LeadAllocationModal } from "@/modules/crm/leads/components/LeadAllocationModal";
 import { useAuth } from "@/contexts/AuthContext";
 
 type TenderDashboardTab = 'under-preparation' | 'did-not-bid' | 'tenders-bid' | 'tender-won' | 'tender-lost' | 'unallocated';
@@ -81,6 +84,7 @@ const TenderListPage = () => {
     );
 
     const deleteTender = useDeleteTender();
+    const updateEnquiry = useUpdateLeadEnquiry();
     const navigate = useNavigate();
     // const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
     //     open: false,
@@ -90,6 +94,29 @@ const TenderListPage = () => {
         open: false,
         tenderId: null
     });
+
+    const [assignTeModal, setAssignTeModal] = useState<{ open: boolean; tenderId: number | null; tenderName?: string }>({
+        open: false,
+        tenderId: null
+    });
+
+    const [rejectEnquiryModal, setRejectEnquiryModal] = useState<{
+        open: boolean;
+        tenderId: number | null;
+        enquiryId: number | null;
+        enquiryName?: string;
+    }>({ open: false, tenderId: null, enquiryId: null });
+
+    const handleRejectEnquiryConfirm = async (enquiryId: number, reason?: string) => {
+        const tenderId = rejectEnquiryModal.tenderId;
+        await updateEnquiry.mutateAsync({
+            id: enquiryId,
+            data: { status: 'Rejected', rejectionReason: reason || null },
+        });
+        if (tenderId) {
+            await deleteTender.mutateAsync(tenderId);
+        }
+    };
 
     // Handle both array (old format) and PaginatedResult (new format)
     const tenders = Array.isArray(apiResponse)
@@ -136,16 +163,29 @@ const TenderListPage = () => {
 
     const tenderActions: ActionItem<TenderWithTimer & { canDelete: boolean }>[] = [
         {
+            label: "Assign TE",
+            onClick: (row: TenderInfoWithNames) => setAssignTeModal({ open: true, tenderId: row.id, tenderName: row.tenderName }),
+            icon: <UserPlus className="h-4 w-4" />,
+            visible: (row) => row.enquiryId != null && row.status === 0,
+        },
+        {
+            label: "Reject Enquiry",
+            onClick: (row: TenderInfoWithNames) => setRejectEnquiryModal({ open: true, tenderId: row.id, enquiryId: row.enquiryId ?? null, enquiryName: row.tenderName }),
+            icon: <XCircle className="h-4 w-4 text-red-600" />,
+            className: "text-red-600",
+            visible: (row) => row.enquiryId != null && row.status === 0,
+        },
+        {
             label: "Fill Info Sheet",
             onClick: (row: TenderWithRelations) => (row.infoSheet ? navigate(paths.tendering.infoSheetEdit(row.id)) : navigate(paths.tendering.infoSheetCreate(row.id))),
             icon: <FilePlus className="h-4 w-4" />,
-            visible: (row) => elligibleForEditing(row), 
+            visible: (row) => !(row.enquiryId && row.status === 0) && elligibleForEditing(row), 
         },
         {
             label: "Reject Tender",
             onClick: (row) => setRejectionModal({ open: true, tenderId: row.id, tenderName: row.tenderName }),
             icon: <XCircle className="h-4 w-4" />,
-            visible:(row) => elligibleForRejection(row) && hasTenderingPermission,
+            visible:(row) => !row.enquiryId && elligibleForRejection(row) && hasTenderingPermission,
         },
         // {
         //     label: "Change Status",
@@ -163,11 +203,13 @@ const TenderListPage = () => {
             label: "Request Extension",
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.requestExtensionCreate(row.id)),
             icon: <Clock className="h-4 w-4" />,
+            visible: (row) => !row.enquiryId,
         },
         {
             label: "Submit Queries",
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.submitQueryCreate(row.id)),
             icon: <Clock className="h-4 w-4" />,
+            visible: (row) => !row.enquiryId,
         },
         {
             label: "Edit",
@@ -425,6 +467,22 @@ const TenderListPage = () => {
                 onSuccess={() => {
                     setRejectionModal({ open: false, tenderId: null });
                 }}
+            />
+
+            <LeadAllocationModal
+                open={assignTeModal.open}
+                onOpenChange={(open) => setAssignTeModal({ ...assignTeModal, open })}
+                mode="tender"
+                tenderId={assignTeModal.tenderId}
+                tenderName={assignTeModal.tenderName}
+            />
+
+            <LeadEnquiryRejectModal
+                open={rejectEnquiryModal.open}
+                onOpenChange={(open) => setRejectEnquiryModal({ ...rejectEnquiryModal, open })}
+                enquiryId={rejectEnquiryModal.enquiryId}
+                enquiryName={rejectEnquiryModal.enquiryName}
+                onConfirm={handleRejectEnquiryConfirm}
             />
         </Card>
     );

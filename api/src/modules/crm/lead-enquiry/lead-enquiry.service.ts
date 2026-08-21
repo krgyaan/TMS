@@ -23,7 +23,6 @@ import { organizations } from '@db/schemas/master/organizations.schema';
 import { teams } from '@db/schemas/master/teams.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
-import { TimersService } from '@/modules/timers/timers.service';
 import { and, asc, desc, eq, ilike, inArray, like, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { GoogleDriveService } from '@/modules/integrations/google/google-drive.service';
@@ -62,7 +61,6 @@ export class LeadEnquiryService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly googleDriveService: GoogleDriveService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
-        private readonly timersService: TimersService,
     ) {}
 
     async findAll(filters?: LeadEnquiryListFilters): Promise<{
@@ -333,28 +331,6 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
         );
     }
 
-    private async startTenderTimer(tenderId: number, userId: number): Promise<void> {
-        try {
-            await this.timersService.startTimer({
-                entityType: 'TENDER',
-                entityId: tenderId,
-                stage: 'tender_info_sheet',
-                userId,
-                assignedUserId: userId,
-                timerConfig: {
-                    type: 'FIXED_DURATION',
-                    durationHours: 72,
-                },
-                metadata: {
-                    createdBy: userId,
-                    source: 'enquiry',
-                },
-            });
-        } catch (error) {
-            // Timer conflicts (already running) should not fail enquiry creation
-        }
-    }
-
     private async computeTenderStages(tenderIds: number[]): Promise<Map<number, string | null>> {
         const stageMap = new Map<number, string | null>();
         if (tenderIds.length === 0) return stageMap;
@@ -469,7 +445,6 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
         });
 
         await this.linkEnquiryToTender(db, newEnquiry.id, tender.id, userId);
-        await this.startTenderTimer(tender.id, userId);
 
         return newEnquiry;
     }
@@ -567,9 +542,6 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
 
             return { lead, enquiry, tenderId: tender.id };
         });
-
-        // Start the timer after the transaction has committed
-        await this.startTenderTimer(result.tenderId, userId);
 
         return { lead: result.lead, enquiry: result.enquiry };
     }

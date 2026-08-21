@@ -400,7 +400,7 @@ export class TenderInfosService {
             conditions.push(
                 or(
                     and(isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1)),
-                    sql`EXISTS (SELECT 1 FROM lead_enquiries le WHERE le.tender_id = ${tenderInfos.id})`
+                    eq(tenderInfos.status, 0)
                 )! as SQL
             );
         } else {
@@ -694,6 +694,36 @@ export class TenderInfosService {
         if (updatedTender) {
             // Send email notification for major updates
             await this.sendTenderUpdateEmail(currentTender, updatedTender, data, updatedBy);
+        }
+
+        // START TIMER: If a team member is being assigned, start the info-sheet timer
+        if (data.teamMember && currentTender.teamMember !== data.teamMember) {
+            try {
+                this.logger.log(`Assigning team member — starting timer for tender ${id}`);
+                await this.timersService.startTimer({
+                    entityType: 'TENDER',
+                    entityId: id,
+                    stage: 'tender_info_sheet',
+                    userId: updatedBy,
+                    assignedUserId: data.teamMember,
+                    timerConfig: {
+                        type: 'FIXED_DURATION',
+                        durationHours: 72,
+                    },
+                    metadata: {
+                        createdBy: updatedBy,
+                        tenderNo: rows[0].tenderNo,
+                        dueDate: rows[0].dueDate,
+                    },
+                });
+                this.logger.log(`Started timer for tender ${id}`);
+            } catch (error) {
+                if (error instanceof ConflictException) {
+                    this.logger.warn(`Timer already running for tender ${id} — skipping`);
+                } else {
+                    this.logger.error(`Failed to start timer for tender ${id}:`, error);
+                }
+            }
         }
 
         return rows[0];
@@ -1271,7 +1301,7 @@ export class TenderInfosService {
                 tenderLost: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${inArray(tenderInfos.status, tenderLostStatusIds)})`,
                 unallocated: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${or(
                     and(isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1)),
-                    sql`EXISTS (SELECT 1 FROM lead_enquiries le WHERE le.tender_id = ${tenderInfos.id})`
+                    eq(tenderInfos.status, 0)
                 )})`,
             })
             .from(tenderInfos)
