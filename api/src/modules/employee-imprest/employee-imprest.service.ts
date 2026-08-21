@@ -72,24 +72,25 @@ export class EmployeeImprestService {
             return;
         }
 
-        const [lockedVoucher] = await this.db
-            .select({ voucherCode: employeeImprestVouchers.voucherCode })
-            .from(employeeImprestVouchers)
-            .where(
-                and(
-                    eq(employeeImprestVouchers.beneficiaryName, String(beneficiaryUserId)),
-                    sql`TRIM(COALESCE(${employeeImprestVouchers.accountsSignedBy}, '')) <> ''`,
-                    sql`EXTRACT(ISOYEAR FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(ISOYEAR FROM CAST(${expenseDate} AS TIMESTAMP))`,
-                    sql`EXTRACT(WEEK FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(WEEK FROM CAST(${expenseDate} AS TIMESTAMP))`
-                )
-            )
-            .limit(1);
+        // [commented out] Allow approved week voucher for all users for now
+        // const [lockedVoucher] = await this.db
+        //     .select({ voucherCode: employeeImprestVouchers.voucherCode })
+        //     .from(employeeImprestVouchers)
+        //     .where(
+        //         and(
+        //             eq(employeeImprestVouchers.beneficiaryName, String(beneficiaryUserId)),
+        //             sql`TRIM(COALESCE(${employeeImprestVouchers.accountsSignedBy}, '')) <> ''`,
+        //             sql`EXTRACT(ISOYEAR FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(ISOYEAR FROM CAST(${expenseDate} AS TIMESTAMP))`,
+        //             sql`EXTRACT(WEEK FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(WEEK FROM CAST(${expenseDate} AS TIMESTAMP))`
+        //         )
+        //     )
+        //     .limit(1);
 
-        if (lockedVoucher) {
-            throw new ForbiddenException(
-                `Expenses for the week of ${expenseDate.toISOString().split("T")[0]} are locked: voucher ${lockedVoucher.voucherCode} is already approved by accounts.`
-            );
-        }
+        // if (lockedVoucher) {
+        //     throw new ForbiddenException(
+        //         `Expenses for the week of ${expenseDate.toISOString().split("T")[0]} are locked: voucher ${lockedVoucher.voucherCode} is already approved by accounts.`
+        //     );
+        // }
     }
 
     /* ----------------------------- CREATE ----------------------------- */

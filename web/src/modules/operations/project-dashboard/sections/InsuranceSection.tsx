@@ -160,7 +160,7 @@ export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ projectId })
                             </CardAction>
                         </div>
                         <CardDescription>
-                            {policies.length} polic{policies.length !== 1 ? "ies" : "y"} found — adding insurance raises a project payment request automatically
+                            {policies.length} polic{policies.length !== 1 ? "ies" : "y"} found
                         </CardDescription>
                     </div>
                 </CardHeader>
