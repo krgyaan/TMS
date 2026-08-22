@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom"
 import { TenderInformationForm } from "./components/InfoSheetForm"
+import { EnquiryInfoSheetForm } from "@/modules/crm/lead-enquiry/components/EnquiryInfoSheetForm"
 import { useTender } from "@/hooks/api/useTenders"
 import { useInfoSheet } from "@/hooks/api/useInfoSheets"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -28,6 +29,21 @@ const InfoSheetEditPage = () => {
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>Invalid tender reference provided.</AlertDescription>
             </Alert>
+        )
+    }
+
+    const isEnquiry = tender?.enquiryId != null;
+
+    if (isEnquiry) {
+        return (
+            <EnquiryInfoSheetForm
+                mode="edit"
+                tenderId={numericId}
+                tender={tender ?? null}
+                initialData={infoSheet ?? null}
+                isTenderLoading={isTenderLoading}
+                isInfoSheetLoading={isInfoSheetLoading}
+            />
         )
     }
 

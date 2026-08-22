@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
@@ -17,13 +17,33 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, MapPin, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { paths } from "@/app/routes/paths";
 import { useCreateLead, useUpdateLead } from "@/hooks/api/useLeads";
 import axiosInstance from "@/lib/axios";
-import type { LeadWithNames } from "../helpers/leads.type";
+import type { LeadWithNames, LiveLocation } from "../helpers/leads.type";
+import { LocationPickerModal } from "./LocationPickerModal";
 
 type Option = { value: string; label: string };
+
+const reverseGeocode = async (lat: number, lng: number): Promise<string | null> => {
+    try {
+        const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=en`,
+            {
+                headers: {
+                    'User-Agent': 'tms-web/1.0',
+                },
+            }
+        );
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data?.display_name || null;
+    } catch {
+        return null;
+    }
+};
 
 const COUNTRY_OPTIONS: Option[] = [
     { label: "India", value: "India" },
@@ -83,7 +103,6 @@ const fetchIndustries = async (): Promise<Option[]> => {
 
 const fetchTeams = async (): Promise<Option[]> => {
     const res = await axiosInstance.get("/teams");
-
     return res.data
         .filter((team: { id: number }) => [1, 2, 6].includes(team.id))
         .map((team: { id: number; name: string }) => ({
@@ -151,6 +170,48 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
     const country = useWatch({ control: form.control, name: "country" });
     const isIndia = country === "India";
 
+    const [locationBlocked, setLocationBlocked] = useState(false);
+    const [locationModal, setLocationModal] = useState<{ open: boolean; lat?: number; lng?: number }>({ open: false });
+    const [liveLocation, setLiveLocation] = useState<LiveLocation | null>(
+        mode === "edit" && lead?.liveLocation ? lead.liveLocation : null
+    );
+
+    const requestLocation = useCallback(() => {
+        if (!navigator.geolocation) {
+            setLocationBlocked(true);
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                setLocationBlocked(false);
+                reverseGeocode(pos.coords.latitude, pos.coords.longitude).then((address) => {
+                    setLiveLocation({
+                        address,
+                        latitude: pos.coords.latitude,
+                        longitude: pos.coords.longitude,
+                        capturedAt: new Date().toISOString(),
+                    });
+                });
+            },
+            () => setLocationBlocked(true),
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    }, []);
+
+    useEffect(() => {
+        if (mode !== "create") return;
+        requestLocation();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mode]);
+
+    const handleLocationConfirm = useCallback((loc: LiveLocation) => {
+        setLiveLocation(loc);
+        setLocationModal({ open: false });
+    }, []);
+
+    const isLocationRequired = mode === "create";
+    const formDisabled = isLocationRequired && locationBlocked;
+
     useEffect(() => {
         setTimeout(() => {
             isInitialLoad.current = false;
@@ -180,6 +241,7 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                 team: values.team || null,
                 pointsDiscussed: values.pointsDiscussed || null,
                 veResponsibility: values.veResponsibility || null,
+                liveLocation,
             };
 
             if (mode === "create") {
@@ -222,208 +284,284 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                         onSubmit={form.handleSubmit(handleSubmit)}
                         className="space-y-6"
                     >
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* Location permission blocked (create only) */}
+                        {isLocationRequired && locationBlocked && (
+                            <Alert variant="destructive" className="mb-4">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="space-y-1">
+                                            <p>
+                                                Location access is required to create a lead. Please allow
+                                                location access to continue.
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                To allow location: click the lock icon in the browser
+                                                address bar → Site Settings → Location → Allow, then
+                                                click Reload below.
+                                            </p>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            className="shrink-0"
+                                            onClick={() => window.location.reload()}
+                                        >
+                                            <MapPin className="mr-1 h-4 w-4" />
+                                            Reload Page
+                                        </Button>
+                                    </div>
+                                </AlertDescription>
+                            </Alert>
+                        )}
 
-                            <SectionSeparator text="Basic Information" />
-
-                            <FieldWrapper<LeadFormValues, "companyName">
-                                control={form.control}
-                                name="companyName"
-                                label="Company Name"
-                            >
-                                {(field) => (
-                                    <Input placeholder="Enter company name" {...field} />
+                        {/* Live location display */}
+                        {!locationBlocked && liveLocation && (
+                            <div className="flex items-start gap-3 rounded-md border bg-muted/30 p-3">
+                                <MapPin className="h-4 w-4 text-red-600 mt-0.5" />
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium">Live Location (creator)</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {liveLocation.address || "Address not resolved"}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                        Lat: {liveLocation.latitude?.toFixed(6) ?? "—"} · Lng:{" "}
+                                        {liveLocation.longitude?.toFixed(6) ?? "—"}
+                                    </p>
+                                </div>
+                                {isLocationRequired && (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            setLocationModal({
+                                                open: true,
+                                                lat: liveLocation.latitude ?? undefined,
+                                                lng: liveLocation.longitude ?? undefined,
+                                            })
+                                        }
+                                    >
+                                        <MapPin className="mr-1 h-4 w-4" />
+                                        Change Location
+                                    </Button>
                                 )}
-                            </FieldWrapper>
+                            </div>
+                        )}
 
-                            <FieldWrapper<LeadFormValues, "name">
-                                control={form.control}
-                                name="name"
-                                label="Person Name"
-                            >
-                                {(field) => (
-                                    <Input placeholder="Enter person name" {...field} />
-                                )}
-                            </FieldWrapper>
+                        <fieldset disabled={formDisabled} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-                            <FieldWrapper<LeadFormValues, "designation">
-                                control={form.control}
-                                name="designation"
-                                label="Designation"
-                            >
-                                {(field) => (
-                                    <Input placeholder="Enter designation" {...field} />
-                                )}
-                            </FieldWrapper>
+                                <SectionSeparator text="Basic Information" />
 
-                            <FieldWrapper<LeadFormValues, "phone">
-                                control={form.control}
-                                name="phone"
-                                label="Phone"
-                            >
-                                {(field) => (
-                                    <Input
-                                        type="tel"
-                                        placeholder="Enter phone number"
-                                        {...field}
-                                    />
-                                )}
-                            </FieldWrapper>
-
-                            <FieldWrapper<LeadFormValues, "email">
-                                control={form.control}
-                                name="email"
-                                label="Email"
-                            >
-                                {(field) => (
-                                    <Input
-                                        type="email"
-                                        placeholder="Enter email address"
-                                        {...field}
-                                    />
-                                )}
-                            </FieldWrapper>
-
-                            <FieldWrapper<LeadFormValues, "address">
-                                control={form.control}
-                                name="address"
-                                label="Address"
-                            >
-                                {(field) => (
-                                    <Input placeholder="Enter address" {...field} />
-                                )}
-                            </FieldWrapper>
-
-                            <SectionSeparator text="Location Details" />
-
-                            <SelectField<LeadFormValues, "country">
-                                control={form.control}
-                                name="country"
-                                label="Country"
-                                options={COUNTRY_OPTIONS}
-                                placeholder="Select Country"
-                            />
-
-                            {isIndia ? (
-                                <SelectField<LeadFormValues, "state">
+                                <FieldWrapper<LeadFormValues, "companyName">
                                     control={form.control}
-                                    name="state"
-                                    label="State"
-                                    options={stateOptions}
-                                    placeholder="Select State"
-                                />
-                            ) : (
-                                <FieldWrapper<LeadFormValues, "state">
+                                    name="companyName"
+                                    label="Company Name"
+                                >
+                                    {(field) => (
+                                        <Input placeholder="Enter company name" {...field} />
+                                    )}
+                                </FieldWrapper>
+
+                                <FieldWrapper<LeadFormValues, "name">
                                     control={form.control}
-                                    name="state"
-                                    label="State"
+                                    name="name"
+                                    label="Person Name"
+                                >
+                                    {(field) => (
+                                        <Input placeholder="Enter person name" {...field} />
+                                    )}
+                                </FieldWrapper>
+
+                                <FieldWrapper<LeadFormValues, "designation">
+                                    control={form.control}
+                                    name="designation"
+                                    label="Designation"
+                                >
+                                    {(field) => (
+                                        <Input placeholder="Enter designation" {...field} />
+                                    )}
+                                </FieldWrapper>
+
+                                <FieldWrapper<LeadFormValues, "phone">
+                                    control={form.control}
+                                    name="phone"
+                                    label="Phone"
                                 >
                                     {(field) => (
                                         <Input
-                                            placeholder="Enter state name"
-                                            disabled={!country}
+                                            type="tel"
+                                            placeholder="Enter phone number"
                                             {...field}
                                         />
                                     )}
                                 </FieldWrapper>
-                            )}
 
-                            <SectionSeparator text="Lead Details" />
-
-                            <SelectField<LeadFormValues, "type">
-                                control={form.control}
-                                name="type"
-                                label="Type"
-                                options={typeOptions}
-                                placeholder="Select Type"
-                            />
-
-                            <SelectField<LeadFormValues, "industry">
-                                control={form.control}
-                                name="industry"
-                                label="Industry"
-                                options={industryOptions}
-                                placeholder="Select Industry"
-                            />
-
-                            <SelectField<LeadFormValues, "team">
-                                control={form.control}
-                                name="team"
-                                label="Team"
-                                options={teamOptions}
-                                placeholder="Select Team"
-                            />
-
-                            <SectionSeparator text="Additional Details" />
-
-                            <div className="col-span-full">
-                                <FieldWrapper<LeadFormValues, "pointsDiscussed">
+                                <FieldWrapper<LeadFormValues, "email">
                                     control={form.control}
-                                    name="pointsDiscussed"
-                                    label="Points Discussed"
+                                    name="email"
+                                    label="Email"
                                 >
                                     {(field) => (
-                                        <textarea
-                                            className="border-input placeholder:text-muted-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                            placeholder="Enter discussion points..."
-                                            maxLength={2000}
+                                        <Input
+                                            type="email"
+                                            placeholder="Enter email address"
                                             {...field}
                                         />
                                     )}
                                 </FieldWrapper>
-                            </div>
 
-                            <div className="col-span-full">
-                                <FieldWrapper<LeadFormValues, "veResponsibility">
+                                <FieldWrapper<LeadFormValues, "address">
                                     control={form.control}
-                                    name="veResponsibility"
-                                    label="VE Responsibility"
+                                    name="address"
+                                    label="Address"
                                 >
                                     {(field) => (
-                                        <textarea
-                                            className="border-input placeholder:text-muted-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                            placeholder="Enter VE responsibilities..."
-                                            maxLength={2000}
-                                            {...field}
-                                        />
+                                        <Input placeholder="Enter address" {...field} />
                                     )}
                                 </FieldWrapper>
-                            </div>
 
-                        </div>
+                                <SectionSeparator text="Location Details" />
 
-                        <div className="w-full flex items-center justify-center gap-2 pt-2">
-                            <Button type="submit" disabled={saving}>
-                                {saving ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Saving...
-                                    </>
-                                ) : mode === "create" ? (
-                                    "Create Lead"
+                                <SelectField<LeadFormValues, "country">
+                                    control={form.control}
+                                    name="country"
+                                    label="Country"
+                                    options={COUNTRY_OPTIONS}
+                                    placeholder="Select Country"
+                                />
+
+                                {isIndia ? (
+                                    <SelectField<LeadFormValues, "state">
+                                        control={form.control}
+                                        name="state"
+                                        label="State"
+                                        options={stateOptions}
+                                        placeholder="Select State"
+                                    />
                                 ) : (
-                                    "Update Lead"
+                                    <FieldWrapper<LeadFormValues, "state">
+                                        control={form.control}
+                                        name="state"
+                                        label="State"
+                                    >
+                                        {(field) => (
+                                            <Input
+                                                placeholder="Enter state name"
+                                                disabled={!country}
+                                                {...field}
+                                            />
+                                        )}
+                                    </FieldWrapper>
                                 )}
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => navigate(paths.crm.leads)}
-                                disabled={saving}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => form.reset()}
-                                disabled={saving}
-                            >
-                                Reset
-                            </Button>
-                        </div>
+
+                                <SectionSeparator text="Lead Details" />
+
+                                <SelectField<LeadFormValues, "type">
+                                    control={form.control}
+                                    name="type"
+                                    label="Type"
+                                    options={typeOptions}
+                                    placeholder="Select Type"
+                                />
+
+                                <SelectField<LeadFormValues, "industry">
+                                    control={form.control}
+                                    name="industry"
+                                    label="Industry"
+                                    options={industryOptions}
+                                    placeholder="Select Industry"
+                                />
+
+                                <SelectField<LeadFormValues, "team">
+                                    control={form.control}
+                                    name="team"
+                                    label="Team"
+                                    options={teamOptions}
+                                    placeholder="Select Team"
+                                />
+
+                                <SectionSeparator text="Additional Details" />
+
+                                <div className="col-span-full">
+                                    <FieldWrapper<LeadFormValues, "pointsDiscussed">
+                                        control={form.control}
+                                        name="pointsDiscussed"
+                                        label="Points Discussed"
+                                    >
+                                        {(field) => (
+                                            <textarea
+                                                className="border-input placeholder:text-muted-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                placeholder="Enter discussion points..."
+                                                maxLength={2000}
+                                                {...field}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
+
+                                <div className="col-span-full">
+                                    <FieldWrapper<LeadFormValues, "veResponsibility">
+                                        control={form.control}
+                                        name="veResponsibility"
+                                        label="VE Responsibility"
+                                    >
+                                        {(field) => (
+                                            <textarea
+                                                className="border-input placeholder:text-muted-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                placeholder="Enter VE responsibilities..."
+                                                maxLength={2000}
+                                                {...field}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
+
+                            </div>
+
+                            <div className="w-full flex items-center justify-center gap-2 pt-2">
+                                <Button type="submit" disabled={saving || formDisabled}>
+                                    {saving ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Saving...
+                                        </>
+                                    ) : mode === "create" ? (
+                                        "Create Lead"
+                                    ) : (
+                                        "Update Lead"
+                                    )}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => navigate(paths.crm.leads)}
+                                    disabled={saving}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => form.reset()}
+                                    disabled={saving}
+                                >
+                                    Reset
+                                </Button>
+                            </div>
+                        </fieldset>
                     </form>
                 </Form>
+
+                <LocationPickerModal
+                    open={locationModal.open}
+                    onOpenChange={(open) => setLocationModal((m) => ({ ...m, open }))}
+                    initialLat={locationModal.lat}
+                    initialLng={locationModal.lng}
+                    onConfirm={handleLocationConfirm}
+                />
             </CardContent>
         </Card>
     );
