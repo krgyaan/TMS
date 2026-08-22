@@ -21,6 +21,7 @@ import { tenderResults } from '@db/schemas/tendering/tender-result.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { organizations } from '@db/schemas/master/organizations.schema';
 import { teams } from '@db/schemas/master/teams.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { and, asc, desc, eq, ilike, inArray, like, or, sql, type SQL } from 'drizzle-orm';
@@ -48,6 +49,7 @@ export type LeadEnquiryWithNames = LeadEnquiry & {
     teamName?: string | null;
     hasSiteVisit?: boolean;
     costingSheetStatus?: string | null;
+    tenderStatusName?: string | null;
     tenderStage?: string | null;
     contacts?: EnquiryContactDto[] | null;
 };
@@ -128,6 +130,7 @@ export class LeadEnquiryService {
                 updatedByName: updatedByUser.name,
                 hasSiteVisit: hasSiteVisitExpr,
                 costingSheetStatus: costingSheetStatusExpr,
+                tenderStatusName: statuses.name,
             })
             .from(leadEnquiries)
             .leftJoin(teams, eq(teams.id, sql`NULLIF(${leadEnquiries.team}, '')::BIGINT`))
@@ -136,6 +139,8 @@ export class LeadEnquiryService {
             .leftJoin(organizations, eq(organizations.id, leadEnquiries.organisationId))
             .leftJoin(createdByUser, eq(createdByUser.id, leadEnquiries.createdBy))
             .leftJoin(updatedByUser, eq(updatedByUser.id, leadEnquiries.updatedBy))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, leadEnquiries.tenderId))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
@@ -156,6 +161,7 @@ export class LeadEnquiryService {
                 updatedByName: row.updatedByName ?? null,
 hasSiteVisit: row.hasSiteVisit ?? false,
                 costingSheetStatus: row.costingSheetStatus ?? null,
+                tenderStatusName: row.tenderStatusName ?? null,
                 tenderStage: row.leadEnquiries.tenderId != null
                     ? (tenderStages.get(row.leadEnquiries.tenderId) ?? null)
                     : null,
@@ -179,6 +185,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 updatedByName: updatedByUser.name,
                 hasSiteVisit: hasSiteVisitExpr,
                 costingSheetStatus: costingSheetStatusExpr,
+                tenderStatusName: statuses.name,
             })
             .from(leadEnquiries)
             .leftJoin(teams, eq(teams.id, sql`NULLIF(${leadEnquiries.team}, '')::BIGINT`))
@@ -187,6 +194,8 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             .leftJoin(organizations, eq(organizations.id, leadEnquiries.organisationId))
             .leftJoin(createdByUser, eq(createdByUser.id, leadEnquiries.createdBy))
             .leftJoin(updatedByUser, eq(updatedByUser.id, leadEnquiries.updatedBy))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, leadEnquiries.tenderId))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(eq(leadEnquiries.id, id))
             .limit(1);
 
@@ -216,6 +225,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             updatedByName: row.updatedByName ?? null,
             hasSiteVisit: row.hasSiteVisit ?? false,
             costingSheetStatus: row.costingSheetStatus ?? null,
+            tenderStatusName: row.tenderStatusName ?? null,
             tenderStage: row.leadEnquiries.tenderId != null
                 ? (tenderStages.get(row.leadEnquiries.tenderId) ?? null)
                 : null,

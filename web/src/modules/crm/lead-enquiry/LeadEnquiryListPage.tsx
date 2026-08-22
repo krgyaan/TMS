@@ -348,36 +348,13 @@ const EnquiryListPage = () => {
             },
         },
         {
-            field: "status",
+            field: "tenderStatusName",
             headerName: "Status",
             width: 160,
             cellRenderer: (params: any) => {
-                const val = params.value;
-                if (!val) return "-";
-                const isRejected = val === 'Rejected';
-                const isCosting = val === 'Costing Sheet Submitted' || val === 'Costing Sheet Created';
-                return (
-                    <Badge
-                        variant={isRejected ? "destructive" : isCosting ? "default" : "secondary"}
-                        className={cn(isCosting && "bg-amber-500 hover:bg-amber-500")}
-                    >
-                        {val}
-                    </Badge>
-                );
-            },
-        },
-        {
-            field: "tenderStage",
-            headerName: "Stage",
-            width: 140,
-            cellRenderer: (params: any) => {
                 const val: string | null | undefined = params.value;
                 if (!val) return "-";
-                return (
-                    <Badge variant="secondary" className="bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500/10">
-                        {val}
-                    </Badge>
-                );
+                return <Badge variant="secondary">{val}</Badge>;
             },
         },
         {
