@@ -9,7 +9,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { useDeleteTender, useTenders, useTendersDashboardCounts } from "@/hooks/api/useTenders";
 import type { TenderInfoWithNames, TenderWithRelations, TenderWithTimer } from "./helpers/tenderInfo.types";
-import { Eye, FilePlus, Pencil, Plus, Search, Clock, Archive, XCircle } from "lucide-react";
+import { Eye, FilePlus, Pencil, Plus, Search, Clock, Archive, XCircle, UserPlus } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { QuickFilter } from "@/components/ui/quick-filter";
 import { TenderRejectionModal } from "./components/TenderRejectionModal";
+import { LeadAllocationModal } from "@/modules/crm/leads/components/LeadAllocationModal";
 import { useAuth } from "@/contexts/AuthContext";
 
 type TenderDashboardTab = 'under-preparation' | 'did-not-bid' | 'tenders-bid' | 'tender-won' | 'tender-lost' | 'unallocated';
@@ -42,7 +43,7 @@ const TenderListPage = () => {
 
     const hasTenderingPermission = isAdmin || isSuperUser || isTeamLead;
 
-    const elligibleForRejection = (row): boolean => {
+    const elligibleForRejection = (row: TenderInfoWithNames): boolean => {
         if (row.statusName && row.statusName == 'Read Tender'){
             return true;
         } else {
@@ -50,7 +51,7 @@ const TenderListPage = () => {
         }  
     }
 
-    const elligibleForEditing = (row) => {
+    const elligibleForEditing = (row: TenderInfoWithNames) => {
         if([0,1,2,29].includes(row.status)){
             return true;
         } else {
@@ -87,6 +88,11 @@ const TenderListPage = () => {
     //     tenderId: null
     // });
     const [rejectionModal, setRejectionModal] = useState<{ open: boolean; tenderId: number | null; tenderName?: string }>({
+        open: false,
+        tenderId: null
+    });
+
+    const [assignTeModal, setAssignTeModal] = useState<{ open: boolean; tenderId: number | null; tenderName?: string }>({
         open: false,
         tenderId: null
     });
@@ -136,10 +142,16 @@ const TenderListPage = () => {
 
     const tenderActions: ActionItem<TenderWithTimer & { canDelete: boolean }>[] = [
         {
+            label: "Assign TE",
+            onClick: (row: TenderInfoWithNames) => setAssignTeModal({ open: true, tenderId: row.id, tenderName: row.tenderName }),
+            icon: <UserPlus className="h-4 w-4" />,
+            visible: (row) => row.enquiryId != null && row.status === 0,
+        },
+        {
             label: "Fill Info Sheet",
             onClick: (row: TenderWithRelations) => (row.infoSheet ? navigate(paths.tendering.infoSheetEdit(row.id)) : navigate(paths.tendering.infoSheetCreate(row.id))),
             icon: <FilePlus className="h-4 w-4" />,
-            visible: (row) => elligibleForEditing(row), 
+            visible: (row) => !(row.enquiryId && row.status === 0) && elligibleForEditing(row), 
         },
         {
             label: "Reject Tender",
@@ -154,22 +166,28 @@ const TenderListPage = () => {
         // },
         {
             label: "View Details",
-            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderView(row.id)),
+            onClick: (row: TenderInfoWithNames) => row.enquiryId
+                ? navigate(paths.crm.enquiryView(row.enquiryId))
+                : navigate(paths.tendering.tenderView(row.id)),
             icon: <Eye className="h-4 w-4" />,
         },
         {
             label: "Request Extension",
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.requestExtensionCreate(row.id)),
             icon: <Clock className="h-4 w-4" />,
+            visible: (row) => !row.enquiryId,
         },
         {
             label: "Submit Queries",
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.submitQueryCreate(row.id)),
             icon: <Clock className="h-4 w-4" />,
+            visible: (row) => !row.enquiryId,
         },
         {
             label: "Edit",
-            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderEdit(row.id)),
+            onClick: (row: TenderInfoWithNames) => row.enquiryId
+                ? navigate(paths.crm.enquiryEdit(row.enquiryId))
+                : navigate(paths.tendering.tenderEdit(row.id)),
             icon: <Pencil className="h-4 w-4" />,
         },
         {
@@ -303,7 +321,7 @@ const TenderListPage = () => {
     ], [activeTab]);
 
     return (
-        <Card className="min-h-[calc(100vh-2rem)] flex flex-col border-0 shadow-none">
+        <Card className="min-h-[calc(100vh-2rem)] flex flex-col">
 
             {/* 2. HEADER: Fixed height */}
             <CardHeader className="flex-none pb-4">
@@ -421,6 +439,14 @@ const TenderListPage = () => {
                 onSuccess={() => {
                     setRejectionModal({ open: false, tenderId: null });
                 }}
+            />
+
+            <LeadAllocationModal
+                open={assignTeModal.open}
+                onOpenChange={(open) => setAssignTeModal({ ...assignTeModal, open })}
+                mode="tender"
+                tenderId={assignTeModal.tenderId}
+                tenderName={assignTeModal.tenderName}
             />
         </Card>
     );

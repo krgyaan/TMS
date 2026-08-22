@@ -49,6 +49,7 @@ export interface TenderInfoWithNames extends TenderInfo {
     oemExperience?: string | null;
     bidSubmissionDate?: Date | null;
     resultDate?: Date | null;
+    enquiryId?: number | null;
 }
 
 export interface CreateTenderRequest {

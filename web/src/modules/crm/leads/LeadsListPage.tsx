@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
     Card,
     CardContent,
@@ -42,14 +42,7 @@ import { LeadPriorityModal } from "./components/LeadPriorityModal";
 import { LeadAllocationModal } from "./components/LeadAllocationModal";
 import { cn } from "@/lib/utils";
 
-type LeadTeamTab = 'AC' | 'DC' | 'Business Development';
 type LeadPriorityTab = 'cold' | 'warm' | 'hot';
-
-const TEAM_TABS: { key: LeadTeamTab; label: string }[] = [
-    { key: 'AC', label: 'AC' },
-    { key: 'DC', label: 'DC' },
-    { key: 'Business Development', label: 'Business Development' },
-];
 
 const PRIORITY_SUBTABS: { key: LeadPriorityTab; label: string }[] = [
     { key: 'cold', label: 'Cold' },
@@ -59,11 +52,8 @@ const PRIORITY_SUBTABS: { key: LeadPriorityTab; label: string }[] = [
 
 const LeadListPage = () => {
     const navigate = useNavigate();
-    const [searchParams, setSearchParams] = useSearchParams();
     const deleteLead = useDeleteLead();
     const updateLead = useUpdateLead();
-
-    const activeTeam = (searchParams.get('tab') as LeadTeamTab) || 'AC';
 
     const {
         activeTab: activePriority,
@@ -81,14 +71,6 @@ const LeadListPage = () => {
         defaultTab: 'cold' as LeadPriorityTab,
         tabParam: 'subtab',
     });
-
-    const setActiveTeam = (team: LeadTeamTab) => {
-        const next = new URLSearchParams(searchParams);
-        next.set('tab', team);
-        next.set('subtab', 'cold');
-        next.delete('page');
-        setSearchParams(next, { replace: true });
-    };
 
     const setActivePriority = (priority: LeadPriorityTab) => {
         setActivePriorityInternal(priority);
@@ -129,26 +111,19 @@ const LeadListPage = () => {
         page: 1, 
         limit: 1, 
         priority: 'Cold', 
-        team: activeTeam 
     });
 
     const { data: warmResponse } = useLeads({ 
         page: 1, 
         limit: 1, 
         priority: 'Warm', 
-        team: activeTeam 
     });
 
     const { data: hotResponse } = useLeads({ 
         page: 1, 
         limit: 1, 
         priority: 'Hot', 
-        team: activeTeam 
     });
-
-    const { data: acTeamResponse } = useLeads({ page: 1, limit: 1, team: 'AC' });
-    const { data: dcTeamResponse } = useLeads({ page: 1, limit: 1, team: 'DC' });
-    const { data: bdTeamResponse } = useLeads({ page: 1, limit: 1, team: 'Business Development' });
 
     const coldCount = Array.isArray(coldResponse) 
         ? coldResponse.length 
@@ -168,19 +143,12 @@ const LeadListPage = () => {
         return hotCount;
     };
 
-    const getTeamCount = (key: LeadTeamTab) => {
-        if (key === 'AC') return Array.isArray(acTeamResponse) ? acTeamResponse.length : (acTeamResponse?.meta?.total ?? 0);
-        if (key === 'DC') return Array.isArray(dcTeamResponse) ? dcTeamResponse.length : (dcTeamResponse?.meta?.total ?? 0);
-        return Array.isArray(bdTeamResponse) ? bdTeamResponse.length : (bdTeamResponse?.meta?.total ?? 0);
-    };
-
     const { data: apiResponse, isLoading } = useLeads(
         {
             page: pagination.pageIndex + 1,
             limit: pagination.pageSize,
             search: debouncedSearch || undefined,
             priority: getPriorityFilter(activePriority as LeadPriorityTab),
-            team: activeTeam,
         },
         { 
             sortBy: sortModel[0]?.colId, 
@@ -455,45 +423,21 @@ const LeadListPage = () => {
     ], [leadActions]);
 
     return (
-        <Card className="min-h-[calc(100vh-2rem)] flex flex-col border-0 shadow-none">
+        <Card className="min-h-[calc(100vh-2rem)] flex flex-col">
             <CardHeader className="flex-none pb-4">
                 <div className="flex items-center justify-between gap-4">
                     <div>
                         <CardTitle>Leads</CardTitle>
                         <CardDescription>Manage all leads</CardDescription>
                     </div>
-                    <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
-                        {TEAM_TABS.map(tab => (
-                            <button 
-                                key={tab.key} 
-                                type="button" 
-                                onClick={() => setActiveTeam(tab.key)} 
-                                className={cn(
-                                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
-                                    activeTeam === tab.key 
-                                        ? "bg-background text-foreground shadow-sm" 
-                                        : "text-muted-foreground hover:text-foreground"
-                                )}
-                            >
-                                {tab.label}
-                                <Badge 
-                                    variant="secondary" 
-                                    className={cn(
-                                        "text-xs h-4 min-w-4 px-1",
-                                        activeTeam === tab.key && "bg-primary/10 text-primary"
-                                    )}
-                                >
-                                    {getTeamCount(tab.key)}
-                                </Badge>
-                            </button>
-                        ))}
+                    <div className="flex items-center gap-2">
+                        <Button 
+                            onClick={() => navigate(paths.crm.leadCreate)} 
+                            className="flex items-center gap-2"
+                        >
+                            <Plus className="h-4 w-4" /> Add Lead
+                        </Button>
                     </div>
-                    <Button 
-                        onClick={() => navigate(paths.crm.leadCreate)} 
-                        className="flex items-center gap-2"
-                    >
-                        <Plus className="h-4 w-4" /> Add Lead
-                    </Button>
                 </div>
             </CardHeader>
             <CardContent className="flex-1 px-0">

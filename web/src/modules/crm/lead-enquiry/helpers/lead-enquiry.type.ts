@@ -2,12 +2,14 @@ export interface LeadEnquiry {
     id: number;
     leadId: number | null;
     happyCallingId: number | null;
+    tenderId: number | null;
     team: string | null;
     enqName: string;
     organisationId: number | null;
     itemId: number;
     locationCode: string;
     approxValue: string;
+    dueDate: string | null;
     siteVisitRequired: boolean;
     createdBy: number;
     updatedBy: number | null;
@@ -34,6 +36,7 @@ export interface LeadEnquiryWithNames extends LeadEnquiry {
     teamName?: string | null;
     hasSiteVisit?: boolean;
     costingSheetStatus?: string | null;
+    tenderStage?: string | null;
     contacts?: EnquiryContact[] | null;
 }
 
@@ -53,6 +56,7 @@ export interface CreateLeadEnquiryRequest {
     itemId: number;
     locationCode: string;
     approxValue: string;
+    dueDate?: string | null;
     siteVisitRequired?: boolean;
     orgAbbName?: string | null;
     enquiryFile?: string | null;
@@ -77,6 +81,7 @@ export interface CreateEnquiryWithLeadRequest {
     itemId: number;
     locationCode: string;
     approxValue: string;
+    dueDate?: string | null;
     siteVisitRequired?: boolean;
     orgAbbName?: string | null;
     enquiryFile?: string | null;

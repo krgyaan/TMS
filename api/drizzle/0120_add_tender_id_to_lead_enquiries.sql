@@ -1,0 +1,1 @@
+ALTER TABLE "public"."lead_enquiries" ADD COLUMN "tender_id" bigint;
