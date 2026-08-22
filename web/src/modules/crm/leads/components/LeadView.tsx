@@ -156,6 +156,30 @@ export function LeadView({
                                 {lead.address || "—"}
                             </TableCell>
                         </TableRow>
+                        {lead.liveLocation && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    <div className="flex items-center gap-2">
+                                        <MapPin className="h-4 w-4 text-red-600" />
+                                        Live Location
+                                    </div>
+                                </TableCell>
+                                <TableCell className="text-sm" colSpan={3}>
+                                    <div className="space-y-0.5">
+                                        <p>
+                                            {lead.liveLocation.address || "Address not resolved"}
+                                        </p>
+                                        {lead.liveLocation.latitude != null &&
+                                            lead.liveLocation.longitude != null && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    Lat: {lead.liveLocation.latitude.toFixed(6)} · Lng:{" "}
+                                                    {lead.liveLocation.longitude.toFixed(6)}
+                                                </p>
+                                            )}
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        )}
 
                         {/* Location Details */}
                         <TableRow className="bg-muted/50">
