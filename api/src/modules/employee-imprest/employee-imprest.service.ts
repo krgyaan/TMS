@@ -215,7 +215,7 @@ export class EmployeeImprestService {
             const insurance = this.parseInsurancePayload(data.insurance);
 
             if (insurance) {
-                await this.insurancePolicyService.createFromImprest(tx, insurance, created.id, actorUser?.sub ?? data.userId ?? 0);
+                await this.insurancePolicyService.createFromImprest(tx, insurance, created.id, actorUser?.sub ?? data.userId ?? 0, created.projectId ?? undefined);
             }
 
             return created;

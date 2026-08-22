@@ -139,10 +139,10 @@ export class InsurancePolicyService {
         return this.findOne(policy.id);
     }
 
-    async createFromImprest(tx: DbInstance, dto: InsurancePayload, imprestId: number, userId: number) {
+    async createFromImprest(tx: DbInstance, dto: InsurancePayload, imprestId: number, userId: number, projectId?: number) {
         const [policy] = await tx
             .insert(insurancePolicies)
-            .values({ ...this.toValues(dto, userId), imprestId })
+            .values({ ...this.toValues(dto, userId), imprestId, projectId: projectId ?? null })
             .returning();
 
         await tx.update(employeeImprests).set({ insurancePolicyId: policy.id, updatedAt: new Date() }).where(eq(employeeImprests.id, imprestId));
