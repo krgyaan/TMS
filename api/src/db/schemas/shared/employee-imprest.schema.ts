@@ -1,4 +1,5 @@
 import { pgTable, serial, integer, bigint, varchar, text, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { projects } from "@/db/schemas/master/projects.schema";
 
 export const employeeImprests = pgTable("employee_imprests", {
     id: serial("id").primaryKey(),
@@ -6,6 +7,9 @@ export const employeeImprests = pgTable("employee_imprests", {
     categoryId: bigint("category_id", { mode: "number" }),
     teamId: integer("team_id"),
     partyName: varchar("party_name", { length: 255 }),
+    projectId: bigint("project_id", { mode: "number" }).references(() => projects.id, {
+        onDelete: "set null",
+    }),
     projectName: varchar("project_name", { length: 255 }),
     amount: integer("amount"),
     remark: text("remark"),

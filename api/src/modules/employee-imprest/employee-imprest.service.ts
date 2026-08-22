@@ -10,6 +10,7 @@ import { insurancePayloadSchema, type InsurancePayload } from "@/modules/insuran
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import type { DbInstance } from "@db";
 import { employeeImprests, employeeImprestTransactions } from "@db/schemas/shared";
+import { projects } from "@/db/schemas/master/projects.schema";
 import { BadRequestException, ForbiddenException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
@@ -116,6 +117,21 @@ export class EmployeeImprestService {
                 throw new BadRequestException("Team member is required for transfer");
             }
 
+            // Fetch project ID from projectName if provided
+            let resolvedProjectId: number | null = null;
+            let resolvedProjectName: string | null = null;
+            if (data.projectName) {
+                const [project] = await this.db
+                    .select({ id: projects.id, projectName: projects.projectName })
+                    .from(projects)
+                    .where(ilike(projects.projectName, data.projectName))
+                    .limit(1);
+                if (project) {
+                    resolvedProjectId = project.id;
+                    resolvedProjectName = project.projectName;
+                }
+            }
+
             // Fetch sender name from DB — never trust client for this
             const [sender] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, data.userId)).limit(1);
 
@@ -139,7 +155,8 @@ export class EmployeeImprestService {
                         categoryId: data.categoryId,
                         teamId: isTransfer ? Number(data.transferToId) : null,
                         partyName: null, // always null for cat 22
-                        projectName: null, // always null for cat 22
+                        projectId: resolvedProjectId,
+                        projectName: resolvedProjectName, // always null for cat 22
                         amount: data.amount,
                         remark: data.remark,
                         invoiceProof: files,
@@ -165,13 +182,29 @@ export class EmployeeImprestService {
 
         // Normal flow — any other category
         const imprest = await this.db.transaction(async tx => {
+            // Resolve projectId from projectName if provided
+            let resolvedProjectId: number | null = null;
+            let resolvedProjectName: string | null = null;
+            if (data.projectName) {
+                const [project] = await this.db
+                    .select({ id: projects.id, projectName: projects.projectName })
+                    .from(projects)
+                    .where(ilike(projects.projectName, data.projectName))
+                    .limit(1);
+                if (project) {
+                    resolvedProjectId = project.id;
+                    resolvedProjectName = project.projectName;
+                }
+            }
+
             const [created] = await tx
                 .insert(employeeImprests)
                 .values({
                     userId: data.userId,
                     categoryId: data.categoryId,
                     partyName: data.partyName,
-                    projectName: data.projectName,
+                    projectId: resolvedProjectId,
+                    projectName: resolvedProjectName,
                     amount: data.amount,
                     remark: data.remark,
                     invoiceProof: files,
@@ -182,7 +215,7 @@ export class EmployeeImprestService {
             const insurance = this.parseInsurancePayload(data.insurance);
 
             if (insurance) {
-                await this.insurancePolicyService.createFromImprest(tx, insurance, created.id, actorUser?.sub ?? data.userId ?? 0);
+                await this.insurancePolicyService.createFromImprest(tx, insurance, created.id, actorUser?.sub ?? data.userId ?? 0, created.projectId ?? undefined);
             }
 
             return created;
@@ -217,9 +250,6 @@ export class EmployeeImprestService {
 
             const [user] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, userId)).limit(1);
 
-            // ==============================
-            // 1️⃣ Summary (reuse logic pattern)
-            // ==============================
             const [imprestAgg] = await this.db
                 .select({
                     amountSpent: sql<number>`
@@ -376,9 +406,6 @@ export class EmployeeImprestService {
         const newIsTransfer = Number(data.categoryId ?? existing.categoryId) === TRANSFER_CATEGORY_ID;
 
         return await this.db.transaction(async tx => {
-            // =========================
-            // 1️⃣ CHECK LINKED TRANSACTION
-            // =========================
             const existingTxn = await tx.query.employeeImprestTransactions.findFirst({
                 where: eq(employeeImprestTransactions.imprestId, id),
             });
@@ -389,9 +416,6 @@ export class EmployeeImprestService {
                 throw new BadRequestException("This transfer cannot be edited because it was created before system upgrade. Please delete and recreate it.");
             }
 
-            // =========================
-            // 2️⃣ DETERMINE ACTIONS
-            // =========================
             const isReceiverChanged = data.teamId !== undefined && data.teamId !== existing.teamId;
             const isAmountChanged = data.amount !== undefined && data.amount !== existing.amount;
 
@@ -400,9 +424,6 @@ export class EmployeeImprestService {
                 (!newIsTransfer || // transfer → non-transfer
                     isReceiverChanged); // receiver changed
 
-            // =========================
-            // 3️⃣ DELETE OLD TRANSFER (if needed)
-            // =========================
             if (shouldDeleteOld) {
                 const deleted = await tx.delete(employeeImprestTransactions).where(eq(employeeImprestTransactions.imprestId, id)).returning();
 
@@ -411,17 +432,27 @@ export class EmployeeImprestService {
                 }
             }
 
-            // =========================
-            // 4️⃣ UPDATE IMPREST
-            // =========================
             const updateData: Record<string, any> = {
                 updatedAt: new Date(),
             };
 
-            if (data.userId !== undefined) updateData.userId = data.userId;
-            if (newIsTransfer) {
-                updateData.partyName = null;
-                updateData.projectName = null;
+            // Resolve projectId from projectName if provided
+            let resolvedProjectId: number | null = null;
+            let resolvedProjectName: string | null = null;
+            if (data.projectName !== undefined) {
+                if (data.projectName) {
+                    const [project] = await this.db
+                        .select({ id: projects.id, projectName: projects.projectName })
+                        .from(projects)
+                        .where(ilike(projects.projectName, data.projectName))
+                        .limit(1);
+                    if (project) {
+                        resolvedProjectId = project.id;
+                        resolvedProjectName = project.projectName;
+                    }
+                }
+                updateData.projectName = resolvedProjectName;
+                updateData.projectId = resolvedProjectId;
             } else {
                 if (data.partyName !== undefined) updateData.partyName = data.partyName;
                 if (data.projectName !== undefined) updateData.projectName = data.projectName;
@@ -440,11 +471,7 @@ export class EmployeeImprestService {
 
             const [updated] = await tx.update(employeeImprests).set(updateData).where(eq(employeeImprests.id, id)).returning();
 
-            // =========================
-            // 5️⃣ HANDLE TRANSFER LOGIC
-            // =========================
-
-            // ➕ CREATE (non-transfer → transfer)
+            // CREATE (non-transfer → transfer)
             if (!oldIsTransfer && newIsTransfer) {
                 const receiverId = data.teamId;
 
@@ -472,7 +499,7 @@ export class EmployeeImprestService {
                 });
             }
 
-            // ✏️ UPDATE AMOUNT ONLY
+            // UPDATE AMOUNT ONLY
             else if (oldIsTransfer && newIsTransfer && isAmountChanged && !isReceiverChanged) {
                 await tx
                     .update(employeeImprestTransactions)
@@ -483,7 +510,7 @@ export class EmployeeImprestService {
                     .where(eq(employeeImprestTransactions.imprestId, id));
             }
 
-            // 🔁 RECREATE (receiver changed)
+            // RECREATE (receiver changed)
             else if (oldIsTransfer && newIsTransfer && isReceiverChanged) {
                 const receiverId = data.teamId!;
                 const amount = data.amount ?? existing.amount;
@@ -509,10 +536,6 @@ export class EmployeeImprestService {
             }
 
             // (transfer → non-transfer already handled by delete)
-
-            // =========================
-            // 6️⃣ HANDLE INSURANCE POLICY
-            // =========================
             const insurance = this.parseInsurancePayload(data.insurance);
             const newCategoryIsInsurance = Number(data.categoryId ?? existing.categoryId) === INSURANCE_CATEGORY_ID;
 
@@ -545,7 +568,7 @@ export class EmployeeImprestService {
             throw new BadRequestException("No files uploaded");
         }
 
-        // 🛑 Guardrail (never silently fix bad data)
+        // Guardrail (never silently fix bad data)
         if (!Array.isArray(existing.invoiceProof)) {
             throw new InternalServerErrorException("invoiceProof is corrupted (expected JSON array)");
         }

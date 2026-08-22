@@ -139,10 +139,10 @@ export class InsurancePolicyService {
         return this.findOne(policy.id);
     }
 
-    async createFromImprest(tx: DbInstance, dto: InsurancePayload, imprestId: number, userId: number) {
+    async createFromImprest(tx: DbInstance, dto: InsurancePayload, imprestId: number, userId: number, projectId?: number) {
         const [policy] = await tx
             .insert(insurancePolicies)
-            .values({ ...this.toValues(dto, userId), imprestId })
+            .values({ ...this.toValues(dto, userId), imprestId, projectId: projectId ?? null })
             .returning();
 
         await tx.update(employeeImprests).set({ insurancePolicyId: policy.id, updatedAt: new Date() }).where(eq(employeeImprests.id, imprestId));
@@ -594,7 +594,22 @@ export class InsurancePolicyService {
 
     /* ----------------------------- HELPERS ----------------------------- */
 
-    private toValues(dto: CreateInsurancePolicyDto | InsurancePayload, userId: number) {
+    private toValues(dto: CreateInsurancePolicyDto | InsurancePayload, userId: number): {
+        insuranceType: string;
+        policyNumber: string | null;
+        insurerName: string | null;
+        startDate: string;
+        endDate: string;
+        policyDocument: string[];
+        sumAssured: string;
+        noOfManpower: number | null;
+        manpowerNames: string | null;
+        location: string | null;
+        itemsCovered: string | null;
+        lrCopy: string[] | null;
+        projectId: number | null;
+        createdBy: number;
+    } {
         return {
             insuranceType: dto.insuranceType,
             policyNumber: dto.policyNumber ?? null,
@@ -607,7 +622,8 @@ export class InsurancePolicyService {
             manpowerNames: dto.manpowerNames ?? null,
             location: dto.location ?? null,
             itemsCovered: dto.itemsCovered ?? null,
-            lrCopy: dto.lrCopy ?? null,
+            lrCopy: dto.lrCopy == null ? null : Array.isArray(dto.lrCopy) ? dto.lrCopy : [dto.lrCopy],
+            projectId: "projectId" in dto ? dto.projectId ?? null : null,
             createdBy: userId,
         };
     }
