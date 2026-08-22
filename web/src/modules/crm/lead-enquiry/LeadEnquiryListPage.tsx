@@ -250,6 +250,17 @@ const EnquiryListPage = () => {
 
     const enquiryActions: ActionItem<LeadEnquiryWithNames>[] = [
         {
+            label: "Fill Info Sheet",
+            onClick: (row) => {
+                if (!row.tenderId) {
+                    toast.error("No linked tender found for this enquiry");
+                    return;
+                }
+                navigate(paths.tendering.infoSheetCreate(row.tenderId));
+            },
+            icon: <FileText className="h-4 w-4" />,
+        },
+        {
             label: "View",
             onClick: (row) => navigate(paths.crm.enquiryView(row.id)),
             icon: <Eye className="h-4 w-4" />,
