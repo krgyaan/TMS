@@ -8,7 +8,6 @@ import type { ActionItem } from "@/components/ui/ActionMenu";
 import { NavLink, useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { useDeleteTender, useTenders, useTendersDashboardCounts } from "@/hooks/api/useTenders";
-import { useUpdateLeadEnquiry } from "@/hooks/api/useLeadEnquiry";
 import type { TenderInfoWithNames, TenderWithRelations, TenderWithTimer } from "./helpers/tenderInfo.types";
 import { Eye, FilePlus, Pencil, Plus, Search, Clock, Archive, XCircle, UserPlus } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,7 +18,6 @@ import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { QuickFilter } from "@/components/ui/quick-filter";
 import { TenderRejectionModal } from "./components/TenderRejectionModal";
-import { LeadEnquiryRejectModal } from "@/modules/crm/lead-enquiry/components/LeadEnquiryRejectModal";
 import { LeadAllocationModal } from "@/modules/crm/leads/components/LeadAllocationModal";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -84,7 +82,6 @@ const TenderListPage = () => {
     );
 
     const deleteTender = useDeleteTender();
-    const updateEnquiry = useUpdateLeadEnquiry();
     const navigate = useNavigate();
     // const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
     //     open: false,
@@ -99,24 +96,6 @@ const TenderListPage = () => {
         open: false,
         tenderId: null
     });
-
-    const [rejectEnquiryModal, setRejectEnquiryModal] = useState<{
-        open: boolean;
-        tenderId: number | null;
-        enquiryId: number | null;
-        enquiryName?: string;
-    }>({ open: false, tenderId: null, enquiryId: null });
-
-    const handleRejectEnquiryConfirm = async (enquiryId: number, reason?: string) => {
-        const tenderId = rejectEnquiryModal.tenderId;
-        await updateEnquiry.mutateAsync({
-            id: enquiryId,
-            data: { status: 'Rejected', rejectionReason: reason || null },
-        });
-        if (tenderId) {
-            await deleteTender.mutateAsync(tenderId);
-        }
-    };
 
     // Handle both array (old format) and PaginatedResult (new format)
     const tenders = Array.isArray(apiResponse)
@@ -169,13 +148,6 @@ const TenderListPage = () => {
             visible: (row) => row.enquiryId != null && row.status === 0,
         },
         {
-            label: "Reject Enquiry",
-            onClick: (row: TenderInfoWithNames) => setRejectEnquiryModal({ open: true, tenderId: row.id, enquiryId: row.enquiryId ?? null, enquiryName: row.tenderName }),
-            icon: <XCircle className="h-4 w-4 text-red-600" />,
-            className: "text-red-600",
-            visible: (row) => row.enquiryId != null && row.status === 0,
-        },
-        {
             label: "Fill Info Sheet",
             onClick: (row: TenderWithRelations) => (row.infoSheet ? navigate(paths.tendering.infoSheetEdit(row.id)) : navigate(paths.tendering.infoSheetCreate(row.id))),
             icon: <FilePlus className="h-4 w-4" />,
@@ -185,7 +157,7 @@ const TenderListPage = () => {
             label: "Reject Tender",
             onClick: (row) => setRejectionModal({ open: true, tenderId: row.id, tenderName: row.tenderName }),
             icon: <XCircle className="h-4 w-4" />,
-            visible:(row) => !row.enquiryId && elligibleForRejection(row) && hasTenderingPermission,
+            visible:(row) => elligibleForRejection(row) && hasTenderingPermission,
         },
         // {
         //     label: "Change Status",
@@ -475,14 +447,6 @@ const TenderListPage = () => {
                 mode="tender"
                 tenderId={assignTeModal.tenderId}
                 tenderName={assignTeModal.tenderName}
-            />
-
-            <LeadEnquiryRejectModal
-                open={rejectEnquiryModal.open}
-                onOpenChange={(open) => setRejectEnquiryModal({ ...rejectEnquiryModal, open })}
-                enquiryId={rejectEnquiryModal.enquiryId}
-                enquiryName={rejectEnquiryModal.enquiryName}
-                onConfirm={handleRejectEnquiryConfirm}
             />
         </Card>
     );
