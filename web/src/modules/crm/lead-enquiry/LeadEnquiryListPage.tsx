@@ -356,6 +356,30 @@ const EnquiryListPage = () => {
             },
         },
         {
+            field: "tenderStage",
+            headerName: "Stage",
+            width: 140,
+            cellRenderer: (params: any) => {
+                const val: string | null | undefined = params.value;
+                if (!val) return "-";
+                return (
+                    <Badge variant="secondary" className="bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500/10">
+                        {val}
+                    </Badge>
+                );
+            },
+        },
+        {
+            field: "dueDate",
+            headerName: "Due Date",
+            width: 120,
+            cellRenderer: (params: any) => {
+                const val: string | null | undefined = params.value;
+                if (!val) return "-";
+                return new Date(val).toLocaleDateString("en-IN");
+            },
+        },
+        {
             headerName: "Timer",
             width: 130,
             cellStyle: {
@@ -391,7 +415,7 @@ const EnquiryListPage = () => {
     ], [enquiryActions]);
 
     return (
-        <Card className="min-h-[calc(100vh-2rem)] flex flex-col border-0 shadow-none">
+        <Card className="min-h-[calc(100vh-2rem)] flex flex-col">
             <CardHeader className="flex-none pb-4">
                 <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex-1">

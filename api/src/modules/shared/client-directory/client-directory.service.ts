@@ -1,5 +1,5 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, desc, asc, and, or, ilike, sql, type SQL } from 'drizzle-orm';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { eq, ne, desc, asc, and, or, ilike, sql, type SQL } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { clientDirectory } from '@db/schemas/shared/client-directory.schema';
@@ -114,6 +114,28 @@ export class ClientDirectoryService {
     }
 
     async create(data: CreateClientDirectoryDto, user?: { id: number; name: string }) {
+        if (data.phone) {
+            const [existingPhone] = await this.db
+                .select({ name: clientDirectory.name })
+                .from(clientDirectory)
+                .where(eq(clientDirectory.phone, data.phone))
+                .limit(1);
+            if (existingPhone) {
+                throw new ConflictException(`${existingPhone.name} already has this phone`);
+            }
+        }
+
+        if (data.email) {
+            const [existingEmail] = await this.db
+                .select({ name: clientDirectory.name })
+                .from(clientDirectory)
+                .where(eq(clientDirectory.email, data.email))
+                .limit(1);
+            if (existingEmail) {
+                throw new ConflictException(`${existingEmail.name} already has this mail`);
+            }
+        }
+
         const stampedRemarks = this.stampRemarks(data.remarks, user);
         const [inserted] = await this.db
             .insert(clientDirectory)
@@ -141,6 +163,28 @@ export class ClientDirectoryService {
 
         if (!existing) {
             throw new NotFoundException(`Client directory entry with ID ${id} not found`);
+        }
+
+        if (data.phone != null) {
+            const [existingPhone] = await this.db
+                .select({ name: clientDirectory.name })
+                .from(clientDirectory)
+                .where(and(eq(clientDirectory.phone, data.phone), ne(clientDirectory.id, id)))
+                .limit(1);
+            if (existingPhone) {
+                throw new ConflictException(`${existingPhone.name} already has this phone`);
+            }
+        }
+
+        if (data.email != null) {
+            const [existingEmail] = await this.db
+                .select({ name: clientDirectory.name })
+                .from(clientDirectory)
+                .where(and(eq(clientDirectory.email, data.email), ne(clientDirectory.id, id)))
+                .limit(1);
+            if (existingEmail) {
+                throw new ConflictException(`${existingEmail.name} already has this mail`);
+            }
         }
 
         const updateValues: Record<string, unknown> = { updatedAt: new Date() };

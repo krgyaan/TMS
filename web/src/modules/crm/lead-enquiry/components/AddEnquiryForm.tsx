@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { ContactPersonForm } from "@/components/form/contactpersonform";
+import { FileUploader } from "@/components/file-upload";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -41,8 +42,10 @@ const AddEnquiryFormSchema = z.object({
     itemId: z.string().min(1, { message: "Item is required" }),
     locationCode: z.string().min(1, { message: "Location is required" }),
     approxValue: z.string().min(1, { message: "Approx value is required" }),
+    dueDate: z.string().optional(),
     siteVisitRequired: z.enum(["yes", "no"]),
     enquiryType: z.string().optional(),
+    enquiryFile: z.array(z.string()).default([]),
     notes: z.string().optional(),
     address: z.string().optional(),
     country: z.string().min(1, { message: "Country is required" }),
@@ -113,8 +116,10 @@ export function AddEnquiryForm() {
             itemId: "",
             locationCode: "",
             approxValue: "",
+            dueDate: "",
             siteVisitRequired: "no",
             enquiryType: "",
+            enquiryFile: [],
             notes: "",
             address: "",
             country: "",
@@ -151,7 +156,7 @@ export function AddEnquiryForm() {
             ? locationOptions.find((o) => o.id === locationVal)?.name
             : "";
         if (orgAbb && itemName && locationName) {
-            form.setValue("enqName", `${orgAbb} ${itemName} ${locationName}`);
+            form.setValue("enqName", `${orgAbb} ${locationName} ${itemName}`);
         } else if (orgAbb && itemName) {
             form.setValue("enqName", `${orgAbb} ${itemName}`);
         } else {
@@ -165,7 +170,9 @@ export function AddEnquiryForm() {
                 ...values,
                 itemId: Number(values.itemId),
                 siteVisitRequired: values.siteVisitRequired === "yes",
+                dueDate: values.dueDate || null,
                 enquiryType: values.enquiryType || null,
+                enquiryFile: values.enquiryFile.length > 0 ? JSON.stringify(values.enquiryFile) : null,
                 contacts: values.contacts,
                 address: values.address || null,
                 state: values.state || null,
@@ -242,12 +249,14 @@ export function AddEnquiryForm() {
                                 placeholder="-- Select Location --"
                             />
 
-                            {/* Row 3: Approx Value + Site Visit + Enquiry Type */}
+                            {/* Row 3: Approx Value + Due Date + Enquiry Type + Site Visit */}
                             <FieldWrapper control={form.control} name="approxValue" label="Approx Value (₹)">
                                 {(field) => <Input placeholder="Enter approx value" {...field} />}
                             </FieldWrapper>
 
-                            
+                            <FieldWrapper control={form.control} name="dueDate" label="Due Date">
+                                {(field) => <Input type="datetime-local" {...field} />}
+                            </FieldWrapper>
 
                             <SelectField
                                 control={form.control}
@@ -321,6 +330,19 @@ export function AddEnquiryForm() {
                                     name="contacts"
                                     label="Contact Person(s)"
                                 />
+                            </div>
+
+                            {/* Upload Documents */}
+                            <div className="col-span-full">
+                                <FieldWrapper control={form.control} name="enquiryFile" label="Upload Documents">
+                                    {(field) => (
+                                        <FileUploader
+                                            context="tender-documents"
+                                            value={field.value}
+                                            onChange={(paths) => form.setValue("enquiryFile", paths)}
+                                        />
+                                    )}
+                                </FieldWrapper>
                             </div>
 
                             {/* Notes */}

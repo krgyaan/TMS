@@ -20,7 +20,7 @@ import { websites } from '@db/schemas/master/websites.schema';
 import { tenderInfos, type NewTenderInfo, type TenderInfo } from '@db/schemas/tendering/tenders.schema';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { and, asc, desc, eq, inArray, isNull, notInArray, sql, SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, notInArray, or, sql, SQL } from 'drizzle-orm';
 
 export type TenderListFilters = {
     statusIds?: number[];
@@ -97,6 +97,7 @@ export class TenderInfosService {
         websites: { name: string | null; url: string | null } | null;
         bidSubmissionsDate?: Date | null;
         resultDate?: Date | null;
+        enquiryId?: number | null;
     }): TenderInfoWithNames => {
         const t = row.tenderInfos;
         return {
@@ -113,6 +114,7 @@ export class TenderInfosService {
             websiteLink: row.websites?.url ?? null,
             bidSubmissionDate: row.bidSubmissionsDate ? new Date(row.bidSubmissionsDate) : null,
             resultDate: row.resultDate ? new Date(row.resultDate) : null,
+            enquiryId: row.enquiryId ?? null,
         };
     };
 
@@ -333,6 +335,7 @@ export class TenderInfosService {
                 organizations: row.organizations,
                 locations: row.locations,
                 websites: row.websites,
+                enquiryId: row.enquiryId,
             })
         );
     }
@@ -367,6 +370,7 @@ export class TenderInfosService {
             },
             bidSubmissionDate: bidSubmissions.submissionDatetime,
             resultDate: sql<Date | null>`(SELECT MAX(${tenderResultDetails.resultUploadedAt}) FROM ${tenderResultDetails} WHERE ${tenderResultDetails.tenderResultId} = ${tenderResults.id})`,
+            enquiryId: sql<number | null>`(SELECT le.id FROM lead_enquiries le WHERE le.tender_id = ${tenderInfos.id} LIMIT 1)`,
         };
     }
 
@@ -393,7 +397,12 @@ export class TenderInfosService {
         const conditions = [eq(tenderInfos.deleteStatus, 0)];
 
         if (filters?.unallocated) {
-            conditions.push(isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1));
+            conditions.push(
+                or(
+                    and(isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1)),
+                    eq(tenderInfos.status, 0)
+                )! as SQL
+            );
         } else {
             let statusIdsToUse: number[] = [];
             if (filters?.category) {
@@ -538,6 +547,7 @@ export class TenderInfosService {
                 websites: row.websites,
                 bidSubmissionsDate: row.bidSubmissionDate,
                 resultDate: row.resultDate,
+                enquiryId: row.enquiryId,
             })
         );
 
@@ -568,6 +578,7 @@ export class TenderInfosService {
             organizations: row.organizations,
             locations: row.locations,
             websites: row.websites,
+            enquiryId: row.enquiryId,
         });
     }
 
@@ -683,6 +694,36 @@ export class TenderInfosService {
         if (updatedTender) {
             // Send email notification for major updates
             await this.sendTenderUpdateEmail(currentTender, updatedTender, data, updatedBy);
+        }
+
+        // START TIMER: If a team member is being assigned, start the info-sheet timer
+        if (data.teamMember && currentTender.teamMember !== data.teamMember) {
+            try {
+                this.logger.log(`Assigning team member — starting timer for tender ${id}`);
+                await this.timersService.startTimer({
+                    entityType: 'TENDER',
+                    entityId: id,
+                    stage: 'tender_info_sheet',
+                    userId: updatedBy,
+                    assignedUserId: data.teamMember,
+                    timerConfig: {
+                        type: 'FIXED_DURATION',
+                        durationHours: 72,
+                    },
+                    metadata: {
+                        createdBy: updatedBy,
+                        tenderNo: rows[0].tenderNo,
+                        dueDate: rows[0].dueDate,
+                    },
+                });
+                this.logger.log(`Started timer for tender ${id}`);
+            } catch (error) {
+                if (error instanceof ConflictException) {
+                    this.logger.warn(`Timer already running for tender ${id} — skipping`);
+                } else {
+                    this.logger.error(`Failed to start timer for tender ${id}:`, error);
+                }
+            }
         }
 
         return rows[0];
@@ -1258,7 +1299,10 @@ export class TenderInfosService {
                 tendersBid: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${inArray(tenderInfos.status, tendersBidStatusIds)})`,
                 tenderWon: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${inArray(tenderInfos.status, tenderWonStatusIds)})`,
                 tenderLost: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${inArray(tenderInfos.status, tenderLostStatusIds)})`,
-                unallocated: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${and(isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1))})`,
+                unallocated: sql<number>`count(distinct ${tenderInfos.id}) filter (where ${or(
+                    and(isNull(tenderInfos.teamMember), eq(tenderInfos.status, 1)),
+                    eq(tenderInfos.status, 0)
+                )})`,
             })
             .from(tenderInfos)
             .where(baseConditions);

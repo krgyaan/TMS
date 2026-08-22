@@ -209,6 +209,9 @@ export function LeadEnquiryViewPage({ enquiryId, onBack, backLabel }: LeadEnquir
     const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
 
     const renderSectionContent = useCallback((stepId: string) => {
+        if (stepId === "enquiries") {
+            return <EnquiryDetailsSection enquiryId={enquiryId} />;
+        }
         if (!leadId) {
             return <div className="flex items-center justify-center py-8 text-muted-foreground">Loading...</div>;
         }
@@ -217,8 +220,6 @@ export function LeadEnquiryViewPage({ enquiryId, onBack, backLabel }: LeadEnquir
                 return <LeadDetailsSection leadId={leadId} />;
             case "followups":
                 return <FollowupViewPage source={{ sourceType: 'lead', sourceId: leadId }} />;
-            case "enquiries":
-                return <EnquiryDetailsSection enquiryId={enquiryId} />;
             case "site-visits":
                 return <LeadSiteVisitsSection leadId={leadId} />;
             case "costings":
