@@ -46,7 +46,7 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
     const createMutation = useCreateImprest();
     const updateMutation = useUpdateImprest();
     const uploadMutation = useUploadImprestProofs();
-    const [files, setFiles] = useState<string[]>([]);
+const [files, setFiles] = useState<string[]>([]);
     const [submitError, setSubmitError] = useState<string | null>(null);
 
     const categoryOptions = imprestCategories.map(i => ({
@@ -279,7 +279,7 @@ export function ImprestForm({ imprest, mode }: ImprestFormProps) {
                                 />
                             )}
 
-                            {/* Transfer To — only shown in transfer mode */}
+                            
                             {isTransferMode && (
                                 <SelectField
                                     control={form.control}
