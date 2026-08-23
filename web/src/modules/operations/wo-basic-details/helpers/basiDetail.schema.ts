@@ -27,9 +27,10 @@ export const WoBasicDetailFormSchema = z.object({
   budgetBuybackSale: z.coerce.number().nonnegative().optional(),
   budgetGemCharges: z.coerce.number().nonnegative().optional(),
 
-  requestGemCharges: z.boolean().default(false),
+  requestGemCharges: z.string().default("false"),
   gemChargesAmount: z.coerce.number().nonnegative().optional(),
   gemChargesPortalLink: z.string().default(""),
+  gemChargesInvoice: z.array(z.string()).default([]),
 
   projectCode: z.string().optional(),
   projectName: z.string().optional(),

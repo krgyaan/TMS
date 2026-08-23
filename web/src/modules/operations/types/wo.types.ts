@@ -160,6 +160,7 @@ export interface CreateWoBasicDetailDto {
   requestGemCharges?: boolean;
   gemChargesPortalLink?: string;
   gemChargesAmount?: number;
+  gemChargesInvoice?: string;
   woDraft?: string;
   tmsDocuments?: TmsDocuments;
 }

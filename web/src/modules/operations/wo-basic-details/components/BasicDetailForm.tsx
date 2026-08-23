@@ -73,6 +73,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     const watchBudget = form.watch("budgetPreGst");
     const watchReceipt = form.watch("receiptPreGst");
     const watchPricesChanged = form.watch("pricesChanged");
+    const watchPaymentConsent = form.watch("requestGemCharges");
 
     const tenderId = watchTenderId ? Number(watchTenderId) : null;
     const { data: prefillData } = useWoBasicDetailPrefill(isNonTender ? null : tenderId);
@@ -321,7 +322,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                             <>
                                 <div>
                                     <h3 className="text-lg font-semibold mb-4">Team & Client Details</h3>
-                                    <div className="grid gap-4 md:grid-cols-4">
+                                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start">
                                         <SelectField
                                             control={form.control}
                                             name="teamId"
@@ -357,7 +358,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                         )}
 
                         {/* WO Basic Info */}
-                        <div className="grid gap-4 grid-cols-1 md:grid-cols-4 items-start">
+                        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start">
                             <FieldWrapper control={form.control} name="woNumber" label="WO Number">
                                 {field => <Input {...field} placeholder="WO Number" value={field.value || ""} onChange={e => field.onChange(e.target.value)} />}
                             </FieldWrapper>
@@ -459,7 +460,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 </div>
                             )}
                             {isNonTender ? (
-                                <div className="grid gap-4 md:grid-cols-4">
+                                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start">
                                     <FieldWrapper control={form.control} name="budgetPreGst" label="Budget Price">
                                         {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                                     </FieldWrapper>
@@ -476,7 +477,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                             ) : (
                                 <>
                                     <ConditionalSection show={watchPricesChanged === "true"}>
-                                        <div className="grid gap-4 md:grid-cols-4">
+                                        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start">
                                             <FieldWrapper control={form.control} name="budgetPreGst" label="Budget Price">
                                                 {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                                             </FieldWrapper>
@@ -492,7 +493,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                         </div>
                                     </ConditionalSection>
                                     <ConditionalSection show={watchPricesChanged !== "true"}>
-                                        <div className="grid gap-4 md:grid-cols-4 p-4 bg-muted/30 rounded-lg border">
+                                        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start p-4 bg-muted/30 rounded-lg border">
                                             <div className="space-y-1">
                                                 <p className="text-sm text-muted-foreground">Budget Price</p>
                                                 <p className="font-semibold">₹{Number(form.watch("budgetPreGst") || 0).toLocaleString()}</p>
@@ -569,6 +570,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                                         onChange={(e) => handleUpdateContact(idx, "email", e.target.value)}
                                                         placeholder="Email"
                                                         className="h-8 text-xs"
+                                                        type="email"
                                                     />
                                                 </td>
                                                 <td className="p-2">
@@ -609,12 +611,12 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                         <Separator />
 
                         {/* Budget Breakdown */}
-                        <div>
-                            <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                        <div className="space-y-3">
+                            <h3 className="text-lg font-semibold flex items-center gap-2">
                                 <Calculator className="h-5 w-5 text-orange-500" />
                                 Budget Breakdown
                             </h3>
-                            <div className="grid gap-4 md:grid-cols-4">
+                            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start">
                                 <FieldWrapper control={form.control} name="budgetSupply" label="Supply (pre GST)">
                                     {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                                 </FieldWrapper>
@@ -633,23 +635,41 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 <FieldWrapper control={form.control} name="budgetGemCharges" label="GEM Charges (pre GST)">
                                     {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                                 </FieldWrapper>
+                            </div>
+                            <div className="flex justify-end gap-4 items-center">
+                                <div className="p-2 bg-muted/30 rounded-lg border">
+                                    <p className="text-sm text-muted-foreground">Total Budget</p>
+                                    <p className="text-lg font-bold">₹{budgetTotal.toLocaleString()}</p>
+                                </div>
+                            </div>
+                            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start">
+                                <SelectField
+                                    control={form.control}
+                                    name="requestGemCharges"
+                                    label="Request Gem Charges Payment"
+                                    options={YES_NO_OPTIONS}
+                                    placeholder=""
+                                />
                                 {/* Gem Charges Payment Request Section */}
-                                <ConditionalSection show={form.watch("requestGemCharges") === true}>
-                                    <div className="grid gap-4 md:grid-cols-4">
+                                <ConditionalSection show={watchPaymentConsent === "true"} className="col-span-3">
+                                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start">
                                         <FieldWrapper control={form.control} name="gemChargesAmount" label="Gem Charges Amount (pre GST)">
                                             {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                                         </FieldWrapper>
                                         <FieldWrapper control={form.control} name="gemChargesPortalLink" label="Portal Link">
                                             {field => <Input {...field} placeholder="Enter portal payment link..." value={field.value || ""} />}
                                         </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="gemChargesInvoice" label="Invoice">
+                                            {field => (
+                                                <FileUploader
+                                                    context="wo-draft"
+                                                    value={field.value ?? []}
+                                                    onChange={paths => field.onChange(paths)}
+                                                />
+                                            )}
+                                        </FieldWrapper>
                                     </div>
                                 </ConditionalSection>
-                            </div>
-                            <div className="flex justify-end mt-4 p-3 bg-muted/30 rounded-lg border">
-                                <div className="text-right">
-                                    <p className="text-sm text-muted-foreground">Total Budget</p>
-                                    <p className="text-lg font-bold">₹{budgetTotal.toLocaleString()}</p>
-                                </div>
                             </div>
                         </div>
 
