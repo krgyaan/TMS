@@ -176,6 +176,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
         "Costing Sheet",
         "TQ",
         "RA and Result details",
+        "Corrigendum"
     ];
 
     useEffect(() => {
@@ -356,7 +357,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                         )}
 
                         {/* WO Basic Info */}
-                        <div className="grid gap-4 md:grid-cols-3 items-start">
+                        <div className="grid gap-4 grid-cols-1 md:grid-cols-4 items-start">
                             <FieldWrapper control={form.control} name="woNumber" label="WO Number">
                                 {field => <Input {...field} placeholder="WO Number" value={field.value || ""} onChange={e => field.onChange(e.target.value)} />}
                             </FieldWrapper>
@@ -389,11 +390,6 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                     />
                                 )}
                             </FieldWrapper>
-                        </div>
-
-                        {/* Project Code & Project Name */}
-                        <Separator />
-                        <div className="flex gap-8 text-sm">
                             <div className="space-y-1">
                                 <span className="text-muted-foreground">Project Code</span>
                                 <p className="font-mono font-semibold text-primary">
@@ -407,7 +403,6 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 </p>
                             </div>
                         </div>
-                        <Separator />
 
                         {/* Checklist - only for tender mode */}
                         {!isNonTender && (
@@ -421,7 +416,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                         <HashIcon className="h-4 w-4 text-orange-500" />
                                         All Documents are complete in the TMS
                                     </p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg border">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg border">
                                         {tmsDocList.map((doc) => (
                                             <div key={doc} className="flex items-center space-x-2">
                                                 <FieldWrapper control={form.control} name={`tmsDocuments.${doc}`} label="">
@@ -481,7 +476,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                             ) : (
                                 <>
                                     <ConditionalSection show={watchPricesChanged === "true"}>
-                                        <div className="grid gap-4 md:grid-cols-2">
+                                        <div className="grid gap-4 md:grid-cols-4">
                                             <FieldWrapper control={form.control} name="budgetPreGst" label="Budget Price">
                                                 {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                                             </FieldWrapper>
@@ -619,7 +614,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 <Calculator className="h-5 w-5 text-orange-500" />
                                 Budget Breakdown
                             </h3>
-                            <div className="grid gap-4 md:grid-cols-3">
+                            <div className="grid gap-4 md:grid-cols-4">
                                 <FieldWrapper control={form.control} name="budgetSupply" label="Supply (pre GST)">
                                     {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                                 </FieldWrapper>
@@ -638,6 +633,17 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 <FieldWrapper control={form.control} name="budgetGemCharges" label="GEM Charges (pre GST)">
                                     {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                                 </FieldWrapper>
+                                {/* Gem Charges Payment Request Section */}
+                                <ConditionalSection show={form.watch("requestGemCharges") === true}>
+                                    <div className="grid gap-4 md:grid-cols-4">
+                                        <FieldWrapper control={form.control} name="gemChargesAmount" label="Gem Charges Amount (pre GST)">
+                                            {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="gemChargesPortalLink" label="Portal Link">
+                                            {field => <Input {...field} placeholder="Enter portal payment link..." value={field.value || ""} />}
+                                        </FieldWrapper>
+                                    </div>
+                                </ConditionalSection>
                             </div>
                             <div className="flex justify-end mt-4 p-3 bg-muted/30 rounded-lg border">
                                 <div className="text-right">
