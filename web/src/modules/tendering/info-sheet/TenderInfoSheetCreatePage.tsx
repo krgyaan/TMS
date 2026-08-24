@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom"
 import { TenderInformationForm } from "./components/InfoSheetForm"
+import { EnquiryInfoSheetForm } from "@/modules/crm/lead-enquiry/components/EnquiryInfoSheetForm"
 import { useTender } from "@/hooks/api/useTenders"
 import { useInfoSheet } from "@/hooks/api/useInfoSheets"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -31,8 +32,21 @@ const InfoSheetCreatePage = () => {
         )
     }
 
+    const isEnquiry = tender?.enquiryId != null;
+
     // Show loading state while checking if info sheet exists
     if (isInfoSheetLoading) {
+        if (isEnquiry) {
+            return (
+                <EnquiryInfoSheetForm
+                    mode="create"
+                    tenderId={numericId}
+                    tender={tender ?? null}
+                    isTenderLoading={isTenderLoading}
+                    isInfoSheetLoading={true}
+                />
+            )
+        }
         return (
             <TenderInformationForm
                 mode="create"
@@ -40,6 +54,17 @@ const InfoSheetCreatePage = () => {
                 tender={tender ?? null}
                 isTenderLoading={isTenderLoading}
                 isInfoSheetLoading={true}
+            />
+        )
+    }
+
+    if (isEnquiry) {
+        return (
+            <EnquiryInfoSheetForm
+                mode="create"
+                tenderId={numericId}
+                tender={tender ?? null}
+                isTenderLoading={isTenderLoading}
             />
         )
     }
