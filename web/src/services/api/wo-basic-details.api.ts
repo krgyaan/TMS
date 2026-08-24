@@ -1,5 +1,8 @@
 import { BaseApiService } from './base.service';
-import type { WoBasicDetail, WoBasicDetailWithRelations, CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, WoBasicDetailsFilters, OeAssignments, DashboardSummary, PaginatedResult, WoBasicDetailPrefillData } from '@/modules/operations/types/wo.types';
+import type { 
+  WoBasicDetail, WoBasicDetailWithRelations, CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, 
+  WoBasicDetailsFilters, OeAssignments, WoBasicDetailsDashboardSummary, PaginatedResult, WoBasicDetailPrefillData 
+} from '@/modules/operations/types/wo.types';
 
 class WoBasicDetailsService extends BaseApiService {
   constructor() {
@@ -71,6 +74,12 @@ class WoBasicDetailsService extends BaseApiService {
     return this.get<{ exists: boolean; projectCode: string }>(`/check-project-code/${projectCode}`);
   }
 
+  async checkProjectNameExists(projectName: string, teamId?: number): Promise<{ exists: boolean; count: number; projectName: string; existingProjectNames: string[]; suggestion: string | null }> {
+    const params = new URLSearchParams({ projectName });
+    if (teamId) params.set('teamId', String(teamId));
+    return this.get(`/project-name-check?${params.toString()}`);
+  }
+
   async calculateGrossMargin(id: number): Promise<WoBasicDetail & { calculatedGrossMargin: string }> {
     return this.post<WoBasicDetail & { calculatedGrossMargin: string }>(`/${id}/calculate-gross-margin`, {});
   }
@@ -88,9 +97,9 @@ class WoBasicDetailsService extends BaseApiService {
   }
 
   // Dashboard/Reporting
-  async getDashboardSummary(teamId?: number): Promise<DashboardSummary> {
+  async getDashboardSummary(teamId?: number): Promise<WoBasicDetailsDashboardSummary> {
     const query = teamId ? `?teamId=${teamId}` : '';
-    return this.get<DashboardSummary>(`/dashboard/summary${query}`);
+    return this.get<WoBasicDetailsDashboardSummary>(`/dashboard/summary${query}`);
   }
 }
 

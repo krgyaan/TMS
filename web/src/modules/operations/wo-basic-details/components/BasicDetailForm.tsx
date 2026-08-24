@@ -22,6 +22,7 @@ import { useWoContactsByBasicDetail, useCreateBulkWoContacts, useDeleteAllContac
 import type { WoBasicDetailFormValues, WoBasicDetail } from "../helpers/basiDetail.types";
 import { buildDefaultValues, mapResponseToForm, mapFormToCreatePayload, mapFormToUpdatePayload } from "../helpers/basiDetail.mapper";
 import { useCreateWoBasicDetail, useUpdateWoBasicDetail, useWoBasicDetailPrefill } from "@/hooks/api/useWoBasicDetails";
+import { ProjectNameWarningAlert } from "./ProjectNameWarningAlert";
 import { useOrganizationOptions, useItemOptions, useLocationOptions, useTeamOptions } from "@/hooks/useSelectOptions";
 import type { CreateWoBasicDetailDto } from "@/modules/operations/types/wo.types";
 import { toast } from "sonner";
@@ -72,6 +73,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     const watchWoDate = form.watch("woDate");
     const watchBudget = form.watch("budgetPreGst");
     const watchReceipt = form.watch("receiptPreGst");
+    const watchProjectName = form.watch("projectName");
     const watchPricesChanged = form.watch("pricesChanged");
     const watchPaymentConsent = form.watch("requestGemCharges");
 
@@ -404,6 +406,13 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 </p>
                             </div>
                         </div>
+
+                        {mode === "create" && watchProjectName && (
+                            <ProjectNameWarningAlert
+                                projectName={watchProjectName}
+                                teamId={form.watch("teamId")}
+                            />
+                        )}
 
                         {/* Checklist - only for tender mode */}
                         {!isNonTender && (

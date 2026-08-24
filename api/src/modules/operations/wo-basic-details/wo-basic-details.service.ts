@@ -808,6 +808,48 @@ export class WoBasicDetailsService {
         };
     }
 
+    async checkProjectNameExists(projectName: string, teamId?: number) {
+        if (!projectName || !projectName.trim()) {
+            return { exists: false, count: 0, projectName: '', existingProjectNames: [], suggestion: null };
+        }
+
+        const trimmed = projectName.trim();
+
+        // Search for exact match AND suffixed variants like "Name (2)", "Name (3)" etc.
+        const suffixPattern = `${trimmed} (%)`;
+        const conditions: any[] = [
+            or(
+                eq(woBasicDetails.projectName, trimmed),
+                ilike(woBasicDetails.projectName, suffixPattern),
+            ),
+        ];
+
+        if (teamId) {
+            conditions.push(eq(woBasicDetails.team, teamId));
+        }
+
+        const rows = await this.db
+            .select({ projectName: woBasicDetails.projectName })
+            .from(woBasicDetails)
+            .where(and(...conditions));
+
+        const count = rows.length;
+        const exists = count > 0;
+
+        let suggestion: string | null = null;
+        if (exists) {
+            suggestion = `${trimmed} (${count + 1})`;
+        }
+
+        return {
+            exists,
+            count,
+            projectName: trimmed,
+            existingProjectNames: rows.map(r => r.projectName),
+            suggestion,
+        };
+    }
+
     async findByTenderId(tenderId: number) {
         const rows = await this.db
             .select()
