@@ -1,3 +1,10 @@
+export interface LiveLocation {
+    address?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    capturedAt?: string | null;
+}
+
 export interface Lead {
     id: number;
     companyName: string | null;
@@ -6,6 +13,7 @@ export interface Lead {
     phone: string | null;
     email: string | null;
     address: string | null;
+    liveLocation: LiveLocation | null;
     country: string | null;
     state: string | null;
     type: string | null;
@@ -55,6 +63,7 @@ export interface CreateLeadRequest {
     phone: string;
     email: string;
     address: string;
+    liveLocation?: LiveLocation | null;
     country: string;
     state: string;
     type?: string | null;
