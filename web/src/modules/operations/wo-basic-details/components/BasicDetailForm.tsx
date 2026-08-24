@@ -74,6 +74,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     const watchBudget = form.watch("budgetPreGst");
     const watchReceipt = form.watch("receiptPreGst");
     const watchProjectName = form.watch("projectName");
+    const [projectNameSuffix, setProjectNameSuffix] = useState<string | null>(null);
     const watchPricesChanged = form.watch("pricesChanged");
     const watchPaymentConsent = form.watch("requestGemCharges");
 
@@ -411,7 +412,33 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                             <ProjectNameWarningAlert
                                 projectName={watchProjectName}
                                 teamId={form.watch("teamId")}
+                                onSuffixChange={suggestion => setProjectNameSuffix(suggestion)}
                             />
+                        )}
+
+                        {projectNameSuffix && (
+                            <div className="flex items-center gap-2 p-2 border-blue-200 rounded">
+                                <span className="text-sm text-blue-700">Suggested: <strong>{projectNameSuffix}</strong></span>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                        form.setValue("projectName", projectNameSuffix);
+                                        setProjectNameSuffix(null);
+                                    }}
+                                >
+                                    Apply Suffix
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setProjectNameSuffix(null)}
+                                >
+                                    Dismiss
+                                </Button>
+                            </div>
                         )}
 
                         {/* Checklist - only for tender mode */}
