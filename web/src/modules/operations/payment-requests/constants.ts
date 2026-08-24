@@ -36,7 +36,8 @@ export const PAYMENT_AGAINST_LABELS: Record<string, string> = {
     professional_charges: 'Professional Charges',
     insurance: 'Insurance',
     YES_BANK_2011: 'Yes Bank Inflow Account (2011)',
-    YES_BANK_0771: "Yes Bank (0771)"
+    YES_BANK_0771: "Yes Bank (0771)",
+    gem_charges: 'GeM Charges'
 };
 
 export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
