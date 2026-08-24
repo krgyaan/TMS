@@ -89,8 +89,8 @@ const ownBankCategory = [
     {label: 'AU_9589', value: 'AU EMD Account (AU_9589)'},
     {label: 'AU_9284', value: 'AU Cash Reserve Account (AU_9284)'},
     {label: 'amex_cc', value: 'Amex Company Credit Card'},
-    {label: 'YES_BANK_2011', value: 'Yes Bank Inflow Account'},
-    {label: 'YES_BANK_0771', value: 'Yes Bank'},
+    {label: 'YES_BANK_2011', value: 'Yes Bank Inflow Account (2011)'},
+    {label: 'YES_BANK_0771', value: 'Yes Bank (0771)'},
 ];
 
 const capitalAssetPurchaseCategory = [

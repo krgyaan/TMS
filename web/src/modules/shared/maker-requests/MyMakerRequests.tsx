@@ -83,6 +83,7 @@ const MyMakerRequests: React.FC = () => {
 
     const CATEGORIES_NEED_INVOICE_AFTER_PAYMENT = useMemo(() => new Set([
         'rent', 'software', 'printing_stationary', 'office_maintenance', 'portal_renewal_charges', 'professional_charges',
+        'gem_charges',
     ]), []);
 
     const confirmUploadInvoice = useCallback(async () => {
