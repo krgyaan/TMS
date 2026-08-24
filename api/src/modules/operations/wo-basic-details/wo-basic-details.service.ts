@@ -440,7 +440,7 @@ export class WoBasicDetailsService {
         }
 
         // Create Project asynchronously (non-blocking)
-        this.safeCreateProject(data, row?.id);
+        this.safeCreateProject(data, row?.id, userId);
 
         return this.mapRowToResponse(row!);
     }
@@ -592,7 +592,7 @@ export class WoBasicDetailsService {
                 portalLink: data.gemChargesPortalLink || null,
                 uploadedInvoiceFile: data.gemChargesInvoice ? JSON.parse(data.gemChargesInvoice) : [],
                 remark: `Auto-created from Basic Detail: ${woBasicDetailId}, for ${data.projectName}`,
-                requestedBy: currentUserId || 0,
+                requestedBy: currentUserId,
             };
 
             await this.paymentRequestService.create(makerRequestBody, currentUserId || 0);
