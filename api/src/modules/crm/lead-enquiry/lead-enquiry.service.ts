@@ -49,6 +49,7 @@ export type LeadEnquiryWithNames = LeadEnquiry & {
     teamName?: string | null;
     hasSiteVisit?: boolean;
     costingSheetStatus?: string | null;
+    tenderStatusId?: number | null;
     tenderStatusName?: string | null;
     tenderStage?: string | null;
     contacts?: EnquiryContactDto[] | null;
@@ -130,6 +131,7 @@ export class LeadEnquiryService {
                 updatedByName: updatedByUser.name,
                 hasSiteVisit: hasSiteVisitExpr,
                 costingSheetStatus: costingSheetStatusExpr,
+                tenderStatusId: statuses.id,
                 tenderStatusName: statuses.name,
             })
             .from(leadEnquiries)
@@ -161,6 +163,7 @@ export class LeadEnquiryService {
                 updatedByName: row.updatedByName ?? null,
 hasSiteVisit: row.hasSiteVisit ?? false,
                 costingSheetStatus: row.costingSheetStatus ?? null,
+                tenderStatusId: row.tenderStatusId ?? null,
                 tenderStatusName: row.tenderStatusName ?? null,
                 tenderStage: row.leadEnquiries.tenderId != null
                     ? (tenderStages.get(row.leadEnquiries.tenderId) ?? null)
@@ -185,6 +188,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 updatedByName: updatedByUser.name,
                 hasSiteVisit: hasSiteVisitExpr,
                 costingSheetStatus: costingSheetStatusExpr,
+                tenderStatusId: statuses.id,
                 tenderStatusName: statuses.name,
             })
             .from(leadEnquiries)
@@ -225,6 +229,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             updatedByName: row.updatedByName ?? null,
             hasSiteVisit: row.hasSiteVisit ?? false,
             costingSheetStatus: row.costingSheetStatus ?? null,
+            tenderStatusId: row.tenderStatusId ?? null,
             tenderStatusName: row.tenderStatusName ?? null,
             tenderStage: row.leadEnquiries.tenderId != null
                 ? (tenderStages.get(row.leadEnquiries.tenderId) ?? null)

@@ -37,6 +37,14 @@ const TEAM_TABS = [
     { key: 'Business Development', label: 'Business Development' },
 ];
 
+const ENQUIRY_STATUS_LABELS: Record<number, string> = {
+    2: 'Enquiry Info Filled',
+    3: 'Enquiry Info Approved',
+    29: 'Enquiry Info Sheet Incomplete',
+    17: 'Quotation Submitted',
+    1: 'Read Enquiry',
+};
+
 
 const EnquiryListPage = () => {
     const navigate = useNavigate();
@@ -352,9 +360,11 @@ const EnquiryListPage = () => {
             headerName: "Status",
             width: 160,
             cellRenderer: (params: any) => {
-                const val: string | null | undefined = params.value;
-                if (!val) return "-";
-                return <Badge variant="secondary">{val}</Badge>;
+                const id = params.data?.tenderStatusId;
+                const name = params.data?.tenderStatusName;
+                const label = id != null ? (ENQUIRY_STATUS_LABELS[id] ?? name) : name;
+                if (!label) return "-";
+                return <Badge variant="secondary">{label}</Badge>;
             },
         },
         {
