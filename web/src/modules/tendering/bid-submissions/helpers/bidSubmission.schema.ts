@@ -15,6 +15,18 @@ export const SubmitBidFormSchema = z.object({
 export type SubmitBidFormValues = z.infer<typeof SubmitBidFormSchema>;
 
 /**
+ * Schema for enquiry-based quotation submission (no proof / screenshot required)
+ */
+export const EnquirySubmitBidFormSchema = z.object({
+    tenderId: z.number(),
+    submissionDatetime: z.string().min(1, 'Quotation submission date and time is required'),
+    submittedDocs: z.array(z.string()).length(1, 'Exactly one quotation document is required'),
+    finalBiddingPrice: z.string().optional(),
+});
+
+export type EnquirySubmitBidFormValues = z.infer<typeof EnquirySubmitBidFormSchema>;
+
+/**
  * Schema for marking a tender as missed
  */
 export const MarkAsMissedFormSchema = z.object({

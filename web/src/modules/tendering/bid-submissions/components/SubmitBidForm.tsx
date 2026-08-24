@@ -13,7 +13,7 @@ import { useSubmitBid, useUpdateBidSubmission } from '@/hooks/api/useBidSubmissi
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { FileUploader } from '@/components/file-upload';
-import { SubmitBidFormSchema, type SubmitBidFormValues } from '../helpers/bidSubmission.schema';
+import { SubmitBidFormSchema, EnquirySubmitBidFormSchema, type SubmitBidFormValues } from '../helpers/bidSubmission.schema';
 import type { SubmitBidFormProps } from '../helpers/bidSubmission.types';
 
 type FormValues = SubmitBidFormValues;
@@ -23,14 +23,15 @@ export default function SubmitBidForm({
     tenderDetails,
     mode,
     existingData,
-    isChecklistFulfilled = true
+    isChecklistFulfilled = true,
+    isEnquiry = false
 }: SubmitBidFormProps) {
     const navigate = useNavigate();
     const submitMutation = useSubmitBid();
     const updateMutation = useUpdateBidSubmission();
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(SubmitBidFormSchema) as Resolver<FormValues>,
+        resolver: zodResolver(isEnquiry ? EnquirySubmitBidFormSchema : SubmitBidFormSchema) as Resolver<FormValues>,
         defaultValues: {
             tenderId: tenderId,
             submissionDatetime: '',
@@ -72,16 +73,16 @@ export default function SubmitBidForm({
             // File paths are already arrays of strings from FileUploader
             // proofOfSubmission and finalPriceSs are arrays, but backend expects single string
             // Take the first file path if array has items
-            const proofOfSubmissionPath = data.proofOfSubmission.length > 0 ? data.proofOfSubmission[0] : '';
-            const finalPriceSsPath = data.finalPriceSs.length > 0 ? data.finalPriceSs[0] : '';
+            const proofOfSubmissionPath = isEnquiry ? '' : (data.proofOfSubmission.length > 0 ? data.proofOfSubmission[0] : '');
+            const finalPriceSsPath = isEnquiry ? '' : (data.finalPriceSs.length > 0 ? data.finalPriceSs[0] : '');
 
             if (mode === 'submit') {
                 await submitMutation.mutateAsync({
                     tenderId: data.tenderId,
                     submissionDatetime: data.submissionDatetime,
                     submittedDocs: data.submittedDocs,
-                    proofOfSubmission: proofOfSubmissionPath,
-                    finalPriceSs: finalPriceSsPath,
+                    proofOfSubmission: isEnquiry ? null : proofOfSubmissionPath,
+                    finalPriceSs: isEnquiry ? null : finalPriceSsPath,
                     finalBiddingPrice: data.finalBiddingPrice || null,
                 });
             } else if (existingData?.id) {
@@ -90,8 +91,8 @@ export default function SubmitBidForm({
                     data: {
                         submissionDatetime: data.submissionDatetime,
                         submittedDocs: data.submittedDocs,
-                        proofOfSubmission: proofOfSubmissionPath,
-                        finalPriceSs: finalPriceSsPath,
+                        proofOfSubmission: isEnquiry ? null : proofOfSubmissionPath,
+                        finalPriceSs: isEnquiry ? null : finalPriceSsPath,
                         finalBiddingPrice: data.finalBiddingPrice || null,
                     },
                 });
@@ -107,11 +108,13 @@ export default function SubmitBidForm({
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle>{mode === 'submit' ? 'Submit Bid' : 'Edit Bid Submission'}</CardTitle>
+                        <CardTitle>{mode === 'submit'
+                            ? (isEnquiry ? 'Submit Quotation' : 'Submit Bid')
+                            : (isEnquiry ? 'Edit Quotation Submission' : 'Edit Bid Submission')}</CardTitle>
                         <CardDescription className="mt-2">
                             {mode === 'submit'
-                                ? 'Submit bid details for this tender'
-                                : 'Update bid submission information'}
+                                ? (isEnquiry ? 'Submit quotation details for this enquiry' : 'Submit bid details for this tender')
+                                : (isEnquiry ? 'Update quotation submission information' : 'Update bid submission information')}
                         </CardDescription>
                     </div>
                     <CardAction>
@@ -173,17 +176,17 @@ export default function SubmitBidForm({
                             </div>
                         </div>
 
-                        {/* Bid Submission Details */}
+                        {/* Bid/Quotation Submission Details */}
                         <div className="space-y-4">
                             <h4 className="font-semibold text-base text-primary border-b pb-2">
-                                Bid Submission Details
+                                {isEnquiry ? 'Quotation Submission Details' : 'Bid Submission Details'}
                             </h4>
 
                             <div className="grid gap-4 md:grid-cols-3 items-start">
                                 <FieldWrapper
                                     control={form.control}
                                     name="submissionDatetime"
-                                    label="Bid Submission Date & Time"
+                                    label={isEnquiry ? 'Quotation Submission Date & Time' : 'Bid Submission Date & Time'}
                                 >
                                     {(field) => (
                                         <Input
@@ -196,8 +199,8 @@ export default function SubmitBidForm({
                                 <FieldWrapper
                                     control={form.control}
                                     name="finalBiddingPrice"
-                                    label="Final Bidding Price (Optional)"
-                                    description="Enter the actual price you bid (may differ from approved costing)"
+                                    label={isEnquiry ? 'Final Quotation Price' : 'Final Bidding Price (Optional)'}
+                                    description={isEnquiry ? undefined : 'Enter the actual price you bid (may differ from approved costing)'}
                                 >
                                     {(field) => (
                                         <div className="relative">
@@ -215,26 +218,30 @@ export default function SubmitBidForm({
                             </div>
                             <div className="grid gap-4 md:grid-cols-3">
                                 <FileUploader
-                                    context="bid-submitted-docs"
+                                    context={isEnquiry ? "enquiry-quotation-docs" : "bid-submitted-docs"}
                                     value={submittedDocs}
                                     onChange={(paths) => form.setValue('submittedDocs', paths)}
-                                    label="Submitted Bid Documents (Optional)"
+                                    label={isEnquiry ? 'Quotation Documents' : 'Submitted Bid Documents (Optional)'}
                                     disabled={isSubmitting}
                                 />
-                                <FileUploader
-                                    context="bid-submission-proof"
-                                    value={proofOfSubmission}
-                                    onChange={(paths) => form.setValue('proofOfSubmission', paths)}
-                                    label="Proof of Submission"
-                                    disabled={isSubmitting}
-                                />
-                                <FileUploader
-                                    context="bid-final-price-ss"
-                                    value={finalPriceSs}
-                                    onChange={(paths) => form.setValue('finalPriceSs', paths)}
-                                    label="Final Bidding Price Screenshot"
-                                    disabled={isSubmitting}
-                                />
+                                {!isEnquiry && (
+                                    <>
+                                        <FileUploader
+                                            context="bid-submission-proof"
+                                            value={proofOfSubmission}
+                                            onChange={(paths) => form.setValue('proofOfSubmission', paths)}
+                                            label="Proof of Submission"
+                                            disabled={isSubmitting}
+                                        />
+                                        <FileUploader
+                                            context="bid-final-price-ss"
+                                            value={finalPriceSs}
+                                            onChange={(paths) => form.setValue('finalPriceSs', paths)}
+                                            label="Final Bidding Price Screenshot"
+                                            disabled={isSubmitting}
+                                        />
+                                    </>
+                                )}
                             </div>
                         </div>
 
@@ -269,7 +276,9 @@ export default function SubmitBidForm({
                             >
                                 {isSubmitting && <span className="animate-spin mr-2">⏳</span>}
                                 <Save className="mr-2 h-4 w-4" />
-                                {mode === 'submit' ? 'Submit Bid' : 'Update Bid'}
+                                {mode === 'submit'
+                                    ? (isEnquiry ? 'Submit Quotation' : 'Submit Bid')
+                                    : (isEnquiry ? 'Update Quotation' : 'Update Bid')}
                             </Button>
                         </div>
                     </form>

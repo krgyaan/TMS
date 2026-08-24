@@ -26,8 +26,8 @@ export const SubmitBidSchema = z.object({
     tenderId: bigintField().positive('Tender ID must be positive'),
     submissionDatetime: requiredDateField,
     submittedDocs: z.array(z.string()).min(1, 'At least one document is required').max(3, 'Maximum 3 documents allowed'),
-    proofOfSubmission: textField().min(1, 'Proof of submission is required'),
-    finalPriceSs: textField().min(1, 'Final price screenshot is required'),
+    proofOfSubmission: optionalString,
+    finalPriceSs: optionalString,
     finalBiddingPrice: optionalNumber(z.coerce.number().min(0, 'Final bidding price must be non-negative')),
 });
 

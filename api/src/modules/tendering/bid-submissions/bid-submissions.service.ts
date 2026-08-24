@@ -416,14 +416,25 @@ export class BidSubmissionsService {
         tenderId: number;
         submissionDatetime: Date;
         submittedDocs: string[];
-        proofOfSubmission: string;
-        finalPriceSs: string;
+        proofOfSubmission: string | null;
+        finalPriceSs: string | null;
         finalBiddingPrice: string | null;
         submittedBy: number;
     }) {
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(data.tenderId);
         const prevStatus = currentTender?.status ?? null;
+
+        // Proof of submission + final price screenshot are required for normal tenders
+        // (enquiry-sourced tenders may submit with only quotation documents → null)
+        if (!currentTender?.enquiryId) {
+            if (!data.proofOfSubmission) {
+                throw new BadRequestException('Proof of submission is required');
+            }
+            if (!data.finalPriceSs) {
+                throw new BadRequestException('Final price screenshot is required');
+            }
+        }
 
         // AUTO STATUS CHANGE: Update tender status to 17 (Bid Submitted) and track it
         const newStatus = 17; // Status ID for "Bid Submitted"
@@ -849,8 +860,8 @@ export class BidSubmissionsService {
         data: {
             submissionDatetime?: Date;
             submittedDocs?: string[];
-            proofOfSubmission?: string;
-            finalPriceSs?: string;
+            proofOfSubmission?: string | null;
+            finalPriceSs?: string | null;
             finalBiddingPrice?: string | null;
             reasonForMissing?: string;
             preventionMeasures?: string;
