@@ -47,6 +47,11 @@ export const CreateWoBasicDetailSchema = z.object({
   // Document upload
   woDraft: z.string().max(255).optional(),
 
+  // Gem charges details (passed through to payment request)
+  gemChargesAmount: z.number().nonnegative().optional(),
+  gemChargesPortalLink: z.string().optional(),
+  gemChargesInvoice: z.string().optional(),
+
   // Checklist and TMS Documents
   teChecklistConfirmed: z.boolean().optional(),
   tmsDocuments: z.record(z.boolean()).optional(),
