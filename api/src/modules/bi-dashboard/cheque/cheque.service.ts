@@ -169,19 +169,18 @@ export class ChequeService {
         // Search filter - search across all rendered columns
         if (searchTerm) {
             const searchStr = `%${searchTerm}%`;
-            const searchConditions: any[] = [
-                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
-                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
-                sql`${instrumentChequeDetails.chequeNo} ILIKE ${searchStr}`,
-                sql`${instrumentChequeDetails.chequeReason} ILIKE ${searchStr}`,
-                sql`${paymentInstruments.favouring} ILIKE ${searchStr}`,
-                sql`${paymentInstruments.amount}::text ILIKE ${searchStr}`,
-                sql`${instrumentChequeDetails.chequeDate}::text ILIKE ${searchStr}`,
-                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
-                sql`${instrumentChequeDetails.dueDate}::text ILIKE ${searchStr}`,
-                sql`${paymentInstruments.status} ILIKE ${searchStr}`,
-            ];
-            conditions.push(sql`(${sql.join(searchConditions, ' OR ')})`);
+            conditions.push(or(
+                ilike(tenderInfos.tenderName, searchStr),
+                ilike(tenderInfos.tenderNo, searchStr),
+                ilike(instrumentChequeDetails.chequeNo, searchStr),
+                ilike(instrumentChequeDetails.chequeReason, searchStr),
+                ilike(paymentInstruments.favouring, searchStr),
+                ilike(paymentInstruments.amount, searchStr),
+                ilike(instrumentChequeDetails.chequeDate, searchStr),
+                ilike(tenderInfos.dueDate, searchStr),
+                ilike(instrumentChequeDetails.dueDate, searchStr),
+                ilike(paymentInstruments.status, searchStr),
+            ));
         }
 
         const whereClause = and(...conditions);

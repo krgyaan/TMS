@@ -325,7 +325,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                             <>
                                 <div>
                                     <h3 className="text-lg font-semibold mb-4">Team & Client Details</h3>
-                                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start">
+                                    <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
                                         <SelectField
                                             control={form.control}
                                             name="teamId"
@@ -361,7 +361,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                         )}
 
                         {/* WO Basic Info */}
-                        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start">
+                        <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
                             <FieldWrapper control={form.control} name="woNumber" label="WO Number">
                                 {field => <Input {...field} placeholder="WO Number" value={field.value || ""} onChange={e => field.onChange(e.target.value)} />}
                             </FieldWrapper>
@@ -394,17 +394,19 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                     />
                                 )}
                             </FieldWrapper>
-                            <div className="space-y-1">
-                                <span className="text-muted-foreground">Project Code</span>
-                                <p className="font-mono font-semibold text-primary">
-                                    {form.watch("projectCode") || "---"}
-                                </p>
-                            </div>
-                            <div className="space-y-1">
-                                <span className="text-muted-foreground">Project Name</span>
-                                <p className="font-semibold text-primary">
-                                    {form.watch("projectName") || "---"}
-                                </p>
+                            <div className="md:col-span-2 p-2">
+                                <div className="space-y-1">
+                                    <span className="text-muted-foreground">Project Code</span>
+                                    <p className="font-mono font-semibold text-primary">
+                                        {form.watch("projectCode") || "---"}
+                                    </p>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-muted-foreground">Project Name</span>
+                                    <p className="font-semibold text-primary">
+                                        {form.watch("projectName") || "---"}
+                                    </p>
+                                </div>
                             </div>
                         </div>
 
@@ -414,31 +416,6 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 teamId={form.watch("teamId")}
                                 onSuffixChange={suggestion => setProjectNameSuffix(suggestion)}
                             />
-                        )}
-
-                        {projectNameSuffix && (
-                            <div className="flex items-center gap-2 p-2 border-blue-200 rounded">
-                                <span className="text-sm text-blue-700">Suggested: <strong>{projectNameSuffix}</strong></span>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                        form.setValue("projectName", projectNameSuffix);
-                                        setProjectNameSuffix(null);
-                                    }}
-                                >
-                                    Apply Suffix
-                                </Button>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => setProjectNameSuffix(null)}
-                                >
-                                    Dismiss
-                                </Button>
-                            </div>
                         )}
 
                         {/* Checklist - only for tender mode */}
@@ -496,7 +473,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 </div>
                             )}
                             {isNonTender ? (
-                                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start">
+                                <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
                                     <FieldWrapper control={form.control} name="budgetPreGst" label="Budget Price">
                                         {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                                     </FieldWrapper>
@@ -513,7 +490,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                             ) : (
                                 <>
                                     <ConditionalSection show={watchPricesChanged === "true"}>
-                                        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start">
+                                        <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
                                             <FieldWrapper control={form.control} name="budgetPreGst" label="Budget Price">
                                                 {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                                             </FieldWrapper>
@@ -529,7 +506,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                         </div>
                                     </ConditionalSection>
                                     <ConditionalSection show={watchPricesChanged !== "true"}>
-                                        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start p-4 bg-muted/30 rounded-lg border">
+                                        <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start p-4 bg-muted/30 rounded-lg border">
                                             <div className="space-y-1">
                                                 <p className="text-sm text-muted-foreground">Budget Price</p>
                                                 <p className="font-semibold">₹{Number(form.watch("budgetPreGst") || 0).toLocaleString()}</p>
@@ -652,7 +629,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 <Calculator className="h-5 w-5 text-orange-500" />
                                 Budget Breakdown
                             </h3>
-                            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start">
+                            <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
                                 <FieldWrapper control={form.control} name="budgetSupply" label="Supply (pre GST)">
                                     {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                                 </FieldWrapper>
@@ -678,7 +655,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                     <p className="text-lg font-bold">₹{budgetTotal.toLocaleString()}</p>
                                 </div>
                             </div>
-                            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start">
+                            <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
                                 <SelectField
                                     control={form.control}
                                     name="requestGemCharges"
@@ -688,7 +665,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 />
                                 {/* Gem Charges Payment Request Section */}
                                 <ConditionalSection show={watchPaymentConsent === "true"} className="col-span-3">
-                                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-start">
+                                    <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
                                         <FieldWrapper control={form.control} name="gemChargesAmount" label="Gem Charges Amount (pre GST)">
                                             {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                                         </FieldWrapper>
