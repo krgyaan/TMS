@@ -113,7 +113,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
     const location = useWatch({ control: manualForm.control, name: "location" });
     const team = useWatch({ control: manualForm.control, name: "team" });
     const watchTenderName = useWatch({ control: manualForm.control, name: "tenderName" });
-    console.log(watchTenderName);
+    console.log({watchTenderName});
 
     // Watch documents for display
     const documents = useWatch({ control: manualForm.control, name: "documents" });
@@ -366,7 +366,17 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                     <TabsContent value="manually">
                         <Form {...manualForm}>
                             <form onSubmit={manualForm.handleSubmit(handleManualSubmit)} className="space-y-8">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {watchTenderName && (
+                                    <TenderNameWarningAlert
+                                        tenderName={watchTenderName}
+                                        organization={manualForm.watch("organization")}
+                                        item={manualForm.watch("item")}
+                                        onSuffixDetected={(suggestion) => {
+                                            manualForm.setValue("tenderName", suggestion, { shouldValidate: false });
+                                        }}
+                                    />
+                                )}
+                                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-start">
                                     {/* Team */}
                                     <SelectField<ManualFormValues, "team">
                                         control={manualForm.control}
@@ -394,17 +404,6 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                     >
                                         {field => <Input placeholder="Tender Name" {...field} readOnly={true} />}
                                     </FieldWrapper>
-
-                                    {watchTenderName && (
-                                        <TenderNameWarningAlert
-                                            tenderName={watchTenderName}
-                                            organization={manualForm.watch("organization")}
-                                            item={manualForm.watch("item")}
-                                            onSuffixDetected={(suggestion) => {
-                                                manualForm.setValue("tenderName", suggestion, { shouldValidate: false });
-                                            }}
-                                        />
-                                    )}
 
                                     {/* Organization */}
                                     <SelectField<ManualFormValues, "organization">
@@ -514,37 +513,35 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                         options={websiteOptions}
                                         placeholder="Select Website"
                                     />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <FileUploader
-                                        context="tender-documents"
-                                        value={documents}
-                                        onChange={(paths) => manualForm.setValue("documents", paths)}
-                                        label="Upload Documents"
-                                        disabled={saving}
-                                    />
-                                    <p className="text-xs text-muted-foreground">
-                                        Upload relevant tender documents (optional)
-                                    </p>
-                                </div>
-
-                                {/* Remarks */}
-                                <FieldWrapper<ManualFormValues, "remarks">
-                                    control={manualForm.control}
-                                    name="remarks"
-                                    label="Remarks"
-                                >
-                                    {field => (
-                                        <textarea
-                                            className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                            placeholder="Remarks"
-                                            maxLength={200}
-                                            {...field}
+                                    <div className="space-y-2">
+                                        <FileUploader
+                                            context="tender-documents"
+                                            value={documents}
+                                            onChange={(paths) => manualForm.setValue("documents", paths)}
+                                            label="Upload Documents"
+                                            disabled={saving}
                                         />
-                                    )}
-                                </FieldWrapper>
+                                        <p className="text-xs text-muted-foreground">
+                                            Upload relevant tender documents (optional)
+                                        </p>
+                                    </div>
 
+                                    {/* Remarks */}
+                                    <FieldWrapper<ManualFormValues, "remarks">
+                                        control={manualForm.control}
+                                        name="remarks"
+                                        label="Remarks"
+                                    >
+                                        {field => (
+                                            <textarea
+                                                className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                placeholder="Remarks"
+                                                maxLength={200}
+                                                {...field}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
                                 <div className="w-full flex items-center justify-center gap-2">
                                     <Button type="submit" disabled={saving}>
                                         {saving ? "Saving..." : mode === "create" ? "Create Tender" : "Update Tender"}

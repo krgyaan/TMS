@@ -1234,15 +1234,17 @@ export class TenderInfosService {
 
     async checkTenderNameExists(tenderName: string, organization?: number, item?: number) {
         if (!tenderName || !tenderName.trim()) {
-            return { exists: false, count: 0, tenderName: '', suggestion: null };
+            return { exists: false, count: 0, tenderName: '', existingTenderNames: [], suggestion: null };
         }
 
         const trimmed = tenderName.trim();
-        const suffixPattern = `${trimmed} (%)`;
+        // Strip any trailing " (number)" to get the base name
+        const baseName = trimmed.replace(/\s+\(\d+\)$/, '');
+        const suffixPattern = `${baseName} (%)`;
 
         const conditions: any[] = [
             or(
-                eq(tenderInfos.tenderName, trimmed),
+                eq(tenderInfos.tenderName, baseName),
                 ilike(tenderInfos.tenderName, suffixPattern),
             ),
             eq(tenderInfos.deleteStatus, 0),
@@ -1265,7 +1267,7 @@ export class TenderInfosService {
 
         let suggestion: string | null = null;
         if (exists) {
-            suggestion = `${trimmed} (${count + 1})`;
+            suggestion = `${baseName} (${count + 1})`;
         }
 
         return {
