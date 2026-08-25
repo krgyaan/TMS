@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
-import { Plus, Search, Pencil, Eye, XCircle, MapPin, FileText } from "lucide-react";
+import { Plus, Search, Pencil, Eye, XCircle, MapPin, FileText, MessageCircle } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { useLeadEnquiries, useUpdateLeadEnquiry, useCreateSiteVisit, useUpdateSiteVisitDetails, useCreateSiteVisitContacts } from "@/hooks/api/useLeadEnquiry";
 import { LeadEnquiryRejectModal } from "./components/LeadEnquiryRejectModal";
@@ -167,6 +167,12 @@ const EnquiryListPage = () => {
                 navigate(paths.tendering.infoSheetCreate(row.tenderId));
             },
             icon: <FileText className="h-4 w-4" />,
+        },
+        {
+            label: "Quotation Followup",
+            onClick: (row) => navigate(paths.crm.enquiryQuotationFollowup(row.id)),
+            icon: <MessageCircle className="h-4 w-4" />,
+            visible: (row) => row.tenderId != null,
         },
         {
             label: "View",

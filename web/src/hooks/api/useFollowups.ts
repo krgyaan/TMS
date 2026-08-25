@@ -34,12 +34,16 @@ export const followupsKey = {
 export const sourceViewPath = (source: FollowupSource): string =>
     source.sourceType === 'lead'
         ? paths.crm.leadView(source.sourceId)
-        : paths.crm.happyCallingView(source.sourceId);
+        : source.sourceType === 'enquiry'
+            ? paths.crm.enquiryView(source.sourceId)
+            : paths.crm.happyCallingView(source.sourceId);
 
 export const sourceFollowupPath = (source: FollowupSource): string =>
     source.sourceType === 'lead'
         ? paths.crm.leadFollowup(source.sourceId)
-        : paths.crm.happyCallingFollowup(source.sourceId);
+        : source.sourceType === 'enquiry'
+            ? paths.crm.enquiryQuotationFollowup(source.sourceId)
+            : paths.crm.happyCallingFollowup(source.sourceId);
 
 export interface SourceRecordLike {
     leadContacts?: ContactPerson[] | null;

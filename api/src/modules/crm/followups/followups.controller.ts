@@ -66,3 +66,53 @@ export class FollowupsController {
         await this.followupsService.delete(id);
     }
 }
+
+@Controller('enquiry/followups')
+export class EnquiryFollowupsController {
+    constructor(private readonly followupsService: FollowupsService) {}
+
+    @Get(':enquiryId')
+    async findAll(
+        @Param('enquiryId', ParseIntPipe) enquiryId: number,
+    ) {
+        return this.followupsService.findAllBySource('enquiry', enquiryId);
+    }
+
+    @Get(':enquiryId/:id')
+    async findOne(
+        @Param('enquiryId', ParseIntPipe) enquiryId: number,
+        @Param('id', ParseIntPipe) id: number,
+    ) {
+        return this.followupsService.findById(id);
+    }
+
+    @Post(':enquiryId')
+    @HttpCode(HttpStatus.CREATED)
+    async create(
+        @Param('enquiryId', ParseIntPipe) enquiryId: number,
+        @ValidatedBody(CreateFollowupSchema) body: CreateFollowupDto,
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        return this.followupsService.create('enquiry', enquiryId, body, user.sub);
+    }
+
+    @Patch(':enquiryId/:id')
+    @HttpCode(HttpStatus.OK)
+    async update(
+        @Param('enquiryId', ParseIntPipe) enquiryId: number,
+        @Param('id', ParseIntPipe) id: number,
+        @ValidatedBody(CreateFollowupSchema) body: CreateFollowupDto,
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        return this.followupsService.update(id, body, user.sub);
+    }
+
+    @Delete(':enquiryId/:id')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    async delete(
+        @Param('enquiryId', ParseIntPipe) enquiryId: number,
+        @Param('id', ParseIntPipe) id: number,
+    ) {
+        await this.followupsService.delete(id);
+    }
+}

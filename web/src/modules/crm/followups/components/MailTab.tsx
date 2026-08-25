@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
@@ -29,18 +29,19 @@ const FREQUENCY_OPTIONS = [
 interface MailTabProps {
     source: FollowupSource;
     mode?: "create" | "view";
+    initialAttachments?: string[];
 }
 
-export function MailTab({ source, mode = "create" }: MailTabProps) {
+export function MailTab({ source, mode = "create", initialAttachments }: MailTabProps) {
     if (mode === "view") {
         return <MailFollowupList source={source} />;
     }
-    return <MailCreateForm source={source} />;
+    return <MailCreateForm source={source} initialAttachments={initialAttachments} />;
 }
 
 // ─── Create / Edit Form ───────────────────────────────────────────────────────
 
-function MailCreateForm({ source }: { source: FollowupSource }) {
+function MailCreateForm({ source, initialAttachments }: { source: FollowupSource; initialAttachments?: string[] }) {
     const {
         form,
         attachmentPaths,
@@ -50,6 +51,14 @@ function MailCreateForm({ source }: { source: FollowupSource }) {
         handleSubmit,
         handleCancelEdit,
     } = useMailForm(source);
+
+    useEffect(() => {
+        if (!isEditMode && initialAttachments && initialAttachments.length > 0) {
+            setAttachmentPaths((prev) =>
+                prev.length === 0 ? [...new Set([...prev, ...initialAttachments])] : prev
+            );
+        }
+    }, [initialAttachments, isEditMode, setAttachmentPaths]);
 
     return (
         <Form {...form}>

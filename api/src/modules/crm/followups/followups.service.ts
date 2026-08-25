@@ -6,6 +6,7 @@ import { leadContacts } from '@db/schemas/crm/lead-contacts.schema';
 import { couriers } from '@db/schemas/shared/couriers.schema';
 import { leads } from '@db/schemas/crm/leads.schema';
 import { happyCalling } from '@db/schemas/crm/happy-calling.schema';
+import { leadEnquiries } from '@db/schemas/crm/lead-enquiries.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { eq, desc, sql, and } from 'drizzle-orm';
 
@@ -17,7 +18,7 @@ import type {
     ContactDto,
 } from './dto/followup.dto';
 
-export type FollowupSourceType = 'lead' | 'happy_calling';
+export type FollowupSourceType = 'lead' | 'happy_calling' | 'enquiry';
 
 @Injectable()
 export class FollowupsService {
@@ -31,6 +32,9 @@ export class FollowupsService {
         if (sourceType === 'happy_calling') {
             return and(eq(leadFollowups.sourceType, 'happy_calling'), eq(leadFollowups.happyCallingId, sourceId));
         }
+        if (sourceType === 'enquiry') {
+            return and(eq(leadFollowups.sourceType, 'enquiry'), eq(leadFollowups.enquiryId, sourceId));
+        }
         return and(eq(leadFollowups.sourceType, 'lead'), eq(leadFollowups.leadId, sourceId));
     }
 
@@ -43,6 +47,17 @@ export class FollowupsService {
                 .limit(1);
             if (!row[0]) {
                 throw new NotFoundException(`Happy calling entry with ID ${sourceId} not found`);
+            }
+            return;
+        }
+        if (sourceType === 'enquiry') {
+            const row = await this.db
+                .select({ id: leadEnquiries.id })
+                .from(leadEnquiries)
+                .where(eq(leadEnquiries.id, sourceId))
+                .limit(1);
+            if (!row[0]) {
+                throw new NotFoundException(`Lead enquiry with ID ${sourceId} not found`);
             }
             return;
         }
@@ -215,7 +230,9 @@ export class FollowupsService {
                 sourceType,
                 ...(sourceType === 'happy_calling'
                     ? { happyCallingId: sourceId }
-                    : { leadId: sourceId }),
+                    : sourceType === 'enquiry'
+                        ? { enquiryId: sourceId }
+                        : { leadId: sourceId }),
                 type: data.type,
                 createdBy,
                 courierId,
@@ -249,7 +266,7 @@ export class FollowupsService {
                 const contactsPayload = (data as CallFollowupDto | VisitFollowupDto)
                     .contacts
                     .map((contact: ContactDto) => ({
-                        ...(sourceType === 'happy_calling'
+                        ...(sourceType === 'happy_calling' || sourceType === 'enquiry'
                             ? { leadId: null }
                             : { leadId: sourceId }),
                         followupId: followup.id,

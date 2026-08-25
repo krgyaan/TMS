@@ -1,6 +1,6 @@
 export type FollowupType = 'mail' | 'call' | 'visit' | 'letter' | 'whatsapp';
 export type MailFrequency = 'daily' | 'weekly' | 'monthly' | 'custom';
-export type FollowupSourceType = 'lead' | 'happy_calling';
+export type FollowupSourceType = 'lead' | 'happy_calling' | 'enquiry';
 
 export interface FollowupSource {
     sourceType: FollowupSourceType;

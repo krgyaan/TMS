@@ -11,6 +11,7 @@ class FollowupsService extends BaseApiService {
     }
 
     private sourceBase(source: FollowupSource): string {
+        if (source.sourceType === 'enquiry') return `/enquiry/followups`;
         return source.sourceType === 'lead'
             ? `/leads/followups`
             : `/happy-calling/followups`;
