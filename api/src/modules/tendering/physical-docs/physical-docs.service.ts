@@ -597,7 +597,7 @@ export class PhysicalDocsService {
 
             this.logger.debug("mail completed successfully");
         } catch (err) {
-            this.logger.error("Mail sending failed", err);
+            this.logger.error("Mail sending failed");
         }
 
         //STOPPING TIMER
