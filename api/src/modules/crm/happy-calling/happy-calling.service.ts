@@ -1,8 +1,10 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, desc, asc, and, or, ilike, sql, type SQL } from 'drizzle-orm';
+import { eq, desc, asc, and, or, ilike, sql, isNotNull, type SQL } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { happyCalling } from '@db/schemas/crm/happy-calling.schema';
+import { leadFollowups } from '@db/schemas/crm/lead-followups.schema';
+import { users } from '@db/schemas/auth/users.schema';
 import type { CreateHappyCallingDto, UpdateHappyCallingDto } from './dto/happy-calling.dto';
 
 export type HappyCallingListFilters = {
@@ -17,6 +19,19 @@ export type HappyCallingListFilters = {
 export class HappyCallingService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
+    private getLatestFollowupSubquery() {
+        return this.db
+            .selectDistinctOn([leadFollowups.happyCallingId], {
+                happyCallingId: leadFollowups.happyCallingId,
+                nextFollowupDate: leadFollowups.nextFollowupDate,
+                lastFollowupDate: leadFollowups.createdAt,
+            })
+            .from(leadFollowups)
+            .where(and(eq(leadFollowups.sourceType, 'happy_calling'), isNotNull(leadFollowups.happyCallingId)))
+            .orderBy(leadFollowups.happyCallingId, desc(leadFollowups.createdAt), desc(leadFollowups.id))
+            .as('latest_happy_followup');
+    }
+
     async findAll(filters?: HappyCallingListFilters) {
         const page = filters?.page ?? 1;
         const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
@@ -24,6 +39,8 @@ export class HappyCallingService {
         const sortOrder = filters?.sortOrder ?? 'desc';
         const sortBy = filters?.sortBy ?? 'createdAt';
         const search = filters?.search?.trim();
+
+        const latestFollowupSubquery = this.getLatestFollowupSubquery();
 
         const orderColumn =
             sortBy === 'name'
@@ -35,15 +52,15 @@ export class HappyCallingService {
                     : sortBy === 'email'
                       ? happyCalling.email
                       : sortBy === 'phone'
-                        ? happyCalling.phone
+                          ? happyCalling.phone
                         : sortBy === 'status'
                           ? happyCalling.status
-                          : sortBy === 'date'
-                            ? happyCalling.date
+                          : sortBy === 'broadcast'
+                            ? happyCalling.broadcast
                             : sortBy === 'nextFollowupDate'
-                              ? happyCalling.nextFollowupDate
-                              : sortBy === 'broadcast'
-                                ? happyCalling.broadcast
+                              ? latestFollowupSubquery.nextFollowupDate
+                              : sortBy === 'lastFollowupDate'
+                                ? latestFollowupSubquery.lastFollowupDate
                                 : happyCalling.createdAt;
         const orderFn = sortOrder === 'desc' ? desc : asc;
 
@@ -70,14 +87,23 @@ export class HappyCallingService {
             this.db
                 .select()
                 .from(happyCalling)
+                .leftJoin(users, eq(users.id, happyCalling.createdBy))
+                .leftJoin(latestFollowupSubquery, eq(latestFollowupSubquery.happyCallingId, happyCalling.id))
                 .where(whereClause)
                 .orderBy(orderFn(orderColumn))
                 .limit(limit)
                 .offset(offset),
         ]);
 
+        const data = rows.map((row) => ({
+            ...row.happy_calling,
+            createdByName: row.users?.name ?? null,
+            nextFollowupDate: row.latest_happy_followup?.nextFollowupDate ?? null,
+            lastFollowupDate: row.latest_happy_followup?.lastFollowupDate ?? null,
+        }));
+
         return {
-            data: rows,
+            data,
             meta: {
                 total: countResult,
                 page,
@@ -88,9 +114,12 @@ export class HappyCallingService {
     }
 
     async findById(id: number) {
+        const latestFollowupSubquery = this.getLatestFollowupSubquery();
         const [row] = await this.db
             .select()
             .from(happyCalling)
+            .leftJoin(users, eq(users.id, happyCalling.createdBy))
+            .leftJoin(latestFollowupSubquery, eq(latestFollowupSubquery.happyCallingId, happyCalling.id))
             .where(eq(happyCalling.id, id))
             .limit(1);
 
@@ -98,10 +127,15 @@ export class HappyCallingService {
             throw new NotFoundException(`Happy calling entry with ID ${id} not found`);
         }
 
-        return row;
+        return {
+            ...row.happy_calling,
+            createdByName: row.users?.name ?? null,
+            nextFollowupDate: row.latest_happy_followup?.nextFollowupDate ?? null,
+            lastFollowupDate: row.latest_happy_followup?.lastFollowupDate ?? null,
+        };
     }
 
-    async create(data: CreateHappyCallingDto) {
+    async create(data: CreateHappyCallingDto, userId?: number) {
         const [inserted] = await this.db
             .insert(happyCalling)
             .values({
@@ -111,11 +145,10 @@ export class HappyCallingService {
                 designation: data.designation ?? null,
                 email: data.email ?? null,
                 phone: data.phone ?? null,
-                date: data.date ? new Date(data.date) : null,
                 status: data.status ?? null,
-                nextFollowupDate: data.nextFollowupDate ? new Date(data.nextFollowupDate) : null,
                 broadcast: data.broadcast,
                 details: data.details ?? null,
+                createdBy: userId ?? null,
             })
             .returning({ id: happyCalling.id });
 
@@ -141,10 +174,7 @@ export class HappyCallingService {
         if (data.designation !== undefined) updateValues.designation = data.designation;
         if (data.email !== undefined) updateValues.email = data.email;
         if (data.phone !== undefined) updateValues.phone = data.phone;
-        if (data.date !== undefined) updateValues.date = data.date ? new Date(data.date) : null;
         if (data.status !== undefined) updateValues.status = data.status ?? null;
-        if (data.nextFollowupDate !== undefined)
-            updateValues.nextFollowupDate = data.nextFollowupDate ? new Date(data.nextFollowupDate) : null;
         if (data.broadcast !== undefined) updateValues.broadcast = data.broadcast;
         if (data.details !== undefined) updateValues.details = data.details;
 

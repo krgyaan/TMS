@@ -12,11 +12,10 @@ export const happyCalling = pgTable(
         email: varchar("email", { length: 255 }),
         phone: varchar("phone", { length: 200 }),
 
-        date: timestamp("date", { withTimezone: true }),
         status: varchar("status", { length: 50 }),
-        nextFollowupDate: timestamp("next_followup_date", { withTimezone: true }),
         broadcast: integer("broadcast").notNull().default(0),
         details: text("details"),
+        createdBy: bigint("created_by", { mode: "number" }),
 
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true })
