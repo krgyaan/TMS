@@ -15,13 +15,14 @@ import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
 import { BidSubmissionSection } from "../bid-submissions/components/BidSubmissionView";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { EnquiryTenderFlow } from "@/modules/tendering/tenders/components/EnquiryTenderFlow";
 
 export default function DocumentChecklistShowPage() {
     const { tenderId: tenderIdParam } = useParams<{ tenderId: string }>();
     const navigate = useNavigate();
     const tenderId = tenderIdParam ? Number(tenderIdParam) : null;
 
-    const { steps: tenderSteps } = useTenderStepStatuses(tenderId);
+    const { steps: tenderSteps, tender } = useTenderStepStatuses(tenderId);
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["checklist"]));
 
@@ -60,6 +61,18 @@ export default function DocumentChecklistShowPage() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>Invalid Tender ID.</AlertDescription>
             </Alert>
+        );
+    }
+
+    if (tender?.enquiryId) {
+        return (
+            <EnquiryTenderFlow
+                tenderId={tenderId}
+                enquiryId={tender.enquiryId}
+                defaultExpanded="checklist"
+                onBack={() => navigate(paths.tendering.checklists)}
+                backLabel="Back to Checklist"
+            />
         );
     }
 

@@ -13,13 +13,14 @@ import { CostingSheetSection } from '../costing-sheets/components/CostingSheetVi
 import { RaSection } from '../ras/components/RaShow';
 import { TqTenderSection } from '../tq-management/components/TqView';
 import { TenderResultSection } from '../results/components/TenderResultView';
+import { EnquiryTenderFlow } from "@/modules/tendering/tenders/components/EnquiryTenderFlow";
 
 export default function CostingApprovalViewPage() {
     const { tenderId: tenderIdParam } = useParams<{ tenderId: string }>();
     const navigate = useNavigate();
     const tenderId = tenderIdParam ? parseInt(tenderIdParam, 10) : null;
 
-    const { steps: tenderSteps } = useTenderStepStatuses(tenderId);
+    const { steps: tenderSteps, tender } = useTenderStepStatuses(tenderId);
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["costing-details"]));
 
@@ -51,6 +52,18 @@ export default function CostingApprovalViewPage() {
             default: return null;
         }
     };
+
+    if (tender?.enquiryId) {
+        return (
+            <EnquiryTenderFlow
+                tenderId={tenderId}
+                enquiryId={tender.enquiryId}
+                defaultExpanded="costing"
+                onBack={() => navigate(paths.tendering.costingApprovals)}
+                backLabel="Back to Costing Approvals"
+            />
+        );
+    }
 
     return (
         <ShowPageLayout

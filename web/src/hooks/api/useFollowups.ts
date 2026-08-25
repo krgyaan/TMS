@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { followupsService } from '@/services/api/followups.service';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/utils/errorToast';
@@ -85,14 +85,9 @@ export const useSourceRecord = (source: FollowupSource): SourceRecordLike | unde
         source.sourceType === 'enquiry' ? (enquiry?.tenderId ?? null) : null
     );
 
-    if (source.sourceType === 'lead') {
-        return lead as unknown as SourceRecordLike | undefined;
-    }
-    if (source.sourceType === 'happy_calling') {
-        return happyCalling as unknown as SourceRecordLike | undefined;
-    }
-    if (source.sourceType === 'enquiry') {
-        const enquiryContacts: ContactPerson[] = (enquiry?.contacts ?? []).map((c) => ({
+    const enquiryRecord = useMemo(() => {
+        if (source.sourceType !== 'enquiry' || !enquiry) return undefined;
+        const enquiryContacts: ContactPerson[] = (enquiry.contacts ?? []).map((c) => ({
             name: c.name || "",
             designation: c.designation || "",
             phone: c.phone || "",
@@ -107,8 +102,15 @@ export const useSourceRecord = (source: FollowupSource): SourceRecordLike | unde
                 email: c.clientEmail || "",
             }));
         return { leadContacts: [...enquiryContacts, ...tenderClients] };
+    }, [source.sourceType, enquiry, infoSheet]);
+
+    if (source.sourceType === 'lead') {
+        return lead as unknown as SourceRecordLike | undefined;
     }
-    return undefined;
+    if (source.sourceType === 'happy_calling') {
+        return happyCalling as unknown as SourceRecordLike | undefined;
+    }
+    return enquiryRecord;
 };
 
 // ─── Utility Functions ────────────────────────────────────────────────────────

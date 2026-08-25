@@ -13,6 +13,7 @@ import { LeadDetailsSection } from "../leads/components/LeadView";
 import { FollowupViewPage } from "../followups/FollowupViewPage";
 import { LeadSiteVisitsSection } from "./components/LeadSiteVisitView";
 import { EnquiryResultSection } from "../enquiry-result/EnquiryResultViewPage";
+import { EnquiryTenderFlow } from "@/modules/tendering/tenders/components/EnquiryTenderFlow";
 
 interface LeadEnquiryViewProps {
     enquiry?: LeadEnquiryWithNames | null;
@@ -179,6 +180,7 @@ interface LeadEnquiryViewPageProps {
 
 export function LeadEnquiryViewPage({ enquiryId, onBack, backLabel }: LeadEnquiryViewPageProps) {
     const { data: enquiry } = useLeadEnquiry(enquiryId ?? null);
+
     const leadId = enquiry?.leadId ?? null;
     const stepStatuses = useLeadStepStatuses(leadId);
 
@@ -226,6 +228,18 @@ export function LeadEnquiryViewPage({ enquiryId, onBack, backLabel }: LeadEnquir
                 return null;
         }
     }, [leadId, enquiryId]);
+
+    if (enquiry?.tenderId) {
+        return (
+            <EnquiryTenderFlow
+                tenderId={enquiry.tenderId}
+                enquiryId={enquiryId}
+                defaultExpanded="enquiry"
+                onBack={onBack}
+                backLabel={backLabel}
+            />
+        );
+    }
 
     return (
         <ShowPageLayout

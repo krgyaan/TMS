@@ -15,6 +15,7 @@ import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
 import { RfqSection } from '../rfqs/components/RfqView';
 import { RaSection } from '../ras/components/RaShow';
 import { TenderResultSection } from '../results/components/TenderResultView';
+import { EnquiryTenderFlow } from "@/modules/tendering/tenders/components/EnquiryTenderFlow";
 
 export default function TqViewPage() {
     const { tenderId } = useParams();
@@ -31,7 +32,7 @@ export default function TqViewPage() {
     const navigate = useNavigate();
     const parsedTenderId = tenderId ? parseInt(tenderId, 10) : null;
 
-    const { steps: tenderSteps } = useTenderStepStatuses(parsedTenderId);
+    const { steps: tenderSteps, tender } = useTenderStepStatuses(parsedTenderId);
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["tq-management"]));
 
@@ -63,6 +64,18 @@ export default function TqViewPage() {
             default: return null;
         }
     };
+
+    if (tender?.enquiryId) {
+        return (
+            <EnquiryTenderFlow
+                tenderId={parsedTenderId}
+                enquiryId={tender.enquiryId}
+                defaultExpanded="tq-management"
+                onBack={() => navigate(paths.tendering.tqManagement)}
+                backLabel="Back to TQ Management"
+            />
+        );
+    }
 
     return (
         <ShowPageLayout

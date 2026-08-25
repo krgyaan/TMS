@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
+import { EnquiryTenderFlow } from "@/modules/tendering/tenders/components/EnquiryTenderFlow";
 
 export default function RfqResponseShowPage() {
     const { responseId } = useParams<{ responseId: string }>();
@@ -56,6 +57,18 @@ export default function RfqResponseShowPage() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>Invalid Response ID.</AlertDescription>
             </Alert>
+        );
+    }
+
+    if (tender?.enquiryId) {
+        return (
+            <EnquiryTenderFlow
+                tenderId={tenderId}
+                enquiryId={tender.enquiryId}
+                defaultExpanded="tender-details"
+                onBack={() => navigate(paths.tendering.rfqsResponses)}
+                backLabel="Back to RFQ Responses"
+            />
         );
     }
 
