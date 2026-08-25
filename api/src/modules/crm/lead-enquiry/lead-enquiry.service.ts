@@ -46,6 +46,7 @@ export type LeadEnquiryWithNames = LeadEnquiry & {
     createdByName?: string | null;
     updatedByName?: string | null;
     teamName?: string | null;
+    teamMemberName?: string | null;
     hasSiteVisit?: boolean;
     tenderStatusId?: number | null;
     tenderStatusName?: string | null;
@@ -58,6 +59,7 @@ export type LeadEnquiryWithNames = LeadEnquiry & {
 
 const createdByUser = alias(users, 'created_by_user');
 const updatedByUser = alias(users, 'updated_by_user');
+const teamMemberUser = alias(users, 'team_member_user');
 
 @Injectable()
 export class LeadEnquiryService {
@@ -128,6 +130,7 @@ export class LeadEnquiryService {
                 orgName: organizations.name,
                 createdByName: createdByUser.name,
                 updatedByName: updatedByUser.name,
+                teamMemberName: teamMemberUser.name,
                 hasSiteVisit: hasSiteVisitExpr,
                 tenderStatusId: statuses.id,
                 tenderStatusName: statuses.name,
@@ -156,6 +159,7 @@ export class LeadEnquiryService {
             .leftJoin(updatedByUser, eq(updatedByUser.id, leadEnquiries.updatedBy))
             .leftJoin(tenderInfos, eq(tenderInfos.id, leadEnquiries.tenderId))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(teamMemberUser, eq(teamMemberUser.id, tenderInfos.teamMember))
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
@@ -174,6 +178,7 @@ export class LeadEnquiryService {
                 orgName: row.orgName ?? null,
                 createdByName: row.createdByName ?? null,
                 updatedByName: row.updatedByName ?? null,
+                teamMemberName: row.teamMemberName ?? null,
 hasSiteVisit: row.hasSiteVisit ?? false,
                 tenderStatusId: row.tenderStatusId ?? null,
                 tenderStatusName: row.tenderStatusName ?? null,
@@ -200,6 +205,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 teamName: teams.name,
                 createdByName: createdByUser.name,
                 updatedByName: updatedByUser.name,
+                teamMemberName: teamMemberUser.name,
                 hasSiteVisit: hasSiteVisitExpr,
                 tenderStatusId: statuses.id,
                 tenderStatusName: statuses.name,
@@ -228,6 +234,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             .leftJoin(updatedByUser, eq(updatedByUser.id, leadEnquiries.updatedBy))
             .leftJoin(tenderInfos, eq(tenderInfos.id, leadEnquiries.tenderId))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(teamMemberUser, eq(teamMemberUser.id, tenderInfos.teamMember))
             .where(eq(leadEnquiries.id, id))
             .limit(1);
 
@@ -255,6 +262,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             teamName: row.teamName ?? null,
             createdByName: row.createdByName ?? null,
             updatedByName: row.updatedByName ?? null,
+            teamMemberName: row.teamMemberName ?? null,
             hasSiteVisit: row.hasSiteVisit ?? false,
             tenderStatusId: row.tenderStatusId ?? null,
             tenderStatusName: row.tenderStatusName ?? null,

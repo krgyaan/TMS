@@ -33,6 +33,7 @@ export interface LeadEnquiryWithNames extends LeadEnquiry {
     createdByName?: string | null;
     updatedByName?: string | null;
     teamName?: string | null;
+    teamMemberName?: string | null;
     hasSiteVisit?: boolean;
     tenderStatusId?: number | null;
     tenderStatusName?: string | null;

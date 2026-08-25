@@ -21,7 +21,6 @@ import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import type { LeadEnquiryWithNames } from "./helpers/lead-enquiry.type";
 import { leadEnquiryService } from "@/services/api/lead-enquiry.service";
 import { toast } from "sonner";
-import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { cn } from "@/lib/utils";
 
 const TEAM_TABS = [
@@ -205,12 +204,25 @@ const EnquiryListPage = () => {
     ];
 
     const colDefs = useMemo<ColDef<LeadEnquiryWithNames>[]>(() => [
-        { field: "enquiryNumber", headerName: "Enquiry No.", width: 140 },
-        { field: "enqName", headerName: "Enquiry Name", width: 220 },
-        { field: "createdByName", headerName: "BD Lead", width: 160 },
-        { field: "organizationName", headerName: "Company Name", width: 180 },
-        { field: "orgAbbName", headerName: "Organisation Name", width: 160 },
-        { field: "itemName", headerName: "Item", width: 160 },
+        {
+            field: "enqName",
+            headerName: "Enquiry Name",
+            width: 240,
+            cellRenderer: (params: any) => (
+                <div className="flex flex-col gap-0.5">
+                    <p className="text-xs">{params.value}</p>
+                    {params.data?.enquiryNumber && (
+                        <p className="text-xs text-[10px] text-muted-foreground truncate">{params.data.enquiryNumber}</p>
+                    )}
+                </div>
+            ),
+        },
+        {
+            field: "teamMemberName",
+            headerName: "Team Member",
+            width: 160,
+            cellRenderer: (params: any) => params.value ? params.value : <span className="text-muted-foreground">-</span>,
+        },
         { field: "approxValue", headerName: "Approx Value", width: 130 },
         {
             headerName: "Site Visit",
@@ -278,33 +290,6 @@ const EnquiryListPage = () => {
                 const val: string | null | undefined = params.value;
                 if (!val) return "-";
                 return new Date(val).toLocaleDateString("en-IN");
-            },
-        },
-        {
-            headerName: "Timer",
-            width: 130,
-            cellStyle: {
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-            },
-            cellRenderer: (params: any) => {
-                const createdAt = params.data?.createdAt;
-                if (!createdAt) {
-                    return (
-                        <TenderTimerDisplay
-                            remainingSeconds={0}
-                            status="NOT_STARTED"
-                        />
-                    );
-                }
-                return (
-                    <TenderTimerDisplay
-                        remainingSeconds={0}
-                        status="RUNNING"
-                        deadline={new Date(createdAt)}
-                    />
-                );
             },
         },
         {
