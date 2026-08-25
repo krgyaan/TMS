@@ -1,7 +1,5 @@
 import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
-/* UI */
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,41 +7,12 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
-/* Icons */
-import {
-    AlertCircle,
-    ArrowLeft,
-    Building2,
-    Calendar,
-    CalendarClock,
-    CheckCircle2,
-    Clock,
-    Copy,
-    Download,
-    Edit,
-    ExternalLink,
-    File,
-    FileImage,
-    FileText,
-    IndianRupee,
-    Mail,
-    MapPin,
-    PauseCircle,
-    Phone,
-    Target,
-    User,
-    UserCheck,
-    UserPlus
+import { 
+    AlertCircle, ArrowLeft, Building2, Calendar, CalendarClock, CheckCircle2, Clock, Copy, Download, Edit, ExternalLink, 
+    File, FileImage, FileText, IndianRupee, Mail, MapPin, PauseCircle, Phone, Target, User, UserCheck, UserPlus
 } from "lucide-react";
-
-/* Data */
 import { paths } from "@/app/routes/paths";
 import { useFollowUp } from "./follow-up.hooks";
-
-/* ================================
-   CONSTANTS
-================================ */
 
 const FREQUENCY_CONFIG: Record<number, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ElementType }> = {
     3: { label: "2 times a day", variant: "secondary", icon: Calendar },
@@ -68,38 +37,6 @@ const STOP_REASON_ICONS: Record<number, React.ElementType> = {
     3: ExternalLink,
     4: FileText,
 };
-
-/* ================================
-   HELPERS
-================================ */
-
-const formatDate = (date?: string | null) =>
-    date
-        ? new Date(date).toLocaleDateString("en-IN", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-          })
-        : null;
-
-const formatDateLong = (date?: string | null) =>
-    date
-        ? new Date(date).toLocaleDateString("en-IN", {
-              weekday: "long",
-              day: "2-digit",
-              month: "long",
-              year: "numeric",
-          })
-        : null;
-
-const formatCurrency = (amount?: number | null) =>
-    amount
-        ? new Intl.NumberFormat("en-IN", {
-              style: "currency",
-              currency: "INR",
-              maximumFractionDigits: 0,
-          }).format(amount)
-        : null;
 
 const getInitials = (name?: string | null) => {
     if (!name) return "?";
@@ -131,10 +68,6 @@ const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     // You could add a toast notification here
 };
-
-/* ================================
-   LOADING SKELETON
-================================ */
 
 function LoadingSkeleton() {
     return (
@@ -175,10 +108,6 @@ function LoadingSkeleton() {
     );
 }
 
-/* ================================
-   ERROR STATE
-================================ */
-
 function ErrorState({ onBack }: { onBack: () => void }) {
     return (
         <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center p-6">
@@ -204,10 +133,6 @@ function ErrorState({ onBack }: { onBack: () => void }) {
         </div>
     );
 }
-
-/* ================================
-   STAT CARD
-================================ */
 
 function StatCard({
     icon: Icon,
@@ -260,10 +185,6 @@ function StatCard({
     );
 }
 
-/* ================================
-   INFO ITEM
-================================ */
-
 function InfoItem({
     icon: Icon,
     label,
@@ -310,10 +231,6 @@ function InfoItem({
     );
 }
 
-/* ================================
-   SECTION HEADER
-================================ */
-
 function SectionHeader({ icon: Icon, title, action }: { icon: React.ElementType; title: string; action?: React.ReactNode }) {
     return (
         <div className="flex items-center justify-between">
@@ -327,10 +244,6 @@ function SectionHeader({ icon: Icon, title, action }: { icon: React.ElementType;
         </div>
     );
 }
-
-/* ================================
-   CONTACT CARD
-================================ */
 
 function ContactCard({ name, phone, email, isPrimary = false }: { name: string; phone?: string | null; email?: string | null; isPrimary?: boolean }) {
     return (
@@ -393,10 +306,6 @@ function ContactCard({ name, phone, email, isPrimary = false }: { name: string; 
         </div>
     );
 }
-
-/* ================================
-   ATTACHMENT CARD
-================================ */
 
 const buildFileUrl = (value?: unknown): string => {
     if (typeof value !== "string" || !value) return "";
