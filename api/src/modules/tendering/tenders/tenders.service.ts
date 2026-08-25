@@ -1226,7 +1226,7 @@ export class TenderInfosService {
         // Generate unique name
         let uniqueName = baseName;
         if (existingCount > 0) {
-            uniqueName = `${baseName} (${existingCount})`;
+            uniqueName = `${baseName} (${existingCount + 1})`;
         }
         console.log("Tender Name: ", uniqueName);
         return { tenderName: uniqueName };
