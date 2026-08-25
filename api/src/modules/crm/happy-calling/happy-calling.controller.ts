@@ -14,6 +14,7 @@ import {
 import { HappyCallingService } from './happy-calling.service';
 import { CreateHappyCallingSchema, UpdateHappyCallingSchema } from './dto/happy-calling.dto';
 import type { CreateHappyCallingDto, UpdateHappyCallingDto } from './dto/happy-calling.dto';
+import { CurrentUser } from '@/decorators/current-user.decorator';
 
 @Controller('happy-calling')
 export class HappyCallingController {
@@ -44,9 +45,9 @@ export class HappyCallingController {
 
     @Post()
     @HttpCode(HttpStatus.CREATED)
-    async create(@Body() body: unknown) {
+    async create(@Body() body: unknown, @CurrentUser() user: { sub: number }) {
         const parsed = CreateHappyCallingSchema.parse(body) as CreateHappyCallingDto;
-        return this.happyCallingService.create(parsed);
+        return this.happyCallingService.create(parsed, user?.sub);
     }
 
     @Patch(':id')
