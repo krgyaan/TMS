@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import { showErrorToast } from '@/utils/errorToast';
 import { useLead } from './useLeads';
 import { useHappyCalling } from './useHappyCalling';
+import { useLeadEnquiry } from './useLeadEnquiry';
+import { useInfoSheet } from './useInfoSheets';
 import { paths } from '@/app/routes/paths';
 import type {
     CreateFollowupRequest,
@@ -78,9 +80,35 @@ export const seedContactsFromSource = (record: SourceRecordLike | undefined): Co
 export const useSourceRecord = (source: FollowupSource): SourceRecordLike | undefined => {
     const { data: lead } = useLead(source.sourceType === 'lead' ? source.sourceId : null);
     const { data: happyCalling } = useHappyCalling(source.sourceType === 'happy_calling' ? source.sourceId : null);
-    return source.sourceType === 'lead'
-        ? (lead as unknown as SourceRecordLike | undefined)
-        : (happyCalling as unknown as SourceRecordLike | undefined);
+    const { data: enquiry } = useLeadEnquiry(source.sourceType === 'enquiry' ? source.sourceId : null);
+    const { data: infoSheet } = useInfoSheet(
+        source.sourceType === 'enquiry' ? (enquiry?.tenderId ?? null) : null
+    );
+
+    if (source.sourceType === 'lead') {
+        return lead as unknown as SourceRecordLike | undefined;
+    }
+    if (source.sourceType === 'happy_calling') {
+        return happyCalling as unknown as SourceRecordLike | undefined;
+    }
+    if (source.sourceType === 'enquiry') {
+        const enquiryContacts: ContactPerson[] = (enquiry?.contacts ?? []).map((c) => ({
+            name: c.name || "",
+            designation: c.designation || "",
+            phone: c.phone || "",
+            email: c.email || "",
+        }));
+        const tenderClients: ContactPerson[] = (infoSheet?.clients ?? [])
+            .filter((c) => c.clientName)
+            .map((c) => ({
+                name: c.clientName || "",
+                designation: c.clientDesignation || "",
+                phone: c.clientMobile || "",
+                email: c.clientEmail || "",
+            }));
+        return { leadContacts: [...enquiryContacts, ...tenderClients] };
+    }
+    return undefined;
 };
 
 // ─── Utility Functions ────────────────────────────────────────────────────────
