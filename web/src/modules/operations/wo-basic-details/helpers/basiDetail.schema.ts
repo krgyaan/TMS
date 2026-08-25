@@ -8,11 +8,11 @@ export const WoBasicDetailFormSchema = z.object({
   itemId: z.coerce.number().nullable().optional(),
   locationId: z.coerce.number().nullable().optional(),
 
-  woNumber: z.string().min(1, "WO Number is required"),
-  woDate: z.date().nullable(),
+  woNumber: z.string().min(1, "WO Number is Required"),
+  woDate: z.date().min(1, "WO Date is Required."),
 
-  woValuePreGst: z.coerce.number().nonnegative().optional(),
-  woValueGstAmt: z.coerce.number().nonnegative().optional(),
+  woValuePreGst: z.coerce.number().nonnegative().min(1, "WO Value (pre GST) is Required."),
+  woValueGstAmt: z.coerce.number().nonnegative().min(1, "WO Value (GST) is Required."),
 
   budgetPreGst: z.coerce.number().nonnegative().optional(),
   receiptPreGst: z.coerce.number().nonnegative().optional(),
@@ -35,9 +35,29 @@ export const WoBasicDetailFormSchema = z.object({
   projectCode: z.string().optional(),
   projectName: z.string().optional(),
 
-  woDraft: z.array(z.string()).optional().nullable(),
+  woDraft: z.array(z.string()).min(1, "Upload at least one file here."),
   teChecklistConfirmed: z.boolean().default(false),
   tmsDocuments: z.record(z.string(), z.boolean().optional()).default({}),
+})
+.superRefine((data, ctx) => {
+  // GEM Charges conditional validation
+  if (data.requestGemCharges === "true") {
+    if (data.gemChargesAmount === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["gemChargesAmount"],
+        message: "GEM Charges Amount is required.",
+      });
+    }
+
+    if (!data.gemChargesPortalLink?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["gemChargesPortalLink"],
+        message: "GEM Charges Portal Link is required.",
+      });
+    }
+  }
 });
 
 export const AssignOeFormSchema = z.object({

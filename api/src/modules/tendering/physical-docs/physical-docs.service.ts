@@ -86,7 +86,9 @@ export class PhysicalDocsService {
         private readonly recipientResolver: RecipientResolver,
         private readonly timersService: TimersService,
         private readonly clientDirectorySyncService: ClientDirectorySyncService,
-    ) {}
+    ) {
+        this.logger = appLogger;
+    }
 
     /**
      * Build role-based filter conditions for tender queries
@@ -558,10 +560,7 @@ export class PhysicalDocsService {
                 }
 
                 // Update tender status only if there are no existing bid submissions
-                let [bidSubmission] = await tx
-                                .select()
-                                .from(bidSubmissions)
-                                .where(eq(bidSubmissions.tenderId, data.tenderId));
+                let [bidSubmission] = await tx.select({id: bidSubmissions.id}).from(bidSubmissions).where(eq(bidSubmissions.tenderId, data.tenderId));
                 
                 if(!bidSubmission){
                     // update only when no bid submission found
