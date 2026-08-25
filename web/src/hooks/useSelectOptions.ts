@@ -31,7 +31,6 @@ export function useOrganizationOptions(status: boolean = true) {
 
 export function useUserOptions(teamId?: number) {
     const { data: users = [] } = useGetTeamMembers(teamId ?? 2);
-    console.log("users", users);
     return useMemo(
         () => users.map((u) => ({ id: String(u.id), name: u.name })),
         [users]

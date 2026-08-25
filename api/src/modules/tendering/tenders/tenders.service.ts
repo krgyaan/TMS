@@ -20,7 +20,7 @@ import { websites } from '@db/schemas/master/websites.schema';
 import { tenderInfos, type NewTenderInfo, type TenderInfo } from '@db/schemas/tendering/tenders.schema';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { and, asc, desc, eq, inArray, isNull, notInArray, or, sql, SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNull, notInArray, or, sql, SQL } from 'drizzle-orm';
 
 export type TenderListFilters = {
     statusIds?: number[];
@@ -1230,6 +1230,51 @@ export class TenderInfosService {
         }
         console.log("Tender Name: ", uniqueName);
         return { tenderName: uniqueName };
+    }
+
+    async checkTenderNameExists(tenderName: string, organization?: number, item?: number) {
+        if (!tenderName || !tenderName.trim()) {
+            return { exists: false, count: 0, tenderName: '', suggestion: null };
+        }
+
+        const trimmed = tenderName.trim();
+        const suffixPattern = `${trimmed} (%)`;
+
+        const conditions: any[] = [
+            or(
+                eq(tenderInfos.tenderName, trimmed),
+                ilike(tenderInfos.tenderName, suffixPattern),
+            ),
+            eq(tenderInfos.deleteStatus, 0),
+        ];
+
+        if (organization) {
+            conditions.push(eq(tenderInfos.organization, organization));
+        }
+        if (item) {
+            conditions.push(eq(tenderInfos.item, item));
+        }
+
+        const rows = await this.db
+            .select({ tenderName: tenderInfos.tenderName })
+            .from(tenderInfos)
+            .where(and(...conditions));
+
+        const count = rows.length;
+        const exists = count > 0;
+
+        let suggestion: string | null = null;
+        if (exists) {
+            suggestion = `${trimmed} (${count + 1})`;
+        }
+
+        return {
+            exists,
+            count,
+            tenderName: trimmed,
+            existingTenderNames: rows.map(r => r.tenderName),
+            suggestion,
+        };
     }
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{

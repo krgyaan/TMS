@@ -20,6 +20,7 @@ import { paths } from "@/app/routes/paths";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { useTeamOptions, useOrganizationOptions, useUserOptions, useLocationOptions, useWebsiteOptions, useItemOptions } from "@/hooks/useSelectOptions";
 import { useAuth } from "@/contexts/AuthContext";
+import { TenderNameWarningAlert } from "./TenderNameWarningAlert";
 
 const ManualFormSchema = z.object({
     team: z.coerce.number().int().positive({ message: "Team is required" }),
@@ -111,6 +112,8 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
     const item = useWatch({ control: manualForm.control, name: "item" });
     const location = useWatch({ control: manualForm.control, name: "location" });
     const team = useWatch({ control: manualForm.control, name: "team" });
+    const watchTenderName = useWatch({ control: manualForm.control, name: "tenderName" });
+    console.log(watchTenderName);
 
     // Watch documents for display
     const documents = useWatch({ control: manualForm.control, name: "documents" });
@@ -391,6 +394,17 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                     >
                                         {field => <Input placeholder="Tender Name" {...field} readOnly={true} />}
                                     </FieldWrapper>
+
+                                    {watchTenderName && (
+                                        <TenderNameWarningAlert
+                                            tenderName={watchTenderName}
+                                            organization={manualForm.watch("organization")}
+                                            item={manualForm.watch("item")}
+                                            onSuffixDetected={(suggestion) => {
+                                                manualForm.setValue("tenderName", suggestion, { shouldValidate: false });
+                                            }}
+                                        />
+                                    )}
 
                                     {/* Organization */}
                                     <SelectField<ManualFormValues, "organization">

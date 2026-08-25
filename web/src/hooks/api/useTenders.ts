@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tenderInfosService } from '@/services/api';
-import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
 import type { CreateTenderRequest, TenderListParams, UpdateTenderRequest, PaginatedResult, TenderInfoWithNames } from '@/types/api.types';
@@ -114,6 +113,14 @@ export const useGenerateTenderName = () => {
         onError: error => {
             console.error("Error generating tender name:", error);
         },
+    });
+};
+
+export const useCheckTenderName = (tenderName: string, organization?: number, item?: number) => {
+    return useQuery({
+        queryKey: [...tendersKey.all, 'tender-name-check', tenderName, organization, item] as const,
+        queryFn: () => tenderInfosService.checkTenderNameExists(tenderName, organization, item),
+        enabled: !!tenderName && tenderName.trim().length > 0,
     });
 };
 
