@@ -20,6 +20,7 @@ import { paths } from "@/app/routes/paths";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { useTeamOptions, useOrganizationOptions, useUserOptions, useLocationOptions, useWebsiteOptions, useItemOptions } from "@/hooks/useSelectOptions";
 import { useAuth } from "@/contexts/AuthContext";
+import { TenderNameWarningAlert } from "./TenderNameWarningAlert";
 
 const ManualFormSchema = z.object({
     team: z.coerce.number().int().positive({ message: "Team is required" }),
@@ -111,6 +112,9 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
     const item = useWatch({ control: manualForm.control, name: "item" });
     const location = useWatch({ control: manualForm.control, name: "location" });
     const team = useWatch({ control: manualForm.control, name: "team" });
+    const watchTenderName = useWatch({ control: manualForm.control, name: "tenderName" });
+    const watchTenderNo = useWatch({ control: manualForm.control, name: "tenderNo" });
+    console.log({watchTenderName});
 
     // Watch documents for display
     const documents = useWatch({ control: manualForm.control, name: "documents" });
@@ -120,7 +124,8 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
 
     // Role-based locking flags (create mode only)
     const lockTeam = mode === "create" && roleId !== 1 && roleId !== 2;
-    const lockUser = mode === "create" && roleId !== 3 && roleId !== 4;
+    const canAssignTeamMember = roleId != null && [1, 2, 3, 4].includes(roleId);
+    const lockUser = !canAssignTeamMember;
 
     const currentTeamId = effectiveTeamId ?? null;
     const currentUserId = user?.id ?? null;
@@ -217,13 +222,13 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
         if (isInitialLoad.current) return;
 
         if (previousValues.current.team !== team) {
-            // If user field is not locked, reset team member on team change
-            if (!lockUser) {
+            // If user field is not locked and a member other than the current user was chosen, reset on team change
+            if (!lockUser && manualForm.getValues("teamMember") !== currentUserId) {
                 manualForm.setValue("teamMember", null, { shouldValidate: false });
             }
             previousValues.current.team = team;
         }
-    }, [team, manualForm, lockUser]);
+    }, [team, manualForm, lockUser, currentUserId]);
 
     // Auto-select team for restricted roles in create mode
     useEffect(() => {
@@ -234,14 +239,13 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
         manualForm.setValue("team", currentTeamId, { shouldValidate: true });
     }, [mode, lockTeam, currentTeamId, manualForm]);
 
-    // Auto-select team member (current user) for restricted roles in create mode
+    // Auto-select team member (current user) in create mode
     useEffect(() => {
         if (mode !== "create") return;
-        if (!lockUser) return;
         if (!currentUserId) return;
 
         manualForm.setValue("teamMember", currentUserId, { shouldValidate: true });
-    }, [mode, lockUser, currentUserId, manualForm]);
+    }, [mode, currentUserId, manualForm]);
 
     const handleManualSubmit: SubmitHandler<ManualFormValues> = async values => {
         try {
@@ -363,7 +367,18 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                     <TabsContent value="manually">
                         <Form {...manualForm}>
                             <form onSubmit={manualForm.handleSubmit(handleManualSubmit)} className="space-y-8">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {(watchTenderName || watchTenderNo) && (
+                                    <TenderNameWarningAlert
+                                        tenderName={watchTenderName}
+                                        tenderNo={watchTenderNo}
+                                        organization={manualForm.watch("organization")}
+                                        item={manualForm.watch("item")}
+                                        onSuffixDetected={(suggestion) => {
+                                            manualForm.setValue("tenderName", suggestion, { shouldValidate: false });
+                                        }}
+                                    />
+                                )}
+                                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-start">
                                     {/* Team */}
                                     <SelectField<ManualFormValues, "team">
                                         control={manualForm.control}
@@ -474,7 +489,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                         label="Team Member"
                                         options={userOptions}
                                         placeholder="Select User"
-                                        disabled={!team}
+                                        disabled={!team || lockUser}
                                     />
 
                                     {/* Due Date & Time */}
@@ -500,37 +515,35 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                         options={websiteOptions}
                                         placeholder="Select Website"
                                     />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <FileUploader
-                                        context="tender-documents"
-                                        value={documents}
-                                        onChange={(paths) => manualForm.setValue("documents", paths)}
-                                        label="Upload Documents"
-                                        disabled={saving}
-                                    />
-                                    <p className="text-xs text-muted-foreground">
-                                        Upload relevant tender documents (optional)
-                                    </p>
-                                </div>
-
-                                {/* Remarks */}
-                                <FieldWrapper<ManualFormValues, "remarks">
-                                    control={manualForm.control}
-                                    name="remarks"
-                                    label="Remarks"
-                                >
-                                    {field => (
-                                        <textarea
-                                            className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                            placeholder="Remarks"
-                                            maxLength={200}
-                                            {...field}
+                                    <div className="space-y-2">
+                                        <FileUploader
+                                            context="tender-documents"
+                                            value={documents}
+                                            onChange={(paths) => manualForm.setValue("documents", paths)}
+                                            label="Upload Documents"
+                                            disabled={saving}
                                         />
-                                    )}
-                                </FieldWrapper>
+                                        <p className="text-xs text-muted-foreground">
+                                            Upload relevant tender documents (optional)
+                                        </p>
+                                    </div>
 
+                                    {/* Remarks */}
+                                    <FieldWrapper<ManualFormValues, "remarks">
+                                        control={manualForm.control}
+                                        name="remarks"
+                                        label="Remarks"
+                                    >
+                                        {field => (
+                                            <textarea
+                                                className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                placeholder="Remarks"
+                                                maxLength={200}
+                                                {...field}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
                                 <div className="w-full flex items-center justify-center gap-2">
                                     <Button type="submit" disabled={saving}>
                                         {saving ? "Saving..." : mode === "create" ? "Create Tender" : "Update Tender"}

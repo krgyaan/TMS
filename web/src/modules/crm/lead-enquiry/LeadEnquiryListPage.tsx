@@ -250,6 +250,17 @@ const EnquiryListPage = () => {
 
     const enquiryActions: ActionItem<LeadEnquiryWithNames>[] = [
         {
+            label: "Fill Info Sheet",
+            onClick: (row) => {
+                if (!row.tenderId) {
+                    toast.error("No linked tender found for this enquiry");
+                    return;
+                }
+                navigate(paths.tendering.infoSheetCreate(row.tenderId));
+            },
+            icon: <FileText className="h-4 w-4" />,
+        },
+        {
             label: "View",
             onClick: (row) => navigate(paths.crm.enquiryView(row.id)),
             icon: <Eye className="h-4 w-4" />,
@@ -337,22 +348,23 @@ const EnquiryListPage = () => {
             },
         },
         {
-            field: "status",
+            field: "tenderStatusName",
             headerName: "Status",
             width: 160,
             cellRenderer: (params: any) => {
-                const val = params.value;
+                const val: string | null | undefined = params.value;
                 if (!val) return "-";
-                const isRejected = val === 'Rejected';
-                const isCosting = val === 'Costing Sheet Submitted' || val === 'Costing Sheet Created';
-                return (
-                    <Badge
-                        variant={isRejected ? "destructive" : isCosting ? "default" : "secondary"}
-                        className={cn(isCosting && "bg-amber-500 hover:bg-amber-500")}
-                    >
-                        {val}
-                    </Badge>
-                );
+                return <Badge variant="secondary">{val}</Badge>;
+            },
+        },
+        {
+            field: "dueDate",
+            headerName: "Due Date",
+            width: 120,
+            cellRenderer: (params: any) => {
+                const val: string | null | undefined = params.value;
+                if (!val) return "-";
+                return new Date(val).toLocaleDateString("en-IN");
             },
         },
         {
@@ -391,7 +403,7 @@ const EnquiryListPage = () => {
     ], [enquiryActions]);
 
     return (
-        <Card className="min-h-[calc(100vh-2rem)] flex flex-col border-0 shadow-none">
+        <Card className="min-h-[calc(100vh-2rem)] flex flex-col">
             <CardHeader className="flex-none pb-4">
                 <div className="flex items-center gap-4 flex-wrap">
                     <div className="flex-1">

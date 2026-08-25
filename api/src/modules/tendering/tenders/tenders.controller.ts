@@ -68,6 +68,23 @@ export class TenderInfoController {
             user,
         });
 
+        // Stop info-sheet timers for tenders that have no assigned team member
+        for (const tender of tenders.data) {
+            if (tender.teamMember == null) {
+                try {
+                    await this.timersService.stopTimer({
+                        entityType: 'TENDER',
+                        entityId: tender.id,
+                        stage: 'tender_info_sheet',
+                        userId: user.sub,
+                        reason: 'No team member assigned',
+                    });
+                } catch {
+                    // No running timer — ignore
+                }
+            }
+        }
+
         const timerMap = await getFrontendTimersBatch(this.timersService, 'TENDER', tenders.data.map(t => t.id), 'tender_info_sheet');
         const tendersWithTimers = tenders.data.map(tender => ({
             ...tender,
@@ -78,6 +95,32 @@ export class TenderInfoController {
             ...tenders,
             data: tendersWithTimers
         };
+    }
+
+    @Get('tender-name-check')
+    async checkTenderName(
+        @Query('tenderName') tenderName: string,
+        @Query('organization') organization?: string,
+        @Query('item') item?: string,
+    ) {
+        return this.tenderInfosService.checkTenderNameExists(
+            tenderName,
+            organization ? Number(organization) : undefined,
+            item ? Number(item) : undefined,
+        );
+    }
+
+    @Get('tender-no-check')
+    async checkTenderNo(
+        @Query('tenderNo') tenderNo: string,
+        @Query('organization') organization?: string,
+        @Query('item') item?: string,
+    ) {
+        return this.tenderInfosService.checkTenderNoExists(
+            tenderNo,
+            organization ? Number(organization) : undefined,
+            item ? Number(item) : undefined,
+        );
     }
 
     @Get(':id/mailing-logs')

@@ -35,6 +35,25 @@ export class WoBasicDetailsController {
         return this.woBasicDetailsService.findAll(parsed);
     }
 
+    // UTILITY OPERATIONS (static routes must be before :id)
+    @Get('project-name-check')
+    async checkProjectName(
+        @Query('projectName') projectName: string,
+        @Query('teamId') teamId?: string,
+    ) {
+        return this.woBasicDetailsService.checkProjectNameExists(projectName, teamId ? Number(teamId) : undefined);
+    }
+
+    @Get('by-tender/:tenderId')
+    async getByTenderId(@Param('tenderId', ParseIntPipe) tenderId: number) {
+        return this.woBasicDetailsService.findByTenderId(tenderId);
+    }
+
+    @Get('by-enquiry/:enquiryId')
+    async getByEnquiryId(@Param('enquiryId', ParseIntPipe) enquiryId: number) {
+        return this.woBasicDetailsService.findByEnquiryId(enquiryId);
+    }
+
     @Get('prefill/:tenderId')
     async getPrefillData(@Param('tenderId', ParseIntPipe) tenderId: number) {
         return this.woBasicDetailsService.getPrefillData(tenderId);
@@ -103,17 +122,6 @@ export class WoBasicDetailsController {
     @Get(':id/oe-assignments')
     async getOeAssignments(@Param('id', ParseIntPipe) id: number) {
         return this.woBasicDetailsService.getOeAssignments(id);
-    }
-
-    // UTILITY OPERATIONS
-    @Get('by-tender/:tenderId')
-    async getByTenderId(@Param('tenderId', ParseIntPipe) tenderId: number) {
-        return this.woBasicDetailsService.findByTenderId(tenderId);
-    }
-
-    @Get('by-enquiry/:enquiryId')
-    async getByEnquiryId(@Param('enquiryId', ParseIntPipe) enquiryId: number) {
-        return this.woBasicDetailsService.findByEnquiryId(enquiryId);
     }
 
     // DASHBOARD/REPORTING

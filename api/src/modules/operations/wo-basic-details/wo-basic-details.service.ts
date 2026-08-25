@@ -1,4 +1,5 @@
 import { items, locations, organizations, projects, teams, tenderClients, tenderCostingDetails, tenderCostingSheets, tenderInfos } from '@/db/schemas';
+import { instrumentTransferDetails } from '@/db/schemas/tendering/payment-requests.schema';
 import { AppLogger } from '@/logger/app-logger.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
@@ -11,7 +12,7 @@ import { BadRequestException, ConflictException, Inject, Injectable, NotFoundExc
 import { and, asc, desc, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { AssignOeDto, BulkAssignOeDto, CreateWoBasicDetailDto, RemoveOeAssignmentDto, UpdateWoBasicDetailDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
-
+import { PaymentRequestService } from '@/modules/operations/payment-requests/payment-request.service';
 const oeFirstUser = alias(users, 'oeFirstUser');
 const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
 const oeDocsPrepUser = alias(users, 'oeDocsPrepUser');
@@ -26,6 +27,7 @@ export class WoBasicDetailsService {
         private readonly appLogger: AppLogger,
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+        private readonly paymentRequestService: PaymentRequestService,
     ) {
         this.logger = this.appLogger.withContext(WoBasicDetailsService.name);
     }
@@ -438,12 +440,12 @@ export class WoBasicDetailsService {
         }
 
         // Create Project asynchronously (non-blocking)
-        this.safeCreateProject(data, row?.id);
+        this.safeCreateProject(data, row?.id, userId);
 
         return this.mapRowToResponse(row!);
     }
 
-    private async safeCreateProject(data: CreateWoBasicDetailDto, woBasicDetailId?: number): Promise<void> {
+    private async safeCreateProject(data: CreateWoBasicDetailDto, woBasicDetailId?: number, currentUserId?: number): Promise<void> {
         if (!woBasicDetailId) return;
 
         setImmediate(async () => {
@@ -503,7 +505,7 @@ export class WoBasicDetailsService {
 
                 const now = new Date();
 
-                await this.db.insert(projects).values({
+                const [project] = await this.db.insert(projects).values({
                     teamName,
                     organisationId: organisationId ?? null,
                     itemId: itemId,
@@ -523,9 +525,12 @@ export class WoBasicDetailsService {
                     enquiryId: data.enquiryId ?? null,
                     createdAt: now,
                     updatedAt: now,
-                } as typeof projects.$inferInsert);
+                } as typeof projects.$inferInsert).returning();
 
                 this.logger.log(`Project created for WO Basic Detail: ${woBasicDetailId}`);
+
+                // Create project payment request payload and call existing service
+                await this.createProjectPaymentRequest(project.id, data, woBasicDetailId, currentUserId);
             } catch (error) {
                 this.logger.error(
                     `Failed to create project for WO Basic Detail: ${woBasicDetailId}`,
@@ -567,6 +572,37 @@ export class WoBasicDetailsService {
             .limit(1);
 
         return !!existing;
+    }
+
+    /**
+     * Create project payment request using existing payment-request.service.create() method
+     */
+    private async createProjectPaymentRequest(
+        projectId: number,
+        data: CreateWoBasicDetailDto,
+        woBasicDetailId?: number,
+        currentUserId?: number
+    ): Promise<void> {
+        try {
+            const makerRequestBody: any = {
+                projectId,
+                amount: data.gemChargesAmount || 0,
+                paymentAgainst: 'gem_charges',
+                paymentMode: 'portal',
+                portalLink: data.gemChargesPortalLink || null,
+                uploadedInvoiceFile: data.gemChargesInvoice ? JSON.parse(data.gemChargesInvoice) : [],
+                remark: `Auto-created from Basic Detail: ${woBasicDetailId}, for ${data.projectName}`,
+                requestedBy: currentUserId,
+            };
+
+            await this.paymentRequestService.create(makerRequestBody, currentUserId || 0);
+            this.logger.log(`Created project payment request for WO Basic Detail: ${woBasicDetailId}`);
+        } catch (error) {
+            this.logger.warn(
+                `Failed to create project payment request for WO Basic Detail: ${woBasicDetailId}`,
+                error instanceof Error ? error.stack : String(error),
+            );
+        }
     }
 
     async update(id: number, data: UpdateWoBasicDetailDto, userId?: number) {
@@ -769,6 +805,48 @@ export class WoBasicDetailsService {
         return {
             exists: !!existing,
             projectCode,
+        };
+    }
+
+    async checkProjectNameExists(projectName: string, teamId?: number) {
+        if (!projectName || !projectName.trim()) {
+            return { exists: false, count: 0, projectName: '', existingProjectNames: [], suggestion: null };
+        }
+
+        const trimmed = projectName.trim();
+
+        // Search for exact match AND suffixed variants like "Name (2)", "Name (3)" etc.
+        const suffixPattern = `${trimmed} (%)`;
+        const conditions: any[] = [
+            or(
+                eq(woBasicDetails.projectName, trimmed),
+                ilike(woBasicDetails.projectName, suffixPattern),
+            ),
+        ];
+
+        if (teamId) {
+            conditions.push(eq(woBasicDetails.team, teamId));
+        }
+
+        const rows = await this.db
+            .select({ projectName: woBasicDetails.projectName })
+            .from(woBasicDetails)
+            .where(and(...conditions));
+
+        const count = rows.length;
+        const exists = count > 0;
+
+        let suggestion: string | null = null;
+        if (exists) {
+            suggestion = `${trimmed} (${count + 1})`;
+        }
+
+        return {
+            exists,
+            count,
+            projectName: trimmed,
+            existingProjectNames: rows.map(r => r.projectName),
+            suggestion,
         };
     }
 

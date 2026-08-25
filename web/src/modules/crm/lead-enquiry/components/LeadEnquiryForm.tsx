@@ -13,6 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { ContactPersonForm } from "@/components/form/contactpersonform";
+import { FileUploader } from "@/components/file-upload";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -36,8 +37,10 @@ const LeadEnquiryFormSchema = z.object({
     itemId: z.string().min(1, { message: "Item is required" }),
     locationCode: z.string().min(1, { message: "Location is required" }),
     approxValue: z.string().min(1, { message: "Approx value is required" }),
+    dueDate: z.string().optional(),
     siteVisitRequired: z.enum(["yes", "no"]),
     enquiryType: z.string().optional(),
+    enquiryFile: z.array(z.string()).default([]),
     notes: z.string().optional(),
     contacts: z.array(z.object({
         name: z.string().min(1, { message: "Contact name is required" }),
@@ -48,6 +51,13 @@ const LeadEnquiryFormSchema = z.object({
 });
 
 type LeadEnquiryFormValues = z.infer<typeof LeadEnquiryFormSchema>;
+
+const toDatetimeLocal = (iso: string): string => {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 
 interface LeadEnquiryFormProps {
     mode: "create" | "edit";
@@ -99,8 +109,10 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
             itemId: enquiry?.itemId?.toString() || "",
             locationCode: enquiry?.locationCode || "",
             approxValue: enquiry?.approxValue || "",
+            dueDate: enquiry?.dueDate ? toDatetimeLocal(enquiry.dueDate) : "",
             siteVisitRequired: enquiry?.siteVisitRequired ? "yes" : "no",
             enquiryType: enquiry?.enquiryType || "",
+            enquiryFile: enquiry?.enquiryFile ? JSON.parse(enquiry.enquiryFile) : [],
             notes: enquiry?.notes || "",
             contacts: enquiry?.contacts?.length
                 ? enquiry.contacts.map((c) => ({
@@ -160,7 +172,7 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
             ? locationOptions.find((o) => o.id === locationVal)?.name
             : "";
         if (orgAbb && itemName && locationName) {
-            form.setValue("enqName", `${orgAbb} ${itemName} ${locationName}`);
+            form.setValue("enqName", `${orgAbb} ${locationName} ${itemName}`);
         } else if (orgAbb && itemName) {
             form.setValue("enqName", `${orgAbb} ${itemName}`);
         } else {
@@ -171,7 +183,7 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
     useEffect(() => {
         if (mode === "edit" && enquiry?.locationCode && locations.length > 0) {
             const loc = (locations as Location[]).find(
-                (l) => l.acronym === enquiry.locationCode
+                (l) => String(l.id) === enquiry.locationCode
             );
             if (loc) {
                 form.setValue("locationCode", String(loc.id));
@@ -187,7 +199,9 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                 happyCallingId: defaultHappyCallingId ? Number(defaultHappyCallingId) : null,
                 itemId: Number(values.itemId),
                 siteVisitRequired: values.siteVisitRequired === "yes",
+                dueDate: values.dueDate || null,
                 enquiryType: values.enquiryType || null,
+                enquiryFile: values.enquiryFile.length > 0 ? JSON.stringify(values.enquiryFile) : null,
                 contacts: values.contacts?.length ? values.contacts : null,
             };
 
@@ -271,9 +285,13 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                                 placeholder="-- Select Location --"
                             />
 
-                            {/* Row 3: Approx Value + Enquiry Type + Site Visit */}
+                            {/* Row 3: Approx Value + Due Date + Enquiry Type + Site Visit */}
                             <FieldWrapper control={form.control} name="approxValue" label="Approx Value (₹)">
                                 {(field) => <Input placeholder="Enter approx value" {...field} />}
+                            </FieldWrapper>
+
+                            <FieldWrapper control={form.control} name="dueDate" label="Due Date">
+                                {(field) => <Input type="datetime-local" {...field} />}
                             </FieldWrapper>
 
                             <SelectField
@@ -312,6 +330,19 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                                     name="contacts"
                                     label="Contact Person(s)"
                                 />
+                            </div>
+
+                            {/* Upload Documents */}
+                            <div className="col-span-full">
+                                <FieldWrapper control={form.control} name="enquiryFile" label="Upload Documents">
+                                    {(field) => (
+                                        <FileUploader
+                                            context="tender-documents"
+                                            value={field.value}
+                                            onChange={(paths) => form.setValue("enquiryFile", paths)}
+                                        />
+                                    )}
+                                </FieldWrapper>
                             </div>
 
                             {/* Notes */}

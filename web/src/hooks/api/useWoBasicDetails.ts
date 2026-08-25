@@ -113,6 +113,14 @@ export const useCheckProjectCode = (projectCode: string) => {
   });
 };
 
+export const useCheckProjectName = (projectName: string, teamId?: number) => {
+  return useQuery({
+    queryKey: [...woBasicDetailsKeys.all, 'project-name-check', projectName, teamId] as const,
+    queryFn: () => woBasicDetailsService.checkProjectNameExists(projectName, teamId),
+    enabled: !!projectName && projectName.trim().length > 0,
+  });
+};
+
 // MUTATION HOOKS
 export const useCreateWoBasicDetail = () => {
   const queryClient = useQueryClient();

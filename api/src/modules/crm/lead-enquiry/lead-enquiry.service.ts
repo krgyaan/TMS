@@ -7,12 +7,24 @@ import { siteVisitContacts, type SiteVisitContact } from '@db/schemas/crm/site-v
 import { privateCostingSheets } from '@db/schemas/crm/private-costing-sheets.schema';
 import { leads, type NewLead } from '@db/schemas/crm/leads.schema';
 import { leadContacts } from '@db/schemas/crm/lead-contacts.schema';
+import { tenderInfos, type TenderInfo } from '@db/schemas/tendering/tenders.schema';
+import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { physicalDocs } from '@db/schemas/tendering/physical-docs.schema';
+import { rfqs } from '@db/schemas/tendering/rfqs.schema';
+import { paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { tenderDocumentChecklists } from '@db/schemas/tendering/tender-document-checklists.schema';
+import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
+import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
+import { tenderQueries } from '@db/schemas/tendering/tender-queries.schema';
+import { reverseAuctions } from '@db/schemas/tendering/reverse-auction.schema';
+import { tenderResults } from '@db/schemas/tendering/tender-result.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { organizations } from '@db/schemas/master/organizations.schema';
 import { teams } from '@db/schemas/master/teams.schema';
-import { locations } from '@db/schemas/master/locations.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
 import { users } from '@db/schemas/auth/users.schema';
-import { and, asc, desc, eq, ilike, like, or, sql, type SQL } from 'drizzle-orm';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { and, asc, desc, eq, ilike, inArray, like, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { GoogleDriveService } from '@/modules/integrations/google/google-drive.service';
 import type { CreateLeadEnquiryDto, UpdateLeadEnquiryDto, CreateSiteVisitDto, UpdateSiteVisitDto, UpdateSiteVisitDetailsDto, CreateSiteVisitContactDto, CreateSiteVisitContactArrayDto, EnquiryContactDto, CreateEnquiryWithLeadDto } from './dto/lead-enquiry.dto';
@@ -37,6 +49,8 @@ export type LeadEnquiryWithNames = LeadEnquiry & {
     teamName?: string | null;
     hasSiteVisit?: boolean;
     costingSheetStatus?: string | null;
+    tenderStatusName?: string | null;
+    tenderStage?: string | null;
     contacts?: EnquiryContactDto[] | null;
 };
 
@@ -48,6 +62,7 @@ export class LeadEnquiryService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly googleDriveService: GoogleDriveService,
+        private readonly tenderStatusHistoryService: TenderStatusHistoryService,
     ) {}
 
     async findAll(filters?: LeadEnquiryListFilters): Promise<{
@@ -115,6 +130,7 @@ export class LeadEnquiryService {
                 updatedByName: updatedByUser.name,
                 hasSiteVisit: hasSiteVisitExpr,
                 costingSheetStatus: costingSheetStatusExpr,
+                tenderStatusName: statuses.name,
             })
             .from(leadEnquiries)
             .leftJoin(teams, eq(teams.id, sql`NULLIF(${leadEnquiries.team}, '')::BIGINT`))
@@ -123,10 +139,17 @@ export class LeadEnquiryService {
             .leftJoin(organizations, eq(organizations.id, leadEnquiries.organisationId))
             .leftJoin(createdByUser, eq(createdByUser.id, leadEnquiries.createdBy))
             .leftJoin(updatedByUser, eq(updatedByUser.id, leadEnquiries.updatedBy))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, leadEnquiries.tenderId))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
             .offset(offset);
+
+        const tenderIds = rows
+            .map((row) => row.leadEnquiries.tenderId)
+            .filter((id): id is number => id != null);
+        const tenderStages = await this.computeTenderStages(tenderIds);
 
         return {
             data: rows.map(row => ({
@@ -138,6 +161,10 @@ export class LeadEnquiryService {
                 updatedByName: row.updatedByName ?? null,
 hasSiteVisit: row.hasSiteVisit ?? false,
                 costingSheetStatus: row.costingSheetStatus ?? null,
+                tenderStatusName: row.tenderStatusName ?? null,
+                tenderStage: row.leadEnquiries.tenderId != null
+                    ? (tenderStages.get(row.leadEnquiries.tenderId) ?? null)
+                    : null,
             })),
             meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
@@ -158,6 +185,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 updatedByName: updatedByUser.name,
                 hasSiteVisit: hasSiteVisitExpr,
                 costingSheetStatus: costingSheetStatusExpr,
+                tenderStatusName: statuses.name,
             })
             .from(leadEnquiries)
             .leftJoin(teams, eq(teams.id, sql`NULLIF(${leadEnquiries.team}, '')::BIGINT`))
@@ -166,6 +194,8 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             .leftJoin(organizations, eq(organizations.id, leadEnquiries.organisationId))
             .leftJoin(createdByUser, eq(createdByUser.id, leadEnquiries.createdBy))
             .leftJoin(updatedByUser, eq(updatedByUser.id, leadEnquiries.updatedBy))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, leadEnquiries.tenderId))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(eq(leadEnquiries.id, id))
             .limit(1);
 
@@ -182,6 +212,9 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             .where(eq(leadContacts.enquiryId, id))
             .orderBy(asc(leadContacts.id));
 
+        const tenderIds = row.leadEnquiries.tenderId != null ? [row.leadEnquiries.tenderId] : [];
+        const tenderStages = await this.computeTenderStages(tenderIds);
+
         return {
             ...row.leadEnquiries,
             leadName: row.leadName ?? null,
@@ -192,6 +225,10 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             updatedByName: row.updatedByName ?? null,
             hasSiteVisit: row.hasSiteVisit ?? false,
             costingSheetStatus: row.costingSheetStatus ?? null,
+            tenderStatusName: row.tenderStatusName ?? null,
+            tenderStage: row.leadEnquiries.tenderId != null
+                ? (tenderStages.get(row.leadEnquiries.tenderId) ?? null)
+                : null,
             contacts,
         };
     }
@@ -228,27 +265,12 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
         return newOrg.id;
     }
 
-    private async resolveLocationCode(db: DbInstance, locationCode: string): Promise<string> {
-        if (!locationCode) return locationCode;
-
-        const locId = Number(locationCode);
-        if (isNaN(locId)) return locationCode;
-
-        const [location] = await db
-            .select({ acronym: locations.acronym })
-            .from(locations)
-            .where(eq(locations.id, locId))
-            .limit(1);
-
-        return location?.acronym ?? locationCode;
-    }
-
     private async generateEnquiryNumber(db: DbInstance): Promise<string> {
         const now = new Date();
         const mm = String(now.getMonth() + 1).padStart(2, '0');
         const yy = String(now.getFullYear()).slice(-2);
         const mmyy = `${mm}${yy}`;
-        const prefix = `ENQ-${mmyy}-`;
+        const prefix = `EN/${mmyy}/`;
 
         const [lastEnquiry] = await db
             .select({ enquiryNumber: leadEnquiries.enquiryNumber })
@@ -265,14 +287,112 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
         return `${prefix}${String(seq).padStart(3, '0')}`;
     }
 
+    private async createLinkedTender(
+        db: DbInstance,
+        params: {
+            team?: string | null;
+            enqName: string;
+            organisationId?: number | null;
+            itemId: number;
+            enquiryNumber: string;
+            dueDate?: string | null;
+            locationCode?: string | null;
+            documents?: string | null;
+            approxValue?: string | null;
+            userId: number;
+        },
+    ): Promise<TenderInfo> {
+        const dueDate = params.dueDate
+            ? new Date(params.dueDate)
+            : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        const [tender] = await db
+            .insert(tenderInfos)
+            .values({
+                team: Number(params.team) || 1,
+                tenderNo: params.enquiryNumber,
+                tenderName: params.enqName,
+                organization: params.organisationId ?? null,
+                item: params.itemId,
+                location: params.locationCode ? Number(params.locationCode) : null,
+                gstValues: params.approxValue ?? "0",
+                dueDate,
+                documents: params.documents ?? null,
+                teamMember: null,
+                status: 0,
+            })
+            .returning();
+
+        return tender;
+    }
+
+    private async linkEnquiryToTender(
+        db: DbInstance,
+        enquiryId: number,
+        tenderId: number,
+        userId: number,
+    ): Promise<void> {
+        await db
+            .update(leadEnquiries)
+            .set({ tenderId })
+            .where(eq(leadEnquiries.id, enquiryId));
+
+        await this.tenderStatusHistoryService.trackStatusChange(
+            tenderId, 0, userId, null, 'Tender created from enquiry', db,
+        );
+    }
+
+    private async computeTenderStages(tenderIds: number[]): Promise<Map<number, string | null>> {
+        const stageMap = new Map<number, string | null>();
+        if (tenderIds.length === 0) return stageMap;
+
+        const uniqueIds = [...new Set(tenderIds)];
+        const stageTable = [
+            { table: tenderInformation, label: 'Info Sheet' },
+            { table: physicalDocs, label: 'Physical Docs' },
+            { table: rfqs, label: 'RFQ' },
+            { table: paymentRequests, label: 'EMD / Fees' },
+            { table: tenderDocumentChecklists, label: 'Checklist' },
+            { table: tenderCostingSheets, label: 'Costing' },
+            { table: bidSubmissions, label: 'Bid' },
+            { table: tenderQueries, label: 'TQ' },
+            { table: reverseAuctions, label: 'RA' },
+            { table: tenderResults, label: 'Result' },
+        ] as const;
+
+        const present = new Map<number, Set<string>>();
+        for (const id of uniqueIds) present.set(id, new Set());
+
+        for (const { table, label } of stageTable) {
+            const rows = await this.db
+                .select({ tenderId: (table as any).tenderId })
+                .from(table as any)
+                .where(inArray((table as any).tenderId, uniqueIds));
+
+            for (const row of rows) {
+                present.get(row.tenderId)?.add(label);
+            }
+        }
+
+        const orderedStages = stageTable.map((s) => s.label);
+        for (const [id, labels] of present) {
+            let current: string | null = null;
+            for (const label of orderedStages) {
+                if (labels.has(label)) current = label;
+            }
+            stageMap.set(id, current);
+        }
+
+        return stageMap;
+    }
+
     async create(data: CreateLeadEnquiryDto, userId: number): Promise<LeadEnquiry> {
         const db = this.db;
 
         // 1. Resolve Organization
         const organisationId = await this.resolveOrganizationId(db, data.organizationName);
 
-        // 2. Resolve Location Code (id → acronym)
-        const locationCode = await this.resolveLocationCode(db, data.locationCode);
+        // 2. Location Code stored directly as the location id
+        const locationCode = data.locationCode;
 
         // 3. Generate Enquiry Number
         const enquiryNumber = await this.generateEnquiryNumber(db);
@@ -289,6 +409,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 itemId: data.itemId,
                 locationCode,
                 approxValue: data.approxValue,
+                dueDate: data.dueDate ? new Date(data.dueDate) : null,
                 siteVisitRequired: data.siteVisitRequired ?? false,
                 createdBy: userId,
                 orgAbbName: data.orgAbbName ?? null,
@@ -319,11 +440,27 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 );
         }
 
+        // 6. Create linked tender so the enquiry flows through the tender workflow
+        const tender = await this.createLinkedTender(db, {
+            team: data.team ?? null,
+            enqName: data.enqName,
+            organisationId,
+            itemId: data.itemId,
+            enquiryNumber,
+            dueDate: data.dueDate ?? null,
+            locationCode: data.locationCode ?? null,
+            documents: data.enquiryFile ?? null,
+            approxValue: data.approxValue ?? null,
+            userId,
+        });
+
+        await this.linkEnquiryToTender(db, newEnquiry.id, tender.id, userId);
+
         return newEnquiry;
     }
 
     async createWithLead(data: CreateEnquiryWithLeadDto, userId: number): Promise<{ lead: typeof leads.$inferSelect; enquiry: LeadEnquiry }> {
-        return this.db.transaction(async (tx) => {
+        const result = await this.db.transaction(async (tx) => {
             const primaryContact = data.contacts[0] ?? null;
 
             // 1. Create the lead row (companyName from the enquiry organisation)
@@ -348,8 +485,8 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             // 2. Resolve Organization
             const organisationId = await this.resolveOrganizationId(tx, data.organizationName);
 
-            // 3. Resolve Location Code (id → acronym)
-            const locationCode = await this.resolveLocationCode(tx, data.locationCode);
+            // 3. Location Code stored directly as the location id
+            const locationCode = data.locationCode;
 
             // 4. Generate Enquiry Number
             const enquiryNumber = await this.generateEnquiryNumber(tx);
@@ -365,6 +502,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                     itemId: data.itemId,
                     locationCode,
                     approxValue: data.approxValue,
+                    dueDate: data.dueDate ? new Date(data.dueDate) : null,
                     siteVisitRequired: data.siteVisitRequired ?? false,
                     createdBy: userId,
                     orgAbbName: data.orgAbbName ?? null,
@@ -396,29 +534,40 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                     );
             }
 
-            return { lead, enquiry };
+            // 7. Create linked tender so the enquiry flows through the tender workflow
+            const tender = await this.createLinkedTender(tx, {
+                team: data.team ?? null,
+                enqName: data.enqName,
+                organisationId,
+                itemId: data.itemId,
+                enquiryNumber,
+                dueDate: data.dueDate ?? null,
+                locationCode: data.locationCode ?? null,
+                documents: data.enquiryFile ?? null,
+                approxValue: data.approxValue ?? null,
+                userId,
+            });
+
+            await this.linkEnquiryToTender(tx, enquiry.id, tender.id, userId);
+
+            return { lead, enquiry, tenderId: tender.id };
         });
+
+        return { lead: result.lead, enquiry: result.enquiry };
     }
 
     async update(id: number, data: UpdateLeadEnquiryDto, userId: number): Promise<LeadEnquiry> {
-        let locationCode = data.locationCode;
-        if (locationCode) {
-            const locId = Number(locationCode);
-            if (!isNaN(locId)) {
-                const [location] = await this.db
-                    .select({ acronym: locations.acronym })
-                    .from(locations)
-                    .where(eq(locations.id, locId))
-                    .limit(1);
+        const locationCode = data.locationCode;
 
-                if (location?.acronym) {
-                    locationCode = location.acronym;
-                }
-            }
-        }
-
-        const { contacts, ...restData } = data;
-        const updateData = { ...restData, locationCode, updatedBy: userId, updatedAt: new Date() };
+        const { contacts, dueDate, enquiryFile, approxValue, ...restData } = data;
+        const updateData = {
+            ...restData,
+            locationCode,
+            dueDate: dueDate ? new Date(dueDate) : undefined,
+            enquiryFile: enquiryFile !== undefined ? enquiryFile : undefined,
+            updatedBy: userId,
+            updatedAt: new Date(),
+        };
 
         const [updated] = await this.db
             .update(leadEnquiries)
@@ -427,6 +576,29 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             .returning();
 
         if (!updated) throw new NotFoundException(`Lead enquiry with ID ${id} not found`);
+
+        // Keep the linked tender's due date, location and documents in sync
+        if (updated.tenderId) {
+            const tenderSync: {
+                dueDate?: Date;
+                location?: number | null;
+                documents?: string | null;
+                gstValues?: string;
+                updatedAt: Date;
+            } = { updatedAt: new Date() };
+
+            if (dueDate) tenderSync.dueDate = new Date(dueDate);
+            if (locationCode) tenderSync.location = Number(locationCode);
+            if (enquiryFile !== undefined) tenderSync.documents = enquiryFile;
+            if (approxValue !== undefined) tenderSync.gstValues = approxValue;
+
+            if (Object.keys(tenderSync).length > 1) {
+                await this.db
+                    .update(tenderInfos)
+                    .set(tenderSync)
+                    .where(eq(tenderInfos.id, updated.tenderId));
+            }
+        }
 
         // Replace enquiry contacts when provided
         if (contacts) {

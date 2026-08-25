@@ -6,6 +6,7 @@ import {
     integer, 
     timestamp,
     boolean,
+    jsonb,
     pgEnum
 } from "drizzle-orm/pg-core";
 
@@ -19,6 +20,12 @@ export const leads = pgTable("leads", {
     phone: varchar("phone", { length: 255 }),
     email: varchar("email", { length: 255 }),
     address: varchar("address", { length: 255 }),
+    liveLocation: jsonb("live_location").$type<{
+        address?: string | null;
+        latitude?: number | null;
+        longitude?: number | null;
+        capturedAt?: string | null;
+    }>(),
     country: varchar("country", { length: 2000 }),
     state: varchar("state", { length: 255 }),
     type: varchar("type", { length: 255 }),

@@ -44,6 +44,7 @@ export type TenderInfoWithNames = TenderInfo & {
     websiteLink: string | null;
     bidSubmissionDate: Date | null;
     resultDate: Date | null;
+    enquiryId: number | null;
 };
 
 export type TenderReference = {
