@@ -94,6 +94,17 @@ class TenderInfosService extends BaseApiService {
         if (item) params.set('item', String(item));
         return this.get(`/tender-name-check?${params.toString()}`);
     }
+
+    async checkTenderNoExists(
+        tenderNo: string,
+        organization?: number,
+        item?: number,
+    ): Promise<{ exists: boolean; count: number; tenderNo: string; existingTenders: { tenderNo: string; tenderName: string; teamMemberName: string }[] }> {
+        const params = new URLSearchParams({ tenderNo });
+        if (organization) params.set('organization', String(organization));
+        if (item) params.set('item', String(item));
+        return this.get(`/tender-no-check?${params.toString()}`);
+    }
 }
 
 export const tenderInfosService = new TenderInfosService();

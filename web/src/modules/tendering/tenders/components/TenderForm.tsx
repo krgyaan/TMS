@@ -113,6 +113,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
     const location = useWatch({ control: manualForm.control, name: "location" });
     const team = useWatch({ control: manualForm.control, name: "team" });
     const watchTenderName = useWatch({ control: manualForm.control, name: "tenderName" });
+    const watchTenderNo = useWatch({ control: manualForm.control, name: "tenderNo" });
     console.log({watchTenderName});
 
     // Watch documents for display
@@ -366,9 +367,10 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                     <TabsContent value="manually">
                         <Form {...manualForm}>
                             <form onSubmit={manualForm.handleSubmit(handleManualSubmit)} className="space-y-8">
-                                {watchTenderName && (
+                                {(watchTenderName || watchTenderNo) && (
                                     <TenderNameWarningAlert
                                         tenderName={watchTenderName}
+                                        tenderNo={watchTenderNo}
                                         organization={manualForm.watch("organization")}
                                         item={manualForm.watch("item")}
                                         onSuffixDetected={(suggestion) => {

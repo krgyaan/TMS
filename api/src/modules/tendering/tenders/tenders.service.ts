@@ -1279,6 +1279,50 @@ export class TenderInfosService {
         };
     }
 
+    async checkTenderNoExists(tenderNo: string, organization?: number, item?: number) {
+        if (!tenderNo || !tenderNo.trim()) {
+            return { exists: false, count: 0, tenderNo: '', existingTenders: [] };
+        }
+
+        const trimmed = tenderNo.trim();
+
+        const conditions: any[] = [
+            eq(tenderInfos.tenderNo, trimmed),
+            eq(tenderInfos.deleteStatus, 0),
+        ];
+
+        if (organization) {
+            conditions.push(eq(tenderInfos.organization, organization));
+        }
+        if (item) {
+            conditions.push(eq(tenderInfos.item, item));
+        }
+
+        const rows = await this.db
+            .select({
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                teamMemberName: users.name,
+            })
+            .from(tenderInfos)
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .where(and(...conditions));
+
+        const count = rows.length;
+        const exists = count > 0;
+
+        return {
+            exists,
+            count,
+            tenderNo: trimmed,
+            existingTenders: rows.map(r => ({
+                tenderNo: r.tenderNo,
+                tenderName: r.tenderName,
+                teamMemberName: r.teamMemberName ?? 'Unassigned',
+            })),
+        };
+    }
+
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{
         'under-preparation': number;
         'did-not-bid': number;

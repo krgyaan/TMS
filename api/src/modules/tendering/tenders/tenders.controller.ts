@@ -110,6 +110,19 @@ export class TenderInfoController {
         );
     }
 
+    @Get('tender-no-check')
+    async checkTenderNo(
+        @Query('tenderNo') tenderNo: string,
+        @Query('organization') organization?: string,
+        @Query('item') item?: string,
+    ) {
+        return this.tenderInfosService.checkTenderNoExists(
+            tenderNo,
+            organization ? Number(organization) : undefined,
+            item ? Number(item) : undefined,
+        );
+    }
+
     @Get(':id/mailing-logs')
     async getMailingLogs(@Param('id', ParseIntPipe) id: number) {
         return this.tenderInfosService.getMailingLogs(id);

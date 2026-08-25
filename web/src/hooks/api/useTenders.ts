@@ -124,6 +124,14 @@ export const useCheckTenderName = (tenderName: string, organization?: number, it
     });
 };
 
+export const useCheckTenderNo = (tenderNo: string, organization?: number, item?: number) => {
+    return useQuery({
+        queryKey: [...tendersKey.all, 'tender-no-check', tenderNo, organization, item] as const,
+        queryFn: () => tenderInfosService.checkTenderNoExists(tenderNo, organization, item),
+        enabled: !!tenderNo && tenderNo.trim().length > 0,
+    });
+};
+
 export const useTendersDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
     // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
