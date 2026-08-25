@@ -175,10 +175,10 @@ export class ChequeService {
                 ilike(instrumentChequeDetails.chequeNo, searchStr),
                 ilike(instrumentChequeDetails.chequeReason, searchStr),
                 ilike(paymentInstruments.favouring, searchStr),
-                ilike(paymentInstruments.amount, searchStr),
-                ilike(instrumentChequeDetails.chequeDate, searchStr),
-                ilike(tenderInfos.dueDate, searchStr),
-                ilike(instrumentChequeDetails.dueDate, searchStr),
+                ilike(sql`${paymentInstruments.amount}::text`, searchStr),
+                ilike(sql`${instrumentChequeDetails.chequeDate}::text`, searchStr),
+                ilike(sql`${tenderInfos.dueDate}::text`, searchStr),
+                ilike(sql`${instrumentChequeDetails.dueDate}::text`, searchStr),
                 ilike(paymentInstruments.status, searchStr),
             ));
         }
