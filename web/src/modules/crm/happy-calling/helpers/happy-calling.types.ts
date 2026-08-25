@@ -13,6 +13,8 @@ export type HappyCallingRow = {
     details: string | null;
     createdBy: number | null;
     createdByName?: string | null;
+    nextFollowupDate?: string | null;
+    lastFollowupDate?: string | null;
     createdAt: string;
     updatedAt: string;
 };

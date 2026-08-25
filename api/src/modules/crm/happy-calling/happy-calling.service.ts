@@ -1,8 +1,9 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, desc, asc, and, or, ilike, sql, type SQL } from 'drizzle-orm';
+import { eq, desc, asc, and, or, ilike, sql, isNotNull, type SQL } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { happyCalling } from '@db/schemas/crm/happy-calling.schema';
+import { leadFollowups } from '@db/schemas/crm/lead-followups.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import type { CreateHappyCallingDto, UpdateHappyCallingDto } from './dto/happy-calling.dto';
 
@@ -18,6 +19,19 @@ export type HappyCallingListFilters = {
 export class HappyCallingService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
+    private getLatestFollowupSubquery() {
+        return this.db
+            .selectDistinctOn([leadFollowups.happyCallingId], {
+                happyCallingId: leadFollowups.happyCallingId,
+                nextFollowupDate: leadFollowups.nextFollowupDate,
+                lastFollowupDate: leadFollowups.createdAt,
+            })
+            .from(leadFollowups)
+            .where(and(eq(leadFollowups.sourceType, 'happy_calling'), isNotNull(leadFollowups.happyCallingId)))
+            .orderBy(leadFollowups.happyCallingId, desc(leadFollowups.createdAt), desc(leadFollowups.id))
+            .as('latest_happy_followup');
+    }
+
     async findAll(filters?: HappyCallingListFilters) {
         const page = filters?.page ?? 1;
         const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
@@ -25,6 +39,8 @@ export class HappyCallingService {
         const sortOrder = filters?.sortOrder ?? 'desc';
         const sortBy = filters?.sortBy ?? 'createdAt';
         const search = filters?.search?.trim();
+
+        const latestFollowupSubquery = this.getLatestFollowupSubquery();
 
         const orderColumn =
             sortBy === 'name'
@@ -41,7 +57,11 @@ export class HappyCallingService {
                           ? happyCalling.status
                           : sortBy === 'broadcast'
                             ? happyCalling.broadcast
-                            : happyCalling.createdAt;
+                            : sortBy === 'nextFollowupDate'
+                              ? latestFollowupSubquery.nextFollowupDate
+                              : sortBy === 'lastFollowupDate'
+                                ? latestFollowupSubquery.lastFollowupDate
+                                : happyCalling.createdAt;
         const orderFn = sortOrder === 'desc' ? desc : asc;
 
         const conditions: (SQL | undefined)[] = [];
@@ -68,6 +88,7 @@ export class HappyCallingService {
                 .select()
                 .from(happyCalling)
                 .leftJoin(users, eq(users.id, happyCalling.createdBy))
+                .leftJoin(latestFollowupSubquery, eq(latestFollowupSubquery.happyCallingId, happyCalling.id))
                 .where(whereClause)
                 .orderBy(orderFn(orderColumn))
                 .limit(limit)
@@ -77,6 +98,8 @@ export class HappyCallingService {
         const data = rows.map((row) => ({
             ...row.happy_calling,
             createdByName: row.users?.name ?? null,
+            nextFollowupDate: row.latest_happy_followup?.nextFollowupDate ?? null,
+            lastFollowupDate: row.latest_happy_followup?.lastFollowupDate ?? null,
         }));
 
         return {
@@ -91,10 +114,12 @@ export class HappyCallingService {
     }
 
     async findById(id: number) {
+        const latestFollowupSubquery = this.getLatestFollowupSubquery();
         const [row] = await this.db
             .select()
             .from(happyCalling)
             .leftJoin(users, eq(users.id, happyCalling.createdBy))
+            .leftJoin(latestFollowupSubquery, eq(latestFollowupSubquery.happyCallingId, happyCalling.id))
             .where(eq(happyCalling.id, id))
             .limit(1);
 
@@ -105,6 +130,8 @@ export class HappyCallingService {
         return {
             ...row.happy_calling,
             createdByName: row.users?.name ?? null,
+            nextFollowupDate: row.latest_happy_followup?.nextFollowupDate ?? null,
+            lastFollowupDate: row.latest_happy_followup?.lastFollowupDate ?? null,
         };
     }
 
