@@ -37,8 +37,6 @@ export function HappyCallingView({ record }: Props) {
                 )}
             </Row>
             <Row label="Phone">{formatOrDash(record.phone)}</Row>
-            <Row label="Date">{formatDateTime(record.date ?? null)}</Row>
-            <Row label="Next Follow Up Date">{formatDateTime(record.nextFollowupDate ?? null)}</Row>
             <Row label="Status">
                 {record.status ? (
                     <Badge variant={record.status === 'done' ? 'default' : 'secondary'}>
@@ -49,6 +47,7 @@ export function HappyCallingView({ record }: Props) {
                 )}
             </Row>
             <Row label="Broadcast">{broadcastName || record.broadcast || '—'}</Row>
+            <Row label="Created By">{record.createdByName || '—'}</Row>
             <Row label="Details">{formatOrDash(record.details)}</Row>
             <Row label="Created At">{formatDateTime(record.createdAt ?? null)}</Row>
             <Row label="Updated At">{formatDateTime(record.updatedAt ?? null)}</Row>

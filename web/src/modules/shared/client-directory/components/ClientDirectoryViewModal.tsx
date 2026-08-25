@@ -70,6 +70,7 @@ export function ClientDirectoryViewModal({ open, onOpenChange, record }: Props) 
                                 '—'
                             )}
                         </Row>
+                        <Row label="Created By">{record.createdByName || '—'}</Row>
                         <Row label="Created At">{formatDateTime(record.createdAt ?? null)}</Row>
                         <Row label="Updated At">{formatDateTime(record.updatedAt ?? null)}</Row>
                     </div>

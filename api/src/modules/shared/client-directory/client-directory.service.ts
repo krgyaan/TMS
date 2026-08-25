@@ -3,6 +3,7 @@ import { eq, ne, desc, asc, and, or, ilike, sql, type SQL } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { clientDirectory } from '@db/schemas/shared/client-directory.schema';
+import { users } from '@db/schemas/auth/users.schema';
 import { ClientDirectorySyncService } from '@/modules/shared/client-directory/client-directory-sync.service';
 import type { CreateClientDirectoryDto, UpdateClientDirectoryDto } from './dto/client-directory.dto';
 
@@ -24,6 +25,8 @@ export type ClientDirectoryRow = {
     organization: string | null;
     giftingTier: string | null;
     remarks: { text: string; by: string; byId: number; at: string }[] | null;
+    createdBy: number | null;
+    createdByName: string | null;
     createdAt: Date;
     updatedAt: Date;
 };
@@ -82,14 +85,20 @@ export class ClientDirectoryService {
             this.db
                 .select()
                 .from(clientDirectory)
+                .leftJoin(users, eq(users.id, clientDirectory.createdBy))
                 .where(whereClause)
                 .orderBy(orderFn(orderColumn))
                 .limit(limit)
                 .offset(offset),
         ]);
 
+        const data = rows.map((row) => ({
+            ...row.client_directory,
+            createdByName: row.users?.name ?? null,
+        }));
+
         return {
-            data: rows,
+            data,
             meta: {
                 total: countResult,
                 page,
@@ -103,6 +112,7 @@ export class ClientDirectoryService {
         const [row] = await this.db
             .select()
             .from(clientDirectory)
+            .leftJoin(users, eq(users.id, clientDirectory.createdBy))
             .where(eq(clientDirectory.id, id))
             .limit(1);
 
@@ -110,7 +120,10 @@ export class ClientDirectoryService {
             throw new NotFoundException(`Client directory entry with ID ${id} not found`);
         }
 
-        return row;
+        return {
+            ...row.client_directory,
+            createdByName: row.users?.name ?? null,
+        };
     }
 
     async create(data: CreateClientDirectoryDto, user?: { id: number; name: string }) {
@@ -148,6 +161,7 @@ export class ClientDirectoryService {
                 organization: data.organization ?? null,
                 giftingTier: data.giftingTier ?? null,
                 remarks: stampedRemarks,
+                createdBy: user?.id ?? null,
             })
             .returning({ id: clientDirectory.id });
 

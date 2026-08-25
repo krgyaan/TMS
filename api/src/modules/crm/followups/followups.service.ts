@@ -314,9 +314,6 @@ export class FollowupsService {
                     status: statusMap[data.type] ?? data.type,
                     updatedAt: new Date(),
                 };
-                if ('nextFollowupDate' in data && data.nextFollowupDate) {
-                    happyCallingUpdate.nextFollowupDate = new Date(data.nextFollowupDate);
-                }
                 await tx
                     .update(happyCalling)
                     .set(happyCallingUpdate)
