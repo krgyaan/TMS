@@ -172,7 +172,7 @@ const EnquiryListPage = () => {
             label: "Quotation Followup",
             onClick: (row) => navigate(paths.crm.enquiryQuotationFollowup(row.id)),
             icon: <MessageCircle className="h-4 w-4" />,
-            visible: (row) => row.tenderId != null,
+            visible: (row) => row.tenderStatusId === 17,
         },
         {
             label: "View",
@@ -231,6 +231,43 @@ const EnquiryListPage = () => {
                 const label = id != null ? (ENQUIRY_STATUS_LABELS[id] ?? name) : name;
                 if (!label) return "-";
                 return <Badge variant="secondary">{label}</Badge>;
+            },
+        },
+        {
+            field: "nextFollowupDate",
+            headerName: "Next Followup",
+            width: 150,
+            cellRenderer: (params: any) => {
+                if (!params.value) {
+                    return <span className="text-muted-foreground">-</span>;
+                }
+                const date = new Date(params.value);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const tomorrow = new Date(today);
+                tomorrow.setDate(today.getDate() + 1);
+                const formatted = date.toLocaleDateString('en-IN', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                });
+                if (date < today) {
+                    return <span className="text-red-500 font-medium">{formatted}</span>;
+                }
+                if (date >= today && date < tomorrow) {
+                    return <span className="text-green-600 font-semibold">Today</span>;
+                }
+                return <span className="text-blue-500">{formatted}</span>;
+            },
+        },
+        {
+            field: "latestFollowupType",
+            headerName: "Last Followup",
+            width: 130,
+            cellRenderer: (params: any) => {
+                const val: string | null | undefined = params.value;
+                if (!val) return "-";
+                return <Badge variant="outline" className="capitalize font-medium">{val}</Badge>;
             },
         },
         {

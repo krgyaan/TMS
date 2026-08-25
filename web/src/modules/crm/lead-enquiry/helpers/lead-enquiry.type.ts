@@ -36,6 +36,9 @@ export interface LeadEnquiryWithNames extends LeadEnquiry {
     hasSiteVisit?: boolean;
     tenderStatusId?: number | null;
     tenderStatusName?: string | null;
+    latestFollowupType?: string | null;
+    nextFollowupDate?: string | null;
+    lastFollowupAt?: string | null;
     tenderStage?: string | null;
     contacts?: EnquiryContact[] | null;
 }
@@ -70,8 +73,7 @@ export interface CreateLeadEnquiryRequest {
     contacts?: EnquiryContact[] | null;
 }
 
-export interface UpdateLeadEnquiryRequest extends Partial<CreateLeadEnquiryRequest> {
-}
+export type UpdateLeadEnquiryRequest = Partial<CreateLeadEnquiryRequest>;
 
 export interface CreateEnquiryWithLeadRequest {
     team?: string | null;

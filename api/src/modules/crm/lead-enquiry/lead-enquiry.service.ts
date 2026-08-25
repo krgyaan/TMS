@@ -6,6 +6,7 @@ import { siteVisits, type SiteVisit, type NewSiteVisit } from '@db/schemas/crm/s
 import { siteVisitContacts, type SiteVisitContact } from '@db/schemas/crm/site-visit-contacts.schema';
 import { leads, type NewLead } from '@db/schemas/crm/leads.schema';
 import { leadContacts } from '@db/schemas/crm/lead-contacts.schema';
+import { leadFollowups } from '@db/schemas/crm/lead-followups.schema';
 import { tenderInfos, type TenderInfo } from '@db/schemas/tendering/tenders.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { physicalDocs } from '@db/schemas/tendering/physical-docs.schema';
@@ -49,6 +50,9 @@ export type LeadEnquiryWithNames = LeadEnquiry & {
     tenderStatusId?: number | null;
     tenderStatusName?: string | null;
     tenderStage?: string | null;
+    latestFollowupType?: string | null;
+    nextFollowupDate?: string | null;
+    lastFollowupAt?: string | null;
     contacts?: EnquiryContactDto[] | null;
 };
 
@@ -127,6 +131,21 @@ export class LeadEnquiryService {
                 hasSiteVisit: hasSiteVisitExpr,
                 tenderStatusId: statuses.id,
                 tenderStatusName: statuses.name,
+                latestFollowupType: sql<string | null>`(
+                    SELECT lf.type FROM ${leadFollowups} lf
+                    WHERE lf.enquiry_id = ${leadEnquiries.id}
+                    ORDER BY lf.created_at DESC, lf.id DESC LIMIT 1
+                )`,
+                nextFollowupDate: sql<string | null>`(
+                    SELECT lf.next_followup_date FROM ${leadFollowups} lf
+                    WHERE lf.enquiry_id = ${leadEnquiries.id} AND lf.next_followup_date IS NOT NULL
+                    ORDER BY lf.created_at DESC, lf.id DESC LIMIT 1
+                )`,
+                lastFollowupAt: sql<string | null>`(
+                    SELECT lf.created_at FROM ${leadFollowups} lf
+                    WHERE lf.enquiry_id = ${leadEnquiries.id}
+                    ORDER BY lf.created_at DESC, lf.id DESC LIMIT 1
+                )`,
             })
             .from(leadEnquiries)
             .leftJoin(teams, eq(teams.id, sql`NULLIF(${leadEnquiries.team}, '')::BIGINT`))
@@ -158,6 +177,9 @@ export class LeadEnquiryService {
 hasSiteVisit: row.hasSiteVisit ?? false,
                 tenderStatusId: row.tenderStatusId ?? null,
                 tenderStatusName: row.tenderStatusName ?? null,
+                latestFollowupType: row.latestFollowupType ?? null,
+                nextFollowupDate: row.nextFollowupDate ?? null,
+                lastFollowupAt: row.lastFollowupAt ?? null,
                 tenderStage: row.leadEnquiries.tenderId != null
                     ? (tenderStages.get(row.leadEnquiries.tenderId) ?? null)
                     : null,
@@ -181,6 +203,21 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 hasSiteVisit: hasSiteVisitExpr,
                 tenderStatusId: statuses.id,
                 tenderStatusName: statuses.name,
+                latestFollowupType: sql<string | null>`(
+                    SELECT lf.type FROM ${leadFollowups} lf
+                    WHERE lf.enquiry_id = ${leadEnquiries.id}
+                    ORDER BY lf.created_at DESC, lf.id DESC LIMIT 1
+                )`,
+                nextFollowupDate: sql<string | null>`(
+                    SELECT lf.next_followup_date FROM ${leadFollowups} lf
+                    WHERE lf.enquiry_id = ${leadEnquiries.id} AND lf.next_followup_date IS NOT NULL
+                    ORDER BY lf.created_at DESC, lf.id DESC LIMIT 1
+                )`,
+                lastFollowupAt: sql<string | null>`(
+                    SELECT lf.created_at FROM ${leadFollowups} lf
+                    WHERE lf.enquiry_id = ${leadEnquiries.id}
+                    ORDER BY lf.created_at DESC, lf.id DESC LIMIT 1
+                )`,
             })
             .from(leadEnquiries)
             .leftJoin(teams, eq(teams.id, sql`NULLIF(${leadEnquiries.team}, '')::BIGINT`))
@@ -221,6 +258,9 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             hasSiteVisit: row.hasSiteVisit ?? false,
             tenderStatusId: row.tenderStatusId ?? null,
             tenderStatusName: row.tenderStatusName ?? null,
+            latestFollowupType: row.latestFollowupType ?? null,
+            nextFollowupDate: row.nextFollowupDate ?? null,
+            lastFollowupAt: row.lastFollowupAt ?? null,
             tenderStage: row.leadEnquiries.tenderId != null
                 ? (tenderStages.get(row.leadEnquiries.tenderId) ?? null)
                 : null,
