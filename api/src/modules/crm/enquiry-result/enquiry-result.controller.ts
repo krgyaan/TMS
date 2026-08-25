@@ -42,11 +42,6 @@ export class EnquiryResultController {
         return this.service.findByEnquiryId(enquiryId);
     }
 
-    @Get('followups-by-quotation/:quotationId')
-    async findFollowupsByQuotationId(@Param('quotationId', ParseIntPipe) quotationId: number) {
-        return this.service.findFollowupsByQuotationId(quotationId);
-    }
-
     @Post()
     async create(@ValidatedBody(CreateEnquiryResultSchema) body: CreateEnquiryResultDto) {
         return this.service.create(body);

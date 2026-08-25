@@ -4,7 +4,6 @@ import type { DbInstance } from '@db';
 import { leadEnquiries, type NewLeadEnquiry, type LeadEnquiry } from '@db/schemas/crm/lead-enquiries.schema';
 import { siteVisits, type SiteVisit, type NewSiteVisit } from '@db/schemas/crm/site-visits.schema';
 import { siteVisitContacts, type SiteVisitContact } from '@db/schemas/crm/site-visit-contacts.schema';
-import { privateCostingSheets } from '@db/schemas/crm/private-costing-sheets.schema';
 import { leads, type NewLead } from '@db/schemas/crm/leads.schema';
 import { leadContacts } from '@db/schemas/crm/lead-contacts.schema';
 import { tenderInfos, type TenderInfo } from '@db/schemas/tendering/tenders.schema';
@@ -26,7 +25,6 @@ import { users } from '@db/schemas/auth/users.schema';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { and, asc, desc, eq, ilike, inArray, like, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import { GoogleDriveService } from '@/modules/integrations/google/google-drive.service';
 import type { CreateLeadEnquiryDto, UpdateLeadEnquiryDto, CreateSiteVisitDto, UpdateSiteVisitDto, UpdateSiteVisitDetailsDto, CreateSiteVisitContactDto, CreateSiteVisitContactArrayDto, EnquiryContactDto, CreateEnquiryWithLeadDto } from './dto/lead-enquiry.dto';
 
 export type LeadEnquiryListFilters = {
@@ -48,7 +46,6 @@ export type LeadEnquiryWithNames = LeadEnquiry & {
     updatedByName?: string | null;
     teamName?: string | null;
     hasSiteVisit?: boolean;
-    costingSheetStatus?: string | null;
     tenderStatusId?: number | null;
     tenderStatusName?: string | null;
     tenderStage?: string | null;
@@ -62,7 +59,6 @@ const updatedByUser = alias(users, 'updated_by_user');
 export class LeadEnquiryService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-        private readonly googleDriveService: GoogleDriveService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
     ) {}
 
@@ -119,7 +115,6 @@ export class LeadEnquiryService {
         }
 
         const hasSiteVisitExpr = sql<boolean>`EXISTS (SELECT 1 FROM site_visits sv WHERE sv.enquiry_id = ${leadEnquiries.id})`;
-        const costingSheetStatusExpr = sql<string | null>`(SELECT pcs.status FROM private_costing_sheets pcs WHERE pcs.enquiry_id = ${leadEnquiries.id} LIMIT 1)`;
 
         const rows = await this.db
             .select({
@@ -130,7 +125,6 @@ export class LeadEnquiryService {
                 createdByName: createdByUser.name,
                 updatedByName: updatedByUser.name,
                 hasSiteVisit: hasSiteVisitExpr,
-                costingSheetStatus: costingSheetStatusExpr,
                 tenderStatusId: statuses.id,
                 tenderStatusName: statuses.name,
             })
@@ -162,7 +156,6 @@ export class LeadEnquiryService {
                 createdByName: row.createdByName ?? null,
                 updatedByName: row.updatedByName ?? null,
 hasSiteVisit: row.hasSiteVisit ?? false,
-                costingSheetStatus: row.costingSheetStatus ?? null,
                 tenderStatusId: row.tenderStatusId ?? null,
                 tenderStatusName: row.tenderStatusName ?? null,
                 tenderStage: row.leadEnquiries.tenderId != null
@@ -175,7 +168,6 @@ hasSiteVisit: row.hasSiteVisit ?? false,
 
 async findById(id: number): Promise<LeadEnquiryWithNames> {
         const hasSiteVisitExpr = sql<boolean>`EXISTS (SELECT 1 FROM site_visits sv WHERE sv.enquiry_id = ${leadEnquiries.id})`;
-        const costingSheetStatusExpr = sql<string | null>`(SELECT pcs.status FROM private_costing_sheets pcs WHERE pcs.enquiry_id = ${leadEnquiries.id} LIMIT 1)`;
 
         const [row] = await this.db
             .select({
@@ -187,7 +179,6 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 createdByName: createdByUser.name,
                 updatedByName: updatedByUser.name,
                 hasSiteVisit: hasSiteVisitExpr,
-                costingSheetStatus: costingSheetStatusExpr,
                 tenderStatusId: statuses.id,
                 tenderStatusName: statuses.name,
             })
@@ -228,7 +219,6 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             createdByName: row.createdByName ?? null,
             updatedByName: row.updatedByName ?? null,
             hasSiteVisit: row.hasSiteVisit ?? false,
-            costingSheetStatus: row.costingSheetStatus ?? null,
             tenderStatusId: row.tenderStatusId ?? null,
             tenderStatusName: row.tenderStatusName ?? null,
             tenderStage: row.leadEnquiries.tenderId != null
@@ -804,27 +794,5 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             .from(siteVisitContacts)
             .where(eq(siteVisitContacts.siteVisitId, siteVisitId))
             .orderBy(asc(siteVisitContacts.id));
-    }
-
-    async checkDriveScopes(userId: number) {
-        return this.googleDriveService.checkUserHasDriveScopes(userId);
-    }
-
-    async createCostingSheet(data: { enquiryId: number }, userId: number): Promise<{ sheetUrl: string }> {
-        const enquiry = await this.findById(data.enquiryId);
-        if (!enquiry) throw new NotFoundException(`Lead enquiry with ID ${data.enquiryId} not found`);
-
-        const teamMapping: Record<string, number> = { AC: 1, DC: 2 };
-        const teamId = teamMapping[enquiry.team || ''] || 1;
-        const sheetName = enquiry.enqName || `Enquiry-${enquiry.id}`;
-
-        const sheetResult = await this.googleDriveService.createSheet(userId, teamId, sheetName);
-
-        await this.db
-            .update(leadEnquiries)
-            .set({ costingDocument: sheetResult.sheetUrl, status: "Costing Sheet Created", updatedAt: new Date() })
-            .where(eq(leadEnquiries.id, data.enquiryId));
-
-        return { sheetUrl: sheetResult.sheetUrl };
     }
 }

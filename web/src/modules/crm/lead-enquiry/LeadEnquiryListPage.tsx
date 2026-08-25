@@ -1,32 +1,25 @@
-import { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
     Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-    Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
-import { Plus, Search, Pencil, Eye, XCircle, MapPin, FileText, ExternalLink, Loader2 } from "lucide-react";
+import { Plus, Search, Pencil, Eye, XCircle, MapPin, FileText } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { useLeadEnquiries, useUpdateLeadEnquiry, useCreateSiteVisit, useUpdateSiteVisitDetails, useCreateSiteVisitContacts, useCheckDriveScopes, useCreateCostingSheet } from "@/hooks/api/useLeadEnquiry";
+import { useLeadEnquiries, useUpdateLeadEnquiry, useCreateSiteVisit, useUpdateSiteVisitDetails, useCreateSiteVisitContacts } from "@/hooks/api/useLeadEnquiry";
 import { LeadEnquiryRejectModal } from "./components/LeadEnquiryRejectModal";
 import { LeadEnquirySiteVisitModal } from "./components/LeadEnquirySiteVisitModal";
 import { LeadEnquirySiteVisitDetailsModal } from "./components/LeadEnquirySiteVisitDetailsModal";
-import { SubmitCostingSheetModal } from "../enquirycosting/components/SubmitCostingSheetModal";
-import { useSubmitCostingSheet } from "@/hooks/api/useEnquiryCosting";
-import { enquiryCostingService } from "@/services/api/enquirycosting.service";
 
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import type { LeadEnquiryWithNames } from "./helpers/lead-enquiry.type";
 import { leadEnquiryService } from "@/services/api/lead-enquiry.service";
-import axiosInstance from "@/lib/axios";
 import { toast } from "sonner";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { cn } from "@/lib/utils";
@@ -52,12 +45,6 @@ const EnquiryListPage = () => {
     const createSiteVisit = useCreateSiteVisit();
     const updateSiteVisitDetails = useUpdateSiteVisitDetails();
     const createSiteVisitContacts = useCreateSiteVisitContacts();
-    const { data: driveScopes, refetch: refetchDriveScopes } = useCheckDriveScopes();
-    const createCostingSheet = useCreateCostingSheet();
-    const submitCostingSheet = useSubmitCostingSheet();
-    const pendingEnquiryId = useRef<number | null>(null);
-    const [connectDriveOpen, setConnectDriveOpen] = useState(false);
-    const [isConnectingDrive, setIsConnectingDrive] = useState(false);
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTeam = searchParams.get('tab') || 'AC';
 
@@ -67,36 +54,6 @@ const EnquiryListPage = () => {
         next.delete('page');
         setSearchParams(next, { replace: true });
     };
-
-    useEffect(() => {
-        const handler = (event: MessageEvent) => {
-            if (event.data?.type !== 'GOOGLE_DRIVE_AUTH') return;
-
-            if (event.data.status === 'success') {
-                refetchDriveScopes();
-                setConnectDriveOpen(false);
-                toast.success('Google Drive connected!');
-
-                if (pendingEnquiryId.current) {
-                    const enquiryId = pendingEnquiryId.current;
-                    pendingEnquiryId.current = null;
-                    createCostingSheet.mutateAsync(enquiryId)
-                        .then((result) => {
-                            if (result.sheetUrl) {
-                                window.open(result.sheetUrl, '_blank');
-                            }
-                        })
-                        .catch(() => {});
-                }
-            } else {
-                toast.error(`Failed to connect Google Drive: ${event.data.error}`);
-                setIsConnectingDrive(false);
-            }
-        };
-
-        window.addEventListener('message', handler);
-        return () => window.removeEventListener('message', handler);
-    }, [refetchDriveScopes, createCostingSheet]);
 
     const {
         search, setSearch, debouncedSearch,
@@ -153,19 +110,6 @@ const EnquiryListPage = () => {
         } | null;
     }>({ open: false, siteVisitId: null });
 
-    const [submitCostingModal, setSubmitCostingModal] = useState<{
-        open: boolean;
-        enquiryId: number | null;
-        enquiryName?: string;
-        initialData?: {
-            finalPrice?: string | null;
-            receiptPreGst?: string | null;
-            budgetPreGst?: string | null;
-            grossMargin?: string | null;
-            remarks?: string | null;
-        } | null;
-    }>({ open: false, enquiryId: null });
-
     const handleRejectConfirm = async (enquiryId: number, reason?: string) => {
         await updateEnquiry.mutateAsync({ id: enquiryId, data: { status: "Rejected", rejectionReason: reason || null } });
     };
@@ -212,50 +156,6 @@ const EnquiryListPage = () => {
         }
     };
 
-    const handleConnectDrive = useCallback(async () => {
-        if (isConnectingDrive) return;
-        setIsConnectingDrive(true);
-        try {
-            const response = await axiosInstance.get('/integrations/google/drive-auth-url');
-            const data = response.data;
-            if (data.hasScopes) {
-                toast.success('Google Drive is already connected');
-                setConnectDriveOpen(false);
-                return;
-            }
-            if (data.url && typeof data.url === 'string') {
-                const w = 600, h = 700;
-                const left = Math.max(0, (window.screen.width - w) / 2);
-                const top = Math.max(0, (window.screen.height - h) / 2);
-                window.open(data.url, 'google-drive-auth', `width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=no`);
-            }
-        } catch (error) {
-            toast.error('Failed to initiate Google Drive connection');
-        } finally {
-            setIsConnectingDrive(false);
-        }
-    }, [isConnectingDrive]);
-
-    const handleCreateCostingSheet = (row: LeadEnquiryWithNames) => {
-        if (!driveScopes?.hasScopes) {
-            pendingEnquiryId.current = row.id;
-            setConnectDriveOpen(true);
-            return;
-        }
-        createCostingSheet.mutate(row.id);
-    };
-
-    const handleSubmitCostingConfirm = async (data: {
-        enquiryId: number;
-        finalPrice?: string | null;
-        receiptPreGst?: string | null;
-        budgetPreGst?: string | null;
-        grossMargin?: string | null;
-        remarks?: string | null;
-    }) => {
-        await submitCostingSheet.mutateAsync(data);
-    };
-
     const enquiryActions: ActionItem<LeadEnquiryWithNames>[] = [
         {
             label: "Fill Info Sheet",
@@ -295,46 +195,6 @@ const EnquiryListPage = () => {
             icon: <MapPin className="h-4 w-4" />,
             visible: (row) => row.hasSiteVisit === true,
             onClick: handleSiteVisitDetailsClick,
-        },
-        {
-            label: "Create Costing Sheet",
-            icon: <FileText className="h-4 w-4" />,
-            visible: (row) => !row.costingDocument,
-            onClick: (row) => handleCreateCostingSheet(row),
-        },
-        {
-            label: "Open Costing Sheet",
-            icon: <ExternalLink className="h-4 w-4" />,
-            visible: (row) => !!row.costingDocument,
-            onClick: (row) => window.open(row.costingDocument!, '_blank'),
-        },
-        {
-            label: "Submit Costing Sheet",
-            icon: <FileText className="h-4 w-4" />,
-            visible: (row) => !!row.costingDocument && !row.costingSheetStatus,
-            onClick: (row) => setSubmitCostingModal({ open: true, enquiryId: row.id, enquiryName: row.enqName, initialData: null }),
-        },
-        {
-            label: "Edit Submit Costing Sheet",
-            icon: <FileText className="h-4 w-4" />,
-            visible: (row) => !!row.costingDocument && (row.costingSheetStatus === 'Pending' || row.costingSheetStatus === 'Redo'),
-            onClick: async (row) => {
-                const costing = await enquiryCostingService.getByEnquiryId(row.id);
-                setSubmitCostingModal({
-                    open: true,
-                    enquiryId: row.id,
-                    enquiryName: row.enqName,
-                    initialData: costing
-                        ? {
-                            finalPrice: costing.finalPrice,
-                            receiptPreGst: costing.receiptPreGst,
-                            budgetPreGst: costing.budgetPreGst,
-                            grossMargin: costing.grossMargin,
-                            remarks: costing.remarks,
-                        }
-                        : null,
-                });
-            },
         },
     ];
 
@@ -511,50 +371,6 @@ const EnquiryListPage = () => {
                 initialData={siteVisitDetailsModal.initialData}
                 onSave={handleSiteVisitDetailsSave}
             />
-
-            <SubmitCostingSheetModal
-                open={submitCostingModal.open}
-                onOpenChange={(open) => setSubmitCostingModal({ ...submitCostingModal, open })}
-                enquiryId={submitCostingModal.enquiryId}
-                enquiryName={submitCostingModal.enquiryName}
-                initialData={submitCostingModal.initialData}
-                onConfirm={handleSubmitCostingConfirm}
-            />
-
-            <Dialog open={connectDriveOpen} onOpenChange={setConnectDriveOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Connect Google Drive</DialogTitle>
-                        <DialogDescription>
-                            To create costing sheets, you need to grant access to Google Drive and Sheets.
-                            This is a one-time authorization.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4">
-                        <p className="text-sm text-muted-foreground">
-                            Required permissions:
-                        </p>
-                        <ul className="list-disc list-inside text-sm mt-2 space-y-1">
-                            <li>Create and edit files in Google Drive</li>
-                            <li>Create and edit Google Sheets</li>
-                        </ul>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setConnectDriveOpen(false)}
-                            disabled={isConnectingDrive}
-                        >
-                            Cancel
-                        </Button>
-                        <Button onClick={handleConnectDrive} disabled={isConnectingDrive}>
-                            {isConnectingDrive ? (
-                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Connecting...</>
-                            ) : 'Connect Google Drive'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </Card>
     );
 };

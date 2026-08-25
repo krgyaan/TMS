@@ -4,8 +4,6 @@ import { useHappyCalling } from "@/hooks/api/useHappyCalling";
 import { useLeadEnquiries } from "@/hooks/api/useLeadEnquiry";
 import { useQuery } from "@tanstack/react-query";
 import { leadEnquiryService } from "@/services/api/lead-enquiry.service";
-import { enquiryCostingService } from "@/services/api/enquirycosting.service";
-import { leadsQuotationService } from "@/services/api/leads-quotation.service";
 import { useEnquiryResultsByLead } from "@/hooks/api/useEnquiryResult";
 import type { StepStatus } from "@/components/layout/ShowPageLayout";
 import type { FollowupSource } from "@/modules/crm/followups/helpers/followup.types";
@@ -40,19 +38,7 @@ export function useLeadStepStatuses(leadId: number | null) {
         enabled: !!leadId,
     });
 
-    const { data: costings, isLoading: l5 } = useQuery({
-        queryKey: ['enquiry-costings', 'by-lead', leadId],
-        queryFn: () => enquiryCostingService.getByLeadId(leadId!),
-        enabled: !!leadId,
-    });
-
-    const { data: quotations, isLoading: l6 } = useQuery({
-        queryKey: ['leads-quotations', 'by-lead', leadId],
-        queryFn: () => leadsQuotationService.getByLeadId(leadId!),
-        enabled: !!leadId,
-    });
-
-    const { data: enquiryResults, isLoading: l7 } = useEnquiryResultsByLead(leadId);
+    const { data: enquiryResults, isLoading: l5 } = useEnquiryResultsByLead(leadId);
 
     const steps: LeadStepStatus[] = [
         {
@@ -92,31 +78,13 @@ export function useLeadStepStatuses(leadId: number | null) {
             status: deriveStatus(Array.isArray(siteVisits) && siteVisits.length > 0, l4),
         },
         {
-            id: "costings",
-            label: "Costings",
-            shortLabel: "Cost",
-            stepNumber: 5,
-            hasData: Array.isArray(costings) && costings.length > 0,
-            isLoading: l5,
-            status: deriveStatus(Array.isArray(costings) && costings.length > 0, l5),
-        },
-        {
-            id: "quotations",
-            label: "Quotations",
-            shortLabel: "Quot",
-            stepNumber: 6,
-            hasData: Array.isArray(quotations) && quotations.length > 0,
-            isLoading: l6,
-            status: deriveStatus(Array.isArray(quotations) && quotations.length > 0, l6),
-        },
-        {
             id: "enquiry-result",
             label: "Enquiry Result",
             shortLabel: "Result",
-            stepNumber: 7,
+            stepNumber: 5,
             hasData: Array.isArray(enquiryResults) && enquiryResults.length > 0,
-            isLoading: l7,
-            status: deriveStatus(Array.isArray(enquiryResults) && enquiryResults.length > 0, l7),
+            isLoading: l5,
+            status: deriveStatus(Array.isArray(enquiryResults) && enquiryResults.length > 0, l5),
         },
     ];
 
@@ -143,19 +111,7 @@ export function useSourceStepStatuses(source: FollowupSource) {
         enabled: isLead,
     });
 
-    const { data: costings, isLoading: l5 } = useQuery({
-        queryKey: ['enquiry-costings', 'by-lead', leadId],
-        queryFn: () => enquiryCostingService.getByLeadId(leadId!),
-        enabled: isLead,
-    });
-
-    const { data: quotations, isLoading: l6 } = useQuery({
-        queryKey: ['leads-quotations', 'by-lead', leadId],
-        queryFn: () => leadsQuotationService.getByLeadId(leadId!),
-        enabled: isLead,
-    });
-
-    const { data: enquiryResults, isLoading: l7 } = useEnquiryResultsByLead(leadId);
+    const { data: enquiryResults, isLoading: l5 } = useEnquiryResultsByLead(leadId);
 
     const record = isLead ? lead : happyCalling;
     const l1 = isLead ? l1Lead : l1Happy;
@@ -198,31 +154,13 @@ export function useSourceStepStatuses(source: FollowupSource) {
             status: isLead ? deriveStatus(Array.isArray(siteVisits) && siteVisits.length > 0, l4) : "pending",
         },
         {
-            id: "costings",
-            label: "Costings",
-            shortLabel: "Cost",
-            stepNumber: 5,
-            hasData: isLead ? Array.isArray(costings) && costings.length > 0 : false,
-            isLoading: isLead ? l5 : false,
-            status: isLead ? deriveStatus(Array.isArray(costings) && costings.length > 0, l5) : "pending",
-        },
-        {
-            id: "quotations",
-            label: "Quotations",
-            shortLabel: "Quot",
-            stepNumber: 6,
-            hasData: isLead ? Array.isArray(quotations) && quotations.length > 0 : false,
-            isLoading: isLead ? l6 : false,
-            status: isLead ? deriveStatus(Array.isArray(quotations) && quotations.length > 0, l6) : "pending",
-        },
-        {
             id: "enquiry-result",
             label: "Enquiry Result",
             shortLabel: "Result",
-            stepNumber: 7,
+            stepNumber: 5,
             hasData: isLead ? Array.isArray(enquiryResults) && enquiryResults.length > 0 : false,
-            isLoading: isLead ? l7 : false,
-            status: isLead ? deriveStatus(Array.isArray(enquiryResults) && enquiryResults.length > 0, l7) : "pending",
+            isLoading: isLead ? l5 : false,
+            status: isLead ? deriveStatus(Array.isArray(enquiryResults) && enquiryResults.length > 0, l5) : "pending",
         },
     ];
 

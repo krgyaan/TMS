@@ -144,7 +144,6 @@ export class FollowUpService {
                         updatedAt: new Date(),
                         deletedAt: null,
                         emdId: dto.emdId ?? null,
-                        quotationId: dto.quotationId ?? null,
                     })
                     .returning();
 

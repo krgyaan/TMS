@@ -3,13 +3,10 @@ import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { enquiryResults } from '@db/schemas/crm/enquiry-result.schema';
 import { leadEnquiries } from '@db/schemas/crm/lead-enquiries.schema';
-import { leadContacts } from '@db/schemas/crm/lead-contacts.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { teams } from '@db/schemas/master/teams.schema';
 import { users } from '@db/schemas/auth/users.schema';
-import { privateQuotes } from '@db/schemas/crm/private-quotes.schema';
-import { privateCostingSheets } from '@db/schemas/crm/private-costing-sheets.schema';
-import { eq, desc, and, inArray, notInArray, sql, type SQL } from 'drizzle-orm';
+import { eq, desc, and, notInArray, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { followUps } from '@db/schemas/shared/follow-ups.schema';
 import { followUpPersons } from '@db/schemas/shared/follow-up-persons.schema';
@@ -40,34 +37,6 @@ const resultSelect = {
     teamName: teams.name,
     createdByName: createdByUser.name,
     itemName: items.name,
-    quotationId: sql<number>`(
-        SELECT pq.id
-        FROM ${privateQuotes} pq
-        WHERE pq.enquiry_id = ${leadEnquiries.id}
-        ORDER BY pq.created_at DESC
-        LIMIT 1
-    )`.as('quotation_id'),
-    quoteSubmissionDatetime: sql<string>`(
-        SELECT pq.quote_submission_datetime
-        FROM ${privateQuotes} pq
-        WHERE pq.enquiry_id = ${leadEnquiries.id}
-        ORDER BY pq.created_at DESC
-        LIMIT 1
-    )`.as('quote_submission_datetime'),
-    finalPrice: sql<string>`(
-        SELECT pcs.final_price
-        FROM ${privateCostingSheets} pcs
-        WHERE pcs.enquiry_id = ${leadEnquiries.id}
-        ORDER BY pcs.updated_at DESC
-        LIMIT 1
-    )`.as('final_price'),
-    approvedFinalPrice: sql<string>`(
-        SELECT pcs.approved_final_price
-        FROM ${privateCostingSheets} pcs
-        WHERE pcs.enquiry_id = ${leadEnquiries.id}
-        ORDER BY pcs.updated_at DESC
-        LIMIT 1
-    )`.as('approved_final_price'),
 };
 
 const resultBaseQuery = (db: DbInstance) =>
@@ -156,8 +125,7 @@ export class EnquiryResultService {
 
         if (!row) throw new NotFoundException(`Enquiry result with ID ${id} not found`);
 
-        const quotation = await this.getQuotationForEnquiry(row.enquiryId);
-        return { ...row, ...quotation };
+        return row;
     }
 
     async findByLeadId(leadId: number) {
@@ -176,51 +144,6 @@ export class EnquiryResultService {
                 .orderBy(desc(enquiryResults.createdAt)),
         ]);
         return data;
-    }
-
-    async findFollowupsByQuotationId(quotationId: number) {
-        const follows = await this.db
-            .select()
-            .from(followUps)
-            .where(and(
-                eq(followUps.quotationId, quotationId),
-                eq(followUps.followupFor, 'Quotation'),
-                sql`${followUps.deletedAt} IS NULL`
-            ))
-            .orderBy(desc(followUps.createdAt));
-        return follows;
-    }
-
-    private async getQuotationForEnquiry(enquiryId: number) {
-        const [quote] = await this.db
-            .select({ id: privateQuotes.id, contacts: privateQuotes.contacts })
-            .from(privateQuotes)
-            .where(eq(privateQuotes.enquiryId, enquiryId))
-            .orderBy(desc(privateQuotes.createdAt))
-            .limit(1);
-
-        if (!quote) return { quotationId: null, contacts: [] as { name: string; designation: string | null; phone: string | null; email: string | null }[] };
-
-        const contactIds = (quote.contacts || '')
-            .split(',')
-            .map(s => s.trim())
-            .filter(s => s.length > 0)
-            .map(Number)
-            .filter(n => !isNaN(n) && n > 0);
-
-        const contacts = contactIds.length > 0
-            ? await this.db
-                .select({
-                    name: leadContacts.name,
-                    designation: leadContacts.designation,
-                    phone: leadContacts.phone,
-                    email: leadContacts.email,
-                })
-                .from(leadContacts)
-                .where(inArray(leadContacts.id, contactIds))
-            : [];
-
-        return { quotationId: quote.id, contacts };
     }
 
     async create(data: CreateEnquiryResultDto) {
@@ -312,7 +235,7 @@ export class EnquiryResultService {
                 .values({
                     area: result.teamName || result.team || 'CRM',
                     partyName: body.organisation_name,
-                    amount: result.finalPrice ? String(Number(result.finalPrice) || 0) : '0',
+                    amount: '0',
                     followupFor: 'Quotation',
                     assignedToId: currentUserId,
                     createdById: currentUserId,
@@ -325,7 +248,6 @@ export class EnquiryResultService {
                     followUpHistory: [],
                     reminderCount: 1,
                     emdId: null,
-                    quotationId: result.quotationId ?? null,
                     createdAt: new Date(),
                     updatedAt: new Date(),
                     deletedAt: null,

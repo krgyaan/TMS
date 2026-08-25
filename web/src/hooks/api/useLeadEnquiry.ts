@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leadEnquiryService } from '@/services/api/lead-enquiry.service';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/utils/errorToast';
-import type { CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, LeadEnquiryWithNames, CreateSiteVisitRequest, UpdateSiteVisitRequest, SiteVisit, SiteVisitContact, CreateSiteVisitContactRequest, UpdateSiteVisitDetailsRequest, SubmitCostingSheetRequest, DriveScopesResponse, CreateEnquiryWithLeadRequest } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
+import type { CreateLeadEnquiryRequest, UpdateLeadEnquiryRequest, LeadEnquiryListParams, LeadEnquiryWithNames, CreateSiteVisitRequest, UpdateSiteVisitRequest, SiteVisit, SiteVisitContact, CreateSiteVisitContactRequest, UpdateSiteVisitDetailsRequest, CreateEnquiryWithLeadRequest } from '@/modules/crm/lead-enquiry/helpers/lead-enquiry.type';
 import type { PaginatedResult } from '@/types/api.types';
 
 export const leadEnquiryKey = {
@@ -167,40 +167,5 @@ export const useFirstSiteVisit = (enquiryId: number | null) => {
         queryKey: [...leadEnquiryKey.all, 'first-site-visit', enquiryId],
         queryFn: () => leadEnquiryService.getFirstSiteVisitByEnquiry(enquiryId!),
         enabled: !!enquiryId,
-    });
-};
-
-export const useCheckDriveScopes = () => {
-    return useQuery<DriveScopesResponse>({
-        queryKey: [...leadEnquiryKey.all, 'driveScopes'],
-        queryFn: () => leadEnquiryService.checkDriveScopes(),
-        staleTime: 60000,
-    });
-};
-
-export const useCreateCostingSheet = () => {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: (enquiryId: number) => leadEnquiryService.createCostingSheet(enquiryId),
-        onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: leadEnquiryKey.lists() });
-            toast.success('Costing sheet created successfully');
-            if (data.sheetUrl) {
-                window.open(data.sheetUrl, '_blank');
-            }
-        },
-        onError: showErrorToast,
-    });
-};
-
-export const useSubmitCostingSheet = () => {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: (data: SubmitCostingSheetRequest) => leadEnquiryService.submitCostingSheet(data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: leadEnquiryKey.lists() });
-            toast.success('Costing sheet submitted successfully');
-        },
-        onError: showErrorToast,
     });
 };

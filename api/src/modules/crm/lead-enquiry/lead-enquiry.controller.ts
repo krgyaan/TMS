@@ -4,7 +4,6 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import type { SiteVisitContact } from '@db/schemas/crm/site-visit-contacts.schema';
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import type {
-    CreateCostingSheetDto,
     CreateEnquiryWithLeadDto,
     CreateLeadEnquiryDto,
     CreateSiteVisitContactArrayDto,
@@ -14,7 +13,6 @@ import type {
     UpdateSiteVisitDto,
 } from './dto/lead-enquiry.dto';
 import {
-    CreateCostingSheetSchema,
     CreateEnquiryWithLeadSchema,
     CreateLeadEnquirySchema,
     CreateSiteVisitContactArraySchema,
@@ -116,20 +114,6 @@ export class LeadEnquiryController {
             results.push(created);
         }
         return results;
-    }
-
-    @Get('check-drive-scopes')
-    async checkDriveScopes(@CurrentUser() user: ValidatedUser) {
-        return this.leadEnquiryService.checkDriveScopes(user.sub);
-    }
-
-    @Post('create-costing-sheet')
-    @HttpCode(HttpStatus.CREATED)
-    async createCostingSheet(
-        @ValidatedBody(CreateCostingSheetSchema) body: CreateCostingSheetDto,
-        @CurrentUser() user: ValidatedUser,
-    ) {
-        return this.leadEnquiryService.createCostingSheet(body, user.sub);
     }
 
     @Post('site-visits/:id/upload-docs')

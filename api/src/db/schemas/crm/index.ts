@@ -18,11 +18,5 @@ export * from './site-visits.schema';
 // Site Visit Contacts
 export * from './site-visit-contacts.schema';
 
-// Private Costing Sheets
-export * from './private-costing-sheets.schema';
-
-// Private Quotes
-export * from './private-quotes.schema';
-
 // Enquiry Results
 export * from './enquiry-result.schema';
