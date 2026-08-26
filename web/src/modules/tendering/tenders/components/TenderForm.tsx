@@ -367,7 +367,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                     <TabsContent value="manually">
                         <Form {...manualForm}>
                             <form onSubmit={manualForm.handleSubmit(handleManualSubmit)} className="space-y-8">
-                                {(watchTenderName || watchTenderNo) && (
+                                {mode === "create" && (watchTenderName || watchTenderNo) && (
                                     <TenderNameWarningAlert
                                         tenderName={watchTenderName}
                                         tenderNo={watchTenderNo}
