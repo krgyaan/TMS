@@ -5,7 +5,7 @@ import { useEnquiryResult, useEnquiryResultsByLead } from "@/hooks/api/useEnquir
 import { useLeadEnquiry } from "@/hooks/api/useLeadEnquiry";
 import { LeadDetailsSection } from "../leads/components/LeadView";
 import { FollowupViewPage } from "../followups/FollowupViewPage";
-import { LeadEnquiriesSection } from "../lead-enquiry/LeadEnquiryViewPage";
+import { LeadEnquiriesSection } from "../lead-enquiry/LeadEnquiryShowPage";
 import { LeadSiteVisitsSection } from "../lead-enquiry/components/LeadSiteVisitView";
 import { EnquiryResultView } from "./components/EnquiryResultView";
 import { useNavigate } from "react-router-dom";

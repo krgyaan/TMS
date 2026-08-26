@@ -3,7 +3,7 @@ import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 import { useEnquiryTenderSteps } from "@/hooks/api/useEnquiryTenderSteps";
 import { LeadDetailsSection } from "@/modules/crm/leads/components/LeadView";
 import { FollowupViewPage } from "@/modules/crm/followups/FollowupViewPage";
-import { EnquiryDetailsSection } from "@/modules/crm/lead-enquiry/LeadEnquiryViewPage";
+import { EnquiryDetailsSection } from "@/modules/crm/lead-enquiry/LeadEnquiryShowPage";
 import { LeadSiteVisitView } from "@/modules/crm/lead-enquiry/components/LeadSiteVisitView";
 import { TenderDetailsSection } from "@/modules/tendering/tenders/components/TenderView";
 import { PhysicalDocsSection } from "@/modules/tendering/physical-docs/components/PhysicalDocsView";
