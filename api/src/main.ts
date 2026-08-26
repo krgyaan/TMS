@@ -6,7 +6,6 @@ import { AllExceptionsFilter } from "@/logger/all-exception.filter";
 import { winstonLogger } from "@/logger/logger.config";
 import { requestIdMiddleware } from "@/logger/request-id.middleware";
 import { StatusCache } from "@/utils/status-cache";
-import type { DbInstance } from "@db";
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { NestExpressApplication } from "@nestjs/platform-express";
@@ -15,16 +14,13 @@ import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { join } from "path";
 import { HttpLoggerMiddleware } from "./logger/http-logger.middleware";
 
+let app: NestExpressApplication;
+
 async function bootstrap() {
-
-    // ✅ IMPORTANT: Use NestExpressApplication
-    const app = await NestFactory.create<NestExpressApplication>(AppModule);
-
+    app = await NestFactory.create<NestExpressApplication>(AppModule);
     app.use(requestIdMiddleware);
-
     app.useGlobalFilters(app.get(AllExceptionsFilter));
 
-    // Register HTTP logger middleware
     const httpLoggerInstance = new HttpLoggerMiddleware(app.get(WINSTON_MODULE_PROVIDER));
 
     app.use((req, res, next) => httpLoggerInstance.use(req, res, next));
@@ -33,11 +29,6 @@ async function bootstrap() {
         prefix: "/uploads",
     });
 
-    /**
-     * Global API prefix
-     * APIs → /api/v1/*
-     * Files → /uploads/*
-     */
     app.setGlobalPrefix("api/v1");
 
     // Global validation pipe with transform enabled
@@ -53,11 +44,9 @@ async function bootstrap() {
     app.use(cookieParser());
 
     // Load status cache (unchanged)
-    await StatusCache.load(app.get(DRIZZLE) as DbInstance);
+    await StatusCache.load(app.get(DRIZZLE));
 
-    /**
-     * CORS (unchanged logic)
-     */
+    // CORS (unchanged logic)
     const allowedOrigins = ["http://localhost:5173", "https://tmsv2.volksenergie.in"];
 
     app.enableCors({
@@ -73,12 +62,23 @@ async function bootstrap() {
         allowedHeaders: ["Content-Type", "Authorization"],
     });
 
-    // Set up signal handlers
-    process.on('SIGINT', () => {
-        winstonLogger.warn('SIGINT');
+    // Graceful shutdown
+    const gracefulShutdown = async (signal: string) => {
+        winstonLogger.warn(`${signal} received — shutting down gracefully`);
+        try {
+            await app.close();
+            winstonLogger.warn("Application closed");
+        } catch (err) {
+            winstonLogger.error("Error during shutdown", err);
+        }
+        process.exit(0);
+    };
+
+    process.on("SIGINT", () => {
+        void gracefulShutdown("SIGINT");
     });
-    process.on('SIGTERM', () => {
-        winstonLogger.warn('SIGTERM');
+    process.on("SIGTERM", () => {
+        void gracefulShutdown("SIGTERM");
     });
 
     const port = 3000;
@@ -88,7 +88,6 @@ async function bootstrap() {
     app.getHttpServer().timeout = 10 * 60 * 1000;
 
     winstonLogger.info(`API running at http://localhost:${port}`);
-    winstonLogger.info(`Uploads served at /uploads/*`);
 }
 
-bootstrap();
+void bootstrap();
