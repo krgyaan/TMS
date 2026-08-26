@@ -8,6 +8,7 @@ import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useProjectVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
+import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
@@ -15,7 +16,7 @@ import type { VendorWorkOrderRow } from "@/modules/operations/vendor-work-orders
 import { OrderProgressCell } from "@/components/OrderProgressCell";
 import type { ColDef, GridApi, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { Edit, Eye, FileUp, History, Plus } from "lucide-react";
+import { Edit, Eye, FileUp, History, Plus, ShieldAlert } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -29,6 +30,7 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
     const navigate = useNavigate();
     const [vwoGridApi, setVwoGridApi] = useState<GridApi | null>(null);
     const { data, isLoading } = useProjectVendorWorkOrders(projectId!);
+    const { hasWC } = useHasWCInsurance(projectId ?? 0);
 
     const vendorWorkOrders = data ?? [];
 
@@ -299,10 +301,31 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
                             Vendor Work Orders
                         </CardTitle>
                         <CardAction>
-                            <Button size="sm" variant="default" onClick={() => navigate(paths.operations.raiseVendorWoForm(projectId))}>
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                Raise Work Order
-                            </Button>
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <span>
+                                            <Button
+                                                size="sm"
+                                                variant="default"
+                                                disabled={!hasWC}
+                                                onClick={() => navigate(paths.operations.raiseVendorWoForm(projectId))}
+                                            >
+                                                <Plus className="mr-1.5 h-4 w-4" />
+                                                Raise Work Order
+                                            </Button>
+                                        </span>
+                                    </TooltipTrigger>
+                                    {!hasWC && (
+                                        <TooltipContent>
+                                            <div className="flex items-center gap-1.5">
+                                                <ShieldAlert className="h-3.5 w-3.5" />
+                                                WC insurance policy required
+                                            </div>
+                                        </TooltipContent>
+                                    )}
+                                </Tooltip>
+                            </TooltipProvider>
                         </CardAction>
                     </div>
                     <CardDescription>
