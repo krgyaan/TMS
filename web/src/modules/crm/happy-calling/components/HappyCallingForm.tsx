@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import DateInput from '@/components/form/DateInput';
 import { BroadcastSelect } from '@/modules/crm/happy-calling/components/BroadcastSelect';
 import { useCreateHappyCalling, useUpdateHappyCalling } from '@/hooks/api/useHappyCalling';
 import { toast } from 'sonner';
@@ -22,9 +21,7 @@ const formSchema = z.object({
     designation: z.string().max(255).optional().or(z.literal('')),
     email: z.string().email('Invalid email').max(255).optional().or(z.literal('')),
     phone: z.string().max(20).optional().or(z.literal('')),
-    date: z.string().optional().or(z.literal('')),
     status: z.string().max(50).optional().or(z.literal('')),
-    nextFollowupDate: z.string().optional().or(z.literal('')),
     broadcast: z.number().optional(),
     details: z.string().max(5000).optional().or(z.literal('')),
 });
@@ -58,12 +55,6 @@ export function HappyCallingForm(props: Props) {
     const client = isEdit ? null : props.client;
     const record = isEdit ? props.record : null;
 
-    const toInput = (v?: string | null) => {
-        if (!v) return '';
-        const s = String(v);
-        return s.includes('T') ? s.slice(0, 16) : s;
-    };
-
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema) as Resolver<FormValues>,
         defaultValues: isEdit
@@ -73,9 +64,7 @@ export function HappyCallingForm(props: Props) {
                   designation: record?.designation ?? '',
                   email: record?.email ?? '',
                   phone: record?.phone ?? '',
-                  date: toInput(record?.date),
                   status: (record?.status as HappyCallingStatus | null) ?? '',
-                  nextFollowupDate: toInput(record?.nextFollowupDate),
                   broadcast: record?.broadcast ?? 0,
                   details: record?.details ?? '',
               }
@@ -85,9 +74,7 @@ export function HappyCallingForm(props: Props) {
                   designation: client?.designation ?? '',
                   email: client?.email ?? '',
                   phone: client?.phone ?? '',
-                  date: '',
                   status: 'call',
-                  nextFollowupDate: '',
                   broadcast: 0,
                   details: '',
               },
@@ -101,9 +88,7 @@ export function HappyCallingForm(props: Props) {
                 designation: props.record.designation ?? '',
                 email: props.record.email ?? '',
                 phone: props.record.phone ?? '',
-                date: toInput(props.record.date),
                 status: (props.record.status as HappyCallingStatus | null) ?? '',
-                nextFollowupDate: toInput(props.record.nextFollowupDate),
                 broadcast: props.record.broadcast ?? 0,
                 details: props.record.details ?? '',
             });
@@ -129,9 +114,7 @@ export function HappyCallingForm(props: Props) {
                     designation: values.designation || null,
                     email: values.email || null,
                     phone: values.phone || null,
-                    date: values.date || null,
                     status: (values.status || null) as HappyCallingStatus | null,
-                    nextFollowupDate: values.nextFollowupDate || null,
                     broadcast: values.broadcast ?? 0,
                     details: values.details || null,
                 },
@@ -146,9 +129,7 @@ export function HappyCallingForm(props: Props) {
                 designation: props.client.designation ?? null,
                 email: props.client.email ?? null,
                 phone: props.client.phone ?? null,
-                date: values.date || null,
                 status: 'call',
-                nextFollowupDate: values.nextFollowupDate || null,
                 broadcast: values.broadcast ?? 0,
                 details: values.details || null,
             });
@@ -235,19 +216,7 @@ export function HappyCallingForm(props: Props) {
                     </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-3">
-                    <div className="space-y-2">
-                        <Label htmlFor="date">{isEdit ? 'Date' : 'Call Date/Time'}</Label>
-                        <Input id="date" type="datetime-local" className={inputCls} {...form.register('date')} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="nextFollowupDate">Next Follow Up Date</Label>
-                        <DateInput
-                            id="nextFollowupDate"
-                            value={form.watch('nextFollowupDate') || ''}
-                            onChange={(value) => form.setValue('nextFollowupDate', value)}
-                        />
-                    </div>
+                <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
                     <div className="space-y-2">
                         <Label>Add to Broadcast List</Label>
                         <BroadcastSelect

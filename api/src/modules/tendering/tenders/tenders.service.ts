@@ -20,7 +20,7 @@ import { websites } from '@db/schemas/master/websites.schema';
 import { tenderInfos, type NewTenderInfo, type TenderInfo } from '@db/schemas/tendering/tenders.schema';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { and, asc, desc, eq, inArray, isNull, notInArray, or, sql, SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNull, notInArray, or, sql, SQL } from 'drizzle-orm';
 
 export type TenderListFilters = {
     statusIds?: number[];
@@ -1226,10 +1226,101 @@ export class TenderInfosService {
         // Generate unique name
         let uniqueName = baseName;
         if (existingCount > 0) {
-            uniqueName = `${baseName} (${existingCount})`;
+            uniqueName = `${baseName} (${existingCount + 1})`;
         }
         console.log("Tender Name: ", uniqueName);
         return { tenderName: uniqueName };
+    }
+
+    async checkTenderNameExists(tenderName: string, organization?: number, item?: number) {
+        if (!tenderName || !tenderName.trim()) {
+            return { exists: false, count: 0, tenderName: '', existingTenderNames: [], suggestion: null };
+        }
+
+        const trimmed = tenderName.trim();
+        // Strip any trailing " (number)" to get the base name
+        const baseName = trimmed.replace(/\s+\(\d+\)$/, '');
+        const suffixPattern = `${baseName} (%)`;
+
+        const conditions: any[] = [
+            or(
+                eq(tenderInfos.tenderName, baseName),
+                ilike(tenderInfos.tenderName, suffixPattern),
+            ),
+            eq(tenderInfos.deleteStatus, 0),
+        ];
+
+        if (organization) {
+            conditions.push(eq(tenderInfos.organization, organization));
+        }
+        if (item) {
+            conditions.push(eq(tenderInfos.item, item));
+        }
+
+        const rows = await this.db
+            .select({ tenderName: tenderInfos.tenderName })
+            .from(tenderInfos)
+            .where(and(...conditions));
+
+        const count = rows.length;
+        const exists = count > 0;
+
+        let suggestion: string | null = null;
+        if (exists) {
+            suggestion = `${baseName} (${count + 1})`;
+        }
+
+        return {
+            exists,
+            count,
+            tenderName: trimmed,
+            existingTenderNames: rows.map(r => r.tenderName),
+            suggestion,
+        };
+    }
+
+    async checkTenderNoExists(tenderNo: string, organization?: number, item?: number) {
+        if (!tenderNo || !tenderNo.trim()) {
+            return { exists: false, count: 0, tenderNo: '', existingTenders: [] };
+        }
+
+        const trimmed = tenderNo.trim();
+
+        const conditions: any[] = [
+            eq(tenderInfos.tenderNo, trimmed),
+            eq(tenderInfos.deleteStatus, 0),
+        ];
+
+        if (organization) {
+            conditions.push(eq(tenderInfos.organization, organization));
+        }
+        if (item) {
+            conditions.push(eq(tenderInfos.item, item));
+        }
+
+        const rows = await this.db
+            .select({
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                teamMemberName: users.name,
+            })
+            .from(tenderInfos)
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .where(and(...conditions));
+
+        const count = rows.length;
+        const exists = count > 0;
+
+        return {
+            exists,
+            count,
+            tenderNo: trimmed,
+            existingTenders: rows.map(r => ({
+                tenderNo: r.tenderNo,
+                tenderName: r.tenderName,
+                teamMemberName: r.teamMemberName ?? 'Unassigned',
+            })),
+        };
     }
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{

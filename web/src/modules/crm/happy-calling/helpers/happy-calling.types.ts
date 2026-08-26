@@ -8,11 +8,13 @@ export type HappyCallingRow = {
     designation: string | null;
     email: string | null;
     phone: string | null;
-    date: string | null;
     status: string | null;
-    nextFollowupDate: string | null;
     broadcast: number;
     details: string | null;
+    createdBy: number | null;
+    createdByName?: string | null;
+    nextFollowupDate?: string | null;
+    lastFollowupDate?: string | null;
     createdAt: string;
     updatedAt: string;
 };
@@ -32,9 +34,7 @@ export type CreateHappyCallingDto = {
     designation?: string | null;
     email?: string | null;
     phone?: string | null;
-    date?: string | null;
     status?: string | null;
-    nextFollowupDate?: string | null;
     broadcast?: number;
     details?: string | null;
 };

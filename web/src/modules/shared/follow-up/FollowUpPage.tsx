@@ -1,53 +1,29 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue } from "react";
-import { useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import { DatePicker } from "@/components/ui/date-picker";
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
+import DataTable from "@/components/ui/data-table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { ActionItem } from "@/components/ui/ActionMenu";
-import {
-    Eye,
-    RefreshCw,
-    FileEdit,
-    Plus,
-    Search,
-    Users,
-    Mail,
-    Phone,
-    Loader2,
-    AlertCircle,
-    Calendar,
-    MessageSquare,
-    TrendingUp,
-    Clock,
-    User,
-    File,
-    CheckCircle,
-    FileCheck,
-    Upload,
-    Trash,
-} from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import DataTable from "@/components/ui/data-table";
-import type { ColDef } from "ag-grid-community";
-import { paths } from "@/app/routes/paths";
 import { cn } from "@/lib/utils";
+import type { ColDef } from "ag-grid-community";
+import { 
+    AlertCircle, Calendar, CheckCircle, Clock, Eye, FileCheck, FileEdit, Loader2, Mail, 
+    MessageSquare, Phone, Plus, RefreshCw, Search, Trash, TrendingUp, Upload, User, Users
+} from "lucide-react";
+import React, { useCallback, useDeferredValue, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-import { useDeleteFollowUp, useFollowUpList, useUpdateFollowUpStatus } from "@/modules/shared/follow-up/follow-up.hooks";
-import type { FollowUpRow, FollowUpQueryDto, UpdateFollowUpStatusDto } from "@/modules/shared/follow-up/follow-up.types";
-import { toast } from "sonner";
+import { FileUploader } from "@/components/file-upload";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDeleteFollowUp, useFollowUpList, useUpdateFollowUpStatus } from "@/modules/shared/follow-up/follow-up.hooks";
+import type { FollowUpQueryDto, FollowUpRow, UpdateFollowUpStatusDto } from "@/modules/shared/follow-up/follow-up.types";
+import { toast } from "sonner";
 
-/* ================================
-   LABEL MAPS
-================================ */
 const FREQUENCY_LABELS: Record<number, string> = {
     1: "Daily",
     2: "Alternate Days",
@@ -84,9 +60,6 @@ const formatCurrency = (amount: number | null): string => {
     }).format(amount);
 };
 
-/* ================================
-   ICON ACTION COMPONENT
-================================ */
 const IconAction: React.FC<{
     icon: React.ElementType;
     label: string;
@@ -120,9 +93,6 @@ const IconAction: React.FC<{
     </TooltipProvider>
 );
 
-/* ================================
-   FREQUENCY BADGE COMPONENT
-================================ */
 const FrequencyBadge: React.FC<{ frequency: string }> = ({ frequency }) => {
     const variant = frequency === "Stopped" ? "destructive" : "secondary";
     return (
@@ -132,31 +102,19 @@ const FrequencyBadge: React.FC<{ frequency: string }> = ({ frequency }) => {
     );
 };
 
-/* ================================
-   MAIN COMPONENT
-================================ */
 const FollowupPage: React.FC = () => {
     const navigate = useNavigate();
 
-    /* ================================
-       STATE
-    ================================ */
     const [activeTab, setActiveTab] = useState<FollowUpQueryDto["tab"]>("ongoing");
     const [searchQuery, setSearchQuery] = useState("");
-    const [debouncedQuery, setDebouncedQuery] = useState<string | null>("");
-
     const [date, setDate] = useState<Date>();
     const [comment, setComment] = useState("");
-
     const [frequency, setFrequency] = useState<number>(1);
     const [stopReason, setStopReason] = useState<number | null>(null);
-
     const [proofText, setProofText] = useState("");
     const [proofImage, setProofImage] = useState<string[]>([]);
     const [stopRemarks, setStopRemarks] = useState("");
-
     const deferedSearchQuery = useDeferredValue(searchQuery);
-
     const { canDelete } = useAuth();
 
     const queryParams = useMemo(
@@ -169,41 +127,23 @@ const FollowupPage: React.FC = () => {
         [activeTab, deferedSearchQuery]
     );
 
-    /* ================================
-       DATA
-    ================================ */
     const { data, isLoading, error } = useFollowUpList(queryParams);
-
     const followups = data?.data ?? [];
 
     const updateStatusMutation = useUpdateFollowUpStatus();
     const deleteMutation = useDeleteFollowUp();
-
-    /* ================================
-       MODALS
-    ================================ */
     const [updateModalOpen, setUpdateModalOpen] = useState(false);
     const [selectedId, setSelectedId] = useState<number | null>(null);
 
     const [personModalOpen, setPersonModalOpen] = useState(false);
     const [personList, setPersonList] = useState<FollowUpRow["followPerson"]>([]);
-    const inputRef = useRef<HTMLInputElement>(null);
-
     const handleOpenUpdateModal = (id: number) => {
         setSelectedId(id);
         setUpdateModalOpen(true);
     };
 
-    // =============================
-    //     SEARCH LOGIC
-    // =============================
-
     const handleUpdateStatus = async () => {
         if (!selectedId) return;
-
-        // ========================
-        // VALIDATION
-        // ========================
         if (frequency === 6 && !stopReason) {
             toast.error("Please select a reason for stopping");
             return;
@@ -224,9 +164,6 @@ const FollowupPage: React.FC = () => {
             return;
         }
 
-        // ========================
-        // BUILD PAYLOAD
-        // ========================
         const payload: Record<string, unknown> = {};
 
         payload.latestComment = comment || "";
@@ -253,17 +190,11 @@ const FollowupPage: React.FC = () => {
         }
 
         try {
-            // ========================
-            // API CALL
-            // ========================
             await updateStatusMutation.mutateAsync({
                 id: selectedId,
                 data: payload as UpdateFollowUpStatusDto & { proofImage?: string },
             });
 
-            // ========================
-            // SUCCESS MESSAGE
-            // ========================
             let message = "Follow-up status updated successfully";
 
             if (frequency === 6) {
@@ -320,9 +251,6 @@ const FollowupPage: React.FC = () => {
         []
     );
 
-    /* ================================
-       COLUMNS
-    ================================ */
     const columns: ColDef<FollowUpRow>[] = useMemo(
         () => [
             {
@@ -443,9 +371,6 @@ const FollowupPage: React.FC = () => {
         [navigate]
     );
 
-    /* ================================
-       TAB COUNTS (optional enhancement)
-    ================================ */
     const tabItems = [
         { value: "ongoing", label: "Ongoing", icon: Clock },
         { value: "achieved", label: "Achieved", icon: TrendingUp },
@@ -453,9 +378,6 @@ const FollowupPage: React.FC = () => {
         { value: "future", label: "Future", icon: Calendar },
     ];
 
-    /* ================================
-       RENDER - MAIN
-    ================================ */
     return (
         <Card className="flex flex-col h-full min-h-0">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
@@ -776,9 +698,6 @@ const FollowupPage: React.FC = () => {
                 </DialogContent>
             </Dialog>
 
-            {/* ================================
-               PERSON MODAL
-            ================================ */}
             <Dialog open={personModalOpen} onOpenChange={setPersonModalOpen}>
                 <DialogContent className="sm:max-w-sm">
                     <DialogHeader>

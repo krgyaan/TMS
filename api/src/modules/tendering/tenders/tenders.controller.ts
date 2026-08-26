@@ -97,6 +97,32 @@ export class TenderInfoController {
         };
     }
 
+    @Get('tender-name-check')
+    async checkTenderName(
+        @Query('tenderName') tenderName: string,
+        @Query('organization') organization?: string,
+        @Query('item') item?: string,
+    ) {
+        return this.tenderInfosService.checkTenderNameExists(
+            tenderName,
+            organization ? Number(organization) : undefined,
+            item ? Number(item) : undefined,
+        );
+    }
+
+    @Get('tender-no-check')
+    async checkTenderNo(
+        @Query('tenderNo') tenderNo: string,
+        @Query('organization') organization?: string,
+        @Query('item') item?: string,
+    ) {
+        return this.tenderInfosService.checkTenderNoExists(
+            tenderNo,
+            organization ? Number(organization) : undefined,
+            item ? Number(item) : undefined,
+        );
+    }
+
     @Get(':id/mailing-logs')
     async getMailingLogs(@Param('id', ParseIntPipe) id: number) {
         return this.tenderInfosService.getMailingLogs(id);

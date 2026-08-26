@@ -22,6 +22,8 @@ export type ClientDirectoryRow = {
     organization: string | null;
     giftingTier: GiftingTier | null;
     remarks: ClientDirectoryRemark[] | null;
+    createdBy: number | null;
+    createdByName?: string | null;
     createdAt: string;
     updatedAt: string;
 };

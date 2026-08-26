@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useHappyCallings } from '@/hooks/api/useHappyCalling';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
-import { formatDate } from '@/hooks/useFormatedDate';
+import { formatDateTime } from '@/hooks/useFormatedDate';
 import type { HappyCallingRow } from '@/modules/crm/happy-calling/helpers/happy-calling.types';
 import { paths } from '@/app/routes/paths';
 
@@ -132,24 +132,6 @@ const HappyCallingListPage = () => {
                 filter: true,
             },
             {
-                field: 'date',
-                colId: 'date',
-                headerName: 'Date',
-                width: 150,
-                valueGetter: (params) => formatDate(params.data?.date ?? null),
-                sortable: true,
-                filter: true,
-            },
-            {
-                field: 'nextFollowupDate',
-                colId: 'nextFollowupDate',
-                headerName: 'Next Follow Up Date',
-                width: 170,
-                valueGetter: (params) => formatDate(params.data?.nextFollowupDate ?? null),
-                sortable: true,
-                filter: true,
-            },
-            {
                 field: 'status',
                 colId: 'status',
                 headerName: 'Status',
@@ -165,6 +147,24 @@ const HappyCallingListPage = () => {
                         </Badge>
                     );
                 },
+                sortable: true,
+                filter: true,
+            },
+            {
+                field: 'nextFollowupDate',
+                colId: 'nextFollowupDate',
+                headerName: 'Next Follow Up Date',
+                width: 180,
+                valueGetter: (params) => formatDateTime(params.data?.nextFollowupDate ?? null),
+                sortable: true,
+                filter: true,
+            },
+            {
+                field: 'lastFollowupDate',
+                colId: 'lastFollowupDate',
+                headerName: 'Last Follow Up Date',
+                width: 180,
+                valueGetter: (params) => formatDateTime(params.data?.lastFollowupDate ?? null),
                 sortable: true,
                 filter: true,
             },

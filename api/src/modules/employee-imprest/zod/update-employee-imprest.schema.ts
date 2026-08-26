@@ -5,6 +5,7 @@ export const UpdateEmployeeImprestSchema = z.object({
     categoryId: z.coerce.number().int().optional().nullable(),
     teamId: z.coerce.number().int().optional().nullable(),
     partyName: z.string().max(255).optional().nullable(),
+    projectId: z.coerce.number().int().optional().nullable(),
     projectName: z.string().max(255).optional().nullable(),
     amount: z.coerce.number().int().min(1).optional(),
     remark: z.string().optional().nullable(),

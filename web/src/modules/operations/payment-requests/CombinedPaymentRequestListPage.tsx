@@ -66,14 +66,11 @@ const CombinedPaymentRequestListPage: React.FC = () => {
         const currentUserId = user?.id ?? null;
 
         const team5Categories = new Set([
-            'imprest', 'others', 'communication', 'courier', 'electricity',
-            'rent', 'emi', 'software', 'office_expenses', 'printing_stationary',
-            'office_maintenance', 'portal_renewal_charges', 'professional_charges',
-            'nbfc_oc_acc', 'loan_principal_return',
-            'AU_5242', 'AU_5180', 'AU_5190', 'AU_8316', 'AU_9589', 'AU_9284',
-            'amex_cc', 'asset_purchase',
+            'electricity', 'rent', 'emi', 'nbfc_oc_acc', 'loan_principal_return',
+            'AU_5242', 'AU_5180', 'AU_5190', 'AU_8316', 'AU_9589', 'AU_9284', 'amex_cc',
         ]);
-
+        // 'imprest', 'others', 'communication', 'courier', 'asset_purchase', 'software', 'office_expenses',
+        // 'printing_stationary', 'office_maintenance', 'portal_renewal_charges', 'professional_charges'
         const userAllowedCategories: Record<string, number[]> = {
             salary: [13, 7, 21, 42, 26],
             related_party: [13, 7, 21, 26],
@@ -82,9 +79,9 @@ const CombinedPaymentRequestListPage: React.FC = () => {
 
         return rows.filter((row) => {
             const category = row.paymentAgainst;
-            // if (team5Categories.has(category)) {
-            //     return currentTeamId === 5;
-            // }
+            if (team5Categories.has(category)) {
+                return currentTeamId === 5 || currentUserId === 7 || currentUserId === 21 || currentUserId === 13;
+            }
             const allowedUsers = userAllowedCategories[category];
             if (allowedUsers) {
                 return currentUserId !== null && allowedUsers.includes(currentUserId);
@@ -134,6 +131,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
 
     const CATEGORIES_NEED_INVOICE_AFTER_PAYMENT = useMemo(() => new Set([
         'rent', 'software', 'printing_stationary', 'office_maintenance', 'portal_renewal_charges', 'professional_charges',
+        'gem_charges',
     ]), []);
 
     const confirmUploadInvoice = useCallback(async () => {

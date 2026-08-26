@@ -27,6 +27,9 @@ export const buildDefaultValues = (): WoBasicDetailFormValues => ({
   projectName: "",
   woDraft: [],
   teChecklistConfirmed: false,
+  requestGemCharges: "false",
+  gemChargesPortalLink: "",
+  gemChargesInvoice: [],
   tmsDocuments: {
     "Complete Tender Documents": false,
     "Tender Info": false,
@@ -37,6 +40,7 @@ export const buildDefaultValues = (): WoBasicDetailFormValues => ({
     "Costing Sheet": false,
     "TQ": false,
     "RA and Result details": false,
+    "Corrigendum": false
   },
 });
 
@@ -66,6 +70,9 @@ export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues 
     projectCode: data.projectCode || "",
     projectName: data.projectName || "",
     woDraft: parseFileArray(data.woDraft),
+    requestGemCharges: "false",
+    gemChargesPortalLink: "",
+    gemChargesInvoice: [],
     tmsDocuments: data.tmsDocuments || {
       "Complete Tender Documents": false,
       "Tender Info": false,
@@ -76,6 +83,7 @@ export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues 
       "Costing Sheet": false,
       "TQ": false,
       "RA and Result details": false,
+      "Corrigendum": false
     },
   };
 };
@@ -103,6 +111,9 @@ export const mapFormToCreatePayload = (values: WoBasicDetailFormValues): CreateW
   if (values.budgetAdmin !== undefined && values.budgetAdmin > 0) payload.budgetAdmin = String(values.budgetAdmin);
   if (values.budgetBuybackSale !== undefined && values.budgetBuybackSale > 0) payload.budgetBuybackSale = String(values.budgetBuybackSale);
   if (values.budgetGemCharges !== undefined && values.budgetGemCharges > 0) payload.budgetGemCharges = String(values.budgetGemCharges);
+  if (values.gemChargesAmount !== undefined && values.gemChargesAmount > 0) payload.gemChargesAmount = values.gemChargesAmount;
+  if (values.gemChargesPortalLink !== undefined && values.gemChargesPortalLink.trim()) payload.gemChargesPortalLink = values.gemChargesPortalLink;
+  if (values.gemChargesInvoice !== undefined && values.gemChargesInvoice.length > 0) payload.gemChargesInvoice = JSON.stringify(values.gemChargesInvoice);
   if (values.woDraft && values.woDraft.length > 0) payload.woDraft = JSON.stringify(values.woDraft);
 
   return payload;
@@ -129,6 +140,9 @@ export const mapFormToUpdatePayload = (values: WoBasicDetailFormValues): UpdateW
   if (values.budgetAdmin !== undefined && values.budgetAdmin > 0) payload.budgetAdmin = String(values.budgetAdmin);
   if (values.budgetBuybackSale !== undefined && values.budgetBuybackSale > 0) payload.budgetBuybackSale = String(values.budgetBuybackSale);
   if (values.budgetGemCharges !== undefined && values.budgetGemCharges > 0) payload.budgetGemCharges = String(values.budgetGemCharges);
+  if (values.gemChargesAmount !== undefined && values.gemChargesAmount > 0) payload.gemChargesAmount = values.gemChargesAmount;
+  if (values.gemChargesPortalLink !== undefined && values.gemChargesPortalLink.trim()) payload.gemChargesPortalLink = values.gemChargesPortalLink;
+  if (values.gemChargesInvoice !== undefined && values.gemChargesInvoice.length > 0) payload.gemChargesInvoice = JSON.stringify(values.gemChargesInvoice);
   if (values.woDraft && values.woDraft.length > 0) payload.woDraft = JSON.stringify(values.woDraft);
 
   return payload;

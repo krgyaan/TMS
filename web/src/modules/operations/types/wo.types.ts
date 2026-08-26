@@ -157,6 +157,10 @@ export interface CreateWoBasicDetailDto {
   budgetAdmin?: string;
   budgetBuybackSale?: string;
   budgetGemCharges?: string;
+  requestGemCharges?: boolean;
+  gemChargesPortalLink?: string;
+  gemChargesAmount?: number;
+  gemChargesInvoice?: string;
   woDraft?: string;
   tmsDocuments?: TmsDocuments;
 }
