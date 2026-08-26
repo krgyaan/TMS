@@ -35,6 +35,7 @@ export type LeadEnquiryListFilters = {
     status?: string;
     team?: string;
     leadId?: number;
+    happyCallingId?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 };
@@ -98,6 +99,10 @@ export class LeadEnquiryService {
 
         if (filters?.leadId) {
             conditions.push(eq(leadEnquiries.leadId, filters.leadId));
+        }
+
+        if (filters?.happyCallingId) {
+            conditions.push(eq(leadEnquiries.happyCallingId, filters.happyCallingId));
         }
 
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -602,7 +607,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
     async update(id: number, data: UpdateLeadEnquiryDto, userId: number): Promise<LeadEnquiry> {
         const locationCode = data.locationCode;
 
-        const { contacts, dueDate, enquiryFile, approxValue, organisationId: _, ...restData } = data;
+        const { contacts, dueDate, enquiryFile, approxValue, ...restData } = data;
 
         // Re-resolve organisation id when the organisation name is provided so it stays in sync
         let resolvedOrganisationId: number | null | undefined = data.organisationId ?? undefined;
@@ -784,6 +789,31 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             .innerJoin(leadEnquiries, eq(leadEnquiries.id, siteVisits.enquiryId))
             .leftJoin(users, eq(users.id, siteVisits.assignedTo))
             .where(eq(leadEnquiries.leadId, leadId))
+            .orderBy(desc(siteVisits.createdAt));
+    }
+
+    async findSiteVisitsByHappyCalling(happyCallingId: number): Promise<(SiteVisit & { enqName: string | null; enquiryNumber: string | null; assignedToName: string | null })[]> {
+        return this.db
+            .select({
+                id: siteVisits.id,
+                enquiryId: siteVisits.enquiryId,
+                assignedTo: siteVisits.assignedTo,
+                assignedToName: users.name,
+                scheduledAt: siteVisits.scheduledAt,
+                conductedAt: siteVisits.conductedAt,
+                information: siteVisits.information,
+                additionalNotes: siteVisits.additionalNotes,
+                documents: siteVisits.documents,
+                status: siteVisits.status,
+                createdAt: siteVisits.createdAt,
+                updatedAt: siteVisits.updatedAt,
+                enqName: leadEnquiries.enqName,
+                enquiryNumber: leadEnquiries.enquiryNumber,
+            })
+            .from(siteVisits)
+            .innerJoin(leadEnquiries, eq(leadEnquiries.id, siteVisits.enquiryId))
+            .leftJoin(users, eq(users.id, siteVisits.assignedTo))
+            .where(eq(leadEnquiries.happyCallingId, happyCallingId))
             .orderBy(desc(siteVisits.createdAt));
     }
 

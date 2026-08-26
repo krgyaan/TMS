@@ -9,6 +9,7 @@ const enquiryResultKey = {
     details: () => [...enquiryResultKey.all, 'detail'],
     detail: (id: number) => [...enquiryResultKey.details(), id],
     byLead: (leadId: number) => [...enquiryResultKey.all, 'by-lead', leadId],
+    byHappyCalling: (happyCallingId: number) => [...enquiryResultKey.all, 'by-happy-calling', happyCallingId],
     followupsByQuotation: (quotationId: number) => [...enquiryResultKey.all, 'followups-by-quotation', quotationId],
     statusSummary: () => [...enquiryResultKey.all, 'status-summary'],
 };
@@ -33,6 +34,14 @@ export function useEnquiryResultsByLead(leadId: number | null) {
         queryKey: enquiryResultKey.byLead(leadId!),
         queryFn: () => enquiryResultService.getByLeadId(leadId!),
         enabled: !!leadId,
+    });
+}
+
+export function useEnquiryResultsByHappyCalling(happyCallingId: number | null) {
+    return useQuery({
+        queryKey: enquiryResultKey.byHappyCalling(happyCallingId!),
+        queryFn: () => enquiryResultService.getByHappyCallingId(happyCallingId!),
+        enabled: !!happyCallingId,
     });
 }
 

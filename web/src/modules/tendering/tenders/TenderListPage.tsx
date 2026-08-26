@@ -166,9 +166,7 @@ const TenderListPage = () => {
         // },
         {
             label: "View Details",
-            onClick: (row: TenderInfoWithNames) => row.enquiryId
-                ? navigate(paths.crm.enquiryView(row.enquiryId))
-                : navigate(paths.tendering.tenderView(row.id)),
+            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderView(row.id)),
             icon: <Eye className="h-4 w-4" />,
         },
         {

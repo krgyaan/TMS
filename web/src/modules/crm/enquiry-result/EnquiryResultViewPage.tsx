@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { ShowPageLayout, type StepConfig } from "@/components/layout/ShowPageLayout";
 import { useLeadStepStatuses } from "@/hooks/api/useLeadStepStatuses";
-import { useEnquiryResult, useEnquiryResultsByLead } from "@/hooks/api/useEnquiryResult";
+import { useEnquiryResult, useEnquiryResultsByLead, useEnquiryResultsByHappyCalling } from "@/hooks/api/useEnquiryResult";
 import { useLeadEnquiry } from "@/hooks/api/useLeadEnquiry";
 import { LeadDetailsSection } from "../leads/components/LeadView";
 import { FollowupViewPage } from "../followups/FollowupViewPage";
@@ -76,6 +76,79 @@ export function EnquiryResultSection({
                 </CardHeader>
                 <CardContent>
                     <p className="text-sm text-muted-foreground py-4 text-center">No enquiry results found for this lead.</p>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            {results.map((result) => (
+                <Card key={result.id} className="mb-6">
+                    <CardHeader>
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    Enquiry Result
+                                    <Badge variant={getStatusVariant(result.status)}>
+                                        {result.status || "—"}
+                                    </Badge>
+                                </CardTitle>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => navigate(`/crm/enquiry-results/followup/${result.id}`)}
+                                >
+                                    <Send className="h-3 w-3 mr-1" /> Initiate Followup
+                                </Button>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <EnquiryResultView result={result} />
+                    </CardContent>
+                </Card>
+            ))}
+        </div>
+    );
+}
+
+export function HappyCallingEnquiryResultSection({
+    happyCallingId
+}: {
+    happyCallingId?: number | null;
+}) {
+    // Show all results for the enquiries linked to this happy calling
+    const { data: results, isLoading } = useEnquiryResultsByHappyCalling(happyCallingId ?? null);
+    const navigate = useNavigate();
+
+    if (isLoading) {
+        return (
+            <Card className="mb-6">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        Enquiry Results
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex items-center justify-center py-8 text-muted-foreground">Loading results...</div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!results || results.length === 0) {
+        return (
+            <Card className="mb-6">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        Enquiry Results
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground py-4 text-center">No enquiry results found for this happy calling.</p>
                 </CardContent>
             </Card>
         );

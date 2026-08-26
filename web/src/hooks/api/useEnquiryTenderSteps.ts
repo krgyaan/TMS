@@ -1,4 +1,5 @@
 import { useLead } from "@/hooks/api/useLeads";
+import { useHappyCalling } from "@/hooks/api/useHappyCalling";
 import { useFollowups } from "@/hooks/api/useFollowups";
 import { useLeadEnquiry, useSiteVisits } from "@/hooks/api/useLeadEnquiry";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
@@ -20,21 +21,27 @@ export interface EnquiryTenderStep {
     status: StepStatus;
 }
 
+export type EnquiryTenderSourceType = 'lead' | 'enquiry' | 'happy_calling';
+
 export function useEnquiryTenderSteps({
     tenderId,
     enquiryId,
+    sourceType = 'lead',
 }: {
     tenderId: number | null;
     enquiryId: number | null;
+    sourceType?: EnquiryTenderSourceType;
 }) {
     const { data: enquiry, isLoading: lEnquiry } = useLeadEnquiry(enquiryId);
-    const leadId = enquiry?.leadId ?? null;
+    const leadId = sourceType === 'happy_calling' ? null : (enquiry?.leadId ?? null);
+    const happyCallingId = sourceType === 'happy_calling' ? (enquiry?.happyCallingId ?? null) : null;
     const siteVisitRequired = enquiry?.siteVisitRequired === true;
 
     const { data: lead, isLoading: lLead } = useLead(leadId);
+    const { data: happyCalling, isLoading: lHappyCalling } = useHappyCalling(happyCallingId);
     const { data: leadFollowups, isLoading: lLeadFollowups } = useFollowups({
-        sourceType: "lead",
-        sourceId: leadId ?? 0,
+        sourceType: sourceType === 'happy_calling' ? 'happy_calling' : 'lead',
+        sourceId: sourceType === 'happy_calling' ? (happyCallingId ?? 0) : (leadId ?? 0),
     });
     const { data: enquiryFollowups, isLoading: lEnquiryFollowups } = useFollowups({
         sourceType: "enquiry",
@@ -64,15 +71,27 @@ export function useEnquiryTenderSteps({
         });
     };
 
-    combined.push({
-        id: "lead-details",
-        label: "Lead Details",
-        shortLabel: "Details",
-        stepNumber: ++stepNumber,
-        hasData: !!lead,
-        isLoading: lLead,
-        status: deriveStatus(!!lead, lLead),
-    });
+    if (sourceType === 'happy_calling') {
+        combined.push({
+            id: "happy-calling-details",
+            label: "Happy Calling",
+            shortLabel: "HC",
+            stepNumber: ++stepNumber,
+            hasData: !!happyCalling,
+            isLoading: lHappyCalling,
+            status: deriveStatus(!!happyCalling, lHappyCalling),
+        });
+    } else {
+        combined.push({
+            id: "lead-details",
+            label: "Lead Details",
+            shortLabel: "Details",
+            stepNumber: ++stepNumber,
+            hasData: !!lead,
+            isLoading: lLead,
+            status: deriveStatus(!!lead, lLead),
+        });
+    }
     combined.push({
         id: "followups",
         label: "Follow-ups",
@@ -124,5 +143,5 @@ export function useEnquiryTenderSteps({
     pushTenderStep("result");
     pushTenderStep("basic-details");
 
-    return { steps: combined, tenderId, enquiryId, leadId };
+    return { steps: combined, tenderId, enquiryId, leadId, happyCallingId };
 }

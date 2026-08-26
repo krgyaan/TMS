@@ -13,7 +13,7 @@ export const leadEnquiryKey = {
     detail: (id: number) => [...leadEnquiryKey.details(), id] as const,
 };
 
-type EnquiryPaginationParams = { page: number; limit: number; search?: string; status?: string; team?: string; leadId?: number; };
+type EnquiryPaginationParams = { page: number; limit: number; search?: string; status?: string; team?: string; leadId?: number; happyCallingId?: number; };
 
 export const useLeadEnquiries = (
     pagination: EnquiryPaginationParams = { page: 1, limit: 50 },
@@ -26,6 +26,7 @@ export const useLeadEnquiries = (
         status: pagination.status,
         team: pagination.team,
         leadId: pagination.leadId,
+        happyCallingId: pagination.happyCallingId,
         ...(sort?.sortBy && { sortBy: sort.sortBy }),
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
     };
@@ -115,6 +116,14 @@ export const useSiteVisits = (enquiryId: number | null) => {
         queryKey: [...leadEnquiryKey.all, 'site-visits', enquiryId],
         queryFn: () => leadEnquiryService.getSiteVisitsByEnquiry(enquiryId!),
         enabled: !!enquiryId,
+    });
+};
+
+export const useSiteVisitsByHappyCalling = (happyCallingId: number | null) => {
+    return useQuery<SiteVisit[]>({
+        queryKey: [...leadEnquiryKey.all, 'site-visits', 'by-happy-calling', happyCallingId],
+        queryFn: () => leadEnquiryService.getSiteVisitsByHappyCalling(happyCallingId!),
+        enabled: !!happyCallingId,
     });
 };
 

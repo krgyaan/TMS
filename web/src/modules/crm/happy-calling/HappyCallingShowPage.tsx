@@ -4,8 +4,10 @@ import { useSearchParams } from "react-router-dom";
 import { HappyCallingView } from "./components/HappyCallingView";
 import { FollowupViewPage } from "../followups/FollowupViewPage";
 import { ShowPageLayout, type StepConfig } from "@/components/layout/ShowPageLayout";
-import { useSourceStepStatuses } from "@/hooks/api/useLeadStepStatuses";
 import { useHappyCalling } from "@/hooks/api/useHappyCalling";
+import { useFollowups } from "@/hooks/api/useFollowups";
+import { useLeadEnquiries } from "@/hooks/api/useLeadEnquiry";
+import { EnquiryTenderFlow } from "@/modules/tendering/tenders/components/EnquiryTenderFlow";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -16,20 +18,40 @@ export default function HappyCallingShowPage() {
     const navigate = useNavigate();
     const happyCallingId = id ? Number(id) : null;
 
-    const stepStatuses = useSourceStepStatuses({ sourceType: 'happy_calling', sourceId: happyCallingId ?? 0 });
     const { data: record, isLoading } = useHappyCalling(happyCallingId);
+    const { data: followups, isLoading: l2 } = useFollowups({ sourceType: 'happy_calling', sourceId: happyCallingId ?? 0 });
+    const { data: enquiriesResponse } = useLeadEnquiries(
+        { page: 1, limit: 1, happyCallingId: happyCallingId ?? undefined },
+    );
     const [searchParams] = useSearchParams();
     const initialSection = searchParams.get("section");
 
-    const steps = useMemo<StepConfig[]>(() => stepStatuses.map(s => ({
-        id: s.id,
-        label: s.label,
-        shortLabel: s.shortLabel,
-        stepNumber: s.stepNumber,
-        status: s.status,
-        hasData: s.hasData,
-        isLoading: s.isLoading,
-    })), [stepStatuses]);
+    const linkedEnquiry = enquiriesResponse?.data?.find((e) => e.tenderId) ?? null;
+    const hasEnquiry = (enquiriesResponse?.meta?.total ?? 0) > 0;
+
+    const simpleSteps = useMemo<StepConfig[]>(() => {
+        const list: StepConfig[] = [
+            {
+                id: "happy-calling-details",
+                label: "Happy Calling",
+                shortLabel: "HC",
+                stepNumber: 1,
+                hasData: !!record,
+                isLoading,
+                status: isLoading ? "loading" : record ? "completed" : "pending",
+            },
+            {
+                id: "followups",
+                label: "Follow-ups",
+                shortLabel: "FU",
+                stepNumber: 2,
+                hasData: Array.isArray(followups) && followups.length > 0,
+                isLoading: l2,
+                status: l2 ? "loading" : (Array.isArray(followups) && followups.length > 0) ? "completed" : "pending",
+            },
+        ];
+        return list;
+    }, [record, isLoading, followups, l2]);
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(
         () => new Set(initialSection === "followups" ? ["followups"] : ["happy-calling-details"])
@@ -45,13 +67,13 @@ export default function HappyCallingShowPage() {
     }, []);
 
     const expandAll = useCallback(
-        () => setExpandedSections(new Set(steps.map((s) => s.id))),
-        [steps]
+        () => setExpandedSections(new Set(simpleSteps.map((s) => s.id))),
+        [simpleSteps]
     );
 
     const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
 
-    const renderSectionContent = useCallback(
+    const renderSimpleContent = useCallback(
         (stepId: string) => {
             switch (stepId) {
                 case "happy-calling-details":
@@ -70,17 +92,7 @@ export default function HappyCallingShowPage() {
                     }
                     return <HappyCallingView record={record} />;
                 case "followups":
-                    return <FollowupViewPage source={{ sourceType: 'happy_calling', sourceId: happyCallingId! }} />;
-                case "enquiries":
-                    return <p className="text-sm text-muted-foreground py-4 text-center">No enquiries found for this happy calling.</p>;
-                case "site-visits":
-                    return <p className="text-sm text-muted-foreground py-4 text-center">No site visits found for this happy calling.</p>;
-                case "costings":
-                    return <p className="text-sm text-muted-foreground py-4 text-center">No costings found for this happy calling.</p>;
-                case "quotations":
-                    return <p className="text-sm text-muted-foreground py-4 text-center">No quotations found for this happy calling.</p>;
-                case "enquiry-result":
-                    return <p className="text-sm text-muted-foreground py-4 text-center">No enquiry results found for this happy calling.</p>;
+                    return happyCallingId ? <FollowupViewPage source={{ sourceType: 'happy_calling', sourceId: happyCallingId }} /> : null;
                 default:
                     return null;
             }
@@ -92,16 +104,29 @@ export default function HappyCallingShowPage() {
         return <div className="p-8 text-center text-muted-foreground">Invalid Happy Calling ID.</div>;
     }
 
+    if (hasEnquiry && linkedEnquiry) {
+        return (
+            <EnquiryTenderFlow
+                tenderId={linkedEnquiry.tenderId}
+                enquiryId={linkedEnquiry.id}
+                sourceType="happy_calling"
+                defaultExpanded="happy-calling-details"
+                onBack={() => navigate(paths.crm.happyCalling)}
+                backLabel="Back to Happy Calling"
+            />
+        );
+    }
+
     return (
         <ShowPageLayout
-            steps={steps}
+            steps={simpleSteps}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
             onExpandAll={expandAll}
             onCollapseAll={collapseAll}
             onBack={() => navigate(paths.crm.happyCalling)}
             backLabel="Back to Happy Calling"
-            renderSectionContent={renderSectionContent}
+            renderSectionContent={renderSimpleContent}
         />
     );
 }

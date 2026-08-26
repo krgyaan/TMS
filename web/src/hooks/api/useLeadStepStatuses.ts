@@ -4,7 +4,7 @@ import { useHappyCalling } from "@/hooks/api/useHappyCalling";
 import { useLeadEnquiries } from "@/hooks/api/useLeadEnquiry";
 import { useQuery } from "@tanstack/react-query";
 import { leadEnquiryService } from "@/services/api/lead-enquiry.service";
-import { useEnquiryResultsByLead } from "@/hooks/api/useEnquiryResult";
+import { useEnquiryResultsByLead, useEnquiryResultsByHappyCalling } from "@/hooks/api/useEnquiryResult";
 import type { StepStatus } from "@/components/layout/ShowPageLayout";
 import type { FollowupSource } from "@/modules/crm/followups/helpers/followup.types";
 
@@ -93,25 +93,37 @@ export function useLeadStepStatuses(leadId: number | null) {
 
 export function useSourceStepStatuses(source: FollowupSource) {
     const isLead = source.sourceType === 'lead';
+    const isHappyCalling = source.sourceType === 'happy_calling';
     const leadId = isLead ? source.sourceId : null;
+    const happyCallingId = isHappyCalling ? source.sourceId : null;
     const { data: lead, isLoading: l1Lead } = useLead(leadId);
     const { data: happyCalling, isLoading: l1Happy } = useHappyCalling(isLead ? null : source.sourceId);
     const { data: followups, isLoading: l2 } = useFollowups(source);
 
-    // Lead-only module queries (disabled for happy-calling sources)
     const { data: enquiriesResponse, isLoading: l3 } = useQuery({
-        queryKey: ['lead-enquiries', 'status', 'by-lead', leadId],
-        queryFn: () => leadEnquiryService.getAll({ page: 1, limit: 1, leadId: leadId ?? undefined }),
-        enabled: isLead,
+        queryKey: isLead
+            ? ['lead-enquiries', 'status', 'by-lead', leadId]
+            : ['lead-enquiries', 'status', 'by-happy-calling', happyCallingId],
+        queryFn: () => isLead
+            ? leadEnquiryService.getAll({ page: 1, limit: 1, leadId: leadId ?? undefined })
+            : leadEnquiryService.getAll({ page: 1, limit: 1, happyCallingId: happyCallingId ?? undefined }),
+        enabled: isLead ? !!leadId : !!happyCallingId,
     });
 
     const { data: siteVisits, isLoading: l4 } = useQuery({
-        queryKey: ['site-visits', 'by-lead', leadId],
-        queryFn: () => leadEnquiryService.getSiteVisitsByLead(leadId!),
-        enabled: isLead,
+        queryKey: isLead
+            ? ['site-visits', 'by-lead', leadId]
+            : ['site-visits', 'by-happy-calling', happyCallingId],
+        queryFn: () => isLead
+            ? leadEnquiryService.getSiteVisitsByLead(leadId!)
+            : leadEnquiryService.getSiteVisitsByHappyCalling(happyCallingId!),
+        enabled: isLead ? !!leadId : !!happyCallingId,
     });
 
-    const { data: enquiryResults, isLoading: l5 } = useEnquiryResultsByLead(leadId);
+    const { data: enquiryResultsByLead, isLoading: l5a } = useEnquiryResultsByLead(leadId);
+    const { data: enquiryResultsByHappyCalling, isLoading: l5b } = useEnquiryResultsByHappyCalling(happyCallingId);
+    const enquiryResults = isLead ? enquiryResultsByLead : enquiryResultsByHappyCalling;
+    const l5 = isLead ? l5a : l5b;
 
     const record = isLead ? lead : happyCalling;
     const l1 = isLead ? l1Lead : l1Happy;
@@ -119,8 +131,8 @@ export function useSourceStepStatuses(source: FollowupSource) {
     const steps: LeadStepStatus[] = [
         {
             id: isLead ? "lead-details" : "happy-calling-details",
-            label: isLead ? "Lead Details" : "Happy Calling Details",
-            shortLabel: "Details",
+            label: isLead ? "Lead Details" : "Happy Calling",
+            shortLabel: isLead ? "Details" : "HC",
             stepNumber: 1,
             hasData: !!record,
             isLoading: l1,
@@ -140,27 +152,27 @@ export function useSourceStepStatuses(source: FollowupSource) {
             label: "Enquiries",
             shortLabel: "Enq",
             stepNumber: 3,
-            hasData: isLead ? (enquiriesResponse?.meta?.total ?? 0) > 0 : false,
-            isLoading: isLead ? l3 : false,
-            status: isLead ? deriveStatus((enquiriesResponse?.meta?.total ?? 0) > 0, l3) : "pending",
+            hasData: (enquiriesResponse?.meta?.total ?? 0) > 0,
+            isLoading: l3,
+            status: deriveStatus((enquiriesResponse?.meta?.total ?? 0) > 0, l3),
         },
         {
             id: "site-visits",
             label: "Site Visits",
             shortLabel: "SV",
             stepNumber: 4,
-            hasData: isLead ? Array.isArray(siteVisits) && siteVisits.length > 0 : false,
-            isLoading: isLead ? l4 : false,
-            status: isLead ? deriveStatus(Array.isArray(siteVisits) && siteVisits.length > 0, l4) : "pending",
+            hasData: Array.isArray(siteVisits) && siteVisits.length > 0,
+            isLoading: l4,
+            status: deriveStatus(Array.isArray(siteVisits) && siteVisits.length > 0, l4),
         },
         {
             id: "enquiry-result",
             label: "Enquiry Result",
             shortLabel: "Result",
             stepNumber: 5,
-            hasData: isLead ? Array.isArray(enquiryResults) && enquiryResults.length > 0 : false,
-            isLoading: isLead ? l5 : false,
-            status: isLead ? deriveStatus(Array.isArray(enquiryResults) && enquiryResults.length > 0, l5) : "pending",
+            hasData: Array.isArray(enquiryResults) && enquiryResults.length > 0,
+            isLoading: l5,
+            status: deriveStatus(Array.isArray(enquiryResults) && enquiryResults.length > 0, l5),
         },
     ];
 

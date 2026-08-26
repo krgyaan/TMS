@@ -37,6 +37,11 @@ export class EnquiryResultController {
         return this.service.findByLeadId(leadId);
     }
 
+    @Get('by-happy-calling/:happyCallingId')
+    async findByHappyCallingId(@Param('happyCallingId', ParseIntPipe) happyCallingId: number) {
+        return this.service.findByHappyCallingId(happyCallingId);
+    }
+
     @Get('by-enquiry/:enquiryId')
     async findByEnquiryId(@Param('enquiryId', ParseIntPipe) enquiryId: number) {
         return this.service.findByEnquiryId(enquiryId);

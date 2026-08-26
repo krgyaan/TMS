@@ -1,7 +1,9 @@
 import { useState, useCallback } from "react";
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
-import { useEnquiryTenderSteps } from "@/hooks/api/useEnquiryTenderSteps";
+import { useEnquiryTenderSteps, type EnquiryTenderSourceType } from "@/hooks/api/useEnquiryTenderSteps";
 import { LeadDetailsSection } from "@/modules/crm/leads/components/LeadView";
+import { HappyCallingView } from "@/modules/crm/happy-calling/components/HappyCallingView";
+import { useHappyCalling } from "@/hooks/api/useHappyCalling";
 import { FollowupViewPage } from "@/modules/crm/followups/FollowupViewPage";
 import { EnquiryDetailsSection } from "@/modules/crm/lead-enquiry/LeadEnquiryShowPage";
 import { LeadSiteVisitView } from "@/modules/crm/lead-enquiry/components/LeadSiteVisitView";
@@ -21,6 +23,7 @@ import { useWoBasicDetailsByTender } from "@/hooks/api/useWoBasicDetails";
 interface EnquiryTenderFlowProps {
     tenderId: number | null;
     enquiryId: number | null;
+    sourceType?: EnquiryTenderSourceType;
     defaultExpanded?: string;
     onBack?: () => void;
     backLabel?: string;
@@ -49,11 +52,13 @@ function EnquirySiteVisitsSection({ enquiryId }: { enquiryId: number | null }) {
 export function EnquiryTenderFlow({
     tenderId,
     enquiryId,
+    sourceType = 'lead',
     defaultExpanded = "tender-details",
     onBack,
     backLabel,
 }: EnquiryTenderFlowProps) {
-    const { steps, leadId } = useEnquiryTenderSteps({ tenderId, enquiryId });
+    const { steps, leadId, happyCallingId } = useEnquiryTenderSteps({ tenderId, enquiryId, sourceType });
+    const { data: happyCalling } = useHappyCalling(happyCallingId);
     const { data: basicDetailsResponse } = useWoBasicDetailsByTender(tenderId ?? 0);
     const basicDetailsId = basicDetailsResponse?.[0]?.id;
 
@@ -76,7 +81,12 @@ export function EnquiryTenderFlow({
             switch (stepId) {
                 case "lead-details":
                     return leadId ? <LeadDetailsSection leadId={leadId} /> : null;
+                case "happy-calling-details":
+                    return happyCalling ? <HappyCallingView record={happyCalling} /> : null;
                 case "followups":
+                    if (sourceType === 'happy_calling') {
+                        return happyCallingId ? <FollowupViewPage source={{ sourceType: "happy_calling", sourceId: happyCallingId }} /> : null;
+                    }
                     return leadId ? <FollowupViewPage source={{ sourceType: "lead", sourceId: leadId }} /> : null;
                 case "enquiry":
                     return <EnquiryDetailsSection enquiryId={enquiryId} />;
@@ -108,7 +118,7 @@ export function EnquiryTenderFlow({
                     return null;
             }
         },
-        [tenderId, enquiryId, leadId, basicDetailsId]
+        [tenderId, enquiryId, leadId, happyCallingId, happyCalling, sourceType, basicDetailsId]
     );
 
     return (

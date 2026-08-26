@@ -31,6 +31,10 @@ class EnquiryResultService extends BaseApiService {
         return this.get<EnquiryResultWithDetails[]>(`/by-lead/${leadId}`);
     }
 
+    async getByHappyCallingId(happyCallingId: number): Promise<EnquiryResultWithDetails[]> {
+        return this.get<EnquiryResultWithDetails[]>(`/by-happy-calling/${happyCallingId}`);
+    }
+
     async getFollowupsByQuotation(quotationId: number): Promise<any[]> {
         return this.get<any[]>(`/followups-by-quotation/${quotationId}`);
     }

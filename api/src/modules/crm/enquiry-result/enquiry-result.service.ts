@@ -137,6 +137,15 @@ export class EnquiryResultService {
         return data;
     }
 
+    async findByHappyCallingId(happyCallingId: number) {
+        const [data] = await Promise.all([
+            resultBaseQuery(this.db)
+                .where(eq(leadEnquiries.happyCallingId, happyCallingId))
+                .orderBy(desc(enquiryResults.createdAt)),
+        ]);
+        return data;
+    }
+
     async findByEnquiryId(enquiryId: number) {
         const [data] = await Promise.all([
             resultBaseQuery(this.db)

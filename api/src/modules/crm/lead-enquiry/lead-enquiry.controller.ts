@@ -35,6 +35,7 @@ export class LeadEnquiryController {
         @Query('status')    status?:    string,
         @Query('team')      team?:      string,
         @Query('leadId')    leadId?:    string,
+        @Query('happyCallingId') happyCallingId?: string,
         @Query('sortBy')    sortBy?:    string,
         @Query('sortOrder') sortOrder?: string,
     ) {
@@ -51,6 +52,7 @@ export class LeadEnquiryController {
             status,
             team,
             leadId: parseNumber(leadId),
+            happyCallingId: parseNumber(happyCallingId),
             sortBy,
             sortOrder: sortOrder as 'asc' | 'desc' | undefined,
         });
@@ -77,6 +79,11 @@ export class LeadEnquiryController {
     @Get('site-visits/by-lead/:leadId')
     async getSiteVisitsByLead(@Param('leadId', ParseIntPipe) leadId: number) {
         return this.leadEnquiryService.findSiteVisitsByLead(leadId);
+    }
+
+    @Get('site-visits/by-happy-calling/:happyCallingId')
+    async getSiteVisitsByHappyCalling(@Param('happyCallingId', ParseIntPipe) happyCallingId: number) {
+        return this.leadEnquiryService.findSiteVisitsByHappyCalling(happyCallingId);
     }
 
     @Patch('site-visits/details/:id')

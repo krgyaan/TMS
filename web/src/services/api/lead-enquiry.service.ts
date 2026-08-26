@@ -14,6 +14,7 @@ class LeadEnquiryService extends BaseApiService {
             if (params.status)    search.set('status',    params.status);
             if (params.team)      search.set('team',      params.team);
             if (params.leadId)    search.set('leadId',    String(params.leadId));
+            if (params.happyCallingId) search.set('happyCallingId', String(params.happyCallingId));
             if (params.sortBy)    search.set('sortBy',    params.sortBy);
             if (params.sortOrder) search.set('sortOrder', params.sortOrder);
         }
@@ -55,6 +56,10 @@ class LeadEnquiryService extends BaseApiService {
 
     async getSiteVisitsByLead(leadId: number): Promise<SiteVisit[]> {
         return this.get<SiteVisit[]>(`/site-visits/by-lead/${leadId}`);
+    }
+
+    async getSiteVisitsByHappyCalling(happyCallingId: number): Promise<SiteVisit[]> {
+        return this.get<SiteVisit[]>(`/site-visits/by-happy-calling/${happyCallingId}`);
     }
 
     async updateSiteVisit(id: number, data: UpdateSiteVisitRequest): Promise<SiteVisit> {
