@@ -8,17 +8,17 @@ import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectInsurancePolicies } from "@/hooks/api/useProjectInsurance";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { formatDate } from "@/hooks/useFormatedDate";
 import type { InsurancePolicyRow } from "@/modules/insurance/helpers/insurance.types";
-import { format } from "date-fns";
 import type { ColDef } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { Eye, Plus, RefreshCcw, ShieldCheck } from "lucide-react";
-import React, { useCallback, useMemo } from "react";
+import { Eye, Plus, RefreshCcw } from "lucide-react";
+import React, { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-    ALL_INSURANCE_TYPES,
-    TYPE_CATEGORY,
-    TOTAL_INSURANCE_TYPES,
+    CATEGORY_NAMES,
+    PROJECT_INSURANCE_CATEGORIES,
+    TOTAL_CATEGORIES,
     type InsuranceChecklistRow,
 } from "../helpers/projectInsurance.types";
 
@@ -53,78 +53,68 @@ export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ projectId })
 
     const policies = useMemo(() => data ?? [], [data]);
 
-    const checklistRows = useMemo<InsuranceChecklistRow[]>(() => {
-        const policiesByType = new Map<string, InsurancePolicyRow[]>();
-        for (const policy of policies) {
-            const type = policy.insuranceType;
-            if (!policiesByType.has(type)) {
-                policiesByType.set(type, []);
-            }
-            policiesByType.get(type)!.push(policy);
-        }
-
-        return ALL_INSURANCE_TYPES.map(typeName => ({
-            typeName,
-            category: TYPE_CATEGORY[typeName],
-            policies: policiesByType.get(typeName) ?? [],
-        }));
-    }, [policies]);
+    const checklistRows = useMemo<InsuranceChecklistRow[]>(() =>
+        CATEGORY_NAMES.map(categoryName => ({
+            categoryName,
+            types: PROJECT_INSURANCE_CATEGORIES[categoryName],
+            policies: policies.filter(p =>
+                PROJECT_INSURANCE_CATEGORIES[categoryName].includes(p.insuranceType)
+            ),
+        })),
+    [policies]);
 
     const coveredCount = useMemo(
         () => checklistRows.filter(r => r.policies.length > 0).length,
         [checklistRows]
     );
 
-    const hasCar = useMemo(() => checklistRows.find(r => r.typeName === "CAR")?.policies.length ?? 0 > 0, [checklistRows]);
-    const hasEar = useMemo(() => checklistRows.find(r => r.typeName === "EAR")?.policies.length ?? 0 > 0, [checklistRows]);
-
-    const isAddDisabled = useCallback((typeName: string): boolean => {
-        if (typeName === "EAR" && hasCar) return true;
-        if (typeName === "CAR" && hasEar) return true;
-        return false;
-    }, [hasCar, hasEar]);
-
     const insuranceActions: ActionItem<InsuranceChecklistRow>[] = useMemo(() => [
         {
             label: "Add Insurance",
             icon: <Plus className="h-4 w-4" />,
-            onClick: (row) => navigate(paths.operations.raiseProjectInsuranceForm(projectId!) + `?type=${row.typeName}`),
-            hidden: (row) => row.policies.length > 0 || isAddDisabled(row.typeName),
+            onClick: (row: InsuranceChecklistRow) => {
+                const path = row.types.length === 1
+                    ? `${paths.operations.raiseProjectInsuranceForm(projectId!)}?type=${row.types[0]}`
+                    : paths.operations.raiseProjectInsuranceForm(projectId!);
+                navigate(path);
+            },
+            hidden: (row: InsuranceChecklistRow) => row.policies.length > 0,
         },
         {
             label: "View Policy",
             icon: <Eye className="h-4 w-4" />,
-            onClick: (row) => {
+            onClick: (row: InsuranceChecklistRow) => {
                 const latest = getLatestPolicy(row);
                 if (latest) navigate(paths.accounts.insuranceView(latest.id));
             },
-            hidden: (row) => row.policies.length === 0,
+            hidden: (row: InsuranceChecklistRow) => row.policies.length === 0,
         },
         {
             label: "Add Payment (Renewal)",
             icon: <RefreshCcw className="h-4 w-4" />,
-            onClick: (row) => {
+            onClick: (row: InsuranceChecklistRow) => {
                 const latest = getLatestPolicy(row);
                 if (latest) navigate(paths.operations.raiseProjectInsuranceRenewalForm(projectId!, latest.id));
             },
-            hidden: (row) => row.policies.length === 0,
+            hidden: (row: InsuranceChecklistRow) => row.policies.length === 0,
         },
-    ], [navigate, projectId, isAddDisabled]);
+    ], [navigate, projectId]);
 
     const insuranceColumns = useMemo<ColDef<InsuranceChecklistRow>[]>(() => [
         {
-            field: "typeName",
+            field: "categoryName",
             headerName: "Insurance Type",
             sortable: true,
             filter: true,
-            width: 160,
+            width: 180,
             cellRenderer: (p: CustomCellRendererProps<InsuranceChecklistRow>) => (
-                <div className="flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                        <span className="text-sm font-medium">{p.value}</span>
-                        <span className="text-xs text-muted-foreground block">{p.data?.category}</span>
-                    </div>
+                <div>
+                    <span className="text-sm font-medium">{p.value}</span>
+                    {p.data && p.data.types.length > 1 && (
+                        <span className="text-xs text-muted-foreground block">
+                            {p.data.types.join(" / ")}
+                        </span>
+                    )}
                 </div>
             ),
         },
@@ -140,6 +130,16 @@ export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ projectId })
                         {status}
                     </Badge>
                 );
+            },
+        },
+        {
+            headerName: "Policy Type",
+            filter: false,
+            sortable: false,
+            width: 120,
+            valueGetter: (params) => {
+                const latest = params.data ? getLatestPolicy(params.data) : null;
+                return latest?.insuranceType ?? "—";
             },
         },
         {
@@ -173,7 +173,7 @@ export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ projectId })
             valueGetter: (params) => {
                 const latest = params.data ? getLatestPolicy(params.data) : null;
                 if (!latest?.startDate || !latest?.endDate) return "—";
-                return `${format(new Date(latest.startDate), "dd-MM-yyyy")} to ${format(new Date(latest.endDate), "dd-MM-yyyy")}`;
+                return `${formatDate(latest.startDate)} to ${formatDate(latest.endDate)}`;
             },
         },
         {
@@ -192,7 +192,18 @@ export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ projectId })
             },
         },
         {
-            headerName: "Actions",
+            field: "policies",
+            headerName: "Added By",
+            sortable: false,
+            filter: false,
+            width: 140,
+            valueGetter: (params) => {
+                const latest = params.data ? getLatestPolicy(params.data) : null;
+                return latest?.createdByName ?? "—";
+            },
+        },
+        {
+            headerName: "",
             filter: false,
             sortable: false,
             cellRenderer: createActionColumnRenderer<InsuranceChecklistRow>(insuranceActions),
@@ -224,12 +235,12 @@ export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ projectId })
                     <div>
                         <CardTitle className="text-base font-semibold">Insurance</CardTitle>
                         <CardDescription>
-                            {coveredCount} of {TOTAL_INSURANCE_TYPES} insurance types covered
+                            {coveredCount} of {TOTAL_CATEGORIES} insurance types covered
                         </CardDescription>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Badge variant={coveredCount === TOTAL_INSURANCE_TYPES ? "success" : "secondary"}>
-                            {coveredCount}/{TOTAL_INSURANCE_TYPES}
+                        <Badge variant={coveredCount === TOTAL_CATEGORIES ? "success" : "secondary"}>
+                            {coveredCount}/{TOTAL_CATEGORIES}
                         </Badge>
                         <CardAction>
                             <Button size="sm" variant="default" onClick={() => navigate(paths.operations.raiseProjectInsuranceForm(projectId))}>

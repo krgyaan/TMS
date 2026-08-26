@@ -20,17 +20,17 @@ export const projectInsuranceFormSchema = z
         if (data.raisePayment) {
             if (data.paymentMode === "BANK_TRANSFER") {
                 if (!data.partyName.trim()) {
-                    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["partyName"], message: "Party name is required" });
+                    ctx.addIssue({ code: "custom", path: ["partyName"], message: "Party name is required" });
                 }
                 if (!data.accountNumber.trim()) {
-                    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["accountNumber"], message: "Account number is required" });
+                    ctx.addIssue({ code: "custom", path: ["accountNumber"], message: "Account number is required" });
                 }
                 if (!data.ifsc.trim()) {
-                    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["ifsc"], message: "IFSC is required" });
+                    ctx.addIssue({ code: "custom", path: ["ifsc"], message: "IFSC is required" });
                 }
             } else {
                 if (!data.portalLink.trim()) {
-                    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["portalLink"], message: "Portal link is required" });
+                    ctx.addIssue({ code: "custom", path: ["portalLink"], message: "Portal link is required" });
                 }
             }
         }

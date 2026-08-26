@@ -10,11 +10,11 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { FileUploader } from "@/components/file-upload";
 import { useBeneficiaries, useCreateBeneficiary } from "@/hooks/api/useProjectPaymentRequests";
-import { useCreateDirectInsurance, useCreateProjectInsurance } from "@/hooks/api/useProjectInsurance";
+import { useCreateDirectInsurance, useCreateProjectInsurance, useProjectInsurancePolicies } from "@/hooks/api/useProjectInsurance";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Loader2, UserPlus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -39,9 +39,17 @@ export default function CreateProjectInsurancePage() {
 
     const createWithPaymentMutation = useCreateProjectInsurance();
     const createDirectMutation = useCreateDirectInsurance();
+    const { data: existingPolicies } = useProjectInsurancePolicies(projectId);
     const { data: beneficiaries } = useBeneficiaries();
     const createBeneficiaryMutation = useCreateBeneficiary();
     const [isAddBeneficiaryOpen, setIsAddBeneficiaryOpen] = useState(false);
+
+    const disabledTypes = useMemo(() => {
+        const types = (existingPolicies ?? []).map(p => p.insuranceType);
+        if (types.includes("CAR")) return ["EAR"];
+        if (types.includes("EAR")) return ["CAR"];
+        return [];
+    }, [existingPolicies]);
 
     const form = useForm<ProjectInsuranceFormValues>({
         resolver: zodResolver(projectInsuranceFormSchema) as never,
@@ -167,7 +175,7 @@ export default function CreateProjectInsurancePage() {
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                        <InsuranceDetailsForm />
+                        <InsuranceDetailsForm disabledTypes={disabledTypes} />
 
                         {!isRenewal && (
                             <div className="border rounded-lg border-dashed p-4 space-y-4">
