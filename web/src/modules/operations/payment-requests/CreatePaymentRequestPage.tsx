@@ -11,9 +11,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBeneficiaries, useCreateBeneficiary, useCreatePaymentRequest, useNextPRNumber } from "@/hooks/api/useProjectPaymentRequests";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
+import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { formatINR } from "@/hooks/useINRFormatter";
-import { ArrowLeft, Building2, Hash, Loader2, UserPlus } from "lucide-react";
+import { AlertCircle, ArrowLeft, Building2, Hash, Loader2, ShieldCheck, UserPlus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -49,6 +50,7 @@ export default function CreatePaymentRequestPage() {
     const vwoIdParam = searchParams.get("vwoId");
 
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
+    const { hasWC, isLoading: isWCLoading } = useHasWCInsurance(projectId);
     const projectName = overview?.project?.projectName;
     const { data: nextPRNumber, isLoading: isLoadingPRNumber } = useNextPRNumber(projectName);
 
@@ -133,6 +135,43 @@ export default function CreatePaymentRequestPage() {
                     {[1, 2, 3].map((i) => (
                         <Skeleton key={i} className="h-32 w-full rounded-lg" />
                     ))}
+                </div>
+            </div>
+        );
+    }
+
+    if (!isWCLoading && !hasWC) {
+        return (
+            <div className="container mx-auto py-6 max-w-4xl">
+                <div className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all hover:shadow-sm">
+                    <div className="flex items-center gap-5">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive shadow-sm">
+                            <ShieldCheck className="h-6 w-6" />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-lg font-bold">WC Insurance Required</h3>
+                                <Badge variant="destructive" className="text-[10px] uppercase tracking-wider font-bold h-5 px-1.5">
+                                    Action Required
+                                </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
+                                This project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy before creating a Payment Request.
+                            </p>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="hidden md:flex gap-2"
+                            onClick={() => navigate(paths.operations.projectDashboard(projectId))}
+                        >
+                            <AlertCircle className="h-4 w-4" />
+                            Go to Dashboard
+                        </Button>
+                    </div>
+                    <div className="absolute -right-10 -bottom-6 opacity-[0.03] text-foreground pointer-events-none">
+                        <AlertCircle size={120} />
+                    </div>
                 </div>
             </div>
         );
