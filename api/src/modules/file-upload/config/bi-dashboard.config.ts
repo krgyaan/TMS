@@ -189,4 +189,10 @@ export const biDashboardConfigs: Record<string, FileConfig> = {
         allowedMimeTypes: [...DOCS],
         allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
     },
+    "cheque-stop-proof-image": {
+        maxFiles: 1,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
 };
