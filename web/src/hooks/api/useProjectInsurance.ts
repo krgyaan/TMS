@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { insuranceService } from "@/services/api/insurance.service";
 import { paymentRequestApi } from "@/services/api/payment-request.api";
@@ -31,4 +32,13 @@ export function useCreateDirectInsurance() {
             queryClient.invalidateQueries({ queryKey: ["insurance-policies"] });
         },
     });
+}
+
+export function useHasWCInsurance(projectId: number) {
+    const { data: policies, isLoading } = useProjectInsurancePolicies(projectId);
+    const hasWC = useMemo(
+        () => (policies ?? []).some(p => p.insuranceType === "WC" && p.status !== "Expired"),
+        [policies]
+    );
+    return { hasWC, isLoading };
 }
