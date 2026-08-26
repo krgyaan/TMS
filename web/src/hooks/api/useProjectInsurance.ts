@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { insuranceService } from "@/services/api/insurance.service";
 import { paymentRequestApi } from "@/services/api/payment-request.api";
-import type { InsurancePolicyRow } from "@/modules/insurance/helpers/insurance.types";
+import type { InsuranceCreatePayload, InsurancePolicyRow } from "@/modules/insurance/helpers/insurance.types";
 
 export function useProjectInsurancePolicies(projectId: number) {
     return useQuery<InsurancePolicyRow[]>({
@@ -19,6 +19,16 @@ export function useCreateProjectInsurance() {
             queryClient.invalidateQueries({ queryKey: ["insurance-policies"] });
             queryClient.invalidateQueries({ queryKey: ["payment-requests"] });
             queryClient.invalidateQueries({ queryKey: ["payment-requests", "project", variables?.projectId] });
+        },
+    });
+}
+
+export function useCreateDirectInsurance() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: InsuranceCreatePayload) => insuranceService.create(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["insurance-policies"] });
         },
     });
 }
