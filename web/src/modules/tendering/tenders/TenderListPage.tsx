@@ -185,9 +185,7 @@ const TenderListPage = () => {
         },
         {
             label: "Edit",
-            onClick: (row: TenderInfoWithNames) => row.enquiryId
-                ? navigate(paths.crm.enquiryEdit(row.enquiryId))
-                : navigate(paths.tendering.tenderEdit(row.id)),
+            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderEdit(row.id)),
             icon: <Pencil className="h-4 w-4" />,
         },
         {

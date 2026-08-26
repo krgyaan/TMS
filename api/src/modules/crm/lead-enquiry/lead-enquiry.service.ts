@@ -602,9 +602,17 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
     async update(id: number, data: UpdateLeadEnquiryDto, userId: number): Promise<LeadEnquiry> {
         const locationCode = data.locationCode;
 
-        const { contacts, dueDate, enquiryFile, approxValue, ...restData } = data;
+        const { contacts, dueDate, enquiryFile, approxValue, organisationId: _, ...restData } = data;
+
+        // Re-resolve organisation id when the organisation name is provided so it stays in sync
+        let resolvedOrganisationId: number | null | undefined = data.organisationId ?? undefined;
+        if (data.organizationName != null) {
+            resolvedOrganisationId = await this.resolveOrganizationId(this.db, data.organizationName);
+        }
+
         const updateData = {
             ...restData,
+            organisationId: resolvedOrganisationId,
             locationCode,
             dueDate: dueDate ? new Date(dueDate) : undefined,
             enquiryFile: enquiryFile !== undefined ? enquiryFile : undefined,
@@ -620,13 +628,17 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
 
         if (!updated) throw new NotFoundException(`Lead enquiry with ID ${id} not found`);
 
-        // Keep the linked tender's due date, location and documents in sync
+        // Keep the linked tender's connected fields in sync
         if (updated.tenderId) {
             const tenderSync: {
                 dueDate?: Date;
                 location?: number | null;
                 documents?: string | null;
                 gstValues?: string;
+                tenderName?: string;
+                tenderNo?: string;
+                organization?: number | null;
+                item?: number;
                 updatedAt: Date;
             } = { updatedAt: new Date() };
 
@@ -634,6 +646,10 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             if (locationCode) tenderSync.location = Number(locationCode);
             if (enquiryFile !== undefined) tenderSync.documents = enquiryFile;
             if (approxValue !== undefined) tenderSync.gstValues = approxValue;
+            if (data.enqName) tenderSync.tenderName = data.enqName;
+            if (data.enquiryNumber) tenderSync.tenderNo = data.enquiryNumber;
+            if (resolvedOrganisationId != null) tenderSync.organization = resolvedOrganisationId;
+            if (data.itemId != null) tenderSync.item = data.itemId;
 
             if (Object.keys(tenderSync).length > 1) {
                 await this.db
