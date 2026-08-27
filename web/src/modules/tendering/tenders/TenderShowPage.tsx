@@ -13,13 +13,14 @@ import { TqTenderSection } from "@/modules/tendering/tq-management/components/Tq
 import { TenderResultSection } from "@/modules/tendering/results/components/TenderResultView";
 import { paths } from "@/app/routes/paths";
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { EnquiryTenderFlow } from "@/modules/tendering/tenders/components/EnquiryTenderFlow";
 
 export default function TenderShowPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const tenderId = id ? Number(id) : null;
 
-    const { steps } = useTenderStepStatuses(tenderId);
+    const { steps, tender } = useTenderStepStatuses(tenderId);
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["tender-details"]));
 
@@ -48,6 +49,18 @@ export default function TenderShowPage() {
             default:               return null;
         }
     }, [tenderId]);
+
+    if (tender?.enquiryId) {
+        return (
+            <EnquiryTenderFlow
+                tenderId={tenderId}
+                enquiryId={tender.enquiryId}
+                defaultExpanded="tender-details"
+                onBack={() => navigate(paths.tendering.tenders)}
+                backLabel="Back to Tenders"
+            />
+        );
+    }
 
     return (
         <ShowPageLayout

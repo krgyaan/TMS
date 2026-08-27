@@ -21,7 +21,6 @@ export interface LeadEnquiry {
     rejectionReason: string | null;
     status: string | null;
     enquiryType: string | null;
-    costingDocument: string | null;
     notes: string | null;
     createdAt: string;
     updatedAt: string;
@@ -34,9 +33,13 @@ export interface LeadEnquiryWithNames extends LeadEnquiry {
     createdByName?: string | null;
     updatedByName?: string | null;
     teamName?: string | null;
+    teamMemberName?: string | null;
     hasSiteVisit?: boolean;
-    costingSheetStatus?: string | null;
+    tenderStatusId?: number | null;
     tenderStatusName?: string | null;
+    latestFollowupType?: string | null;
+    nextFollowupDate?: string | null;
+    lastFollowupAt?: string | null;
     tenderStage?: string | null;
     contacts?: EnquiryContact[] | null;
 }
@@ -71,9 +74,7 @@ export interface CreateLeadEnquiryRequest {
     contacts?: EnquiryContact[] | null;
 }
 
-export interface UpdateLeadEnquiryRequest extends Partial<CreateLeadEnquiryRequest> {
-    costingDocument?: string | null;
-}
+export type UpdateLeadEnquiryRequest = Partial<CreateLeadEnquiryRequest>;
 
 export interface CreateEnquiryWithLeadRequest {
     team?: string | null;
@@ -123,29 +124,6 @@ export interface UpdateSiteVisitDetailsRequest {
     conductedAt?: string | null;
 }
 
-export interface CreateCostingSheetResponse {
-    sheetUrl: string;
-}
-
-export interface SubmitCostingSheetRequest {
-    enquiryId: number;
-    finalPrice?: string | null;
-    receiptPreGst?: string | null;
-    budgetPreGst?: string | null;
-    grossMargin?: string | null;
-    remarks?: string | null;
-}
-
-export interface SubmitCostingSheetResponse {
-    success: boolean;
-}
-
-export type DriveScopesResponse = {
-    hasScopes: boolean;
-    missingScopes: string[];
-    grantedScopes: string[];
-};
-
 export interface LeadEnquiryListParams {
     page?: number;
     limit?: number;
@@ -153,6 +131,7 @@ export interface LeadEnquiryListParams {
     status?: string;
     team?: string;
     leadId?: number;
+    happyCallingId?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 }

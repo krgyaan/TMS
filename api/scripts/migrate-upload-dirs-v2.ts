@@ -11,7 +11,6 @@
  *
  * Folder moves (same-volume renames; merges into existing destinations):
  *   employeeimprest/                -> employee-imprest/
- *   enquiry-results/                -> crm/enquiry-results/
  *   leads-quotations/               -> crm/leads-quotations/
  *   site-visit/                     -> crm/site-visit/
  *   checklist/                      -> accounts/checklist/
@@ -49,7 +48,6 @@ const DRY_RUN = process.argv.includes('--dry-run');
 
 const DIR_MOVES: Array<{ from: string; to: string }> = [
     { from: 'employeeimprest', to: 'employee-imprest' },
-    { from: 'enquiry-results', to: 'crm/enquiry-results' },
     { from: 'leads-quotations', to: 'crm/leads-quotations' },
     { from: 'site-visit', to: 'crm/site-visit' },
     { from: 'checklist', to: 'accounts/checklist' },

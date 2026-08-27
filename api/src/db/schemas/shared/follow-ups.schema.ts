@@ -30,8 +30,6 @@ export const followUps = pgTable(
 
         emdId: bigint("emd_id", { mode: "number" }),
 
-        quotationId: bigint("quotation_id", { mode: "number" }),
-
         area: varchar("area", { length: 255 }).notNull(),
         partyName: varchar("party_name", { length: 255 }).notNull(),
         amount: decimal("amount", { precision: 15, scale: 2 }).notNull().default("0.00"),

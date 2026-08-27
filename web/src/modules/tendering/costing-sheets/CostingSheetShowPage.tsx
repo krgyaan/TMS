@@ -13,6 +13,7 @@ import { TqTenderSection } from "@/modules/tendering/tq-management/components/Tq
 import { TenderResultSection } from "@/modules/tendering/results/components/TenderResultView";
 import { paths } from "@/app/routes/paths";
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { EnquiryTenderFlow } from "@/modules/tendering/tenders/components/EnquiryTenderFlow";
 
 // CostingSheet page shows all relevant steps
 const STEP_IDS = ["tender-details", "physical-docs", "rfq", "emd-fees", "checklist", "costing", "bid", "tq-management", "ra-management", "result"];
@@ -22,7 +23,7 @@ export default function CostingSheetShowPage() {
     const navigate = useNavigate();
     const tenderId = tenderIdParam ? Number(tenderIdParam) : null;
 
-    const { steps: allSteps } = useTenderStepStatuses(tenderId);
+    const { steps: allSteps, tender } = useTenderStepStatuses(tenderId);
     const steps = allSteps.filter((s) => STEP_IDS.includes(s.id));
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["costing"]));
@@ -52,6 +53,18 @@ export default function CostingSheetShowPage() {
             default:               return null;
         }
     }, [tenderId]);
+
+    if (tender?.enquiryId) {
+        return (
+            <EnquiryTenderFlow
+                tenderId={tenderId}
+                enquiryId={tender.enquiryId}
+                defaultExpanded="costing"
+                onBack={() => navigate(paths.tendering.tenders)}
+                backLabel="Back to Tenders"
+            />
+        );
+    }
 
     return (
         <ShowPageLayout

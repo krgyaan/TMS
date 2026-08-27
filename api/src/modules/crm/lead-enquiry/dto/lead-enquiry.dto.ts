@@ -133,9 +133,3 @@ export const CreateSiteVisitContactArraySchema = z.object({
 });
 
 export type CreateSiteVisitContactArrayDto = z.infer<typeof CreateSiteVisitContactArraySchema>;
-
-export const CreateCostingSheetSchema = z.object({
-    enquiryId: z.number().int().positive(),
-});
-
-export type CreateCostingSheetDto = z.infer<typeof CreateCostingSheetSchema>;

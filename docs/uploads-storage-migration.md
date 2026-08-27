@@ -96,7 +96,6 @@ All moves are same-volume renames; skips collisions; idempotent. Also rewrites D
 | Old folder | New folder | Module |
 |---|---|---|
 | `uploads/employeeimprest` | `uploads/employee-imprest` | employee-imprest |
-| `uploads/enquiry-results` | `uploads/crm/enquiry-results` | crm |
 | `uploads/leads-quotations` | `uploads/crm/leads-quotations` | crm |
 | `uploads/site-visit` | `uploads/crm/site-visit` | crm |
 | `uploads/checklist` | `uploads/accounts/checklist` | accounts |

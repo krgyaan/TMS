@@ -4,9 +4,9 @@ import type { DbInstance } from '@db';
 import { leadEnquiries, type NewLeadEnquiry, type LeadEnquiry } from '@db/schemas/crm/lead-enquiries.schema';
 import { siteVisits, type SiteVisit, type NewSiteVisit } from '@db/schemas/crm/site-visits.schema';
 import { siteVisitContacts, type SiteVisitContact } from '@db/schemas/crm/site-visit-contacts.schema';
-import { privateCostingSheets } from '@db/schemas/crm/private-costing-sheets.schema';
 import { leads, type NewLead } from '@db/schemas/crm/leads.schema';
 import { leadContacts } from '@db/schemas/crm/lead-contacts.schema';
+import { leadFollowups } from '@db/schemas/crm/lead-followups.schema';
 import { tenderInfos, type TenderInfo } from '@db/schemas/tendering/tenders.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { physicalDocs } from '@db/schemas/tendering/physical-docs.schema';
@@ -26,7 +26,6 @@ import { users } from '@db/schemas/auth/users.schema';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { and, asc, desc, eq, ilike, inArray, like, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import { GoogleDriveService } from '@/modules/integrations/google/google-drive.service';
 import type { CreateLeadEnquiryDto, UpdateLeadEnquiryDto, CreateSiteVisitDto, UpdateSiteVisitDto, UpdateSiteVisitDetailsDto, CreateSiteVisitContactDto, CreateSiteVisitContactArrayDto, EnquiryContactDto, CreateEnquiryWithLeadDto } from './dto/lead-enquiry.dto';
 
 export type LeadEnquiryListFilters = {
@@ -36,6 +35,7 @@ export type LeadEnquiryListFilters = {
     status?: string;
     team?: string;
     leadId?: number;
+    happyCallingId?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 };
@@ -47,21 +47,25 @@ export type LeadEnquiryWithNames = LeadEnquiry & {
     createdByName?: string | null;
     updatedByName?: string | null;
     teamName?: string | null;
+    teamMemberName?: string | null;
     hasSiteVisit?: boolean;
-    costingSheetStatus?: string | null;
+    tenderStatusId?: number | null;
     tenderStatusName?: string | null;
     tenderStage?: string | null;
+    latestFollowupType?: string | null;
+    nextFollowupDate?: string | null;
+    lastFollowupAt?: string | null;
     contacts?: EnquiryContactDto[] | null;
 };
 
 const createdByUser = alias(users, 'created_by_user');
 const updatedByUser = alias(users, 'updated_by_user');
+const teamMemberUser = alias(users, 'team_member_user');
 
 @Injectable()
 export class LeadEnquiryService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-        private readonly googleDriveService: GoogleDriveService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
     ) {}
 
@@ -97,6 +101,10 @@ export class LeadEnquiryService {
             conditions.push(eq(leadEnquiries.leadId, filters.leadId));
         }
 
+        if (filters?.happyCallingId) {
+            conditions.push(eq(leadEnquiries.happyCallingId, filters.happyCallingId));
+        }
+
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
         const [countResult] = await this.db
@@ -118,7 +126,6 @@ export class LeadEnquiryService {
         }
 
         const hasSiteVisitExpr = sql<boolean>`EXISTS (SELECT 1 FROM site_visits sv WHERE sv.enquiry_id = ${leadEnquiries.id})`;
-        const costingSheetStatusExpr = sql<string | null>`(SELECT pcs.status FROM private_costing_sheets pcs WHERE pcs.enquiry_id = ${leadEnquiries.id} LIMIT 1)`;
 
         const rows = await this.db
             .select({
@@ -128,9 +135,25 @@ export class LeadEnquiryService {
                 orgName: organizations.name,
                 createdByName: createdByUser.name,
                 updatedByName: updatedByUser.name,
+                teamMemberName: teamMemberUser.name,
                 hasSiteVisit: hasSiteVisitExpr,
-                costingSheetStatus: costingSheetStatusExpr,
+                tenderStatusId: statuses.id,
                 tenderStatusName: statuses.name,
+                latestFollowupType: sql<string | null>`(
+                    SELECT lf.type FROM ${leadFollowups} lf
+                    WHERE lf.enquiry_id = ${leadEnquiries.id}
+                    ORDER BY lf.created_at DESC, lf.id DESC LIMIT 1
+                )`,
+                nextFollowupDate: sql<string | null>`(
+                    SELECT lf.next_followup_date FROM ${leadFollowups} lf
+                    WHERE lf.enquiry_id = ${leadEnquiries.id} AND lf.next_followup_date IS NOT NULL
+                    ORDER BY lf.created_at DESC, lf.id DESC LIMIT 1
+                )`,
+                lastFollowupAt: sql<string | null>`(
+                    SELECT lf.created_at FROM ${leadFollowups} lf
+                    WHERE lf.enquiry_id = ${leadEnquiries.id}
+                    ORDER BY lf.created_at DESC, lf.id DESC LIMIT 1
+                )`,
             })
             .from(leadEnquiries)
             .leftJoin(teams, eq(teams.id, sql`NULLIF(${leadEnquiries.team}, '')::BIGINT`))
@@ -141,6 +164,7 @@ export class LeadEnquiryService {
             .leftJoin(updatedByUser, eq(updatedByUser.id, leadEnquiries.updatedBy))
             .leftJoin(tenderInfos, eq(tenderInfos.id, leadEnquiries.tenderId))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(teamMemberUser, eq(teamMemberUser.id, tenderInfos.teamMember))
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
@@ -159,9 +183,13 @@ export class LeadEnquiryService {
                 orgName: row.orgName ?? null,
                 createdByName: row.createdByName ?? null,
                 updatedByName: row.updatedByName ?? null,
+                teamMemberName: row.teamMemberName ?? null,
 hasSiteVisit: row.hasSiteVisit ?? false,
-                costingSheetStatus: row.costingSheetStatus ?? null,
+                tenderStatusId: row.tenderStatusId ?? null,
                 tenderStatusName: row.tenderStatusName ?? null,
+                latestFollowupType: row.latestFollowupType ?? null,
+                nextFollowupDate: row.nextFollowupDate ?? null,
+                lastFollowupAt: row.lastFollowupAt ?? null,
                 tenderStage: row.leadEnquiries.tenderId != null
                     ? (tenderStages.get(row.leadEnquiries.tenderId) ?? null)
                     : null,
@@ -172,7 +200,6 @@ hasSiteVisit: row.hasSiteVisit ?? false,
 
 async findById(id: number): Promise<LeadEnquiryWithNames> {
         const hasSiteVisitExpr = sql<boolean>`EXISTS (SELECT 1 FROM site_visits sv WHERE sv.enquiry_id = ${leadEnquiries.id})`;
-        const costingSheetStatusExpr = sql<string | null>`(SELECT pcs.status FROM private_costing_sheets pcs WHERE pcs.enquiry_id = ${leadEnquiries.id} LIMIT 1)`;
 
         const [row] = await this.db
             .select({
@@ -183,9 +210,25 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
                 teamName: teams.name,
                 createdByName: createdByUser.name,
                 updatedByName: updatedByUser.name,
+                teamMemberName: teamMemberUser.name,
                 hasSiteVisit: hasSiteVisitExpr,
-                costingSheetStatus: costingSheetStatusExpr,
+                tenderStatusId: statuses.id,
                 tenderStatusName: statuses.name,
+                latestFollowupType: sql<string | null>`(
+                    SELECT lf.type FROM ${leadFollowups} lf
+                    WHERE lf.enquiry_id = ${leadEnquiries.id}
+                    ORDER BY lf.created_at DESC, lf.id DESC LIMIT 1
+                )`,
+                nextFollowupDate: sql<string | null>`(
+                    SELECT lf.next_followup_date FROM ${leadFollowups} lf
+                    WHERE lf.enquiry_id = ${leadEnquiries.id} AND lf.next_followup_date IS NOT NULL
+                    ORDER BY lf.created_at DESC, lf.id DESC LIMIT 1
+                )`,
+                lastFollowupAt: sql<string | null>`(
+                    SELECT lf.created_at FROM ${leadFollowups} lf
+                    WHERE lf.enquiry_id = ${leadEnquiries.id}
+                    ORDER BY lf.created_at DESC, lf.id DESC LIMIT 1
+                )`,
             })
             .from(leadEnquiries)
             .leftJoin(teams, eq(teams.id, sql`NULLIF(${leadEnquiries.team}, '')::BIGINT`))
@@ -196,6 +239,7 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             .leftJoin(updatedByUser, eq(updatedByUser.id, leadEnquiries.updatedBy))
             .leftJoin(tenderInfos, eq(tenderInfos.id, leadEnquiries.tenderId))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(teamMemberUser, eq(teamMemberUser.id, tenderInfos.teamMember))
             .where(eq(leadEnquiries.id, id))
             .limit(1);
 
@@ -223,9 +267,13 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             teamName: row.teamName ?? null,
             createdByName: row.createdByName ?? null,
             updatedByName: row.updatedByName ?? null,
+            teamMemberName: row.teamMemberName ?? null,
             hasSiteVisit: row.hasSiteVisit ?? false,
-            costingSheetStatus: row.costingSheetStatus ?? null,
+            tenderStatusId: row.tenderStatusId ?? null,
             tenderStatusName: row.tenderStatusName ?? null,
+            latestFollowupType: row.latestFollowupType ?? null,
+            nextFollowupDate: row.nextFollowupDate ?? null,
+            lastFollowupAt: row.lastFollowupAt ?? null,
             tenderStage: row.leadEnquiries.tenderId != null
                 ? (tenderStages.get(row.leadEnquiries.tenderId) ?? null)
                 : null,
@@ -560,8 +608,16 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
         const locationCode = data.locationCode;
 
         const { contacts, dueDate, enquiryFile, approxValue, ...restData } = data;
+
+        // Re-resolve organisation id when the organisation name is provided so it stays in sync
+        let resolvedOrganisationId: number | null | undefined = data.organisationId ?? undefined;
+        if (data.organizationName != null) {
+            resolvedOrganisationId = await this.resolveOrganizationId(this.db, data.organizationName);
+        }
+
         const updateData = {
             ...restData,
+            organisationId: resolvedOrganisationId,
             locationCode,
             dueDate: dueDate ? new Date(dueDate) : undefined,
             enquiryFile: enquiryFile !== undefined ? enquiryFile : undefined,
@@ -577,13 +633,17 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
 
         if (!updated) throw new NotFoundException(`Lead enquiry with ID ${id} not found`);
 
-        // Keep the linked tender's due date, location and documents in sync
+        // Keep the linked tender's connected fields in sync
         if (updated.tenderId) {
             const tenderSync: {
                 dueDate?: Date;
                 location?: number | null;
                 documents?: string | null;
                 gstValues?: string;
+                tenderName?: string;
+                tenderNo?: string;
+                organization?: number | null;
+                item?: number;
                 updatedAt: Date;
             } = { updatedAt: new Date() };
 
@@ -591,6 +651,10 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             if (locationCode) tenderSync.location = Number(locationCode);
             if (enquiryFile !== undefined) tenderSync.documents = enquiryFile;
             if (approxValue !== undefined) tenderSync.gstValues = approxValue;
+            if (data.enqName) tenderSync.tenderName = data.enqName;
+            if (data.enquiryNumber) tenderSync.tenderNo = data.enquiryNumber;
+            if (resolvedOrganisationId != null) tenderSync.organization = resolvedOrganisationId;
+            if (data.itemId != null) tenderSync.item = data.itemId;
 
             if (Object.keys(tenderSync).length > 1) {
                 await this.db
@@ -728,6 +792,31 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             .orderBy(desc(siteVisits.createdAt));
     }
 
+    async findSiteVisitsByHappyCalling(happyCallingId: number): Promise<(SiteVisit & { enqName: string | null; enquiryNumber: string | null; assignedToName: string | null })[]> {
+        return this.db
+            .select({
+                id: siteVisits.id,
+                enquiryId: siteVisits.enquiryId,
+                assignedTo: siteVisits.assignedTo,
+                assignedToName: users.name,
+                scheduledAt: siteVisits.scheduledAt,
+                conductedAt: siteVisits.conductedAt,
+                information: siteVisits.information,
+                additionalNotes: siteVisits.additionalNotes,
+                documents: siteVisits.documents,
+                status: siteVisits.status,
+                createdAt: siteVisits.createdAt,
+                updatedAt: siteVisits.updatedAt,
+                enqName: leadEnquiries.enqName,
+                enquiryNumber: leadEnquiries.enquiryNumber,
+            })
+            .from(siteVisits)
+            .innerJoin(leadEnquiries, eq(leadEnquiries.id, siteVisits.enquiryId))
+            .leftJoin(users, eq(users.id, siteVisits.assignedTo))
+            .where(eq(leadEnquiries.happyCallingId, happyCallingId))
+            .orderBy(desc(siteVisits.createdAt));
+    }
+
     async updateSiteVisit(id: number, data: UpdateSiteVisitDto): Promise<SiteVisit> {
         const updateData: Record<string, unknown> = { ...data, updatedAt: new Date() };
         if (data.scheduledAt) updateData.scheduledAt = new Date(data.scheduledAt);
@@ -799,27 +888,5 @@ async findById(id: number): Promise<LeadEnquiryWithNames> {
             .from(siteVisitContacts)
             .where(eq(siteVisitContacts.siteVisitId, siteVisitId))
             .orderBy(asc(siteVisitContacts.id));
-    }
-
-    async checkDriveScopes(userId: number) {
-        return this.googleDriveService.checkUserHasDriveScopes(userId);
-    }
-
-    async createCostingSheet(data: { enquiryId: number }, userId: number): Promise<{ sheetUrl: string }> {
-        const enquiry = await this.findById(data.enquiryId);
-        if (!enquiry) throw new NotFoundException(`Lead enquiry with ID ${data.enquiryId} not found`);
-
-        const teamMapping: Record<string, number> = { AC: 1, DC: 2 };
-        const teamId = teamMapping[enquiry.team || ''] || 1;
-        const sheetName = enquiry.enqName || `Enquiry-${enquiry.id}`;
-
-        const sheetResult = await this.googleDriveService.createSheet(userId, teamId, sheetName);
-
-        await this.db
-            .update(leadEnquiries)
-            .set({ costingDocument: sheetResult.sheetUrl, status: "Costing Sheet Created", updatedAt: new Date() })
-            .where(eq(leadEnquiries.id, data.enquiryId));
-
-        return { sheetUrl: sheetResult.sheetUrl };
     }
 }

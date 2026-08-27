@@ -166,9 +166,7 @@ const TenderListPage = () => {
         // },
         {
             label: "View Details",
-            onClick: (row: TenderInfoWithNames) => row.enquiryId
-                ? navigate(paths.crm.enquiryView(row.enquiryId))
-                : navigate(paths.tendering.tenderView(row.id)),
+            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderView(row.id)),
             icon: <Eye className="h-4 w-4" />,
         },
         {
@@ -185,9 +183,7 @@ const TenderListPage = () => {
         },
         {
             label: "Edit",
-            onClick: (row: TenderInfoWithNames) => row.enquiryId
-                ? navigate(paths.crm.enquiryEdit(row.enquiryId))
-                : navigate(paths.tendering.tenderEdit(row.id)),
+            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderEdit(row.id)),
             icon: <Pencil className="h-4 w-4" />,
         },
         {

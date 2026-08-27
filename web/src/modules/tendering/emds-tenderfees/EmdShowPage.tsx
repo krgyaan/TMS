@@ -16,6 +16,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
+import { EnquiryTenderFlow } from "@/modules/tendering/tenders/components/EnquiryTenderFlow";
 
 export default function EmdShowPage() {
     const { id } = useParams<{ id: string }>();
@@ -27,7 +28,7 @@ export default function EmdShowPage() {
 
     const isPaymentRequestView = tenderId === 0 && !!paymentRequestId;
 
-    const { steps: tenderSteps } = useTenderStepStatuses(isPaymentRequestView ? null : tenderId);
+    const { steps: tenderSteps, tender } = useTenderStepStatuses(isPaymentRequestView ? null : tenderId);
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["emd-fees"]));
 
@@ -91,6 +92,18 @@ export default function EmdShowPage() {
                 onBack={() => navigate(paths.tendering.emdsTenderFees)}
                 backLabel="Back to EMD / Tender Fees"
                 renderSectionContent={renderSectionContent}
+            />
+        );
+    }
+
+    if (tender?.enquiryId) {
+        return (
+            <EnquiryTenderFlow
+                tenderId={tenderId}
+                enquiryId={tender.enquiryId}
+                defaultExpanded="tender-details"
+                onBack={() => navigate(paths.tendering.emdsTenderFees)}
+                backLabel="Back to EMD / Tender Fees"
             />
         );
     }

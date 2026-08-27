@@ -107,6 +107,12 @@ allowedExtensions: [".pdf", ".xls", ".xlsx"],
         allowedMimeTypes: [...DOCS],
         allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
     },
+    "enquiry-quotation-docs": {
+        maxFiles: 1,
+        maxSizeBytes: MB(8),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+    },
     "bid-submission-proof": {
         maxFiles: 3,
         maxSizeBytes: MB(8),
