@@ -13,9 +13,6 @@ const CRM_EnquiryWithLeadCreate = lazy(() => import('@/modules/crm/lead-enquiry/
 const CRM_EnquiryEdit     = lazy(() => import('@/modules/crm/lead-enquiry/LeadEnquiryEditPage'));
 const CRM_EnquiryShow     = lazy(() => import('@/modules/crm/lead-enquiry/LeadEnquiryShowPage'));
 const CRM_EnquiryQuotationFollowup = lazy(() => import('@/modules/crm/lead-enquiry/EnquiryQuotationFollowupPage'));
-const CRM_EnquiryResults      = lazy(() => import('@/modules/crm/enquiry-result/EnquiryResultListPage'));
-const CRM_EnquiryResultView   = lazy(() => import('@/modules/crm/enquiry-result/EnquiryResultShowPage'));
-const CRM_EnquiryResultFollowup = lazy(() => import('@/modules/crm/enquiry-result/QuotationFollowupPage'));
 const CRM_HappyCalling       = lazy(() => import('@/modules/crm/happy-calling/HappyCallingListPage'));
 const CRM_HappyCallingCreate = lazy(() => import('@/modules/crm/happy-calling/HappyCallingCreatePage'));
 const CRM_HappyCallingShow   = lazy(() => import('@/modules/crm/happy-calling/HappyCallingShowPage'));
@@ -38,9 +35,6 @@ export default function CRMRoutes() {
             <Route path="enquiries/:id/edit"     element={<RouteWrapper><CRM_EnquiryEdit /></RouteWrapper>} />
             <Route path="enquiries/:id/quotation-followup" element={<RouteWrapper><CRM_EnquiryQuotationFollowup /></RouteWrapper>} />
             <Route path="enquiries/:id"          element={<RouteWrapper><CRM_EnquiryShow /></RouteWrapper>} />
-            <Route path="enquiry-results"          element={<RouteWrapper><CRM_EnquiryResults /></RouteWrapper>} />
-            <Route path="enquiry-results/followup/:id" element={<RouteWrapper><CRM_EnquiryResultFollowup /></RouteWrapper>} />
-            <Route path="enquiry-results/:id"      element={<RouteWrapper><CRM_EnquiryResultView /></RouteWrapper>} />
 
             <Route path="happy-calling"            element={<RouteWrapper><CRM_HappyCalling /></RouteWrapper>} />
             <Route path="happy-calling/create/:clientId" element={<RouteWrapper><CRM_HappyCallingCreate /></RouteWrapper>} />

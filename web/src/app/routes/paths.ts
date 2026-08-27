@@ -292,9 +292,6 @@ export const paths = {
         enquiryEdit: (id: number | string) => `/crm/enquiries/${id}/edit`,
         enquiryView: (id: number | string) => `/crm/enquiries/${id}`,
         enquiryQuotationFollowup: (id: number | string) => `/crm/enquiries/${id}/quotation-followup`,
-        enquiryResults: "/crm/enquiry-results",
-        enquiryResultView: (id: number | string) => `/crm/enquiry-results/${id}`,
-        enquiryResultFollowup: (id: number | string) => `/crm/enquiry-results/followup/${id}`,
 
         happyCalling: "/crm/happy-calling",
         happyCallingCreate: (clientId: number | string) => `/crm/happy-calling/create/${clientId}`,

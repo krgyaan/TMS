@@ -12,12 +12,6 @@ export const crmConfigs: Record<string, FileConfig> = {
         allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx"],
         imageQuality: 85,
     },
-    "enquiry-results": {
-        maxFiles: 10,
-        maxSizeBytes: MB(25),
-        allowedMimeTypes: [...DOCS, ...OFFICE],
-        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx"],
-    },
     "site-visit": {
         maxFiles: 10,
         maxSizeBytes: MB(25),

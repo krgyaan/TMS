@@ -132,7 +132,6 @@ const navMain: NavGroup[] = [
             { title: "Happy Calling", url: paths.crm.happyCalling, permission: "crm.happy_calling" },
             { title: "Leads", url: paths.crm.leads, permission: "crm.leads" },
             { title: "Enquiries", url: paths.crm.enquiries, permission: "crm.enquiries" },
-            { title: "Enquiry Results", url: paths.crm.enquiryResults, permission: "crm.enquiry_results" },
         ],
     },
     {

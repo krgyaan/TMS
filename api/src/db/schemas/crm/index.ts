@@ -18,5 +18,3 @@ export * from './site-visits.schema';
 // Site Visit Contacts
 export * from './site-visit-contacts.schema';
 
-// Enquiry Results
-export * from './enquiry-result.schema';
