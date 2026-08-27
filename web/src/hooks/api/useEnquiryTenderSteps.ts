@@ -1,6 +1,6 @@
 import { useLead } from "@/hooks/api/useLeads";
 import { useHappyCalling } from "@/hooks/api/useHappyCalling";
-import { useFollowups } from "@/hooks/api/useFollowups";
+import { useLeadFollowups } from "@/hooks/api/useLeadFollowups";
 import { useLeadEnquiry, useSiteVisits } from "@/hooks/api/useLeadEnquiry";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
 import type { StepStatus } from "@/components/layout/ShowPageLayout";
@@ -39,11 +39,11 @@ export function useEnquiryTenderSteps({
 
     const { data: lead, isLoading: lLead } = useLead(leadId);
     const { data: happyCalling, isLoading: lHappyCalling } = useHappyCalling(happyCallingId);
-    const { data: leadFollowups, isLoading: lLeadFollowups } = useFollowups({
+    const { data: leadFollowups, isLoading: lLeadFollowups } = useLeadFollowups({
         sourceType: sourceType === 'happy_calling' ? 'happy_calling' : 'lead',
         sourceId: sourceType === 'happy_calling' ? (happyCallingId ?? 0) : (leadId ?? 0),
     });
-    const { data: enquiryFollowups, isLoading: lEnquiryFollowups } = useFollowups({
+    const { data: enquiryFollowups, isLoading: lEnquiryFollowups } = useLeadFollowups({
         sourceType: "enquiry",
         sourceId: enquiryId ?? 0,
     });

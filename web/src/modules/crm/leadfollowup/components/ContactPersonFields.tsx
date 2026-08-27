@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2, User } from "lucide-react";
-import type { ContactPerson } from "../helpers/followup.types";
+import type { ContactPerson } from "../helpers/leadfollowup.types";
 
 interface ContactPersonFieldsProps {
     contacts: ContactPerson[];

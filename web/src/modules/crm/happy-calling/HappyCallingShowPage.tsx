@@ -2,10 +2,10 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { HappyCallingView } from "./components/HappyCallingView";
-import { FollowupViewPage } from "../followups/FollowupViewPage";
+import { LeadFollowupViewPage } from "../leadfollowup/LeadFollowupViewPage";
 import { ShowPageLayout, type StepConfig } from "@/components/layout/ShowPageLayout";
 import { useHappyCalling } from "@/hooks/api/useHappyCalling";
-import { useFollowups } from "@/hooks/api/useFollowups";
+import { useLeadFollowups } from "@/hooks/api/useLeadFollowups";
 import { useLeadEnquiries } from "@/hooks/api/useLeadEnquiry";
 import { EnquiryTenderFlow } from "@/modules/tendering/tenders/components/EnquiryTenderFlow";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,7 +19,7 @@ export default function HappyCallingShowPage() {
     const happyCallingId = id ? Number(id) : null;
 
     const { data: record, isLoading } = useHappyCalling(happyCallingId);
-    const { data: followups, isLoading: l2 } = useFollowups({ sourceType: 'happy_calling', sourceId: happyCallingId ?? 0 });
+    const { data: followups, isLoading: l2 } = useLeadFollowups({ sourceType: 'happy_calling', sourceId: happyCallingId ?? 0 });
     const { data: enquiriesResponse } = useLeadEnquiries(
         { page: 1, limit: 1, happyCallingId: happyCallingId ?? undefined },
     );
@@ -92,7 +92,7 @@ export default function HappyCallingShowPage() {
                     }
                     return <HappyCallingView record={record} />;
                 case "followups":
-                    return happyCallingId ? <FollowupViewPage source={{ sourceType: 'happy_calling', sourceId: happyCallingId }} /> : null;
+                    return happyCallingId ? <LeadFollowupViewPage source={{ sourceType: 'happy_calling', sourceId: happyCallingId }} /> : null;
                 default:
                     return null;
             }

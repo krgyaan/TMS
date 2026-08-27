@@ -16,12 +16,12 @@ import type {
     CallFollowupDto,
     VisitFollowupDto,
     ContactDto,
-} from './dto/followup.dto';
+} from './dto/leadfollowup.dto';
 
 export type FollowupSourceType = 'lead' | 'happy_calling' | 'enquiry';
 
 @Injectable()
-export class FollowupsService {
+export class LeadFollowupsService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
     ) {}

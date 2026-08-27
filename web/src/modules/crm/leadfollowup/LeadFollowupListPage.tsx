@@ -51,7 +51,7 @@ const getValidTab = (tab: string | null): FollowupTabType => {
     return 'mail';
 };
 
-export default function FollowupListPage() {
+export default function LeadFollowupListPage() {
     const { leadId } = useParams<{ leadId: string }>();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();

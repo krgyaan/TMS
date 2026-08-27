@@ -10,13 +10,13 @@ import { FileUploader } from "@/components/file-upload";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { format } from "date-fns";
 import {
-    useFollowups,
+    useLeadFollowups,
     useWhatsappForm,
     isToday,
     sourceFollowupPath,
     type WhatsappFormValues
-} from "@/hooks/api/useFollowups";
-import type { BaseFollowup, FollowupSource } from "../helpers/followup.types";
+} from "@/hooks/api/useLeadFollowups";
+import type { BaseFollowup, FollowupSource } from "../helpers/leadfollowup.types";
 
 interface WhatsappTabProps {
     source: FollowupSource;
@@ -81,7 +81,7 @@ function WhatsappCreateForm({ source }: { source: FollowupSource }) {
 
                 <div className="space-y-2">
                     <FileUploader
-                        context="followups"
+                        context="lead-followups"
                         value={attachmentPaths}
                         onChange={setAttachmentPaths}
                         label="Attachments"
@@ -135,7 +135,7 @@ function WhatsappCreateForm({ source }: { source: FollowupSource }) {
 // ─── List View ────────────────────────────────────────────────────────────────
 
 function WhatsappFollowupList({ source }: { source: FollowupSource }) {
-    const { data: allFollowups = [] } = useFollowups(source);
+    const { data: allFollowups = [] } = useLeadFollowups(source);
 
     const whatsappFollowups = useMemo(
         () => allFollowups

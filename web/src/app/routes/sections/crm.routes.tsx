@@ -6,7 +6,7 @@ const CRM_Leads        = lazy(() => import('@/modules/crm/leads/LeadsListPage'))
 const CRM_LeadCreate   = lazy(() => import('@/modules/crm/leads/LeadCreatePage'));
 const CRM_LeadEdit     = lazy(() => import('@/modules/crm/leads/LeadEditPage'));
 const CRM_LeadShow     = lazy(() => import('@/modules/crm/leads/LeadShowPage'));
-const CRM_Followup     = lazy(() => import('@/modules/crm/followups/FollowupListPage'));
+const CRM_LeadFollowup = lazy(() => import('@/modules/crm/leadfollowup/LeadFollowupListPage'));
 const CRM_Enquiries       = lazy(() => import('@/modules/crm/lead-enquiry/LeadEnquiryListPage'));
 const CRM_EnquiryCreate   = lazy(() => import('@/modules/crm/lead-enquiry/LeadEnquiryCreatePage'));
 const CRM_EnquiryWithLeadCreate = lazy(() => import('@/modules/crm/lead-enquiry/EnquiryWithLeadCreatePage'));
@@ -27,7 +27,7 @@ export default function CRMRoutes() {
             <Route path="leads/create"              element={<RouteWrapper><CRM_LeadCreate /></RouteWrapper>} />
             <Route path="leads/:id/edit"            element={<RouteWrapper><CRM_LeadEdit /></RouteWrapper>} />
             <Route path="leads/:id"                 element={<RouteWrapper><CRM_LeadShow /></RouteWrapper>} />
-            <Route path="followup/:leadId"          element={<RouteWrapper><CRM_Followup /></RouteWrapper>} />
+            <Route path="followup/:leadId"          element={<RouteWrapper><CRM_LeadFollowup /></RouteWrapper>} />
 
             <Route path="enquiry/create/:leadId"  element={<RouteWrapper><CRM_EnquiryCreate /></RouteWrapper>} />
             <Route path="enquiries"              element={<RouteWrapper><CRM_Enquiries /></RouteWrapper>} />

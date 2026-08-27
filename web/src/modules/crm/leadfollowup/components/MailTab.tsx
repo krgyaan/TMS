@@ -11,13 +11,13 @@ import { FileUploader } from "@/components/file-upload";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { format } from "date-fns";
 import {
-    useFollowups,
+    useLeadFollowups,
     useMailForm,
     isToday,
     sourceFollowupPath,
     type MailFormValues
-} from "@/hooks/api/useFollowups";
-import type { BaseFollowup, FollowupSource } from "../helpers/followup.types";
+} from "@/hooks/api/useLeadFollowups";
+import type { BaseFollowup, FollowupSource } from "../helpers/leadfollowup.types";
 
 const FREQUENCY_OPTIONS = [
     { value: "daily", label: "Daily" },
@@ -126,7 +126,7 @@ Write your mail body here..."
 
                 <div className="space-y-2">
                     <FileUploader
-                        context="followups"
+                        context="lead-followups"
                         value={attachmentPaths}
                         onChange={setAttachmentPaths}
                         label="Attachments"
@@ -165,7 +165,7 @@ Write your mail body here..."
 // ─── List View ────────────────────────────────────────────────────────────────
 
 function MailFollowupList({ source }: { source: FollowupSource }) {
-    const { data: allFollowups = [] } = useFollowups(source);
+    const { data: allFollowups = [] } = useLeadFollowups(source);
 
     const mailFollowups = useMemo(
         () =>

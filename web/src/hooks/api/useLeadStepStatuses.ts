@@ -1,5 +1,5 @@
 import { useLead } from "@/hooks/api/useLeads";
-import { useFollowups } from "@/hooks/api/useFollowups";
+import { useLeadFollowups } from "@/hooks/api/useLeadFollowups";
 import { useLeadEnquiries } from "@/hooks/api/useLeadEnquiry";
 import { useQuery } from "@tanstack/react-query";
 import { leadEnquiryService } from "@/services/api/lead-enquiry.service";
@@ -23,7 +23,7 @@ export interface LeadStepStatus {
 
 export function useLeadStepStatuses(leadId: number | null) {
     const { data: lead, isLoading: l1 } = useLead(leadId);
-    const { data: followups, isLoading: l2 } = useFollowups({ sourceType: 'lead', sourceId: leadId ?? 0 });
+    const { data: followups, isLoading: l2 } = useLeadFollowups({ sourceType: 'lead', sourceId: leadId ?? 0 });
 
     const { data: enquiriesResponse, isLoading: l3 } = useLeadEnquiries(
         { page: 1, limit: 1, leadId: leadId ?? undefined },

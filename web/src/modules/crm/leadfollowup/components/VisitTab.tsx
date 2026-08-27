@@ -4,34 +4,38 @@ import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Loader2, Phone, Edit, Save, X, ChevronDown, ChevronUp, User } from "lucide-react";
+import { Loader2, MapPin, Edit, Save, X, ChevronDown, ChevronUp, User } from "lucide-react";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { ContactPersonFields } from "./ContactPersonFields";
 import { format } from "date-fns";
-import {
-    useFollowups,
-    useCallForm,
+import { 
+    useLeadFollowups, 
+    useVisitForm, 
     isToday,
     sourceFollowupPath,
-    type CallFormValues
-} from "@/hooks/api/useFollowups";
-import type { BaseFollowup, FollowupSource } from "../helpers/followup.types";
+    type VisitFormValues 
+} from "@/hooks/api/useLeadFollowups";
+import type { BaseFollowup, FollowupSource } from "../helpers/leadfollowup.types";
 
-interface CallTabProps {
+// ─── Props ────────────────────────────────────────────────────────────────────
+
+interface VisitTabProps {
     source: FollowupSource;
     mode?: 'create' | 'view';
 }
 
-export function CallTab({ source, mode = 'create' }: CallTabProps) {
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export function VisitTab({ source, mode = 'create' }: VisitTabProps) {
     if (mode === 'view') {
-        return <CallFollowupList source={source} />;
+        return <VisitFollowupList source={source} />;
     }
-    return <CallCreateForm source={source} />;
+    return <VisitCreateForm source={source} />;
 }
 
 // ─── Create / Edit Form ───────────────────────────────────────────────────────
 
-function CallCreateForm({ source }: { source: FollowupSource }) {
+function VisitCreateForm({ source }: { source: FollowupSource }) {
     const {
         form,
         contacts,
@@ -41,14 +45,14 @@ function CallCreateForm({ source }: { source: FollowupSource }) {
         saving,
         handleSubmit,
         handleCancelEdit,
-    } = useCallForm(source);
+    } = useVisitForm(source);
 
     return (
         <Form {...form}>
             {isEditMode && (
                 <div className="flex items-center justify-between p-3 mb-6 bg-amber-50 border border-amber-200 rounded-lg dark:bg-amber-950/30 dark:border-amber-800">
                     <p className="text-sm text-amber-800 font-medium dark:text-amber-400">
-                        ✏️ Editing existing call follow-up
+                        ✏️ Editing existing visit follow-up
                     </p>
                     <Button
                         type="button"
@@ -64,38 +68,36 @@ function CallCreateForm({ source }: { source: FollowupSource }) {
             )}
 
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FieldWrapper<CallFormValues, "body">
-                        control={form.control}
-                        name="body"
-                        label="Points Discussed"
-                    >
-                        {(field) => (
-                            <textarea
-                                className="border-input placeholder:text-muted-foreground dark:bg-input/30 min-h-[150px] w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                placeholder="Enter points discussed during the call..."
-                                disabled={saving}
-                                {...field}
-                            />
-                        )}
-                    </FieldWrapper>
+                <FieldWrapper<VisitFormValues, "body">
+                    control={form.control}
+                    name="body"
+                    label="Points Discussed"
+                >
+                    {(field) => (
+                        <textarea
+                            className="border-input placeholder:text-muted-foreground dark:bg-input/30 min-h-[150px] w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                            placeholder="Enter points discussed during the visit..."
+                            disabled={saving}
+                            {...field}
+                        />
+                    )}
+                </FieldWrapper>
 
-                    <FieldWrapper<CallFormValues, "veResponsibility">
-                        control={form.control}
-                        name="veResponsibility"
-                        label="VE Responsibility"
-                    >
-                        {(field) => (
-                            <textarea
-                                className="border-input placeholder:text-muted-foreground dark:bg-input/30 min-h-[150px] w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                placeholder="Enter VE responsibilities..."
-                                disabled={saving}
-                                {...field}
-                                value={field.value ?? ""}
-                            />
-                        )}
-                    </FieldWrapper>
-                </div>
+                <FieldWrapper<VisitFormValues, "veResponsibility">
+                    control={form.control}
+                    name="veResponsibility"
+                    label="VE Responsibility"
+                >
+                    {(field) => (
+                        <textarea
+                            className="border-input placeholder:text-muted-foreground dark:bg-input/30 min-h-[100px] w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                            placeholder="Enter VE responsibilities..."
+                            disabled={saving}
+                            {...field}
+                            value={field.value ?? ""}
+                        />
+                    )}
+                </FieldWrapper>
 
                 <ContactPersonFields
                     contacts={contacts}
@@ -105,7 +107,7 @@ function CallCreateForm({ source }: { source: FollowupSource }) {
                 />
 
                 <div className="w-64">
-                    <FieldWrapper<CallFormValues, "nextFollowupDate">
+                    <FieldWrapper<VisitFormValues, "nextFollowupDate">
                         control={form.control}
                         name="nextFollowupDate"
                         label="Next Follow-up Date"
@@ -132,12 +134,12 @@ function CallCreateForm({ source }: { source: FollowupSource }) {
                         ) : isEditMode ? (
                             <>
                                 <Save className="mr-2 h-4 w-4" />
-                                Update Call Follow-up
+                                Update Visit Follow-up
                             </>
                         ) : (
                             <>
-                                <Phone className="mr-2 h-4 w-4" />
-                                Save Call Follow-up
+                                <MapPin className="mr-2 h-4 w-4" />
+                                Save Visit Follow-up
                             </>
                         )}
                     </Button>
@@ -149,28 +151,28 @@ function CallCreateForm({ source }: { source: FollowupSource }) {
 
 // ─── List View ────────────────────────────────────────────────────────────────
 
-function CallFollowupList({ source }: { source: FollowupSource }) {
-    const { data: allFollowups = [] } = useFollowups(source);
+function VisitFollowupList({ source }: { source: FollowupSource }) {
+    const { data: allFollowups = [] } = useLeadFollowups(source);
 
-    const callFollowups = useMemo(
+    const visitFollowups = useMemo(
         () => allFollowups
-            .filter(f => f.type === 'call')
+            .filter(f => f.type === 'visit')
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
         [allFollowups]
     );
 
-    if (callFollowups.length === 0) {
+    if (visitFollowups.length === 0) {
         return (
             <div className="text-center py-12 text-muted-foreground">
-                No call follow-ups yet
+                No visit follow-ups yet
             </div>
         );
     }
 
     return (
         <div className="space-y-3">
-            {callFollowups.map(followup => (
-                <CallFollowupCard key={followup.id} followup={followup} source={source} />
+            {visitFollowups.map(followup => (
+                <VisitFollowupCard key={followup.id} followup={followup} source={source} />
             ))}
         </div>
     );
@@ -178,7 +180,7 @@ function CallFollowupList({ source }: { source: FollowupSource }) {
 
 // ─── Followup Card ────────────────────────────────────────────────────────────
 
-function CallFollowupCard({ followup, source }: { followup: BaseFollowup; source: FollowupSource }) {
+function VisitFollowupCard({ followup, source }: { followup: BaseFollowup; source: FollowupSource }) {
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
 
@@ -279,13 +281,11 @@ function CallFollowupCard({ followup, source }: { followup: BaseFollowup; source
                 )}
 
                 {isToday(followup.createdAt) && (
-                    <Button
-                        size="sm"
-                        onClick={() =>
-                            navigate(
-                                `${sourceFollowupPath(source)}?tab=call&followupId=${followup.id}`
-                            )
-                        }
+                    <Button 
+                        size="sm" 
+                        onClick={() => navigate(
+                            `${sourceFollowupPath(source)}?tab=visit&followupId=${followup.id}`
+                        )}
                     >
                         <Edit className="h-3 w-3 mr-1" />
                         Edit

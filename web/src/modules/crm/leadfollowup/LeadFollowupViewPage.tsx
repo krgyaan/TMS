@@ -1,12 +1,12 @@
 import { useState, useCallback } from "react";
 import { ShowPageLayout, type StepConfig } from "@/components/layout/ShowPageLayout";
-import { useFollowups } from "@/hooks/api/useFollowups";
+import { useLeadFollowups } from "@/hooks/api/useLeadFollowups";
 import { MailTab } from "./components/MailTab";
 import { CallTab } from "./components/CallTab";
 import { VisitTab } from "./components/VisitTab";
 import { LetterTab } from "./components/LetterTab";
 import { WhatsappTab } from "./components/WhatsappTab";
-import type { FollowupSource } from "./helpers/followup.types";
+import type { FollowupSource } from "./helpers/leadfollowup.types";
 
 
 interface FollowupViewPageProps {
@@ -15,8 +15,8 @@ interface FollowupViewPageProps {
     backLabel?: string;
 }
 
-export function FollowupViewPage({ source, onBack, backLabel }: FollowupViewPageProps) {
-    const { data: followups = [], isLoading } = useFollowups(source);
+export function LeadFollowupViewPage({ source, onBack, backLabel }: FollowupViewPageProps) {
+    const { data: followups = [], isLoading } = useLeadFollowups(source);
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(
         new Set(["mail-followups"])

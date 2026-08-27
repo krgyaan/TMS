@@ -1,10 +1,10 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useCallback, useMemo } from "react";
 import { LeadDetailsSection } from "./components/LeadView";
-import { FollowupViewPage } from "../followups/FollowupViewPage";
+import { LeadFollowupViewPage } from "../leadfollowup/LeadFollowupViewPage";
 import { ShowPageLayout, type StepConfig } from "@/components/layout/ShowPageLayout";
 import { useLead } from "@/hooks/api/useLeads";
-import { useFollowups } from "@/hooks/api/useFollowups";
+import { useLeadFollowups } from "@/hooks/api/useLeadFollowups";
 import { useLeadEnquiries } from "@/hooks/api/useLeadEnquiry";
 import { EnquiryTenderFlow } from "@/modules/tendering/tenders/components/EnquiryTenderFlow";
 import { paths } from "@/app/routes/paths";
@@ -15,7 +15,7 @@ export default function LeadShowPage() {
     const leadId = id ? Number(id) : null;
 
     const { data: lead, isLoading: l1 } = useLead(leadId);
-    const { data: followups, isLoading: l2 } = useFollowups({ sourceType: 'lead', sourceId: leadId ?? 0 });
+    const { data: followups, isLoading: l2 } = useLeadFollowups({ sourceType: 'lead', sourceId: leadId ?? 0 });
     const { data: enquiriesResponse } = useLeadEnquiries(
         { page: 1, limit: 1, leadId: leadId ?? undefined },
     );
@@ -74,7 +74,7 @@ export default function LeadShowPage() {
                 case "lead-details":
                     return leadId ? <LeadDetailsSection leadId={leadId} /> : null;
                 case "followups":
-                    return leadId ? <FollowupViewPage source={{ sourceType: 'lead', sourceId: leadId }} /> : null;
+                    return leadId ? <LeadFollowupViewPage source={{ sourceType: 'lead', sourceId: leadId }} /> : null;
                 default:
                     return null;
             }

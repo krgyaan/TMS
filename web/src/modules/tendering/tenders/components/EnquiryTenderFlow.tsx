@@ -4,7 +4,7 @@ import { useEnquiryTenderSteps, type EnquiryTenderSourceType } from "@/hooks/api
 import { LeadDetailsSection } from "@/modules/crm/leads/components/LeadView";
 import { HappyCallingView } from "@/modules/crm/happy-calling/components/HappyCallingView";
 import { useHappyCalling } from "@/hooks/api/useHappyCalling";
-import { FollowupViewPage } from "@/modules/crm/followups/FollowupViewPage";
+import { LeadFollowupViewPage } from "@/modules/crm/leadfollowup/LeadFollowupViewPage";
 import { EnquiryDetailsSection } from "@/modules/crm/lead-enquiry/LeadEnquiryShowPage";
 import { LeadSiteVisitView } from "@/modules/crm/lead-enquiry/components/LeadSiteVisitView";
 import { TenderDetailsSection } from "@/modules/tendering/tenders/components/TenderView";
@@ -85,9 +85,9 @@ export function EnquiryTenderFlow({
                     return happyCalling ? <HappyCallingView record={happyCalling} /> : null;
                 case "followups":
                     if (sourceType === 'happy_calling') {
-                        return happyCallingId ? <FollowupViewPage source={{ sourceType: "happy_calling", sourceId: happyCallingId }} /> : null;
+                        return happyCallingId ? <LeadFollowupViewPage source={{ sourceType: "happy_calling", sourceId: happyCallingId }} /> : null;
                     }
-                    return leadId ? <FollowupViewPage source={{ sourceType: "lead", sourceId: leadId }} /> : null;
+                    return leadId ? <LeadFollowupViewPage source={{ sourceType: "lead", sourceId: leadId }} /> : null;
                 case "enquiry":
                     return <EnquiryDetailsSection enquiryId={enquiryId} />;
                 case "site-visit":
@@ -105,7 +105,7 @@ export function EnquiryTenderFlow({
                 case "bid":
                     return <BidSubmissionSection tenderId={tenderId} />;
                 case "quotation-followup":
-                    return <FollowupViewPage source={{ sourceType: "enquiry", sourceId: enquiryId! }} />;
+                    return <LeadFollowupViewPage source={{ sourceType: "enquiry", sourceId: enquiryId! }} />;
                 case "tq-management":
                     return <TqTenderSection tenderId={tenderId} />;
                 case "ra-management":

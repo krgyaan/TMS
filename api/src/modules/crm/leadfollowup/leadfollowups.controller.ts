@@ -9,16 +9,16 @@ import {
     HttpCode,
     HttpStatus,
 } from '@nestjs/common';
-import { FollowupsService } from './followups.service';
-import { CreateFollowupSchema } from './dto/followup.dto';
+import { LeadFollowupsService } from './leadfollowups.service';
+import { CreateFollowupSchema } from './dto/leadfollowup.dto';
 import { ValidatedBody } from '@/decorators/validated-body.decorator';
-import type { CreateFollowupDto } from './dto/followup.dto';
+import type { CreateFollowupDto } from './dto/leadfollowup.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('leads/followups')
 export class FollowupsController {
-    constructor(private readonly followupsService: FollowupsService) {}
+    constructor(private readonly followupsService: LeadFollowupsService) {}
 
     @Get(':leadId')
     async findAll(
@@ -69,7 +69,7 @@ export class FollowupsController {
 
 @Controller('enquiry/followups')
 export class EnquiryFollowupsController {
-    constructor(private readonly followupsService: FollowupsService) {}
+    constructor(private readonly followupsService: LeadFollowupsService) {}
 
     @Get(':enquiryId')
     async findAll(

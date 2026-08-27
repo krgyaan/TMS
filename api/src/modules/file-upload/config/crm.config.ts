@@ -1,11 +1,11 @@
 import { MB, DOCS, OFFICE, type FileConfig } from './common';
 
 /**
- * CRM module contexts (followups).
+ * CRM module contexts (lead followups).
  * All files stored under uploads/crm/.
  */
 export const crmConfigs: Record<string, FileConfig> = {
-    followups: {
+    "lead-followups": {
         maxFiles: 5,
         maxSizeBytes: MB(10),
         allowedMimeTypes: [...DOCS, ...OFFICE],

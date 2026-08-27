@@ -3,9 +3,9 @@ import type {
     BaseFollowup,
     CreateFollowupRequest,
     FollowupSource,
-} from '@/modules/crm/followups/helpers/followup.types';
+} from '@/modules/crm/leadfollowup/helpers/leadfollowup.types';
 
-class FollowupsService extends BaseApiService {
+class LeadFollowupsService extends BaseApiService {
     constructor() {
         super('');
     }
@@ -38,4 +38,4 @@ class FollowupsService extends BaseApiService {
     }
 }
 
-export const followupsService = new FollowupsService();
+export const leadFollowupsService = new LeadFollowupsService();

@@ -40,7 +40,7 @@ export const KNOWN_CONTEXTS = [
     // insurance
     'insurances',
     // crm
-    'followups',
+    'lead-followups',
 ] as const;
 
 export type FileContext = (typeof KNOWN_CONTEXTS)[number] | (string & {});

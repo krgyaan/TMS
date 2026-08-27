@@ -9,7 +9,7 @@ import { useLeadEnquiry, useLeadEnquiries } from "@/hooks/api/useLeadEnquiry";
 import { useLeadStepStatuses } from "@/hooks/api/useLeadStepStatuses";
 import { useLocations } from "@/hooks/api/useLocations";
 import { LeadDetailsSection } from "../leads/components/LeadView";
-import { FollowupViewPage } from "../followups/FollowupViewPage";
+import { LeadFollowupViewPage } from "../leadfollowup/LeadFollowupViewPage";
 import { LeadSiteVisitsSection } from "./components/LeadSiteVisitView";
 import { EnquiryTenderFlow } from "@/modules/tendering/tenders/components/EnquiryTenderFlow";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -219,7 +219,7 @@ export default function LeadEnquiryShowPage() {
             case "lead-details":
                 return <LeadDetailsSection leadId={leadId} />;
             case "followups":
-                return <FollowupViewPage source={{ sourceType: 'lead', sourceId: leadId }} />;
+                return <LeadFollowupViewPage source={{ sourceType: 'lead', sourceId: leadId }} />;
             case "site-visits":
                 return <LeadSiteVisitsSection leadId={leadId} />;
             default:

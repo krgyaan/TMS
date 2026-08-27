@@ -4,7 +4,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useState, useEffect, useMemo } from "react";
-import { followupsService } from '@/services/api/followups.service';
+import { leadFollowupsService } from '@/services/api/leadfollowups.service';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/utils/errorToast';
 import { useLead } from './useLeads';
@@ -21,14 +21,14 @@ import type {
     WhatsappFollowupRequest,
     LetterFollowupRequest,
     FollowupSource,
-} from '@/modules/crm/followups/helpers/followup.types';
+} from '@/modules/crm/leadfollowup/helpers/leadfollowup.types';
 
 // ─── Query Keys ───────────────────────────────────────────────────────────────
 
-export const followupsKey = {
-    all: ['followups'] as const,
-    bySource: (sourceType: string, sourceId: number) => [...followupsKey.all, sourceType, sourceId] as const,
-    detail: (sourceType: string, sourceId: number, id: number) => [...followupsKey.bySource(sourceType, sourceId), id] as const,
+export const leadFollowupsKey = {
+    all: ['lead-followups'] as const,
+    bySource: (sourceType: string, sourceId: number) => [...leadFollowupsKey.all, sourceType, sourceId] as const,
+    detail: (sourceType: string, sourceId: number, id: number) => [...leadFollowupsKey.bySource(sourceType, sourceId), id] as const,
 };
 
 // ─── Source Helpers ───────────────────────────────────────────────────────────
@@ -187,24 +187,24 @@ export type LetterFormValues = z.infer<typeof LetterSchema>;
 
 // ─── Basic CRUD Hooks ─────────────────────────────────────────────────────────
 
-export const useFollowups = (source: FollowupSource) => {
+export const useLeadFollowups = (source: FollowupSource) => {
     return useQuery({
-        queryKey: followupsKey.bySource(source.sourceType, source.sourceId),
-        queryFn: () => followupsService.getAll(source),
+        queryKey: leadFollowupsKey.bySource(source.sourceType, source.sourceId),
+        queryFn: () => leadFollowupsService.getAll(source),
         enabled: !!source.sourceId,
     });
 };
 
 export const useFollowup = (source: FollowupSource, followupId: number) => {
     return useQuery({
-        queryKey: followupsKey.detail(source.sourceType, source.sourceId, followupId),
-        queryFn: () => followupsService.getById(source, followupId),
+        queryKey: leadFollowupsKey.detail(source.sourceType, source.sourceId, followupId),
+        queryFn: () => leadFollowupsService.getById(source, followupId),
         enabled: !!source.sourceId && !!followupId,
     });
 };
 
 const invalidateSource = (queryClient: QueryClient, source: FollowupSource) => {
-    queryClient.invalidateQueries({ queryKey: followupsKey.bySource(source.sourceType, source.sourceId) });
+    queryClient.invalidateQueries({ queryKey: leadFollowupsKey.bySource(source.sourceType, source.sourceId) });
     if (source.sourceType === 'lead') {
         queryClient.invalidateQueries({ queryKey: ['leads', 'detail', source.sourceId] });
     } else {
@@ -216,7 +216,7 @@ export const useCreateFollowup = (source: FollowupSource) => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (data: CreateFollowupRequest) =>
-            followupsService.create(source, data),
+            leadFollowupsService.create(source, data),
         onSuccess: () => {
             invalidateSource(queryClient, source);
             toast.success('Follow-up saved successfully');
@@ -229,7 +229,7 @@ export const useUpdateFollowup = (source: FollowupSource) => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: ({ followupId, data }: { followupId: number; data: CreateFollowupRequest }) =>
-            followupsService.update(source, followupId, data),
+            leadFollowupsService.update(source, followupId, data),
         onSuccess: () => {
             invalidateSource(queryClient, source);
             toast.success('Follow-up updated successfully');
@@ -242,7 +242,7 @@ export const useDeleteFollowup = (source: FollowupSource) => {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (followupId: number) =>
-            followupsService.remove(source, followupId),
+            leadFollowupsService.remove(source, followupId),
         onSuccess: () => {
             invalidateSource(queryClient, source);
             toast.success('Follow-up deleted successfully');
@@ -264,7 +264,7 @@ export const useVisitForm = (source: FollowupSource) => {
     const createFollowup = useCreateFollowup(source);
     const updateFollowup = useUpdateFollowup(source);
     const sourceRecord = useSourceRecord(source);
-    const { data: allFollowups = [] } = useFollowups(source);
+    const { data: allFollowups = [] } = useLeadFollowups(source);
 
     const existingFollowup = followupId
         ? allFollowups.find(f => f.id === followupId && f.type === 'visit') ?? null
@@ -365,7 +365,7 @@ export const useCallForm = (source: FollowupSource) => {
     const createFollowup = useCreateFollowup(source);
     const updateFollowup = useUpdateFollowup(source);
     const sourceRecord = useSourceRecord(source);
-    const { data: allFollowups = [] } = useFollowups(source);
+    const { data: allFollowups = [] } = useLeadFollowups(source);
 
     const existingFollowup = followupId
         ? allFollowups.find(f => f.id === followupId && f.type === 'call') ?? null
@@ -465,7 +465,7 @@ export const useMailForm = (source: FollowupSource) => {
 
     const createFollowup = useCreateFollowup(source);
     const updateFollowup = useUpdateFollowup(source);
-    const { data: allFollowups = [] } = useFollowups(source);
+    const { data: allFollowups = [] } = useLeadFollowups(source);
 
     const existingFollowup = followupId
         ? allFollowups.find(f => f.id === followupId && f.type === 'mail') ?? null
@@ -547,7 +547,7 @@ export const useWhatsappForm = (source: FollowupSource) => {
 
     const createFollowup = useCreateFollowup(source);
     const updateFollowup = useUpdateFollowup(source);
-    const { data: allFollowups = [] } = useFollowups(source);
+    const { data: allFollowups = [] } = useLeadFollowups(source);
 
     const existingFollowup = followupId
         ? allFollowups.find(f => f.id === followupId && f.type === 'whatsapp') ?? null
@@ -626,7 +626,7 @@ export const useLetterForm = (source: FollowupSource) => {
 
     const createFollowup = useCreateFollowup(source);
     const updateFollowup = useUpdateFollowup(source);
-    const { data: allFollowups = [] } = useFollowups(source);
+    const { data: allFollowups = [] } = useLeadFollowups(source);
 
     const existingFollowup = followupId
         ? allFollowups.find(f => f.id === followupId && f.type === 'letter') ?? null

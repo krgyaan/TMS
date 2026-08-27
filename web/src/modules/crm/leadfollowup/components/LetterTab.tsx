@@ -14,13 +14,13 @@ import { fileUploadService } from "@/services/api/file-upload.service";
 import { useUsers } from "@/hooks/api/useUsers";
 import { format } from "date-fns";
 import {
-    useFollowups,
+    useLeadFollowups,
     useLetterForm,
     isToday,
     sourceFollowupPath,
     type LetterFormValues
-} from "@/hooks/api/useFollowups";
-import type { BaseFollowup, FollowupSource } from "../helpers/followup.types";
+} from "@/hooks/api/useLeadFollowups";
+import type { BaseFollowup, FollowupSource } from "../helpers/leadfollowup.types";
 
 const docUrl = (doc: string): string =>
     doc.includes("/") ? fileUploadService.getFileUrl(doc) : `/uploads/courier/${doc}`;
@@ -156,7 +156,7 @@ function LetterCreateForm({ source }: { source: FollowupSource }) {
 
                     <div className="col-span-full">
                         <FileUploader
-                            context="followups"
+                            context="lead-followups"
                             value={attachmentPaths}
                             onChange={setAttachmentPaths}
                             label="Soft Copy of Documents"
@@ -193,7 +193,7 @@ function LetterCreateForm({ source }: { source: FollowupSource }) {
 // ─── List View ────────────────────────────────────────────────────────────────
 
 function LetterFollowupList({ source }: { source: FollowupSource }) {
-    const { data: allFollowups = [] } = useFollowups(source);
+    const { data: allFollowups = [] } = useLeadFollowups(source);
 
     const letterFollowups = useMemo(
         () => allFollowups
