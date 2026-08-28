@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { useFollowUp } from "./follow-up.hooks";
+import { formatINR } from "@/hooks/useINRFormatter";
+import { formatDate, formatDateTime } from "@/hooks/useFormatedDate";
 
 const FREQUENCY_CONFIG: Record<number, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ElementType }> = {
     3: { label: "2 times a day", variant: "secondary", icon: Calendar },
@@ -464,7 +466,7 @@ export default function FollowupViewPage() {
 
                 {/* ===== STAT CARDS ===== */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <StatCard icon={IndianRupee} label="Amount" value={formatCurrency(followup.amount) || "-"} variant="primary" />
+                    <StatCard icon={IndianRupee} label="Amount" value={formatINR(Number(followup.amount)) || "-"} variant="primary" />
                     <StatCard
                         icon={Calendar}
                         label="Next Follow-up"
@@ -490,7 +492,7 @@ export default function FollowupViewPage() {
                                     <InfoItem icon={MapPin} label="Area" value={followup.area} />
                                     <InfoItem icon={Building2} label="Party Name" value={followup.partyName} />
                                     <InfoItem icon={Target} label="Follow-up For" value={followup.followupFor} />
-                                    <InfoItem icon={IndianRupee} label="Amount" value={formatCurrency(followup.amount)} />
+                                    <InfoItem icon={IndianRupee} label="Amount" value={formatINR(Number(followup.amount))} />
                                     <InfoItem icon={UserCheck} label="Assigned To" value={followup.assignee?.name} />
                                     <InfoItem icon={UserPlus} label="Created By" value={followup.creator?.name} />
                                 </div>
@@ -513,7 +515,7 @@ export default function FollowupViewPage() {
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                    <InfoItem icon={CalendarClock} label="Start From" value={formatDateLong(followup.startFrom)} />
+                                    <InfoItem icon={CalendarClock} label="Start From" value={formatDateTime(followup.startFrom)} />
                                     <InfoItem icon={Calendar} label="Next Follow-up" value={formatDate(followup.startFrom)} />
                                 </div>
 
