@@ -169,3 +169,16 @@ export const useResetPassword = () => {
         },
     });
 };
+
+export const useChangePassword = () => {
+    return useMutation({
+        mutationFn: ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) =>
+            authService.changePassword(currentPassword, newPassword),
+        onSuccess: data => {
+            toast.success(data.message || "Password updated successfully");
+        },
+        onError: error => {
+            toast.error(handleQueryError(error));
+        },
+    });
+};

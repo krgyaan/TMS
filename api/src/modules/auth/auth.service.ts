@@ -334,4 +334,20 @@ export class AuthService {
 
         return { message: "Password updated successfully" };
     }
+
+    async changePassword(userId: number, currentPassword: string, newPassword: string): Promise<{ message: string }> {
+        const user = await this.usersService.findById(userId);
+        if (!user) {
+            throw new NotFoundException("User not found");
+        }
+
+        const valid = await this.usersService.verifyPassword(user, currentPassword);
+        if (!valid) {
+            throw new UnauthorizedException("Current password is incorrect");
+        }
+
+        await this.usersService.update(user.id, { password: newPassword });
+
+        return { message: "Password updated successfully" };
+    }
 }

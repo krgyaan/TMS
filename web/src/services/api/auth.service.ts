@@ -50,6 +50,10 @@ class AuthService extends BaseApiService {
         return this.post<{ message: string }>("/reset-password", { token, newPassword });
     }
 
+    async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
+        return this.post<{ message: string }>("/change-password", { currentPassword, newPassword });
+    }
+
     /**
      * Refresh the current session to get updated role/team info
      */

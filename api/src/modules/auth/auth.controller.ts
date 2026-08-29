@@ -34,6 +34,11 @@ const ResetPasswordSchema = z.object({
     newPassword: z.string().min(6, "Password must be at least 6 characters long").max(255),
 });
 
+const ChangePasswordSchema = z.object({
+    currentPassword: z.string().min(1, "Current password is required"),
+    newPassword: z.string().min(6, "New password must be at least 6 characters long").max(255),
+});
+
 @Controller("auth")
 export class AuthController {
     constructor(
@@ -84,6 +89,13 @@ export class AuthController {
     async resetPassword(@Body() body: unknown) {
         const { token, newPassword } = ResetPasswordSchema.parse(body);
         return this.authService.resetPassword(token, newPassword);
+    }
+
+    @Post("change-password")
+    @HttpCode(HttpStatus.OK)
+    async changePassword(@Body() body: unknown, @CurrentUser() user: ValidatedUser) {
+        const { currentPassword, newPassword } = ChangePasswordSchema.parse(body);
+        return this.authService.changePassword(user.sub, currentPassword, newPassword);
     }
 
     @Public()

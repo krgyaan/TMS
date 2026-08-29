@@ -27,11 +27,13 @@ import {
   CreditCard,
   ArrowRight,
   Zap,
+  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProfileContext } from "../contexts/ProfileContext";
 import { getInitials } from "../utils";
 import { scaleIn } from "../animations";
+import { ChangePasswordDialog } from "./ChangePasswordDialog";
 
 interface ProfileHeaderProps {
   onEditProfile?: () => void;
@@ -222,6 +224,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 }) => {
   const { data } = useProfileContext();
   const [checklistExpanded, setChecklistExpanded] = useState(true);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   if (!data) return null;
 
@@ -551,6 +554,15 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                   </Button>
                 </div>
 
+                <Button
+                  variant="outline"
+                  onClick={() => setChangePasswordOpen(true)}
+                  className="h-10 w-full rounded-xl border-border/50 font-medium"
+                >
+                  <KeyRound className="mr-2 h-3.5 w-3.5" />
+                  Change Password
+                </Button>
+
                 <div className="rounded-xl border border-border/40 bg-muted/25 px-3.5 py-3">
                   <div className="flex items-center gap-2 text-xs font-semibold text-foreground/80">
                     <Shield className="h-3.5 w-3.5 text-primary/60" />
@@ -829,6 +841,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
             </AnimatePresence>
           </div>
         </div>
+        <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
       </Card>
     </motion.div>
   );
