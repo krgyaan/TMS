@@ -31,7 +31,7 @@ axiosInstance.interceptors.response.use(
     (response) => response,
     async (error: AxiosError) => {
         // Handle 401 Unauthorized
-        if (error.response?.status === 401) {
+        if (error.response?.status === 401 && !(error.config as { skipAuthRedirect?: boolean })?.skipAuthRedirect) {
             // Prevent multiple simultaneous redirects
             if (isRedirecting) {
                 return Promise.reject(error)

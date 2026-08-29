@@ -1,4 +1,4 @@
-import { Body, BadRequestException, Controller, Get, HttpCode, HttpStatus, Post, Query, Res, UnauthorizedException, Param, ParseIntPipe } from "@nestjs/common";
+import { Body, BadRequestException, Controller, Get, HttpCode, HttpException, HttpStatus, Post, Query, Res, UnauthorizedException, Param, ParseIntPipe } from "@nestjs/common";
 import type { Response } from "express";
 import { z } from "zod";
 import { AuthService } from "@/modules/auth/auth.service";
@@ -111,10 +111,21 @@ export class AuthController {
             // Redirect to frontend callback page with error
             const authCfg = this.configService.get<AuthConfig>(authConfig.KEY);
             const frontendBaseUrl = this.getFrontendBaseUrl(authCfg?.googleRedirect);
+
+            const errorBody = error instanceof HttpException ? (error.getResponse() as { errorCode?: string; email?: string }) : undefined;
+            const isNoAccount = errorBody?.errorCode === "NO_ACCOUNT_FOUND";
             const errorMessage = encodeURIComponent(
-                error instanceof BadRequestException ? error.message : `Google OAuth callback failed: ${error instanceof Error ? error.message : "Unknown error occurred"}`
+                isNoAccount
+                    ? "No account found for this Google account. Please register first."
+                    : error instanceof BadRequestException
+                        ? error.message
+                        : `Google OAuth callback failed: ${error instanceof Error ? error.message : "Unknown error occurred"}`
             );
-            return res.redirect(`${frontendBaseUrl}/auth/google/callback?error=${errorMessage}`);
+            const emailParam = isNoAccount
+                ? `&errorCode=NO_ACCOUNT_FOUND&email=${encodeURIComponent(errorBody?.email ?? "")}`
+                : "";
+
+            return res.redirect(`${frontendBaseUrl}/auth/google/callback?error=${errorMessage}${emailParam}`);
         }
     }
 
@@ -157,11 +168,12 @@ export class AuthController {
 
             return { user: session.user };
         } catch (error) {
-            // Re-throw BadRequestException as-is for clearer error messages
-            if (error instanceof BadRequestException) {
+            // Re-throw structured HTTP exceptions (e.g. NO_ACCOUNT_FOUND from
+            // handleGoogleLoginCallback) so the client can branch on errorCode
+            if (error instanceof HttpException) {
                 throw error;
             }
-            // Wrap unexpected errors
+            // Wrap truly unexpected errors
             throw new BadRequestException(`Google OAuth callback failed: ${error instanceof Error ? error.message : "Unknown error occurred"}`);
         }
     }

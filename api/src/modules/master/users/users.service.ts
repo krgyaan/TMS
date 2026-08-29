@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
-import { randomBytes } from "node:crypto";
+
 import { hash, verify } from "argon2";
 import { and, eq, isNull, inArray, asc, sql, or, aliasedTable } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
@@ -607,22 +607,6 @@ export class UsersService {
         if (!rows[0]) {
             throw new NotFoundException(`User with ID ${id} not found`);
         }
-    }
-
-    async createFromGoogle(payload: { email: string; name?: string | null }): Promise<User> {
-        const randomPassword = randomBytes(32).toString("hex");
-        const hashed = await this.hashPassword(randomPassword);
-        const name = payload.name?.trim()?.length ? payload.name : payload.email.split("@")[0];
-        const rows = (await this.db
-            .insert(users)
-            .values({
-                name,
-                email: payload.email,
-                password: hashed,
-                isActive: true,
-            })
-            .returning()) as unknown as User[];
-        return rows[0];
     }
 
     async ensureUser(id: number): Promise<User> {

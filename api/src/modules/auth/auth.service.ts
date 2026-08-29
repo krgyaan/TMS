@@ -142,12 +142,12 @@ export class AuthService {
             );
         }
 
-        let user = await this.usersService.findByEmail(profile.email);
+        const user = await this.usersService.findByEmail(profile.email);
         if (!user) {
-            user = await this.usersService.createFromGoogle({
-                email: profile.email,
-                name: profile.name,
-            });
+            throw new UnauthorizedException(
+                { errorCode: "NO_ACCOUNT_FOUND", email: profile.email },
+                "No account found for this Google account. Please register with your details first."
+            );
         }
 
         await this.googleService.upsertConnection(user.id, tokens, profile);
