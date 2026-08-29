@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { leads } from "./leads.schema";
 import { happyCalling } from "./happy-calling.schema";
+import { leadEnquiries } from "./lead-enquiries.schema";
 import { users } from "../auth/users.schema";
 
 export const followupTypeEnum = pgEnum('followup_type', [
@@ -34,6 +35,9 @@ export const leadFollowups = pgTable("lead_followups", {
 
     happyCallingId: bigint("happy_calling_id", { mode: "number" })
         .references(() => happyCalling.id, { onDelete: "cascade" }),
+
+    enquiryId: bigint("enquiry_id", { mode: "number" })
+        .references(() => leadEnquiries.id, { onDelete: "cascade" }),
 
     sourceType: varchar("source_type", { length: 50 }).notNull().default('lead'),
 

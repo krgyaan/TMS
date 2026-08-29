@@ -20,11 +20,11 @@ import {
 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { useHappyCalling } from "@/hooks/api/useHappyCalling";
-import { MailTab }     from "../followups/components/MailTab";
-import { CallTab }     from "../followups/components/CallTab";
-import { VisitTab }    from "../followups/components/VisitTab";
-import { LetterTab }   from "../followups/components/LetterTab";
-import { WhatsappTab } from "../followups/components/WhatsappTab";
+import { MailTab }     from "../leadfollowup/components/MailTab";
+import { CallTab }     from "../leadfollowup/components/CallTab";
+import { VisitTab }    from "../leadfollowup/components/VisitTab";
+import { LetterTab }   from "../leadfollowup/components/LetterTab";
+import { WhatsappTab } from "../leadfollowup/components/WhatsappTab";
 
 type FollowupTabType = 'mail' | 'call' | 'visit' | 'letter' | 'whatsapp';
 

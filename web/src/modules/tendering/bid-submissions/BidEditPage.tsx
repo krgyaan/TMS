@@ -28,6 +28,8 @@ export default function BidEditPage() {
         );
     }
 
+    const isEnquiry = tenderDetails.enquiryId != null;
+
     return (
         <SubmitBidForm
             tenderId={bidSubmission.tenderId}
@@ -38,10 +40,11 @@ export default function BidEditPage() {
                 teamMemberName: tenderDetails.teamMemberName as string,
                 emdAmount: tenderDetails.emd,
                 gstValues: Number(tenderDetails.gstValues) || 0,
-                finalCosting: costingSheet?.details?.reduce((sum, d) => sum + Number(d.finalPrice || 0), 0).toString() || null,
+                finalCosting: costingSheet?.details?.reduce((sum: number, d: { finalPrice?: string | number | null }) => sum + Number(d.finalPrice || 0), 0).toString() || null,
             }}
             mode="edit"
             existingData={bidSubmission}
+            isEnquiry={isEnquiry}
         />
     );
 }

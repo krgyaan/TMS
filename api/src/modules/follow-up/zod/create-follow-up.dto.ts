@@ -67,7 +67,6 @@ export const createFollowUpSchema = z.object({
     attachments: z.array(z.string()).optional().default([]),
     followUpHistory: z.array(z.any()).optional().default([]), // will refine later
     emdId: z.number().positive().nullable().optional(),
-    quotationId: z.number().positive().nullable().optional(),
 });
 
 export type CreateFollowUpDto = z.infer<typeof createFollowUpSchema>;

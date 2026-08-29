@@ -62,8 +62,8 @@ export type SubmitBidDto = {
     tenderId: number;
     submissionDatetime: string;
     submittedDocs: string[];
-    proofOfSubmission: string;
-    finalPriceSs: string;
+    proofOfSubmission: string | null;
+    finalPriceSs: string | null;
     finalBiddingPrice: string | null;
 };
 
@@ -84,8 +84,8 @@ export type MarkAsMissedGlobalDto = {
 export type UpdateBidSubmissionDto = {
     submissionDatetime?: string;
     submittedDocs?: string[];
-    proofOfSubmission?: string;
-    finalPriceSs?: string;
+    proofOfSubmission?: string | null;
+    finalPriceSs?: string | null;
     finalBiddingPrice?: string | null;
     reasonForMissing?: string;
     preventionMeasures?: string;
@@ -122,6 +122,7 @@ export interface SubmitBidFormProps {
     mode: 'submit' | 'edit';
     existingData?: BidSubmission;
     isChecklistFulfilled?: boolean;
+    isEnquiry?: boolean;
 }
 
 /**

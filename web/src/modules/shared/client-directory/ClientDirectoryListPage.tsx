@@ -8,7 +8,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, Edit, PhoneCall, FileX2, Search, RefreshCw, Plus } from 'lucide-react';
+import { AlertCircle, Eye, Edit, PhoneCall, FileX2, Search, RefreshCw, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -18,11 +18,12 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useClientDirectories, useSyncAllClientDirectory } from '@/hooks/api/useClientDirectory';
+import { useClientDirectories, useSyncAllClientDirectory, useDeleteClientDirectory } from '@/hooks/api/useClientDirectory';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import type { ClientDirectoryRow } from '@/modules/shared/client-directory/helpers/client-directory.types';
 import { ClientDirectoryModal } from '@/modules/shared/client-directory/components/ClientDirectoryModal';
 import { ClientDirectoryViewModal } from '@/modules/shared/client-directory/components/ClientDirectoryViewModal';
+import { ConfirmDeleteModal } from '@/components/ui/ConfirmDeleteModal';
 import { paths } from '@/app/routes/paths';
 
 const ClientDirectoryListPage = () => {
@@ -33,6 +34,7 @@ const ClientDirectoryListPage = () => {
     const debouncedSearch = useDebouncedSearch(search, 300);
 
     const syncMutation = useSyncAllClientDirectory();
+    const deleteMutation = useDeleteClientDirectory();
 
     useEffect(() => {
         setPagination((p) => ({ ...p, pageIndex: 0 }));
@@ -71,6 +73,10 @@ const ClientDirectoryListPage = () => {
         open: false,
         record: null,
     });
+    const [deleteState, setDeleteState] = useState<{ open: boolean; record: ClientDirectoryRow | null }>({
+        open: false,
+        record: null,
+    });
 
     const clientActions: ActionItem<ClientDirectoryRow>[] = useMemo(
         () => [
@@ -89,8 +95,13 @@ const ClientDirectoryListPage = () => {
                 onClick: (row) => navigate(paths.crm.happyCallingCreate(row.id)),
                 icon: <PhoneCall className="h-4 w-4" />,
             },
+            {
+                label: 'Delete',
+                onClick: (row) => setDeleteState({ open: true, record: row }),
+                icon: <Trash2 className="h-4 w-4 text-red-500" />,
+            },
         ],
-        [navigate],
+        [navigate, setDeleteState],
     );
 
     const colDefs = useMemo<ColDef<ClientDirectoryRow>[]>(
@@ -382,6 +393,17 @@ const ClientDirectoryListPage = () => {
                 open={viewState.open}
                 onOpenChange={(open) => setViewState((s) => ({ ...s, open }))}
                 record={viewState.record}
+            />
+
+            <ConfirmDeleteModal
+                open={deleteState.open}
+                onOpenChange={(open) => setDeleteState((s) => ({ ...s, open }))}
+                itemName={deleteState.record?.name}
+                onConfirm={async () => {
+                    if (deleteState.record) {
+                        await deleteMutation.mutateAsync(deleteState.record.id);
+                    }
+                }}
             />
         </>
     );

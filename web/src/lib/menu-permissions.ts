@@ -114,7 +114,6 @@ function getPermissionModule(title: string, parentMenuTitle?: string): string | 
         'Enquiries': 'crm.enquiries',
         'Costings': 'crm.costings',
         'Quotations': 'crm.quotations',
-        'Enquiry Results': 'crm.enquiry_results',
 
         // Performance sub-items
         'Tender Executive': 'performance.tender-executive',

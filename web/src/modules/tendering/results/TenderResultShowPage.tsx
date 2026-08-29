@@ -16,6 +16,7 @@ import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
 import { BasicDetailsSection } from "@/modules/operations/wo-basic-details/components/BasicDetailsSection";
 import { useWoBasicDetailsByTender } from "@/hooks/api/useWoBasicDetails";
+import { EnquiryTenderFlow } from "@/modules/tendering/tenders/components/EnquiryTenderFlow";
 
 export default function TenderResultShowPage() {
     const { tenderId } = useParams<{ tenderId: string }>();
@@ -24,7 +25,7 @@ export default function TenderResultShowPage() {
 
     const basicDetailsId = useWoBasicDetailsByTender(tenderIdNum ?? 0)?.data?.[0]?.id;
 
-    const { steps: tenderSteps } = useTenderStepStatuses(tenderIdNum);
+    const { steps: tenderSteps, tender } = useTenderStepStatuses(tenderIdNum);
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["result", "basic-details"]));
 
     const toggleSection = useCallback((id: string) => {
@@ -62,6 +63,18 @@ export default function TenderResultShowPage() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>Invalid Tender ID.</AlertDescription>
             </Alert>
+        );
+    }
+
+    if (tender?.enquiryId) {
+        return (
+            <EnquiryTenderFlow
+                tenderId={tenderIdNum}
+                enquiryId={tender.enquiryId}
+                defaultExpanded="result"
+                onBack={() => navigate(paths.tendering.results)}
+                backLabel="Back to Results"
+            />
         );
     }
 

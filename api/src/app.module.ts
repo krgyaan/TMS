@@ -47,11 +47,8 @@ import { ItemHeadingsModule } from "@/modules/master/item-headings/item-headings
 import { ItemsModule } from "@/modules/master/items/items.module";
 import { LeadTypesModule } from "@/modules/master/lead-types/lead-types.module";
 import { LeadsModule } from "@/modules/crm/leads/leads.module";
-import { FollowupsModule } from "@/modules/crm/followups/followups.module";
+import { LeadFollowupsModule } from "@/modules/crm/leadfollowup/leadfollowups.module";
 import { LeadEnquiryModule } from "@/modules/crm/lead-enquiry/lead-enquiry.module";
-import { EnquiryCostingModule } from "@/modules/crm/enquirycosting/enquirycosting.module";
-import { LeadsQuotationModule } from "@/modules/crm/leads-quotation/leads-quotation.module";
-import { EnquiryResultModule } from "@/modules/crm/enquiry-result/enquiry-result.module";
 import { HappyCallingModule } from "@/modules/crm/happy-calling/happy-calling.module";
 import { BroadcastsModule } from "@/modules/crm/broadcasts/broadcasts.module";
 import { LeadIndustriesModule } from "@/modules/master/lead-industries/lead-industries.module";
@@ -192,11 +189,8 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         LeadTypesModule,
         LeadIndustriesModule,
         LeadsModule,
-        FollowupsModule,
+        LeadFollowupsModule,
         LeadEnquiryModule,
-        EnquiryCostingModule,
-        LeadsQuotationModule,
-        EnquiryResultModule,
         HappyCallingModule,
         BroadcastsModule,
         TendersModule,

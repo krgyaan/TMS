@@ -72,9 +72,11 @@ export default function BidSubmitPage() {
     const emdConsented = !emdNA && (emdIsSB || (Array.isArray(paymentRequests) &&
         paymentRequests.some(r => r.instruments?.some((i: any) => i.consentForPay))));
 
+    const isEnquiry = tenderDetails.enquiryId != null;
+
     return (
         <div className="space-y-6">
-            <SubmissionChecklist checkpoints={checkpoints} title="Bid Submission Checklist" />
+            <SubmissionChecklist checkpoints={checkpoints} title={isEnquiry ? "Quotation Submission Checklist" : "Bid Submission Checklist"} />
 
             {!emdNA && !emdConsented && (
                 <Alert variant="warning">
@@ -94,10 +96,11 @@ export default function BidSubmitPage() {
                     teamMemberName: tenderDetails.teamMemberName as string,
                     emdAmount: tenderDetails.emd,
                     gstValues: Number(tenderDetails.gstValues) || 0,
-                    finalCosting: costingSheet.details.reduce((sum, d) => sum + Number(d.finalPrice || 0), 0).toString(),
+                    finalCosting: costingSheet.details.reduce((sum: number, d: { finalPrice?: string | number | null }) => sum + Number(d.finalPrice || 0), 0).toString(),
                 }}
                 mode="submit"
                 isChecklistFulfilled={isChecklistFulfilled}
+                isEnquiry={isEnquiry}
             />
         </div>
     );

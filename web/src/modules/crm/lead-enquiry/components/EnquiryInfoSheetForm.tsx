@@ -30,7 +30,7 @@ import {
     physicalDocTypeOptions,
 } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
 import { useDnbStatusOptions } from '@/hooks/useSelectOptions';
-import type { TenderInfoSheetFormValues, TenderInfoSheetResponse } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
+import type { TenderInfoSheetFormValues, TenderInfoSheetResponse, SaveTenderInfoSheetDto } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
 import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
 import { TenderInformationFormSchema } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.schema';
 import { mapResponseToForm, mapFormToPayload } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.mappers';
@@ -149,6 +149,34 @@ const buildEnquiryDefaults = (tender?: TenderInfoWithNames | null): TenderInfoSh
     return defaults;
 };
 
+// Hidden fields (not shown in enquiry info sheet) save their "none"/NO value instead of NULL
+const applyEnquiryHiddenDefaults = (payload: SaveTenderInfoSheetDto): SaveTenderInfoSheetDto => {
+    return {
+        ...payload,
+        processingFeeRequired: payload.processingFeeRequired ?? 'NO',
+        tenderFeeRequired: payload.tenderFeeRequired ?? 'NO',
+        emdRequired: payload.emdRequired ?? 'NO',
+        oemExperience: payload.oemExperience ?? 'NO',
+        bidValidityDays: null,
+        workValueType: null,
+        orderValue1: null,
+        orderValue2: null,
+        orderValue3: null,
+        customEligibilityCriteria: null,
+        techEligibilityAge: null,
+        avgAnnualTurnoverType: null,
+        avgAnnualTurnoverValue: null,
+        workingCapitalType: null,
+        workingCapitalValue: null,
+        solvencyCertificateType: null,
+        solvencyCertificateValue: null,
+        netWorthType: null,
+        netWorthValue: null,
+        technicalWorkOrders: null,
+        commercialDocuments: null,
+    };
+};
+
 export function EnquiryInfoSheetForm({
     tenderId,
     tender,
@@ -216,7 +244,7 @@ export function EnquiryInfoSheetForm({
 
     const handleSubmit: SubmitHandler<TenderInfoSheetFormValues> = async (values) => {
         try {
-            const payload = mapFormToPayload(values);
+            const payload = applyEnquiryHiddenDefaults(mapFormToPayload(values));
 
             if (mode === 'create') {
                 await createInfoSheet.mutateAsync({ tenderId, data: payload });

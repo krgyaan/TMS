@@ -18,6 +18,7 @@ import { organizations } from '@db/schemas/master/organizations.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { websites } from '@db/schemas/master/websites.schema';
 import { tenderInfos, type NewTenderInfo, type TenderInfo } from '@db/schemas/tendering/tenders.schema';
+import { leadEnquiries } from '@db/schemas/crm/lead-enquiries.schema';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { and, asc, desc, eq, ilike, inArray, isNull, notInArray, or, sql, SQL } from 'drizzle-orm';
@@ -687,6 +688,48 @@ export class TenderInfosService {
 
         if (!rows[0]) {
             throw new NotFoundException(`Tender with ID ${id} not found`);
+        }
+
+        // Keep the linked enquiry's connected fields in sync
+        if (currentTender.enquiryId) {
+            const enquirySync: {
+                enqName?: string;
+                enquiryNumber?: string;
+                organisationId?: number | null;
+                organizationName?: string | null;
+                itemId?: number;
+                locationCode?: string;
+                approxValue?: string;
+                dueDate?: Date | null;
+                enquiryFile?: string | null;
+                updatedAt: Date;
+            } = { updatedAt: new Date() };
+
+            if (data.tenderName !== undefined) enquirySync.enqName = data.tenderName;
+            if (data.tenderNo !== undefined) enquirySync.enquiryNumber = data.tenderNo;
+            if (data.item !== undefined) enquirySync.itemId = data.item;
+            if (data.location !== undefined) enquirySync.locationCode = data.location != null ? String(data.location) : undefined;
+            if (data.gstValues !== undefined) enquirySync.approxValue = data.gstValues;
+            if (data.dueDate !== undefined) enquirySync.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+            if (data.documents !== undefined) enquirySync.enquiryFile = data.documents;
+            if (data.organization !== undefined) {
+                enquirySync.organisationId = data.organization;
+                if (data.organization != null) {
+                    const [orgRow] = await this.db
+                        .select({ name: organizations.name })
+                        .from(organizations)
+                        .where(eq(organizations.id, data.organization))
+                        .limit(1);
+                    enquirySync.organizationName = orgRow?.name ?? null;
+                } else {
+                    enquirySync.organizationName = null;
+                }
+            }
+
+            await this.db
+                .update(leadEnquiries)
+                .set(enquirySync)
+                .where(eq(leadEnquiries.id, currentTender.enquiryId));
         }
 
         // Get updated tender with names

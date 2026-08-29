@@ -1,20 +1,14 @@
+import { Card, CardContent, } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
+import { User, FileText, CalendarClock } from 'lucide-react';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { useBroadcasts } from '@/hooks/api/useHappyCalling';
 import type { HappyCallingRow } from '@/modules/crm/happy-calling/helpers/happy-calling.types';
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4 py-3 border-b last:border-b-0">
-            <span className="w-full sm:w-48 shrink-0 font-medium text-muted-foreground text-sm">{label}</span>
-            <span className="text-sm text-foreground">{children}</span>
-        </div>
-    );
-}
-
-type Props = {
+interface Props {
     record: HappyCallingRow;
-};
+}
 
 export function HappyCallingView({ record }: Props) {
     const { data: broadcasts = [] } = useBroadcasts();
@@ -23,37 +17,142 @@ export function HappyCallingView({ record }: Props) {
     const formatOrDash = (value?: string | null) => (value && value.trim().length > 0 ? value : '—');
 
     return (
-        <div className="divide-y">
-            <Row label="Organization">{formatOrDash(record.organization)}</Row>
-            <Row label="Name">{record.name}</Row>
-            <Row label="Designation">{formatOrDash(record.designation)}</Row>
-            <Row label="Email">
-                {record.email ? (
-                    <a href={`mailto:${record.email}`} className="text-primary hover:underline">
-                        {record.email}
-                    </a>
-                ) : (
-                    '—'
-                )}
-            </Row>
-            <Row label="Phone">{formatOrDash(record.phone)}</Row>
-            <Row label="Next Follow Up Date">{formatDateTime(record.nextFollowupDate ?? null)}</Row>
-            <Row label="Last Follow Up Date">{formatDateTime(record.lastFollowupDate ?? null)}</Row>
-            <Row label="Status">
-                {record.status ? (
-                    <Badge variant={record.status === 'done' ? 'default' : 'secondary'}>
-                        {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
-                    </Badge>
-                ) : (
-                    '—'
-                )}
-            </Row>
-            <Row label="Broadcast">{broadcastName || record.broadcast || '—'}</Row>
-            <Row label="Created By">{record.createdByName || '—'}</Row>
-            <Row label="Details">{formatOrDash(record.details)}</Row>
-            <Row label="Created At">{formatDateTime(record.createdAt ?? null)}</Row>
-            <Row label="Updated At">{formatDateTime(record.updatedAt ?? null)}</Row>
-        </div>
+        <Card>
+            
+            <CardContent>
+                <Table>
+                    <TableBody>
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                <FileText className="h-4 w-4 inline mr-2" /> Basic Information
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Organization
+                            </TableCell>
+                            <TableCell className="text-sm w-1/4">
+                                {formatOrDash(record.organization)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Name
+                            </TableCell>
+                            <TableCell className="text-sm w-1/4">
+                                {record.name || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Designation
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatOrDash(record.designation)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Email
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {record.email ? (
+                                    <a href={`mailto:${record.email}`} className="text-primary hover:underline">
+                                        {record.email}
+                                    </a>
+                                ) : (
+                                    '—'
+                                )}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Phone
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatOrDash(record.phone)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Status
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {record.status ? (
+                                    <Badge variant={record.status === 'done' ? 'default' : 'secondary'}>
+                                        {record.status.charAt(0).toUpperCase() + record.status.slice(1)}
+                                    </Badge>
+                                ) : (
+                                    '—'
+                                )}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Broadcast
+                            </TableCell>
+                            <TableCell className="text-sm" colSpan={3}>
+                                {broadcastName || record.broadcast || '—'}
+                            </TableCell>
+                        </TableRow>
+                        {record.details && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Details
+                                </TableCell>
+                                <TableCell className="text-sm break-words" colSpan={3}>
+                                    {record.details}
+                                </TableCell>
+                            </TableRow>
+                        )}
+
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                <CalendarClock className="h-4 w-4 inline mr-2" /> Follow Up Information
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Next Follow Up Date
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatDateTime(record.nextFollowupDate ?? null)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Last Follow Up Date
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatDateTime(record.lastFollowupDate ?? null)}
+                            </TableCell>
+                        </TableRow>
+
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                <User className="h-4 w-4 inline mr-2" /> Audit Information
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Created By
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {record.createdByName || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Created At
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatDateTime(record.createdAt ?? null)}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Updated At
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatDateTime(record.updatedAt ?? null)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground" />
+                            <TableCell className="text-sm" />
+                        </TableRow>
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
     );
 }
 

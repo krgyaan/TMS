@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SubmitHandler, useForm, useWatch, type Resolver } from "react-hook-form";
@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { useCreateLeadEnquiry, useUpdateLeadEnquiry } from "@/hooks/api/useLeadEnquiry";
+import { useInfoSheet } from "@/hooks/api/useInfoSheets";
 import { useLocations } from "@/hooks/api/useLocations";
 import { useLead } from "@/hooks/api/useLeads";
 import { useHappyCalling } from "@/hooks/api/useHappyCalling";
@@ -92,6 +93,20 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
     const { data: locations = [] } = useLocations();
     const { data: leadData } = useLead(defaultLeadId ?? null);
     const { data: happyCallingRecord } = useHappyCalling(defaultHappyCallingId ?? null);
+    const { data: infoSheet } = useInfoSheet(mode === "edit" ? (enquiry?.tenderId ?? null) : null);
+
+    const tenderClients = useMemo(
+        () => (infoSheet?.clients ?? [])
+            .filter((c) => c.clientName)
+            .map((c) => ({
+                name: c.clientName || "",
+                designation: c.clientDesignation || "",
+                phone: c.clientMobile || "",
+                email: c.clientEmail || "",
+            })),
+        [infoSheet]
+    );
+    const lockedCount = mode === "edit" ? tenderClients.length : 0;
 
     const locationOptions = locations.map((l: Location) => ({
         id: String(l.id),
@@ -191,8 +206,20 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
         }
     }, [mode, enquiry, locations, form]);
 
+    useEffect(() => {
+        if (mode === "edit" && tenderClients.length > 0) {
+            const current = form.getValues("contacts") ?? [];
+            const merged = [...current, ...tenderClients];
+            form.setValue("contacts", merged);
+        }
+    }, [mode, tenderClients, form]);
+
     const handleSubmit: SubmitHandler<LeadEnquiryFormValues> = async (values) => {
         try {
+            const editableContacts = values.contacts?.length
+                ? values.contacts.slice(0, Math.max(values.contacts.length - lockedCount, 0))
+                : null;
+
             const payload = {
                 ...values,
                 leadId: values.leadId ? Number(values.leadId) : null,
@@ -202,7 +229,7 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                 dueDate: values.dueDate || null,
                 enquiryType: values.enquiryType || null,
                 enquiryFile: values.enquiryFile.length > 0 ? JSON.stringify(values.enquiryFile) : null,
-                contacts: values.contacts?.length ? values.contacts : null,
+                contacts: editableContacts,
             };
 
             if (mode === "create") {
@@ -329,6 +356,7 @@ export function LeadEnquiryForm({ mode, enquiry, defaultLeadId, defaultHappyCall
                                     control={form.control}
                                     name="contacts"
                                     label="Contact Person(s)"
+                                    lockedCount={lockedCount}
                                 />
                             </div>
 
