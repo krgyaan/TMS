@@ -38,6 +38,18 @@ class AuthService extends BaseApiService {
         return this.post<LoginResponse>("/google/callback", { code, state }, { skipAuthRedirect: true });
     }
 
+    async forgotPassword(email: string): Promise<{ message: string }> {
+        return this.post<{ message: string }>("/forgot-password", { email });
+    }
+
+    async verifyOtp(email: string, otp: string): Promise<{ token: string }> {
+        return this.post<{ token: string }>("/verify-otp", { email, otp });
+    }
+
+    async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+        return this.post<{ message: string }>("/reset-password", { token, newPassword });
+    }
+
     /**
      * Refresh the current session to get updated role/team info
      */

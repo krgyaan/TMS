@@ -20,6 +20,20 @@ const GoogleCallbackSchema = z.object({
     state: z.string().optional(),
 });
 
+const ForgotPasswordSchema = z.object({
+    email: z.string().email(),
+});
+
+const VerifyOtpSchema = z.object({
+    email: z.string().email(),
+    otp: z.string().length(6),
+});
+
+const ResetPasswordSchema = z.object({
+    token: z.string().min(1),
+    newPassword: z.string().min(6, "Password must be at least 6 characters long").max(255),
+});
+
 @Controller("auth")
 export class AuthController {
     constructor(
@@ -46,6 +60,30 @@ export class AuthController {
         }
         // Return full user details including role
         return { user: await this.authService.getProfile(user.sub) };
+    }
+
+    @Public()
+    @Post("forgot-password")
+    @HttpCode(HttpStatus.OK)
+    async forgotPassword(@Body() body: unknown) {
+        const { email } = ForgotPasswordSchema.parse(body);
+        return this.authService.requestPasswordReset(email);
+    }
+
+    @Public()
+    @Post("verify-otp")
+    @HttpCode(HttpStatus.OK)
+    async verifyOtp(@Body() body: unknown) {
+        const { email, otp } = VerifyOtpSchema.parse(body);
+        return this.authService.verifyOtp(email, otp);
+    }
+
+    @Public()
+    @Post("reset-password")
+    @HttpCode(HttpStatus.OK)
+    async resetPassword(@Body() body: unknown) {
+        const { token, newPassword } = ResetPasswordSchema.parse(body);
+        return this.authService.resetPassword(token, newPassword);
     }
 
     @Public()

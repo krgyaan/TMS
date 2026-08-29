@@ -20,7 +20,7 @@ export const useCurrentUser = () => {
                 const user = response.user;
                 setStoredUser(user);
                 return user;
-            } catch (error) {
+            } catch {
                 clearAuthSession();
                 return null;
             }
@@ -132,6 +132,40 @@ export const useRefreshSession = () => {
         },
         onError: error => {
             console.error("❌ Session refresh failed:", error);
+        },
+    });
+};
+
+export const useForgotPassword = () => {
+    return useMutation({
+        mutationFn: (email: string) => authService.forgotPassword(email),
+        onSuccess: data => {
+            toast.success(data.message || "OTP sent to your email");
+        },
+        onError: error => {
+            toast.error(handleQueryError(error));
+        },
+    });
+};
+
+export const useVerifyOtp = () => {
+    return useMutation({
+        mutationFn: ({ email, otp }: { email: string; otp: string }) => authService.verifyOtp(email, otp),
+        onError: error => {
+            toast.error(handleQueryError(error));
+        },
+    });
+};
+
+export const useResetPassword = () => {
+    return useMutation({
+        mutationFn: ({ token, newPassword }: { token: string; newPassword: string }) =>
+            authService.resetPassword(token, newPassword),
+        onSuccess: data => {
+            toast.success(data.message || "Password updated successfully");
+        },
+        onError: error => {
+            toast.error(handleQueryError(error));
         },
     });
 };

@@ -3,6 +3,7 @@ export const paths = {
     auth: {
         login: "/login",
         googleCallback: "/auth/google/callback",
+        forgotPassword: "/forgot-password",
     },
 
     // ==================== INTEGRATIONS ====================

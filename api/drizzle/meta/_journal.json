@@ -421,6 +421,13 @@
                         "when":  1785781402867,
                         "tag":  "0103_add_amc_tables",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  84,
+                        "version":  "7",
+                        "when":  1785960000000,
+                        "tag":  "0127_create_password_reset_otps",
+                        "breakpoints":  true
                     }
                 ]
 }
