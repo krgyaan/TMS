@@ -8,6 +8,7 @@ import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
 import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
+import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
 
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
 import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-items.schema";
@@ -26,6 +27,7 @@ export class VendorWorkOrderService {
         @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
         private readonly pdfGenerator: PdfGeneratorService,
         private readonly clientDirectorySyncService: ClientDirectorySyncService,
+        private readonly insuranceService: InsurancePolicyService,
     ) {}
 
     async generateWONumber(projectName?: string) {
@@ -58,6 +60,15 @@ export class VendorWorkOrderService {
     }
 
     async create(body: any, userId: number) {
+        if (body.projectId) {
+            const hasWC = await this.insuranceService.hasActiveWCInsurance(body.projectId);
+            if (!hasWC) {
+                throw new BadRequestException(
+                    "Cannot create Vendor Work Order: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
+                );
+            }
+        }
+
         const woNumber = await this.generateWONumber(body.projectName);
 
         const [woBasic] = await this.db

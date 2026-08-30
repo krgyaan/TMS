@@ -3,6 +3,8 @@ import "./instrument";
 import { AppModule } from "@/app.module";
 import { DRIZZLE } from "@/db/database.module";
 import { AllExceptionsFilter } from "@/logger/all-exception.filter";
+import { OpenwaService } from "@/openwa/openwa.service";
+import { ConfigService } from "@nestjs/config";
 import { winstonLogger } from "@/logger/logger.config";
 import { requestIdMiddleware } from "@/logger/request-id.middleware";
 import { StatusCache } from "@/utils/status-cache";
@@ -17,7 +19,7 @@ import { HttpLoggerMiddleware } from "./logger/http-logger.middleware";
 let app: NestExpressApplication;
 
 async function bootstrap() {
-    app = await NestFactory.create<NestExpressApplication>(AppModule);
+    app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
     app.use(requestIdMiddleware);
     app.useGlobalFilters(app.get(AllExceptionsFilter));
 
@@ -88,6 +90,46 @@ async function bootstrap() {
     app.getHttpServer().timeout = 10 * 60 * 1000;
 
     winstonLogger.info(`API running at http://localhost:${port}`);
+
+    // Register OpenWA webhook (non-blocking, idempotent)
+    try {
+        const openwa = app.get(OpenwaService);
+        const config = app.get(ConfigService);
+        const sessionId = config.getOrThrow<string>('OPENWA_SESSION_ID');
+        const webhookUrl = 'https://tmsv2.volksenergie.in/api/v1/webhook/openwa';
+        const secret = config.getOrThrow<string>('OPENWA_WEBHOOK_SECRET');
+
+        // Check existing webhooks for this session
+        const existingWebhooks = await openwa.getClient().webhooks.list(sessionId);
+        const existing = existingWebhooks.find((w) => w.url === webhookUrl);
+
+        if (existing) {
+            // Update if events changed (secret not returned in response)
+            if (!arraysEqual(existing.events || [], ['message.received', 'message.sent', 'message.ack'])) {
+                await openwa.getClient().webhooks.update(sessionId, existing.id, {
+                    events: ['message.received', 'message.sent', 'message.ack'],
+                    secret,
+                });
+                winstonLogger.info('OpenWA webhook updated');
+            } else {
+                winstonLogger.info('OpenWA webhook already registered');
+            }
+        } else {
+            await openwa.getClient().webhooks.create(sessionId, {
+                url: webhookUrl,
+                events: ['message.received', 'message.sent', 'message.ack'],
+                secret,
+            });
+            winstonLogger.info('OpenWA webhook registered successfully');
+        }
+    } catch (error) {
+        winstonLogger.warn('OpenWA webhook registration failed (will retry on next start):', error instanceof Error ? error.message : String(error));
+    }
+}
+
+function arraysEqual<T>(a: T[], b: T[]): boolean {
+    if (a.length !== b.length) return false;
+    return a.every((val, idx) => val === b[idx]);
 }
 
 void bootstrap();

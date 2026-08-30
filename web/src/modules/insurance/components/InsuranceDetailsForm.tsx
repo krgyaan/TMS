@@ -5,17 +5,27 @@ import { SelectField } from "@/components/form/SelectField";
 import { FileUploader } from "@/components/file-upload";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
+import { useMemo } from "react";
 import { useFormContext } from "react-hook-form";
 import { INSURANCE_TYPE_OPTIONS } from "../helpers/insurance.schema";
 
 const INSURANCES_CONTEXT = "insurances" as const;
 
-export function InsuranceDetailsForm() {
+interface InsuranceDetailsFormProps {
+    disabledTypes?: string[];
+}
+
+export function InsuranceDetailsForm({ disabledTypes }: InsuranceDetailsFormProps) {
     const { control, watch, setValue } = useFormContext();
 
     const insuranceType = watch("insuranceType") as string | undefined;
     const policyDocument = (watch("policyDocument") as string[] | undefined) ?? [];
     const lrCopy = (watch("lrCopy") as string[] | undefined) ?? [];
+
+    const typeOptions = useMemo(
+        () => INSURANCE_TYPE_OPTIONS.filter(o => !disabledTypes?.includes(o.id)),
+        [disabledTypes]
+    );
 
     return (
         <div className="border rounded-lg border-dashed p-4 space-y-4">
@@ -26,7 +36,7 @@ export function InsuranceDetailsForm() {
                     name="insuranceType"
                     label={<>Insurance Type <span className="text-destructive">*</span></>}
                     placeholder="-- Select Insurance Type --"
-                    options={INSURANCE_TYPE_OPTIONS}
+                    options={typeOptions}
                 />
                 <FieldWrapper control={control} name="policyNumber" label="Policy Number">
                     {field => (

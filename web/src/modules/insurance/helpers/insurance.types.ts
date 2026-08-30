@@ -64,6 +64,7 @@ export interface InsurancePayload {
 export interface InsuranceCreatePayload extends InsurancePayload {
     imprestId?: number | null;
     makerRequestId?: number | null;
+    projectId?: number | null;
 }
 
 export interface InsuranceListResponse {

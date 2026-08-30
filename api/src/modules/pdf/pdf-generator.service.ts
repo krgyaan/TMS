@@ -481,7 +481,7 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
             // Set content
             await page.setContent(html, {
                 waitUntil: 'networkidle0',
-            });
+            } as unknown as Parameters<Page['setContent']>[1]);
 
             // Get PDF options - use custom paper size if specified, otherwise use default A4
             const paperSize = getPaperSize(templateType);

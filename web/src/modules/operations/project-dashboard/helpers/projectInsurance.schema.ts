@@ -3,6 +3,7 @@ import { insuranceFieldsSchema, validateInsuranceFields } from "@/modules/insura
 
 export const projectInsuranceFormSchema = z
     .object({
+        raisePayment: z.boolean().default(true),
         paymentMode: z.enum(["BANK_TRANSFER", "PORTAL"]).default("BANK_TRANSFER"),
         selectedBeneficiaryId: z.string().default(""),
         partyName: z.string().default(""),
@@ -16,19 +17,21 @@ export const projectInsuranceFormSchema = z
         ...insuranceFieldsSchema.shape,
     })
     .superRefine((data, ctx) => {
-        if (data.paymentMode === "BANK_TRANSFER") {
-            if (!data.partyName.trim()) {
-                ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["partyName"], message: "Party name is required" });
-            }
-            if (!data.accountNumber.trim()) {
-                ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["accountNumber"], message: "Account number is required" });
-            }
-            if (!data.ifsc.trim()) {
-                ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["ifsc"], message: "IFSC is required" });
-            }
-        } else {
-            if (!data.portalLink.trim()) {
-                ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["portalLink"], message: "Portal link is required" });
+        if (data.raisePayment) {
+            if (data.paymentMode === "BANK_TRANSFER") {
+                if (!data.partyName.trim()) {
+                    ctx.addIssue({ code: "custom", path: ["partyName"], message: "Party name is required" });
+                }
+                if (!data.accountNumber.trim()) {
+                    ctx.addIssue({ code: "custom", path: ["accountNumber"], message: "Account number is required" });
+                }
+                if (!data.ifsc.trim()) {
+                    ctx.addIssue({ code: "custom", path: ["ifsc"], message: "IFSC is required" });
+                }
+            } else {
+                if (!data.portalLink.trim()) {
+                    ctx.addIssue({ code: "custom", path: ["portalLink"], message: "Portal link is required" });
+                }
             }
         }
 
@@ -38,6 +41,7 @@ export const projectInsuranceFormSchema = z
 export type ProjectInsuranceFormValues = z.infer<typeof projectInsuranceFormSchema>;
 
 export const projectInsuranceDefaultValues: ProjectInsuranceFormValues = {
+    raisePayment: true,
     paymentMode: "BANK_TRANSFER",
     selectedBeneficiaryId: "",
     partyName: "",

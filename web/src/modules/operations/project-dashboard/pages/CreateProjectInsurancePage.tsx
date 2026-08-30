@@ -10,17 +10,18 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { FileUploader } from "@/components/file-upload";
 import { useBeneficiaries, useCreateBeneficiary } from "@/hooks/api/useProjectPaymentRequests";
-import { useCreateProjectInsurance } from "@/hooks/api/useProjectInsurance";
+import { useCreateDirectInsurance, useCreateProjectInsurance, useProjectInsurancePolicies } from "@/hooks/api/useProjectInsurance";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Loader2, UserPlus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { BeneficiaryFormDialog } from "@/modules/operations/vendor-master/components/BeneficiaryFormDialog";
 import type { BeneficiaryFormValues } from "@/modules/operations/vendor-master/vendor-master.types";
 import { InsuranceDetailsForm } from "@/modules/insurance/components/InsuranceDetailsForm";
+import { buildInsurancePayload } from "@/modules/insurance/helpers/insurance.mapper";
 import { projectInsuranceDefaultValues, projectInsuranceFormSchema, type ProjectInsuranceFormValues } from "../helpers/projectInsurance.schema";
 import { mapProjectInsuranceFormToCreateDTO } from "../helpers/projectInsurance.mapper";
 
@@ -30,21 +31,36 @@ export default function CreateProjectInsurancePage() {
     const [searchParams] = useSearchParams();
     const projectId = Number(projectIdParam);
     const insurancePolicyId = searchParams.get("policyId") ? Number(searchParams.get("policyId")) : null;
+    const prefillType = searchParams.get("type");
     const isRenewal = insurancePolicyId != null && !Number.isNaN(insurancePolicyId);
 
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
     const projectName = overview?.project?.projectName;
 
-    const createMutation = useCreateProjectInsurance();
+    const createWithPaymentMutation = useCreateProjectInsurance();
+    const createDirectMutation = useCreateDirectInsurance();
+    const { data: existingPolicies } = useProjectInsurancePolicies(projectId);
     const { data: beneficiaries } = useBeneficiaries();
     const createBeneficiaryMutation = useCreateBeneficiary();
     const [isAddBeneficiaryOpen, setIsAddBeneficiaryOpen] = useState(false);
 
+    const disabledTypes = useMemo(() => {
+        const types = (existingPolicies ?? []).map(p => p.insuranceType);
+        if (types.includes("CAR")) return ["EAR"];
+        if (types.includes("EAR")) return ["CAR"];
+        return [];
+    }, [existingPolicies]);
+
     const form = useForm<ProjectInsuranceFormValues>({
         resolver: zodResolver(projectInsuranceFormSchema) as never,
-        defaultValues: projectInsuranceDefaultValues,
+        defaultValues: {
+            ...projectInsuranceDefaultValues,
+            insuranceType: prefillType ?? null,
+            raisePayment: !isRenewal,
+        },
     });
 
+    const raisePayment = form.watch("raisePayment");
     const selectedBeneficiaryId = form.watch("selectedBeneficiaryId");
     const paymentMode = form.watch("paymentMode");
 
@@ -78,8 +94,23 @@ export default function CreateProjectInsurancePage() {
 
     const handleSubmit = async (values: ProjectInsuranceFormValues) => {
         try {
+            if (!values.raisePayment) {
+                const insurancePayload = buildInsurancePayload(values);
+                if (!insurancePayload) {
+                    toast.error("Insurance type is required");
+                    return;
+                }
+                await createDirectMutation.mutateAsync({
+                    ...insurancePayload,
+                    projectId,
+                });
+                toast.success("Insurance policy added successfully.");
+                navigate(paths.operations.projectDashboard(projectId));
+                return;
+            }
+
             const dto = mapProjectInsuranceFormToCreateDTO(values, projectId, projectName, isRenewal ? insurancePolicyId : null);
-            const result = await createMutation.mutateAsync(dto);
+            const result = await createWithPaymentMutation.mutateAsync(dto);
             if (isRenewal) {
                 toast.success(`Renewal payment raised. Request #${result.requestNo} linked to Policy #${insurancePolicyId}.`);
             } else {
@@ -90,6 +121,8 @@ export default function CreateProjectInsurancePage() {
             toast.error("Failed to add insurance. Please try again.");
         }
     };
+
+    const isMutating = createWithPaymentMutation.isPending || createDirectMutation.isPending || isProjectLoading;
 
     return (
         <Card>
@@ -115,7 +148,10 @@ export default function CreateProjectInsurancePage() {
                             <>
                                 <CardTitle>Add Project Insurance</CardTitle>
                                 <CardDescription className="mt-2">
-                                    Add insurance for this project. A project payment request will be raised automatically.
+                                    {prefillType
+                                        ? `Add ${prefillType} insurance for this project.`
+                                        : "Add insurance for this project."}
+                                    {" "}You can optionally raise a payment request along with it.
                                     <div className="flex items-center gap-3 mt-2">
                                         <Badge variant="outline">
                                             {overview?.tender?.tenderNumber || "N/A"}
@@ -139,103 +175,133 @@ export default function CreateProjectInsurancePage() {
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                        <InsuranceDetailsForm />
+                        <InsuranceDetailsForm disabledTypes={disabledTypes} />
 
-                        <div className="border rounded-lg border-dashed p-4 space-y-4">
-                            <h3 className="text-lg font-semibold">Payment Details</h3>
-                            <RadioGroup
-                                value={paymentMode}
-                                onValueChange={(v) => form.setValue("paymentMode", v as "BANK_TRANSFER" | "PORTAL")}
-                                className="flex gap-6"
-                            >
-                                <div className="flex items-center gap-2">
-                                    <RadioGroupItem value="BANK_TRANSFER" id="insurance-bank-transfer" />
-                                    <Label htmlFor="insurance-bank-transfer" className="cursor-pointer">Bank Transfer</Label>
+                        {!isRenewal && (
+                            <div className="border rounded-lg border-dashed p-4 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-lg font-semibold">Payment Details</h3>
+                                    <div className="flex items-center gap-3">
+                                        <Label htmlFor="raise-payment-toggle" className="text-sm font-medium cursor-pointer">
+                                            Raise payment request?
+                                        </Label>
+                                        <RadioGroup
+                                            value={raisePayment ? "yes" : "no"}
+                                            onValueChange={(v) => form.setValue("raisePayment", v === "yes")}
+                                            className="flex gap-4"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <RadioGroupItem value="yes" id="raise-payment-yes" />
+                                                <Label htmlFor="raise-payment-yes" className="cursor-pointer">Yes</Label>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <RadioGroupItem value="no" id="raise-payment-no" />
+                                                <Label htmlFor="raise-payment-no" className="cursor-pointer">No</Label>
+                                            </div>
+                                        </RadioGroup>
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <RadioGroupItem value="PORTAL" id="insurance-pay-on-portal" />
-                                    <Label htmlFor="insurance-pay-on-portal" className="cursor-pointer">Pay on Portal</Label>
-                                </div>
-                            </RadioGroup>
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
-                                {paymentMode === "BANK_TRANSFER" && (
-                                    <div className="col-span-4 space-y-4">
-                                        <div className="flex items-end gap-4">
-                                            <SelectField
-                                                control={form.control}
-                                                name="selectedBeneficiaryId"
-                                                label="Beneficiary (Master)"
-                                                options={beneficiaryOptions}
-                                                placeholder="Select beneficiary..."
-                                            />
-                                            <Button variant="outline" size="sm" type="button" className="mb-1" onClick={() => setIsAddBeneficiaryOpen(true)}>
-                                                <UserPlus className="mr-2 h-4 w-4" />
-                                                Add New
-                                            </Button>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                            <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
-                                                {(field) => <Input {...field} placeholder="Enter party name" />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="accountNumber" label={<>Account Number <span className="text-destructive">*</span></>}>
-                                                {(field) => <Input {...field} placeholder="Enter account number" />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="bankName" label="Bank Name">
-                                                {(field) => <Input {...field} placeholder="e.g. State Bank of India" />}
-                                            </FieldWrapper>
-                                            <FieldWrapper control={form.control} name="ifsc" label={<>IFSC <span className="text-destructive">*</span></>}>
+
+                                {raisePayment && (
+                                    <>
+                                        <RadioGroup
+                                            value={paymentMode}
+                                            onValueChange={(v) => form.setValue("paymentMode", v as "BANK_TRANSFER" | "PORTAL")}
+                                            className="flex gap-6"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <RadioGroupItem value="BANK_TRANSFER" id="insurance-bank-transfer" />
+                                                <Label htmlFor="insurance-bank-transfer" className="cursor-pointer">Bank Transfer</Label>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <RadioGroupItem value="PORTAL" id="insurance-pay-on-portal" />
+                                                <Label htmlFor="insurance-pay-on-portal" className="cursor-pointer">Pay on Portal</Label>
+                                            </div>
+                                        </RadioGroup>
+                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+                                            {paymentMode === "BANK_TRANSFER" && (
+                                                <div className="col-span-4 space-y-4">
+                                                    <div className="flex items-end gap-4">
+                                                        <SelectField
+                                                            control={form.control}
+                                                            name="selectedBeneficiaryId"
+                                                            label="Beneficiary (Master)"
+                                                            options={beneficiaryOptions}
+                                                            placeholder="Select beneficiary..."
+                                                        />
+                                                        <Button variant="outline" size="sm" type="button" className="mb-1" onClick={() => setIsAddBeneficiaryOpen(true)}>
+                                                            <UserPlus className="mr-2 h-4 w-4" />
+                                                            Add New
+                                                        </Button>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                        <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
+                                                            {(field) => <Input {...field} placeholder="Enter party name" />}
+                                                        </FieldWrapper>
+                                                        <FieldWrapper control={form.control} name="accountNumber" label={<>Account Number <span className="text-destructive">*</span></>}>
+                                                            {(field) => <Input {...field} placeholder="Enter account number" />}
+                                                        </FieldWrapper>
+                                                        <FieldWrapper control={form.control} name="bankName" label="Bank Name">
+                                                            {(field) => <Input {...field} placeholder="e.g. State Bank of India" />}
+                                                        </FieldWrapper>
+                                                        <FieldWrapper control={form.control} name="ifsc" label={<>IFSC <span className="text-destructive">*</span></>}>
+                                                            {(field) => (
+                                                                <Input
+                                                                    {...field}
+                                                                    placeholder="e.g. SBIN0001234"
+                                                                    className="font-mono"
+                                                                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                                />
+                                                            )}
+                                                        </FieldWrapper>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {paymentMode === "PORTAL" && (
+                                                <FieldWrapper control={form.control} name="portalLink" label={<>Portal URL <span className="text-destructive">*</span></>}>
+                                                    {(field) => <Input {...field} placeholder="Enter portal payment link..." />}
+                                                </FieldWrapper>
+                                            )}
+                                            <FieldWrapper control={form.control} name="amount" label={<>Premium Amount <span className="text-destructive">*</span></>}>
                                                 {(field) => (
                                                     <Input
-                                                        {...field}
-                                                        placeholder="e.g. SBIN0001234"
-                                                        className="font-mono"
-                                                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                                        type="number"
+                                                        step="0.01"
+                                                        placeholder="0.00"
+                                                        value={field.value ?? ""}
+                                                        onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
                                                     />
                                                 )}
                                             </FieldWrapper>
+                                            <FieldWrapper control={form.control} name="remark" label="Remark (if any)">
+                                                {(field) => <Input {...field} placeholder="Optional remarks" />}
+                                            </FieldWrapper>
+                                            <FileUploader
+                                                label="Upload Bill"
+                                                context="tender-documents"
+                                                value={form.watch("billFiles")}
+                                                onChange={(paths) => form.setValue("billFiles", paths)}
+                                            />
                                         </div>
-                                    </div>
+                                    </>
                                 )}
-                                {paymentMode === "PORTAL" && (
-                                    <FieldWrapper control={form.control} name="portalLink" label={<>Portal URL <span className="text-destructive">*</span></>}>
-                                        {(field) => <Input {...field} placeholder="Enter portal payment link..." />}
-                                    </FieldWrapper>
-                                )}
-                                <FieldWrapper control={form.control} name="amount" label={<>Premium Amount <span className="text-destructive">*</span></>}>
-                                    {(field) => (
-                                        <Input
-                                            type="number"
-                                            step="0.01"
-                                            placeholder="0.00"
-                                            value={field.value ?? ""}
-                                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
-                                        />
-                                    )}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="remark" label="Remark (if any)">
-                                    {(field) => <Input {...field} placeholder="Optional remarks" />}
-                                </FieldWrapper>
-                                <FileUploader
-                                    label="Upload Bill"
-                                    context="tender-documents"
-                                    value={form.watch("billFiles")}
-                                    onChange={(paths) => form.setValue("billFiles", paths)}
-                                />
                             </div>
-                        </div>
+                        )}
 
                         <div className="flex items-end justify-end">
                             <div className="flex items-center gap-4">
                                 <Button type="button" variant="outline" onClick={() => navigate(-1)}>
                                     Cancel
                                 </Button>
-                                <Button type="submit" className="min-w-40" disabled={createMutation.isPending || isProjectLoading}>
-                                    {createMutation.isPending ? (
+                                <Button type="submit" className="min-w-40" disabled={isMutating}>
+                                    {isMutating ? (
                                         <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</>
                                     ) : isRenewal ? (
                                         "Raise Renewal Payment"
-                                    ) : (
+                                    ) : raisePayment ? (
                                         "Add Insurance & Raise Request"
+                                    ) : (
+                                        "Add Insurance"
                                     )}
                                 </Button>
                             </div>

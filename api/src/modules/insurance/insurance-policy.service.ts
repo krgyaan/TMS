@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
@@ -666,5 +666,24 @@ export class InsurancePolicyService {
         }
 
         await this.db.update(employeeImprests).set({ insurancePolicyId: policyId, updatedAt: new Date() }).where(eq(employeeImprests.id, imprestId));
+    }
+
+    async hasActiveWCInsurance(projectId: number): Promise<boolean> {
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+        const [row] = await this.db
+            .select({ id: insurancePolicies.id })
+            .from(insurancePolicies)
+            .where(
+                and(
+                    eq(insurancePolicies.projectId, projectId),
+                    eq(insurancePolicies.insuranceType, "WC"),
+                    gte(insurancePolicies.endDate, today)
+                )
+            )
+            .limit(1);
+
+        return !!row;
     }
 }

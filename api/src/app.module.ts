@@ -4,6 +4,7 @@ import appConfig, { validateAppEnv } from "@/config/app.config";
 import authConfig, { validateAuthEnv } from "@/config/auth.config";
 import dbConfig, { validateDbEnv } from "@/config/db.config";
 import googleConfig, { validateGoogleEnv } from "@/config/google.config";
+import openwaConfig, { validateOpenwaEnv } from "@/config/openwa.config";
 import redisConfig, { validateRedisEnv } from "@/config/redis.config";
 import { DatabaseModule } from "@/db/database.module";
 import { LoggerModule } from "@/logger/logger.module";
@@ -131,6 +132,10 @@ import { TenderExecutivePerformanceModule } from "./modules/performance/tender-e
 import { ProfileModule } from "./modules/profile/profile.module";
 import { RequestExtensionsModule } from "./modules/tendering/request_extensions/request-extension.module";
 import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-queries.module";
+import { TenderNotificationService } from "./modules/tendering/tender-notification.service";
+import { OpenwaModule } from "./openwa/openwa.module";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
+import { WebhookController } from "./webhook/webhook.controller";
 
 @Module({
     imports: [
@@ -146,13 +151,14 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         ConfigModule.forRoot({
             isGlobal: true,
             expandVariables: true,
-            load: [appConfig, dbConfig, googleConfig, authConfig, redisConfig],
+            load: [appConfig, dbConfig, googleConfig, authConfig, redisConfig, openwaConfig],
             validate: env => ({
                 ...validateAppEnv(env),
                 ...validateDbEnv(env),
                 ...validateGoogleEnv(env),
                 ...validateAuthEnv(env),
                 ...validateRedisEnv(env),
+                ...validateOpenwaEnv(env),
             }),
         }),
         LoggerModule,
@@ -273,8 +279,10 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         ConferenceModule,
         ServiceVisitModule,
         ServiceFeedbackModule,
+        OpenwaModule,
+        NotificationsModule,
     ],
-    controllers: [AppController],
+    controllers: [AppController, WebhookController],
     providers: [
         AppService,
         {
@@ -290,6 +298,8 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
             useClass: AllExceptionsFilter,
         },
         AllExceptionsFilter,
+        TenderNotificationService,
     ],
+    exports: [TenderNotificationService],
 })
 export class AppModule {}

@@ -7,6 +7,7 @@ import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
 import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
 import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
+import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
 import { users } from "@/db/schemas";
 import { paymentRequests, purchaseInvoices, saleInvoiceItems, saleInvoices } from "@/db/schemas/operations";
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
@@ -26,6 +27,7 @@ export class PurchaseOrderService {
 
         private readonly pdfGenerator: PdfGeneratorService,
         private readonly clientDirectorySyncService: ClientDirectorySyncService,
+        private readonly insuranceService: InsurancePolicyService,
     ) {}
 
     async getPurchaseOrders(projectId: number) {
@@ -261,6 +263,15 @@ export class PurchaseOrderService {
     }
 
     async createPurchaseOrder(body: any, userId: number) {
+        if (body.projectId) {
+            const hasWC = await this.insuranceService.hasActiveWCInsurance(body.projectId);
+            if (!hasWC) {
+                throw new BadRequestException(
+                    "Cannot create Purchase Order: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
+                );
+            }
+        }
+
         const poNumber = await this.generatePONumber(body.projectName);
 
         const [woBasic] = await this.db
