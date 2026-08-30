@@ -28,7 +28,6 @@ import { AssetsModule } from "@/modules/hrms/assets/assets.module";
 import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employee-profiles.module";
 import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module";
 import { GoogleIntegrationModule } from "@/modules/integrations/google/google.module";
-import { CompaniesModule } from "@/modules/master/companies/companies.module";
 import { AmcModule } from "@/modules/services/amc/amc.module";
 import { AmcBillingModule } from "@/modules/services/amc-billing/amc-billing.module";
 import { AmcServicesModule } from "@/modules/services/amc-services/amc-services.module";
@@ -180,7 +179,6 @@ import { WebhookController } from "./webhook/webhook.controller";
         LoanPartiesModule,
         LocationsModule,
         OrganizationsModule,
-        CompaniesModule,
         StatusesModule,
         TqTypesModule,
         VendorOrganizationsModule,

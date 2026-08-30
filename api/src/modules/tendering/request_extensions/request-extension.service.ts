@@ -5,7 +5,7 @@ import type { DbInstance } from '@db';
 import { ClientDirectorySyncService } from '@/modules/shared/client-directory/client-directory-sync.service';
 import { CreateRequestExtensionDto, UpdateRequestExtensionDto } from './dto/request-extension.dto';
 import { requestExtension, type Client } from '@/db/schemas/tendering/request-extension.schema';
-import { tenderInfos, userProfiles, users, companies } from '@/db/schemas';
+import { tenderInfos, userProfiles, users } from '@/db/schemas';
 import { EmailService } from '../../email/email.service';
 import { RecipientResolver } from '../../email/recipient.resolver';
 
@@ -311,13 +311,6 @@ export class RequestExtensionsService {
             .limit(1)
             .then(rows => rows[0]);
 
-        // Fetch Company details
-        const company = await this.db
-            .select()
-            .from(companies)
-            .limit(1)
-            .then(rows => rows[0]);
-
         const clients = (typeof ext.clients === 'string' ? JSON.parse(ext.clients) : ext.clients) as Client[];
         const to = [{ type: 'emails', emails: clients.map(c => c.email).filter(Boolean) as string[] }] as any;
 
@@ -338,7 +331,7 @@ export class RequestExtensionsService {
                 assignee: assignee?.name || 'Assigned TE',
                 te_mobile: assignee?.phone || '',
                 te_email: assignee?.email || '',
-                ve_address: company?.registeredAddress || '',
+                ve_address: '',
             },
             eventType: 'Request Extension Sent',
         });

@@ -5,7 +5,7 @@ import type { DbInstance } from '@db';
 import { ClientDirectorySyncService } from '@/modules/shared/client-directory/client-directory-sync.service';
 import { CreateSubmitQueriesDto, UpdateSubmitQueriesDto, ClientContact, QueryListItem } from './dto/submit-queries.dto';
 import { submitQueries, submitQueriesLists } from '@/db/schemas/tendering/submit-queries.schema';
-import { tenderInfos, teams, userProfiles, users, companies } from '@/db/schemas';
+import { tenderInfos, teams, userProfiles, users } from '@/db/schemas';
 import { EmailService } from '../../email/email.service';
 import { RecipientResolver } from '../../email/recipient.resolver';
 
@@ -394,13 +394,6 @@ export class SubmitQueriesService {
             .limit(1)
             .then(rows => rows[0]);
 
-        // Fetch Company details
-        const company = await this.db
-            .select()
-            .from(companies)
-            .limit(1)
-            .then(rows => rows[0]);
-
         const to = [{ type: 'emails', emails: sub.clientContacts.map(c => c.client_email).filter(Boolean) as string[] }] as any;
 
         if (!to[0].emails.length) throw new Error('No client emails found to send to');
@@ -429,7 +422,7 @@ export class SubmitQueriesService {
                 assignee: assignee?.name || 'Tender Executive',
                 te_mobile: assignee?.phone || '',
                 te_email: assignee?.email || '',
-                ve_address: company?.registeredAddress || 'B1/D8 2nd Floor, Mohan Cooperative Industrial Estate, New Delhi 110044',
+                ve_address: 'B1/D8 2nd Floor, Mohan Cooperative Industrial Estate, New Delhi 110044',
             },
             eventType: 'Submit Query Sent',
         });
