@@ -29,11 +29,14 @@ export const FdrActionFormSchema = BaseActionFormSchema.extend({
     delDate: z.string().optional(),
     urgency: z.coerce.number().optional(),
 
+    courier_docs: z.array(z.string()).optional(),
+
     organisation_name: z.string().optional(),
     contacts: z.array(ContactPersonSchema).optional(),
     followup_start_date: z.string().optional(),
     frequency: z.number().int().min(1).max(6).optional(),
     emailBody: z.string().optional(),
+    followup_attachments: z.array(z.string()).optional(),
     docket_no: z.string().optional(),
     docket_slip: z.string().optional(),
 

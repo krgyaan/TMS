@@ -28,6 +28,7 @@ export const ChequeActionFormSchema = BaseActionFormSchema.extend({
     followup_start_date: z.string().optional(),
     frequency: z.number().int().min(1).max(6).optional(),
     emailBody: z.string().optional(),
+    followup_attachments: z.array(z.string()).optional(),
 
     // Stop the cheque from the bank
     stop_reason_text: z.string().optional(),

@@ -222,6 +222,7 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
             if (values.reference) data.reference = values.reference;
             if (values.cancelled_image_path) data.cancelled_image_path = values.cancelled_image_path;
             if (values.emailBody) data.emailBody = values.emailBody;
+            if (values.followup_attachments?.length) data.followup_attachments = values.followup_attachments;
 
             await updateMutation.mutateAsync({ id: instrumentId, data });
             toast.success('Action submitted successfully');
@@ -411,6 +412,7 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
                                 }}
                                 onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
                                 initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}
+                                onFilesChange={(paths) => form.setValue('followup_attachments', paths, { shouldValidate: false })}
                             />
                         </div>
                     </div>

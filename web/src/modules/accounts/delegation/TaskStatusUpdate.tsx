@@ -1,38 +1,13 @@
-// pages/tasks/TaskStatusUpdate.tsx
-import React, { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { CompactFileUploader } from "@/components/file-upload";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from "@/components/ui/select";
+import { AlertCircle, ArrowLeft, Calendar, CheckCircle2, Clock, Flag, Info, Save, User, XCircle } from "lucide-react";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import {
-  ArrowLeft,
-  Save,
-  Paperclip,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
-  XCircle,
-  Info,
-  Calendar,
-  User,
-  Flag,
-} from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type TaskStatus = "Not Started" | "In Progress" | "Completed" | "Blocked";
@@ -40,7 +15,7 @@ type TaskStatus = "Not Started" | "In Progress" | "Completed" | "Blocked";
 interface StatusUpdateForm {
   isCompleted: "yes" | "no" | "";
   status: TaskStatus | "";
-  proof: File | null;
+  proof: string | undefined;
   comments: string;
   reassignDueDate: string;
 }
@@ -263,7 +238,6 @@ const ScoringPreview: React.FC<{
 // ─── Main Component ───────────────────────────────────────────────────────────
 const TaskStatusUpdate: React.FC = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
   const task = contextTask; // In production, fetch by id
 
   const today = new Date().toISOString().split("T")[0];
@@ -271,7 +245,7 @@ const TaskStatusUpdate: React.FC = () => {
   const [form, setForm] = useState<StatusUpdateForm>({
     isCompleted: "",
     status: task.currentStatus,
-    proof: null,
+    proof: undefined,
     comments: "",
     reassignDueDate: "",
   });
@@ -450,57 +424,19 @@ const TaskStatusUpdate: React.FC = () => {
                         <span className="text-destructive ml-0.5">*</span>
                       )}
                     </label>
-                    <label
-                      className={`flex items-center gap-3 px-4 py-4 border border-dashed rounded-xl cursor-pointer hover:bg-muted/50 transition-colors ${
+                    <div
+                      className={`border border-dashed rounded-xl transition-colors ${
                         errors.proof
                           ? "border-destructive bg-destructive/5"
                           : "border-border bg-muted/20"
                       }`}
                     >
-                      <div
-                        className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${
-                          form.proof ? "bg-primary/20" : "bg-muted"
-                        }`}
-                      >
-                        <Paperclip
-                          className={`h-5 w-5 ${
-                            form.proof
-                              ? "text-blue-500"
-                              : "text-slate-400"
-                          }`}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        {form.proof ? (
-                          <div>
-                            <p className="text-sm font-bold text-foreground/90 truncate">
-                              {form.proof.name}
-                            </p>
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">
-                              {(form.proof.size / 1024).toFixed(1)} KB ·
-                              Click to change
-                            </p>
-                          </div>
-                        ) : (
-                          <div>
-                            <p className="text-sm font-bold text-muted-foreground">
-                              Upload proof document
-                            </p>
-                            <p className="text-[10px] font-bold text-muted-foreground/50 uppercase">
-                              Screenshot, PDF, or image · Max 10MB
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                      <input
-                        type="file"
-                        accept="image/*,.pdf,.doc,.docx"
-                        className="hidden"
-                        onChange={(e) =>
-                          set("proof", e.target.files?.[0] ?? null)
-                        }
+                      <CompactFileUploader
+                        context="delegation-proof"
+                        value={form.proof}
+                        onChange={(path) => set("proof", path)}
                       />
-                    </label>
+                    </div>
                     {errors.proof && (
                       <p className="text-[10px] font-bold text-destructive mt-1 uppercase">
                         {errors.proof}

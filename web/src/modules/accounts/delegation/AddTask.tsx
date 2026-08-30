@@ -20,7 +20,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Send, Paperclip, Info } from "lucide-react";
+import { ArrowLeft, Send, Info } from "lucide-react";
+import { CompactFileUploader } from "@/components/file-upload";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Priority = "High" | "Medium" | "Low";
@@ -32,7 +33,7 @@ interface AddTaskForm {
   priority: Priority | "";
   assignedBy: string;
   dueDate: string;
-  attachment: File | null;
+  attachment: string | undefined;
 }
 
 // ─── Dummy Data ───────────────────────────────────────────────────────────────
@@ -104,7 +105,7 @@ const AddTask: React.FC = () => {
     priority: "",
     assignedBy: "",
     dueDate: "",
-    attachment: null,
+    attachment: undefined,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof AddTaskForm, string>>>({});
@@ -138,9 +139,8 @@ const AddTask: React.FC = () => {
     navigate(paths.accounts.delegation);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
-    set("attachment", file);
+  const handleFileChange = (path: string | undefined) => {
+    set("attachment", path);
   };
 
   return (
@@ -338,36 +338,11 @@ const AddTask: React.FC = () => {
                   label="Attachment"
                   hint="Optional supporting document"
                 />
-                <label className="flex items-center gap-3 px-4 py-3 border border-dashed rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
-                  <Paperclip className="h-4 w-4 text-slate-400 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    {form.attachment ? (
-                      <div>
-                        <p className="text-sm font-bold text-foreground/90 truncate">
-                          {form.attachment.name}
-                        </p>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-70">
-                          {(form.attachment.size / 1024).toFixed(1)} KB
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-sm font-bold text-muted-foreground">
-                          Click to upload file
-                        </p>
-                        <p className="text-[10px] font-bold text-muted-foreground/50 uppercase">
-                          PDF, DOC, XLS, PNG up to 10MB
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
-                </label>
+                <CompactFileUploader
+                  context="delegation-attachment"
+                  value={form.attachment}
+                  onChange={handleFileChange}
+                />
               </div>
             </div>
 

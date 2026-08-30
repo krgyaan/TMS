@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
@@ -21,7 +21,7 @@ import { useWatch } from 'react-hook-form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { FileText, Users, Package, Banknote, CheckCircle2, XCircle, CheckSquare, Info, Truck, Upload, X } from 'lucide-react';
+import { FileText, Users, Package, Banknote, CheckCircle2, XCircle, CheckSquare, Info, Truck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ALL_FDR_ACTION_OPTIONS, type FDRActionFormProps } from '../helpers/fdr.types';
 import { useCreateCourier } from '@/modules/shared/courier/courier.hooks';
@@ -32,19 +32,6 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
     const updateMutation = useUpdateFdrAction();
     const createCourierMutation = useCreateCourier();
     const { data: employees = [] } = useUsers();
-    const [files, setFiles] = useState<File[]>([]);
-
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const selectedFiles = Array.from(event.target.files || []);
-        if (selectedFiles.length === 0) return;
-        setFiles(prev => [...prev, ...selectedFiles]);
-        event.target.value = '';
-    };
-
-    const removeFile = (index: number) => {
-        setFiles(prev => prev.filter((_, i) => i !== index));
-    };
-
     const hasAccountsFormData = !!(formHistory?.accountsForm?.fdrReq);
     const hasFollowupData = !!(formHistory?.initiateFollowup?.organisationName);
     const hasReturnedCourierData = !!(formHistory?.returnedCourier?.docketNo);
@@ -280,7 +267,7 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                         delDate: values.delDate || '',
                         urgency: values.urgency || 1,
                     },
-                    files,
+                    filenames: values.courier_docs,
                 });
                 payload.req_no = createdCourier.id;
                 payload.courier_address_json = JSON.stringify({
@@ -307,6 +294,7 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
             if (values.cancellation_amount) payload.fdr_cancellation_amount = values.cancellation_amount;
             if (values.cancellation_reference_no) payload.fdr_cancellation_reference_no = values.cancellation_reference_no;
             if (values.emailBody) payload.emailBody = values.emailBody;
+            if (values.followup_attachments?.length) payload.followup_attachments = values.followup_attachments;
 
             await updateMutation.mutateAsync({ id: instrumentId, data: payload });
             toast.success('Action updated successfully');
@@ -520,35 +508,15 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                                     </div>
 
                                     {/* File Upload Section */}
-                                    <div className="space-y-2">
-                                        <Label>Soft Copy of the documents</Label>
-                                        <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center hover:border-muted-foreground/50 transition-colors">
-                                            <Input
-                                                id="courier_docs"
-                                                type="file"
-                                                className="hidden"
-                                                multiple
-                                                onChange={handleFileChange}
-                                                disabled={isSubmitting}
+                                    <FieldWrapper control={form.control} name="courier_docs" label="Soft Copy of the documents">
+                                        {(field) => (
+                                            <FileUploader
+                                                context="courier"
+                                                value={field.value || []}
+                                                onChange={field.onChange}
                                             />
-                                            <Label htmlFor="courier_docs" className="cursor-pointer flex flex-col items-center justify-center space-y-1">
-                                                <Upload className="h-6 w-6 text-muted-foreground" />
-                                                <div className="text-sm text-muted-foreground">Click to upload or drag and drop</div>
-                                            </Label>
-                                        </div>
-                                        {files.length > 0 && (
-                                            <div className="flex flex-wrap gap-2 mt-2">
-                                                {files.map((file, index) => (
-                                                    <div key={index} className="flex items-center gap-2 bg-muted px-2 py-1 rounded text-xs">
-                                                        <span className="truncate max-w-[150px]">{file.name}</span>
-                                                        <button type="button" onClick={() => removeFile(index)} className="text-destructive">
-                                                            <X className="h-3 w-3" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
                                         )}
-                                    </div>
+                                    </FieldWrapper>
 
                                 <FieldWrapper control={form.control} name="remarks_fdr" label="Remarks (if any)">
                                     {(field) => <Textarea {...field} placeholder="Enter remarks" className="min-h-[80px]" />}
@@ -606,6 +574,7 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                                 }}
                                 onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
                                 initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}
+                                onFilesChange={(paths) => form.setValue('followup_attachments', paths, { shouldValidate: false })}
                             />
                         </div>
                     </div>

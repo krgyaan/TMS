@@ -8,9 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
-import { fileUploadService } from "@/services/api/file-upload.service";
-import { AlertCircle, CheckCircle2, Loader2, Plus, Save, Trash2, Upload } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
+import { FileUploader } from "@/components/file-upload";
+import { AlertCircle, CheckCircle2, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "default" | "outline" | "success" | "destructive" }> = {
@@ -95,62 +95,6 @@ const emptyInvoiceRow = (): InvoiceRow => ({
     gstAmount: "",
     invoiceFile: [],
 });
-
-function FileUploadCell({ value, onChange }: { value: string[]; onChange: (paths: string[]) => void }) {
-    const inputRef = useRef<HTMLInputElement>(null);
-    const [uploading, setUploading] = useState(false);
-
-    const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        setUploading(true);
-        try {
-            const result = await fileUploadService.upload([file], "tender-documents");
-            if (result?.files?.length) {
-                onChange([...value, result.files[0].path]);
-            }
-        } catch (err) {
-            console.error("File upload failed", err);
-        } finally {
-            setUploading(false);
-            if (inputRef.current) inputRef.current.value = "";
-        }
-    };
-
-    return (
-        <div className="flex items-center gap-2">
-            <input
-                ref={inputRef}
-                type="file"
-                className="hidden"
-                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
-                onChange={handleFile}
-            />
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8"
-                disabled={uploading}
-                onClick={() => inputRef.current?.click()}
-            >
-                {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                {value.length > 0 ? "Re-upload" : "Upload"}
-            </Button>
-            {value.map((p) => (
-                <a
-                    key={p}
-                    href={fileUploadService.getFileUrl(p)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary underline truncate max-w-[110px]"
-                >
-                    {p.split("/").pop()}
-                </a>
-            ))}
-        </div>
-    );
-}
 
 const PoClosurePage: React.FC = () => {
     const { poId } = useParams<{ poId: string }>();
@@ -526,8 +470,9 @@ const PoClosurePage: React.FC = () => {
                                                         onChange={(e) => updateInvoiceRow(i, "gstAmount", e.target.value)}
                                                     />
                                                 </TableCell>
-                                                <TableCell>
-                                                    <FileUploadCell
+                                                <TableCell className="min-w-[180px]">
+                                                    <FileUploader
+                                                        context="tender-documents"
                                                         value={row.invoiceFile}
                                                         onChange={(paths) => updateInvoiceRow(i, "invoiceFile", paths)}
                                                     />

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,10 +41,8 @@ import {
   Info,
   Send,
   Paperclip,
-  CloudUpload,
-  X,
-  FileText,
   ImageIcon,
+  FileText,
   Eye,
   MapPin,
   Users,
@@ -70,6 +68,7 @@ import { cn } from "@/lib/utils";
 import { useProfileContext } from "../contexts/ProfileContext";
 import { formatDate } from "../utils";
 import { staggerContainer, fadeInUp, tabContentVariants } from "../animations";
+import { FileUploader } from "@/components/file-upload";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -203,7 +202,7 @@ interface ComplaintFormData {
   previousAttempts: string;
   witnesses: string;
   expectedResolution: string;
-  attachments: File[];
+  attachments: string[];
 }
 
 const INITIAL_FORM: ComplaintFormData = {
@@ -236,44 +235,11 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
   const [form, setForm] = useState<ComplaintFormData>({ ...INITIAL_FORM });
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const totalSteps = 3;
 
   const updateForm = (field: keyof ComplaintFormData, value: any) => {
     setForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
-    else if (e.type === "dragleave") setDragActive(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files) {
-      const files = Array.from(e.dataTransfer.files);
-      setForm((prev) => ({ ...prev, attachments: [...prev.attachments, ...files] }));
-    }
-  }, []);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      setForm((prev) => ({ ...prev, attachments: [...prev.attachments, ...files] }));
-    }
-  };
-
-  const removeAttachment = (index: number) => {
-    setForm((prev) => ({
-      ...prev,
-      attachments: prev.attachments.filter((_, i) => i !== index),
-    }));
   };
 
   const handleSubmit = async () => {
@@ -673,105 +639,18 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
                 transition={{ duration: 0.2 }}
                 className="space-y-5"
               >
-                {/* Drop Zone */}
+                {/* Supporting Documents */}
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
                     <Paperclip className="h-3 w-3" />
                     Supporting Documents
                   </Label>
-                  <div
-                    className={cn(
-                      "relative border-2 border-dashed rounded-2xl transition-all duration-300 cursor-pointer",
-                      dragActive
-                        ? "border-primary bg-primary/5 scale-[1.01]"
-                        : "border-border/50 hover:border-primary/30 hover:bg-muted/20"
-                    )}
-                    onDragEnter={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDragOver={handleDrag}
-                    onDrop={handleDrop}
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="hidden"
-                      multiple
-                      accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
-                      onChange={handleFileSelect}
-                    />
-                    <div className="p-8 text-center">
-                      <motion.div
-                        animate={
-                          dragActive
-                            ? { scale: 1.1, y: -4 }
-                            : { scale: 1, y: 0 }
-                        }
-                        transition={{ type: "spring", stiffness: 300 }}
-                        className="h-14 w-14 rounded-2xl bg-primary/5 flex items-center justify-center mx-auto mb-3"
-                      >
-                        <CloudUpload
-                          className={cn(
-                            "h-7 w-7 transition-colors",
-                            dragActive ? "text-primary" : "text-primary/40"
-                          )}
-                        />
-                      </motion.div>
-                      <p className="text-sm font-semibold mb-1">
-                        {dragActive
-                          ? "Drop files here"
-                          : "Drag & drop files here"}
-                      </p>
-                      <p className="text-xs text-muted-foreground mb-2">
-                        or click to browse
-                      </p>
-                      <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">
-                        Screenshots, photos, documents • Max 10MB each
-                      </p>
-                    </div>
-                  </div>
+                  <FileUploader
+                    context="complaints"
+                    value={form.attachments}
+                    onChange={(paths) => updateForm("attachments", paths)}
+                  />
                 </div>
-
-                {/* Attached Files */}
-                {form.attachments.length > 0 && (
-                  <div className="space-y-2">
-                    {form.attachments.map((file, index) => (
-                      <motion.div
-                        key={`${file.name}-${index}`}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 border border-border/20"
-                      >
-                        <div className="h-9 w-9 rounded-lg bg-primary/5 flex items-center justify-center shrink-0">
-                          {file.type.startsWith("image/") ? (
-                            <ImageIcon className="h-4 w-4 text-primary/60" />
-                          ) : (
-                            <FileText className="h-4 w-4 text-primary/60" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold truncate">
-                            {file.name}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground">
-                            {(file.size / 1024).toFixed(1)} KB
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 rounded-lg hover:bg-destructive/10 hover:text-destructive shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeAttachment(index);
-                          }}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
 
                 {/* Review Summary */}
                 <div className="p-4 rounded-2xl bg-muted/20 border border-border/20 space-y-3">
