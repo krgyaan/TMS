@@ -1,9 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { TiptapEditor } from "@/components/tiptapeditor";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { FileText, Upload, X } from "lucide-react";
+import { FileUploader } from "@/components/file-upload";
 import { buildEmailTemplate } from "@/modules/shared/follow-up/emailTemplateBuilder";
 
 interface FollowupEmailEditorProps {
@@ -20,11 +18,11 @@ interface FollowupEmailEditorProps {
         fdrNo?: string | null;
         expiryDate?: string | null;
         transactionDate?: string | null;
-        courierDetails?: string | null;
+        courierDetails?: string;
     };
     onEmailBodyChange: (html: string) => void;
     initialEmailBody?: string;
-    onFilesChange?: (files: File[]) => void;
+    onFilesChange?: (paths: string[]) => void;
 }
 
 export function FollowupEmailEditor({
@@ -35,8 +33,7 @@ export function FollowupEmailEditor({
     onFilesChange,
 }: FollowupEmailEditorProps) {
     const [htmlContent, setHtmlContent] = useState(initialEmailBody || "");
-    const [files, setFiles] = useState<File[]>([]);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [paths, setPaths] = useState<string[]>([]);
 
     useEffect(() => {
         if (initialEmailBody) {
@@ -47,19 +44,6 @@ export function FollowupEmailEditor({
         setHtmlContent(html);
         onEmailBodyChange(html);
     }, []);
-
-    const handleAddFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newFiles = Array.from(e.target.files || []);
-        setFiles(prev => [...prev, ...newFiles]);
-        onFilesChange?.([...files, ...newFiles]);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-    };
-
-    const handleRemoveFile = (index: number) => {
-        const updated = files.filter((_, i) => i !== index);
-        setFiles(updated);
-        onFilesChange?.(updated);
-    };
 
     return (
         <div className="space-y-4">
@@ -84,40 +68,14 @@ export function FollowupEmailEditor({
                 <p className="text-xs text-muted-foreground mb-2">
                     Add supporting documents (proof, letters, etc.)
                 </p>
-                <div className="flex flex-wrap gap-2 mb-2">
-                    {files.map((file, idx) => (
-                        <div key={idx} className="flex items-center gap-2 bg-muted/30 rounded-md px-3 py-1.5 text-sm">
-                            <FileText className="h-4 w-4 text-muted-foreground" />
-                            <span className="truncate max-w-[200px]">{file.name}</span>
-                            <button
-                                type="button"
-                                onClick={() => handleRemoveFile(idx)}
-                                className="text-muted-foreground hover:text-destructive"
-                            >
-                                <X className="h-3 w-3" />
-                            </button>
-                        </div>
-                    ))}
-                </div>
-                <div className="flex items-center gap-2">
-                    <Input
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        onChange={handleAddFiles}
-                        className="hidden"
-                        id="followup-attachments"
-                    />
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fileInputRef.current?.click()}
-                    >
-                        <Upload className="h-4 w-4 mr-1" />
-                        Add Files
-                    </Button>
-                </div>
+                <FileUploader
+                    context="follow-ups"
+                    value={paths}
+                    onChange={(p) => {
+                        setPaths(p);
+                        onFilesChange?.(p);
+                    }}
+                />
             </div>
         </div>
     );

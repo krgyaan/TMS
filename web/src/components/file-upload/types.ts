@@ -36,7 +36,11 @@ export const KNOWN_CONTEXTS = [
     'finance-document',
     // accounts
     'bankLoanSchedule', 'sanctionLetter', 'tdsDocument', 'bankNoc',
-    'follow-ups',
+    'follow-ups', 'delegation-attachment', 'delegation-proof',
+
+    // hrms
+    'complaints',
+
     // insurance
     'insurances',
     // crm

@@ -1,7 +1,7 @@
 import { type Control, useWatch } from 'react-hook-form';
 import { FieldWrapper } from './FieldWrapper';
 import { Textarea } from '@/components/ui/textarea';
-import { FileUploadField } from './FileUploadField';
+import { CompactFileUploader } from '@/components/file-upload';
 import SelectField from './SelectField';
 
 export const STOP_REASON_LABELS: Record<string, string> = {
@@ -58,13 +58,15 @@ export function StopReasonFields<TFieldValues extends Record<string, any>>({
                         )}
                     </FieldWrapper>
                     {proofImageFieldName && (
-                        <FileUploadField
-                            control={control}
-                            name={proofImageFieldName as any}
-                            label="Proof Image"
-                            allowMultiple={false}
-                            acceptedFileTypes={['image/*', 'application/pdf']}
-                        />
+                        <FieldWrapper control={control} name={proofImageFieldName as any} label="Proof Image">
+                            {(field) => (
+                                <CompactFileUploader
+                                    context="follow-ups"
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                />
+                            )}
+                        </FieldWrapper>
                     )}
                 </>
             )}
