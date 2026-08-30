@@ -133,11 +133,11 @@
         "coverageDirectory": "../coverage",
         "testEnvironment": "node",
         "moduleNameMapper": {
-            "^@/(.*)$": "<rootDir>/src/$1",
-            "^@db$": "<rootDir>/src/db",
-            "^@db/(.*)$": "<rootDir>/src/db/$1",
-            "^@config$": "<rootDir>/src/config",
-            "^@config/(.*)$": "<rootDir>/src/config/$1"
+            "^@/(.*)$": "<rootDir>/$1",
+            "^@db$": "<rootDir>/db",
+            "^@db/(.*)$": "<rootDir>/db/$1",
+            "^@config$": "<rootDir>/config",
+            "^@config/(.*)$": "<rootDir>/config/$1"
         }
     }
 }
