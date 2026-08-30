@@ -48,8 +48,6 @@ export interface ApiError {
     error?: string;
 }
 
-export interface Company {}
-
 export interface NamedEntity {
     id: number | null;
     name: string | null;
@@ -175,16 +173,7 @@ export interface ApiError {
     error?: string;
 }
 
-export interface Company {
-    id: string;
-    name: string;
-    industryId: string;
-    locationId: string;
-    isActive: boolean;
-    logo?: string;
-    createdAt: string;
-    updatedAt: string;
-}
+export interface Company {}
 
 export interface VendorOrganization {
     id: number;

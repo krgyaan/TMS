@@ -19,9 +19,6 @@ const Master_Organization = lazy(() => import("@/modules/master/organization"));
 const Master_Organization_Create = lazy(() => import("@/modules/master/organization/create"));
 const Master_Organization_Edit = lazy(() => import("@/modules/master/organization/edit"));
 
-// Companies
-const Master_Companies = lazy(() => import("@/modules/master/company"));
-
 // Items
 const Master_Item = lazy(() => import("@/modules/master/item"));
 const Master_Item_Create = lazy(() => import("@/modules/master/item/create"));
@@ -210,15 +207,7 @@ export default function MasterRoutes() {
                 />
             </Route>
 
-            {/* Companies */}
-            <Route
-                path="companies"
-                element={
-                    <RouteWrapper>
-                        <Master_Companies />
-                    </RouteWrapper>
-                }
-            />
+            
 
             {/* Items */}
             <Route path="items">

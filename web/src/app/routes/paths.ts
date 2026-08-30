@@ -328,8 +328,6 @@ export const paths = {
         organizations_create: "/master/organizations/create",
         organizations_edit: (id: number | string) => `/master/organizations/${id}/edit`,
 
-        companies: "/master/companies",
-
         items: "/master/items",
         items_create: "/master/items/create",
         items_edit: (id: number | string) => `/master/items/${id}/edit`,
