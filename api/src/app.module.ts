@@ -137,6 +137,7 @@ import { RequestExtensionsModule } from "./modules/tendering/request_extensions/
 import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-queries.module";
 import { TenderNotificationService } from "./modules/tendering/tender-notification.service";
 import { OpenwaModule } from "./openwa/openwa.module";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { WebhookController } from "./webhook/webhook.controller";
 
 @Module({
@@ -285,6 +286,7 @@ import { WebhookController } from "./webhook/webhook.controller";
         ServiceVisitModule,
         ServiceFeedbackModule,
         OpenwaModule,
+        NotificationsModule,
     ],
     controllers: [AppController, WebhookController],
     providers: [
