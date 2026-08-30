@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,8 +31,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useProfileContext } from "../contexts/ProfileContext";
 import { getInitials } from "../utils";
-import { scaleIn } from "../animations";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
+import type { ProfileData, EmployeeProfileData, AddressData, EmergencyContactData } from "../types";
 
 interface ProfileHeaderProps {
   onEditProfile?: () => void;
@@ -46,17 +45,7 @@ interface ProfileHeaderProps {
 const AnimatedNumber: React.FC<{ value: number; className?: string }> = ({
   value,
   className,
-}) => (
-  <motion.span
-    key={value}
-    initial={{ opacity: 0, y: 10, scale: 0.8 }}
-    animate={{ opacity: 1, y: 0, scale: 1 }}
-    transition={{ type: "spring", stiffness: 300, damping: 20 }}
-    className={className}
-  >
-    {value}
-  </motion.span>
-);
+}) => <span className={className}>{value}</span>;
 
 // ─── Modern Progress Bar ─────────────────────────────────────────────────────
 
@@ -72,11 +61,9 @@ const SegmentedProgress: React.FC<{
       {/* Progress track */}
       <div className="relative h-2 w-full rounded-full bg-muted/60 overflow-hidden">
         {/* Filled portion */}
-        <motion.div
+        <div
           className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary via-primary to-primary/80"
-          initial={{ width: 0 }}
-          animate={{ width: `${(completed / total) * 100}%` }}
-          transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
+          style={{ width: `${(completed / total) * 100}%` }}
         />
         {/* Segment dividers */}
         <div className="absolute inset-0 flex">
@@ -91,17 +78,6 @@ const SegmentedProgress: React.FC<{
             )
           )}
         </div>
-        {/* Shine effect */}
-        <motion.div
-          className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-          animate={{ x: ["-100%", "800%"] }}
-          transition={{
-            duration: 3,
-            repeat: Infinity,
-            ease: "linear",
-            repeatDelay: 2,
-          }}
-        />
       </div>
       {/* Labels */}
       <div className="flex items-center justify-between">
@@ -133,16 +109,8 @@ const ChecklistItem: React.FC<{
   description: string;
   done: boolean;
   onAction?: () => void;
-  index: number;
-}> = ({ icon: Icon, label, description, done, onAction, index }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 8 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{
-      delay: 0.04 * index,
-      duration: 0.3,
-      ease: [0.22, 1, 0.36, 1],
-    }}
+}> = ({ icon: Icon, label, description, done, onAction }) => (
+  <div
     onClick={!done ? onAction : undefined}
     className={cn(
       "group relative flex items-center gap-3 rounded-2xl p-3.5 transition-all duration-300 border",
@@ -154,19 +122,9 @@ const ChecklistItem: React.FC<{
     {/* Status icon */}
     <div className="relative flex-shrink-0">
       {done ? (
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{
-            type: "spring",
-            stiffness: 400,
-            damping: 15,
-            delay: 0.08 * index,
-          }}
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/15"
-        >
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/15">
           <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-        </motion.div>
+        </div>
       ) : (
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/8 border border-primary/10 group-hover:bg-primary/12 group-hover:border-primary/20 transition-colors">
           <Icon className="h-4 w-4 text-primary/70 group-hover:text-primary transition-colors" />
@@ -212,7 +170,7 @@ const ChecklistItem: React.FC<{
         Done
       </span>
     )}
-  </motion.div>
+  </div>
 );
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -228,11 +186,11 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
   if (!data) return null;
 
-  const CURRENT_USER = (data.currentUser || {}) as any;
-  const PROFILE = (data.profile || {}) as any;
-  const EMPLOYEE_PROFILE = (data.employeeProfile || {}) as any;
-  const ADDRESS = (data.address || {}) as any;
-  const EMERGENCY_CONTACT = (data.emergencyContact || {}) as any;
+  const CURRENT_USER = data.currentUser;
+  const PROFILE = (data.profile ?? {}) as ProfileData;
+  const EMPLOYEE_PROFILE = (data.employeeProfile ?? {}) as EmployeeProfileData;
+  const ADDRESS = (data.address ?? {}) as AddressData;
+  const EMERGENCY_CONTACT = (data.emergencyContact ?? {}) as EmergencyContactData;
   const DOCUMENTS = data.documents || [];
   const EDUCATION = data.education || [];
   const EXPERIENCE = data.experience || [];
@@ -390,7 +348,15 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
   // ─── Stat cards ──────────────────────────────────────────────────────────
 
-  const statCards = [
+  type StatCard = {
+    label: string;
+    value: number | string;
+    hint: string;
+    icon: React.ElementType;
+    isReady?: boolean;
+  };
+
+  const statCards: StatCard[] = [
     {
       label: "Documents",
       value: DOCUMENTS.length,
@@ -420,17 +386,10 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   ];
 
   return (
-    <motion.div variants={scaleIn}>
+    <div>
       <Card className="relative overflow-hidden rounded-3xl border border-border/50 shadow-xl shadow-black/[0.03] dark:shadow-black/[0.15] p-0 gap-0">
         {/* ─── Top Section: Profile Info ──────────────────────────────── */}
         <div className="relative bg-background">
-          {/* Subtle background gradient */}
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-primary/[0.06] to-transparent" />
-            <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-primary/[0.04] blur-[80px] -translate-y-1/3 translate-x-1/4" />
-            <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-primary/[0.03] blur-[60px] translate-y-1/3 -translate-x-1/4" />
-          </div>
-
           <div className="relative px-6 sm:px-8 lg:px-10 pt-8 sm:pt-10 pb-8">
             <div className="flex flex-col xl:flex-row xl:items-start gap-8">
               {/* Left: Avatar + Info */}
@@ -577,14 +536,11 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
 
             {/* Stat Cards */}
             <div className="mt-7 grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-              {statCards.map((item, idx) => {
-                const isReady = (item as any).isReady;
+              {statCards.map((item) => {
+                const isReady = item.isReady;
                 return (
-                  <motion.div
+                  <div
                     key={item.label}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.06 * idx, duration: 0.3 }}
                     className="rounded-xl border border-border/50 bg-muted/25 p-3.5 transition-all duration-200 hover:bg-muted/40"
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -621,7 +577,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                         />
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>
@@ -708,15 +664,9 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                 {/* Inline segmented progress (desktop) */}
                 <div className="hidden md:block w-48">
                   <div className="flex items-center gap-[3px]">
-                    {checklistItems.map((item, idx) => (
-                      <motion.div
+                    {checklistItems.map((item) => (
+                      <div
                         key={item.id}
-                        initial={{ scaleY: 0 }}
-                        animate={{ scaleY: 1 }}
-                        transition={{
-                          delay: 0.04 * idx,
-                          duration: 0.3,
-                        }}
                         className={cn(
                           "h-2 flex-1 rounded-full transition-colors duration-500",
                           item.done
@@ -728,121 +678,95 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
                   </div>
                 </div>
 
-                <motion.div
-                  animate={{
-                    rotate: checklistExpanded ? 180 : 0,
-                  }}
-                  transition={{
-                    duration: 0.3,
-                    ease: [0.22, 1, 0.36, 1],
-                  }}
-                  className="flex h-8 w-8 items-center justify-center rounded-xl border border-border/50 bg-muted/40 group-hover:bg-muted/60 transition-colors"
+                <div
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-xl border border-border/50 bg-muted/40 group-hover:bg-muted/60 transition-colors",
+                    checklistExpanded && "rotate-180"
+                  )}
                 >
                   <ChevronDown className="h-4 w-4 text-muted-foreground/60" />
-                </motion.div>
+                </div>
               </div>
             </button>
 
             {/* Expanded Checklist */}
-            <AnimatePresence>
-              {checklistExpanded && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{
-                    duration: 0.4,
-                    ease: [0.22, 1, 0.36, 1],
-                  }}
-                  className="overflow-hidden"
-                >
-                  <div className="pt-5 mt-4 border-t border-border/40">
-                    {/* Full-width progress bar */}
-                    <SegmentedProgress
-                      items={checklistItems}
-                      className="mb-5"
-                    />
+            {checklistExpanded && (
+              <div>
+                <div className="pt-5 mt-4 border-t border-border/40">
+                  {/* Full-width progress bar */}
+                  <SegmentedProgress
+                    items={checklistItems}
+                    className="mb-5"
+                  />
 
-                    {/* Checklist grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {checklistItems.map((item, idx) => (
-                        <ChecklistItem
-                          key={item.id}
-                          icon={item.icon}
-                          label={item.label}
-                          description={item.description}
-                          done={item.done}
-                          index={idx}
-                          onAction={() =>
-                            onNavigateToSection?.(item.section)
-                          }
-                        />
-                      ))}
-                    </div>
-
-                    {/* Bottom contextual message */}
-                    {!allDone && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.35 }}
-                        className="mt-4 flex items-center gap-3 rounded-xl bg-primary/[0.05] border border-primary/10 px-4 py-3"
-                      >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
-                          <Zap className="h-4 w-4 text-primary/70" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-foreground/80">
-                            Complete all items for faster HR
-                            approval
-                          </p>
-                          <p className="text-[10px] text-muted-foreground/50 mt-0.5">
-                            Fully completed profiles are
-                            prioritized during verification
-                          </p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={onEditProfile}
-                          className="h-8 rounded-lg text-xs font-semibold text-primary hover:bg-primary/10 gap-1 flex-shrink-0"
-                        >
-                          Continue
-                          <ChevronRight className="h-3 w-3" />
-                        </Button>
-                      </motion.div>
-                    )}
-
-                    {allDone && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.35 }}
-                        className="mt-4 flex items-center gap-3 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/15 px-4 py-3"
-                      >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 flex-shrink-0">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                            Profile complete — HR will review
-                            shortly
-                          </p>
-                          <p className="text-[10px] text-emerald-600/50 dark:text-emerald-400/40 mt-0.5">
-                            You'll be notified once
-                            verification is done
-                          </p>
-                        </div>
-                      </motion.div>
-                    )}
+                  {/* Checklist grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {checklistItems.map((item) => (
+                      <ChecklistItem
+                        key={item.id}
+                        icon={item.icon}
+                        label={item.label}
+                        description={item.description}
+                        done={item.done}
+                        onAction={() =>
+                          onNavigateToSection?.(item.section)
+                        }
+                      />
+                    ))}
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+
+                  {/* Bottom contextual message */}
+                  {!allDone && (
+                    <div className="mt-4 flex items-center gap-3 rounded-xl bg-primary/[0.05] border border-primary/10 px-4 py-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 flex-shrink-0">
+                        <Zap className="h-4 w-4 text-primary/70" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-foreground/80">
+                          Complete all items for faster HR
+                          approval
+                        </p>
+                        <p className="text-[10px] text-muted-foreground/50 mt-0.5">
+                          Fully completed profiles are
+                          prioritized during verification
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={onEditProfile}
+                        className="h-8 rounded-lg text-xs font-semibold text-primary hover:bg-primary/10 gap-1 flex-shrink-0"
+                      >
+                        Continue
+                        <ChevronRight className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+
+                  {allDone && (
+                    <div className="mt-4 flex items-center gap-3 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/15 px-4 py-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 flex-shrink-0">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                          Profile complete — HR will review
+                          shortly
+                        </p>
+                        <p className="text-[10px] text-emerald-600/50 dark:text-emerald-400/40 mt-0.5">
+                          You'll be notified once
+                          verification is done
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
       </Card>
-    </motion.div>
+    </div>
   );
 };

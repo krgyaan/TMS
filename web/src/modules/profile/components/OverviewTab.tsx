@@ -1,11 +1,9 @@
 // OverviewTab.tsx
-import React, { useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -50,22 +48,15 @@ import {
   Plus,
   Trash2,
   Save,
-  X,
   ChevronRight,
   AlertCircle,
   FileText,
-  ArrowUpRight,
-  Sparkles,
   Eye,
   EyeOff,
   Loader2,
-  Check,
   Info,
-  TrendingUp,
   Zap,
-  BookOpen,
   Award,
-  ExternalLink,
   Linkedin,
   Droplets,
 } from "lucide-react";
@@ -73,30 +64,24 @@ import { cn } from "@/lib/utils";
 import { useProfileContext } from "../contexts/ProfileContext";
 import { formatDate } from "../utils";
 import { GlassCard } from "./GlassCard";
-import { tabContentVariants, staggerContainer, fadeInUp } from "../animations";
 import api from "@/lib/axios";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
+import type { EducationData, ExperienceData, ProfileData, EmployeeProfileData, AddressData, EmergencyContactData } from "../types";
+
+type EducationItem = EducationData & { yearOfCompletion?: string };
 
 interface OverviewTabProps {
   setActiveTab: (tab: string) => void;
 }
 
-// ─── Animated Section Wrapper ────────────────────────────────────────────────
+// ─── Section Wrapper ─────────────────────────────────────────────────────────
 
 const SectionMotion: React.FC<{
   children: React.ReactNode;
   className?: string;
   delay?: number;
-}> = ({ children, className, delay = 0 }) => (
-  <motion.div
-    variants={fadeInUp}
-    className={className}
-    custom={delay}
-  >
-    {children}
-  </motion.div>
-);
+}> = ({ children, className }) => <div className={className}>{children}</div>;
 
 // ─── Modern Info Display ─────────────────────────────────────────────────────
 
@@ -300,7 +285,7 @@ const CompletionRing: React.FC<{
           strokeWidth={strokeWidth}
           className="text-muted/30"
         />
-        <motion.circle
+        <circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
@@ -309,9 +294,7 @@ const CompletionRing: React.FC<{
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}
-          initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset: offset }}
-          transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
+          strokeDashoffset={offset}
         />
         <defs>
           <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -321,14 +304,9 @@ const CompletionRing: React.FC<{
         </defs>
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <motion.span
-          className="text-lg font-black text-foreground tracking-tight"
-          initial={{ opacity: 0, scale: 0.5 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.5, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        >
+        <span className="text-lg font-black text-foreground tracking-tight">
           {percentage}%
-        </motion.span>
+        </span>
         <span className="text-[8px] uppercase tracking-[0.15em] font-semibold text-muted-foreground/50">
           Done
         </span>
@@ -342,26 +320,26 @@ const CompletionRing: React.FC<{
 const PersonalInfoDialog: React.FC<{
   open: boolean;
   onClose: () => void;
-  data: any;
-  onSave: (data: any) => Promise<void>;
+  data: Record<string, unknown>;
+  onSave: (data: Record<string, unknown>) => Promise<void>;
   saving: boolean;
   isOnboarding?: boolean;
 }> = ({ open, onClose, data, onSave, saving, isOnboarding = true }) => {
   const [form, setForm] = useState({
-    firstName: data?.firstName || "",
-    middleName: data?.middleName || "",
-    lastName: data?.lastName || "",
-    dateOfBirth: data?.dateOfBirth || "",
-    gender: data?.gender || "",
-    maritalStatus: data?.maritalStatus || "",
-    nationality: data?.nationality || "",
-    personalEmail: data?.personalEmail || "",
-    phone: data?.phone || "",
-    alternatePhone: data?.alternatePhone || "",
-    aadharNumber: data?.aadharNumber || "",
-    panNumber: data?.panNumber || "",
-    bloodGroup: data?.bloodGroup || "",
-    linkedinProfile: data?.linkedinProfile || "",
+    firstName: (data?.firstName as string) || "",
+    middleName: (data?.middleName as string) || "",
+    lastName: (data?.lastName as string) || "",
+    dateOfBirth: (data?.dateOfBirth as string) || "",
+    gender: (data?.gender as string) || "",
+    maritalStatus: (data?.maritalStatus as string) || "",
+    nationality: (data?.nationality as string) || "",
+    personalEmail: (data?.personalEmail as string) || "",
+    phone: (data?.phone as string) || "",
+    alternatePhone: (data?.alternatePhone as string) || "",
+    aadharNumber: (data?.aadharNumber as string) || "",
+    panNumber: (data?.panNumber as string) || "",
+    bloodGroup: (data?.bloodGroup as string) || "",
+    linkedinProfile: (data?.linkedinProfile as string) || "",
   });
 
   const handleChange = (field: string, value: string) => {
@@ -615,32 +593,32 @@ const PersonalInfoDialog: React.FC<{
 const AddressDialog: React.FC<{
   open: boolean;
   onClose: () => void;
-  data: any;
-  onSave: (data: any) => Promise<void>;
+  data: Record<string, unknown>;
+  onSave: (data: Record<string, unknown>) => Promise<void>;
   saving: boolean;
 }> = ({ open, onClose, data, onSave, saving }) => {
   const [sameAsCurrent, setSameAsCurrent] = useState(false);
-  const [form, setForm] = useState({
-    currentAddressLine1: data?.currentAddressLine1 || "",
-    currentAddressLine2: data?.currentAddressLine2 || "",
-    currentCity: data?.currentCity || "",
-    currentState: data?.currentState || "",
-    currentCountry: data?.currentCountry || "",
-    currentPostalCode: data?.currentPostalCode || "",
-    permanentAddressLine1: data?.permanentAddressLine1 || "",
-    permanentAddressLine2: data?.permanentAddressLine2 || "",
-    permanentCity: data?.permanentCity || "",
-    permanentState: data?.permanentState || "",
-    permanentCountry: data?.permanentCountry || "",
-    permanentPostalCode: data?.permanentPostalCode || "",
+const [form, setForm] = useState<Record<string, string>>({
+    currentAddressLine1: (data?.currentAddressLine1 as string) || "",
+    currentAddressLine2: (data?.currentAddressLine2 as string) || "",
+    currentCity: (data?.currentCity as string) || "",
+    currentState: (data?.currentState as string) || "",
+    currentCountry: (data?.currentCountry as string) || "",
+    currentPostalCode: (data?.currentPostalCode as string) || "",
+    permanentAddressLine1: (data?.permanentAddressLine1 as string) || "",
+    permanentAddressLine2: (data?.permanentAddressLine2 as string) || "",
+    permanentCity: (data?.permanentCity as string) || "",
+    permanentState: (data?.permanentState as string) || "",
+    permanentCountry: (data?.permanentCountry as string) || "",
+    permanentPostalCode: (data?.permanentPostalCode as string) || "",
   });
 
   const handleChange = (field: string, value: string) => {
-    setForm((prev: typeof form) => {
+    setForm((prev) => {
       const updated = { ...prev, [field]: value };
       if (sameAsCurrent && field.startsWith("current")) {
         const permField = field.replace("current", "permanent");
-        (updated as any)[permField] = value;
+        updated[permField] = value;
       }
       return updated;
     });
@@ -671,7 +649,7 @@ const AddressDialog: React.FC<{
           Address Line 1 <span className="text-destructive">*</span>
         </Label>
         <Input
-          value={(form as any)[`${prefix}AddressLine1`]}
+          value={form[`${prefix}AddressLine1`]}
           onChange={(e) => handleChange(`${prefix}AddressLine1`, e.target.value)}
           className="rounded-xl h-10 border-border/50 bg-muted/20"
           disabled={disabled}
@@ -680,7 +658,7 @@ const AddressDialog: React.FC<{
       <div className="col-span-2 space-y-1.5">
         <Label className="text-xs font-medium text-muted-foreground">Address Line 2</Label>
         <Input
-          value={(form as any)[`${prefix}AddressLine2`]}
+          value={form[`${prefix}AddressLine2`]}
           onChange={(e) => handleChange(`${prefix}AddressLine2`, e.target.value)}
           className="rounded-xl h-10 border-border/50 bg-muted/20"
           disabled={disabled}
@@ -691,7 +669,7 @@ const AddressDialog: React.FC<{
           City <span className="text-destructive">*</span>
         </Label>
         <Input
-          value={(form as any)[`${prefix}City`]}
+          value={form[`${prefix}City`]}
           onChange={(e) => handleChange(`${prefix}City`, e.target.value)}
           className="rounded-xl h-10 border-border/50 bg-muted/20"
           disabled={disabled}
@@ -702,7 +680,7 @@ const AddressDialog: React.FC<{
           State <span className="text-destructive">*</span>
         </Label>
         <Input
-          value={(form as any)[`${prefix}State`]}
+          value={form[`${prefix}State`]}
           onChange={(e) => handleChange(`${prefix}State`, e.target.value)}
           className="rounded-xl h-10 border-border/50 bg-muted/20"
           disabled={disabled}
@@ -713,7 +691,7 @@ const AddressDialog: React.FC<{
           Country <span className="text-destructive">*</span>
         </Label>
         <Input
-          value={(form as any)[`${prefix}Country`]}
+          value={form[`${prefix}Country`]}
           onChange={(e) => handleChange(`${prefix}Country`, e.target.value)}
           className="rounded-xl h-10 border-border/50 bg-muted/20"
           disabled={disabled}
@@ -724,7 +702,7 @@ const AddressDialog: React.FC<{
           Postal Code <span className="text-destructive">*</span>
         </Label>
         <Input
-          value={(form as any)[`${prefix}PostalCode`]}
+          value={form[`${prefix}PostalCode`]}
           onChange={(e) => handleChange(`${prefix}PostalCode`, e.target.value)}
           className="rounded-xl h-10 border-border/50 bg-muted/20"
           disabled={disabled}
@@ -801,16 +779,16 @@ const AddressDialog: React.FC<{
 const EmergencyContactDialog: React.FC<{
   open: boolean;
   onClose: () => void;
-  data: any;
-  onSave: (data: any) => Promise<void>;
+  data: Record<string, unknown>;
+  onSave: (data: Record<string, unknown>) => Promise<void>;
   saving: boolean;
 }> = ({ open, onClose, data, onSave, saving }) => {
   const [form, setForm] = useState({
-    name: data?.name || "",
-    relationship: data?.relationship || "",
-    phone: data?.phone || "",
-    altPhone: data?.altPhone || "",
-    email: data?.email || "",
+    name: (data?.name as string) || "",
+    relationship: (data?.relationship as string) || "",
+    phone: (data?.phone as string) || "",
+    altPhone: (data?.altPhone as string) || "",
+    email: (data?.email as string) || "",
   });
 
   const handleChange = (field: string, value: string) => {
@@ -913,16 +891,16 @@ const EmergencyContactDialog: React.FC<{
 const EducationDialog: React.FC<{
   open: boolean;
   onClose: () => void;
-  existing?: any;
-  onSave: (data: any) => Promise<void>;
+  existing?: Record<string, unknown>;
+  onSave: (data: Record<string, unknown>) => Promise<void>;
   saving: boolean;
 }> = ({ open, onClose, existing, onSave, saving }) => {
   const [form, setForm] = useState({
-    degree: existing?.degree || "",
-    institution: existing?.institution || "",
-    fieldOfStudy: existing?.fieldOfStudy || "",
-    yearOfCompletion: existing?.yearOfCompletion || "",
-    grade: existing?.grade || "",
+    degree: (existing?.degree as string) || "",
+    institution: (existing?.institution as string) || "",
+    fieldOfStudy: (existing?.fieldOfStudy as string) || "",
+    yearOfCompletion: (existing?.yearOfCompletion as string) || "",
+    grade: (existing?.grade as string) || "",
   });
 
   const handleChange = (field: string, value: string) => {
@@ -1018,24 +996,33 @@ const EducationDialog: React.FC<{
 
 // ─── Experience Dialog ───────────────────────────────────────────────────────
 
+type ExperienceFormState = {
+  companyName: string;
+  designation: string;
+  fromDate: string;
+  toDate: string;
+  currentlyWorking: boolean;
+  responsibilities: string;
+};
+
 const ExperienceDialog: React.FC<{
   open: boolean;
   onClose: () => void;
-  existing?: any;
-  onSave: (data: any) => Promise<void>;
+  existing?: Record<string, unknown>;
+  onSave: (data: ExperienceFormState) => Promise<void>;
   saving: boolean;
 }> = ({ open, onClose, existing, onSave, saving }) => {
-  const [form, setForm] = useState({
-    companyName: existing?.companyName || "",
-    designation: existing?.designation || "",
-    fromDate: existing?.fromDate || "",
-    toDate: existing?.toDate || "",
-    currentlyWorking: existing?.currentlyWorking || false,
-    responsibilities: existing?.responsibilities || "",
+  const [form, setForm] = useState<ExperienceFormState>({
+    companyName: (existing?.companyName as string) || "",
+    designation: (existing?.designation as string) || "",
+    fromDate: (existing?.fromDate as string) || "",
+    toDate: (existing?.toDate as string) || "",
+    currentlyWorking: (existing?.currentlyWorking as boolean) || false,
+    responsibilities: (existing?.responsibilities as string) || "",
   });
 
-  const handleChange = (field: string, value: any) => {
-    setForm((prev: typeof form) => ({ ...prev, [field]: value }));
+  const handleChange = (field: keyof ExperienceFormState, value: string | boolean) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
@@ -1137,43 +1124,13 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
   const [editPersonal, setEditPersonal] = useState(false);
   const [editAddress, setEditAddress] = useState(false);
   const [editEmergency, setEditEmergency] = useState(false);
-  const [editEducation, setEditEducation] = useState<any | null>(null);
-  const [editExperience, setEditExperience] = useState<any | null>(null);
+  const [editEducation, setEditEducation] = useState<Record<string, unknown> | null>(null);
+  const [editExperience, setEditExperience] = useState<Record<string, unknown> | null>(null);
 
-  if (!data) return null;
-
-  const PROFILE = data.profile || ({} as any);
-  const EMPLOYEE_PROFILE = data.employeeProfile || ({} as any);
-  const ADDRESS = data.address || ({} as any);
-  const EMERGENCY_CONTACT = data.emergencyContact || ({} as any);
-  const EDUCATION = data.education || [];
-  const EXPERIENCE = data.experience || [];
-  const CURRENT_USER = data.currentUser || ({} as any);
-
-  // ─── Profile completion calculation ──────────────────────────────────────
-  const completionItems = [
-    { label: "Name", done: !!PROFILE.firstName, icon: User, section: "personal" },
-    { label: "Date of Birth", done: !!PROFILE.dateOfBirth, icon: Calendar, section: "personal" },
-    { label: "Gender", done: !!PROFILE.gender, icon: User, section: "personal" },
-    { label: "Phone", done: !!PROFILE.phone, icon: Phone, section: "personal" },
-    { label: "Email", done: !!PROFILE.personalEmail, icon: Mail, section: "personal" },
-    { label: "Current Address", done: !!ADDRESS.currentAddressLine1, icon: MapPin, section: "address" },
-    { label: "Permanent Address", done: !!ADDRESS.permanentAddressLine1, icon: MapPinned, section: "address" },
-    { label: "Emergency Contact", done: !!EMERGENCY_CONTACT.name, icon: Heart, section: "emergency" },
-    { label: "Education", done: EDUCATION.length > 0, icon: GraduationCap, section: "education" },
-    { label: "Documents", done: (data.documents || []).length > 0, icon: FileText, section: "documents" },
-    { label: "Aadhar", done: !!PROFILE.aadharNumber, icon: Shield, section: "personal" },
-    { label: "PAN", done: !!PROFILE.panNumber, icon: Shield, section: "personal" },
-  ];
-  const completedCount = completionItems.filter((i) => i.done).length;
-  const completionPct = Math.round((completedCount / completionItems.length) * 100);
-  const pendingItems = completionItems.filter((i) => !i.done);
-
-  // ─── Mutations ───────────────────────────────────────────────────────────
-
+  // ─── Mutations (must be called before any early return) ─────────────────
   const profileMutation = useMutation({
-    mutationFn: async (payload: any) => {
-      if (!data.isOnboarding) {
+    mutationFn: async (payload: Record<string, unknown>) => {
+      if (!data?.isOnboarding) {
         await api.patch("/profile/me/basic", payload);
       } else {
         await api.patch("/profile/me", payload);
@@ -1183,13 +1140,14 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
       toast.success("Profile updated successfully");
       refetch();
     },
-    onError: (err: any) => {
-      toast.error(err?.response?.data?.message || "Failed to update profile");
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { message?: string } } };
+      toast.error(e?.response?.data?.message || "Failed to update profile");
     },
   });
 
   const educationAddMutation = useMutation({
-    mutationFn: async (payload: any) => {
+    mutationFn: async (payload: Record<string, unknown>) => {
       await api.post("/profile/education", payload);
     },
     onSuccess: () => {
@@ -1200,7 +1158,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
   });
 
   const educationUpdateMutation = useMutation({
-    mutationFn: async ({ id, ...payload }: any) => {
+    mutationFn: async ({ id, ...payload }: { id: number } & Record<string, unknown>) => {
       await api.patch(`/profile/education/${id}`, payload);
     },
     onSuccess: () => {
@@ -1222,7 +1180,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
   });
 
   const experienceAddMutation = useMutation({
-    mutationFn: async (payload: any) => {
+    mutationFn: async (payload: Record<string, unknown>) => {
       await api.post("/profile/experience", payload);
     },
     onSuccess: () => {
@@ -1233,7 +1191,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
   });
 
   const experienceUpdateMutation = useMutation({
-    mutationFn: async ({ id, ...payload }: any) => {
+    mutationFn: async ({ id, ...payload }: { id: number } & Record<string, unknown>) => {
       await api.patch(`/profile/experience/${id}`, payload);
     },
     onSuccess: () => {
@@ -1256,38 +1214,68 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
 
   // ─── Save handlers ──────────────────────────────────────────────────────
 
-  const handleSavePersonal = async (formData: any) => {
+  const handleSavePersonal = async (formData: Record<string, unknown>) => {
     await profileMutation.mutateAsync(formData);
     setEditPersonal(false);
   };
 
-  const handleSaveAddress = async (formData: any) => {
+  const handleSaveAddress = async (formData: Record<string, unknown>) => {
     await profileMutation.mutateAsync(formData);
     setEditAddress(false);
   };
 
-  const handleSaveEmergency = async (formData: any) => {
+  const handleSaveEmergency = async (formData: Record<string, unknown>) => {
     await profileMutation.mutateAsync(formData);
     setEditEmergency(false);
   };
 
-  const handleSaveEducation = async (formData: any) => {
+  const handleSaveEducation = async (formData: Record<string, unknown>) => {
     if (editEducation?.id) {
-      await educationUpdateMutation.mutateAsync({ id: editEducation.id, ...formData });
+      await educationUpdateMutation.mutateAsync({ id: editEducation.id as number, ...formData });
     } else {
       await educationAddMutation.mutateAsync(formData);
     }
     setEditEducation(null);
   };
 
-  const handleSaveExperience = async (formData: any) => {
+  const handleSaveExperience = async (formData: Record<string, unknown>) => {
     if (editExperience?.id) {
-      await experienceUpdateMutation.mutateAsync({ id: editExperience.id, ...formData });
+      await experienceUpdateMutation.mutateAsync({ id: editExperience.id as number, ...formData });
     } else {
       await experienceAddMutation.mutateAsync(formData);
     }
     setEditExperience(null);
   };
+
+  if (!data) return null;
+
+  const PROFILE = (data.profile ?? {}) as Partial<ProfileData>;
+  const EMPLOYEE_PROFILE = (data.employeeProfile ?? {}) as Partial<EmployeeProfileData>;
+  const ADDRESS = (data.address ?? {}) as Partial<AddressData>;
+  const EMERGENCY_CONTACT = (data.emergencyContact ?? {}) as Partial<EmergencyContactData>;
+  const EDUCATION = data.education || [];
+  const EXPERIENCE = data.experience || [];
+  const CURRENT_USER = data.currentUser;
+  const BANK = data.bankAccounts?.[0];
+
+  // ─── Profile completion calculation ──────────────────────────────────────
+  const completionItems = [
+    { label: "Name", done: !!PROFILE.firstName, icon: User, section: "personal" },
+    { label: "Date of Birth", done: !!PROFILE.dateOfBirth, icon: Calendar, section: "personal" },
+    { label: "Gender", done: !!PROFILE.gender, icon: User, section: "personal" },
+    { label: "Phone", done: !!PROFILE.phone, icon: Phone, section: "personal" },
+    { label: "Email", done: !!PROFILE.personalEmail, icon: Mail, section: "personal" },
+    { label: "Current Address", done: !!ADDRESS.currentAddressLine1, icon: MapPin, section: "address" },
+    { label: "Permanent Address", done: !!ADDRESS.permanentAddressLine1, icon: MapPinned, section: "address" },
+    { label: "Emergency Contact", done: !!EMERGENCY_CONTACT.name, icon: Heart, section: "emergency" },
+    { label: "Education", done: EDUCATION.length > 0, icon: GraduationCap, section: "education" },
+    { label: "Documents", done: (data.documents || []).length > 0, icon: FileText, section: "documents" },
+    { label: "Aadhar", done: !!PROFILE.aadharNumber, icon: Shield, section: "personal" },
+    { label: "PAN", done: !!PROFILE.panNumber, icon: Shield, section: "personal" },
+  ];
+  const completedCount = completionItems.filter((i) => i.done).length;
+  const completionPct = Math.round((completedCount / completionItems.length) * 100);
+  const pendingItems = completionItems.filter((i) => !i.done);
 
   const fullName = PROFILE.firstName
     ? `${PROFILE.firstName} ${PROFILE.middleName || ""} ${PROFILE.lastName || ""}`.trim()
@@ -1303,12 +1291,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
 
   return (
     <>
-      <motion.div
-        key="overview"
-        variants={tabContentVariants}
-        initial="hidden"
-        animate="visible"
-        exit="exit"
+      <div
         className="space-y-6"
       >
         {/* ─── Row 1: Hero Banner + Profile Completion ──────────────────── */}
@@ -1734,7 +1717,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
                 />
                 {EDUCATION.length > 0 ? (
                   <div className="space-y-3">
-                    {EDUCATION.map((edu: any) => (
+                    {EDUCATION.map((edu: EducationItem) => (
                       <div
                         key={edu.id}
                         className="group relative flex items-start gap-3 p-4 rounded-2xl bg-gradient-to-br from-muted/20 to-transparent border border-border/30 hover:border-primary/15 transition-all duration-300"
@@ -1850,7 +1833,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
                     <div className="absolute left-[17px] top-5 bottom-5 w-px bg-gradient-to-b from-primary/20 via-border/20 to-transparent" />
 
                     <div className="space-y-3">
-                      {EXPERIENCE.map((exp: any) => (
+                      {EXPERIENCE.map((exp: ExperienceData) => (
                         <div key={exp.id} className="group relative flex items-start gap-3 pl-0.5">
                           {/* Timeline dot */}
                           <div className="flex-shrink-0 relative z-10 mt-1">
@@ -1961,11 +1944,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
                   badgeVariant="default"
                 />
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <InfoField icon={Building2} label="Bank" value={EMPLOYEE_PROFILE.bankName} />
-                  <InfoField icon={User} label="Holder" value={EMPLOYEE_PROFILE.accountHolderName} />
-                  <InfoField icon={Hash} label="Account" value={EMPLOYEE_PROFILE.accountNumber} mono masked />
-                  <InfoField icon={Hash} label="IFSC" value={EMPLOYEE_PROFILE.ifscCode} mono />
-                  <InfoField icon={MapPinned} label="Branch" value={EMPLOYEE_PROFILE.branchName} />
+                  <InfoField icon={Building2} label="Bank" value={BANK?.bankName} />
+                  <InfoField icon={User} label="Holder" value={BANK?.accountHolderName} />
+                  <InfoField icon={Hash} label="Account" value={BANK?.accountNumber} mono masked />
+                  <InfoField icon={Hash} label="IFSC" value={BANK?.ifscCode} mono />
+                  <InfoField icon={MapPinned} label="Branch" value={BANK?.branchName} />
                   {(EMPLOYEE_PROFILE.uanNumber || EMPLOYEE_PROFILE.pfNumber || EMPLOYEE_PROFILE.esicNumber) && (
                     <>
                       <InfoField icon={Shield} label="UAN" value={EMPLOYEE_PROFILE.uanNumber} mono masked />
@@ -2039,7 +2022,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
             </GlassCard>
           </SectionMotion>
         </div>
-      </motion.div>
+      </div>
 
       {/* ─── Edit Dialogs ─────────────────────────────────────────────────── */}
       {editPersonal && (

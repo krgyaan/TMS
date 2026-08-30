@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,25 +13,19 @@ import {
 import { Eye, EyeOff, Loader2, KeyRound } from "lucide-react";
 import { useChangePassword } from "@/hooks/api/useAuth";
 import { cn } from "@/lib/utils";
-
 interface ChangePasswordDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }
-
 export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({ open, onOpenChange }) => {
     const changePassword = useChangePassword();
-
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
-
     const [showCurrent, setShowCurrent] = useState(false);
     const [showNew, setShowNew] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
-
     const [error, setError] = useState<string | null>(null);
-
     const resetForm = () => {
         setCurrentPassword("");
         setNewPassword("");
@@ -42,26 +35,21 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({ open
         setShowConfirm(false);
         setError(null);
     };
-
     const handleClose = (next: boolean) => {
         if (!next) resetForm();
         onOpenChange(next);
     };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
-
         if (newPassword !== confirmPassword) {
             setError("New passwords do not match");
             return;
         }
-
         if (newPassword.length < 6) {
             setError("New password must be at least 6 characters long");
             return;
         }
-
         changePassword.mutate(
             { currentPassword, newPassword },
             {
@@ -75,7 +63,6 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({ open
             }
         );
     };
-
     return (
         <Dialog open={open} onOpenChange={handleClose}>
             <DialogContent className="sm:max-w-[420px]">
@@ -90,7 +77,6 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({ open
                         Verify your current password, then set a new one.
                     </DialogDescription>
                 </DialogHeader>
-
                 <form onSubmit={handleSubmit} className="grid gap-4">
                     <div className="grid gap-2">
                         <Label htmlFor="current-password">Current Password</Label>
@@ -113,7 +99,6 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({ open
                             </button>
                         </div>
                     </div>
-
                     <div className="grid gap-2">
                         <Label htmlFor="new-password">New Password</Label>
                         <div className="relative">
@@ -135,7 +120,6 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({ open
                             </button>
                         </div>
                     </div>
-
                     <div className="grid gap-2">
                         <Label htmlFor="confirm-password">Re-enter New Password</Label>
                         <div className="relative">
@@ -157,17 +141,13 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({ open
                             </button>
                         </div>
                     </div>
-
                     {error && (
-                        <motion.p
-                            initial={{ opacity: 0, y: -6 }}
-                            animate={{ opacity: 1, y: 0 }}
+                        <p
                             className={cn("text-sm text-destructive")}
                         >
                             {error}
-                        </motion.p>
+                        </p>
                     )}
-
                     <DialogFooter>
                         <Button
                             type="button"
