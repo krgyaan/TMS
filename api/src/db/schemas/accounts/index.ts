@@ -6,5 +6,9 @@ export * from "./loan-parties.relations";
 export * from "./imprest-categories.schema";
 export * from "./imprest-categories.relations";
 
+// Imprest Vouchers
+export * from "./employee-imprest-voucher";
+export * from "./employee-imprest-voucher-item.schema";
+
 // Insurance Policies
 export * from "./insurance-policy.schema";
