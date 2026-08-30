@@ -1,9 +1,3 @@
-// Companies
-export * from "./companies.schema";
-export * from "./companies.relations";
-export * from "./company-documents.schema";
-export * from "./company-documents.relations";
-
 // Organizations
 export * from "./organizations.schema";
 export * from "./organizations.relations";

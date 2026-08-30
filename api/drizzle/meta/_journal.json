@@ -421,6 +421,20 @@
                         "when":  1785781402867,
                         "tag":  "0103_add_amc_tables",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  84,
+                        "version":  "7",
+                        "when":  1788225100000,
+                        "tag":  "0127_add_path_to_company_documents",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  85,
+                        "version":  "7",
+                        "when":  1788080547911,
+                        "tag":  "0128_drop_companies_and_documents",
+                        "breakpoints":  true
                     }
                 ]
 }
