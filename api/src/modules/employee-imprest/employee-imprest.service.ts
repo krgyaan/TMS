@@ -459,6 +459,7 @@ export class EmployeeImprestService {
             }
             if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
             if (data.teamId !== undefined) updateData.teamId = data.teamId;
+            if (data.userId !== undefined) updateData.userId = data.userId;
             if (data.amount !== undefined) updateData.amount = data.amount;
             if (data.remark !== undefined) updateData.remark = data.remark;
 
