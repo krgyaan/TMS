@@ -409,7 +409,7 @@ export class InsurancePolicyService {
             .leftJoin(paymentRequests, eq(paymentRequests.id, insurancePolicies.paymentRequestId))
             .leftJoin(employeeImprests, eq(employeeImprests.id, insurancePolicies.imprestId))
             .leftJoin(users, eq(users.id, insurancePolicies.createdBy))
-            .where(or(eq(paymentRequests.projectId, projectId), sql`${employeeImprests.projectName} = ${project.projectName}`))
+            .where(or(eq(insurancePolicies.projectId, projectId), eq(paymentRequests.projectId, projectId), sql`${employeeImprests.projectName} = ${project.projectName}`))
             .orderBy(desc(insurancePolicies.createdAt));
 
         const now = new Date();
