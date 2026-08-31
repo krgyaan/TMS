@@ -11,10 +11,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBeneficiaries, useCreateBeneficiary, useCreatePaymentRequest, useNextPRNumber } from "@/hooks/api/useProjectPaymentRequests";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
-import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance";
+// import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance"; // WC_POLICY_LOCK: disabled
 import { zodResolver } from "@hookform/resolvers/zod";
 import { formatINR } from "@/hooks/useINRFormatter";
-import { AlertCircle, ArrowLeft, Building2, Hash, Loader2, ShieldCheck, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, Hash, Loader2, UserPlus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -50,7 +50,7 @@ export default function CreatePaymentRequestPage() {
     const vwoIdParam = searchParams.get("vwoId");
 
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
-    const { hasWC, isLoading: isWCLoading } = useHasWCInsurance(projectId);
+    // const { hasWC, isLoading: isWCLoading } = { hasWC: true, isLoading: false }; // WC_POLICY_LOCK: disabled
     const projectName = overview?.project?.projectName;
     const { data: nextPRNumber, isLoading: isLoadingPRNumber } = useNextPRNumber(projectName);
 
@@ -140,6 +140,7 @@ export default function CreatePaymentRequestPage() {
         );
     }
 
+    {/* WC_POLICY_LOCK: start — full-page WC block disabled
     if (!isWCLoading && !hasWC) {
         return (
             <div className="container mx-auto py-6 max-w-4xl">
@@ -176,6 +177,7 @@ export default function CreatePaymentRequestPage() {
             </div>
         );
     }
+    WC_POLICY_LOCK: end */}
 
     return (
         <Card>
