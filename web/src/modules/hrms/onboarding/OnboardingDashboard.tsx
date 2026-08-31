@@ -1,6 +1,5 @@
 import React, { useState, useDeferredValue, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -55,11 +54,7 @@ import {
   FileText,
   Download,
   ExternalLink,
-  ChevronRight,
   Activity,
-  ArrowUpRight,
-  Filter,
-  MoreHorizontal,
   DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -71,6 +66,54 @@ import {
 import { type OnboardingRequest } from "@/services/api/onboarding.service";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+type ProfileEducationItem = {
+  id: number;
+  degree: string;
+  institution: string;
+  fieldOfStudy?: string;
+  startDate?: string;
+  endDate?: string;
+  grade?: string;
+  status: string;
+  hrStatus?: "pending" | "approved" | "rejected";
+};
+
+type ProfileExperienceItem = {
+  id: number;
+  companyName: string;
+  designation: string;
+  fromDate: string;
+  toDate?: string;
+  currentlyWorking?: boolean;
+  responsibilities?: string;
+  status: string;
+  hrStatus?: "pending" | "approved" | "rejected";
+};
+
+type ProfileDocumentItem = {
+  id: number;
+  docType: string;
+  docCategory: string;
+  fileName?: string;
+  fileUrl?: string;
+  status: string;
+  hrStatus?: "pending" | "approved" | "rejected";
+  remarks?: string;
+  uploadedAt?: string;
+};
+
+type ProfileBankItem = {
+  id: number;
+  bankName: string;
+  accountHolderName: string;
+  accountNumber: string;
+  ifscCode: string;
+  branchName?: string;
+  isPrimary: boolean;
+  status: string;
+  hrStatus?: "pending" | "approved" | "rejected";
+};
 
 const formatDate = (dateStr: string): string =>
   new Date(dateStr).toLocaleDateString("en-GB", {
@@ -203,67 +246,6 @@ const HrStatusBadge: React.FC<{
   );
 };
 
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-
-interface StatCardProps {
-  label: string;
-  value: number;
-  icon: React.ElementType;
-  trend?: string;
-  accentClass: string;
-  onClick?: () => void;
-  active?: boolean;
-}
-
-const StatCard: React.FC<StatCardProps> = ({
-  label,
-  value,
-  icon: Icon,
-  trend,
-  accentClass,
-  onClick,
-  active,
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={cn(
-      "relative overflow-hidden rounded-2xl border p-5 text-left transition-all duration-200",
-      "hover:shadow-md hover:-translate-y-0.5",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-      active
-        ? "border-primary/30 bg-primary/[0.03] shadow-sm ring-1 ring-primary/10"
-        : "border-border/60 bg-card hover:border-border"
-    )}
-  >
-    <div className="flex items-start justify-between">
-      <div className="space-y-3">
-        <p className="text-sm font-medium text-muted-foreground">{label}</p>
-        <div className="flex items-baseline gap-2">
-          <p className="text-3xl font-bold tracking-tight">{value}</p>
-          {trend && (
-            <span className="flex items-center gap-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-              <ArrowUpRight className="h-3 w-3" />
-              {trend}
-            </span>
-          )}
-        </div>
-      </div>
-      <div
-        className={cn(
-          "flex h-11 w-11 items-center justify-center rounded-xl",
-          accentClass
-        )}
-      >
-        <Icon className="h-5 w-5" />
-      </div>
-    </div>
-    {active && (
-      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-    )}
-  </button>
-);
-
 // ─── Progress Bar ─────────────────────────────────────────────────────────────
 
 const ProgressIndicator: React.FC<{ value: number; className?: string }> = ({ value, className,}) => (
@@ -326,8 +308,8 @@ const JoineeCard: React.FC<JoineeCardProps> = ({
           {/* Top row: avatar, name, status */}
           <div className="flex items-start gap-4">
             <Avatar className="h-12 w-12 rounded-xl flex-shrink-0 ring-1 ring-border/50">
-              {(joinee as any).profilePhoto && (
-                <AvatarImage src={(joinee as any).profilePhoto} alt={joinee.name} className="object-cover" />
+              {joinee.profilePhoto && (
+                <AvatarImage src={joinee.profilePhoto} alt={joinee.name} className="object-cover" />
               )}
               <AvatarFallback
                 className={cn(
@@ -544,7 +526,7 @@ const EmptyState: React.FC<{
 // ─── Data Item ────────────────────────────────────────────────────────────────
 
 const DataItem: React.FC<{
-  icon: any;
+  icon: React.ElementType;
   label: string;
   value: React.ReactNode;
 }> = ({ icon: Icon, label, value }) => (
@@ -656,7 +638,7 @@ const ViewModal: React.FC<{
   if (!joinee) return null;
   const isPending = joinee.status === "pending";
 
-  const renderAddress = (addr: any) => {
+  const renderAddress = (addr: Record<string, string | undefined> | null | undefined) => {
     if (!addr || Object.keys(addr).length === 0) return null;
     const parts = [
       addr.line1,
@@ -676,8 +658,8 @@ const ViewModal: React.FC<{
         <DialogHeader className="px-8 py-3 border-b">
           <div className="flex items-center gap-5">
             <Avatar className="h-14 w-14 rounded-2xl ring-2 ring-border/50">
-              {(joinee as any).profilePhoto && (
-                <AvatarImage src={(joinee as any).profilePhoto} alt={joinee.name} className="object-cover" />
+              {joinee.profilePhoto && (
+                <AvatarImage src={joinee.profilePhoto} alt={joinee.name} className="object-cover" />
               )}
               <AvatarFallback
                 className={cn(
@@ -960,9 +942,9 @@ const ViewModal: React.FC<{
                         title="Education"
                         count={profile?.education?.length}
                       />
-                      {profile?.education?.length > 0 ? (
+                      {(profile?.education?.length ?? 0) > 0 ? (
                         <div className="space-y-3">
-                          {profile.education.map((edu: any) => (
+                          {profile?.education?.map((edu: ProfileEducationItem) => (
                             <div
                               key={edu.id}
                               className="p-4 rounded-xl border bg-card"
@@ -1028,9 +1010,9 @@ const ViewModal: React.FC<{
                         title="Work Experience"
                         count={profile?.experience?.length}
                       />
-                      {profile?.experience?.length > 0 ? (
+                      {(profile?.experience?.length ?? 0) > 0 ? (
                         <div className="space-y-3">
-                          {profile.experience.map((exp: any) => (
+                          {profile?.experience?.map((exp: ProfileExperienceItem) => (
                             <div
                               key={exp.id}
                               className="p-4 rounded-xl border bg-card"
@@ -1215,9 +1197,9 @@ const ViewModal: React.FC<{
                         title="Documents"
                         count={profile?.documents?.length}
                       />
-                      {profile?.documents?.length > 0 ? (
+                      {(profile?.documents?.length ?? 0) > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {profile.documents.map((doc: any) => (
+                          {profile?.documents?.map((doc: ProfileDocumentItem) => (
                             <div
                               key={doc.id}
                               className="flex items-center gap-3 p-4 rounded-xl border bg-card hover:border-primary/20 transition-colors"
@@ -1281,7 +1263,7 @@ const ViewModal: React.FC<{
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           const link = document.createElement("a");
-                                          link.href = doc.fileUrl;
+                                          link.href = doc.fileUrl ?? "";
                                           link.download =
                                             doc.fileName || "document";
                                           link.click();
@@ -1315,9 +1297,9 @@ const ViewModal: React.FC<{
                         title="Bank Details"
                         count={profile?.bankDetails?.length}
                       />
-                      {profile?.bankDetails?.length > 0 ? (
+                      {(profile?.bankDetails?.length ?? 0) > 0 ? (
                         <div className="space-y-3">
-                          {profile.bankDetails.map((bank: any) => (
+                          {profile?.bankDetails?.map((bank: ProfileBankItem) => (
                             <div
                               key={bank.id}
                               className="p-4 rounded-xl border bg-card"
@@ -1618,18 +1600,16 @@ const OnboardingDashboard: React.FC = () => {
   );
 
   const filtered = useMemo(() => {
-    return joinees
-      .filter((j) => {
-        const matchesTab = activeTab === "all" || j.status === activeTab;
-        const q = deferredSearch.toLowerCase();
-        const matchesSearch =
-          !q ||
-          j.name.toLowerCase().includes(q) ||
-          j.email.toLowerCase().includes(q) ||
-          j.phone?.toLowerCase().includes(q);
-        return matchesTab && matchesSearch;
-      })
-      .sort((a, b) => (b.employeeProgress ?? 0) - (a.employeeProgress ?? 0));
+    return joinees.filter((j) => {
+      const matchesTab = activeTab === "all" || j.status === activeTab;
+      const q = deferredSearch.toLowerCase();
+      const matchesSearch =
+        !q ||
+        j.name.toLowerCase().includes(q) ||
+        j.email.toLowerCase().includes(q) ||
+        j.phone?.toLowerCase().includes(q);
+      return matchesTab && matchesSearch;
+    });
   }, [joinees, activeTab, deferredSearch]);
 
   const openView = (j: OnboardingRequest) => {
@@ -1739,43 +1719,6 @@ const OnboardingDashboard: React.FC = () => {
             <Plus className="h-4 w-4" />
             Add New Hire
           </Button>
-        </div>
-
-        {/* Stats Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            label="Total Joiners"
-            value={stats.total}
-            icon={Users}
-            accentClass="bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400"
-            onClick={() => setActiveTab("all")}
-            active={activeTab === "all"}
-          />
-          <StatCard
-            label="Pending Review"
-            value={stats.pending}
-            icon={Clock}
-            accentClass="bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400"
-            onClick={() => setActiveTab("pending")}
-            active={activeTab === "pending"}
-            trend={stats.pending > 0 ? "Action needed" : undefined}
-          />
-          <StatCard
-            label="Approved"
-            value={stats.approved}
-            icon={CheckCircle2}
-            accentClass="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"
-            onClick={() => setActiveTab("approved")}
-            active={activeTab === "approved"}
-          />
-          <StatCard
-            label="Rejected"
-            value={stats.rejected}
-            icon={XCircle}
-            accentClass="bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400"
-            onClick={() => setActiveTab("rejected")}
-            active={activeTab === "rejected"}
-          />
         </div>
 
         {/* Filters Bar */}
