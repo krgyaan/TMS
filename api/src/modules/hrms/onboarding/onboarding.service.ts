@@ -628,125 +628,26 @@ export class OnboardingService {
         return [];
       }
 
-      const requestIds = rows.map((r) => r.id);
-      const userIds = rows.map((r) => r.userId).filter(Boolean) as number[];
-
-      const [profiles, documents, education, experience, bankDetails, induction, oauthAccs] = await Promise.all([
-        this.db.select().from(onboardingProfiles).where(inArray(onboardingProfiles.onboardingId, requestIds)),
-        this.db.select().from(onboardingDocuments).where(inArray(onboardingDocuments.onboardingId, requestIds)),
-        this.db.select().from(onboardingEducation).where(inArray(onboardingEducation.onboardingId, requestIds)),
-        this.db.select().from(onboardingExperience).where(inArray(onboardingExperience.onboardingId, requestIds)),
-        this.db.select().from(onboardingBankDetails).where(inArray(onboardingBankDetails.onboardingId, requestIds)),
-        this.db.select().from(onboardingInduction).where(inArray(onboardingInduction.onboardingId, requestIds)),
-        userIds.length > 0 ? this.db.select().from(oauthAccounts).where(inArray(oauthAccounts.userId, userIds)) : Promise.resolve([] as any[]),
-      ]);
-
-
-      const calculateHrStatus = (items: any[]) => {
-        if (!items || items.length === 0) return 'pending';
-        if (items.some((i) => i.hrStatus === 'rejected')) return 'rejected';
-        if (items.every((i) => i.hrStatus === 'approved')) return 'approved';
-        return 'pending';
-      };
-
-      const calculateHrRate = (items: any[]) => {
-        if (!items || items.length === 0) return { text: '0/0', percentage: 0 };
-        const approvedCount = items.filter((i) => i.hrStatus === 'approved').length;
-        const totalPercentage = Math.round((approvedCount / items.length) * 100);
-        return { text: `${approvedCount}/${items.length}`, percentage: totalPercentage };
-      };
-
-      // Induction uses 'status' instead of 'hrStatus'
-      const calculateInductionHrStatus = (items: any[]) => {
-        if (!items || items.length === 0) return 'pending';
-        if (items.every((i) => i.status === 'completed')) return 'approved';
-        return 'pending';
-      };
-
-      const calculateInductionRate = (items: any[]) => {
-        if (!items || items.length === 0) return { text: '0/0', percentage: 0 };
-        const completedCount = items.filter((i) => i.status === 'completed').length;
-        const totalPercentage = Math.round((completedCount / items.length) * 100);
-        return { text: `${completedCount}/${items.length}`, percentage: totalPercentage };
-      };
-
-      const enrichedRows = rows.map((row) => {
-        // 1. Filter child items for this row
-        const rowProfile = profiles.find((p) => p.onboardingId === row.id) || null;
-        const rowDocs = documents.filter((d) => d.onboardingId === row.id);
-        const rowEdu = education.filter((e) => e.onboardingId === row.id);
-        const rowExp = experience.filter((e) => e.onboardingId === row.id);
-        const rowBank = bankDetails.filter((b) => b.onboardingId === row.id);
-        const rowInduction = induction.filter((i) => i.onboardingId === row.id);
-
-        // 2. Employee Progress %
-        // We look at the 5 main statuses tracked on the base request
+      const result = rows.map((row) => {
         const statuses = [
           row.profileStatus,
           row.documentStatus,
           row.educationStatus,
           row.experienceStatus,
           row.bankStatus,
-          // row.inductionStatus,
         ];
-
         const submittedCount = statuses.filter((s) => s == 'submitted').length;
-        const employeeProgressPercent = Math.round((submittedCount / statuses.length) * 100);
-
-        // 3. HR Progress Calculations
-        let profileHrStatus = 'pending';
-        let profileHrRate = { text: '0/0', percentage: 0 };
-        if (rowProfile) {
-          if (rowProfile.hrStatus === 'rejected') profileHrStatus = 'rejected';
-          else if (rowProfile.hrStatus === 'approved') {
-            profileHrStatus = 'approved';
-            profileHrRate = { text: '1/1', percentage: 100 };
-          } else {
-            profileHrRate = { text: '0/1', percentage: 0 };
-          }
-        }
-
-        const oauthPhoto = oauthAccs.find((o) => o.userId === row.userId)?.avatar;
-        const docProfilePhoto = rowDocs.find((d) => d.docType === 'Passport Size Photo')?.fileUrl;
-        const profilePhoto = docProfilePhoto || oauthPhoto || null;
+        const employeeProgress = Math.round((submittedCount / statuses.length) * 100);
+        const progress = row.progress === 'pending' || !row.progress ? 0 : Number(row.progress) || 0;
 
         return {
           ...row,
-          progress: row.progress === 'pending' || !row.progress ? 0 : Number(row.progress) || 0,
-          employeeProgress: employeeProgressPercent,
-          profilePhoto : profilePhoto,
-
-          // The raw arrays/objects so the frontend can display remarks/details
-          profile: rowProfile,
-          documents: rowDocs,
-          education: rowEdu,
-          experience: rowExp,
-          bankDetails: rowBank,
-          // induction: rowInduction,
-
-          // Aggregated top-level statuses (rejected if one rejected, etc.)
-          hrStatuses: {
-            profile: profileHrStatus,
-            documents: calculateHrStatus(rowDocs),
-            education: calculateHrStatus(rowEdu),
-            experience: calculateHrStatus(rowExp),
-            bankDetails: calculateHrStatus(rowBank),
-            induction: calculateInductionHrStatus(rowInduction),
-          },
-
-          // HR Approval fractions & percentages
-          hrRates: {
-            profile: profileHrRate,
-            documents: calculateHrRate(rowDocs),
-            education: calculateHrRate(rowEdu),
-            experience: calculateHrRate(rowExp),
-            bankDetails: calculateHrRate(rowBank),
-            induction: calculateInductionRate(rowInduction),
-          },
+          progress,
+          employeeProgress,
         };
       });
 
-      return enrichedRows;
+      return result;
     } catch (err) {
       this.logger.error('OnboardingService.findAll failed', { err });
       throw err;
