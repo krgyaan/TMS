@@ -8,11 +8,34 @@ import { VideoProcessingWorkerModule } from "./modules/hrms/training/worker/vide
 import { GenericMailWorkerModule } from "./modules/scheduler/generic-mail-worker.module";
 
 async function bootstrap() {
-    await NestFactory.createApplicationContext(FollowupWorkerModule);
-    await NestFactory.createApplicationContext(AccountChecklistWorkerModule);
-    await NestFactory.createApplicationContext(VideoProcessingWorkerModule);
-    await NestFactory.createApplicationContext(GenericMailWorkerModule);
-    console.log("✅ Workers started");
-}
-bootstrap();
+    const workers = [
+        { name: "Followup", module: FollowupWorkerModule },
+        { name: "AccountChecklist", module: AccountChecklistWorkerModule },
+        { name: "VideoProcessing", module: VideoProcessingWorkerModule },
+        { name: "GenericMail", module: GenericMailWorkerModule },
+    ];
 
+    const started: string[] = [];
+    const failed: { name: string; error: string }[] = [];
+
+    for (const { name, module } of workers) {
+        try {
+            await NestFactory.createApplicationContext(module);
+            started.push(name);
+            console.log(`${name} worker context started`);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`${name} worker context FAILED to start: ${message}`);
+            failed.push({ name, error: message });
+        }
+    }
+
+    if (failed.length > 0) {
+        console.error("Some workers failed to start:", JSON.stringify(failed, null, 2));
+        process.exitCode = 1;
+        return;
+    }
+    console.log("All workers started");
+}
+
+void bootstrap();
