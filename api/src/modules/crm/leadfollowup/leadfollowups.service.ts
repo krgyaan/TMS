@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, Inject, BadRequestException } from '@nes
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { leadFollowups, type NewLeadFollowup } from '@db/schemas/crm/lead-followups.schema';
-import { leadContacts } from '@db/schemas/crm/lead-contacts.schema';
+import { leadContacts, type NewLeadContact } from '@db/schemas/crm/lead-contacts.schema';
 import { couriers } from '@db/schemas/shared/couriers.schema';
 import { leads } from '@db/schemas/crm/leads.schema';
 import { happyCalling } from '@db/schemas/crm/happy-calling.schema';
@@ -263,7 +263,7 @@ export class LeadFollowupsService {
                     ? 'call_followup'
                     : 'visit_followup';
 
-                const contactsPayload = (data as CallFollowupDto | VisitFollowupDto)
+                const contactsPayload: NewLeadContact[] = (data as CallFollowupDto | VisitFollowupDto)
                     .contacts
                     .map((contact: ContactDto) => ({
                         ...(sourceType === 'happy_calling' || sourceType === 'enquiry'
@@ -274,7 +274,7 @@ export class LeadFollowupsService {
                         designation: contact.designation ?? null,
                         phone: contact.phone ?? null,
                         email: contact.email ?? null,
-                        source: contactSource as 'call_followup' | 'visit_followup',
+                        source: contactSource,
                     }));
 
                 await tx.insert(leadContacts).values(contactsPayload);
@@ -441,7 +441,7 @@ export class LeadFollowupsService {
                 // Insert new contacts
                 if ((data as CallFollowupDto | VisitFollowupDto).contacts.length > 0) {
                     const contactSource = data.type === 'call' ? 'call_followup' : 'visit_followup';
-                    const contactsPayload = (data as CallFollowupDto | VisitFollowupDto)
+                    const contactsPayload: NewLeadContact[] = (data as CallFollowupDto | VisitFollowupDto)
                         .contacts
                         .map((contact: ContactDto) => ({
                             leadId: updatedFollowup.leadId ?? null,
@@ -450,7 +450,7 @@ export class LeadFollowupsService {
                             designation: contact.designation ?? null,
                             phone: contact.phone ?? null,
                             email: contact.email ?? null,
-                            source: contactSource as 'call_followup' | 'visit_followup',
+                            source: contactSource,
                         }));
 
                     await tx.insert(leadContacts).values(contactsPayload);

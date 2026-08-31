@@ -1,18 +1,16 @@
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { FileUploader } from "@/components/file-upload";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -20,74 +18,67 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  MessageSquare,
-  Plus,
-  Search,
-  Filter,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  XCircle,
-  ArrowUpRight,
-  ChevronRight,
-  CalendarDays,
-  Hash,
-  User,
-  Building2,
-  Shield,
-  AlertTriangle,
-  Flame,
-  Info,
-  Send,
-  Paperclip,
-  ImageIcon,
-  FileText,
-  Eye,
-  MapPin,
-  Users,
-  Lightbulb,
-  History,
-  ChevronDown,
-  ChevronUp,
-  RotateCcw,
-  Sparkles,
-  Megaphone,
-  Scale,
-  Wallet,
-  Calendar,
-  Wrench,
-  Monitor,
-  UserX,
-  BookOpen,
-  ShieldAlert,
-  HelpCircle,
-  Loader2,
-} from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowUpRight,
+  BookOpen,
+  Calendar,
+  CalendarDays,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Clock,
+  Eye,
+  FileText,
+  Filter,
+  Flame,
+  HelpCircle,
+  History,
+  ImageIcon,
+  Info,
+  Lightbulb,
+  Loader2,
+  MapPin,
+  Megaphone,
+  MessageSquare,
+  Monitor,
+  Paperclip,
+  Plus,
+  RotateCcw,
+  Scale,
+  Search,
+  Send,
+  Shield,
+  ShieldAlert,
+  Sparkles,
+  User,
+  Users,
+  UserX,
+  Wallet,
+  Wrench,
+  XCircle,
+} from "lucide-react";
+import React, { useState } from "react";
 import { useProfileContext } from "../contexts/ProfileContext";
+import type { ComplaintData } from "../types";
 import { formatDate } from "../utils";
-import { staggerContainer, fadeInUp, tabContentVariants } from "../animations";
-import { FileUploader } from "@/components/file-upload";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
-interface Complaint {
-  id: string;
-  complaintCode: string;
-  subject: string;
-  complaintType: string;
-  complaintAgainst: string;
+interface Complaint extends ComplaintData {
+  complaintType?: string;
+  complaintAgainst?: string;
   complaintAgainstName?: string;
-  priority: "low" | "medium" | "high" | "critical";
-  status: "open" | "in_progress" | "resolved" | "closed" | "rejected";
-  description: string;
+  description?: string;
   incidentDate?: string;
   incidentLocation?: string;
   witnesses?: string;
   previousAttempts?: string;
   expectedResolution?: string;
-  createdAt: string;
   updatedAt?: string;
   resolvedAt?: string;
   attachments?: { name: string; size: string; type: string }[];
@@ -238,7 +229,7 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
 
   const totalSteps = 3;
 
-  const updateForm = (field: keyof ComplaintFormData, value: any) => {
+    const updateForm = (field: keyof ComplaintFormData, value: ComplaintFormData[keyof ComplaintFormData]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -331,15 +322,15 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
 
         {/* Form Content */}
         <div className="flex-1 overflow-y-auto px-6 pb-6">
-          <AnimatePresence mode="wait">
+          
             {/* ── STEP 1: Classification ──────────────────────────────── */}
             {step === 1 && (
-              <motion.div
+              <div
                 key="step-1"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
+                
+                
+                
+                
                 className="space-y-5"
               >
                 {/* Complainant Info (Auto-filled) */}
@@ -349,13 +340,13 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
                     Complainant Details (Auto-filled)
                   </p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {[
-                      { label: "Name", value: data?.employee?.firstName + " " + (data?.employee?.lastName || "") },
-                      { label: "Employee ID", value: data?.employee?.employeeId || "—" },
-                      { label: "Department", value: data?.employee?.department || "—" },
-                      { label: "Designation", value: data?.employee?.designation || "—" },
-                      { label: "Email", value: data?.employee?.email || "—" },
-                      { label: "Phone", value: data?.employee?.phone || "—" },
+                                        {[
+                      { label: "Name", value: (user?.name) || "—" },
+                      { label: "Employee ID", value: user?.username || "—" },
+                      { label: "Department", value: empProfile?.department || "—" },
+                      { label: "Designation", value: empProfile?.designation || "—" },
+                      { label: "Email", value: user?.email || "—" },
+                      { label: "Phone", value: user?.mobile || "—" },
                     ].map((item) => (
                       <div key={item.label}>
                         <p className="text-[9px] uppercase tracking-wider text-muted-foreground/60 font-semibold">
@@ -479,10 +470,10 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
                 {/* Complaint Against Name (conditional) */}
                 {(form.complaintAgainst === "person" ||
                   form.complaintAgainst === "department") && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
+                  <div
+                    
+                    
+                    
                     className="space-y-2"
                   >
                     <Label className="text-xs font-semibold text-muted-foreground">
@@ -502,7 +493,7 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
                       }
                       className="h-11 rounded-xl border-border/50 bg-muted/20 focus:bg-background text-sm"
                     />
-                  </motion.div>
+                  </div>
                 )}
 
                 {/* Incident Date + Location */}
@@ -532,17 +523,17 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
                     />
                   </div>
                 </div>
-              </motion.div>
+              </div>
             )}
 
             {/* ── STEP 2: Details ─────────────────────────────────────── */}
             {step === 2 && (
-              <motion.div
+              <div
                 key="step-2"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
+                
+                
+                
+                
                 className="space-y-5"
               >
                 {/* Summary of Step 1 */}
@@ -626,17 +617,17 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
                     className="min-h-[80px] rounded-xl border-border/50 bg-muted/20 focus:bg-background text-sm resize-none"
                   />
                 </div>
-              </motion.div>
+              </div>
             )}
 
             {/* ── STEP 3: Evidence & Submit ───────────────────────────── */}
             {step === 3 && (
-              <motion.div
+              <div
                 key="step-3"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
+                
+                
+                
+                
                 className="space-y-5"
               >
                 {/* Supporting Documents */}
@@ -717,9 +708,9 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
                     </p>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
+          
         </div>
 
         {/* Footer Actions */}
@@ -796,10 +787,10 @@ const ComplaintDetailDialog: React.FC<ComplaintDetailDialogProps> = ({
 
   if (!c) return null;
 
-  const statusConfig = STATUS_CONFIG[c.status] || STATUS_CONFIG.open;
+  const statusConfig = STATUS_CONFIG[c.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.open;
   const StatusIcon = statusConfig.icon;
   const priorityConfig =
-    PRIORITY_CONFIG[c.priority] || PRIORITY_CONFIG.medium;
+    PRIORITY_CONFIG[c.priority as keyof typeof PRIORITY_CONFIG] || PRIORITY_CONFIG.medium;
   const PriorityIcon = priorityConfig.icon;
   const typeConfig = COMPLAINT_TYPES.find((t) => t.value === c.complaintType);
   const TypeIcon = typeConfig?.icon || HelpCircle;
@@ -1044,12 +1035,12 @@ const ComplaintDetailDialog: React.FC<ComplaintDetailDialogProps> = ({
                 )}
               </button>
 
-              <AnimatePresence>
+              
                 {showTimeline && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
+                  <div
+                    
+                    
+                    
                     className="overflow-hidden"
                   >
                     <div className="relative pl-6 space-y-4">
@@ -1083,9 +1074,9 @@ const ComplaintDetailDialog: React.FC<ComplaintDetailDialogProps> = ({
                         </div>
                       ))}
                     </div>
-                  </motion.div>
+                  </div>
                 )}
-              </AnimatePresence>
+              
             </div>
           )}
         </div>
@@ -1098,29 +1089,26 @@ const ComplaintDetailDialog: React.FC<ComplaintDetailDialogProps> = ({
 
 interface ComplaintCardProps {
   complaint: Complaint;
-  index: number;
   onClick: (c: Complaint) => void;
 }
 
 const ComplaintCard: React.FC<ComplaintCardProps> = ({
   complaint: c,
-  index,
   onClick,
 }) => {
-  const statusConfig = STATUS_CONFIG[c.status] || STATUS_CONFIG.open;
-  const StatusIcon = statusConfig.icon;
+  const statusConfig = STATUS_CONFIG[c.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.open;
   const priorityConfig =
-    PRIORITY_CONFIG[c.priority] || PRIORITY_CONFIG.medium;
+    PRIORITY_CONFIG[c.priority as keyof typeof PRIORITY_CONFIG] || PRIORITY_CONFIG.medium;
   const PriorityIcon = priorityConfig.icon;
   const typeConfig = COMPLAINT_TYPES.find((t) => t.value === c.complaintType);
   const TypeIcon = typeConfig?.icon || MessageSquare;
 
   return (
-    <motion.div
-      variants={fadeInUp}
-      custom={index}
-      whileHover={{ x: 4 }}
-      transition={{ duration: 0.2 }}
+    <div
+      
+      
+      
+      
     >
       <Card
         className="border-border/40 shadow-lg shadow-black/[0.03] hover:shadow-xl hover:shadow-primary/[0.06] hover:border-primary/15 hover:bg-muted/30 transition-all duration-400 group bg-muted/20 backdrop-blur-sm cursor-pointer"
@@ -1209,7 +1197,7 @@ const ComplaintCard: React.FC<ComplaintCardProps> = ({
           </div>
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 };
 
@@ -1262,50 +1250,46 @@ export const ComplaintsSection: React.FC = () => {
   // ─── EMPTY STATE ────────────────────────────────────────────────────────
   if (COMPLAINTS.length === 0) {
     return (
-      <motion.div
+      <div
         key="complaints"
-        variants={tabContentVariants}
-        initial="hidden"
-        animate="visible"
-        exit="exit"
+        
+        
+        
+        
       >
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          animate="show"
+        <div
+          
+          
+          
           className="space-y-6"
         >
-          <motion.div variants={fadeInUp}>
+          <div >
             <Card className="border-dashed border-2 border-border/30 bg-muted/10 backdrop-blur-sm">
               <CardContent className="py-20 px-6">
                 <div className="text-center max-w-sm mx-auto">
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{
-                      delay: 0.2,
-                      type: "spring",
-                      stiffness: 200,
-                    }}
+                  <div
+                    
+                    
+                    
                     className="relative w-20 h-20 mx-auto mb-6"
                   >
                     <div className="absolute inset-0 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
                       <CheckCircle2 className="h-10 w-10 text-emerald-500/40" />
                     </div>
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.4, type: "spring" }}
+                    <div
+                      
+                      
+                      
                       className="absolute -top-1 -right-1 h-7 w-7 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30"
                     >
                       <Sparkles className="h-3.5 w-3.5 text-white" />
-                    </motion.div>
-                  </motion.div>
+                    </div>
+                  </div>
 
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
+                  <div
+                    
+                    
+                    
                   >
                     <h3 className="text-lg font-bold mb-2">
                       No Complaints Filed
@@ -1317,12 +1301,12 @@ export const ComplaintsSection: React.FC = () => {
                       If you're facing any issues at work, feel free to raise a
                       complaint. All submissions are handled confidentially.
                     </p>
-                  </motion.div>
+                  </div>
 
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
+                  <div
+                    
+                    
+                    
                   >
                     <Button
                       className="gap-2 rounded-xl font-semibold shadow-lg shadow-primary/20 h-11 px-6"
@@ -1331,12 +1315,12 @@ export const ComplaintsSection: React.FC = () => {
                       <Plus className="h-4 w-4" />
                       Raise a Complaint
                     </Button>
-                  </motion.div>
+                  </div>
 
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5 }}
+                  <div
+                    
+                    
+                    
                     className="mt-6 p-4 rounded-2xl bg-muted/20 border border-border/20"
                   >
                     <div className="flex items-center gap-3 justify-center">
@@ -1348,39 +1332,39 @@ export const ComplaintsSection: React.FC = () => {
                         and handled by authorized HR personnel only.
                       </p>
                     </div>
-                  </motion.div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
 
         <RaiseComplaintDialog
           open={raiseDialogOpen}
           onOpenChange={setRaiseDialogOpen}
         />
-      </motion.div>
+      </div>
     );
   }
 
   // ─── MAIN RENDER ────────────────────────────────────────────────────────
   return (
-    <motion.div
+    <div
       key="complaints"
-      variants={tabContentVariants}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
+      
+      
+      
+      
     >
-      <motion.div
-        variants={staggerContainer}
-        initial="hidden"
-        animate="show"
+      <div
+        
+        
+        
         className="space-y-6"
       >
         {/* ── Stats Grid ──────────────────────────────────────────────── */}
-        <motion.div
-          variants={fadeInUp}
+        <div
+          
           className="grid grid-cols-2 sm:grid-cols-4 gap-3"
         >
           {[
@@ -1434,14 +1418,14 @@ export const ComplaintsSection: React.FC = () => {
                   <stat.icon className={cn("h-4.5 w-4.5", stat.color)} />
                 </div>
                 <div>
-                  <motion.p
+                  <p
                     className="text-xl font-black tracking-tight"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
+                    
+                    
+                    
                   >
                     {stat.value}
-                  </motion.p>
+                  </p>
                   <p className="text-[9px] uppercase tracking-[0.1em] text-muted-foreground font-semibold leading-tight">
                     {stat.label}
                   </p>
@@ -1449,10 +1433,10 @@ export const ComplaintsSection: React.FC = () => {
               </CardContent>
             </Card>
           ))}
-        </motion.div>
+        </div>
 
         {/* ── Search + Filters + Raise Button ─────────────────────────── */}
-        <motion.div variants={fadeInUp} className="space-y-3">
+        <div  className="space-y-3">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
@@ -1525,33 +1509,32 @@ export const ComplaintsSection: React.FC = () => {
               </Button>
             ))}
           </div>
-        </motion.div>
+        </div>
 
         {/* ── Complaints List ─────────────────────────────────────────── */}
-        <AnimatePresence mode="wait">
+        
           {filtered.length > 0 ? (
-            <motion.div
+            <div
               key="complaints-list"
-              variants={staggerContainer}
-              initial="hidden"
-              animate="show"
+              
+              
+              
               className="space-y-3"
             >
-              {filtered.map((c, index) => (
+                            {filtered.map((c) => (
                 <ComplaintCard
                   key={c.id}
                   complaint={c}
-                  index={index}
                   onClick={handleComplaintClick}
                 />
               ))}
-            </motion.div>
+            </div>
           ) : (
-            <motion.div
+            <div
               key="no-results"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
+              
+              
+              
             >
               <Card className="border-dashed border-2 border-border/30 bg-muted/10">
                 <CardContent className="p-12 text-center">
@@ -1578,12 +1561,12 @@ export const ComplaintsSection: React.FC = () => {
                   </Button>
                 </CardContent>
               </Card>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        
 
         {/* ── Raise Complaint CTA ─────────────────────────────────────── */}
-        <motion.div variants={fadeInUp}>
+        <div >
           <Card
             className="border-dashed border-2 border-border/30 bg-muted/5 hover:border-primary/20 hover:bg-primary/[0.02] transition-all duration-300 cursor-pointer group"
             onClick={() => setRaiseDialogOpen(true)}
@@ -1607,8 +1590,8 @@ export const ComplaintsSection: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
 
       {/* ── Dialogs ─────────────────────────────────────────────────── */}
       <RaiseComplaintDialog
@@ -1620,6 +1603,6 @@ export const ComplaintsSection: React.FC = () => {
         onOpenChange={setDetailDialogOpen}
         complaint={selectedComplaint}
       />
-    </motion.div>
+    </div>
   );
 };

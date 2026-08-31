@@ -55,7 +55,7 @@ import {
 } from "./useOnboarding";
 
 import AvatarComponent from "./components/AvatarComponent";
-import { formatDate } from "./components/helpers";
+import { formatDate } from "./helpers/onboarding.type";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type StageKey = "profile" | "education" | "experience" | "documents" | "bankDetails";

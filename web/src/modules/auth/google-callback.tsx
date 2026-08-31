@@ -29,6 +29,8 @@ const GoogleLoginCallback = () => {
             const state = params.get("state");
             const errorParam = params.get("error");
             const successParam = params.get("success");
+            const errorCodeParam = params.get("errorCode");
+            const emailParam = params.get("email");
             const redirectTo = sessionStorage.getItem("auth_redirect") || "/";
 
             console.log("🔍 Google Callback - Processing...");
@@ -37,8 +39,17 @@ const GoogleLoginCallback = () => {
             // Handle error from Google or backend
             if (errorParam) {
                 console.error("❌ Google OAuth error:", errorParam);
-                setError(`Google sign-in failed: ${errorParam}`);
                 setMessage("");
+
+                if (errorCodeParam === "NO_ACCOUNT_FOUND") {
+                    const email = emailParam ?? "";
+                    const signupUrl = email ? `/sign-up?email=${encodeURIComponent(email)}` : "/sign-up";
+                    toast.info("No account found. Please register first.");
+                    setTimeout(() => navigate(signupUrl, { replace: true }), 500);
+                    return;
+                }
+
+                setError(`Google sign-in failed: ${errorParam}`);
                 clearAuthSession();
                 toast.error(`Google sign-in failed: ${errorParam}`);
                 setTimeout(() => navigate(redirectTo, { replace: true }), 2000);
@@ -115,6 +126,20 @@ const GoogleLoginCallback = () => {
 
             } catch (err) {
                 console.error("❌ Google callback failed:", err);
+
+                const errorData =
+                    err && typeof err === "object" && "response" in err
+                        ? (err as { response?: { data?: { errorCode?: string; email?: string } } }).response?.data
+                        : undefined;
+                if (errorData?.errorCode === "NO_ACCOUNT_FOUND") {
+                    const email = errorData?.email ?? "";
+                    const signupUrl = email ? `/sign-up?email=${encodeURIComponent(email)}` : "/sign-up";
+                    setMessage("");
+                    clearAuthSession();
+                    toast.info("No account found. Please register first.");
+                    setTimeout(() => navigate(signupUrl, { replace: true }), 500);
+                    return;
+                }
 
                 const errorMessage = err instanceof Error
                     ? err.message
