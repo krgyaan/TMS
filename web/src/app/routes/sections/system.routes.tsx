@@ -7,7 +7,7 @@ const SystemHealth = lazy(() => import('@/modules/system-health'));
 export default function SystemRoutes() {
     return (
         <Routes>
-            <Route path="health" element={<RouteWrapper><SystemHealth /></RouteWrapper>} />
+            <Route path="/" element={<RouteWrapper><SystemHealth /></RouteWrapper>} />
         </Routes>
     );
 }
