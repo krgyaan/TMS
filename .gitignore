@@ -10,3 +10,5 @@ grafana-dashboard.json
 AGENTS.md
 .opencode
 opencode.json
+deploy.sh
+ecosystem.config.js
