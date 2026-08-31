@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { FollowUpService } from "./follow-up.service";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
+import { startHeartbeat } from "@/infra/queue/worker-heartbeat";
 
 @Injectable()
 export class FollowupWorker implements OnModuleInit {
@@ -17,6 +18,8 @@ export class FollowupWorker implements OnModuleInit {
     onModuleInit() {
         const host = this.configService.get<string>('redis.host');
         const port = this.configService.get<number>('redis.port');
+
+        startHeartbeat({ key: "worker:followup", host, port, queue: "followup-mail-queue" });
 
         const worker = new Worker(
             "followup-mail-queue",

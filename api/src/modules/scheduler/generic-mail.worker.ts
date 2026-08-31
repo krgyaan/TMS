@@ -5,6 +5,7 @@ import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { PaymentRequestsNotificationService } from "@/modules/tendering/payment-requests/services/payment-requests-notification.service";
 import { Inject } from "@nestjs/common";
+import { startHeartbeat } from "@/infra/queue/worker-heartbeat";
 
 @Injectable()
 export class GenericMailWorker implements OnModuleInit {
@@ -17,6 +18,8 @@ export class GenericMailWorker implements OnModuleInit {
     onModuleInit() {
         const host = this.configService.get<string>('redis.host');
         const port = this.configService.get<number>('redis.port');
+
+        startHeartbeat({ key: "worker:generic-mail", host, port, queue: "generic-mail-queue" });
 
         const worker = new Worker("generic-mail-queue", async job => {
             const { type } = job.data;

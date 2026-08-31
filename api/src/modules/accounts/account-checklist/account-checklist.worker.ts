@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { AccountChecklistService } from "./account-checklist.service";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
+import { startHeartbeat } from "@/infra/queue/worker-heartbeat";
 
 @Injectable()
 export class AccountChecklistWorker implements OnModuleInit {
@@ -17,6 +18,8 @@ export class AccountChecklistWorker implements OnModuleInit {
     onModuleInit() {
         const host = this.configService.get<string>('redis.host');
         const port = this.configService.get<number>('redis.port');
+
+        startHeartbeat({ key: "worker:account-checklist", host, port, queue: "checklist-mail-queue" });
 
         const worker = new Worker(
             "checklist-mail-queue",
