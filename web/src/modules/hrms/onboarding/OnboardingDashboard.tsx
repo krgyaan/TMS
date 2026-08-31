@@ -64,6 +64,7 @@ import {
   useProfile,
 } from "./useOnboarding";
 import { type OnboardingRequest } from "@/services/api/onboarding.service";
+import { paths } from "@/app/routes/paths";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1713,7 +1714,7 @@ const OnboardingDashboard: React.FC = () => {
             </div>
           </div>
           <Button
-            onClick={() => navigate("/hrms/onboarding/signup")}
+            onClick={() => navigate(paths.hrms.employeeRegistration)}
             className="gap-2 rounded-xl shadow-sm h-10"
           >
             <Plus className="h-4 w-4" />
