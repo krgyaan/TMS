@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Edit, Eye, FileText, History, Plus, ShieldAlert } from "lucide-react";
+import { Edit, Eye, FileText, History, Plus } from "lucide-react";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import DataTable from "@/components/ui/data-table";
@@ -15,7 +15,7 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import { useProjectPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
-import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance";
+// import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance"; // WC_POLICY_LOCK: disabled
 import { Button } from "@/components/ui/button";
 import type { PurchaseOrderRow } from "../helpers/purchaseOrder.types";
 import { OrderProgressCell } from "@/components/OrderProgressCell";
@@ -30,7 +30,7 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
     const navigate = useNavigate();
     const [poGridApi, setPoGridApi] = useState<GridApi | null>(null);
     const { data, isLoading } = useProjectPurchaseOrders(projectId!);
-    const { hasWC } = useHasWCInsurance(projectId ?? 0);
+    // const { hasWC } = useHasWCInsurance(projectId ?? 0); // WC_POLICY_LOCK: disabled
 
     const purchaseOrders = data?.purchaseOrders ?? [];
 
@@ -339,31 +339,17 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
                             Purchase Orders
                         </CardTitle>
                         <CardAction>
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <span>
-                                            <Button
-                                                size="sm"
-                                                variant="default"
-                                                disabled={!hasWC}
-                                                onClick={() => navigate(paths.operations.raisePoForm(projectId))}
-                                            >
-                                                <Plus className="mr-1.5 h-4 w-4" />
-                                                Raise Purchase Order
-                                            </Button>
-                                        </span>
-                                    </TooltipTrigger>
-                                    {!hasWC && (
-                                        <TooltipContent>
-                                            <div className="flex items-center gap-1.5">
-                                                <ShieldAlert className="h-3.5 w-3.5" />
-                                                WC insurance policy required
-                                            </div>
-                                        </TooltipContent>
-                                    )}
-                                </Tooltip>
-                            </TooltipProvider>
+                            {/* WC_POLICY_LOCK: start — disabled WC insurance gate */}
+                            <Button
+                                size="sm"
+                                variant="default"
+                                // disabled={!hasWC}
+                                onClick={() => navigate(paths.operations.raisePoForm(projectId))}
+                            >
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                Raise Purchase Order
+                            </Button>
+                            {/* WC_POLICY_LOCK: end */}
                         </CardAction>
                     </div>
                     <CardDescription>
