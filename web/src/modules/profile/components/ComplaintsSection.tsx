@@ -223,6 +223,8 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
   onOpenChange,
 }) => {
   const { data } = useProfileContext();
+  const user = data?.currentUser;
+  const empProfile = data?.employeeProfile;
   const [form, setForm] = useState<ComplaintFormData>({ ...INITIAL_FORM });
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
