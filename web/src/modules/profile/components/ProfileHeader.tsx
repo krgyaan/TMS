@@ -194,6 +194,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   const DOCUMENTS = data.documents || [];
   const EDUCATION = data.education || [];
   const EXPERIENCE = data.experience || [];
+  const bankAccount = data.bankAccounts?.[0];
 
   const fullName =
     [PROFILE.firstName, PROFILE.middleName, PROFILE.lastName]
@@ -308,7 +309,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
       label: "Bank & Financial Details",
       description: "Bank account, IFSC, UAN",
       done: !!(
-        EMPLOYEE_PROFILE?.bankName && EMPLOYEE_PROFILE?.accountNumber
+        bankAccount?.bankName && bankAccount?.accountNumber
       ),
       section: "banking",
     },
