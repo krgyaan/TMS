@@ -30,6 +30,7 @@ const DocumentDashboardRoutes = lazy(() => import("./sections/document-dashboard
 const HrmsRoutes = lazy(() => import("./sections/hrms.routes"));
 const Profile = lazy(() => import("@/modules/profile"));
 const TrainingRoutes = lazy(() => import("./sections/training.routes"));
+const SystemRoutes = lazy(() => import("./sections/system.routes"));
 
 import { ProfileProvider } from "@/modules/profile/contexts/ProfileContext";
 
@@ -203,6 +204,16 @@ export default function AppRoutes() {
                         element={
                             <RouteWrapper>
                                 <HrmsRoutes />
+                            </RouteWrapper>
+                        }
+                    />
+
+                    {/* System Health (direct URL only, not in sidebar) */}
+                    <Route
+                        path="system-health/*"
+                        element={
+                            <RouteWrapper>
+                                <SystemRoutes />
                             </RouteWrapper>
                         }
                     />

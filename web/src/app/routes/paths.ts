@@ -16,6 +16,11 @@ export const paths = {
     dashboard: "/",
     profile: "/profile",
 
+    // ==================== SYSTEM ====================
+    system: {
+        health: "/system-health",
+    },
+
 
     training: {
         root: "/training",

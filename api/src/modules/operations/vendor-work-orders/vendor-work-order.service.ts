@@ -60,14 +60,16 @@ export class VendorWorkOrderService {
     }
 
     async create(body: any, userId: number) {
-        if (body.projectId) {
-            const hasWC = await this.insuranceService.hasActiveWCInsurance(body.projectId);
-            if (!hasWC) {
-                throw new BadRequestException(
-                    "Cannot create Vendor Work Order: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
-                );
-            }
-        }
+        // WC_POLICY_LOCK: start — disabled WC insurance gate
+        // if (body.projectId) {
+        //     const hasWC = await this.insuranceService.hasActiveWCInsurance(body.projectId);
+        //     if (!hasWC) {
+        //         throw new BadRequestException(
+        //             "Cannot create Vendor Work Order: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
+        //         );
+        //     }
+        // }
+        // WC_POLICY_LOCK: end
 
         const woNumber = await this.generateWONumber(body.projectName);
 

@@ -12,6 +12,7 @@ import * as ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import * as ffprobeInstaller from "@ffprobe-installer/ffprobe";
 import * as path from "path";
 import * as fs from "fs";
+import { startHeartbeat } from "@/infra/queue/worker-heartbeat";
 
 
 @Injectable()
@@ -25,6 +26,8 @@ export class VideoProcessingWorker implements OnModuleInit {
     onModuleInit() {
         const host = this.configService.get<string>('redis.host');
         const port = this.configService.get<number>('redis.port');
+
+        startHeartbeat({ key: "worker:video-processing", host, port, queue: "video-processing-queue" });
 
         const worker = new Worker(
             "video-processing-queue",

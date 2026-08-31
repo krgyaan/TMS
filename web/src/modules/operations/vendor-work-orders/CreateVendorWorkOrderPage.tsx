@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
-import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance";
+// import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance"; // WC_POLICY_LOCK: disabled
 import { useCreatePoParty, usePoParties } from "@/hooks/api/usePurchaseOrders";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,7 +26,7 @@ import { VWOTermsField } from "./components/VWOTermsField";
 import { DEFAULT_VWO_TERMS_ROWS } from "./helpers/vwoForm.constants";
 import { VWOFormPreview } from "./components/VWOFormPreview";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, AlertCircle, Building2, Calendar, Eye, FileText, Hash, Mail, MapPin, Phone, ShieldCheck, UserCheck, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, Eye, FileText, Hash, Mail, MapPin, Phone, UserCheck, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
@@ -101,7 +101,7 @@ export default function CreateVendorWorkOrderPage() {
   const { teamId } = useAuth();
 
   const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
-  const { hasWC, isLoading: isWCLoading } = useHasWCInsurance(projectId);
+  // const { hasWC, isLoading: isWCLoading } = { hasWC: true, isLoading: false }; // WC_POLICY_LOCK: disabled
   const { data: partiesData } = usePoParties();
   const createPartyMutation = useCreatePoParty();
 
@@ -268,6 +268,7 @@ export default function CreateVendorWorkOrderPage() {
     );
   }
 
+  {/* WC_POLICY_LOCK: start — full-page WC block disabled
   if (!isWCLoading && !hasWC) {
     return (
       <div className="container mx-auto py-6 max-w-6xl">
@@ -304,6 +305,7 @@ export default function CreateVendorWorkOrderPage() {
       </div>
     );
   }
+  WC_POLICY_LOCK: end */}
 
   return (
     <Card>

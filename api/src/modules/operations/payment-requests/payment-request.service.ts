@@ -52,15 +52,17 @@ export class PaymentRequestService {
     async create(body: any, userId: number) {
         const requestNo = body.requestNo || await this.generateNumber(body.projectName);
 
+        // WC_POLICY_LOCK: start — disabled WC insurance gate
         // WC insurance gate: block PO/VWO/Others payment requests if no active WC policy
-        if (body.projectId && body.paymentAgainst && !["insurance", "imprest"].includes(body.paymentAgainst)) {
-            const hasWC = await this.insurancePolicyService.hasActiveWCInsurance(body.projectId);
-            if (!hasWC) {
-                throw new BadRequestException(
-                    "Cannot create Payment Request: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
-                );
-            }
-        }
+        // if (body.projectId && body.paymentAgainst && !["insurance", "imprest"].includes(body.paymentAgainst)) {
+        //     const hasWC = await this.insurancePolicyService.hasActiveWCInsurance(body.projectId);
+        //     if (!hasWC) {
+        //         throw new BadRequestException(
+        //             "Cannot create Payment Request: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
+        //         );
+        //     }
+        // }
+        // WC_POLICY_LOCK: end
 
         // Validate against PO TDS cap
         if (body.purchaseOrderId) {
