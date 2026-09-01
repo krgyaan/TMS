@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -30,6 +29,8 @@ import {
   Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSubmitSignup } from "@/hooks/api/useSignUp";
+import type { SignupPayload } from "@/services/api/hrms-onboarding.service";
 
 // ─── Schemas ────────────────────────────────────────────────────────────────
 
@@ -39,7 +40,7 @@ const personalSchema = z.object({
   middleName: z.string().optional(),
   lastName: z.string().min(1, "Last name is required"),
   dateOfBirth: z.string().min(1, "Date of birth is required"),
-  gender: z.enum(["Male", "Female", "Other"], { required_error: "Gender is required" }),
+  gender: z.enum(["Male", "Female", "Other"], { error: "Gender is required" }),
   maritalStatus: z.string().min(1, "Marital status is required"),
   nationality: z.string().min(1, "Nationality is required"),
   personalEmail: z.string().email("Enter a valid email"),
@@ -151,12 +152,12 @@ const slideVariants = {
   center: {
     x: 0,
     opacity: 1,
-    transition: { duration: 0.3, ease: "easeOut" },
+    transition: { duration: 0.3, ease: "easeOut" as const },
   },
   exit: (dir: number) => ({
     x: dir > 0 ? -60 : 60,
     opacity: 0,
-    transition: { duration: 0.2, ease: "easeIn" },
+    transition: { duration: 0.2, ease: "easeIn" as const },
   }),
 };
 
@@ -207,18 +208,19 @@ const SectionLabel: React.FC<{ icon: React.ElementType; label: string }> = ({ ic
 // ─── Phone Input ─────────────────────────────────────────────────────────────
 
 interface PhoneInputProps {
-  value?: string;
   onChange: (val: string) => void;
   placeholder?: string;
   error?: boolean;
 }
 
-const PhoneInput: React.FC<PhoneInputProps> = ({ value = "", onChange, placeholder, error }) => {
+const PhoneInput: React.FC<PhoneInputProps> = ({ onChange, placeholder, error }) => {
   const [code, setCode] = useState("+91");
   const [number, setNumber] = useState("");
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   useEffect(() => {
-    onChange(`${code} ${number}`);
+    onChangeRef.current(`${code} ${number}`);
   }, [code, number]);
 
   return (
@@ -307,13 +309,13 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ steps, current, completed
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 const EmployeeRegistration: React.FC = () => {
-  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [direction, setDirection] = useState(1);
   const [sameAsCurrent, setSameAsCurrent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const submitSignupMutation = useSubmitSignup();
 
   const {
     register,
@@ -384,12 +386,42 @@ const EmployeeRegistration: React.FC = () => {
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
     try {
-      // TODO: wire up API calls here
-      await new Promise((r) => setTimeout(r, 1800));
+      const payload: SignupPayload = {
+        firstName: data.firstName,
+        middleName: data.middleName,
+        lastName: data.lastName,
+        dateOfBirth: data.dateOfBirth,
+        gender: data.gender,
+        maritalStatus: data.maritalStatus,
+        nationality: data.nationality,
+        personalEmail: data.personalEmail,
+        phone: data.phone,
+        alternatePhone: data.alternatePhone,
+        aadharNumber: data.aadharNumber,
+        panNumber: data.panNumber,
+        currentAddressLine1: data.currentAddressLine1,
+        currentAddressLine2: data.currentAddressLine2,
+        currentCity: data.currentCity,
+        currentState: data.currentState,
+        currentCountry: data.currentCountry,
+        currentPostalCode: data.currentPostalCode,
+        sameAsCurrent: data.sameAsCurrent,
+        permanentAddressLine1: data.permanentAddressLine1,
+        permanentAddressLine2: data.permanentAddressLine2,
+        permanentCity: data.permanentCity,
+        permanentState: data.permanentState,
+        permanentCountry: data.permanentCountry,
+        permanentPostalCode: data.permanentPostalCode,
+        emergencyContactName: data.emergencyContactName,
+        emergencyContactRelationship: data.emergencyContactRelationship,
+        emergencyContactPhone: data.emergencyContactPhone,
+        emergencyContactAltPhone: data.emergencyContactAltPhone,
+        emergencyContactEmail: data.emergencyContactEmail,
+      };
+      await submitSignupMutation.mutateAsync(payload);
       setSubmitted(true);
-      toast.success("Registration submitted successfully!");
     } catch {
-      toast.error("Submission failed. Please try again.");
+      // errors are toasted by the useSubmitSignup hook (e.g. duplicate email 409)
     } finally {
       setIsSubmitting(false);
     }

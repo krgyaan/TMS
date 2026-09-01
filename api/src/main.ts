@@ -49,7 +49,7 @@ async function bootstrap() {
     await StatusCache.load(app.get(DRIZZLE));
 
     // CORS (unchanged logic)
-    const allowedOrigins = ["http://localhost:5173", "https://tmsv2.volksenergie.in"];
+    const allowedOrigins = ["http://localhost:5173","http://localhost:5174", "http://localhost:4173",  "https://tmsv2.volksenergie.in"];
 
     app.enableCors({
         origin: (origin, callback) => {
