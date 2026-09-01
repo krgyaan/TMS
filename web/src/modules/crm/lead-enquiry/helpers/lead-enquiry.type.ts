@@ -132,6 +132,7 @@ export interface LeadEnquiryListParams {
     team?: string;
     leadId?: number;
     happyCallingId?: number;
+    enquiryType?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 }
