@@ -61,7 +61,7 @@ export interface CreateLeadRequest {
     name: string;
     designation: string;
     phone: string;
-    email: string;
+    email: string | null;
     address: string;
     liveLocation?: LiveLocation | null;
     country: string;

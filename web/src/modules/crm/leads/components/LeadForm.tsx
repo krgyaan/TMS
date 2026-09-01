@@ -57,15 +57,14 @@ const COUNTRY_OPTIONS: Option[] = [
 const LeadFormSchema = z.object({
     companyName: z.string().min(1, { message: "Company name is required" }),
     name: z.string().min(1, { message: "Person name is required" }),
-    designation: z.string().min(1, { message: "Designation is required" }),
+    designation: z.string().optional().nullable(),
     phone: z.string().min(1, { message: "Phone is required" }),
-    email: z.string().email({ message: "A valid email is required" }),
+    email: z.string().email({ message: "A valid email is required" }).optional().nullable().or(z.literal("")),
     address: z.string().min(1, { message: "Address is required" }),
     country: z.string().min(1, { message: "Country is required" }),
     state: z.string().min(1, { message: "State is required" }),
     type: z.string().optional(),
     industry: z.string().optional(),
-    team: z.string().optional(),
     pointsDiscussed: z.string().max(2000).optional(),
     veResponsibility: z.string().max(2000).optional(),
 });
@@ -101,16 +100,6 @@ const fetchIndustries = async (): Promise<Option[]> => {
     }));
 };
 
-const fetchTeams = async (): Promise<Option[]> => {
-    const res = await axiosInstance.get("/teams");
-    return res.data
-        .filter((team: { id: number }) => [1, 2, 6].includes(team.id))
-        .map((team: { id: number; name: string }) => ({
-            label: team.name,
-            value: team.id.toString(),
-        }));
-};
-
 const SectionSeparator = ({ text }: { text: string }) => (
     <div className="col-span-full flex items-center gap-4 py-1">
         <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap">
@@ -143,17 +132,12 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
         queryFn: fetchIndustries,
     });
 
-    const { data: teamOptions = [] } = useQuery({
-        queryKey: ["teams"],
-        queryFn: fetchTeams,
-    });
-
     const form = useForm<LeadFormValues>({
         resolver: zodResolver(LeadFormSchema) as any,
         defaultValues: {
             companyName: lead?.companyName || "",
             name: lead?.name || "",
-            designation: lead?.designation || "",
+            designation: lead?.designation || "Not Available",
             phone: lead?.phone || "",
             email: lead?.email || "",
             address: lead?.address || "",
@@ -161,7 +145,6 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
             state: lead?.state || "",
             type: lead?.type || "",
             industry: lead?.industry || "",
-            team: lead?.team || "",
             pointsDiscussed: lead?.pointsDiscussed || "",
             veResponsibility: lead?.veResponsibility || "",
         },
@@ -230,15 +213,15 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
             const payload = {
                 companyName: values.companyName,
                 name: values.name,
-                designation: values.designation,
+                designation: values.designation || "Not Available",
                 phone: values.phone,
-                email: values.email,
+                email: values.email || null,
                 address: values.address,
                 country: values.country,
                 state: values.state,
                 type: values.type || null,
                 industry: values.industry || null,
-                team: values.team || null,
+                team: null,
                 pointsDiscussed: values.pointsDiscussed || null,
                 veResponsibility: values.veResponsibility || null,
                 liveLocation,
@@ -473,14 +456,6 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                                     label="Industry"
                                     options={industryOptions}
                                     placeholder="Select Industry"
-                                />
-
-                                <SelectField<LeadFormValues, "team">
-                                    control={form.control}
-                                    name="team"
-                                    label="Team"
-                                    options={teamOptions}
-                                    placeholder="Select Team"
                                 />
 
                                 <SectionSeparator text="Additional Details" />
