@@ -7,6 +7,7 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
     root: ".",
     appType: "spa",
+    base: "/pwa/",
     plugins: [
         react(),
         tailwindcss(),
@@ -22,8 +23,8 @@ export default defineConfig({
                 background_color: "#ffffff",
                 display: "standalone",
                 orientation: "portrait",
-                scope: "/",
-                start_url: "/",
+                scope: "/pwa/",
+                start_url: "/pwa/",
                 icons: [
                     {
                         src: "pwa-icons/icon-192x192.png",
@@ -50,6 +51,7 @@ export default defineConfig({
                 // The PWA HTML entry is emitted as index.pwa.html; it is the
                 // precached app shell, so route all in-app navigations to it.
                 navigateFallback: "index.pwa.html",
+                maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10 MB
                 navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//],
                 runtimeCaching: [
                     // NETWORK-FIRST for API data: fresh online, cached offline.

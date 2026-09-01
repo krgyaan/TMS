@@ -1,1 +1,377 @@
-if(!self.define){let s,e={};const l=(l,i)=>(l=new URL(l+".js",i).href,e[l]||new Promise(e=>{if("document"in self){const s=document.createElement("script");s.src=l,s.onload=e,document.head.appendChild(s)}else s=l,importScripts(l),e()}).then(()=>{let s=e[l];if(!s)throw new Error(`Module ${l} didn’t register its module`);return s}));self.define=(i,r)=>{const n=s||("document"in self?document.currentScript.src:"")||location.href;if(e[n])return;let a={};const u=s=>l(s,n),o={module:{uri:n},exports:a,require:u};e[n]=Promise.all(i.map(s=>o[s]||u(s))).then(s=>(r(...s),a))}}define(["./workbox-bdb082da"],function(s){"use strict";self.skipWaiting(),s.clientsClaim(),s.precacheAndRoute([{url:"ve_logo.png",revision:"817ebfadb16bfa7a63dd7426f606a2e0"},{url:"ve_favicon.png",revision:"6f4969a8ace1f6cf79a252f639cd0902"},{url:"registerSW.js",revision:"1872c500de691dce40960bb85481de07"},{url:"index.pwa.html",revision:"363fce2f082c8855e20a520cd8653973"},{url:"arju-boi.png",revision:"62f7f838ce21dcf8cdfe9627e28dcec1"},{url:"pwa-icons/icon-maskable-512x512.png",revision:"a5fb7db3b7e905deb484edc4959b5ca6"},{url:"pwa-icons/icon-512x512.png",revision:"6a2e8b7caacc4e53d7f979400565b9bb"},{url:"pwa-icons/icon-192x192.png",revision:"5597243db85c4bf8b0e7bab675d050b9"},{url:"assets/WhatsappTab-DNpYmjSV.js",revision:null},{url:"assets/VoucherViewPage-qOXN7Ow3.js",revision:null},{url:"assets/VoucherListPage-BNNndHpU.js",revision:null},{url:"assets/useUsers-BEGsVelE.js",revision:null},{url:"assets/useTenders-DHCMMBfM.js",revision:null},{url:"assets/useSelectOptions-qLHBqFA_.js",revision:null},{url:"assets/UserImprestsPage-DtKRNlk0.js",revision:null},{url:"assets/UserImprestsPage-DRT7dAKZ.css",revision:null},{url:"assets/usePersistentTableState-C5oCf8-f.js",revision:null},{url:"assets/useLocations-BqnbPmUi.js",revision:null},{url:"assets/useLeads-DeASruhL.js",revision:null},{url:"assets/useLeadEnquiry-Dm8z3PgN.js",revision:null},{url:"assets/useINRFormatter-C8lEoKOj.js",revision:null},{url:"assets/useInfoSheets-BqD4RKsV.js",revision:null},{url:"assets/useHappyCalling-B_e2Yiwm.js",revision:null},{url:"assets/useFormatedDate-8knD0qdf.js",revision:null},{url:"assets/useDebouncedSearch-kxj1thwo.js",revision:null},{url:"assets/useClientDirectory-BYCXUiH-.js",revision:null},{url:"assets/useBidSubmissions-B3GcqR3x.js",revision:null},{url:"assets/triangle-alert-CqRqOwSj.js",revision:null},{url:"assets/trash-2-C5mPwRmt.js",revision:null},{url:"assets/textarea-BwPuoMSE.js",revision:null},{url:"assets/tabs-CRkHIEwe.js",revision:null},{url:"assets/square-pen-Dk37wksp.js",revision:null},{url:"assets/shield-alert-BPteuzII.js",revision:null},{url:"assets/send-969bWGEV.js",revision:null},{url:"assets/SelectField-BXq165O0.js",revision:null},{url:"assets/search-70gAnBah.js",revision:null},{url:"assets/save-jBrF4RH4.js",revision:null},{url:"assets/plus-CKN5fVt-.js",revision:null},{url:"assets/pencil-DfP_ZCLQ.js",revision:null},{url:"assets/PaymentHistoryPage-DjkBtBfs.js",revision:null},{url:"assets/message-circle-CMsSbVPc.js",revision:null},{url:"assets/LeadsListPage-C5g18zQ0.js",revision:null},{url:"assets/LeadShowPage-ByO2sX9V.js",revision:null},{url:"assets/LeadForm-Cn36q4q6.js",revision:null},{url:"assets/LeadForm-CIGW-MKW.css",revision:null},{url:"assets/LeadFollowupListPage-CIAH6E2P.js",revision:null},{url:"assets/LeadEnquiryListPage-BCbtfRzg.js",revision:null},{url:"assets/LeadEnquiryForm-DZO4RZyS.js",revision:null},{url:"assets/LeadEnquiryEditPage-DAHHeX1Y.js",revision:null},{url:"assets/LeadEnquiryCreatePage-CN-CRNug.js",revision:null},{url:"assets/LeadEditPage-DqpJZn4U.js",revision:null},{url:"assets/LeadCreatePage-BYpy3TrE.js",revision:null},{url:"assets/index-DMJqG0r3.css",revision:null},{url:"assets/index-BJ83dh5N.js",revision:null},{url:"assets/index-af3GkBr6.js",revision:null},{url:"assets/ImprestForm-B0sXEqn3.js",revision:null},{url:"assets/imprest.hooks-Ch6rn16L.js",revision:null},{url:"assets/HappyCallingShowPage-BuFpAIA2.js",revision:null},{url:"assets/HappyCallingListPage-DHVqDcD8.js",revision:null},{url:"assets/HappyCallingForm-Cxdy9ULa.js",revision:null},{url:"assets/HappyCallingFollowupPage-DJLCB5t2.js",revision:null},{url:"assets/HappyCallingEnquiryCreatePage-D3IrLeg9.js",revision:null},{url:"assets/HappyCallingEditPage-DoiRtYQI.js",revision:null},{url:"assets/HappyCallingCreatePage-DoQnUDBC.js",revision:null},{url:"assets/format-CSQe5d3I.js",revision:null},{url:"assets/FileUploader-CQYXQqiP.js",revision:null},{url:"assets/file-x-2-BaIOxnf2.js",revision:null},{url:"assets/file-question-mark-ZzVo1alV.js",revision:null},{url:"assets/file-check-CpIACDTA.js",revision:null},{url:"assets/errorToast-BPnf1IyH.js",revision:null},{url:"assets/EnquiryWithLeadCreatePage-opfHpGOQ.js",revision:null},{url:"assets/EnquiryTenderFlow-Yk96EUw0.js",revision:null},{url:"assets/EnquiryQuotationFollowupPage-NqSiOT9T.js",revision:null},{url:"assets/EditImprestPage-B6yEqual.js",revision:null},{url:"assets/dialog--Rj-0KxC.js",revision:null},{url:"assets/data-table-DMWn548J.js",revision:null},{url:"assets/data-table-6HwaDZaa.css",revision:null},{url:"assets/CreateImprestPage-DuV6lNer.js",revision:null},{url:"assets/contactpersonform-UeEaff-I.js",revision:null},{url:"assets/compat-Cd3mMpYe.js",revision:null},{url:"assets/coerce-aIlhsTjb.js",revision:null},{url:"assets/ClientDirectoryListPage-DVFr6BZf.js",revision:null},{url:"assets/circle-x-CKq-Rh5f.js",revision:null},{url:"assets/circle-check-big-BPC2yocD.js",revision:null},{url:"assets/briefcase-zszgxXi_.js",revision:null},{url:"assets/badge-PL0x3frf.js",revision:null},{url:"assets/ActionColumnRenderer-Br6PHI_p.js",revision:null},{url:"pwa-icons/icon-192x192.png",revision:"5597243db85c4bf8b0e7bab675d050b9"},{url:"pwa-icons/icon-512x512.png",revision:"6a2e8b7caacc4e53d7f979400565b9bb"},{url:"pwa-icons/icon-maskable-512x512.png",revision:"a5fb7db3b7e905deb484edc4959b5ca6"},{url:"manifest.webmanifest",revision:"e294dd4d1eac0139e0732767277376e5"}],{}),s.cleanupOutdatedCaches(),s.registerRoute(new s.NavigationRoute(s.createHandlerBoundToURL("index.pwa.html"),{denylist:[/^\/api\//,/^\/uploads\//]})),s.registerRoute(({url:s})=>s.pathname.startsWith("/api/"),new s.NetworkFirst({cacheName:"tms-api-cache",networkTimeoutSeconds:10,plugins:[new s.ExpirationPlugin({maxEntries:100,maxAgeSeconds:86400})]}),"GET"),s.registerRoute(({url:s})=>s.pathname.startsWith("/uploads/"),new s.CacheFirst({cacheName:"tms-uploads-cache",plugins:[new s.ExpirationPlugin({maxEntries:50,maxAgeSeconds:604800})]}),"GET")});
+/**
+ * Copyright 2018 Google Inc. All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// If the loader is already loaded, just stop.
+if (!self.define) {
+  let registry = {};
+
+  // Used for `eval` and `importScripts` where we can't get script URL by other means.
+  // In both cases, it's safe to use a global var because those functions are synchronous.
+  let nextDefineUri;
+
+  const singleRequire = (uri, parentUri) => {
+    uri = new URL(uri + ".js", parentUri).href;
+    return registry[uri] || (
+      
+        new Promise(resolve => {
+          if ("document" in self) {
+            const script = document.createElement("script");
+            script.src = uri;
+            script.onload = resolve;
+            document.head.appendChild(script);
+          } else {
+            nextDefineUri = uri;
+            importScripts(uri);
+            resolve();
+          }
+        })
+      
+      .then(() => {
+        let promise = registry[uri];
+        if (!promise) {
+          throw new Error(`Module ${uri} didn’t register its module`);
+        }
+        return promise;
+      })
+    );
+  };
+
+  self.define = (depsNames, factory) => {
+    const uri = nextDefineUri || ("document" in self ? document.currentScript.src : "") || location.href;
+    if (registry[uri]) {
+      // Module is already loading or loaded.
+      return;
+    }
+    let exports = {};
+    const require = depUri => singleRequire(depUri, uri);
+    const specialDeps = {
+      module: { uri },
+      exports,
+      require
+    };
+    registry[uri] = Promise.all(depsNames.map(
+      depName => specialDeps[depName] || require(depName)
+    )).then(deps => {
+      factory(...deps);
+      return exports;
+    });
+  };
+}
+define(['./workbox-d488705a'], (function (workbox) { 'use strict';
+
+  self.skipWaiting();
+  workbox.clientsClaim();
+  /**
+   * The precacheAndRoute() method efficiently caches and responds to
+   * requests for URLs in the manifest.
+   * See https://goo.gl/S9QRab
+   */
+  workbox.precacheAndRoute([{
+    "url": "ve_logo.png",
+    "revision": "817ebfadb16bfa7a63dd7426f606a2e0"
+  }, {
+    "url": "ve_favicon.png",
+    "revision": "6f4969a8ace1f6cf79a252f639cd0902"
+  }, {
+    "url": "registerSW.js",
+    "revision": "1872c500de691dce40960bb85481de07"
+  }, {
+    "url": "index.pwa.html",
+    "revision": "ce15839633b9d8c76026eaa496812dc4"
+  }, {
+    "url": "arju-boi.png",
+    "revision": "62f7f838ce21dcf8cdfe9627e28dcec1"
+  }, {
+    "url": "pwa-icons/icon-maskable-512x512.png",
+    "revision": "a5fb7db3b7e905deb484edc4959b5ca6"
+  }, {
+    "url": "pwa-icons/icon-512x512.png",
+    "revision": "6a2e8b7caacc4e53d7f979400565b9bb"
+  }, {
+    "url": "pwa-icons/icon-192x192.png",
+    "revision": "5597243db85c4bf8b0e7bab675d050b9"
+  }, {
+    "url": "assets/useUsers-DN-5UuWl.js",
+    "revision": null
+  }, {
+    "url": "assets/useTenders-BCft31eM.js",
+    "revision": null
+  }, {
+    "url": "assets/useSelectOptions-D7f6aTkQ.js",
+    "revision": null
+  }, {
+    "url": "assets/usePersistentTableState-DVFWuhtK.js",
+    "revision": null
+  }, {
+    "url": "assets/useLocations-QLyrBOyH.js",
+    "revision": null
+  }, {
+    "url": "assets/useLeads-CEoVdwSW.js",
+    "revision": null
+  }, {
+    "url": "assets/useLeadEnquiry-B_176pOk.js",
+    "revision": null
+  }, {
+    "url": "assets/useInfoSheets-CQXHcUNY.js",
+    "revision": null
+  }, {
+    "url": "assets/useINRFormatter-C8lEoKOj.js",
+    "revision": null
+  }, {
+    "url": "assets/useHappyCalling-IlqXjtBj.js",
+    "revision": null
+  }, {
+    "url": "assets/useFormatedDate-8knD0qdf.js",
+    "revision": null
+  }, {
+    "url": "assets/useDebouncedSearch-Cu0tM_Vc.js",
+    "revision": null
+  }, {
+    "url": "assets/useClientDirectory-CahYR_kS.js",
+    "revision": null
+  }, {
+    "url": "assets/useBidSubmissions-NvGG-lZL.js",
+    "revision": null
+  }, {
+    "url": "assets/triangle-alert-BnFtumgP.js",
+    "revision": null
+  }, {
+    "url": "assets/trash-2-BwQev54h.js",
+    "revision": null
+  }, {
+    "url": "assets/textarea-ttiD1xvp.js",
+    "revision": null
+  }, {
+    "url": "assets/tabs-ByuthGh2.js",
+    "revision": null
+  }, {
+    "url": "assets/square-pen-C04lheIa.js",
+    "revision": null
+  }, {
+    "url": "assets/shield-alert-BdcLfqVr.js",
+    "revision": null
+  }, {
+    "url": "assets/send-CX5Abdbw.js",
+    "revision": null
+  }, {
+    "url": "assets/search-BXHBdDHD.js",
+    "revision": null
+  }, {
+    "url": "assets/save-HqJxLoT8.js",
+    "revision": null
+  }, {
+    "url": "assets/plus-Du4FQWOW.js",
+    "revision": null
+  }, {
+    "url": "assets/pencil-BMgOj7Dl.js",
+    "revision": null
+  }, {
+    "url": "assets/message-circle-yVjTFw8J.js",
+    "revision": null
+  }, {
+    "url": "assets/index-DMJqG0r3.css",
+    "revision": null
+  }, {
+    "url": "assets/index-BgYyokae.js",
+    "revision": null
+  }, {
+    "url": "assets/index-BP8_wRAF.js",
+    "revision": null
+  }, {
+    "url": "assets/imprest.hooks-OeJ_YVVQ.js",
+    "revision": null
+  }, {
+    "url": "assets/format-CSQe5d3I.js",
+    "revision": null
+  }, {
+    "url": "assets/file-x-2-CPgIlfdb.js",
+    "revision": null
+  }, {
+    "url": "assets/file-question-mark-C7fFNwt2.js",
+    "revision": null
+  }, {
+    "url": "assets/file-check-mSviy9Is.js",
+    "revision": null
+  }, {
+    "url": "assets/errorToast-DXsdS3xF.js",
+    "revision": null
+  }, {
+    "url": "assets/dialog-BWLagPbP.js",
+    "revision": null
+  }, {
+    "url": "assets/data-table-6HwaDZaa.css",
+    "revision": null
+  }, {
+    "url": "assets/data-table-3gFLDxp2.js",
+    "revision": null
+  }, {
+    "url": "assets/contactpersonform-DIxv8M9t.js",
+    "revision": null
+  }, {
+    "url": "assets/compat-BNjhwUDn.js",
+    "revision": null
+  }, {
+    "url": "assets/coerce-BD1jtbSz.js",
+    "revision": null
+  }, {
+    "url": "assets/circle-x-CMurb1Tb.js",
+    "revision": null
+  }, {
+    "url": "assets/circle-check-big-dv-PHEM4.js",
+    "revision": null
+  }, {
+    "url": "assets/briefcase-ipi5gfgz.js",
+    "revision": null
+  }, {
+    "url": "assets/badge-DM0OO9QB.js",
+    "revision": null
+  }, {
+    "url": "assets/WhatsappTab-q0fCy9S1.js",
+    "revision": null
+  }, {
+    "url": "assets/VoucherViewPage-D4Wmnpn2.js",
+    "revision": null
+  }, {
+    "url": "assets/VoucherListPage-DepiNFpP.js",
+    "revision": null
+  }, {
+    "url": "assets/UserImprestsPage-DRT7dAKZ.css",
+    "revision": null
+  }, {
+    "url": "assets/UserImprestsPage-DQXeuIcu.js",
+    "revision": null
+  }, {
+    "url": "assets/SelectField-B0czCDg4.js",
+    "revision": null
+  }, {
+    "url": "assets/PaymentHistoryPage-Dk4djcDJ.js",
+    "revision": null
+  }, {
+    "url": "assets/LeadsListPage-VPO4yrKm.js",
+    "revision": null
+  }, {
+    "url": "assets/LeadShowPage-DI9CQ-0c.js",
+    "revision": null
+  }, {
+    "url": "assets/LeadForm-todezTeQ.js",
+    "revision": null
+  }, {
+    "url": "assets/LeadForm-CIGW-MKW.css",
+    "revision": null
+  }, {
+    "url": "assets/LeadFollowupListPage-C_ryr_Pc.js",
+    "revision": null
+  }, {
+    "url": "assets/LeadEnquiryListPage-HPL0iumD.js",
+    "revision": null
+  }, {
+    "url": "assets/LeadEnquiryForm-uo9x2Z1r.js",
+    "revision": null
+  }, {
+    "url": "assets/LeadEnquiryEditPage-BQZdM5PI.js",
+    "revision": null
+  }, {
+    "url": "assets/LeadEnquiryCreatePage-qdOHFEre.js",
+    "revision": null
+  }, {
+    "url": "assets/LeadEditPage-DFES5oVO.js",
+    "revision": null
+  }, {
+    "url": "assets/LeadCreatePage-DQhA-OHD.js",
+    "revision": null
+  }, {
+    "url": "assets/ImprestForm-DvZiOyyn.js",
+    "revision": null
+  }, {
+    "url": "assets/HappyCallingShowPage-fDxluC2x.js",
+    "revision": null
+  }, {
+    "url": "assets/HappyCallingListPage-8cddb1nL.js",
+    "revision": null
+  }, {
+    "url": "assets/HappyCallingForm-B5Ju8fFv.js",
+    "revision": null
+  }, {
+    "url": "assets/HappyCallingFollowupPage-Dza0g6G-.js",
+    "revision": null
+  }, {
+    "url": "assets/HappyCallingEnquiryCreatePage-D8_0hmJ1.js",
+    "revision": null
+  }, {
+    "url": "assets/HappyCallingEditPage-6MgEYW4T.js",
+    "revision": null
+  }, {
+    "url": "assets/HappyCallingCreatePage-BJb4vdDq.js",
+    "revision": null
+  }, {
+    "url": "assets/FileUploader-BF79IGVz.js",
+    "revision": null
+  }, {
+    "url": "assets/EnquiryWithLeadCreatePage-DQv9a-IN.js",
+    "revision": null
+  }, {
+    "url": "assets/EnquiryTenderFlow-PMRdaMlA.js",
+    "revision": null
+  }, {
+    "url": "assets/EnquiryQuotationFollowupPage-irnhPCut.js",
+    "revision": null
+  }, {
+    "url": "assets/EditImprestPage-C7cV9BN2.js",
+    "revision": null
+  }, {
+    "url": "assets/CreateImprestPage-CJ3-1eo2.js",
+    "revision": null
+  }, {
+    "url": "assets/ClientDirectoryListPage-Csy8vdfq.js",
+    "revision": null
+  }, {
+    "url": "assets/ActionColumnRenderer-ZIRlZnGZ.js",
+    "revision": null
+  }, {
+    "url": "pwa-icons/icon-192x192.png",
+    "revision": "5597243db85c4bf8b0e7bab675d050b9"
+  }, {
+    "url": "pwa-icons/icon-512x512.png",
+    "revision": "6a2e8b7caacc4e53d7f979400565b9bb"
+  }, {
+    "url": "pwa-icons/icon-maskable-512x512.png",
+    "revision": "a5fb7db3b7e905deb484edc4959b5ca6"
+  }, {
+    "url": "manifest.webmanifest",
+    "revision": "e294dd4d1eac0139e0732767277376e5"
+  }], {});
+  workbox.cleanupOutdatedCaches();
+  workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("index.pwa.html"), {
+    denylist: [/^\/api\//, /^\/uploads\//]
+  }));
+  workbox.registerRoute(({
+    url
+  }) => url.pathname.startsWith("/api/"), new workbox.NetworkFirst({
+    "cacheName": "tms-api-cache",
+    "networkTimeoutSeconds": 10,
+    plugins: [new workbox.ExpirationPlugin({
+      maxEntries: 100,
+      maxAgeSeconds: 86400
+    })]
+  }), 'GET');
+  workbox.registerRoute(({
+    url
+  }) => url.pathname.startsWith("/uploads/"), new workbox.CacheFirst({
+    "cacheName": "tms-uploads-cache",
+    plugins: [new workbox.ExpirationPlugin({
+      maxEntries: 50,
+      maxAgeSeconds: 604800
+    })]
+  }), 'GET');
+
+}));
