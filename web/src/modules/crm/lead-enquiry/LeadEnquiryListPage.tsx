@@ -14,7 +14,6 @@ import { useLeadEnquiries, useUpdateLeadEnquiry, useCreateSiteVisit, useUpdateSi
 import { LeadEnquiryRejectModal } from "./components/LeadEnquiryRejectModal";
 import { LeadEnquirySiteVisitModal } from "./components/LeadEnquirySiteVisitModal";
 import { LeadEnquirySiteVisitDetailsModal } from "./components/LeadEnquirySiteVisitDetailsModal";
-
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
@@ -26,7 +25,12 @@ import { cn } from "@/lib/utils";
 const TEAM_TABS = [
     { key: 'AC', label: 'AC' },
     { key: 'DC', label: 'DC' },
-    { key: 'Business Development', label: 'Business Development' },
+    { key: 'BD', label: 'BD' },
+];
+
+const ENQUIRY_TYPE_TABS = [
+    { key: 'Budgetary Quotation', label: 'Budgetary' },
+    { key: 'RFQ Received', label: 'RFQ' },
 ];
 
 const ENQUIRY_STATUS_LABELS: Record<number, string> = {
@@ -37,6 +41,11 @@ const ENQUIRY_STATUS_LABELS: Record<number, string> = {
     1: 'Read Enquiry',
 };
 
+// Mapping function to convert frontend team names to backend team names
+const mapTeamForBackend = (frontendTeam: string): string => {
+    if (frontendTeam === 'BD') return 'Business Development';
+    return frontendTeam;
+};
 
 const EnquiryListPage = () => {
     const navigate = useNavigate();
@@ -46,10 +55,18 @@ const EnquiryListPage = () => {
     const createSiteVisitContacts = useCreateSiteVisitContacts();
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTeam = searchParams.get('tab') || 'AC';
+    const activeType = searchParams.get('type') || 'Budgetary Quotation';
 
     const setActiveTeam = (team: string) => {
         const next = new URLSearchParams(searchParams);
         next.set('tab', team);
+        next.delete('page');
+        setSearchParams(next, { replace: true });
+    };
+
+    const setActiveType = (type: string) => {
+        const next = new URLSearchParams(searchParams);
+        next.set('type', type);
         next.delete('page');
         setSearchParams(next, { replace: true });
     };
@@ -64,9 +81,10 @@ const EnquiryListPage = () => {
         tabParam: 'enquiryTab',
     });
 
-    const { data: acResponse } = useLeadEnquiries({ page: 1, limit: 1, team: 'AC' });
-    const { data: dcResponse } = useLeadEnquiries({ page: 1, limit: 1, team: 'DC' });
-    const { data: bdResponse } = useLeadEnquiries({ page: 1, limit: 1, team: 'Business Development' });
+    // Convert frontend team names to backend team names for API calls
+    const { data: acResponse } = useLeadEnquiries({ page: 1, limit: 1, team: mapTeamForBackend('AC'), enquiryType: activeType });
+    const { data: dcResponse } = useLeadEnquiries({ page: 1, limit: 1, team: mapTeamForBackend('DC'), enquiryType: activeType });
+    const { data: bdResponse } = useLeadEnquiries({ page: 1, limit: 1, team: mapTeamForBackend('BD'), enquiryType: activeType });
 
     const acCount = acResponse?.meta?.total ?? 0;
     const dcCount = dcResponse?.meta?.total ?? 0;
@@ -75,11 +93,18 @@ const EnquiryListPage = () => {
     const getTeamCount = (key: string) => {
         if (key === 'AC') return acCount;
         if (key === 'DC') return dcCount;
-        return bdCount;
+        if (key === 'BD') return bdCount;
+        return 0;
     };
 
     const { data: apiResponse, isLoading } = useLeadEnquiries(
-        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined, team: activeTeam },
+        { 
+            page: pagination.pageIndex + 1, 
+            limit: pagination.pageSize, 
+            search: debouncedSearch || undefined, 
+            team: mapTeamForBackend(activeTeam), 
+            enquiryType: activeType 
+        },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
@@ -303,48 +328,78 @@ const EnquiryListPage = () => {
     return (
         <Card className="min-h-[calc(100vh-2rem)] flex flex-col">
             <CardHeader className="flex-none pb-4">
-                <div className="flex items-center gap-4 flex-wrap">
-                    <div className="flex-1">
+                {/* ── Header row with three sections: Left (title), Center (type tabs), Right (button) ── */}
+                <div className="flex items-center justify-between">
+                    {/* Left: title + description */}
+                    <div className="flex flex-col flex-1">
                         <CardTitle>Enquiries</CardTitle>
                         <CardDescription>Manage all enquiries</CardDescription>
                     </div>
-                    <div className="flex justify-center">
+
+                    {/* Center: Budgetary / RFQ pill tabs */}
+                    <div className="flex items-center justify-center flex-1">
                         <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
-                            {TEAM_TABS.map(tab => (
+                            {ENQUIRY_TYPE_TABS.map(tab => (
                                 <button
                                     key={tab.key}
                                     type="button"
-                                    onClick={() => setActiveTeam(tab.key)}
+                                    onClick={() => setActiveType(tab.key)}
                                     className={cn(
                                         "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
-                                        activeTeam === tab.key
+                                        activeType === tab.key
                                             ? "bg-background text-foreground shadow-sm"
                                             : "text-muted-foreground hover:text-foreground"
                                     )}
                                 >
                                     {tab.label}
-                                    <Badge
-                                        variant="secondary"
-                                        className={cn(
-                                            "text-xs h-4 min-w-4 px-1",
-                                            activeTeam === tab.key && "bg-primary/10 text-primary"
-                                        )}
-                                    >
-                                        {getTeamCount(tab.key)}
-                                    </Badge>
                                 </button>
                             ))}
                         </div>
                     </div>
-                    <div className="flex-1 flex justify-end">
-                        <Button onClick={() => navigate(paths.crm.enquiryCreate)} className="flex items-center gap-2">
+
+                    {/* Right: Add Enquiry button */}
+                    <div className="flex justify-end flex-1">
+                        <Button
+                            onClick={() => navigate(paths.crm.enquiryCreate)}
+                            className="flex items-center gap-2"
+                        >
                             <Plus className="h-4 w-4" /> Add Enquiry
                         </Button>
                     </div>
                 </div>
             </CardHeader>
+
             <CardContent className="flex-1 px-0">
-                <div className="flex items-center justify-end px-6 pb-4">
+                <div className="flex items-center justify-between px-6 pb-4 gap-3 flex-wrap">
+                    {/* Team tabs */}
+                    <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg">
+                        {TEAM_TABS.map(tab => (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                onClick={() => setActiveTeam(tab.key)}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                                    activeTeam === tab.key
+                                        ? "bg-background text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {tab.label}
+                                <Badge
+                                    variant="secondary"
+                                    className={cn(
+                                        "text-xs h-4 min-w-4 px-1",
+                                        activeTeam === tab.key && "bg-primary/10 text-primary"
+                                    )}
+                                >
+                                    {getTeamCount(tab.key)}
+                                </Badge>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Search */}
                     <div className="relative">
                         <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -356,6 +411,7 @@ const EnquiryListPage = () => {
                         />
                     </div>
                 </div>
+
                 <DataTable
                     data={enquiries}
                     loading={isLoading}
@@ -394,7 +450,11 @@ const EnquiryListPage = () => {
 
             <LeadEnquirySiteVisitDetailsModal
                 open={siteVisitDetailsModal.open}
-                onOpenChange={(open) => setSiteVisitDetailsModal({ ...siteVisitDetailsModal, open, initialData: open ? siteVisitDetailsModal.initialData : null })}
+                onOpenChange={(open) => setSiteVisitDetailsModal({
+                    ...siteVisitDetailsModal,
+                    open,
+                    initialData: open ? siteVisitDetailsModal.initialData : null,
+                })}
                 siteVisitId={siteVisitDetailsModal.siteVisitId}
                 initialData={siteVisitDetailsModal.initialData}
                 onSave={handleSiteVisitDetailsSave}
