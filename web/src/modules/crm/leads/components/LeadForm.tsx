@@ -21,6 +21,8 @@ import { ArrowLeft, Loader2, MapPin, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { paths } from "@/app/routes/paths";
 import { useCreateLead, useUpdateLead } from "@/hooks/api/useLeads";
+import { useUsers } from "@/hooks/api/useUsers";
+import { useAuth } from "@/contexts/AuthContext";
 import axiosInstance from "@/lib/axios";
 import type { LeadWithNames, LiveLocation } from "../helpers/leads.type";
 import { LocationPickerModal } from "./LocationPickerModal";
@@ -65,6 +67,7 @@ const LeadFormSchema = z.object({
     state: z.string().min(1, { message: "State is required" }),
     type: z.string().optional(),
     industry: z.string().optional(),
+    allocatedTe: z.string().optional(),
     pointsDiscussed: z.string().max(2000).optional(),
     veResponsibility: z.string().max(2000).optional(),
 });
@@ -113,6 +116,7 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
     const navigate = useNavigate();
     const createLead = useCreateLead();
     const updateLead = useUpdateLead();
+    const { user, roleId } = useAuth();
 
     const isInitialLoad = useRef(true);
     const previousCountry = useRef<string>("");
@@ -132,6 +136,15 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
         queryFn: fetchIndustries,
     });
 
+    const { data: allUsers = [], isLoading: teLoading } = useUsers();
+
+    const teOptions = allUsers.map((u: { id: number; name: string; team?: { name?: string } | null }) => ({
+        value: u.id.toString(),
+        label: u.team?.name ? `${u.name} (${u.team.name})` : (u.name ?? ""),
+    }));
+
+    const canChangeTE = roleId != null && [1, 2, 4].includes(roleId);
+
     const form = useForm<LeadFormValues>({
         resolver: zodResolver(LeadFormSchema) as any,
         defaultValues: {
@@ -145,6 +158,7 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
             state: lead?.state || "",
             type: lead?.type || "",
             industry: lead?.industry || "",
+            allocatedTe: mode === "create" ? (user?.id?.toString() ?? "") : (lead?.allocatedTe?.toString() ?? ""),
             pointsDiscussed: lead?.pointsDiscussed || "",
             veResponsibility: lead?.veResponsibility || "",
         },
@@ -187,6 +201,14 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mode]);
 
+    // Auto-select current user as TE in create mode (until the async user loads)
+    useEffect(() => {
+        if (mode !== "create") return;
+        if (!user?.id) return;
+        form.setValue("allocatedTe", user.id.toString(), { shouldValidate: false });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mode, user?.id]);
+
     const handleLocationConfirm = useCallback((loc: LiveLocation) => {
         setLiveLocation(loc);
         setLocationModal({ open: false });
@@ -222,6 +244,7 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                 type: values.type || null,
                 industry: values.industry || null,
                 team: null,
+                allocatedTe: values.allocatedTe ? Number(values.allocatedTe) : null,
                 pointsDiscussed: values.pointsDiscussed || null,
                 veResponsibility: values.veResponsibility || null,
                 liveLocation,
@@ -456,6 +479,15 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                                     label="Industry"
                                     options={industryOptions}
                                     placeholder="Select Industry"
+                                />
+
+                                <SelectField<LeadFormValues, "allocatedTe">
+                                    control={form.control}
+                                    name="allocatedTe"
+                                    label="Allocate TE"
+                                    options={teOptions}
+                                    placeholder={teLoading ? "Loading TEs..." : "-- Select TE --"}
+                                    disabled={!canChangeTE}
                                 />
 
                                 <SectionSeparator text="Additional Details" />
