@@ -1,0 +1,1 @@
+import{o as i,ai as r}from"./main-CXf9gvvn.js";const s={all:["info-sheets"],details:()=>[...s.all,"detail"],detail:e=>[...s.details(),e]},n=e=>i({queryKey:s.detail(e??0),queryFn:()=>r.getByTenderId(e),enabled:!!e,retry:(a,t)=>t?.status===404||t?.response?.status===404?!1:a<2});export{n as u};

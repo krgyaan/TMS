@@ -1,0 +1,1 @@
+import{o as t,ah as e}from"./main-CXf9gvvn.js";const l={all:["locations"],lists:()=>[...l.all,"list"],list:s=>[...l.lists(),{filters:s}],details:()=>[...l.all,"detail"],detail:s=>[...l.details(),s]},i=()=>t({queryKey:l.lists(),queryFn:()=>e.getAll()});export{i as u};

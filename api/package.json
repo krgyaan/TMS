@@ -5,8 +5,8 @@
     "author": "",
     "private": true,
     "license": "UNLICENSED",
-    "scripts": {
-        "build": "cross-env NODE_OPTIONS=--max-old-space-size=4096 nest build && pnpm run copy:templates",
+     "scripts": {
+        "build": "NODE_OPTIONS=--max-old-space-size=4096 nest build && pnpm run copy:templates",
         "copy:templates": "cpy \"src/**/*.hbs\" \"src/modules/pdf/assets/**/*\" dist --parents",
         "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
         "start": "nest start",
@@ -28,8 +28,8 @@
         "migrate:uploads:v2": "ts-node -r tsconfig-paths/register scripts/migrate-upload-dirs-v2.ts",
         "backfill:uploads-paths": "ts-node -r tsconfig-paths/register scripts/backfill-file-uploader-paths.ts",
         "postinstall": "npx puppeteer browsers install chrome",
-        "type-check": "tsc --noEmit",              
-        "type-check:watch": "tsc --noEmit --watch"  
+        "type-check": "tsc --noEmit",
+        "type-check:watch": "tsc --noEmit --watch"
     },
     "dependencies": {
         "@asteasolutions/zod-to-openapi": "^7.3.4",

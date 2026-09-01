@@ -5,9 +5,14 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
+        "dev:pwa": "vite --config vite.pwa.config.ts",
         "build": "vite build",
-        "lint": "eslint .",
-        "preview": "vite preview"
+        "build:pwa": "vite build --config vite.pwa.config.ts && node -e \"const fs=require('fs');fs.copyFileSync('dist-pwa/index.pwa.html','dist-pwa/index.html')\"",
+        "preview": "vite preview",
+        "preview:pwa": "vite preview --config vite.pwa.config.ts",
+        "type-check": "tsc --noEmit",
+        "type-check:watch": "tsc --noEmit --watch",
+        "lint": "eslint ."
     },
     "dependencies": {
         "@hookform/resolvers": "^5.2.1",
@@ -94,6 +99,8 @@
         "tw-animate-css": "^1.3.7",
         "typescript": "~5.8.3",
         "typescript-eslint": "^8.39.1",
-        "vite": "^7.1.2"
+        "vite": "^7.1.2",
+        "vite-plugin-pwa": "^1.3.0",
+        "workbox-window": "^7.4.1"
     }
 }
