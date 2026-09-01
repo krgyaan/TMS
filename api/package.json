@@ -5,7 +5,7 @@
     "author": "",
     "private": true,
     "license": "UNLICENSED",
-    "scripts": {
+     "scripts": {
         "build": "NODE_OPTIONS=--max-old-space-size=4096 nest build && pnpm run copy:templates",
         "copy:templates": "cpy \"src/**/*.hbs\" \"src/modules/pdf/assets/**/*\" dist --parents",
         "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -27,7 +27,9 @@
         "migrate:uploads": "ts-node -r tsconfig-paths/register scripts/migrate-file-upload-dirs.ts",
         "migrate:uploads:v2": "ts-node -r tsconfig-paths/register scripts/migrate-upload-dirs-v2.ts",
         "backfill:uploads-paths": "ts-node -r tsconfig-paths/register scripts/backfill-file-uploader-paths.ts",
-        "postinstall": "npx puppeteer browsers install chrome"
+        "postinstall": "npx puppeteer browsers install chrome",
+        "type-check": "tsc --noEmit",
+        "type-check:watch": "tsc --noEmit --watch"
     },
     "dependencies": {
         "@asteasolutions/zod-to-openapi": "^7.3.4",
@@ -97,6 +99,7 @@
         "@types/pg": "^8.15.5",
         "@types/supertest": "^6.0.2",
         "cpy-cli": "^6.0.0",
+        "cross-env": "^10.1.0",
         "dotenv": "^17.2.3",
         "drizzle-kit": "^0.31.4",
         "eslint": "^9.18.0",
