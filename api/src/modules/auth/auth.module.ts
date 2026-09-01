@@ -5,6 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import authConfig, { type AuthConfig } from '@/config/auth.config';
 import { UsersModule } from '@/modules/master/users/users.module';
 import { GoogleIntegrationModule } from '@/modules/integrations/google/google.module';
+import { MailerModule } from '@/mailer/mailer.module';
 import { DatabaseModule } from '@db/database.module';
 
 import { AuthService } from '@/modules/auth/auth.service';
@@ -35,6 +36,7 @@ import type { StringValue } from 'ms';
         }),
         UsersModule,
         GoogleIntegrationModule,
+        MailerModule,
     ],
     controllers: [AuthController],
     providers: [

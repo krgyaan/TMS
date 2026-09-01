@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   User, 
@@ -12,7 +11,6 @@ import {
 import { cn } from "@/lib/utils";
 
 import { ProfileProvider, useProfileContext } from "./contexts/ProfileContext";
-import { staggerContainer } from "./animations";
 
 import { ProfileHeader } from "./components/ProfileHeader";
 import { OverviewTab } from "./components/OverviewTab";
@@ -45,21 +43,12 @@ function StandardProfileView() {
   ];
 
   return (
-    <motion.div
-      variants={staggerContainer}
-      initial="hidden"
-      animate="visible"
-      className="space-y-6"
-    >
+    <div className="space-y-6">
       {/* Header Card */}
       <ProfileHeader />
 
       {/* Tabs Navigation */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
+      <div>
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
@@ -89,37 +78,35 @@ function StandardProfileView() {
 
           {/* Tab Contents */}
           <div className="mt-6">
-            <AnimatePresence mode="wait">
-              {activeTab === "overview" && (
-                <TabsContent value="overview" className="outline-none m-0" key="overview" forceMount>
-                  <OverviewTab setActiveTab={setActiveTab} />
-                </TabsContent>
-              )}
-              {activeTab === "documents" && (
-                <TabsContent value="documents" className="outline-none m-0" key="documents" forceMount>
-                  <DocumentsSection />
-                </TabsContent>
-              )}
-              {activeTab === "notifications" && (
-                <TabsContent value="notifications" className="outline-none m-0" key="notifications" forceMount>
-                  <NotificationsSection />
-                </TabsContent>
-              )}
-              {activeTab === "assets" && (
-                <TabsContent value="assets" className="outline-none m-0" key="assets" forceMount>
-                  <AssetsSection />
-                </TabsContent>
-              )}
-              {activeTab === "complaints" && (
-                <TabsContent value="complaints" className="outline-none m-0" key="complaints" forceMount>
-                  <ComplaintsSection />
-                </TabsContent>
-              )}
-            </AnimatePresence>
+            {activeTab === "overview" && (
+              <TabsContent value="overview" className="outline-none m-0" forceMount>
+                <OverviewTab setActiveTab={setActiveTab} />
+              </TabsContent>
+            )}
+            {activeTab === "documents" && (
+              <TabsContent value="documents" className="outline-none m-0" forceMount>
+                <DocumentsSection />
+              </TabsContent>
+            )}
+            {activeTab === "notifications" && (
+              <TabsContent value="notifications" className="outline-none m-0" forceMount>
+                <NotificationsSection />
+              </TabsContent>
+            )}
+            {activeTab === "assets" && (
+              <TabsContent value="assets" className="outline-none m-0" forceMount>
+                <AssetsSection />
+              </TabsContent>
+            )}
+            {activeTab === "complaints" && (
+              <TabsContent value="complaints" className="outline-none m-0" forceMount>
+                <ComplaintsSection />
+              </TabsContent>
+            )}
           </div>
         </Tabs>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 
@@ -159,13 +146,6 @@ function ProfilePageContent() {
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/10">
-      {/* ── Decorative Background Blobs ───────────────────────────────────── */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-        <div className="absolute -top-[15%] -right-[10%] w-[45%] h-[45%] rounded-full bg-primary/[0.04] blur-[120px]" />
-        <div className="absolute top-[30%] -left-[8%]  w-[35%] h-[35%] rounded-full bg-primary/[0.03] blur-[100px]" />
-        <div className="absolute bottom-[10%] right-[15%] w-[25%] h-[25%] rounded-full bg-primary/[0.02] blur-[80px]"  />
-      </div>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 relative">
         {/* my very personal router */}
         {data.isOnboarding ? (

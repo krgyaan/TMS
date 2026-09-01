@@ -14,3 +14,6 @@ export * from './role-permissions.schema';
 // OAuth
 export * from './oauth-accounts.schema';
 export * from './oauth-accounts.relations';
+
+// Password Reset
+export * from './password-reset-otps.schema';

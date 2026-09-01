@@ -435,6 +435,13 @@
                         "when":  1788080547911,
                         "tag":  "0128_drop_companies_and_documents",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  86,
+                        "version":  "7",
+                        "when":  1785960000000,
+                        "tag":  "0127_create_password_reset_otps",
+                        "breakpoints":  true
                     }
                 ]
 }

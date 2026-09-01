@@ -2,29 +2,20 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form'
+import { Form } from '@/components/ui/form'
 import { FieldWrapper } from '@/components/form/FieldWrapper'
 import { Input } from '@/components/ui/input'
 import { useUpdateUserProfile, useCreateUserProfile } from '@/hooks/api/useUserProfiles'
 import { useUpdateUser } from '@/hooks/api/useUsers'
-import { useTeams } from '@/hooks/api/useTeams'
 import type { User } from '@/types/api.types'
 import type { UserProfile } from '@/types/auth.types'
 import { toast } from 'sonner'
 
-const preprocessText = (value: unknown) => {
-    if (typeof value !== 'string') {
-        return value
-    }
-    const trimmed = value.trim()
-    return trimmed.length ? trimmed : undefined
-}
-
 const optionalString = (max: number, message: string) =>
-    z.preprocess(preprocessText, z.string().max(max, message)).optional()
+    z.string().trim().max(max, message).optional()
 
 const optionalEmail = () =>
-    z.preprocess(preprocessText, z.string().email('Invalid email address')).optional()
+    z.string().trim().email('Invalid email address').optional()
 
 const ProfileSchema = z.object({
     firstName: optionalString(255, 'First name too long'),
@@ -63,7 +54,6 @@ export const ProfileForm = ({ user, profile, onCancel, onSuccess }: ProfileFormP
     const updateUser = useUpdateUser()
     const updateProfile = useUpdateUserProfile()
     const createProfile = useCreateUserProfile()
-    const { data: teams = [] } = useTeams()
 
     const form = useForm<ProfileFormValues>({
         resolver: zodResolver(ProfileFormSchema),
@@ -89,11 +79,6 @@ export const ProfileForm = ({ user, profile, onCancel, onSuccess }: ProfileFormP
             },
         },
     })
-
-    const teamOptions = [
-        { id: '', name: 'None' },
-        ...teams.map((team) => ({ id: String(team.id), name: team.name })),
-    ]
 
     const handleSubmit = async (values: ProfileFormValues) => {
         try {
@@ -132,7 +117,7 @@ export const ProfileForm = ({ user, profile, onCancel, onSuccess }: ProfileFormP
                     data: profilePayload,
                 })
             } else {
-                await createProfile.mutateAsync(profilePayload as any)
+                await createProfile.mutateAsync(profilePayload as Omit<UserProfile, "id">)
             }
 
             toast.success('Profile updated successfully')
@@ -150,17 +135,17 @@ export const ProfileForm = ({ user, profile, onCancel, onSuccess }: ProfileFormP
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
                 <div className="grid gap-6 md:grid-cols-2">
                     <FieldWrapper control={form.control} name="name" label="Full Name">
-                        {(field) => <Input placeholder="Enter full name" {...field as any} value={field.value ?? ''} />}
+                        {(field) => <Input placeholder="Enter full name" {...field} value={field.value ?? ''} />}
                     </FieldWrapper>
                     <FieldWrapper control={form.control} name="username" label="Username (optional)">
-                        {(field) => <Input placeholder="Username" {...field as any} value={field.value ?? ''} />}
+                        {(field) => <Input placeholder="Username" {...field} value={field.value ?? ''} />}
                     </FieldWrapper>
                     <FieldWrapper control={form.control} name="mobile" label="Mobile (optional)">
-                        {(field) => <Input placeholder="Phone number" {...field as any} value={field.value ?? ''} />}
+                        {(field) => <Input placeholder="Phone number" {...field} value={field.value ?? ''} />}
                     </FieldWrapper>
                     <div>
                         <label className="text-sm font-medium">Email</label>
-                        <Input value={user.email} disabled className="mt-1" />
+                        <Input value={user.email ?? ''} disabled className="mt-1" />
                         <p className="text-xs text-muted-foreground mt-1">Email cannot be changed</p>
                     </div>
                 </div>

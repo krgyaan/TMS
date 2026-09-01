@@ -1,25 +1,15 @@
-import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Tooltip,
   TooltipContent,
@@ -34,10 +24,8 @@ import {
   Upload,
   Eye,
   Download,
-  X,
   CheckCircle2,
   AlertCircle,
-  Clock,
   Shield,
   Lock,
   GraduationCap,
@@ -51,10 +39,8 @@ import {
   RotateCcw,
   Info,
   Search,
-  Filter,
   Plus,
   CloudUpload,
-  ArrowUpRight,
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -63,9 +49,9 @@ import { FileUploader } from "@/components/file-upload";
 import api from "@/lib/axios";
 import { useProfileContext } from "../contexts/ProfileContext";
 import { useOnboardingContext } from "./onboarding/contexts/OnboardingContext";
+import type { ProfileResponse, DocumentData } from "../types";
 import { formatDate } from "../utils";
 import { getStatusConfig } from "./ui-helpers";
-import { staggerContainer, fadeInUp, tabContentVariants } from "../animations";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -77,21 +63,8 @@ interface DocumentType {
   uploaded: boolean;
 }
 
-interface UploadedDocument {
-  id: string;
-  docType: string;
-  docCategory: string;
-  docNumber?: string;
-  issueDate?: string;
-  expiryDate?: string;
-  fileName?: string;
+interface UploadedDocument extends DocumentData {
   fileSize?: string;
-  fileUrl?: string;
-  verificationStatus: "pending" | "approved" | "rejected";
-  remarks?: string;
-  uploadedAt?: string;
-  verifiedBy?: string;
-  verificationDate?: string;
 }
 
 // ─── REQUIRED DOCUMENT DEFINITIONS ───────────────────────────────────────────
@@ -140,13 +113,6 @@ function getFileIcon(fileName?: string) {
   return FileText;
 }
 
-function formatFileSize(bytes?: number): string {
-  if (!bytes) return "";
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
-  return (bytes / 1048576).toFixed(1) + " MB";
-}
-
 // ─── UPLOAD DIALOG ──────────────────────────────────────────────────────────
 
 interface UploadDialogProps {
@@ -168,9 +134,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
   onSuccess,
   isOnboarding = false,
 }) => {
-  const [dragActive, setDragActive] = useState(false);
   const [files, setFiles] = useState<string[]>([]);
-  const [docNumber, setDocNumber] = useState(existingDoc?.docNumber || "");
   const [issueDate, setIssueDate] = useState(existingDoc?.issueDate || "");
   const [expiryDate, setExpiryDate] = useState(existingDoc?.expiryDate || "");
   const [uploading, setUploading] = useState(false);
@@ -187,10 +151,8 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
 
       const urlPrefix = isOnboarding ? "/hrms/employee-onboarding" : "/profile";
       if (isReupload && existingDoc) {
-        // PATCH /profile/documents/:id or /hrms/onboarding/documents/:id
         await api.patch(`${urlPrefix}/documents/${existingDoc.id}`, payload);
       } else if (documentType) {
-        // POST /profile/documents or /hrms/onboarding/documents
         payload.docType = documentType.docType;
         payload.docCategory = documentType.docCategory;
         await api.post(`${urlPrefix}/documents`, payload);
@@ -198,23 +160,16 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
 
       onSuccess();
       setFiles([]);
-      setDocNumber("");
       setIssueDate("");
       setExpiryDate("");
       onOpenChange(false);
-    } catch (err: any) {
-      const message = err?.response?.data?.message || "Upload failed. Please try again.";
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      const message = e?.response?.data?.message || "Upload failed. Please try again.";
       alert(message);
     } finally {
       setUploading(false);
     }
-  };
-
-  const handleReset = () => {
-    setFiles([]);
-    setDocNumber("");
-    setIssueDate("");
-    setExpiryDate("");
   };
 
   const docName = documentType?.docType || existingDoc?.docType || "Document";
@@ -313,12 +268,9 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
             >
               {uploading ? (
                 <>
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  >
+                  <div className="animate-spin">
                     <RotateCcw className="h-4 w-4" />
-                  </motion.div>
+                  </div>
                   Uploading...
                 </>
               ) : (
@@ -437,27 +389,16 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({ open, onOpenChange, docum
 
 interface PendingUploadCardProps {
   doc: DocumentType;
-  index: number;
   onUpload: (doc: DocumentType) => void;
   isOnboarding?: boolean;
 }
 
-const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, index, onUpload, isOnboarding = true }) => {
+const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, onUpload, isOnboarding = true }) => {
   const catConfig = CATEGORY_CONFIG[doc.docCategory] || CATEGORY_CONFIG["Other Documents"];
   const CatIcon = catConfig.icon;
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, scale: 0.95, y: 16 }}
-      animate={{
-        opacity: 1,
-        scale: 1,
-        y: 0,
-        transition: { delay: index * 0.04, duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-      }}
-      exit={{ opacity: 0, scale: 0.95, y: -16 }}
-    >
+    <div>
       <Card
         className={cn(
           "border-dashed border-2 shadow-none hover:shadow-lg hover:shadow-primary/[0.04] transition-all duration-400 group bg-muted/10 backdrop-blur-sm overflow-hidden",
@@ -513,7 +454,7 @@ const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, index, onUpl
           )}
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 };
 
@@ -521,32 +462,19 @@ const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, index, onUpl
 
 interface UploadedDocCardProps {
   doc: UploadedDocument;
-  index: number;
   onView: (doc: UploadedDocument) => void;
   onReupload: (doc: UploadedDocument) => void;
   onDelete: (doc: UploadedDocument) => void;
   isOnboarding?: boolean;
 }
 
-const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, onReupload, onDelete, isOnboarding = true }) => {
+const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, onView, onReupload, onDelete, isOnboarding = true }) => {
   const status = getStatusConfig(doc.verificationStatus);
   const StatusIcon = status.icon;
-  const catConfig = CATEGORY_CONFIG[doc.docCategory] || CATEGORY_CONFIG["Other Documents"];
-  const CatIcon = catConfig.icon;
-  const FileIcon = getFileIcon(doc.fileName);
+  const FileIcon = getFileIcon(doc.fileName ?? undefined);
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, scale: 0.95, y: 16 }}
-      animate={{
-        opacity: 1,
-        scale: 1,
-        y: 0,
-        transition: { delay: index * 0.04, duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-      }}
-      exit={{ opacity: 0, scale: 0.95, y: -16 }}
-    >
+    <div>
       <Card className="border-border/40 shadow-lg shadow-black/[0.03] hover:shadow-xl hover:shadow-primary/[0.06] hover:border-primary/15 hover:bg-muted/30 transition-all duration-400 group bg-muted/20 backdrop-blur-sm overflow-hidden">
         <CardContent className="p-5">
           <div className="flex items-start justify-between mb-4">
@@ -687,7 +615,7 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, o
           </div>
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 };
 
@@ -695,8 +623,8 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, o
 
 export const DocumentsSection: React.FC = () => {
   // Try to use Onboarding context first, fallback to Profile context
-  let contextData: any;
-  let contextRefetch: any;
+  let contextData: ProfileResponse | undefined;
+  let contextRefetch: (() => void) | undefined;
   let isOnboarding = false;
 
   try {
@@ -706,7 +634,7 @@ export const DocumentsSection: React.FC = () => {
       contextRefetch = onboarding.refetch;
       isOnboarding = true;
     }
-  } catch (e) {
+  } catch {
     // Not within OnboardingProvider
   }
 
@@ -800,16 +728,17 @@ export const DocumentsSection: React.FC = () => {
       await api.delete(`${urlPrefix}/documents/${doc.id}`);
       queryClient.invalidateQueries({ queryKey: [isOnboarding ? 'my-onboarding-draft' : 'my-profile'] });
       refetch?.();
-    } catch (err: any) {
-      alert(err?.response?.data?.message || "Failed to delete document.");
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      alert(e?.response?.data?.message || "Failed to delete document.");
     }
   };
 
   return (
-    <motion.div key="documents" variants={tabContentVariants} initial="hidden" animate="visible" exit="exit">
-      <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-6">
+    <div>
+      <div className="space-y-6">
         {/* ── Progress Banner ──────────────────────────────────────────── */}
-        <motion.div variants={fadeInUp}>
+        <div>
           <Card className="border-border/40 shadow-lg shadow-black/[0.02] bg-gradient-to-r from-primary/[0.03] via-background to-primary/[0.02] backdrop-blur-sm overflow-hidden">
             <CardContent className="p-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -819,13 +748,9 @@ export const DocumentsSection: React.FC = () => {
                       <Sparkles className="h-7 w-7 text-primary" />
                     </div>
                     {completionPct === 100 && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30"
-                      >
+                      <div className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
                         <CheckCircle2 className="h-3.5 w-3.5 text-white" />
-                      </motion.div>
+                      </div>
                     )}
                   </div>
                   <div>
@@ -846,16 +771,14 @@ export const DocumentsSection: React.FC = () => {
                       <span className="text-sm font-black text-primary">{completionPct}%</span>
                     </div>
                     <div className="h-2.5 rounded-full bg-muted/50 overflow-hidden">
-                      <motion.div
+                      <div
                         className={cn(
                           "h-full rounded-full",
                           completionPct === 100
                             ? "bg-gradient-to-r from-emerald-500 to-emerald-400"
                             : "bg-gradient-to-r from-primary to-primary/80"
                         )}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${completionPct}%` }}
-                        transition={{ duration: 1, ease: "easeOut", delay: 0.3 }}
+                        style={{ width: `${completionPct}%` }}
                       />
                     </div>
                   </div>
@@ -871,10 +794,10 @@ export const DocumentsSection: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-        </motion.div>
+        </div>
 
         {/* ── Stats Grid ──────────────────────────────────────────────── */}
-        <motion.div variants={fadeInUp} className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
             {
               label: "Total Uploaded",
@@ -929,14 +852,9 @@ export const DocumentsSection: React.FC = () => {
                   <stat.icon className={cn("h-4.5 w-4.5", stat.color)} />
                 </div>
                 <div>
-                  <motion.p
-                    className="text-xl font-black tracking-tight"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                  >
+                  <p className="text-xl font-black tracking-tight">
                     {stat.value}
-                  </motion.p>
+                  </p>
                   <p className="text-[9px] uppercase tracking-[0.1em] text-muted-foreground font-semibold leading-tight">
                     {stat.label}
                   </p>
@@ -944,10 +862,10 @@ export const DocumentsSection: React.FC = () => {
               </CardContent>
             </Card>
           ))}
-        </motion.div>
+        </div>
 
         {/* ── View Toggle + Search + Filters ─────────────────────────── */}
-        <motion.div variants={fadeInUp} className="space-y-4">
+        <div className="space-y-4">
           {/* View Toggle */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-2 p-1 bg-muted/20 rounded-xl border border-border/30">
@@ -1015,34 +933,24 @@ export const DocumentsSection: React.FC = () => {
               );
             })}
           </div>
-        </motion.div>
+        </div>
 
         {/* ── Document Grid ──────────────────────────────────────────── */}
-        <motion.div variants={fadeInUp}>
-          <AnimatePresence mode="wait">
-            {activeView === "uploaded" ? (
-              <motion.div
-                key="uploaded-grid"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                transition={{ duration: 0.2 }}
-              >
+        <div>
+          {activeView === "uploaded" ? (
+              <div>
                 {filteredUploaded.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <AnimatePresence mode="popLayout">
-                      {filteredUploaded.map((doc, index) => (
-                        <UploadedDocCard
-                          key={doc.id}
-                          doc={doc}
-                          index={index}
-                          onView={handleView}
-                          onReupload={handleReupload}
-                          onDelete={handleDelete}
-                          isOnboarding={data.isOnboarding}
-                        />
-                      ))}
-                    </AnimatePresence>
+                    {filteredUploaded.map((doc) => (
+                      <UploadedDocCard
+                        key={doc.id}
+                        doc={doc}
+                        onView={handleView}
+                        onReupload={handleReupload}
+                        onDelete={handleDelete}
+                        isOnboarding={data.isOnboarding}
+                      />
+                    ))}
                   </div>
                 ) : (
                   <Card className="border-dashed border-2 border-border/30 bg-muted/10">
@@ -1067,22 +975,12 @@ export const DocumentsSection: React.FC = () => {
                     </CardContent>
                   </Card>
                 )}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="pending-grid"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                transition={{ duration: 0.2 }}
-              >
+              </div>
+          ) : (
+              <div>
                 {/* Required Docs Alert */}
                 {requiredPendingCount > 0 && activeCategory === "all" && !searchQuery && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-4 flex items-start gap-3 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/15"
-                  >
+                  <div className="mb-4 flex items-start gap-3 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/15">
                     <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
                     <div>
                       <p className="text-sm font-bold text-amber-700 mb-0.5">
@@ -1092,37 +990,29 @@ export const DocumentsSection: React.FC = () => {
                         Please upload all required documents marked with a red badge to complete your onboarding.
                       </p>
                     </div>
-                  </motion.div>
+                  </div>
                 )}
 
                 {filteredPending.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <AnimatePresence mode="popLayout">
-                      {/* Sort: required first */}
-                      {[...filteredPending]
-                        .sort((a, b) => (a.required === b.required ? 0 : a.required ? -1 : 1))
-                        .map((doc, index) => (
-                          <PendingUploadCard
-                            key={doc.id}
-                            doc={doc}
-                            index={index}
-                            onUpload={handleUploadClick}
-                            isOnboarding={data.isOnboarding}
-                          />
-                        ))}
-                    </AnimatePresence>
+                    {/* Sort: required first */}
+                    {[...filteredPending]
+                      .sort((a, b) => (a.required === b.required ? 0 : a.required ? -1 : 1))
+                      .map((doc) => (
+                        <PendingUploadCard
+                          key={doc.id}
+                          doc={doc}
+                          onUpload={handleUploadClick}
+                          isOnboarding={data.isOnboarding}
+                        />
+                      ))}
                   </div>
                 ) : (
-                  <Card className="border-border/30 bg-emerald-500/5 border-emerald-500/15">
+                  <Card className="bg-emerald-500/5 border-emerald-500/15">
                     <CardContent className="p-12 text-center">
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", stiffness: 200 }}
-                        className="h-16 w-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4"
-                      >
+                      <div className="h-16 w-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
                         <CheckCircle2 className="h-8 w-8 text-emerald-500" />
-                      </motion.div>
+                      </div>
                       <h3 className="text-sm font-bold mb-1 text-emerald-700">All documents uploaded!</h3>
                       <p className="text-xs text-emerald-600/70">
                         {searchQuery || activeCategory !== "all"
@@ -1132,14 +1022,13 @@ export const DocumentsSection: React.FC = () => {
                     </CardContent>
                   </Card>
                 )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+              </div>
+          )}
+        </div>
 
         {/* ── Category-wise Summary (Collapsed) ──────────────────────── */}
         {activeView === "uploaded" && DOCUMENTS.length > 0 && (
-          <motion.div variants={fadeInUp}>
+          <div>
             <Card className="border-border/30 bg-muted/10 backdrop-blur-sm">
               <CardContent className="p-5">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
@@ -1194,9 +1083,9 @@ export const DocumentsSection: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
-          </motion.div>
+          </div>
         )}
-      </motion.div>
+      </div>
 
       {/* ── Dialogs ─────────────────────────────────────────────────── */}
       <UploadDialog
@@ -1214,6 +1103,6 @@ export const DocumentsSection: React.FC = () => {
         onOpenChange={setPreviewDialogOpen}
         document={selectedUploadedDoc}
       />
-    </motion.div>
+    </div>
   );
 };
