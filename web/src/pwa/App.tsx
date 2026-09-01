@@ -1,6 +1,10 @@
+import { Routes, Route } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext"; // reuse existing
+import { paths } from "@/app/routes/paths";
 import PwaRouter from "./router";
 import Login from "@/modules/auth/login"; // reuse existing login page
+import SignUp from "@/modules/auth/sign-up";
+import ForgotPasswordPage from "@/modules/auth/forgot-password";
 
 export default function PwaApp() {
     const { isAuthenticated, isLoading } = useAuth();
@@ -17,7 +21,13 @@ export default function PwaApp() {
     }
 
     if (!isAuthenticated) {
-        return <Login />;  // reuse existing login page
+        return (
+            <Routes>
+                <Route path={paths.auth.forgotPassword} element={<ForgotPasswordPage />} />
+                <Route path="/sign-up" element={<SignUp />} />
+                <Route path="*" element={<Login />} />
+            </Routes>
+        );
     }
 
     return <PwaRouter />;

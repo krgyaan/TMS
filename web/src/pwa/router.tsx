@@ -4,6 +4,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { RouteWrapper } from "@/app/routes/components/RouteWrapper";
 import PwaLayout from "./layout/PwaLayout";
 
+// ========== Profile ==========
+const Profile = lazy(() => import("@/modules/profile"));
+
+// ========== Shared / Document Dashboard Module ==========
+const Shared_ClientDirectory = lazy(() => import("@/modules/shared/client-directory/ClientDirectoryListPage"));
+
 // ========== CRM Module ==========
 const CRM_Leads = lazy(() => import("@/modules/crm/leads/LeadsListPage"));
 const CRM_LeadCreate = lazy(() => import("@/modules/crm/leads/LeadCreatePage"));
@@ -59,6 +65,7 @@ export default function PwaRouter() {
 
     const hasCRM = isAdmin || isSuperUser || permissions.includes("crm:read");
     const hasImprest = isAdmin || isSuperUser || permissions.includes("imprest:read");
+    const hasClientDirectory = isAdmin || isSuperUser || permissions.includes("shared.client-directory");
 
     const defaultRoute = hasCRM
         ? "/crm/leads"
@@ -85,6 +92,24 @@ export default function PwaRouter() {
                             ) : (
                                 <NoPermission />
                             )
+                        }
+                    />
+
+                    {/* ========== Profile ========== */}
+                    <Route
+                        path="profile"
+                        element={
+                            <RouteWrapper><Profile /></RouteWrapper>
+                        }
+                    />
+
+                    {/* ========== Client Directory ========== */}
+                    <Route
+                        path="document-dashboard/client-directory"
+                        element={
+                            <PermissionRoute hasAccess={hasClientDirectory}>
+                                <RouteWrapper><Shared_ClientDirectory /></RouteWrapper>
+                            </PermissionRoute>
                         }
                     />
 

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Users, Share2 } from "lucide-react";
+import { BookUser, Mail, PhoneCall, Users, Wallet } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
@@ -20,47 +20,21 @@ import type { LucideIcon } from "lucide-react";
 type NavItem = {
     title: string;
     url: string;
+    icon?: LucideIcon;
     permission?: string;
 };
 
-type NavGroup = {
-    title: string;
-    url?: string;
-    icon?: LucideIcon;
-    items?: NavItem[];
-};
-
-// 👈 Only CRM + Imprest items
-const pwaNavItems: NavGroup[] = [
-    {
-        title: "CRM",
-        icon: Users,
-        items: [
-            { title: "Happy Calling", url: paths.crm.happyCalling, permission: "crm.happy_calling" },
-            { title: "Leads", url: paths.crm.leads, permission: "crm.leads" },
-            { title: "Enquiries", url: paths.crm.enquiries, permission: "crm.enquiries" },
-        ],
-    },
-    {
-        title: "Shared",
-        icon: Share2,
-        items: [
-            { title: "Imprests", url: paths.shared.imprest, permission: "shared.imprests" },
-        ],
-    },
+// 👈 Flat field options (no grouped folders)
+const pwaNavItems: NavItem[] = [
+    { title: "Client Directory", url: paths.documentDashboard.clientDirectory, icon: BookUser, permission: "shared.client-directory" },
+    { title: "Happy Calling", url: paths.crm.happyCalling, icon: PhoneCall, permission: "crm.happy_calling" },
+    { title: "Leads", url: paths.crm.leads, icon: Users, permission: "crm.leads" },
+    { title: "Enquiries", url: paths.crm.enquiries, icon: Mail, permission: "crm.enquiries" },
+    { title: "Imprest", url: paths.shared.imprest, icon: Wallet, permission: "shared.imprests" },
 ];
 
-function filterMenu(user: AuthUser | null, menu: NavGroup[]): NavGroup[] {
-    return menu
-        .map(group => {
-            if (!group.items) return group;
-            const visibleItems = group.items.filter(
-                item => !item.permission || canRead(user, item.permission)
-            );
-            if (visibleItems.length === 0) return null;
-            return { ...group, items: visibleItems };
-        })
-        .filter(Boolean) as NavGroup[];
+function filterMenu(user: AuthUser | null, menu: NavItem[]): NavItem[] {
+    return menu.filter(item => !item.permission || canRead(user, item.permission));
 }
 
 export function PwaSidebar(props: React.ComponentProps<typeof Sidebar>) {

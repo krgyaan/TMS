@@ -13,7 +13,7 @@ export default defineConfig({
         VitePWA({
             registerType: "autoUpdate",
             injectRegister: "auto",
-            includeAssets: ["favicon.ico", "pwa-icons/*.png", "pwa-icons/wp.jpg"],
+            includeAssets: ["favicon.ico", "pwa-icons/*.png"],
             manifest: {
                 name: "TMS Field App",
                 short_name: "TMS",
