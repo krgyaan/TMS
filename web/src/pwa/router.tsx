@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { RouteWrapper } from "@/app/routes/components/RouteWrapper";
 import PwaLayout from "./layout/PwaLayout";
+import PwaDashboard from "./pages/Dashboard";
 
 // ========== Profile ==========
 const Profile = lazy(() => import("@/modules/profile"));
@@ -37,17 +38,6 @@ const ImprestPaymentHistory = lazy(() => import("@/modules/imprest/PaymentHistor
 const ImprestVoucherPage = lazy(() => import("@/modules/imprest/VoucherListPage"));
 const ImprestVoucherViewPage = lazy(() => import("@/modules/imprest/VoucherViewPage"));
 
-// No Permission page
-function NoPermission() {
-    return (
-        <div className="flex h-screen items-center justify-center">
-            <p className="text-muted-foreground">
-                No modules assigned to your account.
-            </p>
-        </div>
-    );
-}
-
 // Protected route - redirects if no permission
 function PermissionRoute({
     hasAccess,
@@ -67,12 +57,6 @@ export default function PwaRouter() {
     const hasImprest = isAdmin || isSuperUser || permissions.includes("imprest:read");
     const hasClientDirectory = isAdmin || isSuperUser || permissions.includes("shared.client-directory");
 
-    const defaultRoute = hasCRM
-        ? "/crm/leads"
-        : hasImprest
-        ? "/shared/imprests"
-        : null;
-
     return (
         <Suspense
             fallback={
@@ -83,15 +67,11 @@ export default function PwaRouter() {
         >
             <Routes>
                 <Route element={<PwaLayout />}>
-                    {/* Default redirect */}
+                    {/* Dashboard (home) */}
                     <Route
                         path="/"
                         element={
-                            defaultRoute ? (
-                                <Navigate to={defaultRoute} replace />
-                            ) : (
-                                <NoPermission />
-                            )
+                            <PwaDashboard />
                         }
                     />
 
