@@ -45,7 +45,3 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
-
-web/dist-pwa/index.html
-web/dist-pwa/index.pwa.html
-web/dist-pwa/sw.js
