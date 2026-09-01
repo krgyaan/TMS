@@ -13,7 +13,7 @@ export default defineConfig({
         VitePWA({
             registerType: "autoUpdate",
             injectRegister: "auto",
-            includeAssets: ["favicon.ico", "pwa-icons/*.png"],
+            includeAssets: ["favicon.ico", "pwa-icons/*.png", "pwa-icons/wp.jpg"],
             manifest: {
                 name: "TMS Field App",
                 short_name: "TMS",
@@ -29,25 +29,33 @@ export default defineConfig({
                         src: "pwa-icons/icon-192x192.png",
                         sizes: "192x192",
                         type: "image/png",
+                        purpose: "any",
                     },
                     {
                         src: "pwa-icons/icon-512x512.png",
                         sizes: "512x512",
                         type: "image/png",
+                        purpose: "any",
                     },
                     {
-                        src: "pwa-icons/icon-512x512.png",
+                        src: "pwa-icons/icon-maskable-512x512.png",
                         sizes: "512x512",
                         type: "image/png",
-                        purpose: "any maskable",
+                        purpose: "maskable",
                     },
                 ],
             },
             workbox: {
                 globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+                // The PWA HTML entry is emitted as index.pwa.html; it is the
+                // precached app shell, so route all in-app navigations to it.
+                navigateFallback: "index.pwa.html",
+                navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//],
                 runtimeCaching: [
+                    // NETWORK-FIRST for API data: fresh online, cached offline.
+                    // Origin-agnostic so it works in dev (localhost proxy) and prod (VITE_API_URL).
                     {
-                        urlPattern: /^http:\/\/localhost:3000\/api\/.*/i,
+                        urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
                         handler: "NetworkFirst",
                         options: {
                             cacheName: "tms-api-cache",
@@ -58,8 +66,9 @@ export default defineConfig({
                             networkTimeoutSeconds: 10,
                         },
                     },
+                    // CACHE-FIRST for uploaded files (fast, reuse existing downloads).
                     {
-                        urlPattern: /^http:\/\/localhost:3000\/uploads\/.*/i,
+                        urlPattern: ({ url }) => url.pathname.startsWith("/uploads/"),
                         handler: "CacheFirst",
                         options: {
                             cacheName: "tms-uploads-cache",
@@ -78,7 +87,7 @@ export default defineConfig({
         emptyOutDir: true,
         rollupOptions: {
             input: {
-                main: path.resolve("index.pwa.html"),
+                index: path.resolve("index.pwa.html"),
             },
         },
     },

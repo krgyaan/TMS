@@ -1,1 +1,0 @@
-import{o as l,az as t}from"./main-CXf9gvvn.js";const s={all:["users"],lists:()=>[...s.all,"list"],list:e=>[...s.lists(),{filters:e}],details:()=>[...s.all,"detail"],detail:e=>[...s.details(),e]},a=()=>l({queryKey:s.lists(),queryFn:()=>t.getAll()}),u=e=>l({queryKey:s.detail(e),queryFn:()=>t.getById(e),enabled:!!e});export{u as a,a as u};

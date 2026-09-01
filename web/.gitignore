@@ -13,6 +13,7 @@ node_modules/
 
 # Build output
 dist/
+dist-pwa/
 dist-ssr/
 build/
 
