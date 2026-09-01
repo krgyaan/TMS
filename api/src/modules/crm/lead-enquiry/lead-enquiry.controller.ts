@@ -36,6 +36,7 @@ export class LeadEnquiryController {
         @Query('team')      team?:      string,
         @Query('leadId')    leadId?:    string,
         @Query('happyCallingId') happyCallingId?: string,
+        @Query('enquiryType') enquiryType?: string,
         @Query('sortBy')    sortBy?:    string,
         @Query('sortOrder') sortOrder?: string,
     ) {
@@ -53,6 +54,7 @@ export class LeadEnquiryController {
             team,
             leadId: parseNumber(leadId),
             happyCallingId: parseNumber(happyCallingId),
+            enquiryType,
             sortBy,
             sortOrder: sortOrder as 'asc' | 'desc' | undefined,
         });

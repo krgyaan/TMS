@@ -36,6 +36,7 @@ export type LeadEnquiryListFilters = {
     team?: string;
     leadId?: number;
     happyCallingId?: number;
+    enquiryType?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 };
@@ -103,6 +104,10 @@ export class LeadEnquiryService {
 
         if (filters?.happyCallingId) {
             conditions.push(eq(leadEnquiries.happyCallingId, filters.happyCallingId));
+        }
+
+        if (filters?.enquiryType) {
+            conditions.push(eq(leadEnquiries.enquiryType, filters.enquiryType));
         }
 
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
