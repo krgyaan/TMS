@@ -54,9 +54,9 @@ export class ImprestAdminService {
                 WITH imprest_agg AS (
                     SELECT
                         user_id,
-                        CASE WHEN EXTRACT(MONTH FROM COALESCE(approved_date, created_at)) >= 4 
-                             THEN EXTRACT(YEAR FROM COALESCE(approved_date, created_at)) 
-                             ELSE EXTRACT(YEAR FROM COALESCE(approved_date, created_at)) - 1 
+                        CASE WHEN EXTRACT(MONTH FROM date_of_expense) >= 4 
+                             THEN EXTRACT(YEAR FROM date_of_expense) 
+                             ELSE EXTRACT(YEAR FROM date_of_expense) - 1 
                         END::int AS fy_start_year,
                         COALESCE(SUM(amount), 0) AS amount_spent,
                         COALESCE(SUM(CASE WHEN approval_status = 1 THEN amount ELSE 0 END), 0) AS amount_approved
@@ -77,9 +77,10 @@ export class ImprestAdminService {
                 voucher_base AS (
                     SELECT
                         user_id,
-                        COALESCE(approved_date, created_at)::date AS effective_date
+                        date_of_expense::date AS effective_date
                     FROM employee_imprests
                     WHERE approval_status = 1
+                      AND date_of_expense IS NOT NULL
                 ),
                 voucher_amounts AS (
                     SELECT
@@ -87,13 +88,7 @@ export class ImprestAdminService {
                         EXTRACT(ISOYEAR FROM effective_date)::int AS year,
                         EXTRACT(WEEK FROM effective_date)::int AS week,
                         MIN(effective_date) AS start_date,
-                        (
-                            MIN(effective_date)
-                            + (
-                                (6 - ((EXTRACT(DOW FROM MIN(effective_date)) + 6) % 7))
-                                * INTERVAL '1 day'
-                            )
-                        )::date AS end_date,
+                        (date_trunc('week', MIN(effective_date)) + INTERVAL '6 days')::date AS end_date,
                         MAX(effective_date) AS max_effective_date
                     FROM voucher_base
                     GROUP BY user_id, year, week
@@ -343,13 +338,13 @@ export class ImprestAdminService {
                         ei.id AS imprest_id,
                         ei.user_id,
 
-                        /* Grouping by expense date; legacy fallback */
-                        COALESCE(ei.approved_date, ei.created_at)::date AS effective_date,
-
+                        /* Grouping by expense date (required) */
+                        ei.date_of_expense::date AS effective_date,
                         ei.amount,
                         ei.invoice_proof
                     FROM employee_imprests ei
                     WHERE ei.approval_status = 1
+                      AND ei.date_of_expense IS NOT NULL
                     ${whereSql}
                 ),
                 amounts AS (
@@ -360,14 +355,7 @@ export class ImprestAdminService {
                         EXTRACT(WEEK FROM effective_date)::int AS week,
 
                         MIN(effective_date) AS start_date,
-
-                        (
-                            MIN(effective_date)
-                            + (
-                                (6 - ((EXTRACT(DOW FROM MIN(effective_date)) + 6) % 7))
-                                * INTERVAL '1 day'
-                            )
-                        )::date AS end_date,
+                        (date_trunc('week', MIN(effective_date)) + INTERVAL '6 days')::date AS end_date,
 
                         SUM(amount)::numeric AS total_amount
                     FROM base
@@ -441,9 +429,10 @@ export class ImprestAdminService {
         const fyOptionsResult = await this.db.execute(
             sql`
                 SELECT DISTINCT
-                    EXTRACT(YEAR FROM (COALESCE(ei.approved_date, ei.created_at)::date - INTERVAL '3 months'))::int AS "fy"
+                    EXTRACT(YEAR FROM (ei.date_of_expense::date - INTERVAL '3 months'))::int AS "fy"
                 FROM employee_imprests ei
                 WHERE ei.approval_status = 1
+                  AND ei.date_of_expense IS NOT NULL
                 ${userId ? sql`AND ei.user_id = ${userId}` : sql``}
                 ORDER BY "fy" DESC
             `
@@ -503,8 +492,8 @@ export class ImprestAdminService {
         SELECT invoice_proof
         FROM employee_imprests
         WHERE user_id = ${userId}
-          AND EXTRACT(ISOYEAR FROM COALESCE(approved_date, created_at)) = ${year}
-          AND EXTRACT(WEEK FROM COALESCE(approved_date, created_at)) = ${week}
+          AND EXTRACT(ISOYEAR FROM date_of_expense) = ${year}
+          AND EXTRACT(WEEK FROM date_of_expense) = ${week}
     `);
 
         const files = rows.rows.flatMap(r => (Array.isArray(r.invoice_proof) ? r.invoice_proof : [])).filter(Boolean);
@@ -610,7 +599,7 @@ export class ImprestAdminService {
                 sql`TRUE`
             )
             .where(and(eq(employeeImprestVoucherItems.voucherId, voucher.id), eq(employeeImprests.approvalStatus, 1)))
-            .orderBy(sql`COALESCE(${employeeImprests.approvedDate}), ${employeeImprests.id}`);
+            .orderBy(sql`${employeeImprests.dateOfExpense}, ${employeeImprests.id}`);
 
         const proofFiles = items.flatMap(item => (Array.isArray(item.invoiceProof) ? item.invoiceProof : [])).filter(Boolean);
 
@@ -683,7 +672,7 @@ export class ImprestAdminService {
                     eq(employeeImprests.userId, userId),
                     eq(employeeImprests.approvalStatus, 1),
                     sql`
-                    COALESCE(${employeeImprests.approvedDate})::date
+                    ${employeeImprests.dateOfExpense}::date
                     BETWEEN ${from}::date AND ${to}::date
                 `
                 )
@@ -734,7 +723,10 @@ export class ImprestAdminService {
 
     private async linkImprestsToVoucher(voucherId: number, imprestIds: number[]) {
         if (imprestIds.length === 0) return;
-        await this.db.insert(employeeImprestVoucherItems).values(imprestIds.map(imprestId => ({ voucherId, imprestId }))).onConflictDoNothing();
+        await this.db
+            .insert(employeeImprestVoucherItems)
+            .values(imprestIds.map(imprestId => ({ voucherId, imprestId })))
+            .onConflictDoNothing();
     }
 
     private async recomputeVoucherAmount(voucherId: number) {
@@ -767,14 +759,18 @@ export class ImprestAdminService {
 
     /**
      * Ensures an approved imprest is linked to (and, if needed, creates) the
-     * voucher whose valid_from..valid_to window covers its approval date.
+     * voucher whose valid_from..valid_to window covers its expense date.
      */
-    async ensureVoucherForImprest({ imprestId, userId, approvedDate, createdBy }: { imprestId: number; userId: number; approvedDate: Date; createdBy: string }) {
-        if (!userId || !approvedDate) {
+    async ensureVoucherForImprest({ imprestId, userId, effectiveDate, createdBy }: { imprestId: number; userId: number; effectiveDate: Date; createdBy: string }) {
+        if (!userId) {
             return null;
         }
 
-        const { monday, sunday } = this.isoWeekBounds(approvedDate);
+        if (!effectiveDate) {
+            throw new BadRequestException("Imprest has no date of expense — cannot assign to a voucher.");
+        }
+
+        const { monday, sunday } = this.isoWeekBounds(effectiveDate);
 
         const voucher = await this.buildVoucherIfMissing({
             userId,

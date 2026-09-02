@@ -105,6 +105,10 @@ export class EmployeeImprestService {
             throw new Error("No sender user found. Kindly login again");
         }
 
+        if (!data.dateOfExpense) {
+            throw new BadRequestException("dateOfExpense is required");
+        }
+
         await this.assertExpenseWeekNotLocked({
             beneficiaryUserId: data.userId,
             expenseDate: data.dateOfExpense,
@@ -395,6 +399,10 @@ export class EmployeeImprestService {
             throw new NotFoundException("Employee imprest not found");
         }
 
+        if (data.dateOfExpense === null) {
+            throw new BadRequestException("dateOfExpense cannot be null");
+        }
+
         await this.assertExpenseWeekNotLocked({
             beneficiaryUserId: data.userId ?? existing.userId,
             expenseDate: data.dateOfExpense ?? existing.dateOfExpense,
@@ -549,8 +557,7 @@ export class EmployeeImprestService {
 
         // Re-sync voucher membership only when fields that affect a voucher's
         // contents (approval state, amount) actually changed.
-        const touchesVoucher =
-            data.approvalStatus !== undefined || data.approvedDate !== undefined || data.amount !== undefined;
+        const touchesVoucher = data.approvalStatus !== undefined || data.approvedDate !== undefined || data.amount !== undefined || data.dateOfExpense !== undefined;
 
         if (touchesVoucher) {
             await this.syncVoucherLinksForUpdatedImprest(updated, actorUser);
@@ -574,7 +581,7 @@ export class EmployeeImprestService {
                 await this.imprestAdminService.ensureVoucherForImprest({
                     imprestId: updated.id,
                     userId: updated.userId,
-                    approvedDate: updated.approvedDate ?? updated.createdAt,
+                    effectiveDate: updated.dateOfExpense,
                     createdBy: String(actorUser?.sub ?? updated.userId),
                 });
             }
@@ -672,7 +679,7 @@ export class EmployeeImprestService {
                 await this.imprestAdminService.ensureVoucherForImprest({
                     imprestId,
                     userId: imprest.userId,
-                    approvedDate: approvedDate!,
+                    effectiveDate: imprest.dateOfExpense,
                     createdBy: String(userId),
                 });
             }

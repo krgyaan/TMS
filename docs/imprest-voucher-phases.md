@@ -74,31 +74,60 @@ verifiable.
 
 ---
 
-## Phase 1 — Backend: Switch Grouping to `date_of_expense` Week
+## Phase 1 — Backend: Switch Grouping to `date_of_expense` Week (DONE)
 
 **Goal:** Vouchers grouped by `date_of_expense` ISO week, not approval week.
 
 **Key files:** `api/src/modules/imprest-admin/imprest-admin.service.ts`, `api/src/modules/employee-imprest/employee-imprest.service.ts`
 
-- `listVouchersRaw()` — `effective_date = COALESCE(date_of_expense, approved_date, created_at)::date`;
+- `listVouchersRaw()` — `effective_date = date_of_expense::date` (**strict, no fallback**);
   `validFrom = date_trunc('week', MIN(effective_date))::date`, `validTo = validFrom + 6 days`;
-  `fyOptions` uses the same new `effective_date`.
-- `getEmployeeSummary()` — `voucher_base` selects `COALESCE(date_of_expense, approved_date, created_at)::date`.
-- `getVoucherProofs()` — `EXTRACT(ISOYEAR/WEEK FROM COALESCE(date_of_expense, approved_date, created_at))`.
-- `getVoucherById()` — items filter `COALESCE(date_of_expense)::date BETWEEN valid_from::date AND valid_to::date`
+  `fyOptions` uses the same `effective_date`.
+- `getEmployeeSummary()` — `voucher_base` selects `date_of_expense::date` (+ `WHERE date_of_expense IS NOT NULL`).
+- `getVoucherProofs()` — `EXTRACT(ISOYEAR/WEEK FROM date_of_expense)`.
+- `getVoucherById()` — items filter `date_of_expense::date BETWEEN valid_from::date AND valid_to::date`
   (query already reads via the Phase‑0 join table).
-- `buildVoucherIfMissing()` — same `date_of_expense` predicate + `SUM(amount)` over the expense week.
+- `buildVoucherIfMissing()` — period predicate `date_of_expense::date BETWEEN` + `SUM(amount)` over the expense week.
 - `approveImprest()` eager path — use `isoWeekBounds(date_of_expense)` instead of `approvedDate`.
-- Keep the `COALESCE(date_of_expense, approved_date, created_at)` fallback for legacy rows with
-  `date_of_expense IS NULL`. When week-lock is later enabled, `BadRequest` if an entry has no expense date.
+- `date_of_expense` is **required** (DB `NOT NULL`, Zod create/update require it, service throws
+  `400` on null). No COALESCE fallback to approval/created date.
 
 ### Cleanup / helpers
 
 - `isoWeekBounds(date)` (existing private helper) produces Mon–Sun bounds matching PG
-  `date_trunc('week')` — the ad-hoc `MIN + (6 - ((DOW+6)%7))` Sunday math can be replaced by
-  `date_trunc('week', d)` in SQL where clearer.
-- Re-run `verify:voucher-items` should still PASS after this phase (the join table is the source
-  of truth for `getVoucherById`; list/summary only change the grouping key).
+  `date_trunc('week')` — replaces the ad-hoc `MIN + (6 - ((DOW+6)%7))` Sunday math in SQL.
+- Re-run `verify:voucher-items` (now strict on `date_of_expense`); `--legacy` audited the OLD
+  approval-date grouping.
+
+### Implemented
+
+- `listVouchersRaw()` / `getEmployeeSummary()` / `fyOptions` / `getVoucherProofs()` /
+  `getVoucherById()` ordering all use `date_of_expense` only.
+- DOW Sunday math replaced with `date_trunc('week', MIN(effective_date))::date` +
+  `INTERVAL '6 days'` in both list + summary SQL.
+- `buildVoucherIfMissing()` period predicate is `date_of_expense::date BETWEEN from AND to`.
+- `ensureVoucherForImprest({ imprestId, userId, effectiveDate, createdBy })` (renamed from
+  `approvedDate`) buckets by `isoWeekBounds(effectiveDate)`; throws `400` if `effectiveDate` missing.
+- `approveImprest()` / `syncVoucherLinksForUpdatedImprest()` pass `dateOfExpense` only.
+- `dateOfExpense` made NOT NULL in schema; migration `0130` backfills nulls then sets `NOT NULL`.
+- `verify:voucher-items` defaults to strict `date_of_expense`; `--legacy` restores the approval-date check.
+
+### Migration 0130
+
+```sql
+UPDATE employee_imprests SET date_of_expense = COALESCE(approved_date, created_at) WHERE date_of_expense IS NULL;
+ALTER TABLE employee_imprests ALTER COLUMN date_of_expense SET NOT NULL;
+```
+Journal entry `idx 87` (format preserved). Applied to dev DB (`UPDATE 0` — no nulls existed, `ALTER` applied; confirmed `nulls = 0`).
+
+### Verification (dev DB)
+
+> `pnpm build` ✓, `tsc --noEmit` ✓, `pnpm test` ✓, lint parity (services 104→99, all
+> pre-existing `no-unsafe-*`). Legacy `--legacy` verify still **PASS** (1070 vouchers, 0
+> mismatches/orphans/strays — pre-existing data unchanged). Strict expense-date verify surfaces
+> the expected historical drift — 223 vouchers of 1070 bucketed by approval-week no longer align
+> (155 orphan imprests, 891 stray links). **Historical vouchers were NOT rebucketed**;
+> rebucket is a separate Phase 1b migration if historical consistency is required.
 
 ---
 

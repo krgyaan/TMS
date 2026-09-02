@@ -444,5 +444,13 @@
                         "tag":  "0129_add_employee_imprest_voucher_items",
                         "breakpoints":  true
                     }
+,
+                    {
+                        "idx":  87,
+                        "version":  "7",
+                        "when":  1788329096209,
+                        "tag":  "0130_backfill_date_of_expense_strict",
+                        "breakpoints":  true
+                    }
                 ]
 }

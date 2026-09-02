@@ -15,7 +15,7 @@ export const UpdateEmployeeImprestSchema = z.object({
     proofStatus: z.coerce.number().int().optional(),
     status: z.coerce.number().int().optional(),
     approvedDate: z.coerce.date().optional().nullable(),
-    dateOfExpense: z.coerce.date().optional().nullable(),
+    dateOfExpense: z.coerce.date().optional(),
     insurance: z.string().optional().nullable(),
 });
 

@@ -18,7 +18,7 @@ export const employeeImprests = pgTable("employee_imprests", {
     tallyStatus: integer("tally_status").notNull().default(0),
     proofStatus: integer("proof_status").notNull().default(0),
     status: integer("status").notNull().default(1),
-    dateOfExpense: timestamp("date_of_expense", { withTimezone: true }),
+    dateOfExpense: timestamp("date_of_expense", { withTimezone: true }).notNull(),
     accRemark: text("acc_remark"),
     approvedDate: timestamp("approved_date", { withTimezone: true }),
     insurancePolicyId: integer("insurance_policy_id"),
