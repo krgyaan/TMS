@@ -8,6 +8,7 @@ import {
     ParseIntPipe,
     HttpCode,
     HttpStatus,
+    Body,
 } from '@nestjs/common';
 import { LeadFollowupsService } from './leadfollowups.service';
 import { CreateFollowupSchema } from './dto/leadfollowup.dto';
@@ -54,6 +55,16 @@ export class HappyCallingFollowupsController {
         @CurrentUser() user: ValidatedUser,
     ) {
         return this.followupsService.update(id, body, user.sub);
+    }
+
+    @Patch(':happyCallingId/:id/stop')
+    @HttpCode(HttpStatus.OK)
+    async stop(
+        @Param('happyCallingId', ParseIntPipe) _happyCallingId: number,
+        @Param('id', ParseIntPipe) id: number,
+        @Body() body: { reason?: string },
+    ) {
+        return this.followupsService.stop(id, body?.reason ?? undefined);
     }
 
     @Delete(':happyCallingId/:id')

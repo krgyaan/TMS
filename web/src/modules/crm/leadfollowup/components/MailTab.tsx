@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Loader2, Send, Edit, Save, X, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
@@ -10,13 +11,7 @@ import { SelectField } from "@/components/form/SelectField";
 import { FileUploader } from "@/components/file-upload";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { format } from "date-fns";
-import {
-    useLeadFollowups,
-    useMailForm,
-    isToday,
-    sourceFollowupPath,
-    type MailFormValues
-} from "@/hooks/api/useLeadFollowups";
+import {useLeadFollowups, useMailForm, useStopFollowup,isToday,sourceFollowupPath, type MailFormValues} from "@/hooks/api/useLeadFollowups";
 import type { BaseFollowup, FollowupSource } from "../helpers/leadfollowup.types";
 
 const FREQUENCY_OPTIONS = [
@@ -81,6 +76,22 @@ function MailCreateForm({ source, initialAttachments }: { source: FollowupSource
             )}
 
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                <FieldWrapper<MailFormValues, "subject">
+                    control={form.control}
+                    name="subject"
+                    label="Subject"
+                >
+                    {(field) => (
+                        <Input
+                            type="text"
+                            placeholder="Enter mail subject"
+                            disabled={saving}
+                            {...field}
+                            value={field.value ?? ""}
+                        />
+                    )}
+                </FieldWrapper>
+
                 <FieldWrapper<MailFormValues, "body">
                     control={form.control}
                     name="body"
@@ -211,6 +222,12 @@ function MailFollowupCard({
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
+    const stopFollowup = useStopFollowup(source);
+    const isStopped = followup.status === "stopped";
+
+    const handleStop = async () => {
+        await stopFollowup.mutateAsync(followup.id);
+    };
 
     return (
         <Collapsible
@@ -232,6 +249,9 @@ function MailFollowupCard({
                         {isToday(followup.createdAt) && (
                             <Badge className="bg-green-500">Today</Badge>
                         )}
+                        {isStopped && (
+                            <Badge variant="secondary" className="bg-red-100 text-red-700">Stopped</Badge>
+                        )}
                     </div>
                     {isOpen ? (
                         <ChevronUp className="h-5 w-5" />
@@ -242,6 +262,15 @@ function MailFollowupCard({
             </CollapsibleTrigger>
 
             <CollapsibleContent className="p-4 pt-0 space-y-4">
+                {followup.subject && (
+                    <div>
+                        <p className="text-sm font-medium text-muted-foreground mb-1">
+                            Subject
+                        </p>
+                        <p className="text-sm font-medium">{followup.subject}</p>
+                    </div>
+                )}
+
                 <div>
                     <p className="text-sm font-medium text-muted-foreground mb-1">
                         Mail Body
@@ -293,19 +322,33 @@ function MailFollowupCard({
                     </div>
                 )}
 
-                {isToday(followup.createdAt) && (
-                    <Button
-                        size="sm"
-                        onClick={() =>
-                            navigate(
-                                `${sourceFollowupPath(source)}?tab=mail&followupId=${followup.id}`
-                            )
-                        }
-                    >
-                        <Edit className="h-3 w-3 mr-1" />
-                        Edit
-                    </Button>
-                )}
+                <div className="flex items-center gap-2">
+                    {!isStopped && (
+                        <Button
+                            size="sm"
+                            onClick={() =>
+                                navigate(
+                                    `${sourceFollowupPath(source)}?tab=mail&followupId=${followup.id}`
+                                )
+                            }
+                        >
+                            <Edit className="h-3 w-3 mr-1" />
+                            Edit
+                        </Button>
+                    )}
+                    {!isStopped && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 border-red-300 hover:bg-red-50"
+                            onClick={handleStop}
+                            disabled={stopFollowup.isPending}
+                        >
+                            {stopFollowup.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <X className="h-3 w-3 mr-1" />}
+                            Stop
+                        </Button>
+                    )}
+                </div>
             </CollapsibleContent>
         </Collapsible>
     );

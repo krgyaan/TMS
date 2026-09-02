@@ -14,6 +14,7 @@ export const ContactSchema = z.object({
 export const MailFollowupSchema = z.object({
     type: z.literal('mail'),
     body: z.string().min(1, { message: 'Mail body is required' }),
+    subject: z.string().min(1, { message: 'Subject is required' }),
     frequency: z.enum(['daily', 'weekly', 'monthly', 'custom']),
     attachments: z.array(z.string()).default([]),
     nextFollowupDate: z.string().optional().nullable(),
