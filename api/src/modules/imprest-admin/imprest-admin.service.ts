@@ -3,6 +3,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
 import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-voucher";
+import { employeeImprestVoucherItems } from "@/db/schemas/accounts/employee-imprest-voucher-item.schema";
 import { users } from "@/db/schemas/auth/users.schema";
 import { employeeImprestTransactions } from "@/db/schemas/shared/employee-imprest-transaction.schema";
 import { employeeImprests } from "@/db/schemas/shared/employee-imprest.schema";
@@ -148,19 +149,22 @@ export class ImprestAdminService {
             });
 
             // Group rows by user
-            const userGroups = new Map<number, {
-                userId: number;
-                userName: string;
-                years: Array<{
-                    fyStartYear: number;
-                    amountSpent: number;
-                    amountApproved: number;
-                    amountReceived: number;
-                    totalVouchers: number;
-                    accountsApproved: number;
-                    adminApproved: number;
-                }>;
-            }>();
+            const userGroups = new Map<
+                number,
+                {
+                    userId: number;
+                    userName: string;
+                    years: Array<{
+                        fyStartYear: number;
+                        amountSpent: number;
+                        amountApproved: number;
+                        amountReceived: number;
+                        totalVouchers: number;
+                        accountsApproved: number;
+                        adminApproved: number;
+                    }>;
+                }
+            >();
 
             for (const row of rows as any[]) {
                 const userId = Number(row.userId);
@@ -168,7 +172,7 @@ export class ImprestAdminService {
                     userGroups.set(userId, {
                         userId,
                         userName: row.userName,
-                        years: []
+                        years: [],
                     });
                 }
                 userGroups.get(userId)!.years.push({
@@ -192,17 +196,15 @@ export class ImprestAdminService {
                     amountReceived: 0,
                     totalVouchers: 0,
                     accountsApproved: 0,
-                    adminApproved: 0
+                    adminApproved: 0,
                 };
 
-                const previousYearsData = group.years
-                    .filter(y => y.fyStartYear < currentFyStartYear)
-                    .sort((a, b) => b.fyStartYear - a.fyStartYear);
+                const previousYearsData = group.years.filter(y => y.fyStartYear < currentFyStartYear).sort((a, b) => b.fyStartYear - a.fyStartYear);
 
                 const totalSpent = group.years.reduce((sum, y) => sum + y.amountSpent, 0);
                 const totalApproved = group.years.reduce((sum, y) => sum + y.amountApproved, 0);
                 const totalReceived = group.years.reduce((sum, y) => sum + y.amountReceived, 0);
-                
+
                 const totalVouchers = group.years.reduce((sum, y) => sum + y.totalVouchers, 0);
                 const accountsApproved = group.years.reduce((sum, y) => sum + y.accountsApproved, 0);
                 const adminApproved = group.years.reduce((sum, y) => sum + y.adminApproved, 0);
@@ -230,8 +232,8 @@ export class ImprestAdminService {
                         voucherInfo: {
                             totalVouchers: currentYearData.totalVouchers,
                             accountsApproved: currentYearData.accountsApproved,
-                            adminApproved: currentYearData.adminApproved
-                        }
+                            adminApproved: currentYearData.adminApproved,
+                        },
                     },
 
                     previous: previousYearsData.map(y => ({
@@ -244,9 +246,9 @@ export class ImprestAdminService {
                         voucherInfo: {
                             totalVouchers: y.totalVouchers,
                             accountsApproved: y.accountsApproved,
-                            adminApproved: y.adminApproved
-                        }
-                    }))
+                            adminApproved: y.adminApproved,
+                        },
+                    })),
                 });
             }
 
@@ -542,7 +544,6 @@ export class ImprestAdminService {
     }
 
     async getVoucherById({ user, voucherId }: { user: { id: number; role: string }; voucherId: number }) {
-
         const [voucher] = await this.db
             .select({
                 id: employeeImprestVouchers.id,
@@ -593,7 +594,8 @@ export class ImprestAdminService {
                 amount: employeeImprests.amount,
                 invoiceProof: employeeImprests.invoiceProof,
             })
-            .from(employeeImprests)
+            .from(employeeImprestVoucherItems)
+            .innerJoin(employeeImprests, eq(employeeImprestVoucherItems.imprestId, employeeImprests.id))
             .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
             .leftJoin(
                 sql`
@@ -607,22 +609,10 @@ export class ImprestAdminService {
                 `,
                 sql`TRUE`
             )
-            .where(
-                and(
-                    eq(employeeImprests.userId, voucher.employeeId),
-                    eq(employeeImprests.approvalStatus, 1),
-                    sql`
-                COALESCE(${employeeImprests.approvedDate})::date
-                BETWEEN ${voucher.validFrom}::date
-                AND ${voucher.validTo}::date
-            `
-                )
-            )
-            .orderBy(sql`COALESCE(${employeeImprests.approvedDate})`);
+            .where(and(eq(employeeImprestVoucherItems.voucherId, voucher.id), eq(employeeImprests.approvalStatus, 1)))
+            .orderBy(sql`COALESCE(${employeeImprests.approvedDate}), ${employeeImprests.id}`);
 
-        const proofFiles = items
-            .flatMap(item => (Array.isArray(item.invoiceProof) ? item.invoiceProof : []))
-            .filter(Boolean);
+        const proofFiles = items.flatMap(item => (Array.isArray(item.invoiceProof) ? item.invoiceProof : [])).filter(Boolean);
 
         const proofs = proofFiles.map((file: string, index: number) => {
             const ext = file.split(".").pop()?.toLowerCase() ?? "";
@@ -686,7 +676,7 @@ export class ImprestAdminService {
         }
 
         const imprests = await this.db
-            .select({ amount: employeeImprests.amount })
+            .select({ id: employeeImprests.id, amount: employeeImprests.amount })
             .from(employeeImprests)
             .where(
                 and(
@@ -717,7 +707,141 @@ export class ImprestAdminService {
             })
             .returning();
 
+        // Persist the explicit voucher <-> imprest links so no approved entry
+        // within the period can ever be missed from this voucher.
+        if (imprests.length > 0) {
+            await this.linkImprestsToVoucher(
+                voucher.id,
+                imprests.map(r => r.id)
+            );
+        }
+
         return voucher;
+    }
+
+    /* ----------------------- VOUCHER <-> IMPREST LINKS ------------------------ */
+
+    private isoWeekBounds(date: Date): { monday: Date; sunday: Date } {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        const day = (d.getDay() + 6) % 7; // Monday = 0 ... Sunday = 6
+        const monday = new Date(d);
+        monday.setDate(d.getDate() - day);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        return { monday, sunday };
+    }
+
+    private async linkImprestsToVoucher(voucherId: number, imprestIds: number[]) {
+        if (imprestIds.length === 0) return;
+        await this.db.insert(employeeImprestVoucherItems).values(imprestIds.map(imprestId => ({ voucherId, imprestId }))).onConflictDoNothing();
+    }
+
+    private async recomputeVoucherAmount(voucherId: number) {
+        await this.db.execute(sql`
+            UPDATE employee_imprest_vouchers v
+            SET amount = COALESCE(
+                    (
+                        SELECT SUM(ei.amount)
+                        FROM employee_imprest_voucher_items vi
+                        JOIN employee_imprests ei ON ei.id = vi.imprest_id
+                        WHERE vi.voucher_id = ${voucherId}
+                    ),
+                    0
+                ),
+                updated_at = now()
+            WHERE v.id = ${voucherId}
+        `);
+    }
+
+    private async deleteVoucherIfEmpty(voucherId: number) {
+        await this.db.execute(sql`
+            DELETE FROM employee_imprest_vouchers v
+            WHERE v.id = ${voucherId}
+              AND TRIM(COALESCE(v.accounts_signed_by, '')) = ''
+              AND NOT EXISTS (
+                  SELECT 1 FROM employee_imprest_voucher_items vi WHERE vi.voucher_id = ${voucherId}
+              )
+        `);
+    }
+
+    /**
+     * Ensures an approved imprest is linked to (and, if needed, creates) the
+     * voucher whose valid_from..valid_to window covers its approval date.
+     */
+    async ensureVoucherForImprest({ imprestId, userId, approvedDate, createdBy }: { imprestId: number; userId: number; approvedDate: Date; createdBy: string }) {
+        if (!userId || !approvedDate) {
+            return null;
+        }
+
+        const { monday, sunday } = this.isoWeekBounds(approvedDate);
+
+        const voucher = await this.buildVoucherIfMissing({
+            userId,
+            from: monday,
+            to: sunday,
+            createdBy,
+        });
+
+        const isVoucherSigned = voucher.accountsSignedBy && voucher.accountsSignedBy.trim() !== "";
+
+        // Already linked? Nothing to do.
+        const [existingLink] = await this.db
+            .select({ id: employeeImprestVoucherItems.imprestId })
+            .from(employeeImprestVoucherItems)
+            .where(and(eq(employeeImprestVoucherItems.voucherId, voucher.id), eq(employeeImprestVoucherItems.imprestId, imprestId)))
+            .limit(1);
+
+        if (!existingLink) {
+            // Mutating a signed voucher is not allowed — an approved entry that
+            // arrives after accounts sign-off will be surfaced by verification.
+            if (isVoucherSigned) {
+                this.logger.warn("Skipped linking imprest to signed voucher", {
+                    imprestId,
+                    voucherId: voucher.id,
+                    voucherCode: voucher.voucherCode,
+                });
+                return voucher;
+            }
+
+            await this.linkImprestsToVoucher(voucher.id, [imprestId]);
+            await this.recomputeVoucherAmount(voucher.id);
+        }
+
+        return voucher;
+    }
+
+    /**
+     * Removes an imprest from any voucher it is linked to, recomputes the
+     * voucher amount, and drops the voucher if it became empty (and unsigned).
+     * Throws if the imprest is part of an accounts-signed voucher.
+     */
+    async removeImprestFromVoucher(imprestId: number) {
+        const links = await this.db
+            .select({ voucherId: employeeImprestVoucherItems.voucherId })
+            .from(employeeImprestVoucherItems)
+            .where(eq(employeeImprestVoucherItems.imprestId, imprestId));
+
+        for (const link of links) {
+            const [voucher] = await this.db
+                .select({ id: employeeImprestVouchers.id, accountsSignedBy: employeeImprestVouchers.accountsSignedBy })
+                .from(employeeImprestVouchers)
+                .where(eq(employeeImprestVouchers.id, link.voucherId))
+                .limit(1);
+
+            if (voucher && voucher.accountsSignedBy && voucher.accountsSignedBy.trim() !== "") {
+                throw new BadRequestException("This imprest is part of a voucher already approved by accounts and cannot be modified.");
+            }
+
+            await this.db
+                .delete(employeeImprestVoucherItems)
+                .where(and(eq(employeeImprestVoucherItems.voucherId, link.voucherId), eq(employeeImprestVoucherItems.imprestId, imprestId)));
+
+            if (voucher) {
+                await this.recomputeVoucherAmount(voucher.id);
+                await this.deleteVoucherIfEmpty(voucher.id);
+            }
+        }
     }
 
     private async generateVoucherCode() {
@@ -785,9 +909,9 @@ export class ImprestAdminService {
         if (approve && voucher.adminSignedBy) {
             throw new BadRequestException("Voucher already approved by admin");
         }
-        
+
         //check for ceo approval w/o accounts approval
-        if(approve && !voucher.accountsSignedBy){
+        if (approve && !voucher.accountsSignedBy) {
             throw new BadRequestException("Admin Approval can only be done once the Account Approval has been submitted");
         }
 

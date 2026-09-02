@@ -15,6 +15,7 @@ import { BadRequestException, ForbiddenException, Inject, Injectable, InternalSe
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
+import { ImprestAdminService } from "@/modules/imprest-admin/imprest-admin.service";
 const TRANSFER_CATEGORY_ID = 22;
 const INSURANCE_CATEGORY_ID = 8;
 const WEEK_LOCK_EXEMPT_PERMISSION = { module: "shared.imprests", action: "week-lock-exempt" } as const;
@@ -33,13 +34,11 @@ export class EmployeeImprestService {
     constructor(
         @Inject(DRIZZLE)
         private readonly db: DbInstance,
-
         @Inject(WINSTON_MODULE_PROVIDER)
         private readonly logger: Logger,
-
         private readonly permissionService: PermissionService,
-
-        private readonly insurancePolicyService: InsurancePolicyService
+        private readonly insurancePolicyService: InsurancePolicyService,
+        private readonly imprestAdminService: ImprestAdminService
     ) {}
 
     /* ----------------------- WEEK LOCK GUARD ------------------------ */
@@ -74,24 +73,24 @@ export class EmployeeImprestService {
         }
 
         // [commented out] Allow approved week voucher for all users for now
-        // const [lockedVoucher] = await this.db
-        //     .select({ voucherCode: employeeImprestVouchers.voucherCode })
-        //     .from(employeeImprestVouchers)
-        //     .where(
-        //         and(
-        //             eq(employeeImprestVouchers.beneficiaryName, String(beneficiaryUserId)),
-        //             sql`TRIM(COALESCE(${employeeImprestVouchers.accountsSignedBy}, '')) <> ''`,
-        //             sql`EXTRACT(ISOYEAR FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(ISOYEAR FROM CAST(${expenseDate} AS TIMESTAMP))`,
-        //             sql`EXTRACT(WEEK FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(WEEK FROM CAST(${expenseDate} AS TIMESTAMP))`
-        //         )
-        //     )
-        //     .limit(1);
+        const [lockedVoucher] = await this.db
+            .select({ voucherCode: employeeImprestVouchers.voucherCode })
+            .from(employeeImprestVouchers)
+            .where(
+                and(
+                    eq(employeeImprestVouchers.beneficiaryName, String(beneficiaryUserId)),
+                    sql`TRIM(COALESCE(${employeeImprestVouchers.accountsSignedBy}, '')) <> ''`,
+                    sql`EXTRACT(ISOYEAR FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(ISOYEAR FROM CAST(${expenseDate} AS TIMESTAMP))`,
+                    sql`EXTRACT(WEEK FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(WEEK FROM CAST(${expenseDate} AS TIMESTAMP))`
+                )
+            )
+            .limit(1);
 
-        // if (lockedVoucher) {
-        //     throw new ForbiddenException(
-        //         `Expenses for the week of ${expenseDate.toISOString().split("T")[0]} are locked: voucher ${lockedVoucher.voucherCode} is already approved by accounts.`
-        //     );
-        // }
+        if (lockedVoucher) {
+            throw new ForbiddenException(
+                `Expenses for the week of ${expenseDate.toISOString().split("T")[0]} are locked: voucher ${lockedVoucher.voucherCode} is already approved by accounts.`
+            );
+        }
     }
 
     /* ----------------------------- CREATE ----------------------------- */
@@ -405,7 +404,7 @@ export class EmployeeImprestService {
         const oldIsTransfer = Number(existing.categoryId) === TRANSFER_CATEGORY_ID;
         const newIsTransfer = Number(data.categoryId ?? existing.categoryId) === TRANSFER_CATEGORY_ID;
 
-        return await this.db.transaction(async tx => {
+        const updated = await this.db.transaction(async tx => {
             const existingTxn = await tx.query.employeeImprestTransactions.findFirst({
                 where: eq(employeeImprestTransactions.imprestId, id),
             });
@@ -548,6 +547,41 @@ export class EmployeeImprestService {
 
             return updated;
         });
+
+        // Re-sync voucher membership only when fields that affect a voucher's
+        // contents (approval state, amount) actually changed.
+        const touchesVoucher =
+            data.approvalStatus !== undefined || data.approvedDate !== undefined || data.amount !== undefined;
+
+        if (touchesVoucher) {
+            await this.syncVoucherLinksForUpdatedImprest(updated, actorUser);
+        }
+
+        return updated;
+    }
+
+    /**
+     * After an edit, refresh the imprest's voucher linkage: remove it from its
+     * previous voucher (if any) and re-attach it to the correct one based on
+     * the currently approved state.
+     */
+    private async syncVoucherLinksForUpdatedImprest(updated: any, actorUser?: ImprestActorUser) {
+        const wasModified = updated.approvalStatus === 1 || updated.approvedDate;
+
+        if (updated.approvalStatus === 1) {
+            // Rebuild the mapping to the correct acceptance period.
+            if (updated.userId) {
+                await this.imprestAdminService.removeImprestFromVoucher(updated.id);
+                await this.imprestAdminService.ensureVoucherForImprest({
+                    imprestId: updated.id,
+                    userId: updated.userId,
+                    approvedDate: updated.approvedDate ?? updated.createdAt,
+                    createdBy: String(actorUser?.sub ?? updated.userId),
+                });
+            }
+        } else if (wasModified) {
+            await this.imprestAdminService.removeImprestFromVoucher(updated.id);
+        }
     }
 
     private async deleteExistingTransfer(tx: any, existing: any) {
@@ -622,14 +656,30 @@ export class EmployeeImprestService {
         }
 
         const newStatus = imprest.approvalStatus === 1 ? 0 : 1;
+        const approvedDate = newStatus === 1 ? new Date() : null;
 
         await this.db
             .update(employeeImprests)
             .set({
                 approvalStatus: newStatus,
-                approvedDate: newStatus === 1 ? new Date() : null,
+                approvedDate,
             })
             .where(eq(employeeImprests.id, imprestId));
+
+        // Keep voucher <-> imprest links in sync: link on approve, unlink on
+        // revoke so the explicit join table always mirrors approved entries.
+        if (newStatus === 1) {
+            if (imprest.userId) {
+                await this.imprestAdminService.ensureVoucherForImprest({
+                    imprestId,
+                    userId: imprest.userId,
+                    approvedDate: approvedDate!,
+                    createdBy: String(userId),
+                });
+            }
+        } else {
+            await this.imprestAdminService.removeImprestFromVoucher(imprestId);
+        }
 
         return {
             success: true,
@@ -668,6 +718,11 @@ export class EmployeeImprestService {
         if (!existing) {
             throw new NotFoundException("Employee imprest not found");
         }
+
+        // Unlink from any voucher BEFORE deleting (recomputes the voucher amount
+        // and drops the voucher if it becomes empty). Also blocks deletion when
+        // the imprest is part of an accounts-signed voucher.
+        await this.imprestAdminService.removeImprestFromVoucher(id);
 
         await this.db.transaction(async tx => {
             if (existing.insurancePolicyId) {

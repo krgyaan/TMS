@@ -6,5 +6,6 @@ import { PermissionService } from "../auth/services/permission.service";
 @Module({
     controllers: [ImprestAdminController],
     providers: [ImprestAdminService, PermissionService],
+    exports: [ImprestAdminService],
 })
 export class ImprestAdminModule {}
