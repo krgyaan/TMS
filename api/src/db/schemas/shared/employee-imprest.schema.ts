@@ -12,7 +12,7 @@ export const employeeImprests = pgTable("employee_imprests", {
     }),
     projectName: varchar("project_name", { length: 255 }),
     amount: integer("amount"),
-    remark: text("remark"),
+    remark: text("remark").notNull(),
     invoiceProof: jsonb("invoice_proof").notNull().default([]),
     approvalStatus: integer("approval_status").notNull().default(0),
     tallyStatus: integer("tally_status").notNull().default(0),

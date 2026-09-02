@@ -131,23 +131,56 @@ Journal entry `idx 87` (format preserved). Applied to dev DB (`UPDATE 0` — no 
 
 ---
 
-## Phase 2 — Week-Lock: Block New Entries for Accounts-Approved Weeks
+## Phase 2 — Week-Lock: Block New Entries for Accounts-Approved Weeks (DONE)
 
 **Goal:** Once `accounts_signed_by <> ''` exists for an expense-week voucher, no
-new `employee_imprests` may be created (or updated into) that `(user_id, ISOYEAR/WEEK of date_of_expense)`.
+`employee_imprest` may be created, updated, deleted, approved, or have proofs
+changed if its `(user_id, ISOYEAR/WEEK of date_of_expense)` maps to that voucher.
 
 **Key file:** `api/src/modules/employee-imprest/employee-imprest.service.ts`
 
-- Uncomment + fix `assertExpenseWeekNotLocked()` (currently a no-op):
-  - Compare `EXTRACT(ISOYEAR FROM valid_from) = EXTRACT(ISOYEAR FROM CAST(expenseDate AS DATE))`
-    and `EXTRACT(WEEK FROM valid_from) = EXTRACT(WEEK FROM CAST(expenseDate AS DATE))`.
-  - Condition: `TRIM(COALESCE(accounts_signed_by, '')) <> ''` on that voucher.
-  - Throw `ForbiddenException` with the voucher code when locked.
-- Respect exemption: `WEEK_LOCK_EXEMPT_PERMISSION = { module: "shared.imprests", action: "week-lock-exempt" }`
-  via `PermissionService` (extend to detect the check instead of always returning).
-- Call it in `createWithTransfer()` (already wired) and `update()` — re-check when `dateOfExpense` changes.
-- Use the Phase‑0 join table to find the locked voucher: an entry whose expense week maps to a
-  voucher with `accounts_signed_by` set.
+### Guard (`assertExpenseWeekNotLocked`)
+
+Active since Phase 0. Queries `employee_imprest_vouchers` where
+`beneficiary_name = String(userId)` AND `EXTRACT(ISOYEAR/WEEK FROM valid_from)` equal to the
+expense date's ISOYEAR/WEEK AND `TRIM(COALESCE(accounts_signed_by, '')) <> ''`; throws
+`ForbiddenException(voucher code)`. Exempt via `WEEK_LOCK_EXEMPT_PERMISSION = { module:
+"shared.imprests", action: "week-lock-exempt" }` (`SUPER_USER`/`ADMIN` auto-exempt, else
+`role_permissions`/`user_permissions`, 60s cache).
+
+### Hardening (closed bypasses)
+
+- **`createWithTransfer()`** (guarded) — now also rejects missing/blank `remark`.
+- **`update()`** (guarded) — rejects `dateOfExpense === null`; Zod rejects empty `remark` when supplied.
+- **`delete(id, actorUser)`** — added week-lock guard before `removeImprestFromVoucher()` (blocks
+  unlinked-but-week-locked deletions). Exempt can delete.
+- **`uploadDocs()` / `deleteProof()`** — added guard; proof edits blocked on signed weeks (Q1: block).
+- **`approveImprest()`** — added guard on the approve (link) path; throws `403` immediately (Q3) instead
+  of silently leaving an orphaned approved imprest. `ImprestAdminService.ensureVoucherForImprest` now
+  **throws** `ForbiddenException` (was `logger.warn` + skip) when the target voucher is accounts-signed.
+- **`addAccountRemark()`** — left open (Q4: writes `accRemark` only, not voucher-week coupling).
+- **Controller** — `delete`, `upload`, `deleteProof`, `approve` now pass `req.user as ImprestActorUser`
+  (was lossy `@CurrentUser("id")`) so the exempt check has `roleId/roleName`.
+
+### Required `remark`
+
+- DB `remark` → `.notNull()`; migration `api/drizzle/0131_require_imprest_remark.sql` backfills
+  blank rows to `'-'` then `SET NOT NULL` (journal `idx 88`; applied to dev: 10 rows backfilled).
+- Backend Create Zod: `remark: z.string().trim().min(1)` (required); Update Zod: required-when-supplied
+  (`min(1)` on optional). Service adds a `400` guard as defense-in-depth.
+- Frontend `imprest.schema.ts` remark → required; `ImprestForm.tsx` remark field now `required` with
+  `Enter remark` placeholder.
+
+### Verification
+
+> `pnpm build` ✓, `tsc --noEmit` ✓ (API; web errors are pre-existing in unrelated modules),
+> `pnpm test` ✓, lint parity (all remaining are pre-existing `no-unsafe-*`).
+
+### Out of scope
+
+No bulk/excel imprest route exists. Future bulk must call `assertExpenseWeekNotLocked` per record
+before the insert transaction, resolve `hasPermission` once per request, and fail the batch atomically
+on any locked week.
 
 ---
 

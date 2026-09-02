@@ -325,7 +325,7 @@ const [files, setFiles] = useState<string[]>([]);
                                 </div>
                             </div>
 
-                            {/* Remarks — always shown (optional) */}
+                            {/* Remarks — always shown (required) */}
                             <FieldWrapper<ImprestFormValues, "remark">
                                 control={form.control}
                                 name="remark"
@@ -335,9 +335,10 @@ const [files, setFiles] = useState<string[]>([]);
                                 {field => (
                                     <textarea
                                         className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                        placeholder="Remarks (optional)"
+                                        placeholder="Enter remark"
                                         {...field}
                                         value={field.value ?? ""}
+                                        required
                                     />
                                 )}
                             </FieldWrapper>

@@ -8,7 +8,7 @@ export const UpdateEmployeeImprestSchema = z.object({
     projectId: z.coerce.number().int().optional().nullable(),
     projectName: z.string().max(255).optional().nullable(),
     amount: z.coerce.number().int().min(1).optional(),
-    remark: z.string().optional().nullable(),
+    remark: z.string().trim().min(1, "Remark cannot be empty").optional(),
     invoiceProof: z.array(z.string()).optional(),
     approvalStatus: z.coerce.number().int().optional(),
     tallyStatus: z.coerce.number().int().optional(),

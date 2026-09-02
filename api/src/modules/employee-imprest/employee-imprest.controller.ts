@@ -1,5 +1,4 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req } from "@nestjs/common";
-import { CurrentUser } from "@/decorators/current-user.decorator";
 import { EmployeeImprestService, type ImprestActorUser } from "@/modules/employee-imprest/employee-imprest.service";
 import { CreateEmployeeImprestSchema } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
 import { UpdateEmployeeImprestSchema, type UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
@@ -70,8 +69,8 @@ export class EmployeeImprestController {
     }
 
     @Delete(":id")
-    delete(@Param("id", ParseIntPipe) id: number, @CurrentUser("id") userId: number) {
-        return this.service.delete(id, userId);
+    delete(@Param("id", ParseIntPipe) id: number, @Req() req) {
+        return this.service.delete(id, req.user as ImprestActorUser);
     }
 
     @Post(":id/approve")
@@ -79,6 +78,7 @@ export class EmployeeImprestController {
         return this.service.approveImprest({
             imprestId: Number(id),
             userId: req.user.sub,
+            actorUser: req.user as ImprestActorUser,
         });
     }
 
@@ -100,23 +100,19 @@ export class EmployeeImprestController {
 
     // File upload code
     @Post(":id/upload")
-    uploadDocs(@Param("id", ParseIntPipe) id: number, @Body() body: { files?: string[] }, @CurrentUser("id") userId: number) {
+    uploadDocs(@Req() req, @Param("id", ParseIntPipe) id: number, @Body() body: { files?: string[] }) {
         console.log("file upload begins");
         console.log("Files received:", body?.files);
-        return this.service.uploadDocs(id, body?.files ?? [], userId);
+        return this.service.uploadDocs(id, body?.files ?? [], req.user as ImprestActorUser);
     }
 
     @Patch(":id/account-remark")
-    addAccRemark(@Param("id", ParseIntPipe) id: number, @Body () body :{remark: string}){
+    addAccRemark(@Param("id", ParseIntPipe) id: number, @Body() body: { remark: string }) {
         return this.service.addAccountRemark(id, body.remark);
     }
 
     @Delete(":id/proof/:filename")
-    deleteProof(
-        @Param("id", ParseIntPipe) id: number,
-        @Param("filename") filename: string,
-        @CurrentUser("id") userId: number
-    ) {
-        return this.service.deleteProof(id, decodeURIComponent(filename), userId);
+    deleteProof(@Req() req, @Param("id", ParseIntPipe) id: number, @Param("filename") filename: string) {
+        return this.service.deleteProof(id, decodeURIComponent(filename), req.user as ImprestActorUser);
     }
 }

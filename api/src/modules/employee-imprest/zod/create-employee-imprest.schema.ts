@@ -8,7 +8,7 @@ export const CreateEmployeeImprestSchema = z.object({
     projectId: z.coerce.number().int().optional().nullable(),
     projectName: z.string().max(255).optional().nullable(),
     amount: z.coerce.number().int().min(1),
-    remark: z.string().optional().nullable(),
+    remark: z.string().trim().min(1, "Remark is required"),
     invoiceProof: z.array(z.unknown()).optional(),
     approvalStatus: z.coerce.number().int().optional(),
     tallyStatus: z.coerce.number().int().optional(),

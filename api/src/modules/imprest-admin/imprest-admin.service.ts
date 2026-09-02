@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
@@ -789,15 +789,11 @@ export class ImprestAdminService {
             .limit(1);
 
         if (!existingLink) {
-            // Mutating a signed voucher is not allowed — an approved entry that
-            // arrives after accounts sign-off will be surfaced by verification.
+            // Mutating a signed voucher is not allowed. Approving into an
+            // accounts-signed week is a week-lock violation — fail fast rather
+            // than leave the imprest approved but excluded from its voucher.
             if (isVoucherSigned) {
-                this.logger.warn("Skipped linking imprest to signed voucher", {
-                    imprestId,
-                    voucherId: voucher.id,
-                    voucherCode: voucher.voucherCode,
-                });
-                return voucher;
+                throw new ForbiddenException(`Cannot link imprest to voucher ${voucher.voucherCode} — expense week is already approved by accounts.`);
             }
 
             await this.linkImprestsToVoucher(voucher.id, [imprestId]);

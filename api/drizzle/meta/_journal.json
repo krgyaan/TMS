@@ -435,21 +435,26 @@
                         "when":  1788080547911,
                         "tag":  "0128_drop_companies_and_documents",
                         "breakpoints":  true
-                    }
-,
+                    },
                     {
                         "idx":  86,
                         "version":  "7",
                         "when":  1788102720040,
                         "tag":  "0129_add_employee_imprest_voucher_items",
                         "breakpoints":  true
-                    }
-,
+                    },
                     {
                         "idx":  87,
                         "version":  "7",
                         "when":  1788329096209,
                         "tag":  "0130_backfill_date_of_expense_strict",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  88,
+                        "version":  "7",
+                        "when":  1788332239287,
+                        "tag":  "0131_require_imprest_remark",
                         "breakpoints":  true
                     }
                 ]

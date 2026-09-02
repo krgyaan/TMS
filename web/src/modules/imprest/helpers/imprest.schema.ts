@@ -41,7 +41,7 @@ export const imprestFormSchema = z
             z.date({ error: "Expense Date is required" })
         ),
 
-        remark: z.string().optional().nullable(),
+        remark: z.string().trim().min(1, "Remark is required"),
 
         ...insuranceFieldsSchema.shape,
     })

@@ -72,7 +72,8 @@ export class EmployeeImprestService {
             return;
         }
 
-        // [commented out] Allow approved week voucher for all users for now
+        // A voucher whose week has been accounts-approved locks this expense
+        // week for this beneficiary — no new/updated imprest may enter it.
         const [lockedVoucher] = await this.db
             .select({ voucherCode: employeeImprestVouchers.voucherCode })
             .from(employeeImprestVouchers)
@@ -107,6 +108,10 @@ export class EmployeeImprestService {
 
         if (!data.dateOfExpense) {
             throw new BadRequestException("dateOfExpense is required");
+        }
+
+        if (!data.remark?.trim()) {
+            throw new BadRequestException("Remark is required");
         }
 
         await this.assertExpenseWeekNotLocked({
@@ -599,11 +604,17 @@ export class EmployeeImprestService {
     }
 
     /* ------------------------- UPLOAD DOCUMENTS ------------------------ */
-    async uploadDocs(id: number, files: string[], userId: number) {
+    async uploadDocs(id: number, files: string[], actorUser: ImprestActorUser) {
         const existing = await this.findOne(id);
         if (!existing) {
             throw new NotFoundException("Employee imprest not found");
         }
+
+        await this.assertExpenseWeekNotLocked({
+            beneficiaryUserId: existing.userId,
+            expenseDate: existing.dateOfExpense,
+            actorUser,
+        });
 
         if (!files || files.length === 0) {
             throw new BadRequestException("No files uploaded");
@@ -652,7 +663,7 @@ export class EmployeeImprestService {
         };
     }
 
-    async approveImprest({ imprestId, userId }: { imprestId: number; userId: number }) {
+    async approveImprest({ imprestId, userId, actorUser }: { imprestId: number; userId: number; actorUser: ImprestActorUser }) {
         const imprest = await this.db.query.employeeImprests.findFirst({
             where: eq(employeeImprests.id, imprestId),
         });
@@ -662,6 +673,15 @@ export class EmployeeImprestService {
         }
 
         const newStatus = imprest.approvalStatus === 1 ? 0 : 1;
+
+        if (newStatus === 1) {
+            await this.assertExpenseWeekNotLocked({
+                beneficiaryUserId: imprest.userId,
+                expenseDate: imprest.dateOfExpense,
+                actorUser,
+            });
+        }
+
         const approvedDate = newStatus === 1 ? new Date() : null;
 
         await this.db
@@ -718,12 +738,18 @@ export class EmployeeImprestService {
     }
 
     /* ----------------------------- DELETE ------------------------------ */
-    async delete(id: number, userId: number) {
+    async delete(id: number, actorUser: ImprestActorUser) {
         const existing = await this.findOne(id);
 
         if (!existing) {
             throw new NotFoundException("Employee imprest not found");
         }
+
+        await this.assertExpenseWeekNotLocked({
+            beneficiaryUserId: existing.userId,
+            expenseDate: existing.dateOfExpense,
+            actorUser,
+        });
 
         // Unlink from any voucher BEFORE deleting (recomputes the voucher amount
         // and drops the voucher if it becomes empty). Also blocks deletion when
@@ -741,12 +767,18 @@ export class EmployeeImprestService {
         return { success: true };
     }
 
-    async deleteProof(id: number, filename: string, userId: number) {
+    async deleteProof(id: number, filename: string, actorUser: ImprestActorUser) {
         const existing = await this.findOne(id);
 
         if (!existing) {
             throw new NotFoundException("Employee imprest not found");
         }
+
+        await this.assertExpenseWeekNotLocked({
+            beneficiaryUserId: existing.userId,
+            expenseDate: existing.dateOfExpense,
+            actorUser,
+        });
 
         if (!Array.isArray(existing.invoiceProof)) {
             throw new InternalServerErrorException("invoiceProof is corrupted");
