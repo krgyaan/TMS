@@ -21,7 +21,7 @@ createRoot(document.getElementById("root")!).render(
     <StrictMode>
         <QueryClientProvider client={queryClient}>
             <ThemeProvider defaultTheme="system" storageKey="tms-ui-theme">
-                <BrowserRouter>
+                <BrowserRouter basename="/pwa">
                     <AuthProvider>
                         <PwaApp />
                     </AuthProvider>
