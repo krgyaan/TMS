@@ -15,7 +15,7 @@ import { BadRequestException, ForbiddenException, Inject, Injectable, InternalSe
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
-import { ImprestAdminService } from "@/modules/imprest-admin/imprest-admin.service";
+import { ImprestAdminService, type DbOrTx } from "@/modules/imprest-admin/imprest-admin.service";
 const TRANSFER_CATEGORY_ID = 22;
 const INSURANCE_CATEGORY_ID = 8;
 const WEEK_LOCK_EXEMPT_PERMISSION = { module: "shared.imprests", action: "week-lock-exempt" } as const;
@@ -112,6 +112,12 @@ export class EmployeeImprestService {
 
         if (!data.remark?.trim()) {
             throw new BadRequestException("Remark is required");
+        }
+
+        // An approve-on-create bypass would leave the imprest approved but not
+        // linked to a voucher. Force the explicit approve flow instead.
+        if (data.approvalStatus && Number(data.approvalStatus) === 1) {
+            throw new BadRequestException("Cannot create an already-approved imprest. Use the approve endpoint instead.");
         }
 
         await this.assertExpenseWeekNotLocked({
@@ -474,7 +480,14 @@ export class EmployeeImprestService {
             if (data.amount !== undefined) updateData.amount = data.amount;
             if (data.remark !== undefined) updateData.remark = data.remark;
 
-            if (data.approvalStatus !== undefined) updateData.approvalStatus = data.approvalStatus;
+            if (data.approvalStatus !== undefined) {
+                updateData.approvalStatus = data.approvalStatus;
+                // Revoking approval must clear the approved date so the row no
+                // longer looks approved to any vouchers / legacy audits.
+                if (Number(data.approvalStatus) === 0) {
+                    updateData.approvedDate = null;
+                }
+            }
             if (data.proofStatus !== undefined) updateData.proofStatus = data.proofStatus;
             if (data.tallyStatus !== undefined) updateData.tallyStatus = data.tallyStatus;
             if (data.status !== undefined) updateData.status = data.status;
@@ -557,16 +570,17 @@ export class EmployeeImprestService {
                 await this.insurancePolicyService.unlinkFromImprest(tx, updated.id);
             }
 
+            // Re-sync voucher membership inside the SAME transaction so a
+            // lock/Forbidden failure rolls the imprest edit back instead of
+            // leaving an approved row detached from its voucher.
+            const touchesVoucher = data.approvalStatus !== undefined || data.approvedDate !== undefined || data.amount !== undefined || data.dateOfExpense !== undefined;
+
+            if (touchesVoucher) {
+                await this.syncVoucherLinksForUpdatedImprest(updated, actorUser, tx);
+            }
+
             return updated;
         });
-
-        // Re-sync voucher membership only when fields that affect a voucher's
-        // contents (approval state, amount) actually changed.
-        const touchesVoucher = data.approvalStatus !== undefined || data.approvedDate !== undefined || data.amount !== undefined || data.dateOfExpense !== undefined;
-
-        if (touchesVoucher) {
-            await this.syncVoucherLinksForUpdatedImprest(updated, actorUser);
-        }
 
         return updated;
     }
@@ -574,24 +588,29 @@ export class EmployeeImprestService {
     /**
      * After an edit, refresh the imprest's voucher linkage: remove it from its
      * previous voucher (if any) and re-attach it to the correct one based on
-     * the currently approved state.
+     * the currently approved state. Runs on the caller's transaction handle.
      */
-    private async syncVoucherLinksForUpdatedImprest(updated: any, actorUser?: ImprestActorUser) {
-        const wasModified = updated.approvalStatus === 1 || updated.approvedDate;
+    private async syncVoucherLinksForUpdatedImprest(updated: any, actorUser?: ImprestActorUser, tx?: DbOrTx) {
+        const txn = tx ?? this.db;
 
         if (updated.approvalStatus === 1) {
             // Rebuild the mapping to the correct acceptance period.
             if (updated.userId) {
-                await this.imprestAdminService.removeImprestFromVoucher(updated.id);
-                await this.imprestAdminService.ensureVoucherForImprest({
-                    imprestId: updated.id,
-                    userId: updated.userId,
-                    effectiveDate: updated.dateOfExpense,
-                    createdBy: String(actorUser?.sub ?? updated.userId),
-                });
+                await this.imprestAdminService.removeImprestFromVoucher(updated.id, txn);
+                await this.imprestAdminService.ensureVoucherForImprest(
+                    {
+                        imprestId: updated.id,
+                        userId: updated.userId,
+                        effectiveDate: updated.dateOfExpense,
+                        createdBy: String(actorUser?.sub ?? updated.userId),
+                    },
+                    txn
+                );
             }
-        } else if (wasModified) {
-            await this.imprestAdminService.removeImprestFromVoucher(updated.id);
+        } else if (updated.approvalStatus !== undefined) {
+            // Revoked (or set to pending): drop any legacy voucher link. This is
+            // a no-op when the imprest was never linked.
+            await this.imprestAdminService.removeImprestFromVoucher(updated.id, txn);
         }
     }
 
@@ -684,28 +703,35 @@ export class EmployeeImprestService {
 
         const approvedDate = newStatus === 1 ? new Date() : null;
 
-        await this.db
-            .update(employeeImprests)
-            .set({
-                approvalStatus: newStatus,
-                approvedDate,
-            })
-            .where(eq(employeeImprests.id, imprestId));
+        // Toggle + voucher re-link run in ONE transaction so a Forbidden week
+        // lock rolls back the approval toggle (no orphaned approved rows).
+        await this.db.transaction(async tx => {
+            await tx
+                .update(employeeImprests)
+                .set({
+                    approvalStatus: newStatus,
+                    approvedDate,
+                })
+                .where(eq(employeeImprests.id, imprestId));
 
-        // Keep voucher <-> imprest links in sync: link on approve, unlink on
-        // revoke so the explicit join table always mirrors approved entries.
-        if (newStatus === 1) {
-            if (imprest.userId) {
-                await this.imprestAdminService.ensureVoucherForImprest({
-                    imprestId,
-                    userId: imprest.userId,
-                    effectiveDate: imprest.dateOfExpense,
-                    createdBy: String(userId),
-                });
+            // Keep voucher <-> imprest links in sync: link on approve, unlink on
+            // revoke so the explicit join table always mirrors approved entries.
+            if (newStatus === 1) {
+                if (imprest.userId) {
+                    await this.imprestAdminService.ensureVoucherForImprest(
+                        {
+                            imprestId,
+                            userId: imprest.userId,
+                            effectiveDate: imprest.dateOfExpense,
+                            createdBy: String(userId),
+                        },
+                        tx
+                    );
+                }
+            } else {
+                await this.imprestAdminService.removeImprestFromVoucher(imprestId, tx);
             }
-        } else {
-            await this.imprestAdminService.removeImprestFromVoucher(imprestId);
-        }
+        });
 
         return {
             success: true,
@@ -751,12 +777,12 @@ export class EmployeeImprestService {
             actorUser,
         });
 
-        // Unlink from any voucher BEFORE deleting (recomputes the voucher amount
-        // and drops the voucher if it becomes empty). Also blocks deletion when
-        // the imprest is part of an accounts-signed voucher.
-        await this.imprestAdminService.removeImprestFromVoucher(id);
-
+        // Unlink from any voucher, drop insurance and delete the imprest in ONE
+        // transaction. removeImprestFromVoucher recomputes the voucher amount /
+        // drops an empty unsigned voucher, and blocks a signed-week deletion.
         await this.db.transaction(async tx => {
+            await this.imprestAdminService.removeImprestFromVoucher(id, tx);
+
             if (existing.insurancePolicyId) {
                 await this.insurancePolicyService.removeByImprestId(tx, id);
             }

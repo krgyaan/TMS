@@ -1,7 +1,11 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
+
+/** A Drizzle db handle or an in-flight transaction handle. */
+type Tx = Parameters<Parameters<DbInstance["transaction"]>[0]>[0];
+export type DbOrTx = DbInstance | Tx;
 import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-voucher";
 import { employeeImprestVoucherItems } from "@/db/schemas/accounts/employee-imprest-voucher-item.schema";
 import { users } from "@/db/schemas/auth/users.schema";
@@ -478,13 +482,19 @@ export class ImprestAdminService {
     }
 
     async createVoucher({ user, userId, validFrom, validTo }: { user: any; userId: number; validFrom: Date; validTo: Date }) {
-        // ✅ THIS is where buildVoucherIfMissing is used
-        return this.buildVoucherIfMissing({
-            userId,
-            from: new Date(validFrom),
-            to: new Date(validTo),
-            createdBy: String(user.sub),
-        });
+        // Transaction-wrapped so the advisory lock in buildVoucherIfMissing is
+        // held until commit (prevents concurrent duplicate voucher creation).
+        return this.db.transaction(tx =>
+            this.buildVoucherIfMissing(
+                {
+                    userId,
+                    from: new Date(validFrom),
+                    to: new Date(validTo),
+                    createdBy: String(user.sub),
+                },
+                tx
+            )
+        );
     }
 
     async getVoucherProofs({ user, userId, year, week }: { user: any; userId: number; year: number; week: number }) {
@@ -519,12 +529,17 @@ export class ImprestAdminService {
     }
 
     async getVoucherByPeriod({ user, userId, from, to }: { user: any; userId: number; from: Date; to: Date }) {
-        const voucher = await this.buildVoucherIfMissing({
-            userId,
-            from,
-            to,
-            createdBy: String(user.sub),
-        });
+        const voucher = await this.db.transaction(tx =>
+            this.buildVoucherIfMissing(
+                {
+                    userId,
+                    from,
+                    to,
+                    createdBy: String(user.sub),
+                },
+                tx
+            )
+        );
 
         return this.getVoucherById({
             user,
@@ -614,6 +629,30 @@ export class ImprestAdminService {
             };
         });
 
+        // Amount integrity: stored voucher.amount must equal the sum of the
+        // linked approved imprests. Auto-correct unsigned vouchers (with a
+        // warning); a signed week cannot be silently rewritten — 409 instead.
+        const computedAmount = items.reduce((sum, item) => sum + Number(item.amount), 0);
+        const storedAmount = Number(voucher.amount);
+        const isAccountsSigned = typeof voucher.accountsSignedBy === "string" && voucher.accountsSignedBy.trim() !== "";
+
+        if (Math.abs(computedAmount - storedAmount) > 0.001) {
+            if (isAccountsSigned) {
+                throw new ConflictException(
+                    `Voucher ${voucher.voucherCode} amount mismatch: stored ${storedAmount}, linked ${computedAmount}. ` +
+                        "Week is already approved by accounts and cannot be auto-corrected."
+                );
+            }
+
+            await this.recomputeVoucherAmount(voucher.id);
+            voucher.amount = computedAmount;
+            this.logger.warn(`Auto-corrected voucher ${voucher.voucherCode} amount ${storedAmount} -> ${computedAmount} (drifted from linked imprests)`, {
+                voucherId: voucher.id,
+                storedAmount,
+                computedAmount,
+            });
+        }
+
         return {
             voucher: {
                 id: voucher.id,
@@ -647,8 +686,16 @@ export class ImprestAdminService {
         };
     }
 
-    async buildVoucherIfMissing({ userId, from, to, createdBy }: { userId: number; from: Date; to: Date; createdBy: string }) {
-        const [existing] = await this.db
+    async buildVoucherIfMissing(
+        { userId, from, to, createdBy }: { userId: number; from: Date; to: Date; createdBy: string },
+        tx: DbOrTx = this.db
+    ) {
+        // Serialize concurrent creation for the same (beneficiary, week window).
+        // pg_advisory_xact_lock is released when the enclosing transaction
+        // commits/rolls back, so two racing approvals cannot create duplicates.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`imprest-voucher|${userId}|${from.getTime()}|${to.getTime()}`})::bigint)`);
+
+        const [existing] = await tx
             .select()
             .from(employeeImprestVouchers)
             .where(
@@ -664,7 +711,7 @@ export class ImprestAdminService {
             return existing;
         }
 
-        const imprests = await this.db
+        const imprests = await tx
             .select({ id: employeeImprests.id, amount: employeeImprests.amount })
             .from(employeeImprests)
             .where(
@@ -684,10 +731,10 @@ export class ImprestAdminService {
 
         const totalAmount = imprests.reduce((sum, r) => sum + Number(r.amount), 0);
 
-        const [voucher] = await this.db
+        const [voucher] = await tx
             .insert(employeeImprestVouchers)
             .values({
-                voucherCode: await this.generateVoucherCode(),
+                voucherCode: await this.generateVoucherCode(tx),
                 beneficiaryName: String(userId),
                 amount: totalAmount,
                 validFrom: from, // time no longer matters
@@ -701,7 +748,8 @@ export class ImprestAdminService {
         if (imprests.length > 0) {
             await this.linkImprestsToVoucher(
                 voucher.id,
-                imprests.map(r => r.id)
+                imprests.map(r => r.id),
+                tx
             );
         }
 
@@ -721,16 +769,16 @@ export class ImprestAdminService {
         return { monday, sunday };
     }
 
-    private async linkImprestsToVoucher(voucherId: number, imprestIds: number[]) {
+    private async linkImprestsToVoucher(voucherId: number, imprestIds: number[], tx: DbOrTx = this.db) {
         if (imprestIds.length === 0) return;
-        await this.db
+        await tx
             .insert(employeeImprestVoucherItems)
             .values(imprestIds.map(imprestId => ({ voucherId, imprestId })))
             .onConflictDoNothing();
     }
 
-    private async recomputeVoucherAmount(voucherId: number) {
-        await this.db.execute(sql`
+    private async recomputeVoucherAmount(voucherId: number, tx: DbOrTx = this.db) {
+        await tx.execute(sql`
             UPDATE employee_imprest_vouchers v
             SET amount = COALESCE(
                     (
@@ -746,11 +794,15 @@ export class ImprestAdminService {
         `);
     }
 
-    private async deleteVoucherIfEmpty(voucherId: number) {
-        await this.db.execute(sql`
+    private async deleteVoucherIfEmpty(voucherId: number, tx: DbOrTx = this.db) {
+        // A voucher is only auto-removable when it holds no linked imprests AND
+        // has not been approved by accounts or admin (signed weeks are retained
+        // even if all items later leave).
+        await tx.execute(sql`
             DELETE FROM employee_imprest_vouchers v
             WHERE v.id = ${voucherId}
               AND TRIM(COALESCE(v.accounts_signed_by, '')) = ''
+              AND TRIM(COALESCE(v.admin_signed_by, '')) = ''
               AND NOT EXISTS (
                   SELECT 1 FROM employee_imprest_voucher_items vi WHERE vi.voucher_id = ${voucherId}
               )
@@ -761,7 +813,7 @@ export class ImprestAdminService {
      * Ensures an approved imprest is linked to (and, if needed, creates) the
      * voucher whose valid_from..valid_to window covers its expense date.
      */
-    async ensureVoucherForImprest({ imprestId, userId, effectiveDate, createdBy }: { imprestId: number; userId: number; effectiveDate: Date; createdBy: string }) {
+    async ensureVoucherForImprest({ imprestId, userId, effectiveDate, createdBy }: { imprestId: number; userId: number; effectiveDate: Date; createdBy: string }, tx: DbOrTx = this.db) {
         if (!userId) {
             return null;
         }
@@ -772,17 +824,20 @@ export class ImprestAdminService {
 
         const { monday, sunday } = this.isoWeekBounds(effectiveDate);
 
-        const voucher = await this.buildVoucherIfMissing({
-            userId,
-            from: monday,
-            to: sunday,
-            createdBy,
-        });
+        const voucher = await this.buildVoucherIfMissing(
+            {
+                userId,
+                from: monday,
+                to: sunday,
+                createdBy,
+            },
+            tx
+        );
 
         const isVoucherSigned = voucher.accountsSignedBy && voucher.accountsSignedBy.trim() !== "";
 
         // Already linked? Nothing to do.
-        const [existingLink] = await this.db
+        const [existingLink] = await tx
             .select({ id: employeeImprestVoucherItems.imprestId })
             .from(employeeImprestVoucherItems)
             .where(and(eq(employeeImprestVoucherItems.voucherId, voucher.id), eq(employeeImprestVoucherItems.imprestId, imprestId)))
@@ -796,8 +851,8 @@ export class ImprestAdminService {
                 throw new ForbiddenException(`Cannot link imprest to voucher ${voucher.voucherCode} — expense week is already approved by accounts.`);
             }
 
-            await this.linkImprestsToVoucher(voucher.id, [imprestId]);
-            await this.recomputeVoucherAmount(voucher.id);
+            await this.linkImprestsToVoucher(voucher.id, [imprestId], tx);
+            await this.recomputeVoucherAmount(voucher.id, tx);
         }
 
         return voucher;
@@ -808,14 +863,14 @@ export class ImprestAdminService {
      * voucher amount, and drops the voucher if it became empty (and unsigned).
      * Throws if the imprest is part of an accounts-signed voucher.
      */
-    async removeImprestFromVoucher(imprestId: number) {
-        const links = await this.db
+    async removeImprestFromVoucher(imprestId: number, tx: DbOrTx = this.db) {
+        const links = await tx
             .select({ voucherId: employeeImprestVoucherItems.voucherId })
             .from(employeeImprestVoucherItems)
             .where(eq(employeeImprestVoucherItems.imprestId, imprestId));
 
         for (const link of links) {
-            const [voucher] = await this.db
+            const [voucher] = await tx
                 .select({ id: employeeImprestVouchers.id, accountsSignedBy: employeeImprestVouchers.accountsSignedBy })
                 .from(employeeImprestVouchers)
                 .where(eq(employeeImprestVouchers.id, link.voucherId))
@@ -825,21 +880,25 @@ export class ImprestAdminService {
                 throw new BadRequestException("This imprest is part of a voucher already approved by accounts and cannot be modified.");
             }
 
-            await this.db
+            await tx
                 .delete(employeeImprestVoucherItems)
                 .where(and(eq(employeeImprestVoucherItems.voucherId, link.voucherId), eq(employeeImprestVoucherItems.imprestId, imprestId)));
 
             if (voucher) {
-                await this.recomputeVoucherAmount(voucher.id);
-                await this.deleteVoucherIfEmpty(voucher.id);
+                await this.recomputeVoucherAmount(voucher.id, tx);
+                await this.deleteVoucherIfEmpty(voucher.id, tx);
             }
         }
     }
 
-    private async generateVoucherCode() {
+    private async generateVoucherCode(tx: DbOrTx = this.db) {
         const year = this.getFinancialYear();
 
-        const result = await this.db.execute<{
+        // Serialize code allocation for the FY across concurrent creators.
+        // Must run inside a transaction (advisory lock releases at commit).
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`imprest-voucher-code|${year}`})::bigint)`);
+
+        const result = await tx.execute<{
             max: number | null;
         }>(sql`
         SELECT
@@ -873,17 +932,23 @@ export class ImprestAdminService {
         const [profile] = await this.db.select({ signature: userProfiles.signature }).from(userProfiles).where(eq(userProfiles.userId, user.id)).limit(1);
         console.log("profile", profile);
 
-        await this.db
-            .update(employeeImprestVouchers)
-            .set({
-                accountsRemark: remark ?? voucher.accountsRemark,
+        await this.db.transaction(async tx => {
+            // Amount must reflect the linked imprests before the week gets
+            // locked by this signature.
+            await this.recomputeVoucherAmount(voucherId, tx);
 
-                ...(approve && {
-                    accountsSignedBy: profile?.signature ?? "kailash.jpg",
-                    accountsSignedAt: new Date(),
-                }),
-            })
-            .where(eq(employeeImprestVouchers.id, voucherId));
+            await tx
+                .update(employeeImprestVouchers)
+                .set({
+                    accountsRemark: remark ?? voucher.accountsRemark,
+
+                    ...(approve && {
+                        accountsSignedBy: profile?.signature ?? "kailash.jpg",
+                        accountsSignedAt: new Date(),
+                    }),
+                })
+                .where(eq(employeeImprestVouchers.id, voucherId));
+        });
 
         return {
             success: true,
@@ -909,17 +974,21 @@ export class ImprestAdminService {
 
         const [profile] = await this.db.select({ signature: userProfiles.signature }).from(userProfiles).where(eq(userProfiles.userId, user.id)).limit(1);
 
-        await this.db
-            .update(employeeImprestVouchers)
-            .set({
-                adminRemark: remark ?? voucher.adminRemark,
+        await this.db.transaction(async tx => {
+            await this.recomputeVoucherAmount(voucherId, tx);
 
-                ...(approve && {
-                    adminSignedBy: profile?.signature ?? "piyush.jpeg",
-                    adminSignedAt: new Date(),
-                }),
-            })
-            .where(eq(employeeImprestVouchers.id, voucherId));
+            await tx
+                .update(employeeImprestVouchers)
+                .set({
+                    adminRemark: remark ?? voucher.adminRemark,
+
+                    ...(approve && {
+                        adminSignedBy: profile?.signature ?? "piyush.jpeg",
+                        adminSignedAt: new Date(),
+                    }),
+                })
+                .where(eq(employeeImprestVouchers.id, voucherId));
+        });
 
         return {
             success: true,

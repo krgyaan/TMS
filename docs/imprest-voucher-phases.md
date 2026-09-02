@@ -184,19 +184,88 @@ on any locked week.
 
 ---
 
-## Phase 3 — Amount / Lifecycle Integrity
+## Phase 3 — Amount / Lifecycle Integrity (DONE)
 
-**Goal:** Voucher `amount` stays consistent; signed vouchers are immutable.
+**Goal:** Voucher `amount` stays consistent; signed vouchers are immutable; concurrent
+approval of the same (beneficiary, week) is impossible; approved-on-create orphan bypass is
+closed.
 
-- `linkImprestsToVoucher(voucherId, ids)` → `INSERT ... ON CONFLICT DO NOTHING` (done).
-- `recomputeVoucherAmount(voucherId)` → `amount = COALESCE(SUM(ei.amount) via items, 0)` (done).
-- `deleteVoucherIfEmpty(voucherId)` → drop when 0 linked items and unsigned (done).
-- `ensureVoucherForImprest()`:
-  - Do not mutate a voucher whose `accounts_signed_by` is set; log a warning instead (done).
-- `removeImprestFromVoucher(imprestId)`:
-  - Throw if the imprest belongs to an accounts-signed voucher; otherwise unlink, recompute,
-    and purge empty vouchers (done).
-- `update()`/`delete()` path guards described in Phase 0 are part of this phase’s behavior.
+### Duplicate Vouchers + Concurrency
+
+- **Migration `api/drizzle/0132_dedup_vouchers_unique_week.sql`** (journal `idx 89`; applied to dev: 44
+  zero-amount, 0-item duplicate voucher rows deleted):
+  - Deletes non-canonical legacy duplicates per (beneficiary_name, valid_from::date, valid_to::date),
+    keeping the row with most signatures (accounts > admin > lowest id).
+  - `UNIQUE INDEX` on `(beneficiary_name, valid_from::date, valid_to::date)` **not created** (PG treats
+    `timestamptz::date` as non-IMMUTABLE — index and generated-column approaches both fail).
+  - Uniqueness enforced **at the application layer** instead (below).
+- **`buildVoucherIfMissing()`** (`imprest-admin.service.ts`): acquires `pg_advisory_xact_lock(hashtext(...))`
+  on `(beneficiary, from.getTime(), to.getTime())` before `SELECT`+`INSERT`. Lock is held until the
+  enclosing transaction commits/rolls back, so concurrent approvals in the same week serialize and
+  cannot create duplicate vouchers.
+- **`generateVoucherCode()`** acquires a separate FY-wide advisory lock before `MAX()`, preventing
+  concurrent creators from generating the same code (`VE/XX/VNNN`).
+- **`createVoucher()`** and **`getVoucherByPeriod()`** are now transaction-wrapped so the advisory locks
+  in `buildVoucherIfMissing` actually hold (a bare autocommit call would release immediately).
+
+### Tx-Aware Helpers
+
+All internal voucher helpers now accept an optional `tx` parameter (type `DbOrTx = DbInstance | PgTransaction`,
+exported from `imprest-admin.service.ts`), defaulting to `this.db`. This allows callers inside a
+`db.transaction()` to pass their transaction handle, keeping voucher-link mutations atomic with the
+rest of the business operation.
+
+- `linkImprestsToVoucher(voucherId, ids, tx?)`
+- `recomputeVoucherAmount(voucherId, tx?)`
+- `deleteVoucherIfEmpty(voucherId, tx?)`
+- `buildVoucherIfMissing({ ... }, tx?)`
+- `ensureVoucherForImprest({ ... }, tx?)`
+- `removeImprestFromVoucher(imprestId, tx?)`
+- `generateVoucherCode(tx?)`
+
+### Atomicity: Employee-Imprest Mutations
+
+- **`update()`**: voucher sync (`removeImprestFromVoucher` + `ensureVoucherForImprest`) is now **inside the
+  same `db.transaction()`** that modifies the imprest. A `ForbiddenException` (locked week) during sync
+  rolls back the imprest edit instead of leaving an orphaned approved row.
+- **`approveImprest()`**: toggle + `ensureVoucherForImprest`/`removeImprestFromVoucher` run in one `db.transaction()`.
+- **`delete()`**: `removeImprestFromVoucher` + insurance removal + `DELETE FROM employee_imprests` run in one
+  `db.transaction()` (was split across two calls; a failed `DELETE` could leave the voucher already mutated).
+- **`update()` revoke path**: setting `data.approvalStatus === 0` now explicitly sets `approvedDate = null`
+  (was left stale, polluting `verify --legacy` audits).
+
+### Approved-On-Create Rejection
+
+- `POST /imprest/employee` with `approvalStatus: 1` is now rejected `400 "Cannot create an
+  already-approved imprest. Use the approve endpoint instead."` — prevents orphaned approved rows
+  that bypass voucher linking.
+
+### Amount Integrity (Q2)
+
+- **`getVoucherById()`**: compares stored `v.amount` vs `SUM(items.amount)` (approved linked imprests).
+  - If mismatch and unsigned: **auto-recompute** `recomputeVoucherAmount()` + `logger.warn`.
+  - If mismatch and signed (`TRIM(accounts_signed_by) <> ''`): throw `409 ConflictException` — the
+    week is locked and the drift cannot be silently corrected.
+- **`accountApproveVoucher()` / `adminApproveVoucher()`**: call `recomputeVoucherAmount()` **inside the signing
+  transaction** before setting `accountsSignedBy` / `adminSignedBy`, ensuring the locked `amount` is fresh.
+
+### `deleteVoucherIfEmpty()` (Q4)
+
+- Now retains vouchers approved by **admin** (`admin_signed_by <> ''`) in addition to accounts-signed.
+  An empty voucher is only auto-deleted when both `TRIM(accounts_signed_by) = ''` AND
+  `TRIM(admin_signed_by) = ''`.
+
+### `syncVoucherLinksForUpdatedImprest()` refactored
+
+Old logic: `wasModified = approvalStatus === 1 || approvedDate` — confused when `update` set `approvedDate`
+on revoke. New logic: if `updated.approvalStatus === 1` → rebuild (remove + ensure); otherwise
+(unconditionally) → remove. No dependency on `approvedDate` (which is now properly cleared on revoke).
+
+### Verification
+
+> `pnpm build` ✓, `tsc --noEmit` ✓, `pnpm test` ✓, `verify --report-only` shows same historical drift
+> as before (orphans/strays unchanged; 44 zero-amount shells removed by dedup). 96 lint problems in
+> the two service files — all pre-existing `no-unsafe-*`/`no-unused-vars`; no new lint errors.
 
 ---
 
