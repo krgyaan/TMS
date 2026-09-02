@@ -442,8 +442,7 @@
                         "when":  1785960000000,
                         "tag":  "0127_create_password_reset_otps",
                         "breakpoints":  true
-                    }
-,
+                    },
                     {
                         "idx":  86,
                         "version":  "7",
