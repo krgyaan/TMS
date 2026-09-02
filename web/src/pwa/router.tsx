@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { RouteWrapper } from "@/app/routes/components/RouteWrapper";
+import { canRead } from "@/types/auth.types";
 import PwaLayout from "./layout/PwaLayout";
 import PwaDashboard from "./pages/Dashboard";
 
@@ -51,11 +52,15 @@ function PermissionRoute({
 }
 
 export default function PwaRouter() {
-    const { permissions, isAdmin, isSuperUser } = useAuth();
+    const { user, isAdmin, isSuperUser } = useAuth();
 
-    const hasCRM = isAdmin || isSuperUser || permissions.includes("crm:read");
-    const hasImprest = isAdmin || isSuperUser || permissions.includes("imprest:read");
-    const hasClientDirectory = isAdmin || isSuperUser || permissions.includes("shared.client-directory");
+    // Per-slot PWA access — shares the same permission strings as the sidebar
+    // (canRead → "module:read"). Keep admin/super as an override.
+    const hasClientDirectory = isAdmin || isSuperUser || canRead(user, "shared.client-directory");
+    const hasHappyCalling = isAdmin || isSuperUser || canRead(user, "crm.happy_calling");
+    const hasLeads = isAdmin || isSuperUser || canRead(user, "crm.leads");
+    const hasEnquiries = isAdmin || isSuperUser || canRead(user, "crm.enquiries");
+    const hasImprest = isAdmin || isSuperUser || canRead(user, "shared.imprests");
 
     return (
         <Suspense
@@ -97,7 +102,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/leads"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasLeads}>
                                 <RouteWrapper><CRM_Leads /></RouteWrapper>
                             </PermissionRoute>
                         }
@@ -105,7 +110,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/leads/create"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasLeads}>
                                 <RouteWrapper><CRM_LeadCreate /></RouteWrapper>
                             </PermissionRoute>
                         }
@@ -113,7 +118,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/leads/:id/edit"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasLeads}>
                                 <RouteWrapper><CRM_LeadEdit /></RouteWrapper>
                             </PermissionRoute>
                         }
@@ -121,7 +126,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/leads/:id"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasLeads}>
                                 <RouteWrapper><CRM_LeadShow /></RouteWrapper>
                             </PermissionRoute>
                         }
@@ -129,7 +134,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/followup/:leadId"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasLeads}>
                                 <RouteWrapper><CRM_LeadFollowup /></RouteWrapper>
                             </PermissionRoute>
                         }
@@ -137,7 +142,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/enquiries"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasEnquiries}>
                                 <RouteWrapper><CRM_Enquiries /></RouteWrapper>
                             </PermissionRoute>
                         }
@@ -145,7 +150,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/enquiries/create"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasEnquiries}>
                                 <RouteWrapper><CRM_EnquiryWithLeadCreate /></RouteWrapper>
                             </PermissionRoute>
                         }
@@ -153,7 +158,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/enquiry/create/:leadId"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasEnquiries}>
                                 <RouteWrapper><CRM_EnquiryCreate /></RouteWrapper>
                             </PermissionRoute>
                         }
@@ -161,7 +166,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/enquiries/:id/edit"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasEnquiries}>
                                 <RouteWrapper><CRM_EnquiryEdit /></RouteWrapper>
                             </PermissionRoute>
                         }
@@ -169,7 +174,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/enquiries/:id/quotation-followup"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasEnquiries}>
                                 <RouteWrapper><CRM_EnquiryQuotationFollowup /></RouteWrapper>
                             </PermissionRoute>
                         }
@@ -177,7 +182,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/enquiries/:id"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasEnquiries}>
                                 <RouteWrapper><CRM_EnquiryShow /></RouteWrapper>
                             </PermissionRoute>
                         }
@@ -185,7 +190,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/happy-calling"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasHappyCalling}>
                                 <RouteWrapper><CRM_HappyCalling /></RouteWrapper>
                             </PermissionRoute>
                         }
@@ -193,7 +198,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/happy-calling/create/:clientId"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasHappyCalling}>
                                 <RouteWrapper><CRM_HappyCallingCreate /></RouteWrapper>
                             </PermissionRoute>
                         }
@@ -201,7 +206,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/happy-calling/enquiry/create/:id"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasHappyCalling}>
                                 <RouteWrapper><CRM_HappyCallingEnquiryCreate /></RouteWrapper>
                             </PermissionRoute>
                         }
@@ -209,7 +214,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/happy-calling/followup/:id"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasHappyCalling}>
                                 <RouteWrapper><CRM_HappyCallingFollowup /></RouteWrapper>
                             </PermissionRoute>
                         }
@@ -217,7 +222,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/happy-calling/:id"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasHappyCalling}>
                                 <RouteWrapper><CRM_HappyCallingShow /></RouteWrapper>
                             </PermissionRoute>
                         }
@@ -225,7 +230,7 @@ export default function PwaRouter() {
                     <Route
                         path="crm/happy-calling/:id/edit"
                         element={
-                            <PermissionRoute hasAccess={hasCRM}>
+                            <PermissionRoute hasAccess={hasHappyCalling}>
                                 <RouteWrapper><CRM_HappyCallingEdit /></RouteWrapper>
                             </PermissionRoute>
                         }
