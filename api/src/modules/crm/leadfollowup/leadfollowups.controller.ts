@@ -8,6 +8,7 @@ import {
     ParseIntPipe,
     HttpCode,
     HttpStatus,
+    Body,
 } from '@nestjs/common';
 import { LeadFollowupsService } from './leadfollowups.service';
 import { CreateFollowupSchema } from './dto/leadfollowup.dto';
@@ -55,6 +56,16 @@ export class FollowupsController {
         @CurrentUser() user: ValidatedUser,
     ) {
         return this.followupsService.update(id, body, user.sub);
+    }
+
+    @Patch(':leadId/:id/stop')
+    @HttpCode(HttpStatus.OK)
+    async stop(
+        @Param('leadId', ParseIntPipe) _leadId: number,
+        @Param('id', ParseIntPipe) id: number,
+        @Body() body: { reason?: string },
+    ) {
+        return this.followupsService.stop(id, body?.reason ?? undefined);
     }
 
     @Delete(':leadId/:id')
@@ -105,6 +116,16 @@ export class EnquiryFollowupsController {
         @CurrentUser() user: ValidatedUser,
     ) {
         return this.followupsService.update(id, body, user.sub);
+    }
+
+    @Patch(':enquiryId/:id/stop')
+    @HttpCode(HttpStatus.OK)
+    async stop(
+        @Param('enquiryId', ParseIntPipe) _enquiryId: number,
+        @Param('id', ParseIntPipe) id: number,
+        @Body() body: { reason?: string },
+    ) {
+        return this.followupsService.stop(id, body?.reason ?? undefined);
     }
 
     @Delete(':enquiryId/:id')

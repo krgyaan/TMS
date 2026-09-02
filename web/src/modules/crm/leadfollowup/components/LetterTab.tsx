@@ -4,9 +4,10 @@ import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
-import { Loader2, FileText, Edit, Save, X, ChevronDown, ChevronUp, Mail, User, MapPin, Phone, Briefcase, Eye } from "lucide-react";
+import { Loader2, FileText, Edit, Save, X, ChevronDown, ChevronUp, Mail, User, MapPin, Phone, Briefcase, Eye, Calendar, Package, Building2 } from "lucide-react";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { FileUploader } from "@/components/file-upload";
@@ -254,92 +255,155 @@ function LetterFollowupCard({ followup, source }: { followup: BaseFollowup; sour
                 </div>
             </CollapsibleTrigger>
 
-            <CollapsibleContent className="p-4 pt-0 space-y-4">
-                {courier ? (
-                    <div className="border rounded-lg overflow-hidden">
+            <CollapsibleContent>
+                <Card className="border-0 shadow-none rounded-none">
+                    <CardContent className="pt-4 px-4">
                         <Table>
                             <TableBody>
+                                {courier ? (
+                                    <>
+                                        <TableRow className="bg-muted/50">
+                                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                                <Briefcase className="h-4 w-4 inline mr-2" /> Courier Details
+                                            </TableCell>
+                                        </TableRow>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                                <div className="flex items-center gap-2">
+                                                    <Package className="h-4 w-4" />
+                                                    Courier ID
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-sm">{courier.id ?? followup.courierId ?? "—"}</TableCell>
+                                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                                <div className="flex items-center gap-2">
+                                                    <Building2 className="h-4 w-4" />
+                                                    Organization Name
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-sm">{courier.toOrg || "—"}</TableCell>
+                                        </TableRow>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                <div className="flex items-center gap-2">
+                                                    <User className="h-4 w-4" />
+                                                    Person Name
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-sm">{courier.toName || "—"}</TableCell>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                <div className="flex items-center gap-2">
+                                                    <MapPin className="h-4 w-4" />
+                                                    Address
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-sm">{courier.toAddr || "—"}</TableCell>
+                                        </TableRow>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Pin Code
+                                            </TableCell>
+                                            <TableCell className="text-sm">{courier.toPin || "—"}</TableCell>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                <div className="flex items-center gap-2">
+                                                    <Phone className="h-4 w-4" />
+                                                    Mobile Number
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-sm">{courier.toMobile || "—"}</TableCell>
+                                        </TableRow>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                <div className="flex items-center gap-2">
+                                                    <Mail className="h-4 w-4" />
+                                                    Courier From
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-sm">{senderName || "—"}</TableCell>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Expected Delivery Date
+                                            </TableCell>
+                                            <TableCell className="text-sm">{courier.delDate ? format(new Date(courier.delDate), "PP") : "—"}</TableCell>
+                                        </TableRow>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Dispatch Urgency
+                                            </TableCell>
+                                            <TableCell className="text-sm">{urgencyLabel ? <Badge variant="outline">{urgencyLabel}</Badge> : "—"}</TableCell>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Documents
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {courierDocs.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {courierDocs.map((doc, idx) => (
+                                                            <a
+                                                                key={idx}
+                                                                href={docUrl(doc)}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-muted text-blue-600 hover:text-blue-800 hover:underline"
+                                                            >
+                                                                <Eye className="h-3 w-3" />
+                                                                {doc.split('/').pop()}
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                ) : "—"}
+                                            </TableCell>
+                                        </TableRow>
+                                    </>
+                                ) : (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                            <div className="flex items-center gap-2">
+                                                <Package className="h-4 w-4" />
+                                                Courier ID
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {followup.courierId || "—"}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+
                                 <TableRow className="bg-muted/50">
                                     <TableCell colSpan={4} className="font-semibold text-sm">
-                                        <Briefcase className="h-4 w-4 inline mr-2" /> Courier Details
+                                        <Calendar className="h-4 w-4 inline mr-2" /> Follow-up
                                     </TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Courier ID</TableCell>
-                                    <TableCell className="text-sm">{courier.id ?? followup.courierId ?? "—"}</TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">Organization Name</TableCell>
-                                    <TableCell className="text-sm">{courier.toOrg || "—"}</TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground"><User className="h-3.5 w-3.5 inline mr-1" /> Person Name</TableCell>
-                                    <TableCell className="text-sm">{courier.toName || "—"}</TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground"><MapPin className="h-3 w-3.5 inline mr-1" /> Address</TableCell>
-                                    <TableCell className="text-sm">{courier.toAddr || "—"}</TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Pin Code</TableCell>
-                                    <TableCell className="text-sm">{courier.toPin || "—"}</TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground"><Phone className="h-3 w-3.5 inline mr-1" /> Mobile Number</TableCell>
-                                    <TableCell className="text-sm">{courier.toMobile || "—"}</TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground"><Mail className="h-3 w-3.5 inline mr-1" /> Courier From</TableCell>
-                                    <TableCell className="text-sm">{senderName || "—"}</TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Expected Delivery Date</TableCell>
-                                    <TableCell className="text-sm">{courier.delDate ? format(new Date(courier.delDate), "PP") : "—"}</TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Dispatch Urgency</TableCell>
-                                    <TableCell className="text-sm">{urgencyLabel ? <Badge variant="outline">{urgencyLabel}</Badge> : "—"}</TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Documents</TableCell>
-                                    <TableCell className="text-sm">
-                                        {courierDocs.length > 0 ? (
-                                            <div className="flex flex-wrap gap-2">
-                                                {courierDocs.map((doc, idx) => (
-                                                    <a
-                                                        key={idx}
-                                                        href={docUrl(doc)}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-muted text-blue-600 hover:text-blue-800 hover:underline"
-                                                    >
-                                                        <Eye className="h-3 w-3" />
-                                                        {doc.split('/').pop()}
-                                                    </a>
-                                                ))}
-                                            </div>
-                                        ) : "—"}
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                        <div className="flex items-center gap-2">
+                                            <Calendar className="h-4 w-4" />
+                                            Next Follow-up Date
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-sm" colSpan={3}>
+                                        {followup.nextFollowupDate
+                                            ? format(new Date(followup.nextFollowupDate), "PP")
+                                            : "—"}
                                     </TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
-                    </div>
-                ) : (
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-1">Courier ID</p>
-                        <p className="text-sm">{followup.courierId || "—"}</p>
-                    </div>
-                )}
-
-                {followup.nextFollowupDate && (
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-1">Next Follow-up Date</p>
-                        <p className="text-sm">{format(new Date(followup.nextFollowupDate), 'PP')}</p>
-                    </div>
-                )}
+                    </CardContent>
+                </Card>
 
                 {isToday(followup.createdAt) && (
-                    <Button
-                        size="sm"
-                        onClick={() =>
-                            navigate(
-                                `${sourceFollowupPath(source)}?tab=letter&followupId=${followup.id}`
-                            )
-                        }
-                    >
-                        <Edit className="h-3 w-3 mr-1" />
-                        Edit
-                    </Button>
+                    <div className="px-4 pb-4">
+                        <Button
+                            size="sm"
+                            onClick={() =>
+                                navigate(
+                                    `${sourceFollowupPath(source)}?tab=letter&followupId=${followup.id}`
+                                )
+                            }
+                        >
+                            <Edit className="h-3 w-3 mr-1" />
+                            Edit
+                        </Button>
+                    </div>
                 )}
             </CollapsibleContent>
         </Collapsible>

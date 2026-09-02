@@ -1,10 +1,12 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Loader2, Phone, Edit, Save, X, ChevronDown, ChevronUp, User } from "lucide-react";
+import { Phone, MessageSquare, ClipboardList, Calendar, User, Loader2, Edit, Save, X, ChevronDown, ChevronUp } from "lucide-react";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { ContactPersonFields } from "./ContactPersonFields";
 import { format } from "date-fns";
@@ -206,90 +208,115 @@ function CallFollowupCard({ followup, source }: { followup: BaseFollowup; source
                 </div>
             </CollapsibleTrigger>
 
-            <CollapsibleContent className="p-4 pt-0 space-y-4">
-                <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">
-                        Points Discussed
-                    </p>
-                    <p className="text-sm whitespace-pre-wrap">
-                        {followup.body || "—"}
-                    </p>
-                </div>
-
-                {followup.veResponsibility && (
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-1">
-                            VE Responsibility
-                        </p>
-                        <p className="text-sm whitespace-pre-wrap">
-                            {followup.veResponsibility}
-                        </p>
-                    </div>
-                )}
-
-                {followup.contacts && followup.contacts.length > 0 && (
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-2">
-                            Contacts
-                        </p>
-                        <div className="space-y-2">
-                            {followup.contacts.map((contact, idx) => (
-                                <div
-                                    key={idx}
-                                    className="border rounded-lg p-3 bg-muted/30"
-                                >
-                                    <div className="flex items-start gap-2">
-                                        <User className="h-4 w-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                                        <div className="space-y-0.5">
-                                            <p className="font-medium text-sm">
-                                                {contact.name}
-                                            </p>
-                                            {contact.designation && (
-                                                <p className="text-xs text-muted-foreground">
-                                                    {contact.designation}
-                                                </p>
-                                            )}
-                                            {contact.phone && (
-                                                <p className="text-xs">
-                                                    📞 {contact.phone}
-                                                </p>
-                                            )}
-                                            {contact.email && (
-                                                <p className="text-xs text-blue-500">
-                                                    ✉️ {contact.email}
-                                                </p>
-                                            )}
+            <CollapsibleContent>
+                <Card className="border-0 shadow-none rounded-none">
+                    <CardContent className="pt-4 px-4">
+                        <Table>
+                            <TableBody>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        <Phone className="h-4 w-4 inline mr-2" />
+                                        Call Details
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                        <div className="flex items-center gap-2">
+                                            <MessageSquare className="h-4 w-4" />
+                                            Points Discussed
                                         </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                                    </TableCell>
+                                    <TableCell className="text-sm whitespace-pre-wrap w-1/4">
+                                        {followup.body || "—"}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                        <div className="flex items-center gap-2">
+                                            <Calendar className="h-4 w-4" />
+                                            Next Follow-up Date
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-sm w-1/4">
+                                        {followup.nextFollowupDate
+                                            ? format(new Date(followup.nextFollowupDate), "PP")
+                                            : "—"}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        <div className="flex items-center gap-2">
+                                            <ClipboardList className="h-4 w-4" />
+                                            VE Responsibility
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-sm whitespace-pre-wrap" colSpan={3}>
+                                        {followup.veResponsibility || "—"}
+                                    </TableCell>
+                                </TableRow>
 
-                {followup.nextFollowupDate && (
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-1">
-                            Next Follow-up Date
-                        </p>
-                        <p className="text-sm">
-                            {format(new Date(followup.nextFollowupDate), 'PP')}
-                        </p>
-                    </div>
-                )}
+                                {followup.contacts && followup.contacts.length > 0 && (
+                                    <>
+                                        <TableRow className="bg-muted/50">
+                                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                                <User className="h-4 w-4 inline mr-2" />
+                                                Contacts
+                                            </TableCell>
+                                        </TableRow>
+                                        {followup.contacts.map((contact, idx) => (
+                                            <React.Fragment key={idx}>
+                                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                                        <div className="flex items-center gap-2">
+                                                            <User className="h-4 w-4" />
+                                                            {idx === 0 ? "Primary Contact" : `Contact ${idx + 1}`}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-sm font-semibold w-1/4">
+                                                        {contact.name}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                                        Phone
+                                                    </TableCell>
+                                                    <TableCell className="text-sm w-1/4">
+                                                        {contact.phone || "—"}
+                                                    </TableCell>
+                                                </TableRow>
+                                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                                        Designation
+                                                    </TableCell>
+                                                    <TableCell className="text-sm">
+                                                        {contact.designation || "—"}
+                                                    </TableCell>
+                                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                                        Email
+                                                    </TableCell>
+                                                    <TableCell className="text-sm">
+                                                        {contact.email || "—"}
+                                                    </TableCell>
+                                                </TableRow>
+                                            </React.Fragment>
+                                        ))}
+                                    </>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
 
                 {isToday(followup.createdAt) && (
-                    <Button
-                        size="sm"
-                        onClick={() =>
-                            navigate(
-                                `${sourceFollowupPath(source)}?tab=call&followupId=${followup.id}`
-                            )
-                        }
-                    >
-                        <Edit className="h-3 w-3 mr-1" />
-                        Edit
-                    </Button>
+                    <div className="px-4 pb-4">
+                        <Button
+                            size="sm"
+                            onClick={() =>
+                                navigate(
+                                    `${sourceFollowupPath(source)}?tab=call&followupId=${followup.id}`
+                                )
+                            }
+                        >
+                            <Edit className="h-3 w-3 mr-1" />
+                            Edit
+                        </Button>
+                    </div>
                 )}
             </CollapsibleContent>
         </Collapsible>

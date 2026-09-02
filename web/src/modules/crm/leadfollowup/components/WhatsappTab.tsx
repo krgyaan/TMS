@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Loader2, MessageCircle, Edit, Save, X, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { MessageCircle, Calendar, Paperclip, Loader2, Edit, Save, X, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { FileUploader } from "@/components/file-upload";
 import { fileUploadService } from "@/services/api/file-upload.service";
@@ -188,61 +190,86 @@ function WhatsappFollowupCard({ followup, source }: { followup: BaseFollowup; so
                 </div>
             </CollapsibleTrigger>
 
-            <CollapsibleContent className="p-4 pt-0 space-y-4">
-                <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">
-                        What was sent
-                    </p>
-                    <p className="text-sm whitespace-pre-wrap">
-                        {followup.body || "—"}
-                    </p>
-                </div>
-
-                {followup.attachments && followup.attachments.length > 0 && (
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-2">
-                            Attachments
-                        </p>
-                        <div className="space-y-2">
-                            {followup.attachments.map((path, idx) => (
-                                <a
-                                    key={idx}
-                                    href={fileUploadService.getFileUrl(path)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
-                                >
-                                    <ExternalLink className="h-3 w-3" />
-                                    {path.split('/').pop()}
-                                </a>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {followup.nextFollowupDate && (
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-1">
-                            Next Follow-up Date
-                        </p>
-                        <p className="text-sm">
-                            {format(new Date(followup.nextFollowupDate), 'PP')}
-                        </p>
-                    </div>
-                )}
+            <CollapsibleContent>
+                <Card className="border-0 shadow-none rounded-none">
+                    <CardContent className="pt-4 px-4">
+                        <Table>
+                            <TableBody>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        <MessageCircle className="h-4 w-4 inline mr-2" />
+                                        WhatsApp Message
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                        <div className="flex items-center gap-2">
+                                            <MessageCircle className="h-4 w-4" />
+                                            What was sent
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-sm whitespace-pre-wrap" colSpan={3}>
+                                        {followup.body || "—"}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        <div className="flex items-center gap-2">
+                                            <Calendar className="h-4 w-4" />
+                                            Next Follow-up Date
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-sm w-1/4">
+                                        {followup.nextFollowupDate
+                                            ? format(new Date(followup.nextFollowupDate), "PP")
+                                            : "—"}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        <div className="flex items-center gap-2">
+                                            <Paperclip className="h-4 w-4" />
+                                            Attachments
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-sm w-1/4">
+                                        {followup.attachments && followup.attachments.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {followup.attachments.map((path, idx) => (
+                                                    <a
+                                                        key={idx}
+                                                        href={fileUploadService.getFileUrl(path)}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-muted text-blue-600 hover:text-blue-800 hover:underline"
+                                                    >
+                                                        <ExternalLink className="h-3 w-3" />
+                                                        {path.split("/").pop()}
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            "—"
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
 
                 {isToday(followup.createdAt) && (
-                    <Button
-                        size="sm"
-                        onClick={() =>
-                            navigate(
-                                `${sourceFollowupPath(source)}?tab=whatsapp&followupId=${followup.id}`
-                            )
-                        }
-                    >
-                        <Edit className="h-3 w-3 mr-1" />
-                        Edit
-                    </Button>
+                    <div className="px-4 pb-4">
+                        <Button
+                            size="sm"
+                            onClick={() =>
+                                navigate(
+                                    `${sourceFollowupPath(source)}?tab=whatsapp&followupId=${followup.id}`
+                                )
+                            }
+                        >
+                            <Edit className="h-3 w-3 mr-1" />
+                            Edit
+                        </Button>
+                    </div>
                 )}
             </CollapsibleContent>
         </Collapsible>

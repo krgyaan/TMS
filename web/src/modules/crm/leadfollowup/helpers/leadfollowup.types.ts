@@ -25,6 +25,9 @@ export interface BaseFollowup {
     attachments: string[];
     nextFollowupDate: string | null;
     frequency: MailFrequency | null;
+    subject: string | null;
+    status: string | null;
+    stopReason: string | null;
     courierId: number | null;
     createdBy: number | null;
     createdByName: string | null;
@@ -57,6 +60,7 @@ export interface CourierFollowup {
 export interface MailFollowupRequest {
     type: 'mail';
     body: string;
+    subject: string;
     frequency: MailFrequency;
     attachments: string[];
     nextFollowupDate?: string | null;
