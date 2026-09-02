@@ -7,13 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Mail, Clock, Calendar, Paperclip, Loader2, Send, Edit, Save, X, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { Mail, Clock, Calendar, Paperclip, Loader2, Send, Edit, Save, X, ExternalLink, ChevronDown, ChevronUp, Users } from "lucide-react";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { FileUploader } from "@/components/file-upload";
+import { ContactPersonFields } from "./ContactPersonFields";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { format } from "date-fns";
-import {useLeadFollowups, useMailForm, useStopFollowup,isToday,sourceFollowupPath, type MailFormValues} from "@/hooks/api/useLeadFollowups";
+import {useLeadFollowups, useMailForm, useStopFollowup, useSourceRecord, seedContactsFromSource, isToday, sourceFollowupPath, type MailFormValues} from "@/hooks/api/useLeadFollowups";
 import type { BaseFollowup, FollowupSource } from "../helpers/leadfollowup.types";
 
 const FREQUENCY_OPTIONS = [
@@ -48,6 +49,9 @@ function MailCreateForm({ source, initialAttachments }: { source: FollowupSource
         handleSubmit,
         handleCancelEdit,
     } = useMailForm(source);
+
+    const sourceRecord = useSourceRecord(source);
+    const contacts = useMemo(() => seedContactsFromSource(sourceRecord), [sourceRecord]);
 
     useEffect(() => {
         if (!isEditMode && initialAttachments && initialAttachments.length > 0) {
@@ -136,6 +140,13 @@ Write your mail body here..."
                         )}
                     </FieldWrapper>
                 </div>
+
+                <ContactPersonFields
+                    contacts={contacts}
+                    onChange={() => {}}
+                    disabled={true}
+                    lockedCount={contacts.length}
+                />
 
                 <div className="space-y-2">
                     <FileUploader
@@ -226,6 +237,8 @@ function MailFollowupCard({
     const navigate = useNavigate();
     const stopFollowup = useStopFollowup(source);
     const isStopped = followup.status === "stopped";
+    const sourceRecord = useSourceRecord(source);
+    const contacts = useMemo(() => seedContactsFromSource(sourceRecord), [sourceRecord]);
 
     const handleStop = async () => {
         await stopFollowup.mutateAsync(followup.id);
@@ -295,6 +308,35 @@ function MailFollowupCard({
                                             <Badge variant="outline" className="capitalize">
                                                 {followup.frequency}
                                             </Badge>
+                                        ) : (
+                                            "—"
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                        <div className="flex items-center gap-2">
+                                            <Users className="h-4 w-4" />
+                                            Recipients
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-sm" colSpan={3}>
+                                        {contacts.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {contacts.map((recipient, idx) => (
+                                                    <span
+                                                        key={idx}
+                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-muted border border-border"
+                                                    >
+                                                        {recipient.name || "—"}
+                                                        {recipient.email && (
+                                                            <span className="text-muted-foreground">
+                                                                · {recipient.email}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                ))}
+                                            </div>
                                         ) : (
                                             "—"
                                         )}

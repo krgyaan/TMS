@@ -7,6 +7,7 @@ import { couriers } from '@db/schemas/shared/couriers.schema';
 import { leads } from '@db/schemas/crm/leads.schema';
 import { happyCalling } from '@db/schemas/crm/happy-calling.schema';
 import { leadEnquiries } from '@db/schemas/crm/lead-enquiries.schema';
+import { tenderClients } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { eq, desc, sql, and, isNotNull, lte } from 'drizzle-orm';
 import { EmailService } from '@/modules/email/email.service';
@@ -47,17 +48,47 @@ export class LeadFollowupsService {
         return this.escapeHtml(text).replace(/\r?\n/g, '<br />');
     }
 
-    private async resolveRecipientEmail(sourceType: FollowupSourceType, sourceId: number): Promise<string | null> {
+    private async resolveRecipientEmails(sourceType: FollowupSourceType, sourceId: number): Promise<string[]> {
+        const emails = new Set<string>();
+        const push = (email?: string | null) => {
+            const e = (email ?? '').trim();
+            if (e) emails.add(e);
+        };
+
         if (sourceType === 'lead') {
             const [row] = await this.db.select({ email: leads.email }).from(leads).where(eq(leads.id, sourceId)).limit(1);
-            return row?.email ?? null;
+            push(row?.email);
+            return [...emails];
         }
+
         if (sourceType === 'happy_calling') {
             const [row] = await this.db.select({ email: happyCalling.email }).from(happyCalling).where(eq(happyCalling.id, sourceId)).limit(1);
-            return row?.email ?? null;
+            push(row?.email);
+            return [...emails];
         }
-        const [row] = await this.db.select({ email: leadContacts.email }).from(leadContacts).where(eq(leadContacts.enquiryId, sourceId)).limit(1);
-        return row?.email ?? null;
+
+        // Enquiry → all enquiry contacts + tender info-sheet clients
+        const contacts = await this.db
+            .select({ email: leadContacts.email })
+            .from(leadContacts)
+            .where(eq(leadContacts.enquiryId, sourceId));
+        contacts.forEach((c) => push(c.email));
+
+        const [enquiryRow] = await this.db
+            .select({ tenderId: leadEnquiries.tenderId })
+            .from(leadEnquiries)
+            .where(eq(leadEnquiries.id, sourceId))
+            .limit(1);
+
+        if (enquiryRow?.tenderId) {
+            const clients = await this.db
+                .select({ email: tenderClients.clientEmail })
+                .from(tenderClients)
+                .where(eq(tenderClients.tenderId, enquiryRow.tenderId));
+            clients.forEach((c) => push(c.email));
+        }
+
+        return [...emails];
     }
 
     private async sendLeadFollowupMail(options: {
@@ -67,9 +98,10 @@ export class LeadFollowupsService {
         subject: string;
         htmlBody: string;
         attachments?: string[];
+        recipientEmails: string[];
     }): Promise<{ success: boolean; emailLogId?: number; error?: string }> {
-        const recipient = await this.resolveRecipientEmail(options.sourceType, options.sourceId);
-        if (!recipient) {
+        const emails = [...new Set(options.recipientEmails.map((e) => e.trim()).filter(Boolean))];
+        if (emails.length === 0) {
             this.logger.warn(`Lead follow-up mail skipped: no recipient email for ${options.sourceType}:${options.sourceId}`);
             return { success: false, error: 'No recipient email found.' };
         }
@@ -79,7 +111,7 @@ export class LeadFollowupsService {
             referenceId: options.sourceId,
             eventType: 'lead_followup_mail',
             fromUserId: options.fromUserId,
-            to: [{ type: 'emails', emails: [recipient] }],
+            to: [{ type: 'emails', emails }],
             subject: options.subject,
             template: 'lead-followup-mail',
             data: {
@@ -631,6 +663,8 @@ export class LeadFollowupsService {
         const sourceId = followup.leadId ?? followup.happyCallingId ?? followup.enquiryId;
         if (!sourceId) return;
 
+        const recipientEmails = await this.resolveRecipientEmails(sourceType, sourceId);
+
         await this.sendLeadFollowupMail({
             sourceType,
             sourceId,
@@ -638,6 +672,7 @@ export class LeadFollowupsService {
             subject: followup.subject ?? 'Follow-up',
             htmlBody: this.textToHtml(followup.body ?? ''),
             attachments: followup.attachments ?? [],
+            recipientEmails,
         });
 
         if (followup.frequency === 'custom') {
