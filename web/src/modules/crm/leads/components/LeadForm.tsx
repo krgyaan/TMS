@@ -21,6 +21,8 @@ import { ArrowLeft, Loader2, MapPin, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { paths } from "@/app/routes/paths";
 import { useCreateLead, useUpdateLead } from "@/hooks/api/useLeads";
+import { useUsers } from "@/hooks/api/useUsers";
+import { useAuth } from "@/contexts/AuthContext";
 import axiosInstance from "@/lib/axios";
 import type { LeadWithNames, LiveLocation } from "../helpers/leads.type";
 import { LocationPickerModal } from "./LocationPickerModal";
@@ -57,15 +59,15 @@ const COUNTRY_OPTIONS: Option[] = [
 const LeadFormSchema = z.object({
     companyName: z.string().min(1, { message: "Company name is required" }),
     name: z.string().min(1, { message: "Person name is required" }),
-    designation: z.string().min(1, { message: "Designation is required" }),
+    designation: z.string().optional().nullable(),
     phone: z.string().min(1, { message: "Phone is required" }),
-    email: z.string().email({ message: "A valid email is required" }),
+    email: z.string().email({ message: "A valid email is required" }).optional().nullable().or(z.literal("")),
     address: z.string().min(1, { message: "Address is required" }),
     country: z.string().min(1, { message: "Country is required" }),
     state: z.string().min(1, { message: "State is required" }),
     type: z.string().optional(),
     industry: z.string().optional(),
-    team: z.string().optional(),
+    allocatedTe: z.string().optional(),
     pointsDiscussed: z.string().max(2000).optional(),
     veResponsibility: z.string().max(2000).optional(),
 });
@@ -101,16 +103,6 @@ const fetchIndustries = async (): Promise<Option[]> => {
     }));
 };
 
-const fetchTeams = async (): Promise<Option[]> => {
-    const res = await axiosInstance.get("/teams");
-    return res.data
-        .filter((team: { id: number }) => [1, 2, 6].includes(team.id))
-        .map((team: { id: number; name: string }) => ({
-            label: team.name,
-            value: team.id.toString(),
-        }));
-};
-
 const SectionSeparator = ({ text }: { text: string }) => (
     <div className="col-span-full flex items-center gap-4 py-1">
         <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap">
@@ -124,6 +116,7 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
     const navigate = useNavigate();
     const createLead = useCreateLead();
     const updateLead = useUpdateLead();
+    const { user, roleId } = useAuth();
 
     const isInitialLoad = useRef(true);
     const previousCountry = useRef<string>("");
@@ -143,17 +136,21 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
         queryFn: fetchIndustries,
     });
 
-    const { data: teamOptions = [] } = useQuery({
-        queryKey: ["teams"],
-        queryFn: fetchTeams,
-    });
+    const { data: allUsers = [], isLoading: teLoading } = useUsers();
+
+    const teOptions = allUsers.map((u: { id: number; name: string; team?: { name?: string } | null }) => ({
+        value: u.id.toString(),
+        label: u.team?.name ? `${u.name} (${u.team.name})` : (u.name ?? ""),
+    }));
+
+    const canChangeTE = roleId != null && [1, 2, 4].includes(roleId);
 
     const form = useForm<LeadFormValues>({
         resolver: zodResolver(LeadFormSchema) as any,
         defaultValues: {
             companyName: lead?.companyName || "",
             name: lead?.name || "",
-            designation: lead?.designation || "",
+            designation: lead?.designation || "Not Available",
             phone: lead?.phone || "",
             email: lead?.email || "",
             address: lead?.address || "",
@@ -161,7 +158,7 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
             state: lead?.state || "",
             type: lead?.type || "",
             industry: lead?.industry || "",
-            team: lead?.team || "",
+            allocatedTe: mode === "create" ? (user?.id?.toString() ?? "") : (lead?.allocatedTe?.toString() ?? ""),
             pointsDiscussed: lead?.pointsDiscussed || "",
             veResponsibility: lead?.veResponsibility || "",
         },
@@ -204,6 +201,14 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mode]);
 
+    // Auto-select current user as TE in create mode (until the async user loads)
+    useEffect(() => {
+        if (mode !== "create") return;
+        if (!user?.id) return;
+        form.setValue("allocatedTe", user.id.toString(), { shouldValidate: false });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mode, user?.id]);
+
     const handleLocationConfirm = useCallback((loc: LiveLocation) => {
         setLiveLocation(loc);
         setLocationModal({ open: false });
@@ -230,15 +235,16 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
             const payload = {
                 companyName: values.companyName,
                 name: values.name,
-                designation: values.designation,
+                designation: values.designation || "Not Available",
                 phone: values.phone,
-                email: values.email,
+                email: values.email || null,
                 address: values.address,
                 country: values.country,
                 state: values.state,
                 type: values.type || null,
                 industry: values.industry || null,
-                team: values.team || null,
+                team: null,
+                allocatedTe: values.allocatedTe ? Number(values.allocatedTe) : null,
                 pointsDiscussed: values.pointsDiscussed || null,
                 veResponsibility: values.veResponsibility || null,
                 liveLocation,
@@ -475,12 +481,13 @@ export function LeadForm({ mode, lead }: LeadFormProps) {
                                     placeholder="Select Industry"
                                 />
 
-                                <SelectField<LeadFormValues, "team">
+                                <SelectField<LeadFormValues, "allocatedTe">
                                     control={form.control}
-                                    name="team"
-                                    label="Team"
-                                    options={teamOptions}
-                                    placeholder="Select Team"
+                                    name="allocatedTe"
+                                    label="Allocate TE"
+                                    options={teOptions}
+                                    placeholder={teLoading ? "Loading TEs..." : "-- Select TE --"}
+                                    disabled={!canChangeTE}
                                 />
 
                                 <SectionSeparator text="Additional Details" />

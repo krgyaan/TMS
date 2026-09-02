@@ -1,14 +1,17 @@
-import { Injectable, NotFoundException, Inject, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, Logger } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { leadFollowups, type NewLeadFollowup } from '@db/schemas/crm/lead-followups.schema';
+import { leadFollowups, type NewLeadFollowup, type LeadFollowup } from '@db/schemas/crm/lead-followups.schema';
 import { leadContacts, type NewLeadContact } from '@db/schemas/crm/lead-contacts.schema';
 import { couriers } from '@db/schemas/shared/couriers.schema';
 import { leads } from '@db/schemas/crm/leads.schema';
 import { happyCalling } from '@db/schemas/crm/happy-calling.schema';
 import { leadEnquiries } from '@db/schemas/crm/lead-enquiries.schema';
+import { tenderClients } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { users } from '@db/schemas/auth/users.schema';
-import { eq, desc, sql, and } from 'drizzle-orm';
+import { eq, desc, sql, and, isNotNull, lte } from 'drizzle-orm';
+import { EmailService } from '@/modules/email/email.service';
+import type { SendEmailOptions } from '@/modules/email/dto/send-email.dto';
 
 import type {
     CreateFollowupDto,
@@ -16,15 +19,131 @@ import type {
     CallFollowupDto,
     VisitFollowupDto,
     ContactDto,
+    MailFollowupDto,
 } from './dto/leadfollowup.dto';
 
 export type FollowupSourceType = 'lead' | 'happy_calling' | 'enquiry';
 
 @Injectable()
 export class LeadFollowupsService {
+    private readonly logger = new Logger(LeadFollowupsService.name);
+
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly emailService: EmailService,
     ) {}
+
+    // ─── Mail helpers ─────────────────────────────────────────────────
+
+    private escapeHtml(text: string): string {
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    private textToHtml(text: string): string {
+        return this.escapeHtml(text).replace(/\r?\n/g, '<br />');
+    }
+
+    private async resolveRecipientEmails(sourceType: FollowupSourceType, sourceId: number): Promise<string[]> {
+        const emails = new Set<string>();
+        const push = (email?: string | null) => {
+            const e = (email ?? '').trim();
+            if (e) emails.add(e);
+        };
+
+        if (sourceType === 'lead') {
+            const [row] = await this.db.select({ email: leads.email }).from(leads).where(eq(leads.id, sourceId)).limit(1);
+            push(row?.email);
+            return [...emails];
+        }
+
+        if (sourceType === 'happy_calling') {
+            const [row] = await this.db.select({ email: happyCalling.email }).from(happyCalling).where(eq(happyCalling.id, sourceId)).limit(1);
+            push(row?.email);
+            return [...emails];
+        }
+
+        // Enquiry → all enquiry contacts + tender info-sheet clients
+        const contacts = await this.db
+            .select({ email: leadContacts.email })
+            .from(leadContacts)
+            .where(eq(leadContacts.enquiryId, sourceId));
+        contacts.forEach((c) => push(c.email));
+
+        const [enquiryRow] = await this.db
+            .select({ tenderId: leadEnquiries.tenderId })
+            .from(leadEnquiries)
+            .where(eq(leadEnquiries.id, sourceId))
+            .limit(1);
+
+        if (enquiryRow?.tenderId) {
+            const clients = await this.db
+                .select({ email: tenderClients.clientEmail })
+                .from(tenderClients)
+                .where(eq(tenderClients.tenderId, enquiryRow.tenderId));
+            clients.forEach((c) => push(c.email));
+        }
+
+        return [...emails];
+    }
+
+    private async sendLeadFollowupMail(options: {
+        sourceType: FollowupSourceType;
+        sourceId: number;
+        fromUserId: number;
+        subject: string;
+        htmlBody: string;
+        attachments?: string[];
+        recipientEmails: string[];
+    }): Promise<{ success: boolean; emailLogId?: number; error?: string }> {
+        const emails = [...new Set(options.recipientEmails.map((e) => e.trim()).filter(Boolean))];
+        if (emails.length === 0) {
+            this.logger.warn(`Lead follow-up mail skipped: no recipient email for ${options.sourceType}:${options.sourceId}`);
+            return { success: false, error: 'No recipient email found.' };
+        }
+
+        const sendOptions: SendEmailOptions = {
+            referenceType: options.sourceType,
+            referenceId: options.sourceId,
+            eventType: 'lead_followup_mail',
+            fromUserId: options.fromUserId,
+            to: [{ type: 'emails', emails }],
+            subject: options.subject,
+            template: 'lead-followup-mail',
+            data: {
+                subject: options.subject,
+                sentAt: new Date().toISOString(),
+                body: options.htmlBody,
+            },
+            attachments: options.attachments && options.attachments.length > 0
+                ? { files: options.attachments }
+                : undefined,
+        };
+
+        return this.emailService.send(sendOptions);
+    }
+
+    private computeNextFollowupDate(from: Date, frequency: string): Date {
+        const next = new Date(from);
+        switch (frequency) {
+            case 'daily':
+                next.setDate(next.getDate() + 1);
+                break;
+            case 'weekly':
+                next.setDate(next.getDate() + 7);
+                break;
+            case 'monthly':
+                next.setMonth(next.getMonth() + 1);
+                break;
+            default:
+                break;
+        }
+        return next;
+    }
 
     // ─── Resolve which id column + entity to verify ───────────────────
 
@@ -245,6 +364,13 @@ export class LeadFollowupsService {
             if ('nextFollowupDate' in data)  followupPayload.nextFollowupDate = data.nextFollowupDate ? new Date(data.nextFollowupDate) : null;
             if ('frequency' in data)         followupPayload.frequency = data.frequency ?? null;
 
+            // ── Mail-specific fields ───────────────────────────────────
+            if (data.type === 'mail') {
+                const mailData = data as MailFollowupDto;
+                followupPayload.subject = mailData.subject;
+                followupPayload.status = 'active';
+            }
+
             // ── Insert followup ───────────────────────────────────────
 
             const [followup] = await tx
@@ -352,18 +478,6 @@ export class LeadFollowupsService {
         // Get existing followup
         const existingFollowup = await this.findById(id);
 
-        // Check if it was created today (only today's followups can be edited)
-        const createdAt = new Date(existingFollowup.createdAt);
-        const today = new Date();
-        const isToday =
-            createdAt.getDate() === today.getDate() &&
-            createdAt.getMonth() === today.getMonth() &&
-            createdAt.getFullYear() === today.getFullYear();
-
-        if (!isToday) {
-            throw new BadRequestException('Only today\'s follow-ups can be edited');
-        }
-
         return this.db.transaction(async (tx) => {
             let courierId = existingFollowup.courierId;
 
@@ -420,6 +534,12 @@ export class LeadFollowupsService {
             if ('attachments' in data)      updatePayload.attachments = data.attachments ?? [];
             if ('nextFollowupDate' in data) updatePayload.nextFollowupDate = data.nextFollowupDate ? new Date(data.nextFollowupDate) : null;
             if ('frequency' in data)        updatePayload.frequency = data.frequency ?? null;
+
+            // Mail-specific fields
+            if (data.type === 'mail') {
+                const mailData = data as MailFollowupDto;
+                if (mailData.subject) updatePayload.subject = mailData.subject;
+            }
 
             // Update followup
             const [updatedFollowup] = await tx
@@ -508,5 +628,80 @@ export class LeadFollowupsService {
                     .where(eq(leads.id, followup.leadId));
             }
         });
+    }
+
+    // ─── Scheduler methods ───────────────────────────────────────────
+
+    async getDueLeadFollowups(): Promise<LeadFollowup[]> {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        return this.db
+            .select()
+            .from(leadFollowups)
+            .where(
+                and(
+                    eq(leadFollowups.type, 'mail'),
+                    eq(leadFollowups.status, 'active'),
+                    isNotNull(leadFollowups.nextFollowupDate),
+                    lte(leadFollowups.nextFollowupDate, today),
+                ),
+            );
+    }
+
+    async processLeadFollowupMail(id: number): Promise<void> {
+        const [followup] = await this.db
+            .select()
+            .from(leadFollowups)
+            .where(eq(leadFollowups.id, id))
+            .limit(1);
+
+        if (!followup || followup.status !== 'active') return;
+        if (!followup.nextFollowupDate) return;
+
+        const sourceType = followup.sourceType as FollowupSourceType;
+        const sourceId = followup.leadId ?? followup.happyCallingId ?? followup.enquiryId;
+        if (!sourceId) return;
+
+        const recipientEmails = await this.resolveRecipientEmails(sourceType, sourceId);
+
+        await this.sendLeadFollowupMail({
+            sourceType,
+            sourceId,
+            fromUserId: followup.createdBy ?? 0,
+            subject: followup.subject ?? 'Follow-up',
+            htmlBody: this.textToHtml(followup.body ?? ''),
+            attachments: followup.attachments ?? [],
+            recipientEmails,
+        });
+
+        if (followup.frequency === 'custom') {
+            await this.db
+                .update(leadFollowups)
+                .set({ status: 'stopped', stoppedAt: new Date(), updatedAt: new Date() })
+                .where(eq(leadFollowups.id, id));
+        } else {
+            const nextDate = this.computeNextFollowupDate(followup.nextFollowupDate, followup.frequency!);
+            await this.db
+                .update(leadFollowups)
+                .set({ nextFollowupDate: nextDate, updatedAt: new Date() })
+                .where(eq(leadFollowups.id, id));
+        }
+    }
+
+    async stop(id: number, reason?: string): Promise<LeadFollowup> {
+        const [updated] = await this.db
+            .update(leadFollowups)
+            .set({
+                status: 'stopped',
+                stopReason: reason ?? null,
+                stoppedAt: new Date(),
+                updatedAt: new Date(),
+            })
+            .where(eq(leadFollowups.id, id))
+            .returning();
+
+        if (!updated) throw new NotFoundException(`Follow-up with ID ${id} not found`);
+        return updated;
     }
 }

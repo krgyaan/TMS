@@ -2,21 +2,19 @@ import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Loader2, Send, Edit, Save, X, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { Mail, Clock, Calendar, Paperclip, Loader2, Send, Edit, Save, X, ExternalLink, ChevronDown, ChevronUp, Users } from "lucide-react";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { FileUploader } from "@/components/file-upload";
+import { ContactPersonFields } from "./ContactPersonFields";
 import { fileUploadService } from "@/services/api/file-upload.service";
 import { format } from "date-fns";
-import {
-    useLeadFollowups,
-    useMailForm,
-    isToday,
-    sourceFollowupPath,
-    type MailFormValues
-} from "@/hooks/api/useLeadFollowups";
+import {useLeadFollowups, useMailForm, useStopFollowup, useSourceRecord, seedContactsFromSource, isToday, sourceFollowupPath, type MailFormValues} from "@/hooks/api/useLeadFollowups";
 import type { BaseFollowup, FollowupSource } from "../helpers/leadfollowup.types";
 
 const FREQUENCY_OPTIONS = [
@@ -52,6 +50,9 @@ function MailCreateForm({ source, initialAttachments }: { source: FollowupSource
         handleCancelEdit,
     } = useMailForm(source);
 
+    const sourceRecord = useSourceRecord(source);
+    const contacts = useMemo(() => seedContactsFromSource(sourceRecord), [sourceRecord]);
+
     useEffect(() => {
         if (!isEditMode && initialAttachments && initialAttachments.length > 0) {
             setAttachmentPaths((prev) =>
@@ -81,6 +82,22 @@ function MailCreateForm({ source, initialAttachments }: { source: FollowupSource
             )}
 
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                <FieldWrapper<MailFormValues, "subject">
+                    control={form.control}
+                    name="subject"
+                    label="Subject"
+                >
+                    {(field) => (
+                        <Input
+                            type="text"
+                            placeholder="Enter mail subject"
+                            disabled={saving}
+                            {...field}
+                            value={field.value ?? ""}
+                        />
+                    )}
+                </FieldWrapper>
+
                 <FieldWrapper<MailFormValues, "body">
                     control={form.control}
                     name="body"
@@ -123,6 +140,13 @@ Write your mail body here..."
                         )}
                     </FieldWrapper>
                 </div>
+
+                <ContactPersonFields
+                    contacts={contacts}
+                    onChange={() => {}}
+                    disabled={true}
+                    lockedCount={contacts.length}
+                />
 
                 <div className="space-y-2">
                     <FileUploader
@@ -211,6 +235,14 @@ function MailFollowupCard({
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
+    const stopFollowup = useStopFollowup(source);
+    const isStopped = followup.status === "stopped";
+    const sourceRecord = useSourceRecord(source);
+    const contacts = useMemo(() => seedContactsFromSource(sourceRecord), [sourceRecord]);
+
+    const handleStop = async () => {
+        await stopFollowup.mutateAsync(followup.id);
+    };
 
     return (
         <Collapsible
@@ -232,6 +264,9 @@ function MailFollowupCard({
                         {isToday(followup.createdAt) && (
                             <Badge className="bg-green-500">Today</Badge>
                         )}
+                        {isStopped && (
+                            <Badge variant="secondary" className="bg-red-100 text-red-700">Stopped</Badge>
+                        )}
                     </div>
                     {isOpen ? (
                         <ChevronUp className="h-5 w-5" />
@@ -241,71 +276,157 @@ function MailFollowupCard({
                 </div>
             </CollapsibleTrigger>
 
-            <CollapsibleContent className="p-4 pt-0 space-y-4">
-                <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">
-                        Mail Body
-                    </p>
-                    <p className="text-sm whitespace-pre-wrap">
-                        {followup.body || "—"}
-                    </p>
+            <CollapsibleContent>
+                <Card className="border-0 shadow-none rounded-none">
+                    <CardContent className="pt-4 px-4">
+                        <Table>
+                            <TableBody>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        <Mail className="h-4 w-4 inline mr-2" />
+                                        Mail Details
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                        <div className="flex items-center gap-2">
+                                            <Mail className="h-4 w-4" />
+                                            Subject
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold w-1/4">
+                                        {followup.subject || "—"}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                        <div className="flex items-center gap-2">
+                                            <Clock className="h-4 w-4" />
+                                            Frequency
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-sm w-1/4">
+                                        {followup.frequency ? (
+                                            <Badge variant="outline" className="capitalize">
+                                                {followup.frequency}
+                                            </Badge>
+                                        ) : (
+                                            "—"
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                        <div className="flex items-center gap-2">
+                                            <Users className="h-4 w-4" />
+                                            Recipients
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-sm" colSpan={3}>
+                                        {contacts.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {contacts.map((recipient, idx) => (
+                                                    <span
+                                                        key={idx}
+                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-muted border border-border"
+                                                    >
+                                                        {recipient.name || "—"}
+                                                        {recipient.email && (
+                                                            <span className="text-muted-foreground">
+                                                                · {recipient.email}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            "—"
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        <div className="flex items-center gap-2">
+                                            <Calendar className="h-4 w-4" />
+                                            Next Follow-up Date
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {followup.nextFollowupDate
+                                            ? format(new Date(followup.nextFollowupDate), "PP")
+                                            : "—"}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        <div className="flex items-center gap-2">
+                                            <Paperclip className="h-4 w-4" />
+                                            Attachments
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {followup.attachments && followup.attachments.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {followup.attachments.map((path, idx) => (
+                                                    <a
+                                                        key={idx}
+                                                        href={fileUploadService.getFileUrl(path)}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-muted text-blue-600 hover:text-blue-800 hover:underline"
+                                                    >
+                                                        <ExternalLink className="h-3 w-3" />
+                                                        {path.split("/").pop()}
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            "—"
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Mail Content
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Mail Body
+                                    </TableCell>
+                                    <TableCell className="text-sm whitespace-pre-wrap" colSpan={3}>
+                                        {followup.body || "—"}
+                                    </TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+
+                <div className="flex items-center gap-2 px-4 pb-4">
+                    {!isStopped && (
+                        <Button
+                            size="sm"
+                            onClick={() =>
+                                navigate(
+                                    `${sourceFollowupPath(source)}?tab=mail&followupId=${followup.id}`
+                                )
+                            }
+                        >
+                            <Edit className="h-3 w-3 mr-1" />
+                            Edit
+                        </Button>
+                    )}
+                    {!isStopped && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 border-red-300 hover:bg-red-50"
+                            onClick={handleStop}
+                            disabled={stopFollowup.isPending}
+                        >
+                            {stopFollowup.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <X className="h-3 w-3 mr-1" />}
+                            Stop
+                        </Button>
+                    )}
                 </div>
-
-                <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">
-                        Frequency
-                    </p>
-                    <Badge variant="outline">
-                        {followup.frequency || "—"}
-                    </Badge>
-                </div>
-
-                {followup.nextFollowupDate && (
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-1">
-                            Next Follow-up Date
-                        </p>
-                        <p className="text-sm">
-                            {format(new Date(followup.nextFollowupDate), "PP")}
-                        </p>
-                    </div>
-                )}
-
-                {followup.attachments && followup.attachments.length > 0 && (
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-2">
-                            Attachments
-                        </p>
-                        <div className="space-y-2">
-                            {followup.attachments.map((path: string, idx: number) => (
-                                <a
-                                    key={idx}
-                                    href={fileUploadService.getFileUrl(path)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 text-sm text-blue-500 hover:underline"
-                                >
-                                    <ExternalLink className="h-3 w-3" />
-                                    {path.split("/").pop()}
-                                </a>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {isToday(followup.createdAt) && (
-                    <Button
-                        size="sm"
-                        onClick={() =>
-                            navigate(
-                                `${sourceFollowupPath(source)}?tab=mail&followupId=${followup.id}`
-                            )
-                        }
-                    >
-                        <Edit className="h-3 w-3 mr-1" />
-                        Edit
-                    </Button>
-                )}
             </CollapsibleContent>
         </Collapsible>
     );

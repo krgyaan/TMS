@@ -27,7 +27,6 @@ import {
     Calendar,
     Star,
     Mail,
-    UserPlus,
     MapPin,
     User,
 } from "lucide-react";
@@ -39,7 +38,6 @@ import type { ActionItem } from "@/components/ui/ActionMenu";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { LeadDeleteModal } from "./components/LeadDeleteModal";
 import { LeadPriorityModal } from "./components/LeadPriorityModal";
-import { LeadAllocationModal } from "./components/LeadAllocationModal";
 import { cn } from "@/lib/utils";
 
 type LeadPriorityTab = 'cold' | 'warm' | 'hot';
@@ -90,15 +88,6 @@ const LeadListPage = () => {
         leadId: number | null; 
         leadName?: string; 
         currentPriority?: string | null 
-    }>({ 
-        open: false, 
-        leadId: null 
-    });
-
-    const [allocationModal, setAllocationModal] = useState<{ 
-        open: boolean; 
-        leadId: number | null; 
-        leadName?: string 
     }>({ 
         open: false, 
         leadId: null 
@@ -205,15 +194,6 @@ const LeadListPage = () => {
             label: "Edit Lead", 
             onClick: (row) => navigate(paths.crm.leadEdit(row.id)), 
             icon: <Pencil className="h-4 w-4" /> 
-        },
-        { 
-            label: "Allocate to TE", 
-            onClick: (row) => setAllocationModal({ 
-                open: true, 
-                leadId: row.id, 
-                leadName: row.companyName || undefined 
-            }), 
-            icon: <UserPlus className="h-4 w-4" /> 
         },
         { 
             label: "Disqualify", 
@@ -517,12 +497,6 @@ const LeadListPage = () => {
                 leadName={priorityModal.leadName} 
                 currentPriority={priorityModal.currentPriority} 
                 onConfirm={handlePriorityUpdate} 
-            />
-            <LeadAllocationModal 
-                open={allocationModal.open} 
-                onOpenChange={(open) => setAllocationModal({ ...allocationModal, open })} 
-                leadId={allocationModal.leadId} 
-                leadName={allocationModal.leadName} 
             />
         </Card>
     );

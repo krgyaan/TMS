@@ -62,10 +62,16 @@ export const leadFollowups = pgTable("lead_followups", {
 
     // ── Mail-specific ──────────────────────────────────────────────────
     frequency: mailFrequencyEnum("frequency"),
+    subject: varchar("subject", { length: 500 }),
 
     // ── Letter-specific ────────────────────────────────────────────────
     // Links to existing courier_dashboards table
     courierId: bigint("courier_id", { mode: "number" }),
+
+    // ── Status / stop (recurring follow-up turn-off) ───────────────────
+    status: varchar("status", { length: 50 }).notNull().default('active'),
+    stopReason: varchar("stop_reason", { length: 255 }),
+    stoppedAt: timestamp("stopped_at", { withTimezone: true }),
 
     // ── Metadata ──────────────────────────────────────────────────────
     createdBy: bigint("created_by", { mode: "number" })
