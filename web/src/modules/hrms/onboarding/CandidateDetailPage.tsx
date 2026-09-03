@@ -297,11 +297,11 @@ export default function CandidateDetailPage() {
               <div className="flex items-start gap-1">
                 <ProgressStage label="Profile" status={joinee.profileStatus} />
                 <div className="flex-shrink-0 h-px w-4 bg-border mt-[18px]" />
-                <ProgressStage label="Documents" status={joinee.documentStatus} />
-                <div className="flex-shrink-0 h-px w-4 bg-border mt-[18px]" />
                 <ProgressStage label="Education" status={joinee.educationStatus} />
                 <div className="flex-shrink-0 h-px w-4 bg-border mt-[18px]" />
                 <ProgressStage label="Experience" status={joinee.experienceStatus} />
+                <div className="flex-shrink-0 h-px w-4 bg-border mt-[18px]" />
+                <ProgressStage label="Documents" status={joinee.documentStatus} />
                 <div className="flex-shrink-0 h-px w-4 bg-border mt-[18px]" />
                 <ProgressStage label="Bank" status={joinee.bankStatus} />
                 <div className="flex-shrink-0 h-px w-4 bg-border mt-[18px]" />
@@ -466,7 +466,7 @@ export default function CandidateDetailPage() {
                                     <GraduationCap className="h-4 w-4 text-primary" />
                                   </div>
                                   <div>
-                                    <p className="text-sm font-semibold">{edu.degree}</p>
+                                    <p className="text-sm font-semibold">{edu.degree}{edu.fieldOfStudy ? ` (${edu.fieldOfStudy})` : ""}</p>
                                     <p className="text-xs text-muted-foreground">{edu.institution}</p>
                                   </div>
                                 </div>
