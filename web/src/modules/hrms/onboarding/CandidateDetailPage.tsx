@@ -308,7 +308,7 @@ export default function CandidateDetailPage() {
                 <ProgressStage label="Induction" status={joinee.inductionStatus} />
               </div>
               <div className="mt-5">
-                <ProgressIndicator value={joinee.employeeProgress} />
+                <ProgressIndicator value={joinee.progress} />
               </div>
             </div>
           </div>
