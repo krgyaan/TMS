@@ -1,9 +1,14 @@
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { canRead } from "@/types/auth.types";
 import { QuickActionCard } from "@/modules/dashboard/components/QuickActionCard";
 import { pwaNavItems } from "../nav";
 
 export default function Dashboard() {
     const navigate = useNavigate();
+    const { user } = useAuth();
+
+    const visibleItems = pwaNavItems.filter(item => canRead(user, item.permission));
 
     return (
         <div className="space-y-6">
@@ -13,7 +18,7 @@ export default function Dashboard() {
             </div>
 
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {pwaNavItems.map(item => (
+                {visibleItems.map(item => (
                     <QuickActionCard
                         key={item.title}
                         title={item.title}
