@@ -654,7 +654,7 @@ export class OnboardingService {
           row.experienceStatus,
           row.bankStatus,
         ];
-        const submittedCount = statuses.filter((s) => s == 'submitted').length;
+        const submittedCount = statuses.filter((s) => s === 'submitted' || s === 'resubmitted' || s === 'approved').length;
         const employeeProgress = Math.round((submittedCount / statuses.length) * 100);
         const progress = row.progress === 'pending' || !row.progress ? 0 : Number(row.progress) || 0;
 
@@ -1527,6 +1527,44 @@ export class OnboardingService {
       await this.recalculateProgress(tx, id);
       return { success: true };
     });
+  }
+
+  // ─── Section-Level Approval (approve/reject all records of a stage) ─────────
+
+  async approveEducationSection(id: number, status: 'approved' | 'rejected', remark: string, adminId: number) {
+    const records = await this.db.select().from(onboardingEducation).where(eq(onboardingEducation.onboardingId, id));
+    if (records.length === 0) throw new NotFoundException('No education records found');
+    for (const r of records) {
+      await this.approveEducationRecord(id, r.id, status, adminId, remark);
+    }
+    return { success: true, count: records.length };
+  }
+
+  async approveExperienceSection(id: number, status: 'approved' | 'rejected', remark: string, adminId: number) {
+    const records = await this.db.select().from(onboardingExperience).where(eq(onboardingExperience.onboardingId, id));
+    if (records.length === 0) throw new NotFoundException('No experience records found');
+    for (const r of records) {
+      await this.approveExperienceRecord(id, r.id, status, remark, adminId);
+    }
+    return { success: true, count: records.length };
+  }
+
+  async approveBankSection(id: number, status: 'approved' | 'rejected', remark: string, adminId: number) {
+    const records = await this.db.select().from(onboardingBankDetails).where(eq(onboardingBankDetails.onboardingId, id));
+    if (records.length === 0) throw new NotFoundException('No bank details found');
+    for (const r of records) {
+      await this.approveBankRecord(id, r.id, status, remark, adminId);
+    }
+    return { success: true, count: records.length };
+  }
+
+  async verifyDocumentSection(id: number, status: 'approved' | 'rejected', remark: string, adminId: number) {
+    const records = await this.db.select().from(onboardingDocuments).where(eq(onboardingDocuments.onboardingId, id));
+    if (records.length === 0) throw new NotFoundException('No documents found');
+    for (const r of records) {
+      await this.verifyDocument(id, r.id, status, remark, adminId);
+    }
+    return { success: true, count: records.length };
   }
 
 

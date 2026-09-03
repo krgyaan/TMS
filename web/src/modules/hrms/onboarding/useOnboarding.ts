@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { onboardingService } from "@/services/api/onboarding.service";
-import type { OnboardingRequest, UpdateStatusDto, UpdateProfileDto } from "@/services/api/onboarding.service";
+import type { UpdateStatusDto, UpdateProfileDto } from "@/services/api/onboarding.service";
 import { toast } from "sonner";
 
 // ─── Dashboard hooks ──────────────────────────────────────────────────────────
@@ -242,6 +242,35 @@ export const useUpdateEntryStatus = (stageKey: StageKey) => {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || "Failed to update entry status");
+    },
+  });
+};
+
+/** Approve or reject ALL records of a section (education, experience, documents, bankDetails) */
+export const useUpdateSectionStatus = (stageKey: Exclude<StageKey, "profile">) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      onboardingId,
+      status,
+      reason,
+    }: {
+      onboardingId: number;
+      status: 'approved' | 'rejected';
+      reason?: string;
+    }) => {
+      return onboardingService.approveSection(onboardingId, STAGE_ENDPOINTS[stageKey], status, reason);
+    },
+    onSuccess: (_, { onboardingId, status }) => {
+      qc.invalidateQueries({ queryKey: ["onboarding", stageKey, onboardingId] });
+      qc.invalidateQueries({ queryKey: ["onboarding", "dashboard"] });
+      qc.invalidateQueries({ queryKey: ["onboarding", "list"] });
+      qc.invalidateQueries({ queryKey: ["onboarding", "profiles"] });
+      qc.invalidateQueries({ queryKey: ["onboarding", "profile", onboardingId] });
+      toast.success(`Section ${status} successfully`);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || "Failed to update section status");
     },
   });
 };

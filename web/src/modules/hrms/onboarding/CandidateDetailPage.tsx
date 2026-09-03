@@ -44,6 +44,8 @@ import {
   useOnboardingDashboard,
   useProfile,
   useUpdateOnboardingStatus,
+  useUpdateEntryStatus,
+  useUpdateSectionStatus,
 } from "./useOnboarding";
 import { type OnboardingRequest } from "@/services/api/onboarding.service";
 import { paths } from "@/app/routes/paths";
@@ -54,6 +56,7 @@ import { ProgressStage } from "./components/ProgressStage";
 import { DataItem } from "./components/DataItem";
 import { SectionHeader } from "./components/SectionHeader";
 import { ActionModal } from "./components/ActionModal";
+import { SectionApproveModal } from "./components/SectionApproveModal";
 import {
   formatDate,
   timeAgo,
@@ -66,11 +69,61 @@ import {
   type ProfileBankItem,
 } from "./helpers/onboarding.type";
 
+type SectionStage = "profile" | "education" | "experience" | "documents" | "bankDetails";
+
+const SectionActionBar: React.FC<{
+  status?: string;
+  loading?: boolean;
+  onApprove: () => void;
+  onReject: () => void;
+}> = ({ status, loading, onApprove, onReject }) => {
+  if (status === "approved") {
+    return (
+      <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-300 bg-emerald-50 dark:text-emerald-400 dark:border-emerald-500/30 dark:bg-emerald-500/10 gap-1 rounded-lg px-2 py-1">
+        <CheckCircle2 className="h-3 w-3" />
+        Approved
+      </Badge>
+    );
+  }
+  if (status === "rejected") {
+    return (
+      <Badge variant="outline" className="text-[10px] text-red-600 border-red-300 bg-red-50 dark:text-red-400 dark:border-red-500/30 dark:bg-red-500/10 gap-1 rounded-lg px-2 py-1">
+        <XCircle className="h-3 w-3" />
+        Rejected
+      </Badge>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2 flex-shrink-0">
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={loading}
+        onClick={onApprove}
+        className="gap-1.5 rounded-lg h-8 text-xs text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-500/40 dark:hover:bg-emerald-500/10"
+      >
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        Approve
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={loading}
+        onClick={onReject}
+        className="gap-1.5 rounded-lg h-8 text-xs text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-500/40 dark:hover:bg-red-500/10"
+      >
+        <XCircle className="h-3.5 w-3.5" />
+        Reject
+      </Button>
+      {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+    </div>
+  );
+};
+
 export default function CandidateDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const candidateId = Number(id);
-
   const { data: joinees } = useOnboardingDashboard();
   const joinee = joinees?.find((j) => j.id === candidateId);
 
@@ -104,6 +157,50 @@ export default function CandidateDetailPage() {
         },
       }
     );
+  };
+
+  // ── Section-level approve/reject ─────────────────────────────────────────
+  const [sectionAction, setSectionAction] = useState<{
+    stage: "profile" | "education" | "experience" | "documents" | "bankDetails";
+    type: "approved" | "rejected";
+  } | null>(null);
+
+  const sectionMutations = {
+    education: useUpdateSectionStatus("education"),
+    experience: useUpdateSectionStatus("experience"),
+    documents: useUpdateSectionStatus("documents"),
+    bankDetails: useUpdateSectionStatus("bankDetails"),
+  };
+  const profileMutation = useUpdateEntryStatus("profile");
+
+  const handleConfirmSectionAction = (note: string) => {
+    if (!sectionAction) return;
+    const { stage, type } = sectionAction;
+    const onSuccess = () => setSectionAction(null);
+    if (stage === "profile") {
+      profileMutation.mutate(
+        { onboardingId: candidateId, status: type, reason: note },
+        { onSuccess }
+      );
+    } else {
+      sectionMutations[stage].mutate(
+        { onboardingId: candidateId, status: type, reason: note },
+        { onSuccess }
+      );
+    }
+  };
+
+  const isSectionLoading =
+    sectionAction !== null &&
+    (sectionAction.stage === "profile"
+      ? profileMutation.isPending
+      : sectionMutations[sectionAction.stage].isPending);
+
+  const openSectionApprove = (stage: SectionStage) => {
+    setSectionAction({ stage, type: "approved" });
+  };
+  const openSectionReject = (stage: SectionStage) => {
+    setSectionAction({ stage, type: "rejected" });
   };
 
   if (!joinee) {
@@ -211,7 +308,7 @@ export default function CandidateDetailPage() {
                 <ProgressStage label="Induction" status={joinee.inductionStatus} />
               </div>
               <div className="mt-5">
-                <ProgressIndicator value={joinee.progress} />
+                <ProgressIndicator value={joinee.employeeProgress} />
               </div>
             </div>
           </div>
@@ -226,18 +323,24 @@ export default function CandidateDetailPage() {
           ) : (
             <div className="space-y-6">
               <Tabs defaultValue="personal" className="w-full space-y-6">
-                <TabsList className="grid w-full grid-cols-4 rounded-xl bg-muted/60 p-1">
+                <TabsList className="grid w-full grid-cols-6 rounded-xl bg-muted/60 p-1">
                   <TabsTrigger value="personal" className="rounded-lg text-xs font-semibold py-2">
                     Personal
                   </TabsTrigger>
-                  <TabsTrigger value="education_experience" className="rounded-lg text-xs font-semibold py-2">
-                    Edu & Exp
+                  <TabsTrigger value="education" className="rounded-lg text-xs font-semibold py-2">
+                    Education
+                  </TabsTrigger>
+                  <TabsTrigger value="experience" className="rounded-lg text-xs font-semibold py-2">
+                    Experience
+                  </TabsTrigger>
+                  <TabsTrigger value="documents" className="rounded-lg text-xs font-semibold py-2">
+                    Documents
+                  </TabsTrigger>
+                  <TabsTrigger value="bank" className="rounded-lg text-xs font-semibold py-2">
+                    Bank
                   </TabsTrigger>
                   <TabsTrigger value="work_compensation" className="rounded-lg text-xs font-semibold py-2">
                     Work & Salary
-                  </TabsTrigger>
-                  <TabsTrigger value="documents_bank" className="rounded-lg text-xs font-semibold py-2">
-                    Docs & Bank
                   </TabsTrigger>
                 </TabsList>
 
@@ -245,7 +348,15 @@ export default function CandidateDetailPage() {
                   {/* Tab: Personal */}
                   <TabsContent value="personal" className="space-y-6 mt-4 outline-none">
                     <div className="space-y-4">
-                      <SectionHeader icon={User} title="Personal Information" />
+                      <div className="flex items-center justify-between">
+                        <SectionHeader icon={User} title="Personal Information" />
+                        <SectionActionBar
+                          status={joinee.profileStatus}
+                          loading={sectionAction?.stage === "profile" && isSectionLoading}
+                          onApprove={() => openSectionApprove("profile")}
+                          onReject={() => openSectionReject("profile")}
+                        />
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5 pl-1">
                         <DataItem icon={User} label="First Name" value={profile?.firstName} />
                         <DataItem icon={User} label="Middle Name" value={profile?.middleName} />
@@ -333,10 +444,18 @@ export default function CandidateDetailPage() {
                     </div>
                   </TabsContent>
 
-                  {/* Tab: Edu & Exp */}
-                  <TabsContent value="education_experience" className="space-y-6 mt-4 outline-none">
+                  {/* Tab: Education */}
+                  <TabsContent value="education" className="space-y-6 mt-4 outline-none">
                     <div className="space-y-4">
-                      <SectionHeader icon={GraduationCap} title="Education" count={profile?.education?.length} />
+                      <div className="flex items-center justify-between">
+                        <SectionHeader icon={GraduationCap} title="Education" count={profile?.education?.length} />
+                        <SectionActionBar
+                          status={joinee.educationStatus}
+                          loading={sectionAction?.stage === "education" && isSectionLoading}
+                          onApprove={() => openSectionApprove("education")}
+                          onReject={() => openSectionReject("education")}
+                        />
+                      </div>
                       {(profile?.education?.length ?? 0) > 0 ? (
                         <div className="space-y-3">
                           {profile?.education?.map((edu: ProfileEducationItem) => (
@@ -375,11 +494,20 @@ export default function CandidateDetailPage() {
                         </p>
                       )}
                     </div>
+                  </TabsContent>
 
-                    <Separator />
-
+                  {/* Tab: Experience */}
+                  <TabsContent value="experience" className="space-y-6 mt-4 outline-none">
                     <div className="space-y-4">
-                      <SectionHeader icon={Briefcase} title="Work Experience" count={profile?.experience?.length} />
+                      <div className="flex items-center justify-between">
+                        <SectionHeader icon={Briefcase} title="Work Experience" count={profile?.experience?.length} />
+                        <SectionActionBar
+                          status={joinee.experienceStatus}
+                          loading={sectionAction?.stage === "experience" && isSectionLoading}
+                          onApprove={() => openSectionApprove("experience")}
+                          onReject={() => openSectionReject("experience")}
+                        />
+                      </div>
                       {(profile?.experience?.length ?? 0) > 0 ? (
                         <div className="space-y-3">
                           {profile?.experience?.map((exp: ProfileExperienceItem) => (
@@ -470,10 +598,18 @@ export default function CandidateDetailPage() {
                     </div>
                   </TabsContent>
 
-                  {/* Tab: Docs & Bank */}
-                  <TabsContent value="documents_bank" className="space-y-6 mt-4 outline-none">
+                  {/* Tab: Documents */}
+                  <TabsContent value="documents" className="space-y-6 mt-4 outline-none">
                     <div className="space-y-4">
-                      <SectionHeader icon={FileText} title="Documents" count={profile?.documents?.length} />
+                      <div className="flex items-center justify-between">
+                        <SectionHeader icon={FileText} title="Documents" count={profile?.documents?.length} />
+                        <SectionActionBar
+                          status={joinee.documentStatus}
+                          loading={sectionAction?.stage === "documents" && isSectionLoading}
+                          onApprove={() => openSectionApprove("documents")}
+                          onReject={() => openSectionReject("documents")}
+                        />
+                      </div>
                       {(profile?.documents?.length ?? 0) > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {profile?.documents?.map((doc: ProfileDocumentItem) => (
@@ -557,11 +693,20 @@ export default function CandidateDetailPage() {
                         </p>
                       )}
                     </div>
+                  </TabsContent>
 
-                    <Separator />
-
+                  {/* Tab: Bank */}
+                  <TabsContent value="bank" className="space-y-6 mt-4 outline-none">
                     <div className="space-y-4">
-                      <SectionHeader icon={CreditCard} title="Bank Details" count={profile?.bankDetails?.length} />
+                      <div className="flex items-center justify-between">
+                        <SectionHeader icon={CreditCard} title="Bank Details" count={profile?.bankDetails?.length} />
+                        <SectionActionBar
+                          status={joinee.bankStatus}
+                          loading={sectionAction?.stage === "bankDetails" && isSectionLoading}
+                          onApprove={() => openSectionApprove("bankDetails")}
+                          onReject={() => openSectionReject("bankDetails")}
+                        />
+                      </div>
                       {(profile?.bankDetails?.length ?? 0) > 0 ? (
                         <div className="space-y-3">
                           {profile?.bankDetails?.map((bank: ProfileBankItem) => (
@@ -651,6 +796,19 @@ export default function CandidateDetailPage() {
           }}
           onConfirm={handleConfirmAction}
           isLoading={updateStatus.isPending}
+        />
+
+        <SectionApproveModal
+          open={!!sectionAction}
+          type={sectionAction?.type ?? null}
+          title={
+            sectionAction?.stage === "profile"
+              ? "Approve / Reject Personal Details"
+              : `Approve / Reject ${sectionAction?.stage ? sectionAction.stage.charAt(0).toUpperCase() + sectionAction.stage.slice(1) : ""}`
+          }
+          onClose={() => setSectionAction(null)}
+          onConfirm={handleConfirmSectionAction}
+          isLoading={isSectionLoading}
         />
       </div>
     </TooltipProvider>

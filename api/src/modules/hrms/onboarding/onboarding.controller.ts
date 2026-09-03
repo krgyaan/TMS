@@ -246,4 +246,65 @@ export class OnboardingController {
         throw new BadRequestException(`Invalid stage endpoint: ${stage}`);
     }
   }
+
+  /**
+   * PATCH /hrms/onboarding/:id/education/approve-all
+   * Approve or reject all education records for a request.
+   */
+  @Patch(':id/education/approve-all')
+  async approveEducationSection(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status: 'approved' | 'rejected'; remark?: string },
+    @Req() req: any,
+  ) {
+    if (!body.status || (body.status === 'rejected' && !body.remark?.trim())) {
+      throw new BadRequestException('A remark is required when rejecting.');
+    }
+    return this.onboardingService.approveEducationSection(id, body.status, body.remark || '', req.user.id);
+  }
+
+  /**
+   * PATCH /hrms/onboarding/:id/experience/approve-all
+   */
+  @Patch(':id/experience/approve-all')
+  async approveExperienceSection(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status: 'approved' | 'rejected'; remark?: string },
+    @Req() req: any,
+  ) {
+    if (!body.status || (body.status === 'rejected' && !body.remark?.trim())) {
+      throw new BadRequestException('A remark is required when rejecting.');
+    }
+    return this.onboardingService.approveExperienceSection(id, body.status, body.remark || '', req.user.id);
+  }
+
+  /**
+   * PATCH /hrms/onboarding/:id/bank-details/approve-all
+   */
+  @Patch(':id/bank-details/approve-all')
+  async approveBankSection(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status: 'approved' | 'rejected'; remark?: string },
+    @Req() req: any,
+  ) {
+    if (!body.status || (body.status === 'rejected' && !body.remark?.trim())) {
+      throw new BadRequestException('A remark is required when rejecting.');
+    }
+    return this.onboardingService.approveBankSection(id, body.status, body.remark || '', req.user.id);
+  }
+
+  /**
+   * PATCH /hrms/onboarding/:id/documents/approve-all
+   */
+  @Patch(':id/documents/approve-all')
+  async verifyDocumentSection(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status: 'approved' | 'rejected'; remark?: string },
+    @Req() req: any,
+  ) {
+    if (!body.status || (body.status === 'rejected' && !body.remark?.trim())) {
+      throw new BadRequestException('A remark is required when rejecting.');
+    }
+    return this.onboardingService.verifyDocumentSection(id, body.status, body.remark || '', req.user.id);
+  }
 }

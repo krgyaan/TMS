@@ -266,4 +266,17 @@ export const onboardingService = {
     const { data } = await axiosInstance.patch(url, payload);
     return data;
   },
+
+  /** Approve or reject ALL records of a section */
+  approveSection: async (
+    id: number,
+    stageEndpoint: string,
+    status: 'approved' | 'rejected',
+    reason?: string
+  ): Promise<any> => {
+    const url = `/hrms/onboarding/${id}/${stageEndpoint}/approve-all`;
+    const payload = { status, remark: reason || '' };
+    const { data } = await axiosInstance.patch(url, payload);
+    return data;
+  },
 };
