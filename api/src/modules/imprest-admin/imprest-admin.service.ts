@@ -91,7 +91,7 @@ export class ImprestAdminService {
                         user_id,
                         EXTRACT(ISOYEAR FROM effective_date)::int AS year,
                         EXTRACT(WEEK FROM effective_date)::int AS week,
-                        MIN(effective_date) AS start_date,
+                        date_trunc('week', MIN(effective_date))::date AS start_date,
                         (date_trunc('week', MIN(effective_date)) + INTERVAL '6 days')::date AS end_date,
                         MAX(effective_date) AS max_effective_date
                     FROM voucher_base
@@ -358,7 +358,7 @@ export class ImprestAdminService {
                         EXTRACT(ISOYEAR FROM effective_date)::int AS year,
                         EXTRACT(WEEK FROM effective_date)::int AS week,
 
-                        MIN(effective_date) AS start_date,
+                        date_trunc('week', MIN(effective_date))::date AS start_date,
                         (date_trunc('week', MIN(effective_date)) + INTERVAL '6 days')::date AS end_date,
 
                         SUM(amount)::numeric AS total_amount
@@ -481,15 +481,19 @@ export class ImprestAdminService {
         };
     }
 
-    async createVoucher({ user, userId, validFrom, validTo }: { user: any; userId: number; validFrom: Date; validTo: Date }) {
+    async createVoucher({ user, userId, validFrom }: { user: any; userId: number; validFrom: Date; validTo: Date }) {
+        // Normalize the requested period to the ISO week (Monday-Sunday) so a
+        // mid-week start (e.g. Tuesday) maps to the canonical Monday voucher and
+        // cannot create a duplicate overlapping the same ISO week.
+        const { monday, sunday } = this.isoWeekBounds(new Date(validFrom));
         // Transaction-wrapped so the advisory lock in buildVoucherIfMissing is
         // held until commit (prevents concurrent duplicate voucher creation).
         return this.db.transaction(tx =>
             this.buildVoucherIfMissing(
                 {
                     userId,
-                    from: new Date(validFrom),
-                    to: new Date(validTo),
+                    from: monday,
+                    to: sunday,
                     createdBy: String(user.sub),
                 },
                 tx
@@ -528,13 +532,17 @@ export class ImprestAdminService {
         return String(year).slice(-2);
     }
 
-    async getVoucherByPeriod({ user, userId, from, to }: { user: any; userId: number; from: Date; to: Date }) {
+    async getVoucherByPeriod({ user, userId, from }: { user: any; userId: number; from: Date; to: Date }) {
+        // Normalize the requested period to the ISO week (Monday-Sunday) so a
+        // mid-week start maps to the canonical voucher and cannot spawn a
+        // duplicate for the same week.
+        const { monday, sunday } = this.isoWeekBounds(new Date(from));
         const voucher = await this.db.transaction(tx =>
             this.buildVoucherIfMissing(
                 {
                     userId,
-                    from,
-                    to,
+                    from: monday,
+                    to: sunday,
                     createdBy: String(user.sub),
                 },
                 tx
@@ -759,13 +767,22 @@ export class ImprestAdminService {
     /* ----------------------- VOUCHER <-> IMPREST LINKS ------------------------ */
 
     private isoWeekBounds(date: Date): { monday: Date; sunday: Date } {
-        const d = new Date(date);
-        d.setHours(0, 0, 0, 0);
-        const day = (d.getDay() + 6) % 7; // Monday = 0 ... Sunday = 6
-        const monday = new Date(d);
-        monday.setDate(d.getDate() - day);
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
+        // Derive the ISO week boundary from the Asia/Kolkata (IST) wall-clock,
+        // not the server's local timezone. IST is a fixed +05:30 offset (no DST),
+        // so shifting the instant by +5.5h makes the UTC components represent the
+        // IST calendar date. This ensures an expense made near IST midnight on a
+        // Monday never lands in the previous ISO week.
+        const istMs = date.getTime() + 5.5 * 3600 * 1000;
+        const ist = new Date(istMs);
+        const y = ist.getUTCFullYear();
+        const m = ist.getUTCMonth();
+        const d = ist.getUTCDate();
+        const weekday = ist.getUTCDay(); // 0=Sun ... 6=Sat
+        const day = (weekday + 6) % 7; // Monday = 0 ... Sunday = 6
+
+        // Monday 00:00 IST expressed as a UTC instant.
+        const monday = new Date(Date.UTC(y, m, d - day, 0, 0, 0) - 5.5 * 3600 * 1000);
+        const sunday = new Date(monday.getTime() + 6 * 24 * 3600 * 1000);
         return { monday, sunday };
     }
 
