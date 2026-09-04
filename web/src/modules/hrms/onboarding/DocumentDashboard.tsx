@@ -249,7 +249,7 @@ const mapApiEmployee = (raw: any): EmployeeDocRecord => ({
   middleName: raw.middleName ?? undefined,
   email: raw.email ?? "",
   designation: raw.designation ?? raw.employeeType ?? "—",
-  department: raw.department ?? raw.departmentId ?? "—",
+    department: String(raw.department ?? raw.departmentId ?? "—"),
   dateOfJoining: raw.dateOfJoining ?? raw.approvedAt ?? new Date().toISOString(),
   documents: Array.isArray(raw.documents)
     ? raw.documents.map(mapApiDoc)

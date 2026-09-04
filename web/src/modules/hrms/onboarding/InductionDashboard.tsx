@@ -315,7 +315,7 @@ const mapApiEmployee = (raw: any): EmployeeInduction => {
     middleName: raw.middleName ?? undefined,
     email: raw.email ?? "",
     designation: raw.designation ?? raw.employeeType ?? "—",
-    department: raw.department ?? raw.departmentId ?? "—",
+    department: String(raw.department ?? raw.departmentId ?? "—"),
     dateOfJoining: raw.dateOfJoining ?? raw.approvedAt ?? new Date().toISOString(),
     approvedAt: raw.approvedAt ?? new Date().toISOString(),
     tasks: Array.isArray(raw.tasks) ? raw.tasks.map(mapApiTask) : [],

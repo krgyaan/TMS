@@ -1112,11 +1112,12 @@ export class OnboardingService {
         lastName: onboardingProfiles.lastName,
         middleName: onboardingProfiles.middleName,
         designation: onboardingProfiles.employeeType,
-        department: onboardingProfiles.departmentId, 
+        department: teams.name, 
         dateOfJoining: onboardingProfiles.dateOfJoining,
       })
       .from(onboardingRequests)
       .leftJoin(onboardingProfiles, eq(onboardingProfiles.onboardingId, onboardingRequests.id))
+      .leftJoin(teams, eq(onboardingProfiles.departmentId, teams.id))
       .where(eq(onboardingRequests.status, 'approved'))
       .orderBy(desc(onboardingRequests.approvedAt));
 
