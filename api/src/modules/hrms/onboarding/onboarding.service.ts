@@ -1118,7 +1118,7 @@ export class OnboardingService {
       .from(onboardingRequests)
       .leftJoin(onboardingProfiles, eq(onboardingProfiles.onboardingId, onboardingRequests.id))
       .leftJoin(teams, eq(onboardingProfiles.departmentId, teams.id))
-      .where(eq(onboardingRequests.status, 'approved'))
+      .where(inArray(onboardingRequests.status, ['approved', 'fully_completed']))
       .orderBy(desc(onboardingRequests.approvedAt));
 
     const requestIds = rows.map((r) => r.id);

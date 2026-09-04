@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -71,7 +71,6 @@ import {
   Milestone,
   FileText,
   Info,
-  Sparkles,
   Activity,
   Zap,
 } from "lucide-react";
@@ -141,37 +140,6 @@ const useStaggeredEntrance = (itemCount: number, baseDelay = 30) => {
   }, [itemCount, baseDelay]);
 
   return visibleItems;
-};
-
-// ─── Animated Number ─────────────────────────────────────────────────────────
-
-const AnimatedNumber: React.FC<{ value: number; duration?: number }> = ({
-  value,
-  duration = 600,
-}) => {
-  const [display, setDisplay] = useState(0);
-  const ref = useRef<number>(0);
-
-  useEffect(() => {
-    const start = ref.current;
-    const diff = value - start;
-    if (diff === 0) return;
-    const startTime = performance.now();
-
-    const animate = (now: number) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const current = Math.round(start + diff * eased);
-      setDisplay(current);
-      if (progress < 1) requestAnimationFrame(animate);
-      else ref.current = value;
-    };
-
-    requestAnimationFrame(animate);
-  }, [value, duration]);
-
-  return <>{display}</>;
 };
 
 // ─── Default task definitions ─────────────────────────────────────────────────
@@ -521,16 +489,6 @@ const EmployeeRowSkeleton: React.FC = () => (
   </div>
 );
 
-const StatCardSkeleton: React.FC = () => (
-  <div className="rounded-2xl border border-border/50 p-5 flex items-center gap-4 bg-card/50">
-    <Skeleton className="w-12 h-12 rounded-xl flex-shrink-0" />
-    <div className="space-y-2.5">
-      <Skeleton className="h-7 w-12" />
-      <Skeleton className="h-3 w-28" />
-    </div>
-  </div>
-);
-
 const TaskRowSkeleton: React.FC = () => (
   <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/50 bg-card/50">
     <Skeleton className="h-4 w-4 rounded flex-shrink-0" />
@@ -593,56 +551,6 @@ const CircularProgress: React.FC<{
     </div>
   );
 };
-
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-
-const StatCard: React.FC<{
-  label: string;
-  value: number;
-  sub?: string;
-  icon: React.ElementType;
-  highlight?: boolean;
-  success?: boolean;
-  delay?: number;
-}> = ({ label, value, sub, icon: Icon, highlight, success, delay = 0 }) => (
-  <div
-    className={cn(
-      "group relative rounded-2xl border p-5 flex items-center gap-4 transition-all duration-300",
-      "hover:shadow-lg hover:-translate-y-0.5 ind-fade-up",
-      highlight && "bg-primary/[0.03] border-primary/20 hover:border-primary/30 hover:shadow-primary/5",
-      success && "bg-emerald-50/50 dark:bg-emerald-950/10 border-emerald-200/50 dark:border-emerald-800/30 hover:border-emerald-300 hover:shadow-emerald-500/5",
-      !highlight && !success && "bg-card border-border/50 hover:border-border"
-    )}
-    style={{ animationDelay: `${delay}ms` }}
-  >
-    <div
-      className={cn(
-        "w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-105",
-        highlight && "bg-primary/10",
-        success && "bg-emerald-100 dark:bg-emerald-900/30",
-        !highlight && !success && "bg-muted/70"
-      )}
-    >
-      <Icon
-        className={cn(
-          "h-5.5 w-5.5",
-          highlight && "text-primary",
-          success && "text-emerald-600 dark:text-emerald-400",
-          !highlight && !success && "text-muted-foreground"
-        )}
-      />
-    </div>
-    <div className="min-w-0">
-      <p className="text-2xl font-bold tracking-tight leading-none">
-        <AnimatedNumber value={value} />
-      </p>
-      <p className="text-xs font-medium text-muted-foreground mt-1">{label}</p>
-      {sub && <p className="text-[10px] text-muted-foreground/60 mt-0.5">{sub}</p>}
-    </div>
-  </div>
-);
-
-
 
 // ─── Phase Mini Progress ──────────────────────────────────────────────────────
 
@@ -1549,46 +1457,6 @@ const InductionDashboard: React.FC = () => {
         </CardHeader>
 
         <CardContent className="flex-1 min-h-0 flex flex-col gap-5">
-          {/* ── Stats ── */}
-          {isLoadingTracker ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <StatCardSkeleton key={i} />
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <StatCard
-                label="Total Tasks"
-                value={globalStats.totalTasks}
-                icon={ListChecks}
-                sub={`across ${employees.length} employees`}
-                delay={0}
-              />
-              <StatCard
-                label="Pending Tasks"
-                value={globalStats.pendingTasks}
-                icon={Clock}
-                highlight={globalStats.pendingTasks > 0}
-                delay={60}
-              />
-              <StatCard
-                label="Completed Tasks"
-                value={globalStats.completedTasks}
-                icon={CheckCheck}
-                delay={120}
-              />
-              <StatCard
-                label="Fully Inducted"
-                value={globalStats.fullyDone}
-                icon={Sparkles}
-                success={globalStats.fullyDone > 0}
-                sub={`of ${employees.length} employees`}
-                delay={180}
-              />
-            </div>
-          )}
-
           {/* ── Toolbar ── */}
           <div className="flex flex-col gap-3">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
