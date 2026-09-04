@@ -32,12 +32,12 @@ import {
   FileText,
   Download,
   ExternalLink,
-  Activity,
   DollarSign,
   Users,
   ArrowLeft,
   CheckCircle2,
   XCircle,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -51,8 +51,6 @@ import { type OnboardingRequest } from "@/services/api/onboarding.service";
 import { paths } from "@/app/routes/paths";
 import { StatusBadge } from "./components/StatusBadge";
 import { HrStatusBadge } from "./components/HrStatusBadge";
-import { ProgressIndicator } from "./components/ProgressIndicator";
-import { ProgressStage } from "./components/ProgressStage";
 import { DataItem } from "./components/DataItem";
 import { SectionHeader } from "./components/SectionHeader";
 import { ActionModal } from "./components/ActionModal";
@@ -70,6 +68,70 @@ import {
 } from "./helpers/onboarding.type";
 
 type SectionStage = "profile" | "education" | "experience" | "documents" | "bankDetails";
+
+const TAB_STATUS_META: Record<
+  string,
+  { icon: React.ElementType; className: string; label: string }
+> = {
+  approved: {
+    icon: CheckCircle2,
+    className: "text-emerald-700 dark:text-emerald-400",
+    label: "Approved",
+  },
+  completed: {
+    icon: CheckCircle2,
+    className: "text-emerald-700 dark:text-emerald-400",
+    label: "Completed",
+  },
+  rejected: {
+    icon: XCircle,
+    className: "text-red-700 dark:text-red-400",
+    label: "Rejected",
+  },
+  pending: {
+    icon: Clock,
+    className: "text-amber-700 dark:text-amber-400",
+    label: "Pending",
+  },
+  in_progress: {
+    icon: Clock,
+    className: "text-amber-700 dark:text-amber-400",
+    label: "In Progress",
+  },
+  submitted: {
+    icon: Clock,
+    className: "text-amber-700 dark:text-amber-400",
+    label: "Submitted",
+  },
+  resubmitted: {
+    icon: Clock,
+    className: "text-amber-700 dark:text-amber-400",
+    label: "Resubmitted",
+  },
+};
+
+const TabStatusDot: React.FC<{ status: string }> = ({ status }) => {
+  const meta = TAB_STATUS_META[status];
+  const Icon = meta?.icon ?? Clock;
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Icon
+            aria-label={`Status: ${meta?.label ?? status}`}
+            className={cn(
+              "h-3.5 w-3.5 flex-shrink-0 cursor-default",
+              meta?.className ?? "text-slate-500 dark:text-slate-400"
+            )}
+          />
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="text-xs">
+          {meta?.label ?? status.replace(/_/g, " ")}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
 
 const SectionActionBar: React.FC<{
   status?: string;
@@ -290,29 +352,6 @@ export default function CandidateDetailPage() {
 
         {/* Body */}
         <div className="px-8 py-6 space-y-8 overflow-y-auto">
-          {/* Progress Pipeline */}
-          <div className="space-y-4">
-            <SectionHeader icon={Activity} title="Onboarding Progress" />
-            <div className="p-6 rounded-2xl bg-muted/30 border border-dashed">
-              <div className="flex items-start gap-1">
-                <ProgressStage label="Profile" status={joinee.profileStatus} />
-                <div className="flex-shrink-0 h-px w-4 bg-border mt-[18px]" />
-                <ProgressStage label="Education" status={joinee.educationStatus} />
-                <div className="flex-shrink-0 h-px w-4 bg-border mt-[18px]" />
-                <ProgressStage label="Experience" status={joinee.experienceStatus} />
-                <div className="flex-shrink-0 h-px w-4 bg-border mt-[18px]" />
-                <ProgressStage label="Documents" status={joinee.documentStatus} />
-                <div className="flex-shrink-0 h-px w-4 bg-border mt-[18px]" />
-                <ProgressStage label="Bank" status={joinee.bankStatus} />
-                <div className="flex-shrink-0 h-px w-4 bg-border mt-[18px]" />
-                <ProgressStage label="Induction" status={joinee.inductionStatus} />
-              </div>
-              <div className="mt-5">
-                <ProgressIndicator value={joinee.progress} />
-              </div>
-            </div>
-          </div>
-
           {profileLoading ? (
             <div className="py-16 flex flex-col items-center justify-center gap-4">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -324,20 +363,25 @@ export default function CandidateDetailPage() {
             <div className="space-y-6">
               <Tabs defaultValue="personal" className="w-full space-y-6">
                 <TabsList className="grid w-full grid-cols-6 rounded-xl bg-muted/60 p-1">
-                  <TabsTrigger value="personal" className="rounded-lg text-xs font-semibold py-2">
+                  <TabsTrigger value="personal" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
                     Personal
+                    <TabStatusDot status={joinee.profileStatus} />
                   </TabsTrigger>
-                  <TabsTrigger value="education" className="rounded-lg text-xs font-semibold py-2">
+                  <TabsTrigger value="education" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
                     Education
+                    <TabStatusDot status={joinee.educationStatus} />
                   </TabsTrigger>
-                  <TabsTrigger value="experience" className="rounded-lg text-xs font-semibold py-2">
+                  <TabsTrigger value="experience" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
                     Experience
+                    <TabStatusDot status={joinee.experienceStatus} />
                   </TabsTrigger>
-                  <TabsTrigger value="documents" className="rounded-lg text-xs font-semibold py-2">
+                  <TabsTrigger value="documents" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
                     Documents
+                    <TabStatusDot status={joinee.documentStatus} />
                   </TabsTrigger>
-                  <TabsTrigger value="bank" className="rounded-lg text-xs font-semibold py-2">
+                  <TabsTrigger value="bank" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
                     Bank
+                    <TabStatusDot status={joinee.bankStatus} />
                   </TabsTrigger>
                   <TabsTrigger value="work_compensation" className="rounded-lg text-xs font-semibold py-2">
                     Work & Salary
