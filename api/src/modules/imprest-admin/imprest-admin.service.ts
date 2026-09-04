@@ -6,6 +6,19 @@ import { DRIZZLE } from "@/db/database.module";
 /** A Drizzle db handle or an in-flight transaction handle. */
 type Tx = Parameters<Parameters<DbInstance["transaction"]>[0]>[0];
 export type DbOrTx = DbInstance | Tx;
+
+/**
+ * Voucher week bucketing cutover.
+ *
+ * Before this date (inclusive) historic vouchers were bucketed to the week of
+ * their MIN(effective_date) (e.g. a Tuesday), producing stored valid_from that
+ * is not a Monday. From this date onward every voucher is created with an
+ * ISO week Monday boundary via isoWeekBounds(). The list query branches on
+ * this cutover so legacy mid-week vouchers keep appearing as Approved instead
+ * of being hidden by the Monday INNER JOIN. Override via
+ * VOUCHER_MONDAY_CUTOVER (YYYY-MM-DD); defaults to 2026-08-01.
+ */
+const VOUCHER_MONDAY_CUTOVER = process.env.VOUCHER_MONDAY_CUTOVER ?? "2026-08-01";
 import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-voucher";
 import { employeeImprestVoucherItems } from "@/db/schemas/accounts/employee-imprest-voucher-item.schema";
 import { users } from "@/db/schemas/auth/users.schema";
@@ -91,8 +104,17 @@ export class ImprestAdminService {
                         user_id,
                         EXTRACT(ISOYEAR FROM effective_date)::int AS year,
                         EXTRACT(WEEK FROM effective_date)::int AS week,
-                        date_trunc('week', MIN(effective_date))::date AS start_date,
-                        (date_trunc('week', MIN(effective_date)) + INTERVAL '6 days')::date AS end_date,
+                        -- See listVouchersRaw: pre-cutover weeks replay their
+                        -- MIN(effective_date) bucketing so historic vouchers
+                        -- still match; from the cutover onward use ISO Monday.
+                        CASE WHEN MIN(effective_date) >= ${VOUCHER_MONDAY_CUTOVER}::date
+                             THEN date_trunc('week', MIN(effective_date))::date
+                             ELSE MIN(effective_date)::date
+                        END AS start_date,
+                        CASE WHEN MIN(effective_date) >= ${VOUCHER_MONDAY_CUTOVER}::date
+                             THEN (date_trunc('week', MIN(effective_date)) + INTERVAL '6 days')::date
+                             ELSE (MIN(effective_date) + (6 - ((EXTRACT(DOW FROM MIN(effective_date))::int + 6) % 7)))::date
+                        END AS end_date,
                         MAX(effective_date) AS max_effective_date
                     FROM voucher_base
                     GROUP BY user_id, year, week
@@ -358,8 +380,21 @@ export class ImprestAdminService {
                         EXTRACT(ISOYEAR FROM effective_date)::int AS year,
                         EXTRACT(WEEK FROM effective_date)::int AS week,
 
-                        date_trunc('week', MIN(effective_date))::date AS start_date,
-                        (date_trunc('week', MIN(effective_date)) + INTERVAL '6 days')::date AS end_date,
+                        -- From the cutover date onward vouchers are bucketed to
+                        -- the ISO Monday of their week. Historic (pre-cutover)
+                        -- vouchers were bucketed to their MIN(effective_date)
+                        -- and stored a mid-week valid_from, so replay that to
+                        -- keep them matching (and visible as Approved) instead
+                        -- of being dropped by the INNER JOIN below.
+                        CASE WHEN MIN(effective_date) >= ${VOUCHER_MONDAY_CUTOVER}::date
+                             THEN date_trunc('week', MIN(effective_date))::date
+                             ELSE MIN(effective_date)::date
+                        END AS start_date,
+
+                        CASE WHEN MIN(effective_date) >= ${VOUCHER_MONDAY_CUTOVER}::date
+                             THEN (date_trunc('week', MIN(effective_date)) + INTERVAL '6 days')::date
+                             ELSE (MIN(effective_date) + (6 - ((EXTRACT(DOW FROM MIN(effective_date))::int + 6) % 7)))::date
+                        END AS end_date,
 
                         SUM(amount)::numeric AS total_amount
                     FROM base

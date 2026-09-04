@@ -129,6 +129,16 @@ Journal entry `idx 87` (format preserved). Applied to dev DB (`UPDATE 0` — no 
 > (155 orphan imprests, 891 stray links). **Historical vouchers were NOT rebucketed**;
 > rebucket is a separate Phase 1b migration if historical consistency is required.
 
+> **Cutover short-circuit (`2026-08-01`):** instead of rebucketing history, the list query
+> now switches on `VOUCHER_MONDAY_CUTOVER` (`.env`, default `2026-08-01`): weeks with
+> `MIN(effective_date) >= cutover` are bucketed to the ISO Monday (`date_trunc('week', …)`),
+> while pre-cutover weeks replay their original `MIN(effective_date)`/end-of-week Sunday
+> bucketing. This keeps historic mid-week `valid_from` vouchers matching (and visible as
+> Approved) while guaranteeing every **new** voucher is Monday-boundary from now on.
+> `listVouchersRaw` and `getEmployeeSummary` both use the branch; `createVoucher` /
+> `getVoucherByPeriod` continue to normalize via `isoWeekBounds`, so new vouchers always
+> start on Monday regardless of the requested `from` date.
+
 ---
 
 ## Phase 2 — Week-Lock: Block New Entries for Accounts-Approved Weeks (DONE)
