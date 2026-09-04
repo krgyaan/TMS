@@ -12,3 +12,6 @@ AGENTS.md
 opencode.json
 deploy.sh
 ecosystem.config.js
+volksAi/venv/
+volksAi/__pycache__/
+volksAi/.env
