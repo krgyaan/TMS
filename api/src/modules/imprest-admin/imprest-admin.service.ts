@@ -415,7 +415,7 @@ export class ImprestAdminService {
                     ON p.user_id = a.user_id
                 AND p.year = a.year
                 AND p.week = a.week
-                LEFT JOIN employee_imprest_vouchers v
+                INNER JOIN employee_imprest_vouchers v
                     ON v.beneficiary_name = a.user_id::text
                 AND v.valid_from::date = a.start_date
                 AND v.valid_to::date   = a.end_date
