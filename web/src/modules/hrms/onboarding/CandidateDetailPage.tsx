@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
   TooltipContent,
@@ -38,11 +39,13 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  ListChecks,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   useOnboardingDashboard,
   useProfile,
+  useEmployeeInduction,
   useUpdateOnboardingStatus,
   useUpdateEntryStatus,
   useUpdateSectionStatus,
@@ -133,6 +136,42 @@ const TabStatusDot: React.FC<{ status: string }> = ({ status }) => {
   );
 };
 
+type InductionTabPhase = "before_joining" | "after_joining";
+
+interface InductionTabTask {
+  id: string;
+  name: string;
+  phase: InductionTabPhase;
+  status: "pending" | "completed";
+  required: boolean;
+  remarks?: string;
+  completedAt?: string;
+}
+
+const normalizeInductionPhase = (v?: string | null): InductionTabPhase =>
+  (v ?? "").toLowerCase().includes("after") ? "after_joining" : "before_joining";
+
+const mapInductionTasks = (data: unknown): InductionTabTask[] => {
+  const source: unknown[] = Array.isArray(data)
+    ? data
+    : data && typeof data === "object" && Array.isArray((data as { tasks?: unknown[] }).tasks)
+      ? (data as { tasks: unknown[] }).tasks
+      : [];
+  return source.map((raw, i) => {
+    const t = (raw ?? {}) as Record<string, unknown>;
+    const status = String(t.status ?? "pending").toLowerCase();
+    return {
+      id: String(t.id ?? i),
+      name: String(t.name ?? t.taskName ?? "Unknown Task"),
+      phase: normalizeInductionPhase(String(t.phase ?? t.taskType ?? "")),
+      status: status === "completed" ? "completed" : "pending",
+      required: Boolean(t.required ?? false),
+      remarks: t.remarks ? String(t.remarks) : undefined,
+      completedAt: t.completedAt ? String(t.completedAt) : undefined,
+    };
+  });
+};
+
 const SectionActionBar: React.FC<{
   status?: string;
   loading?: boolean;
@@ -192,6 +231,10 @@ export default function CandidateDetailPage() {
   const { data: profile, isLoading: profileLoading } = useProfile(
     Number.isNaN(candidateId) ? null : candidateId
   );
+
+  // ── Induction tasks (view-only tab) ──────────────────────────────────────
+  const { data: rawInduction, isLoading: inductionLoading } =
+    useEmployeeInduction(Number.isNaN(candidateId) ? null : candidateId);
   const updateStatus = useUpdateOnboardingStatus();
   const [actionType, setActionType] = useState<"approved" | "rejected" | null>(
     null
@@ -362,7 +405,7 @@ export default function CandidateDetailPage() {
           ) : (
             <div className="space-y-6">
               <Tabs defaultValue="personal" className="w-full space-y-6">
-                <TabsList className="grid w-full grid-cols-6 rounded-xl bg-muted/60 p-1">
+                <TabsList className="grid w-full grid-cols-7 rounded-xl bg-muted/60 p-1">
                   <TabsTrigger value="personal" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
                     Personal
                     <TabStatusDot status={joinee.profileStatus} />
@@ -382,6 +425,10 @@ export default function CandidateDetailPage() {
                   <TabsTrigger value="bank" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
                     Bank
                     <TabStatusDot status={joinee.bankStatus} />
+                  </TabsTrigger>
+                  <TabsTrigger value="induction" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
+                    Induction
+                    <TabStatusDot status={joinee.inductionStatus} />
                   </TabsTrigger>
                   <TabsTrigger value="work_compensation" className="rounded-lg text-xs font-semibold py-2">
                     Work & Salary
@@ -596,6 +643,103 @@ export default function CandidateDetailPage() {
                         <p className="text-sm text-muted-foreground italic pl-[42px]">
                           No work experience provided
                         </p>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  {/* Tab: Induction */}
+                  <TabsContent value="induction" className="space-y-6 mt-4 outline-none">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <SectionHeader icon={UserCheck} title="Induction Tasks" />
+                        {(() => {
+                          const tasks = mapInductionTasks(rawInduction);
+                          const done = tasks.filter((t) => t.status === "completed").length;
+                          return (
+                            <Badge variant="secondary" className="text-[10px] font-semibold rounded-full">
+                              {done} / {tasks.length} completed
+                            </Badge>
+                          );
+                        })()}
+                      </div>
+
+                      {inductionLoading ? (
+                        <div className="space-y-2">
+                          {[0, 1, 2, 3].map((i) => (
+                            <Skeleton key={i} className="h-12 w-full rounded-xl" />
+                          ))}
+                        </div>
+                      ) : mapInductionTasks(rawInduction).length === 0 ? (
+                        <p className="text-sm text-muted-foreground italic">
+                          No induction tasks assigned yet
+                        </p>
+                      ) : (
+                        (["before_joining", "after_joining"] as InductionTabPhase[]).map((phase) => {
+                          const phaseTasks = mapInductionTasks(rawInduction).filter(
+                            (t) => t.phase === phase
+                          );
+                          if (phaseTasks.length === 0) return null;
+                          return (
+                            <div key={phase} className="space-y-2">
+                              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                {phase === "before_joining" ? "Before Joining" : "After Joining"}
+                              </p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                                {phaseTasks.map((task) => {
+                                  const isDone = task.status === "completed";
+                                  return (
+                                    <div
+                                      key={task.id}
+                                      className={cn(
+                                        "flex items-center gap-2.5 px-3 py-3 rounded-xl border",
+                                        isDone
+                                          ? "bg-emerald-50/40 dark:bg-emerald-950/10 border-emerald-200/40 dark:border-emerald-900/30"
+                                          : "bg-card border-border/40"
+                                      )}
+                                    >
+                                      <div
+                                        className={cn(
+                                          "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0",
+                                          isDone ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-muted/60"
+                                        )}
+                                      >
+                                        {isDone ? (
+                                          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                        ) : (
+                                          <ListChecks className="h-4 w-4 text-muted-foreground" />
+                                        )}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p
+                                          className={cn(
+                                            "text-xs font-medium",
+                                            isDone && "line-through text-muted-foreground/70"
+                                          )}
+                                        >
+                                          {task.name}
+                                        </p>
+                                        {(task.remarks || (isDone && task.completedAt)) && (
+                                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                            {isDone && task.completedAt && (
+                                              <span className="text-[10px] text-muted-foreground/70">
+                                                {formatDate(task.completedAt)}
+                                              </span>
+                                            )}
+                                            {task.remarks && (
+                                              <span className="text-[10px] text-muted-foreground/60 italic line-clamp-1">
+                                                {task.remarks}
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   </TabsContent>
