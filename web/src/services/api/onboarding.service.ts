@@ -192,7 +192,7 @@ export const onboardingService = {
     return data;
   },
 
-  approveProfile: async (id: number, status: 'approved' | 'rejected', remark?: string): Promise<any> => {
+  approveProfile: async (id: number, status: 'approved' | 'rejected' | 'pending', remark?: string): Promise<any> => {
     const { data } = await axiosInstance.patch(`/hrms/onboarding/${id}/approve-profile`, { status, remark: remark || "" });
     return data;
   },
@@ -258,7 +258,7 @@ export const onboardingService = {
     id: number,
     stageEndpoint: string,
     entryId: number,
-    status: 'approved' | 'rejected',
+    status: 'approved' | 'rejected' | 'pending',
     reason?: string
   ): Promise<any> => {
     const url = `/hrms/onboarding/${id}/${stageEndpoint}/${entryId}/approve`;
@@ -267,11 +267,11 @@ export const onboardingService = {
     return data;
   },
 
-  /** Approve or reject ALL records of a section */
+  /** Approve, reject or revert ALL records of a section */
   approveSection: async (
     id: number,
     stageEndpoint: string,
-    status: 'approved' | 'rejected',
+    status: 'approved' | 'rejected' | 'pending',
     reason?: string
   ): Promise<any> => {
     const url = `/hrms/onboarding/${id}/${stageEndpoint}/approve-all`;

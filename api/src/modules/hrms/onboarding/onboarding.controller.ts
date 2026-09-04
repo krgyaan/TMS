@@ -33,6 +33,8 @@ const UpdateProfileSchema = z.object({
 
 // ─── Controller ───────────────────────────────────────────────────────────────
 
+type SectionActionStatus = 'approved' | 'rejected' | 'pending';
+
 @Controller('hrms/onboarding')
 export class OnboardingController {
   constructor(private readonly onboardingService: OnboardingService) {}
@@ -211,7 +213,7 @@ export class OnboardingController {
   @Patch(':id/approve-profile')
   async approveProfile(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { status: 'approved' | 'rejected'; remark: string },
+    @Body() body: { status: SectionActionStatus; remark: string },
     @Req() req: any,
   ) {
     return this.onboardingService.approveProfileSection(id, body.status, body.remark, req.user.id);
@@ -219,14 +221,14 @@ export class OnboardingController {
 
   /**
    * PATCH /hrms/onboarding/:id/:stage/:entryId/approve
-   * Dynamic endpoint for approving or rejecting stage entries (education, experience, bank-details, documents)
+   * Dynamic endpoint for approving, rejecting or reverting stage entries (education, experience, bank-details, documents)
    */
   @Patch(':id/:stage/:entryId/approve')
   async approveStageEntry(
     @Param('id', ParseIntPipe) id: number,
     @Param('stage') stage: string,
     @Param('entryId', ParseIntPipe) entryId: number,
-    @Body() body: { status: 'approved' | 'rejected'; remark?: string },
+    @Body() body: { status: SectionActionStatus; remark?: string },
     @Req() req: any,
   ) {
     const adminId = req.user.id;
@@ -254,7 +256,7 @@ export class OnboardingController {
   @Patch(':id/education/approve-all')
   async approveEducationSection(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { status: 'approved' | 'rejected'; remark?: string },
+    @Body() body: { status: SectionActionStatus; remark?: string },
     @Req() req: any,
   ) {
     if (!body.status || (body.status === 'rejected' && !body.remark?.trim())) {
@@ -269,7 +271,7 @@ export class OnboardingController {
   @Patch(':id/experience/approve-all')
   async approveExperienceSection(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { status: 'approved' | 'rejected'; remark?: string },
+    @Body() body: { status: SectionActionStatus; remark?: string },
     @Req() req: any,
   ) {
     if (!body.status || (body.status === 'rejected' && !body.remark?.trim())) {
@@ -284,7 +286,7 @@ export class OnboardingController {
   @Patch(':id/bank-details/approve-all')
   async approveBankSection(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { status: 'approved' | 'rejected'; remark?: string },
+    @Body() body: { status: SectionActionStatus; remark?: string },
     @Req() req: any,
   ) {
     if (!body.status || (body.status === 'rejected' && !body.remark?.trim())) {
@@ -299,7 +301,7 @@ export class OnboardingController {
   @Patch(':id/documents/approve-all')
   async verifyDocumentSection(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { status: 'approved' | 'rejected'; remark?: string },
+    @Body() body: { status: SectionActionStatus; remark?: string },
     @Req() req: any,
   ) {
     if (!body.status || (body.status === 'rejected' && !body.remark?.trim())) {

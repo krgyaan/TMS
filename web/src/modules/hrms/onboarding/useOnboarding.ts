@@ -222,7 +222,7 @@ export const useUpdateEntryStatus = (stageKey: StageKey) => {
     }: {
       entryId?: number;
       onboardingId: number;
-      status: 'approved' | 'rejected';
+      status: 'approved' | 'rejected' | 'pending';
       reason?: string;
     }) => {
       if (stageKey === "profile") {
@@ -235,10 +235,11 @@ export const useUpdateEntryStatus = (stageKey: StageKey) => {
       qc.invalidateQueries({
         queryKey: ["onboarding", stageKey, onboardingId],
       });
+      qc.invalidateQueries({ queryKey: ["onboarding", "dashboard"] });
       qc.invalidateQueries({ queryKey: ["onboarding", "list"] });
       qc.invalidateQueries({ queryKey: ["onboarding", "profiles"] });
       qc.invalidateQueries({ queryKey: ["onboarding", "profile", onboardingId] });
-      toast.success(`Entry ${status} successfully`);
+      toast.success(`Entry ${status === "pending" ? "reverted" : status} successfully`);
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || "Failed to update entry status");
@@ -256,7 +257,7 @@ export const useUpdateSectionStatus = (stageKey: Exclude<StageKey, "profile">) =
       reason,
     }: {
       onboardingId: number;
-      status: 'approved' | 'rejected';
+      status: 'approved' | 'rejected' | 'pending';
       reason?: string;
     }) => {
       return onboardingService.approveSection(onboardingId, STAGE_ENDPOINTS[stageKey], status, reason);
@@ -267,7 +268,7 @@ export const useUpdateSectionStatus = (stageKey: Exclude<StageKey, "profile">) =
       qc.invalidateQueries({ queryKey: ["onboarding", "list"] });
       qc.invalidateQueries({ queryKey: ["onboarding", "profiles"] });
       qc.invalidateQueries({ queryKey: ["onboarding", "profile", onboardingId] });
-      toast.success(`Section ${status} successfully`);
+      toast.success(`Section ${status === "pending" ? "reverted" : status} successfully`);
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || "Failed to update section status");

@@ -3,6 +3,12 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -40,6 +46,8 @@ import {
   XCircle,
   Clock,
   ListChecks,
+  ChevronDown,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -175,47 +183,69 @@ const mapInductionTasks = (data: unknown): InductionTabTask[] => {
 const SectionActionBar: React.FC<{
   status?: string;
   loading?: boolean;
-  onApprove: () => void;
-  onReject: () => void;
-}> = ({ status, loading, onApprove, onReject }) => {
-  if (status === "approved") {
-    return (
-      <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-300 bg-emerald-50 dark:text-emerald-400 dark:border-emerald-500/30 dark:bg-emerald-500/10 gap-1 rounded-lg px-2 py-1">
-        <CheckCircle2 className="h-3 w-3" />
-        Approved
-      </Badge>
-    );
-  }
-  if (status === "rejected") {
-    return (
-      <Badge variant="outline" className="text-[10px] text-red-600 border-red-300 bg-red-50 dark:text-red-400 dark:border-red-500/30 dark:bg-red-500/10 gap-1 rounded-lg px-2 py-1">
-        <XCircle className="h-3 w-3" />
-        Rejected
-      </Badge>
-    );
-  }
+  onAction: (action: "approved" | "rejected" | "pending") => void;
+}> = ({ status, loading, onAction }) => {
+  const actions: {
+    value: "approved" | "rejected" | "pending";
+    label: string;
+    icon: React.ElementType;
+    className: string;
+  }[] = [
+    {
+      value: "approved",
+      label: "Approve",
+      icon: CheckCircle2,
+      className: "text-emerald-600 focus:text-emerald-600",
+    },
+    {
+      value: "rejected",
+      label: "Reject",
+      icon: XCircle,
+      className: "text-red-600 focus:text-red-600",
+    },
+    {
+      value: "pending",
+      label: "Revert",
+      icon: RotateCcw,
+      className: "text-amber-600 focus:text-amber-600",
+    },
+  ];
+
   return (
     <div className="flex items-center gap-2 flex-shrink-0">
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={loading}
-        onClick={onApprove}
-        className="gap-1.5 rounded-lg h-8 text-xs text-emerald-600 border-emerald-300 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-500/40 dark:hover:bg-emerald-500/10"
-      >
-        <CheckCircle2 className="h-3.5 w-3.5" />
-        Approve
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={loading}
-        onClick={onReject}
-        className="gap-1.5 rounded-lg h-8 text-xs text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-500/40 dark:hover:bg-red-500/10"
-      >
-        <XCircle className="h-3.5 w-3.5" />
-        Reject
-      </Button>
+      {status === "approved" && (
+        <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-300 bg-emerald-50 dark:text-emerald-400 dark:border-emerald-500/30 dark:bg-emerald-500/10 gap-1 rounded-lg px-2 py-1">
+          <CheckCircle2 className="h-3 w-3" />
+          Approved
+        </Badge>
+      )}
+      {status === "rejected" && (
+        <Badge variant="outline" className="text-[10px] text-red-600 border-red-300 bg-red-50 dark:text-red-400 dark:border-red-500/30 dark:bg-red-500/10 gap-1 rounded-lg px-2 py-1">
+          <XCircle className="h-3 w-3" />
+          Rejected
+        </Badge>
+      )}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="sm" variant="outline" disabled={loading} className="gap-1.5 rounded-lg h-8 text-xs">
+            Action
+            <ChevronDown className="h-3.5 w-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-36">
+          {actions.map(({ value, label, icon: Icon, className }) => (
+            <DropdownMenuItem
+              key={value}
+              disabled={loading || status === value}
+              onClick={() => onAction(value)}
+              className={cn("gap-2 text-xs cursor-pointer", className)}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
       {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
     </div>
   );
@@ -306,6 +336,37 @@ export default function CandidateDetailPage() {
   };
   const openSectionReject = (stage: SectionStage) => {
     setSectionAction({ stage, type: "rejected" });
+  };
+
+  const runSectionMutation = (
+    stage: SectionStage,
+    type: "approved" | "rejected" | "pending",
+    note: string
+  ) => {
+    if (stage === "profile") {
+      profileMutation.mutate(
+        { onboardingId: candidateId, status: type, reason: note }
+      );
+    } else {
+      sectionMutations[stage].mutate(
+        { onboardingId: candidateId, status: type, reason: note }
+      );
+    }
+  };
+
+  const handleSectionAction = (
+    stage: SectionStage,
+    action: "approved" | "rejected" | "pending"
+  ) => {
+    if (action === "pending") {
+      runSectionMutation(stage, "pending", "");
+      return;
+    }
+    if (action === "approved") {
+      openSectionApprove(stage);
+    } else {
+      openSectionReject(stage);
+    }
   };
 
   if (!joinee) {
@@ -444,8 +505,7 @@ export default function CandidateDetailPage() {
                         <SectionActionBar
                           status={joinee.profileStatus}
                           loading={sectionAction?.stage === "profile" && isSectionLoading}
-                          onApprove={() => openSectionApprove("profile")}
-                          onReject={() => openSectionReject("profile")}
+                          onAction={(action) => handleSectionAction("profile", action)}
                         />
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5 pl-1">
@@ -543,8 +603,7 @@ export default function CandidateDetailPage() {
                         <SectionActionBar
                           status={joinee.educationStatus}
                           loading={sectionAction?.stage === "education" && isSectionLoading}
-                          onApprove={() => openSectionApprove("education")}
-                          onReject={() => openSectionReject("education")}
+                          onAction={(action) => handleSectionAction("education", action)}
                         />
                       </div>
                       {(profile?.education?.length ?? 0) > 0 ? (
@@ -595,8 +654,7 @@ export default function CandidateDetailPage() {
                         <SectionActionBar
                           status={joinee.experienceStatus}
                           loading={sectionAction?.stage === "experience" && isSectionLoading}
-                          onApprove={() => openSectionApprove("experience")}
-                          onReject={() => openSectionReject("experience")}
+                          onAction={(action) => handleSectionAction("experience", action)}
                         />
                       </div>
                       {(profile?.experience?.length ?? 0) > 0 ? (
@@ -794,8 +852,7 @@ export default function CandidateDetailPage() {
                         <SectionActionBar
                           status={joinee.documentStatus}
                           loading={sectionAction?.stage === "documents" && isSectionLoading}
-                          onApprove={() => openSectionApprove("documents")}
-                          onReject={() => openSectionReject("documents")}
+                          onAction={(action) => handleSectionAction("documents", action)}
                         />
                       </div>
                       {(profile?.documents?.length ?? 0) > 0 ? (
@@ -891,8 +948,7 @@ export default function CandidateDetailPage() {
                         <SectionActionBar
                           status={joinee.bankStatus}
                           loading={sectionAction?.stage === "bankDetails" && isSectionLoading}
-                          onApprove={() => openSectionApprove("bankDetails")}
-                          onReject={() => openSectionReject("bankDetails")}
+                          onAction={(action) => handleSectionAction("bankDetails", action)}
                         />
                       </div>
                       {(profile?.bankDetails?.length ?? 0) > 0 ? (
