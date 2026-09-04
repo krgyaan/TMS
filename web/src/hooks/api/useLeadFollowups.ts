@@ -158,6 +158,7 @@ export const CallSchema = z.object({
 
 export const MailSchema = z.object({
     body: z.string().min(1, { message: "Mail body is required" }),
+    subject: z.string().min(1, { message: "Subject is required" }),
     frequency: z.enum(["daily", "weekly", "monthly", "custom"]),
     nextFollowupDate: z.string().optional().nullable(),
 });
@@ -246,6 +247,19 @@ export const useDeleteFollowup = (source: FollowupSource) => {
         onSuccess: () => {
             invalidateSource(queryClient, source);
             toast.success('Follow-up deleted successfully');
+        },
+        onError: showErrorToast,
+    });
+};
+
+export const useStopFollowup = (source: FollowupSource) => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (followupId: number) =>
+            leadFollowupsService.stop(source, followupId),
+        onSuccess: () => {
+            invalidateSource(queryClient, source);
+            toast.success('Follow-up stopped successfully');
         },
         onError: showErrorToast,
     });
@@ -478,6 +492,7 @@ export const useMailForm = (source: FollowupSource) => {
         resolver: zodResolver(MailSchema),
         defaultValues: {
             body: "",
+            subject: "",
             frequency: "daily",
             nextFollowupDate: "",
         },
@@ -487,6 +502,7 @@ export const useMailForm = (source: FollowupSource) => {
         if (isEditMode && existingFollowup) {
             form.reset({
                 body: existingFollowup.body || "",
+                subject: existingFollowup.subject || "",
                 frequency: existingFollowup.frequency || "daily",
                 nextFollowupDate: formatDateForInput(existingFollowup.nextFollowupDate),
             });
@@ -498,6 +514,7 @@ export const useMailForm = (source: FollowupSource) => {
         const payload: MailFollowupRequest = {
             type: "mail",
             body: values.body,
+            subject: values.subject,
             frequency: values.frequency,
             attachments: attachmentPaths,
             nextFollowupDate: values.nextFollowupDate || null,

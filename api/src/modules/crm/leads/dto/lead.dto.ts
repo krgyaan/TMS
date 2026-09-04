@@ -3,9 +3,9 @@ import { z } from 'zod';
 export const CreateLeadSchema = z.object({
     companyName: z.string().min(1, { message: 'Company name is required' }),
     name: z.string().min(1, { message: 'Person name is required' }),
-    designation: z.string().min(1, { message: 'Designation is required' }),
+    designation: z.string().optional().nullable(),
     phone: z.string().min(1, { message: 'Phone is required' }),
-    email: z.string().email({ message: 'A valid email is required' }),
+    email: z.string().email({ message: 'A valid email is required' }).optional().nullable().or(z.literal('')),
     address: z.string().min(1, { message: 'Address is required' }),
     liveLocation: z.any().optional().nullable(),
     country: z.string().min(1, { message: 'Country is required' }),
@@ -38,9 +38,9 @@ export const CreateLeadSchema = z.object({
 export const UpdateLeadSchema = z.object({
     companyName: z.string().min(1).optional(),
     name: z.string().min(1).optional(),
-    designation: z.string().min(1).optional(),
+    designation: z.string().optional().nullable(),
     phone: z.string().min(1).optional(),
-    email: z.string().email().optional(),
+    email: z.string().email().optional().nullable().or(z.literal('')),
     address: z.string().min(1).optional(),
     liveLocation: z.any().optional().nullable(),
     country: z.string().min(1).optional(),

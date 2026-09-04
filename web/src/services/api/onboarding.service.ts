@@ -21,6 +21,7 @@ export interface OnboardingRequest {
   createdAt: string;
   updatedAt: string;
   reviewedBy: string | null;
+  profilePhoto?: string | null;
 }
 
 export interface UpdateStatusDto {

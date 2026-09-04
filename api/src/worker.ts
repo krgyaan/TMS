@@ -6,6 +6,7 @@ import { FollowupWorkerModule } from "./modules/follow-up/followup-worker.module
 import { AccountChecklistWorkerModule } from "./modules/accounts/account-checklist/account-checklist-worker.module";
 import { VideoProcessingWorkerModule } from "./modules/hrms/training/worker/video-processing-worker.module";
 import { GenericMailWorkerModule } from "./modules/scheduler/generic-mail-worker.module";
+import { LeadFollowupWorkerModule } from "./modules/crm/leadfollowup/lead-followup-worker.module";
 
 async function bootstrap() {
     const workers = [
@@ -13,6 +14,7 @@ async function bootstrap() {
         { name: "AccountChecklist", module: AccountChecklistWorkerModule },
         { name: "VideoProcessing", module: VideoProcessingWorkerModule },
         { name: "GenericMail", module: GenericMailWorkerModule },
+        { name: "LeadFollowup", module: LeadFollowupWorkerModule },
     ];
 
     const started: string[] = [];

@@ -23,6 +23,7 @@ import { EmailModule } from "@/modules/email/email.module";
 import { EmployeeImprestModule } from "@/modules/employee-imprest/employee-imprest.module";
 import { InsurancePolicyModule } from "@/modules/insurance/insurance-policy.module";
 import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
+import { LeadFollowupSchedulerModule } from "@/modules/crm/leadfollowup/lead-followup-scheduler.module";
 import { FollowUpModule } from "@/modules/follow-up/follow-up.module";
 import { AssetsModule } from "@/modules/hrms/assets/assets.module";
 import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employee-profiles.module";
@@ -243,6 +244,7 @@ import { WebhookController } from "./webhook/webhook.controller";
         KickOffMeetingModule,
         ProjectDashboardModule,
         FollowupSchedulerModule,
+        LeadFollowupSchedulerModule,
         PqrModule,
         FinanceDocumentsModule,
         ProjectsMasterModule,

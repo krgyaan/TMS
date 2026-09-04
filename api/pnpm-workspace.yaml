@@ -2,6 +2,7 @@ allowBuilds:
   '@ffmpeg-installer/linux-x64': true
   '@ffprobe-installer/linux-x64': true
   '@nestjs/core': true
+  '@parcel/watcher': true
   '@sentry/node-cpu-profiler': true
   argon2: true
   esbuild: true

@@ -11,13 +11,16 @@ export const projectInsuranceFormSchema = z
         bankName: z.string().default(""),
         ifsc: z.string().default(""),
         portalLink: z.string().default(""),
-        amount: z.number().nullable().refine(v => v !== null && v >= 0, "Amount must be >= 0"),
+        amount: z.number().nullable(),
         billFiles: z.array(z.string()).default([]),
         remark: z.string().default(""),
         ...insuranceFieldsSchema.shape,
     })
     .superRefine((data, ctx) => {
         if (data.raisePayment) {
+            if (data.amount === null || data.amount < 0) {
+                ctx.addIssue({ code: "custom", path: ["amount"], message: "Amount must be >= 0" });
+            }
             if (data.paymentMode === "BANK_TRANSFER") {
                 if (!data.partyName.trim()) {
                     ctx.addIssue({ code: "custom", path: ["partyName"], message: "Party name is required" });
