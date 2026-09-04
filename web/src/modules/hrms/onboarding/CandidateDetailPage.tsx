@@ -183,8 +183,9 @@ const mapInductionTasks = (data: unknown): InductionTabTask[] => {
 const SectionActionBar: React.FC<{
   status?: string;
   loading?: boolean;
+  hasData?: boolean;
   onAction: (action: "approved" | "rejected" | "pending") => void;
-}> = ({ status, loading, onAction }) => {
+}> = ({ status, loading, hasData = true, onAction }) => {
   const actions: {
     value: "approved" | "rejected" | "pending";
     label: string;
@@ -227,7 +228,13 @@ const SectionActionBar: React.FC<{
       )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button size="sm" variant="outline" disabled={loading} className="gap-1.5 rounded-lg h-8 text-xs">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={loading || !hasData}
+            title={!hasData ? "No details submitted yet" : undefined}
+            className="gap-1.5 rounded-lg h-8 text-xs"
+          >
             Action
             <ChevronDown className="h-3.5 w-3.5" />
           </Button>
@@ -505,6 +512,7 @@ export default function CandidateDetailPage() {
                         <SectionActionBar
                           status={joinee.profileStatus}
                           loading={sectionAction?.stage === "profile" && isSectionLoading}
+                          hasData={!!profile?.firstName}
                           onAction={(action) => handleSectionAction("profile", action)}
                         />
                       </div>
@@ -603,6 +611,7 @@ export default function CandidateDetailPage() {
                         <SectionActionBar
                           status={joinee.educationStatus}
                           loading={sectionAction?.stage === "education" && isSectionLoading}
+                          hasData={(profile?.education?.length ?? 0) > 0}
                           onAction={(action) => handleSectionAction("education", action)}
                         />
                       </div>
@@ -654,6 +663,7 @@ export default function CandidateDetailPage() {
                         <SectionActionBar
                           status={joinee.experienceStatus}
                           loading={sectionAction?.stage === "experience" && isSectionLoading}
+                          hasData={(profile?.experience?.length ?? 0) > 0}
                           onAction={(action) => handleSectionAction("experience", action)}
                         />
                       </div>
@@ -852,6 +862,7 @@ export default function CandidateDetailPage() {
                         <SectionActionBar
                           status={joinee.documentStatus}
                           loading={sectionAction?.stage === "documents" && isSectionLoading}
+                          hasData={(profile?.documents?.length ?? 0) > 0}
                           onAction={(action) => handleSectionAction("documents", action)}
                         />
                       </div>
@@ -948,6 +959,7 @@ export default function CandidateDetailPage() {
                         <SectionActionBar
                           status={joinee.bankStatus}
                           loading={sectionAction?.stage === "bankDetails" && isSectionLoading}
+                          hasData={(profile?.bankDetails?.length ?? 0) > 0}
                           onAction={(action) => handleSectionAction("bankDetails", action)}
                         />
                       </div>
