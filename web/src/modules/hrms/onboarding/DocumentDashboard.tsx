@@ -215,7 +215,51 @@ const normalizeCategory = (cat: string | null | undefined): DocCategory => {
 /**
  * Map a raw API document row → our frontend Document shape.
  */
-const mapApiDoc = (raw: any): Document => ({
+
+// ─── Raw API Interfaces ──────────────────────────────────────────────────────
+
+interface RawDoc {
+  id?: number | string;
+  name?: string;
+  docType?: string;
+  category?: string;
+  docCategory?: string;
+  required?: boolean;
+  status?: string;
+  uploadedAt?: string;
+  createdAt?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  verificationDate?: string;
+  rejectedReason?: string;
+  remarks?: string;
+  fileName?: string;
+  fileUrl?: string;
+  fileSize?: string;
+  fileType?: string;
+  documentNumber?: string;
+  issueDate?: string;
+  expiryDate?: string;
+}
+
+interface RawDocEmployee {
+  id: number;
+  employeeId?: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  middleName?: string;
+  email?: string;
+  designation?: string;
+  employeeType?: string;
+  department?: string;
+  departmentId?: number;
+  dateOfJoining?: string;
+  approvedAt?: string;
+  documents?: RawDoc[];
+}
+
+const mapApiDoc = (raw: RawDoc): Document => ({
   id: String(raw.id),
   name: raw.name ?? raw.docType ?? "Unknown Document",
   category: normalizeCategory(raw.category ?? raw.docCategory),
@@ -237,24 +281,26 @@ const mapApiDoc = (raw: any): Document => ({
 /**
  * Map a raw API tracker row → our frontend EmployeeDocRecord shape.
  */
-const mapApiEmployee = (raw: any): EmployeeDocRecord => ({
-  id: raw.id,
-  employeeId: raw.employeeId ?? `EMP-${String(raw.id).padStart(4, "0")}`,
-  firstName: raw.firstName ?? raw.name?.split(" ")[0] ?? "—",
-  lastName:
-    raw.lastName ??
-    (raw.name?.split(" ").length > 1
-      ? raw.name.split(" ").slice(-1)[0]
-      : ""),
-  middleName: raw.middleName ?? undefined,
-  email: raw.email ?? "",
-  designation: raw.designation ?? raw.employeeType ?? "—",
+
+const mapApiEmployee = (raw: RawDocEmployee): EmployeeDocRecord => {
+  const nameParts = raw.name?.split(" ") ?? [];
+  return {
+    id: raw.id,
+    employeeId: raw.employeeId ?? `EMP-${String(raw.id).padStart(4, "0")}`,
+    firstName: raw.firstName ?? nameParts[0] ?? "—",
+    lastName:
+      raw.lastName ??
+      (nameParts.length > 1 ? nameParts[nameParts.length - 1] : ""),
+    middleName: raw.middleName ?? undefined,
+    email: raw.email ?? "",
+    designation: raw.designation ?? raw.employeeType ?? "—",
     department: String(raw.department ?? raw.departmentId ?? "—"),
-  dateOfJoining: raw.dateOfJoining ?? raw.approvedAt ?? new Date().toISOString(),
-  documents: Array.isArray(raw.documents)
-    ? raw.documents.map(mapApiDoc)
-    : [],
-});
+    dateOfJoining: raw.dateOfJoining ?? raw.approvedAt ?? new Date().toISOString(),
+    documents: Array.isArray(raw.documents)
+      ? raw.documents.map(mapApiDoc)
+      : [],
+  };
+};
 
 const computeDocStats = (docs: Document[]) => {
   const total = docs.length;
@@ -660,7 +706,7 @@ const DocRow: React.FC<DocRowProps> = ({ doc, onVerify, onReject, onView }) => {
       {/* Status Badge */}
       <span
         className={cn(
-          "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border flex-shrink-0 hidden sm:inline-flex",
+          "items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border flex-shrink-0 hidden sm:inline-flex",
           cfg.badgeClass
         )}
       >
@@ -939,7 +985,7 @@ const EmployeeDocModal: React.FC<EmployeeDocModalProps> = ({
         <div className="px-5 py-3 border-b bg-muted/10 flex items-center gap-2 flex-wrap flex-shrink-0">
           <Select
             value={filterCat}
-            onValueChange={(v) => setFilterCat(v as any)}
+            onValueChange={(v) => setFilterCat(v as DocCategory | "all")}
           >
             <SelectTrigger className="h-8 w-36 text-xs">
               <SelectValue placeholder="All Categories" />
@@ -955,7 +1001,7 @@ const EmployeeDocModal: React.FC<EmployeeDocModalProps> = ({
           </Select>
           <Select
             value={filterStatus}
-            onValueChange={(v) => setFilterStatus(v as any)}
+            onValueChange={(v) => setFilterStatus(v as DocStatus | "all")}
           >
             <SelectTrigger className="h-8 w-36 text-xs">
               <SelectValue placeholder="All Statuses" />
@@ -1388,7 +1434,7 @@ const ErrorState: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
 const Legend: React.FC = () => (
   <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
     {(
-      ["verified", "pending", "rejected", "not_uploaded"] as DocStatus[]
+      ["approved", "pending", "rejected", "not_uploaded"] as DocStatus[]
     ).map((s) => {
       const cfg = DOC_STATUS_CONFIG[s];
       const Icon = cfg.icon;
@@ -1397,7 +1443,7 @@ const Legend: React.FC = () => (
           <Icon
             className={cn(
               "h-3.5 w-3.5",
-              s === "verified" && "text-green-600 dark:text-green-400",
+              s === "approved" && "text-green-600 dark:text-green-400",
               s === "pending" && "text-amber-600 dark:text-amber-400",
               s === "rejected" && "text-destructive",
               s === "not_uploaded" && "text-muted-foreground"
@@ -1412,7 +1458,7 @@ const Legend: React.FC = () => (
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
-type TabFilter = "all" | "pending" | "verified" | "rejected" | "incomplete";
+  type TabFilter = "all" | "pending" | "approved" | "rejected" | "incomplete";
 
 const DocumentDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabFilter>("all");
@@ -1471,13 +1517,13 @@ const DocumentDashboard: React.FC = () => {
   // ── Derived: map raw API data → typed EmployeeDocRecord[] ─────────────────
   const employees: EmployeeDocRecord[] = useMemo(() => {
     if (!rawTracker) return [];
-    return (rawTracker as any[]).map(mapApiEmployee);
+    return rawTracker.map(mapApiEmployee);
   }, [rawTracker]);
 
   // ── Derived: live documents for the open employee modal ───────────────────
   const liveDocuments: Document[] | undefined = useMemo(() => {
     if (!rawEmployeeDocs) return undefined;
-    return (rawEmployeeDocs as any[]).map(mapApiDoc);
+    return rawEmployeeDocs.map(mapApiDoc);
   }, [rawEmployeeDocs]);
 
   // ── Global stats (computed from tracker data) ─────────────────────────────
@@ -1488,7 +1534,7 @@ const DocumentDashboard: React.FC = () => {
     );
     const verified = employees.reduce(
       (a, e) =>
-        a + e.documents.filter((d) => d.status === "verified").length,
+        a + e.documents.filter((d) => d.status === "approved").length,
       0
     );
     const pending = employees.reduce(
@@ -1511,8 +1557,8 @@ const DocumentDashboard: React.FC = () => {
       pending: employees.filter(
         (e) => getEmployeeDocStatus(e) === "pending"
       ).length,
-      verified: employees.filter(
-        (e) => getEmployeeDocStatus(e) === "verified"
+      approved: employees.filter(
+        (e) => getEmployeeDocStatus(e) === "approved"
       ).length,
       rejected: employees.filter(
         (e) => getEmployeeDocStatus(e) === "rejected"

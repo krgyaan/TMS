@@ -8,7 +8,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,7 +39,6 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Eye,
   ChevronDown,
   ChevronRight,
   CircleDashed,
@@ -74,7 +72,6 @@ import {
   FileText,
   Info,
   Sparkles,
-  TrendingUp,
   Activity,
   Zap,
 } from "lucide-react";
@@ -285,7 +282,42 @@ const normalizeAssignedTo = (assignedTo: string | null | undefined): AssignedTo 
   return "HR";
 };
 
-const mapApiTask = (raw: any): InductionTask => {
+// ─── Raw API Interfaces ──────────────────────────────────────────────────────
+
+interface RawInductionTask {
+  id?: number | string;
+  name?: string;
+  taskName?: string;
+  phase?: string;
+  taskType?: string;
+  assignedTo?: string;
+  required?: boolean;
+  status?: string;
+  completedAt?: string;
+  completedBy?: string;
+  remarks?: string;
+}
+
+interface RawInductionEmployee {
+  id: number;
+  employeeId?: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  middleName?: string;
+  email?: string;
+  designation?: string;
+  employeeType?: string;
+  department?: string;
+  departmentId?: number;
+  dateOfJoining?: string;
+  approvedAt?: string;
+  tasks?: RawInductionTask[];
+  inductionCoordinator?: string;
+  profilePhoto?: string;
+}
+
+const mapApiTask = (raw: RawInductionTask): InductionTask => {
   const name: string = raw.name ?? raw.taskName ?? "Unknown Task";
   const defaultMatch = DEFAULT_TASKS.find(
     (d) => d.name.toLowerCase() === name.toLowerCase()
@@ -305,7 +337,7 @@ const mapApiTask = (raw: any): InductionTask => {
   };
 };
 
-const mapApiEmployee = (raw: any): EmployeeInduction => {
+const mapApiEmployee = (raw: RawInductionEmployee): EmployeeInduction => {
   const nameParts = (raw.name ?? "").split(" ");
   return {
     id: raw.id,
@@ -654,45 +686,6 @@ const PhaseMiniBar: React.FC<{
   );
 };
 
-
-
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-
-const StatusBadge: React.FC<{ status: EmployeeInductionTab }> = ({ status }) => {
-  const config = {
-    not_started: {
-      label: "Not Started",
-      icon: CircleDashed,
-      cls: "text-muted-foreground bg-muted/60 border-border/50",
-    },
-    in_progress: {
-      label: "In Progress",
-      icon: Activity,
-      cls: "text-primary bg-primary/5 border-primary/20",
-    },
-    completed: {
-      label: "Completed",
-      icon: CheckCircle2,
-      cls: "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/40",
-    },
-    all: { label: "", icon: Users, cls: "" },
-  };
-
-  const c = config[status];
-  if (status === "all") return null;
-
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold border",
-        c.cls
-      )}
-    >
-      <c.icon className="h-3 w-3" />
-      {c.label}
-    </span>
-  );
-};
 
 // ─── Employee Row ─────────────────────────────────────────────────────────────
 
@@ -1218,7 +1211,7 @@ const EmployeeInductionModal: React.FC<{
 
           {/* Filters */}
           <div className="px-5 py-3 border-b border-border/30 bg-muted/5 flex items-center gap-2 flex-wrap flex-shrink-0">
-            <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)}>
+            <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as TaskStatus | "all")}>
               <SelectTrigger className="h-8 w-32 text-xs rounded-xl">
                 <SelectValue placeholder="All Tasks" />
               </SelectTrigger>
@@ -1419,12 +1412,12 @@ const InductionDashboard: React.FC = () => {
   // ── Derived data ──────────────────────────────────────────────────────────
   const employees: EmployeeInduction[] = useMemo(() => {
     if (!rawTracker) return [];
-    return (rawTracker as any[]).map(mapApiEmployee);
+    return rawTracker.map(mapApiEmployee);
   }, [rawTracker]);
 
   const liveTasks: InductionTask[] | undefined = useMemo(() => {
     if (!rawEmployeeTasks) return undefined;
-    return (rawEmployeeTasks as any[]).map(mapApiTask);
+    return rawEmployeeTasks.map(mapApiTask);
   }, [rawEmployeeTasks]);
 
   // ── Global stats ──────────────────────────────────────────────────────────
