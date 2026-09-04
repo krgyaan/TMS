@@ -3,6 +3,7 @@ export const paths = {
     auth: {
         login: "/login",
         googleCallback: "/auth/google/callback",
+        forgotPassword: "/forgot-password",
     },
 
     // ==================== INTEGRATIONS ====================
@@ -484,6 +485,7 @@ export const paths = {
         
         //================ onboarding  ==============================//
         onboardingDashboard: "/hrms/onboarding/dashboard",
+        onboardingCandidate: (id: number | string) => `/hrms/onboarding/candidate/${id}`,
         profileDetailsDashboard: "/hrms/onboarding/profile-details",
         documentDashboard: "/hrms/onboarding/documents",
         approvalDashboard: "/hrms/onboarding/approval",

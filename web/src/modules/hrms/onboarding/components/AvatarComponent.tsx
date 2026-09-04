@@ -1,5 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getInitials } from "./helpers";
+import { getInitials } from "../helpers/onboarding.type";
 import { cn } from "@/lib/utils";
 
 interface AvatarComponentProps {

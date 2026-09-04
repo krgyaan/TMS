@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import type { Variants } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,9 +47,7 @@ const personalSchema = z.object({
   middleName: z.string().optional(),
   lastName: z.string().min(1, "Last name is required"),
   dateOfBirth: z.string().min(1, "Date of birth is required"),
-  gender: z.enum(["Male", "Female", "Other"], {
-    required_error: "Gender is required",
-  }),
+  gender: z.enum(["Male", "Female", "Other"], "Gender is required"),
   maritalStatus: z.string().min(1, "Marital status is required"),
   nationality: z.string().min(1, "Nationality is required"),
   personalEmail: z.string().email("Enter a valid email"),
@@ -167,7 +166,7 @@ const STEPS = [
 
 // ─── Slide variants ───────────────────────────────────────────────────────────
 
-const slideVariants = {
+const slideVariants: Variants = {
   enter: (dir: number) => ({ x: dir > 0 ? 60 : -60, opacity: 0 }),
   center: { x: 0, opacity: 1, transition: { duration: 0.3, ease: "easeOut" } },
   exit:  (dir: number) => ({
@@ -357,7 +356,7 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 const SignUp: React.FC = () => {
-  const navigate  = useNavigate();
+  const [searchParams] = useSearchParams();
   const [currentStep,    setCurrentStep]    = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [direction,      setDirection]      = useState(1);
@@ -393,6 +392,7 @@ const SignUp: React.FC = () => {
       gender:         "Male",
       currentCountry: "India",
       permanentCountry: "India",
+      personalEmail:  searchParams.get("email") ?? "",
     },
     mode: "onChange",
   });

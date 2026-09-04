@@ -439,26 +439,33 @@
                     {
                         "idx":  86,
                         "version":  "7",
+                        "when":  1785960000000,
+                        "tag":  "0127_create_password_reset_otps",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  87,
+                        "version":  "7",
                         "when":  1788102720040,
                         "tag":  "0129_add_employee_imprest_voucher_items",
                         "breakpoints":  true
                     },
                     {
-                        "idx":  87,
+                        "idx":  88,
                         "version":  "7",
                         "when":  1788329096209,
                         "tag":  "0130_backfill_date_of_expense_strict",
                         "breakpoints":  true
                     },
                     {
-                        "idx":  88,
+                        "idx":  89,
                         "version":  "7",
                         "when":  1788332239287,
                         "tag":  "0131_require_imprest_remark",
                         "breakpoints":  true
                     },
                     {
-                        "idx":  89,
+                        "idx":  90,
                         "version":  "7",
                         "when":  1788350000000,
                         "tag":  "0132_dedup_vouchers_unique_week",

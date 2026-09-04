@@ -36,6 +36,10 @@ class LeadFollowupsService extends BaseApiService {
     async remove(source: FollowupSource, followupId: number): Promise<void> {
         return super.delete<void>(`${this.sourceBase(source)}/${source.sourceId}/${followupId}`);
     }
+
+    async stop(source: FollowupSource, followupId: number, reason?: string): Promise<BaseFollowup> {
+        return this.patch<BaseFollowup>(`${this.sourceBase(source)}/${source.sourceId}/${followupId}/stop`, { reason: reason ?? null });
+    }
 }
 
 export const leadFollowupsService = new LeadFollowupsService();

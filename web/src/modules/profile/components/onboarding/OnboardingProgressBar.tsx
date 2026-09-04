@@ -1,8 +1,7 @@
 // web/src/modules/profile/components/onboarding/OnboardingProgressBar.tsx
 
-import React, { useMemo } from "react";
-import { motion } from "framer-motion";
-import { CheckCircle2, Clock, AlertCircle } from "lucide-react";
+import React from "react";
+import { CheckCircle2, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -28,45 +27,14 @@ type OnboardingProgressBarProps = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helpers
+// Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-
-function getStepStyles(status: StageProgressStatus, isLast: boolean) {
-  switch (status) {
-    case "completed":
-      return {
-        dot: "bg-emerald-500 border-emerald-500 text-white",
-        label: "text-emerald-700 dark:text-emerald-300 font-semibold",
-        connector: "bg-emerald-500",
-        icon: CheckCircle2,
-        ring: "ring-emerald-200 dark:ring-emerald-800/50",
-      };
-    case "in_progress":
-      return {
-        dot: "bg-primary border-primary text-primary-foreground",
-        label: "text-primary font-semibold",
-        connector: "bg-gradient-to-r from-primary/60 to-muted/40",
-        icon: Clock,
-        ring: "ring-primary/20",
-      };
-    default:
-      return {
-        dot: "bg-muted border-border text-muted-foreground",
-        label: "text-muted-foreground",
-        connector: "bg-muted/60",
-        icon: Clock,
-        ring: "ring-transparent",
-      };
-  }
-}
 
 export function OnboardingProgressBar({
   progress,
   stages,
   className,
 }: OnboardingProgressBarProps) {
-  const clampedProgress = Math.min(100, Math.max(0, progress));
-
   return (
     <div className={cn("space-y-6", className)}>
       {/* Header Section */}
@@ -76,45 +44,29 @@ export function OnboardingProgressBar({
           <p className="text-xs text-muted-foreground">
             Complete all stages to finalize your profile
           </p>
-        </div>
-        {/* <div className="flex items-center gap-3 bg-muted/30 px-4 py-2 rounded-2xl border border-border/50">
+                </div>
+        <div className="flex items-center gap-3 rounded-2xl border border-border/50 bg-muted/30 px-4 py-2">
           <div className="text-right">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Overall</p>
-            <p className="text-sm font-bold text-primary tabular-nums">{clampedProgress}%</p>
+            <p className="text-sm font-bold text-primary tabular-nums">
+              {Math.min(100, Math.max(0, progress))}%
+            </p>
           </div>
-          <div className="h-8 w-[2px] bg-border/50" />
-          <div className="h-10 w-10 rounded-full border-4 border-primary/20 flex items-center justify-center relative">
-            <svg className="h-full w-full -rotate-90 absolute">
-              <circle
-                cx="20"
-                cy="20"
-                r="16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="4"
-                className="text-primary"
-                strokeDasharray={100}
-                strokeDashoffset={100 - clampedProgress}
-                style={{ transition: "stroke-dashoffset 1s ease-out" }}
-              />
-            </svg>
-            <span className="text-[10px] font-bold z-10">{clampedProgress}%</span>
-          </div>
-        </div> */}
+        </div>
       </div>
 
       {/* Non-Linear Status Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {stages.map((stage, idx) => {
+        {stages.map((stage) => {
           const isCompleted = ["completed", "submitted" , "resubmitted"].includes(stage.status);
           const Icon = stage.icon || Clock;
 
           return (
-            <motion.div
+            <div
               key={stage.key}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.05 }}
+              
+              
+              
               className={cn(
                 "group relative rounded-2xl border p-3 transition-all duration-300",
                 isCompleted
@@ -152,7 +104,7 @@ export function OnboardingProgressBar({
                   isCompleted ? "bg-emerald-500" : "bg-transparent"
                 )} />
               </div>
-            </motion.div>
+            </div>
           );
         })}
       </div>

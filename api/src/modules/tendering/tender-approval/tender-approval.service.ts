@@ -495,49 +495,25 @@ export class TenderApprovalService {
     }
 
     async updateApproval(tenderId: number, payload: TenderApprovalPayload, changedBy: number) {
-        console.log('[updateApproval] START', { tenderId, payload, changedBy });
-        
-        const currentTender = await this.tenderInfosService.findById(tenderId);
-        console.log('[updateApproval] currentTender fetched', { tenderId: currentTender?.id, tlStatus: currentTender?.tlStatus });
-        
+        const currentTender = await this.tenderInfosService.findById(tenderId);        
         if (!currentTender) throw new Error("Tender not found");
         const prevStatus = currentTender.status;
         const isEditMode = String(currentTender?.tlStatus) === payload.tlStatus;
         
-        console.log('[updateApproval] Mode check', { prevStatus, isEditMode, payloadTlStatus: payload.tlStatus });
-
         const { newStatus, statusComment, updateData } = await this.buildApprovalUpdateData(tenderId, payload, isEditMode);
-        console.log('[updateApproval] buildApprovalUpdateData done', { newStatus, statusComment, updateDataKeys: Object.keys(updateData) });
-
-        await this.db.transaction(async tx => {
-            console.log('[updateApproval] Transaction started');
-            
+        await this.db.transaction(async tx => {            
             await tx.update(tenderInfos).set(updateData).where(eq(tenderInfos.id, tenderId)).returning();
-            console.log('[updateApproval] Tender updated');
-
             if (isEditMode && payload.tlStatus === "1" && currentTender) {
-                console.log('[updateApproval] Checking payment mode changes', { 
-                    currentEmdMode: currentTender.emdMode, 
-                    newEmdMode: payload.emdMode,
-                    currentTenderFeeMode: currentTender.tenderFeeMode,
-                    newTenderFeeMode: payload.tenderFeeMode,
-                    currentProcessingFeeMode: currentTender.processingFeeMode,
-                    newProcessingFeeMode: payload.processingFeeMode
-                });
                 await this.handlePaymentModeChanges(tx, tenderId, currentTender, payload);
             }
 
             if (payload.tlStatus === "1" && payload.emdMode === 'exempt') {
-                console.log('[updateApproval] Handling exempt EMD');
                 await this.handleExemptEmd(tx, tenderId);
             }
 
             if (newStatus !== null && newStatus !== prevStatus) {
-                console.log('[updateApproval] Tracking status change', { newStatus, prevStatus, statusComment });
                 await this.tenderStatusHistoryService.trackStatusChange(tenderId, newStatus, changedBy, prevStatus, statusComment, tx);
             }
-            
-            console.log('[updateApproval] Transaction committed');
         });
 
         // Send email notification for approval/rejection/review
@@ -561,6 +537,29 @@ export class TenderApprovalService {
                 this.logger.log(`Successfully stopped tender_approval timer for tender ${tenderId}`);
             } catch (error) {
                 this.logger.warn(`Failed to stop tender_approval timer for tender ${tenderId}:`, error);
+            }
+
+            // If tlStatus is "3" (Incomplete), resume the info_sheet timer with remaining time and skip downstream timers
+            if (payload.tlStatus === "3") {
+                try {
+                    const infoSheetTimer = await this.timersService.getTimer("TENDER", tenderId, "tender_info_sheet");
+
+                    const resumeMs = infoSheetTimer?.remainingTimeMs ?? 0;
+
+                    await this.timersService.startTimer({
+                        entityType: "TENDER",
+                        entityId: tenderId,
+                        stage: "tender_info_sheet",
+                        userId: changedBy,
+                        assignedUserId: (await this.tenderInfosService.findById(tenderId))?.teamMember ?? changedBy,
+                        allocatedTimeMs: resumeMs,
+                    });
+                    this.logger.log(`Resumed info_sheet timer for tender ${tenderId} with ${resumeMs}ms remaining`);
+                } catch (error) {
+                    this.logger.warn(`Failed to resume info_sheet timer for tender ${tenderId}:`, error);
+                }
+
+                return this.getByTenderId(tenderId);
             }
 
             // 2. Get tender and info sheet data

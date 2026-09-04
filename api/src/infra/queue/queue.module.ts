@@ -62,7 +62,17 @@ import { ConfigService } from "@nestjs/config";
                 return new Queue("generic-mail-queue", { connection });
             },
         },
+        {
+            provide: "LEAD_FOLLOWUP_QUEUE",
+            inject: ["REDIS_CONNECTION"],
+            useFactory: (connection: IORedis | null) => {
+                if (!connection) {
+                    return { add: async () => {} } as unknown as Queue;
+                }
+                return new Queue("lead-followup-mail-queue", { connection });
+            },
+        },
     ],
-    exports: ["FOLLOWUP_QUEUE", "CHECKLIST_QUEUE", "VIDEO_PROCESSING_QUEUE", "GENERIC_QUEUE", "REDIS_CONNECTION"],
+    exports: ["FOLLOWUP_QUEUE", "CHECKLIST_QUEUE", "VIDEO_PROCESSING_QUEUE", "GENERIC_QUEUE", "LEAD_FOLLOWUP_QUEUE", "REDIS_CONNECTION"],
 })
 export class QueueModule { }

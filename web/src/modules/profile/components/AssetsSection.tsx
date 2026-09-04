@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,20 +37,11 @@ import {
 import { cn } from "@/lib/utils";
 import { useProfileContext } from "../contexts/ProfileContext";
 import { formatDate } from "../utils";
-import { staggerContainer, fadeInUp, tabContentVariants } from "../animations";
+import type { AssetData } from "../types";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
-interface Asset {
-  id: string;
-  assetType: string;
-  assetCode: string;
-  brand: string;
-  model: string;
-  serialNumber: string;
-  assetStatus: string;
-  assetCondition: string;
-  assignedDate: string;
+interface Asset extends AssetData {
   returnDate?: string;
   specifications?: string;
   remarks?: string;
@@ -319,23 +309,16 @@ const AssetDetailDialog: React.FC<AssetDetailDialogProps> = ({
 
 interface AssetCardProps {
   asset: Asset;
-  index: number;
   onClick: (asset: Asset) => void;
 }
 
-const AssetCard: React.FC<AssetCardProps> = ({ asset, index, onClick }) => {
+const AssetCard: React.FC<AssetCardProps> = ({ asset, onClick }) => {
   const AssetIcon = getAssetIcon(asset.assetType);
   const statusConfig = getAssetStatusConfig(asset.assetStatus);
-  const StatusIcon = statusConfig.icon;
   const conditionConfig = getConditionConfig(asset.assetCondition);
 
   return (
-    <motion.div
-      variants={fadeInUp}
-      custom={index}
-      whileHover={{ y: -4 }}
-      transition={{ duration: 0.3 }}
-    >
+    <div>
       <Card
         className="border-border/40 shadow-lg shadow-black/[0.03] hover:shadow-xl hover:shadow-primary/[0.06] hover:border-primary/15 hover:bg-muted/30 transition-all duration-400 group bg-muted/20 backdrop-blur-sm overflow-hidden h-full cursor-pointer"
         onClick={() => onClick(asset)}
@@ -430,7 +413,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, index, onClick }) => {
           </div>
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 };
 
@@ -479,187 +462,101 @@ export const AssetsSection: React.FC = () => {
   // ─── EMPTY STATE ────────────────────────────────────────────────────────
   if (ASSETS.length === 0) {
     return (
-      <motion.div
-        key="assets"
-        variants={tabContentVariants}
-        initial="hidden"
-        animate="visible"
-        exit="exit"
-      >
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          animate="show"
-          className="space-y-6"
-        >
-          <motion.div variants={fadeInUp}>
-            <Card className="border-dashed border-2 border-border/30 bg-muted/10 backdrop-blur-sm">
-              <CardContent className="py-20 px-6">
-                <div className="text-center max-w-sm mx-auto">
-                  {/* Animated Icon Stack */}
-                  <div className="relative w-24 h-24 mx-auto mb-6">
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.5, rotate: -12 }}
-                      animate={{ opacity: 1, scale: 1, rotate: -12 }}
-                      transition={{
-                        delay: 0.1,
-                        type: "spring",
-                        stiffness: 200,
-                      }}
-                      className="absolute inset-0 h-20 w-20 rounded-2xl bg-muted/40 border border-border/20 flex items-center justify-center top-2 left-2"
-                    >
-                      <Monitor className="h-8 w-8 text-muted-foreground/20" />
-                    </motion.div>
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.5, rotate: 6 }}
-                      animate={{ opacity: 1, scale: 1, rotate: 6 }}
-                      transition={{
-                        delay: 0.2,
-                        type: "spring",
-                        stiffness: 200,
-                      }}
-                      className="absolute inset-0 h-20 w-20 rounded-2xl bg-muted/30 border border-border/20 flex items-center justify-center top-0 left-4"
-                    >
-                      <Keyboard className="h-8 w-8 text-muted-foreground/15" />
-                    </motion.div>
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.5 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{
-                        delay: 0.3,
-                        type: "spring",
-                        stiffness: 200,
-                      }}
-                      className="absolute h-20 w-20 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-center top-1 left-1 shadow-lg shadow-primary/5"
-                    >
-                      <Laptop className="h-9 w-9 text-primary/30" />
-                    </motion.div>
-                  </div>
-
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                  >
-                    <h3 className="text-lg font-bold mb-2">
-                      No Assets Assigned
-                    </h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed mb-1">
-                      You don't have any assets assigned to you yet.
-                    </p>
-                    <p className="text-xs text-muted-foreground/60">
-                      Assets like laptops, monitors, and other equipment will
-                      appear here once they are assigned to you by your IT or
-                      Admin team.
-                    </p>
-                  </motion.div>
-
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5 }}
-                    className="mt-6 p-4 rounded-2xl bg-muted/20 border border-border/20"
-                  >
-                    <div className="flex items-center gap-3 justify-center">
-                      <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <Info className="h-4 w-4 text-primary/60" />
-                      </div>
-                      <p className="text-xs text-muted-foreground text-left">
-                        If you believe an asset should be assigned to you,
-                        please contact the reception or raise a complaint regarding the same.
-                      </p>
-                    </div>
-                  </motion.div>
+      <div className="space-y-6">
+        <Card className="border-dashed border-2 border-border/30 bg-muted/10 backdrop-blur-sm">
+          <CardContent className="py-20 px-6">
+            <div className="text-center max-w-sm mx-auto">
+              {/* Icon Stack */}
+              <div className="relative w-24 h-24 mx-auto mb-6">
+                <div className="absolute inset-0 h-20 w-20 rounded-2xl bg-muted/40 border border-border/20 flex items-center justify-center top-2 left-2">
+                  <Monitor className="h-8 w-8 text-muted-foreground/20" />
                 </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </motion.div>
-      </motion.div>
+                <div className="absolute inset-0 h-20 w-20 rounded-2xl bg-muted/30 border border-border/20 flex items-center justify-center top-0 left-4">
+                  <Keyboard className="h-8 w-8 text-muted-foreground/15" />
+                </div>
+                <div className="absolute h-20 w-20 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-center top-1 left-1 shadow-lg shadow-primary/5">
+                  <Laptop className="h-9 w-9 text-primary/30" />
+                </div>
+              </div>
+
+              <h3 className="text-lg font-bold mb-2">
+                No Assets Assigned
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-1">
+                You don't have any assets assigned to you yet.
+              </p>
+              <p className="text-xs text-muted-foreground/60">
+                Assets like laptops, monitors, and other equipment will
+                appear here once they are assigned to you by your IT or
+                Admin team.
+              </p>
+
+              <div className="mt-6 p-4 rounded-2xl bg-muted/20 border border-border/20">
+                <div className="flex items-center gap-3 justify-center">
+                  <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Info className="h-4 w-4 text-primary/60" />
+                  </div>
+                  <p className="text-xs text-muted-foreground text-left">
+                    If you believe an asset should be assigned to you,
+                    please contact the reception or raise a complaint regarding the same.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   // ─── MAIN RENDER ────────────────────────────────────────────────────────
   return (
-    <motion.div
-      key="assets"
-      variants={tabContentVariants}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
-    >
-      <motion.div
-        variants={staggerContainer}
-        initial="hidden"
-        animate="show"
-        className="space-y-6"
-      >
-        {/* ── Summary Banner ─────────────────────────────────────────── */}
-        <motion.div variants={fadeInUp}>
-          <Card className="border-border/40 shadow-lg shadow-black/[0.02] bg-gradient-to-r from-primary/[0.03] via-background to-primary/[0.02] backdrop-blur-sm overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center shadow-inner">
-                    <Package className="h-7 w-7 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold mb-0.5">
-                      Your Assets
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      Equipment and devices assigned to you
-                    </p>
-                  </div>
+    <div className="space-y-6">
+      {/* ── Summary Banner ─────────────────────────────────────────── */}
+      <div>
+        <Card className="border-border/40 shadow-lg shadow-black/[0.02] bg-gradient-to-r from-primary/[0.03] via-background to-primary/[0.02] backdrop-blur-sm overflow-hidden">
+          <CardContent className="p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center shadow-inner">
+                  <Package className="h-7 w-7 text-primary" />
                 </div>
-                <div className="flex items-center gap-6">
-                  <div className="text-center">
-                    <motion.p
-                      className="text-3xl font-black tracking-tight text-primary"
-                      initial={{ opacity: 0, scale: 0.5 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{
-                        delay: 0.3,
-                        type: "spring",
-                        stiffness: 200,
-                      }}
-                    >
-                      {totalCount}
-                    </motion.p>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
-                      Total
-                    </p>
-                  </div>
-                  <div className="h-10 w-px bg-border/30" />
-                  <div className="text-center">
-                    <motion.p
-                      className="text-3xl font-black tracking-tight text-emerald-600"
-                      initial={{ opacity: 0, scale: 0.5 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{
-                        delay: 0.4,
-                        type: "spring",
-                        stiffness: 200,
-                      }}
-                    >
-                      {activeCount}
-                    </motion.p>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
-                      Active
-                    </p>
-                  </div>
+                <div>
+                  <h3 className="text-lg font-bold mb-0.5">
+                    Your Assets
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Equipment and devices assigned to you
+                  </p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+              <div className="flex items-center gap-6">
+                <div className="text-center">
+                  <p className="text-3xl font-black tracking-tight text-primary">
+                    {totalCount}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+                    Total
+                  </p>
+                </div>
+                <div className="h-10 w-px bg-border/30" />
+                <div className="text-center">
+                  <p className="text-3xl font-black tracking-tight text-emerald-600">
+                    {activeCount}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+                    Active
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-        {/* ── Search + Filters ───────────────────────────────────────── */}
-        {ASSETS.length > 3 && (
-          <motion.div
-            variants={fadeInUp}
-            className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-          >
+      {/* ── Search + Filters ───────────────────────────────────────── */}
+      {ASSETS.length > 3 && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex flex-wrap gap-2">
               {[
                 { label: "All", value: "all" },
@@ -699,65 +596,51 @@ export const AssetsSection: React.FC = () => {
                 className="h-9 pl-9 rounded-xl border-border/40 bg-muted/20 focus:bg-background text-sm"
               />
             </div>
-          </motion.div>
-        )}
+        </div>
+      )}
 
-        {/* ── Asset Grid ─────────────────────────────────────────────── */}
-        <AnimatePresence mode="wait">
-          {filtered.length > 0 ? (
-            <motion.div
-              key="asset-grid"
-              variants={staggerContainer}
-              initial="hidden"
-              animate="show"
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-            >
-              {filtered.map((asset, index) => (
-                <AssetCard
-                  key={asset.id}
-                  asset={asset}
-                  index={index}
-                  onClick={handleAssetClick}
-                />
-              ))}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="no-results"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-            >
-              <Card className="border-dashed border-2 border-border/30 bg-muted/10">
-                <CardContent className="p-12 text-center">
-                  <div className="h-14 w-14 rounded-2xl bg-muted/30 flex items-center justify-center mx-auto mb-4">
-                    <Search className="h-7 w-7 text-muted-foreground/30" />
-                  </div>
-                  <h3 className="text-sm font-bold mb-1">No assets found</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Try adjusting your search or filter criteria
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-4 rounded-xl text-xs font-semibold"
-                    onClick={() => {
-                      setSearchQuery("");
-                      setActiveFilter("all");
-                    }}
-                  >
-                    Clear filters
-                  </Button>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* ── Asset Grid ─────────────────────────────────────────────── */}
+      {filtered.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((asset) => (
+            <AssetCard
+              key={asset.id}
+              asset={asset}
+              onClick={handleAssetClick}
+            />
+          ))}
+        </div>
+      ) : (
+        <div>
+          <Card className="border-dashed border-2 border-border/30 bg-muted/10">
+            <CardContent className="p-12 text-center">
+              <div className="h-14 w-14 rounded-2xl bg-muted/30 flex items-center justify-center mx-auto mb-4">
+                <Search className="h-7 w-7 text-muted-foreground/30" />
+              </div>
+              <h3 className="text-sm font-bold mb-1">No assets found</h3>
+              <p className="text-xs text-muted-foreground">
+                Try adjusting your search or filter criteria
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4 rounded-xl text-xs font-semibold"
+                onClick={() => {
+                  setSearchQuery("");
+                  setActiveFilter("all");
+                }}
+              >
+                Clear filters
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-        {/* ── Asset Type Summary ──────────────────────────────────────── */}
-        {ASSETS.length > 1 && (
-          <motion.div variants={fadeInUp}>
-            <Card className="border-border/30 bg-muted/10 backdrop-blur-sm">
+      {/* ── Asset Type Summary ──────────────────────────────────────── */}
+      {ASSETS.length > 1 && (
+        <div>
+          <Card className="border-border/30 bg-muted/10 backdrop-blur-sm">
               <CardContent className="p-5">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
                   <BoxSelect className="h-3.5 w-3.5" />
@@ -804,9 +687,8 @@ export const AssetsSection: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
-          </motion.div>
+          </div>
         )}
-      </motion.div>
 
       {/* ── Detail Dialog ──────────────────────────────────────────── */}
       <AssetDetailDialog
@@ -814,6 +696,6 @@ export const AssetsSection: React.FC = () => {
         onOpenChange={setDetailOpen}
         asset={selectedAsset}
       />
-    </motion.div>
+    </div>
   );
 };

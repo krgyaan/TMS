@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { Link } from "react-router-dom";
 
 type LoginFormProps = React.ComponentProps<"div"> & {
     onPasswordLogin?: (credentials: { email: string; password: string }) => Promise<void> | void;
@@ -80,9 +81,9 @@ export function LoginForm({ className, onPasswordLogin, onGoogleLogin, ...props 
                                 <div className="mb-3 grid gap-3">
                                     <div className="flex items-center">
                                         <Label htmlFor="password">Password</Label>
-                                        <a href="#" className="ml-auto text-sm underline-offset-2 hover:underline">
+                                        <Link to="/forgot-password" className="ml-auto text-sm underline-offset-2 hover:underline">
                                             Forgot your password?
-                                        </a>
+                                        </Link>
                                     </div>
                                     <div className="relative">
                                         <Input
@@ -118,6 +119,12 @@ export function LoginForm({ className, onPasswordLogin, onGoogleLogin, ...props 
                     </div>
                 </CardContent>
             </Card>
+            <div className="text-center text-sm">
+                <span className="text-muted-foreground">New employee? </span>
+                <Link to="/sign-up" className="font-medium underline-offset-4 hover:underline">
+                    Register here
+                </Link>
+            </div>
             <div className="text-muted-foreground text-center text-xs text-balance *:[a]:underline *:[a]:underline-offset-4 *:[a]:hover:text-primary">
                 By clicking continue, you agree to our <a href="#">Terms of Service</a> and
                 <a href="#"> Privacy Policy</a>.
