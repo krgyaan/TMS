@@ -143,11 +143,23 @@ const [files, setFiles] = useState<string[]>([]);
     const imprestId = imprest?.id ?? 0;
 
     const extractServerError = (err: unknown): string => {
-        const message = (err as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
-        if (Array.isArray(message)) {
-            return message.filter(Boolean).join(", ");
+        const ax = err as { response?: { status?: number; data?: { message?: string | string[] } } };
+        const status = ax?.response?.status;
+        const raw = ax?.response?.data?.message;
+        const text = Array.isArray(raw) ? raw.filter(Boolean).join(", ") : raw ?? "";
+
+        if (status === 403 && /locked|approved by accounts/i.test(text)) {
+            form.setError("dateOfExpense", { message: "This expense week is locked." });
+            return `This expense week is locked — accounts has already approved the voucher. ${text}`;
         }
-        return message || "Failed to save imprest. Please try again.";
+        if (status === 409) {
+            return `Voucher amount mismatch — please refresh the voucher view. ${text}`;
+        }
+        if (status === 400 && /cannot create an already-approved/i.test(text)) {
+            return "Use the Approve button after saving.";
+        }
+
+        return text || "Failed to save imprest. Please try again.";
     };
 
     const handleSubmit = async (data: ImprestFormValues) => {
@@ -325,7 +337,7 @@ const [files, setFiles] = useState<string[]>([]);
                                 </div>
                             </div>
 
-                            {/* Remarks — always shown (optional) */}
+                            {/* Remarks — always shown (required) */}
                             <FieldWrapper<ImprestFormValues, "remark">
                                 control={form.control}
                                 name="remark"
@@ -335,9 +347,10 @@ const [files, setFiles] = useState<string[]>([]);
                                 {field => (
                                     <textarea
                                         className="border-input placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                        placeholder="Remarks (optional)"
+                                        placeholder="Enter remark"
                                         {...field}
                                         value={field.value ?? ""}
+                                        required
                                     />
                                 )}
                             </FieldWrapper>
