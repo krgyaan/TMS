@@ -133,6 +133,9 @@ export class ImprestAdminService {
                 LEFT JOIN imprest_agg i ON i.user_id = f.user_id AND i.fy_start_year = f.fy_start_year
                 LEFT JOIN txn_agg t ON t.user_id = f.user_id AND t.fy_start_year = f.fy_start_year
                 LEFT JOIN voucher_agg v ON v.user_id = f.user_id AND v.fy_start_year = f.fy_start_year
+                WHERE EXISTS (
+                    SELECT 1 FROM employee_imprests ei WHERE ei.user_id = u.id
+                )
                 ORDER BY u.name, f.fy_start_year DESC
             `;
 

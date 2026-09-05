@@ -32,6 +32,7 @@ const ImprestVoucherList: React.FC = () => {
     const { pagination, setPagination, search, setSearch, debouncedSearch } = usePersistentTableState({
         storageKey: "imprest-vouchers",
         defaultTab: "" as const,
+        debounceDelay: 500,
     });
 
     const fyParam = searchParams.get("fy");
