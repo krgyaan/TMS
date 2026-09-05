@@ -147,6 +147,7 @@ const UserImprestsPage: React.FC = () => {
     const { pagination, setPagination, search, setSearch, debouncedSearch } = usePersistentTableState({
         storageKey: "user-imprests",
         defaultTab: "" as const,
+        debounceDelay: 500,
     });
     const { data, isLoading, error } = useImprestList(
         numericUserId,

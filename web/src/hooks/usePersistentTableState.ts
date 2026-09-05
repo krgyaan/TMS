@@ -11,6 +11,7 @@ export interface PersistentTableStateOptions<Tab extends string> {
     defaultPageSize?: number;
     defaultSortBy?: string;
     defaultSortOrder?: "asc" | "desc";
+    debounceDelay?: number;
 }
 
 const RELEVANT_PARAMS = ['tab', 'subtab', 'q', 'page', 'size', 'sortBy', 'sortOrder'];
@@ -22,6 +23,7 @@ export function usePersistentTableState<Tab extends string>({
     defaultPageSize = 50,
     defaultSortBy,
     defaultSortOrder,
+    debounceDelay = 300,
 }: PersistentTableStateOptions<Tab>) {
     const [searchParams, setSearchParams] = useSearchParams();
 
@@ -58,7 +60,7 @@ export function usePersistentTableState<Tab extends string>({
 
     const [activeTab, setActiveTabState] = useState<Tab>(initialTab);
     const [search, setSearch] = useState<string>(initialSearch);
-    const debouncedSearch = useDebouncedSearch(search, 300);
+    const debouncedSearch = useDebouncedSearch(search, debounceDelay);
     const [pagination, setPagination] = useState({ pageIndex: initialPage, pageSize: initialPageSize });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>(
         initialSortBy ? [{ colId: initialSortBy, sort: initialSortOrder || 'asc' }] : []

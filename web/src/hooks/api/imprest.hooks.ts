@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { imprestService } from "@/services/api";
 import type { CreateImprestCreditPayload, EmployeeImprestSummary } from "@/modules/imprest/helpers/imprest-admin.types";
@@ -63,6 +63,8 @@ export const useImprestList = (userId?: number, params?: { page?: number; limit?
             }
             return imprestService.getMyDashboard(params);
         },
+
+        placeholderData: keepPreviousData,
 
         // Enable:
         // - When viewing own page (userId undefined)
@@ -213,6 +215,7 @@ export const useImprestVoucherList = (userId?: number, params?: { page?: number;
     return useQuery<ImprestVoucherListResponse>({
         queryKey: [...imprestVoucherKeys.list(userId), { params }],
         queryFn: () => imprestService.getVouchers({ userId, ...params }),
+        placeholderData: keepPreviousData,
         enabled: userId === undefined || typeof userId === "number",
     });
 };
@@ -221,6 +224,7 @@ export const useImprestVoucherView = (params: { userId: number; from: string; to
     return useQuery({
         queryKey: imprestVoucherKeys.detail(params),
         queryFn: () => imprestService.getVoucherView(params),
+        placeholderData: keepPreviousData,
         enabled: !!params.userId && !!params.from && !!params.to,
     });
 };
@@ -234,6 +238,7 @@ export const useImprestPaymentHistory = (userId?: number) => {
     return useQuery<ImprestPaymentHistoryRow[]>({
         queryKey: imprestPaymentHistoryKeys.list(userId),
         queryFn: () => imprestService.getPaymentHistory(userId),
+        placeholderData: keepPreviousData,
     });
 };
 
