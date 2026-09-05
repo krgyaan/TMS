@@ -2,9 +2,6 @@ import React, { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,17 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   Search,
   CheckCircle2,
   XCircle,
-  Eye,
   Loader2,
   AlertCircle,
   RefreshCw,
@@ -30,9 +21,7 @@ import {
   Mail,
   Phone,
   MapPin,
-  Calendar,
   Building2,
-  GraduationCap,
   Briefcase,
   CreditCard,
   Heart,
@@ -45,8 +34,9 @@ import {
   DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useProfileList, useProfile, useUpdateProfile } from "./useOnboarding";
-import type { ProfileListItem, FullProfile, UpdateProfileDto } from "../../../services/api/onboarding.service";
+import { useProfileList, useProfile, useUpdateProfile } from "@/hooks/api/useOnboarding";
+import type { ProfileListItem, UpdateProfileDto } from "../../../services/api/onboarding.service";
+import type { ProfileBankItem } from "./helpers/onboarding.type";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,7 +60,7 @@ const mapProfile = (item: ProfileListItem): ProfileSummary => ({
   name: item.name || `${item.firstName ?? ""} ${item.lastName ?? ""}`.trim() || "Unknown",
   email: item.email,
   phone: item.phone || "—",
-  submittedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
+      submittedAt: item.updatedAt || new Date().toISOString(),
   hrStatus: (item.hrStatus as ProfileSummary["hrStatus"]) || "pending",
   hrRemark: item.hrRemark || undefined,
   employeeCompleted: item.employeeCompleted ?? false,
@@ -371,7 +361,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ profileId, open, onClose }) =
                   <Separator />
                   <DetailSection icon={Building2} title="Bank Details">
                     <div className="col-span-2 space-y-3">
-                      {profile.bankDetails.map((bank: any, index: number) => (
+                      {(profile.bankDetails as ProfileBankItem[]).map((bank, index: number) => (
                         <div key={bank.id || index} className="p-3 rounded-lg border bg-muted/20 space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-semibold text-foreground">

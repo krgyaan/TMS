@@ -53,11 +53,11 @@ import { cn } from "@/lib/utils";
 import {
   useOnboardingDashboard,
   useProfile,
-  useEmployeeInduction,
   useUpdateOnboardingStatus,
   useUpdateEntryStatus,
   useUpdateSectionStatus,
-} from "./useOnboarding";
+} from "@/hooks/api/useOnboarding";
+import { useEmployeeInduction } from "@/hooks/api/useInduction";
 import { type OnboardingRequest } from "@/services/api/onboarding.service";
 import { paths } from "@/app/routes/paths";
 import { StatusBadge } from "./components/StatusBadge";

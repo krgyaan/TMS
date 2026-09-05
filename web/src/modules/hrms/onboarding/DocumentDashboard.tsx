@@ -68,7 +68,7 @@ import {
   useDocumentTrackerList,
   useEmployeeDocuments,
   useVerifyDocument,
-} from "./useOnboarding";
+} from "@/hooks/api/useOnboarding";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // ─── Types ────────────────────────────────────────────────────────────────────

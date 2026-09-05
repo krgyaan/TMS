@@ -107,6 +107,7 @@ export interface FullProfile {
   esicApplicable: boolean;
   hrCompleted: boolean;
   employeeCompleted: boolean;
+  hrRemark?: string | null;
   updatedAt: string;
   createdAt: string;
   // Lists
@@ -229,7 +230,7 @@ export const onboardingService = {
 
   // ─── Stage Specific Methods ───────────────────────────────────────────────────
 
-  getOnboardingList: async (): Promise<any> => {
+  getOnboardingList: async (): Promise<OnboardingRequest[]> => {
     const { data } = await axiosInstance.get("/hrms/onboarding/dashboard");
     return data;
   },

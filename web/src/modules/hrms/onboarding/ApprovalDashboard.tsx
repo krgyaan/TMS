@@ -6,7 +6,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
@@ -22,7 +21,6 @@ import {
   AlertCircle,
   RefreshCw,
   Mail,
-  Clock,
   Check,
   X,
   AlertTriangle,
@@ -30,14 +28,11 @@ import {
   Briefcase,
   CreditCard,
   FileText,
-  ChevronLeft,
-  ChevronRight,
   Building2,
   Calendar,
   MapPin,
   Hash,
   BookOpen,
-  Upload,
   ExternalLink,
   User,
   Phone,
@@ -52,7 +47,7 @@ import {
   useDocuments,
   useBankDetails,
   useUpdateEntryStatus,
-} from "./useOnboarding";
+} from "@/hooks/api/useOnboarding";
 
 import AvatarComponent from "./components/AvatarComponent";
 import { formatDate } from "./helpers/onboarding.type";
@@ -76,7 +71,7 @@ interface StageEntry {
   status: EntryStatus;
   hrStatus: EntryStatus;
   hrRemark?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // ─── Stage Configuration ──────────────────────────────────────────────────────
@@ -333,7 +328,7 @@ const UserRow: React.FC<UserRowProps> = ({ user, onStageClick }) => {
 // ─── Entry Card (inside modal) ────────────────────────────────────────────────
 
 interface EntryCardProps {
-  entry: any;
+  entry: StageEntry;
   stageKey: StageKey;
   index: number;
   total: number;
@@ -400,7 +395,7 @@ const EntryCard: React.FC<EntryCardProps> = ({
                 <DetailField icon={User} label="First Name" value={entry.firstName} />
                 <DetailField icon={User} label="Middle Name" value={entry.middleName} />
                 <DetailField icon={User} label="Last Name" value={entry.lastName} />
-                <DetailField icon={Calendar} label="Date of Birth" value={entry.dob ? formatDate(entry.dob) : null} />
+                <DetailField icon={Calendar} label="Date of Birth" value={entry.dob ? formatDate(String(entry.dob)) : null} />
                 <DetailField icon={User} label="Gender" value={entry.gender} />
                 <DetailField icon={User} label="Marital Status" value={entry.maritalStatus} />
                 <DetailField icon={User} label="Nationality" value={entry.nationality} />
@@ -473,17 +468,17 @@ const EntryCard: React.FC<EntryCardProps> = ({
           <div className="grid grid-cols-2 gap-x-6 gap-y-3">
             <DetailField icon={Building2} label="Company" value={entry.companyName} />
             <DetailField icon={Briefcase} label="Designation" value={entry.designation} />
-            <DetailField icon={Calendar} label="From" value={formatDate(entry.fromDate)} />
+            <DetailField icon={Calendar} label="From" value={entry.fromDate ? formatDate(String(entry.fromDate)) : null} />
             <DetailField
               icon={Calendar}
               label="To"
-              value={entry.currentlyWorking ? "Present" : formatDate(entry.toDate)}
+              value={entry.currentlyWorking ? "Present" : entry.toDate ? formatDate(String(entry.toDate)) : null}
             />
-            {entry.responsibilities && (
+            {entry.responsibilities ? (
               <div className="col-span-2">
                 <DetailField icon={BookOpen} label="Responsibilities" value={entry.responsibilities} />
               </div>
-            )}
+            ) : null}
           </div>
         );
 
@@ -505,12 +500,12 @@ const EntryCard: React.FC<EntryCardProps> = ({
             <DetailField icon={Hash} label="Document No." value={entry.docNumber} />
             {/* <DetailField icon={Calendar} label="Issue Date" value={formatDate(entry.issueDate)} />
             <DetailField icon={Calendar} label="Expiry Date" value={formatDate(entry.expiryDate)} /> */}
-            {entry.fileUrl && (
+            {entry.fileUrl ? (
               <div className="col-span-2 mt-2">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-medium text-foreground">Document Preview</p>
                   <a
-                    href={entry.fileUrl}
+                    href={String(entry.fileUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 px-2.5 py-1 rounded-md transition-colors"
@@ -520,13 +515,13 @@ const EntryCard: React.FC<EntryCardProps> = ({
                   </a>
                 </div>
                 <div className="relative w-full h-48 sm:h-64 rounded-xl border bg-muted/20 overflow-hidden flex items-center justify-center group">
-                  {entry.fileUrl.match(/\.(jpeg|jpg|gif|png|webp|svg|bmp)$/i) ? (
+                  {String(entry.fileUrl).match(/\.(jpeg|jpg|gif|png|webp|svg|bmp)$/i) ? (
                     <img
-                      src={entry.fileUrl}
+                      src={String(entry.fileUrl)}
                       alt="Document Preview"
                       className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-[1.02]"
                     />
-                  ) : entry.fileUrl.match(/\.pdf$/i) ? (
+                  ) : String(entry.fileUrl).match(/\.pdf$/i) ? (
                     <iframe
                       src={`${entry.fileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
                       className="w-full h-full bg-white"
@@ -542,7 +537,7 @@ const EntryCard: React.FC<EntryCardProps> = ({
                   <div className="absolute inset-0 ring-1 ring-inset ring-black/5 dark:ring-white/5 pointer-events-none rounded-xl" />
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         );
 
@@ -554,15 +549,15 @@ const EntryCard: React.FC<EntryCardProps> = ({
             <DetailField icon={Hash} label="Account Number" value={entry.accountNumber} />
             <DetailField icon={Hash} label="IFSC Code" value={entry.ifscCode} />
             <DetailField icon={MapPin} label="Branch" value={entry.branchName} />
-            {entry.upiId && <DetailField icon={CreditCard} label="UPI ID" value={entry.upiId} />}
-            {entry.isPrimary && (
+            {entry.upiId ? <DetailField icon={CreditCard} label="UPI ID" value={entry.upiId} /> : null}
+            {entry.isPrimary ? (
               <div className="col-span-2">
                 <span className="text-[10px] font-medium px-2 py-0.5 rounded-full
                   bg-primary/10 text-primary">
                   Primary Account
                 </span>
               </div>
-            )}
+            ) : null}
           </div>
         );
 
@@ -711,7 +706,7 @@ const EntryCard: React.FC<EntryCardProps> = ({
 const DetailField: React.FC<{
   icon: React.ElementType;
   label: string;
-  value?: string | number | null;
+  value?: unknown;
 }> = ({ icon: Icon, label, value }) => (
   <div>
     <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-0.5">
@@ -719,7 +714,11 @@ const DetailField: React.FC<{
       {label}
     </p>
     <p className="text-sm font-medium text-foreground break-words">
-      {value || <span className="text-muted-foreground/50 italic text-xs">Not provided</span>}
+      {value !== undefined && value !== null && value !== "" ? (
+        String(value)
+      ) : (
+        <span className="text-muted-foreground/50 italic text-xs">Not provided</span>
+      )}
     </p>
   </div>
 );
@@ -951,7 +950,7 @@ const ApprovalDashboard: React.FC = () => {
   const users: OnboardingUser[] = useMemo(
     () =>
       rawUsers
-        .filter((u: any) => {
+        .filter((u) => {
           // 1. Only show requests that are actively onboarding (registration approved)
           if (u.status !== "approved") return false;
 
@@ -977,7 +976,7 @@ const ApprovalDashboard: React.FC = () => {
 
           return hasStarted && !isFullyApproved;
         })
-        .map((u: any) => ({
+        .map((u) => ({
           id: u.id,
           name: u.name,
           email: u.email,

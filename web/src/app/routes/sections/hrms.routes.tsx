@@ -17,7 +17,7 @@ const CandidateDetailPage = lazy(() => import('@/modules/hrms/onboarding/Candida
 const ProfileDetailsDashboard = lazy(() => import('@/modules/hrms/onboarding/ProfileDetailsDashboard'));
 const DocumentDashboard = lazy(() => import('@/modules/hrms/onboarding/DocumentDashboard'));
 const ApprovalDashboard = lazy(() => import('@/modules/hrms/onboarding/ApprovalDashboard'));
-const InductionDashboard = lazy(() => import('@/modules/hrms/onboarding/InductionDashboard'))
+const InductionDashboard = lazy(() => import('@/modules/hrms/induction/InductionDashboard'))
 
 const TrainingDashboard = lazy(() => import('@/modules/hrms/training/TrainingDashboard'))
 const UploadVideo = lazy(() => import("@/modules/hrms/training/components/UploadVideo"))

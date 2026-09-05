@@ -127,41 +127,6 @@ export const useVerifyDocument = (onboardingId: number) => {
   });
 };
 
-// ─── Induction hooks ──────────────────────────────────────────────────────────
-
-export const useInductionTrackerList = () => {
-  return useQuery({
-    queryKey: ["onboarding", "induction-tracker"],
-    queryFn: onboardingService.getInductionTrackerList,
-  });
-};
-
-export const useEmployeeInduction = (id: number | null) => {
-  return useQuery({
-    queryKey: ["onboarding", "induction", id],
-    queryFn: () => onboardingService.getEmployeeInduction(id!),
-    enabled: !!id,
-  });
-};
-
-export const useUpdateInductionTask = (onboardingId: number) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ taskId, updates }: { taskId: number; updates: { status?: string; remarks?: string } }) =>
-      onboardingService.updateInductionTask(onboardingId, taskId, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["onboarding", "induction-tracker"] });
-      queryClient.invalidateQueries({ queryKey: ["onboarding", "induction", onboardingId] });
-      toast.success("Task updated successfully");
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || "Failed to update task");
-    },
-  });
-};
-
-
 // ─── List all onboarding users with their stage statuses ──────────────────────
 
 export const useOnboardingList = () =>
