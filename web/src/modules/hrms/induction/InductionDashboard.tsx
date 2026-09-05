@@ -32,14 +32,20 @@ import {
   AlertTriangle,
   Milestone,
   CheckCheck,
-  CalendarDays,
-  ChevronRight,
+  MoreVertical,
+  Briefcase,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { formatDate as formatDateString } from "@/hooks/useFormatedDate";
 import {
   DEFAULT_TASKS,
   computeInductionStats,
-  formatDate,
   getAvatarColor,
   getInitials,
   getInductionStatus,
@@ -54,6 +60,7 @@ import {
   useStaggeredEntrance,
 } from "@/hooks/api/useInduction";
 import { EmployeeInductionModal, CircularProgress } from "./components/EmployeeInductionModal";
+import { WorkDetailsModal } from "./components/WorkDetailsModal";
 
 // ─── CSS Keyframes (injected once) ────────────────────────────────────────────
 
@@ -223,9 +230,10 @@ const PhaseMiniBar: React.FC<{
 const EmployeeRow: React.FC<{
   employee: EmployeeInduction;
   onView: (e: EmployeeInduction) => void;
+  onWorkDetails: (e: EmployeeInduction) => void;
   index: number;
   isVisible: boolean;
-}> = ({ employee, onView, index, isVisible }) => {
+}> = ({ employee, onView, onWorkDetails, index, isVisible }) => {
   const displayTasks = employee.tasks.length > 0 ? employee.tasks : DEFAULT_TASKS;
   const stats = computeInductionStats(displayTasks);
   const status = getInductionStatus(employee);
@@ -288,7 +296,7 @@ const EmployeeRow: React.FC<{
       </div>
 
       {/* Circular Progress */}
-      <div className="flex items-center gap-3 flex-shrink-0">
+      <div className="flex items-center justify-center gap-3 flex-shrink-0 w-24">
         <CircularProgress value={stats.pct} size={42} strokeWidth={3} />
         <div className="text-right">
           <p className="text-xs font-semibold tabular-nums">{stats.completed}/{stats.total}</p>
@@ -296,31 +304,42 @@ const EmployeeRow: React.FC<{
         </div>
       </div>
 
-      {/* Required */}
-      <div className="flex-shrink-0 w-24 hidden md:block">
-        <div
-          className={cn(
-            "text-center text-[10px] font-medium px-2 py-1.5 rounded-xl border transition-colors",
-            stats.allRequiredDone
-              ? "bg-emerald-50/80 border-emerald-200/50 text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-800/30 dark:text-emerald-400"
-              : "bg-amber-50/80 border-amber-200/50 text-amber-700 dark:bg-amber-950/20 dark:border-amber-800/30 dark:text-amber-400"
-          )}
-        >
-          {stats.requiredCompleted}/{stats.requiredTotal} req
-        </div>
-      </div>
-
       {/* DOJ */}
-      <div className="hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground flex-shrink-0 w-24">
-        <CalendarDays className="h-3.5 w-3.5 flex-shrink-0" />
-        <span className="tabular-nums">{employee.dateOfJoining ? formatDate(employee.dateOfJoining) : "—"}</span>
+      <div className="hidden lg:flex items-center text-xs text-muted-foreground flex-shrink-0 w-24">
+        <span className="tabular-nums">{employee.dateOfJoining ? formatDateString(employee.dateOfJoining) : "—"}</span>
       </div>
 
-      {/* View indicator */}
-      <div className="flex items-center flex-shrink-0">
-        <div className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground/40 group-hover:text-primary group-hover:bg-primary/5 transition-all duration-200">
-          <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-        </div>
+      {/* Actions */}
+      <div
+        className="flex items-center justify-center flex-shrink-0 w-12"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              aria-label="Actions"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuItem
+              onClick={() => onView(employee)}
+              className="gap-2 text-xs cursor-pointer"
+            >
+              <ClipboardList className="h-3.5 w-3.5" />
+              Induction
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onWorkDetails(employee)}
+              className="gap-2 text-xs cursor-pointer"
+            >
+              <Briefcase className="h-3.5 w-3.5" />
+              Work Details
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
@@ -334,6 +353,8 @@ const InductionDashboard: React.FC = () => {
   const [sortBy, setSortBy] = useState<"name" | "progress" | "joined" | "pending">("pending");
   const [viewEmployee, setViewEmployee] = useState<EmployeeInduction | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
+  const [workDetailsEmployee, setWorkDetailsEmployee] = useState<EmployeeInduction | null>(null);
+  const [workDetailsOpen, setWorkDetailsOpen] = useState(false);
   const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
   const [remarkSavingTaskId, setRemarkSavingTaskId] = useState<string | null>(null);
 
@@ -561,13 +582,12 @@ const InductionDashboard: React.FC = () => {
           </div>
 
           {/* ── Column Headers ── */}
-          <div className="hidden lg:flex items-center gap-3 px-5 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
+          <div className="hidden lg:flex items-center gap-3 px-4 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
             <div className="flex-1">Employee</div>
             <div className="w-44">Phase Progress</div>
             <div className="w-24 text-center">Progress</div>
-            <div className="w-24 text-center">Required</div>
             <div className="w-24">Joining</div>
-            <div className="w-8" />
+            <div className="w-12 text-center">Action</div>
           </div>
 
           {/* ── List ── */}
@@ -594,6 +614,10 @@ const InductionDashboard: React.FC = () => {
                       setViewEmployee(e);
                       setViewOpen(true);
                     }}
+                    onWorkDetails={(e) => {
+                      setWorkDetailsEmployee(e);
+                      setWorkDetailsOpen(true);
+                    }}
                   />
                 ))}
               </div>
@@ -616,6 +640,16 @@ const InductionDashboard: React.FC = () => {
           onToggleTask={handleToggleTask}
           onSaveRemark={handleSaveRemark}
           isRemarkLoading={remarkSavingTaskId !== null}
+        />
+
+        {/* ── Work Details Modal ── */}
+        <WorkDetailsModal
+          employee={workDetailsEmployee}
+          open={workDetailsOpen}
+          onClose={() => {
+            setWorkDetailsOpen(false);
+            setWorkDetailsEmployee(null);
+          }}
         />
       </Card>
     </TooltipProvider>

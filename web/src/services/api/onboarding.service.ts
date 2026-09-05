@@ -92,6 +92,7 @@ export interface FullProfile {
   // HR
   designation: string | null;
   department: string | null;
+  departmentId: number | null;
   reportingTl: string | null;
   employeeType: string | null;
   workLocation: string | null;
