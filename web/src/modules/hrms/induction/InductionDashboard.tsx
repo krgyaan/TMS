@@ -241,12 +241,11 @@ const EmployeeRow: React.FC<{
   return (
     <div
       className={cn(
-        "group relative flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 rounded-2xl border border-border/40 bg-card/80 transition-all duration-300 cursor-pointer",
+        "group relative flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 rounded-2xl border border-border/40 bg-card/80 transition-all duration-300",
         "hover:bg-muted/40 hover:border-border/80 hover:shadow-md hover:shadow-black/[0.03] dark:hover:shadow-white/[0.02]",
         isVisible ? "ind-fade-up" : "opacity-0"
       )}
       style={{ animationDelay: `${index * 40}ms` }}
-      onClick={() => onView(employee)}
     >
       {/* Avatar + Info */}
       <div className="flex items-center gap-3.5 flex-1 min-w-0">
