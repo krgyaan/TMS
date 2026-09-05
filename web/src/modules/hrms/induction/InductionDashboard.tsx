@@ -6,11 +6,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  TooltipProvider,
-} from "@/components/ui/tooltip";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -25,13 +26,22 @@ import {
   CheckCircle2,
   CircleDashed,
   ArrowUpDown,
+  ListChecks,
   ClipboardList,
   Activity,
+  AlertTriangle,
+  Milestone,
+  CheckCheck,
+  CalendarDays,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DEFAULT_TASKS,
   computeInductionStats,
+  formatDate,
+  getAvatarColor,
+  getInitials,
   getInductionStatus,
   mapApiEmployee,
   mapApiTask,
@@ -43,12 +53,280 @@ import {
   useUpdateInductionTask,
   useStaggeredEntrance,
 } from "@/hooks/api/useInduction";
-import { StyleInjector } from "./components/ui-bits";
-import { EmployeeRow } from "./components/EmployeeRow";
-import { EmployeeInductionModal } from "./components/EmployeeInductionModal";
-import { EmptyState, ErrorState } from "./components/state-views";
-import { Legend } from "./components/Legend";
-import { EmployeeRowSkeleton } from "./components/skeletons";
+import { EmployeeInductionModal, CircularProgress } from "./components/EmployeeInductionModal";
+
+// ─── CSS Keyframes (injected once) ────────────────────────────────────────────
+
+const StyleInjector: React.FC = () => (
+  <style>{`
+    @keyframes ind-fade-up {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes ind-fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes ind-scale-in {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes ind-slide-down {
+      from { opacity: 0; max-height: 0; }
+      to { opacity: 1; max-height: 2000px; }
+    }
+    @keyframes ind-shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    @keyframes ind-pulse-soft {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    @keyframes ind-check-pop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+    .ind-fade-up {
+      animation: ind-fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .ind-fade-in {
+      animation: ind-fade-in 0.3s ease forwards;
+    }
+    .ind-scale-in {
+      animation: ind-scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .ind-slide-down {
+      animation: ind-slide-down 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      overflow: hidden;
+    }
+    .ind-check-pop {
+      animation: ind-check-pop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .ind-progress-bar {
+      transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .ind-glass {
+      backdrop-filter: blur(12px) saturate(1.5);
+      -webkit-backdrop-filter: blur(12px) saturate(1.5);
+    }
+  `}</style>
+);
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+const EmployeeRowSkeleton: React.FC = () => (
+  <div className="flex items-center gap-3 px-5 py-4 rounded-2xl border border-border/50 bg-card/50">
+    <Skeleton className="h-10 w-10 rounded-xl flex-shrink-0" />
+    <div className="flex-1 space-y-2.5">
+      <Skeleton className="h-3.5 w-44" />
+      <Skeleton className="h-3 w-60" />
+    </div>
+    <Skeleton className="h-3 w-28 hidden lg:block" />
+    <Skeleton className="h-6 w-20 hidden md:block" />
+  </div>
+);
+
+// ─── States ───────────────────────────────────────────────────────────────────
+
+const EmptyState: React.FC<{ search: string; tab: EmployeeInductionTab }> = ({ search, tab }) => (
+  <div className="flex flex-col items-center justify-center py-20 text-center ind-fade-in">
+    <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-5">
+      <ListChecks className="h-8 w-8 text-muted-foreground/40" />
+    </div>
+    <p className="text-sm font-semibold">
+      {search ? "No matching employees" : `No ${tab === "all" ? "" : tab.replace(/_/g, " ")} inductions`}
+    </p>
+    <p className="text-xs text-muted-foreground mt-1.5 max-w-xs">
+      {search
+        ? `Try adjusting your search — "${search}"`
+        : "Approved employees will appear here for induction tracking."}
+    </p>
+  </div>
+);
+
+const ErrorState: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
+  <div className="flex flex-col items-center justify-center py-20 text-center ind-fade-in">
+    <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-5">
+      <AlertTriangle className="h-8 w-8 text-destructive/50" />
+    </div>
+    <p className="text-sm font-semibold">Failed to load induction data</p>
+    <p className="text-xs text-muted-foreground mt-1.5 mb-5">
+      There was an error fetching data from the server.
+    </p>
+    <Button variant="outline" size="sm" onClick={onRetry} className="rounded-xl">
+      Try Again
+    </Button>
+  </div>
+);
+
+// ─── Legend ───────────────────────────────────────────────────────────────────
+
+const Legend: React.FC = () => (
+  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+    <div className="flex items-center gap-1">
+      <Milestone className="h-3 w-3" />
+      <span className="text-[10px]">Before</span>
+    </div>
+    <div className="flex items-center gap-1">
+      <CheckCheck className="h-3 w-3" />
+      <span className="text-[10px]">After</span>
+    </div>
+  </div>
+);
+
+// ─── Phase Mini Progress ──────────────────────────────────────────────────────
+
+const PhaseMiniBar: React.FC<{
+  label: string;
+  completed: number;
+  total: number;
+  icon: React.ElementType;
+}> = ({ label, completed, total, icon: Icon }) => {
+  const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-2 cursor-default min-w-0">
+            <Icon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            <div className="w-16 h-1.5 rounded-full bg-muted/60 overflow-hidden flex-shrink-0">
+              <div
+                className={cn(
+                  "h-full rounded-full ind-progress-bar",
+                  pct === 100
+                    ? "bg-emerald-500"
+                    : pct > 0
+                    ? "bg-primary"
+                    : "bg-muted-foreground/15"
+                )}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <span className="text-[10px] tabular-nums text-muted-foreground w-7 text-right flex-shrink-0">
+              {pct}%
+            </span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          <p className="font-medium">{label}</p>
+          <p className="text-muted-foreground">{completed}/{total} tasks</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
+
+// ─── Employee Row ─────────────────────────────────────────────────────────────
+
+const EmployeeRow: React.FC<{
+  employee: EmployeeInduction;
+  onView: (e: EmployeeInduction) => void;
+  index: number;
+  isVisible: boolean;
+}> = ({ employee, onView, index, isVisible }) => {
+  const displayTasks = employee.tasks.length > 0 ? employee.tasks : DEFAULT_TASKS;
+  const stats = computeInductionStats(displayTasks);
+  const status = getInductionStatus(employee);
+
+  return (
+    <div
+      className={cn(
+        "group relative flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 rounded-2xl border border-border/40 bg-card/80 transition-all duration-300 cursor-pointer",
+        "hover:bg-muted/40 hover:border-border/80 hover:shadow-md hover:shadow-black/[0.03] dark:hover:shadow-white/[0.02]",
+        isVisible ? "ind-fade-up" : "opacity-0"
+      )}
+      style={{ animationDelay: `${index * 40}ms` }}
+      onClick={() => onView(employee)}
+    >
+      {/* Avatar + Info */}
+      <div className="flex items-center gap-3.5 flex-1 min-w-0">
+        <div className="relative flex-shrink-0">
+          <Avatar className="h-10 w-10 rounded-xl flex-shrink-0 ring-2 ring-background shadow-sm">
+            {employee.profilePhoto && (
+              <AvatarImage src={employee.profilePhoto} alt={`${employee.firstName} ${employee.lastName}`} className="object-cover" />
+            )}
+            <AvatarFallback
+              className={cn(
+                "rounded-xl text-xs font-bold",
+                getAvatarColor(`${employee.firstName} ${employee.lastName}`)
+              )}
+            >
+              {getInitials(employee.firstName, employee.lastName)}
+            </AvatarFallback>
+          </Avatar>
+          <div
+            className={cn(
+              "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-background transition-colors",
+              status === "completed"
+                ? "bg-emerald-500"
+                : status === "in_progress"
+                ? "bg-primary"
+                : "bg-muted-foreground/30"
+            )}
+          />
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-semibold leading-none tracking-tight">
+              {employee.firstName}{" "}
+              {employee.middleName ? `${employee.middleName} ` : ""}
+              {employee.lastName}
+            </p>
+            <span className="text-[10px] font-mono bg-muted/70 text-muted-foreground px-1.5 py-0.5 rounded-md hidden sm:inline border border-border/40">
+              {employee.employeeId}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Phase Bars */}
+      <div className="hidden lg:flex flex-col gap-2 w-44">
+        <PhaseMiniBar label="Before Joining" completed={stats.beforeCompleted} total={stats.beforeTasks} icon={Milestone} />
+        <PhaseMiniBar label="After Joining" completed={stats.afterCompleted} total={stats.afterTasks} icon={CheckCheck} />
+      </div>
+
+      {/* Circular Progress */}
+      <div className="flex items-center gap-3 flex-shrink-0">
+        <CircularProgress value={stats.pct} size={42} strokeWidth={3} />
+        <div className="text-right">
+          <p className="text-xs font-semibold tabular-nums">{stats.completed}/{stats.total}</p>
+          <p className="text-[10px] text-muted-foreground">tasks</p>
+        </div>
+      </div>
+
+      {/* Required */}
+      <div className="flex-shrink-0 w-24 hidden md:block">
+        <div
+          className={cn(
+            "text-center text-[10px] font-medium px-2 py-1.5 rounded-xl border transition-colors",
+            stats.allRequiredDone
+              ? "bg-emerald-50/80 border-emerald-200/50 text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-800/30 dark:text-emerald-400"
+              : "bg-amber-50/80 border-amber-200/50 text-amber-700 dark:bg-amber-950/20 dark:border-amber-800/30 dark:text-amber-400"
+          )}
+        >
+          {stats.requiredCompleted}/{stats.requiredTotal} req
+        </div>
+      </div>
+
+      {/* DOJ */}
+      <div className="hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground flex-shrink-0 w-24">
+        <CalendarDays className="h-3.5 w-3.5 flex-shrink-0" />
+        <span className="tabular-nums">{employee.dateOfJoining ? formatDate(employee.dateOfJoining) : "—"}</span>
+      </div>
+
+      {/* View indicator */}
+      <div className="flex items-center flex-shrink-0">
+        <div className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground/40 group-hover:text-primary group-hover:bg-primary/5 transition-all duration-200">
+          <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 const InductionDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<EmployeeInductionTab>("all");
