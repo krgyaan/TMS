@@ -7,6 +7,7 @@ const schema = z.object({
   OPENWA_API_KEY: z.string().min(1, 'OPENWA_API_KEY is required'),
   OPENWA_SESSION_ID: z.string().uuid('OPENWA_SESSION_ID must be a valid UUID'),
   OPENWA_WEBHOOK_SECRET: z.string().min(1, 'OPENWA_WEBHOOK_SECRET is required'),
+  OPENWA_DRY_RUN: z.coerce.boolean().default(false),
 });
 
 export type OpenwaConfig = z.infer<typeof schema>;
