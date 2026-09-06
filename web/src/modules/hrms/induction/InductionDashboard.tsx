@@ -168,21 +168,6 @@ const ErrorState: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
   </div>
 );
 
-// ─── Legend ───────────────────────────────────────────────────────────────────
-
-const Legend: React.FC = () => (
-  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-    <div className="flex items-center gap-1">
-      <Milestone className="h-3 w-3" />
-      <span className="text-[10px]">Before</span>
-    </div>
-    <div className="flex items-center gap-1">
-      <CheckCheck className="h-3 w-3" />
-      <span className="text-[10px]">After</span>
-    </div>
-  </div>
-);
-
 // ─── Phase Mini Progress ──────────────────────────────────────────────────────
 
 const PhaseMiniBar: React.FC<{
@@ -567,16 +552,6 @@ const InductionDashboard: React.FC = () => {
                   />
                 </div>
               </div>
-            </div>
-
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <Legend />
-              <p className="text-xs text-muted-foreground tabular-nums">
-                <span className="font-semibold text-foreground">
-                  {isLoadingTracker ? "—" : filtered.length}
-                </span>{" "}
-                of {isLoadingTracker ? "—" : employees.length} employees
-              </p>
             </div>
           </div>
 
