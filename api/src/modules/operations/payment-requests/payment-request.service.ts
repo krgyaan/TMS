@@ -56,11 +56,18 @@ export class PaymentRequestService {
 
         // WC insurance gate: block PO/VWO/Others payment requests if no active WC policy
         if (body.projectId && body.paymentAgainst && !["insurance", "imprest"].includes(body.paymentAgainst)) {
-            const hasWC = await this.insurancePolicyService.hasActiveWCInsurance(body.projectId);
-            if (!hasWC) {
-                throw new BadRequestException(
-                    "Cannot create Payment Request: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
-                );
+            const [project] = await this.db
+                .select({ insuranceRequired: projects.insuranceRequired })
+                .from(projects)
+                .where(eq(projects.id, body.projectId))
+                .limit(1);
+            if (project?.insuranceRequired) {
+                const hasWC = await this.insurancePolicyService.hasActiveWCInsurance(body.projectId);
+                if (!hasWC) {
+                    throw new BadRequestException(
+                        "Cannot create Payment Request: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
+                    );
+                }
             }
         }
 

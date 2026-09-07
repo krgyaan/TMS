@@ -34,11 +34,11 @@ export function useCreateDirectInsurance() {
     });
 }
 
-export function useHasWCInsurance(projectId: number) {
+export function useHasWCInsurance(projectId: number, insuranceRequired: boolean = true) {
     const { data: policies, isLoading } = useProjectInsurancePolicies(projectId);
     const hasWC = useMemo(
-        () => (policies ?? []).some(p => p.insuranceType === "WC" && p.status !== "Expired"),
-        [policies]
+        () => !insuranceRequired || (policies ?? []).some(p => p.insuranceType === "WC" && p.status !== "Expired"),
+        [policies, insuranceRequired]
     );
     return { hasWC, isLoading };
 }

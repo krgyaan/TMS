@@ -342,6 +342,8 @@ export class ProjectsMasterService {
                 sapPoNo: input.sapPoNo ?? existing.sapPoNo,
                 tenderId: input.tenderId !== undefined ? input.tenderId : existing.tenderId,
                 enquiryId: input.enquiryId !== undefined ? input.enquiryId : existing.enquiryId,
+                insuranceRequired: input.insuranceRequired ?? existing.insuranceRequired,
+                insuranceRequiredRemark: input.insuranceRequiredRemark !== undefined ? input.insuranceRequiredRemark : existing.insuranceRequiredRemark,
                 updatedAt: new Date(),
             })
             .where(eq(projects.id, id))

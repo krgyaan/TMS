@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Eye } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 
 import { EmployeeImprestsSection } from "./sections/EmployeeImprestsSection";
 import { InsuranceSection } from "./sections/InsuranceSection";
@@ -19,6 +20,9 @@ export default function ProjectDashboardPage() {
     const { projectId: projectIdParam } = useParams<{ projectId: string }>();
     const navigate = useNavigate();
     const projectId = projectIdParam ? Number(projectIdParam) : null;
+
+    const { data: overview } = useProjectOverview(projectId!);
+    const insuranceRequired = overview?.project?.insuranceRequired ?? true;
 
     return (
         <div className="space-y-6">
@@ -54,11 +58,11 @@ export default function ProjectDashboardPage() {
             {/* Sections — each fetches its own data in parallel */}
             <ProjectOverviewSection projectId={projectId} />
             <ProjectSummarySheetSection projectId={projectId} />
-            <PurchaseOrdersSection projectId={projectId} />
-            <VendorWorkOrdersSection projectId={projectId} />
+            <PurchaseOrdersSection projectId={projectId} insuranceRequired={insuranceRequired} />
+            <VendorWorkOrdersSection projectId={projectId} insuranceRequired={insuranceRequired} />
             <SaleInvoicesSection projectId={projectId} />
             <PurchaseInvoicesSection projectId={projectId} />
-            <PaymentRequestsSection projectId={projectId} />
+            <PaymentRequestsSection projectId={projectId} insuranceRequired={insuranceRequired} />
             <InsuranceSection projectId={projectId} />
             <EmployeeImprestsSection projectId={projectId} />
             <ProjectClosureSection projectId={projectId} />

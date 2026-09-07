@@ -48,6 +48,8 @@ export class ProjectDashboardService {
             .select({
                 projectName: projects.projectName,
                 tenderId: projects.tenderId,
+                insuranceRequired: projects.insuranceRequired,
+                insuranceRequiredRemark: projects.insuranceRequiredRemark,
             })
             .from(projects)
             .where(eq(projects.id, projectId));
@@ -115,7 +117,11 @@ export class ProjectDashboardService {
         const { expenses_done, po_raised, wo_raised } = rows?.[0] ?? {};
 
         return {
-            project: { projectName: project.projectName },
+            project: {
+                projectName: project.projectName,
+                insuranceRequired: project.insuranceRequired,
+                insuranceRequiredRemark: project.insuranceRequiredRemark,
+            },
             tender: tender ?? undefined,
             woBasicDetail: {
                 ...(basicDetail ?? {}),

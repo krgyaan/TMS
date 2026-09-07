@@ -22,15 +22,17 @@ import { useNavigate } from "react-router-dom";
 
 interface VendorWorkOrdersSectionProps {
     projectId: number | null;
+    insuranceRequired?: boolean;
 }
 
 export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = ({
     projectId,
+    insuranceRequired = true,
 }) => {
     const navigate = useNavigate();
     const [vwoGridApi, setVwoGridApi] = useState<GridApi | null>(null);
     const { data, isLoading } = useProjectVendorWorkOrders(projectId!);
-    const { hasWC } = useHasWCInsurance(projectId ?? 0);
+    const { hasWC } = useHasWCInsurance(projectId ?? 0, insuranceRequired);
 
     const vendorWorkOrders = data ?? [];
 

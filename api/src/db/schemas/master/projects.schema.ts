@@ -1,3 +1,4 @@
+import { boolean } from "drizzle-orm/pg-core";
 import { jsonb } from "drizzle-orm/pg-core";
 import { pgTable, bigserial, bigint, varchar, timestamp, date, integer, index } from "drizzle-orm/pg-core";
 
@@ -20,6 +21,8 @@ export const projects = pgTable("projects", {
     sapPoNo: varchar("sap_po_no", { length: 255 }),
     tenderId: integer("tender_id"),
     enquiryId: bigint("enquiry_id", { mode: "number" }),
+    insuranceRequired: boolean("insurance_required").notNull().default(true),
+    insuranceRequiredRemark: varchar("insurance_required_remark", { length: 500 }),
     createdAt: timestamp("created_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }),
   },

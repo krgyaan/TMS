@@ -30,6 +30,8 @@ export const ProjectBaseSchema = z.object({
 
     tenderId: z.number().int().nullable().optional(),
     enquiryId: z.number().int().nullable().optional(),
+    insuranceRequired: z.boolean().optional(),
+    insuranceRequiredRemark: z.string().max(500).nullable().optional(),
 });
 
 export const CreateProjectSchema = ProjectBaseSchema;

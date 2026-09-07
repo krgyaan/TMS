@@ -11,6 +11,7 @@ import { ClientDirectorySyncService } from "@/modules/shared/client-directory/cl
 import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
 
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
+import { projects } from "@/db/schemas/master/projects.schema";
 import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-items.schema";
 import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
 import { paymentRequests } from "@/db/schemas/operations";
@@ -61,11 +62,18 @@ export class VendorWorkOrderService {
 
     async create(body: any, userId: number) {
         if (body.projectId) {
-            const hasWC = await this.insuranceService.hasActiveWCInsurance(body.projectId);
-            if (!hasWC) {
-                throw new BadRequestException(
-                    "Cannot create Vendor Work Order: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
-                );
+            const [project] = await this.db
+                .select({ insuranceRequired: projects.insuranceRequired })
+                .from(projects)
+                .where(eq(projects.id, body.projectId))
+                .limit(1);
+            if (project?.insuranceRequired) {
+                const hasWC = await this.insuranceService.hasActiveWCInsurance(body.projectId);
+                if (!hasWC) {
+                    throw new BadRequestException(
+                        "Cannot create Vendor Work Order: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
+                    );
+                }
             }
         }
 

@@ -22,15 +22,17 @@ import { OrderProgressCell } from "@/components/OrderProgressCell";
 
 interface PurchaseOrdersSectionProps {
     projectId: number | null;
+    insuranceRequired?: boolean;
 }
 
 export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
     projectId,
+    insuranceRequired = true,
 }) => {
     const navigate = useNavigate();
     const [poGridApi, setPoGridApi] = useState<GridApi | null>(null);
     const { data, isLoading } = useProjectPurchaseOrders(projectId!);
-    const { hasWC } = useHasWCInsurance(projectId ?? 0);
+    const { hasWC } = useHasWCInsurance(projectId ?? 0, insuranceRequired);
 
     const purchaseOrders = data?.purchaseOrders ?? [];
 
