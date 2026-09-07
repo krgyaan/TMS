@@ -12,13 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
-// import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance"; // WC_POLICY_LOCK: disabled
+import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance";
 import { useCreatePoParty, useCreatePurchaseOrder, useNextPONumber, usePoParties } from "@/hooks/api/usePurchaseOrders";
 import { useCreatePurchaseInvoice } from "@/hooks/api/usePurchaseInvoices";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { useAuth } from "@/contexts/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Building2, Calendar, Eye, FileText, Hash, Mail, MapPin, Phone, UserCheck, UserPlus } from "lucide-react";
+import { AlertCircle, ArrowLeft, Building2, Calendar, Eye, FileText, Hash, Mail, MapPin, Phone, ShieldCheck, UserCheck, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
@@ -106,7 +106,7 @@ export default function CreatePurchaseOrderPage() {
   const { teamId } = useAuth();
 
   const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
-  // const { hasWC, isLoading: isWCLoading } = { hasWC: true, isLoading: false }; // WC_POLICY_LOCK: disabled
+  const { hasWC, isLoading: isWCLoading } = useHasWCInsurance(projectId);
   const { data: partiesData } = usePoParties();
   const createPOMutation = useCreatePurchaseOrder();
   const createPartyMutation = useCreatePoParty();
@@ -272,7 +272,6 @@ export default function CreatePurchaseOrderPage() {
     );
   }
 
-  {/* WC_POLICY_LOCK: start — full-page WC block disabled
   if (!isWCLoading && !hasWC) {
     return (
       <div className="container mx-auto py-6 max-w-6xl">
@@ -309,7 +308,6 @@ export default function CreatePurchaseOrderPage() {
       </div>
     );
   }
-  WC_POLICY_LOCK: end */}
 
   return (
     <Card>
