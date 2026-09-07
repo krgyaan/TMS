@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pymupdf
+pytesseract
+pillow
+anthropic
+requests
+httpx
+paddlepaddle>=2.6.0
+paddleocr>=2.8.0
+pyyaml
+rapidfuzz
+python-dotenv
