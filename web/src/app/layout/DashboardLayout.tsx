@@ -48,7 +48,9 @@ export default function DashboardLayout() {
             });
             return;
         }
-        window.location.href = "/pwa/";
+        toast.info("Install the TMS Field App", {
+            description: "Use the install icon in your browser's address bar to install the app.",
+        });
     }, [canInstall, isIOS, promptInstall]);
 
     return (
