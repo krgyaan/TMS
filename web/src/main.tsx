@@ -2,6 +2,14 @@ window.addEventListener("vite:preloadError", () => {
     window.location.reload();
 });
 
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker
+            .register("/sw-root.js", { scope: "/" })
+            .catch(() => {});
+    });
+}
+
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
