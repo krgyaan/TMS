@@ -8,7 +8,7 @@ import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useProjectVendorWorkOrders } from "@/hooks/api/useVendorWorkOrders";
-// import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance"; // WC_POLICY_LOCK: disabled
+import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
@@ -30,7 +30,7 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
     const navigate = useNavigate();
     const [vwoGridApi, setVwoGridApi] = useState<GridApi | null>(null);
     const { data, isLoading } = useProjectVendorWorkOrders(projectId!);
-    // const { hasWC } = useHasWCInsurance(projectId ?? 0); // WC_POLICY_LOCK: disabled
+    const { hasWC } = useHasWCInsurance(projectId ?? 0);
 
     const vendorWorkOrders = data ?? [];
 
@@ -301,17 +301,15 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
                             Vendor Work Orders
                         </CardTitle>
                         <CardAction>
-                            {/* WC_POLICY_LOCK: start — disabled WC insurance gate */}
                             <Button
                                 size="sm"
                                 variant="default"
-                                // disabled={!hasWC}
+                                disabled={!hasWC}
                                 onClick={() => navigate(paths.operations.raiseVendorWoForm(projectId))}
                             >
                                 <Plus className="mr-1.5 h-4 w-4" />
                                 Raise Work Order
                             </Button>
-                            {/* WC_POLICY_LOCK: end */}
                         </CardAction>
                     </div>
                     <CardDescription>

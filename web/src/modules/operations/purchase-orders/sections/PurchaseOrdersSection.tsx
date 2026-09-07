@@ -15,7 +15,7 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import { useProjectPurchaseOrders } from "@/hooks/api/usePurchaseOrders";
-// import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance"; // WC_POLICY_LOCK: disabled
+import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance";
 import { Button } from "@/components/ui/button";
 import type { PurchaseOrderRow } from "../helpers/purchaseOrder.types";
 import { OrderProgressCell } from "@/components/OrderProgressCell";
@@ -30,7 +30,7 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
     const navigate = useNavigate();
     const [poGridApi, setPoGridApi] = useState<GridApi | null>(null);
     const { data, isLoading } = useProjectPurchaseOrders(projectId!);
-    // const { hasWC } = useHasWCInsurance(projectId ?? 0); // WC_POLICY_LOCK: disabled
+    const { hasWC } = useHasWCInsurance(projectId ?? 0);
 
     const purchaseOrders = data?.purchaseOrders ?? [];
 
@@ -339,17 +339,15 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
                             Purchase Orders
                         </CardTitle>
                         <CardAction>
-                            {/* WC_POLICY_LOCK: start — disabled WC insurance gate */}
                             <Button
                                 size="sm"
                                 variant="default"
-                                // disabled={!hasWC}
+                                disabled={!hasWC}
                                 onClick={() => navigate(paths.operations.raisePoForm(projectId))}
                             >
                                 <Plus className="mr-1.5 h-4 w-4" />
                                 Raise Purchase Order
                             </Button>
-                            {/* WC_POLICY_LOCK: end */}
                         </CardAction>
                     </div>
                     <CardDescription>
