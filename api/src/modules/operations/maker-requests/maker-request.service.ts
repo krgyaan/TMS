@@ -93,6 +93,7 @@ export class MakerRequestService {
           partyName: mr.partyName ?? null,
           portalLink: mr.portalLink ?? null,
           requestedBy: userId,
+          category: mr.paymentAgainst ?? '',
         }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
 
         return mr;
@@ -151,6 +152,7 @@ export class MakerRequestService {
             portalLink: updated.portalLink ?? null,
             utrNumber: updated.utrNumber ?? null,
             requestedBy: existing.requestedBy ?? 0,
+            category: existing.paymentAgainst ?? '',
           }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
         }
 
@@ -161,6 +163,7 @@ export class MakerRequestService {
             portalLink: updated.portalLink ?? null,
             rejectionReason: body.rejectionReason ?? null,
             requestedBy: existing.requestedBy ?? 0,
+            category: existing.paymentAgainst ?? '',
           }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
         }
 
@@ -170,6 +173,7 @@ export class MakerRequestService {
             partyName: updated.partyName ?? null,
             portalLink: updated.portalLink ?? null,
             requestedBy: existing.requestedBy ?? 0,
+            category: existing.paymentAgainst ?? '',
           }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
         }
 

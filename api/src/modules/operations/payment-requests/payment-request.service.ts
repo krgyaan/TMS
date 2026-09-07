@@ -190,6 +190,7 @@ export class PaymentRequestService {
           partyName: pr.partyName ?? null,
           portalLink: pr.portalLink ?? null,
           requestedBy: userId,
+          category: pr.paymentAgainst ?? '',
         }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
 
         return pr;
@@ -292,6 +293,7 @@ export class PaymentRequestService {
                 portalLink: updated.portalLink ?? null,
                 utrNumber: updated.utrNumber ?? null,
                 requestedBy: existing.requestedBy ?? 0,
+                category: existing.paymentAgainst ?? '',
               }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
             }
 
@@ -302,6 +304,7 @@ export class PaymentRequestService {
                 portalLink: updated.portalLink ?? null,
                 rejectionReason: body.rejectionReason ?? null,
                 requestedBy: existing.requestedBy ?? 0,
+                category: existing.paymentAgainst ?? '',
               }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
             }
 
@@ -311,6 +314,7 @@ export class PaymentRequestService {
                 partyName: updated.partyName ?? null,
                 portalLink: updated.portalLink ?? null,
                 requestedBy: existing.requestedBy ?? 0,
+                category: existing.paymentAgainst ?? '',
               }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
             }
 
