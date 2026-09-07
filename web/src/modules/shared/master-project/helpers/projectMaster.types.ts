@@ -60,6 +60,8 @@ export interface CreateProjectMasterDto {
 
 export interface UpdateProjectMasterDto extends Partial<CreateProjectMasterDto> {
     id: number;
+    insuranceRequired?: boolean | null;
+    insuranceRequiredRemark?: string | null;
 }
 
 export interface ProjectMasterListParams {

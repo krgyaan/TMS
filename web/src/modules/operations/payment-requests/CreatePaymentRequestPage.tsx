@@ -50,7 +50,7 @@ export default function CreatePaymentRequestPage() {
     const vwoIdParam = searchParams.get("vwoId");
 
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
-    const { hasWC, isLoading: isWCLoading } = useHasWCInsurance(projectId);
+    const { hasWC, isLoading: isWCLoading } = useHasWCInsurance(projectId, overview?.project?.insuranceRequired ?? true);
     const projectName = overview?.project?.projectName;
     const { data: nextPRNumber, isLoading: isLoadingPRNumber } = useNextPRNumber(projectName);
 

@@ -206,6 +206,8 @@ export class ProjectsMasterService {
                     sapPoNo: projects.sapPoNo,
                     tenderId: projects.tenderId,
                     enquiryId: projects.enquiryId,
+                    insuranceRequired: projects.insuranceRequired,
+                    insuranceRequiredRemark: projects.insuranceRequiredRemark,
                     organizationName: organizations.name,
                     itemName: items.name,
                     locationName: locations.name,
@@ -256,6 +258,8 @@ export class ProjectsMasterService {
             sapPoNo: row.sapPoNo,
             tenderId: row.tenderId,
             enquiryId: row.enquiryId,
+            insuranceRequired: row.insuranceRequired,
+            insuranceRequiredRemark: row.insuranceRequiredRemark,
             organizationName: row.organizationName,
             itemName: row.itemName,
             locationName: row.locationName,
@@ -342,6 +346,8 @@ export class ProjectsMasterService {
                 sapPoNo: input.sapPoNo ?? existing.sapPoNo,
                 tenderId: input.tenderId !== undefined ? input.tenderId : existing.tenderId,
                 enquiryId: input.enquiryId !== undefined ? input.enquiryId : existing.enquiryId,
+                insuranceRequired: input.insuranceRequired ?? existing.insuranceRequired,
+                insuranceRequiredRemark: input.insuranceRequiredRemark !== undefined ? input.insuranceRequiredRemark : existing.insuranceRequiredRemark,
                 updatedAt: new Date(),
             })
             .where(eq(projects.id, id))

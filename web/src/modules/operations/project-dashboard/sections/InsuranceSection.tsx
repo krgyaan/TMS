@@ -4,17 +4,25 @@ import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import DataTable from "@/components/ui/data-table";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { useProjectInsurancePolicies } from "@/hooks/api/useProjectInsurance";
+import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
+import { useAuth } from "@/contexts/AuthContext";
+import { projectMasterService } from "@/services/api/projects-master.service";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { formatDate } from "@/hooks/useFormatedDate";
 import type { InsurancePolicyRow } from "@/modules/insurance/helpers/insurance.types";
 import type { ColDef } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { Eye, Plus, RefreshCcw } from "lucide-react";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
     CATEGORY_NAMES,
     PROJECT_INSURANCE_CATEGORIES,
@@ -48,10 +56,62 @@ function getRowStatus(row: InsuranceChecklistRow): string {
 
 export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ projectId }) => {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
+    const { user } = useAuth();
+    const canToggle = user?.role?.name === "Admin" || user?.role?.name === "Super User";
 
     const { data, isLoading } = useProjectInsurancePolicies(projectId ?? 0);
+    const { data: overview } = useProjectOverview(projectId!);
+    const insuranceRequired = overview?.project?.insuranceRequired ?? true;
+    const insuranceRequiredRemark = overview?.project?.insuranceRequiredRemark ?? "";
+
+    const [remarkOpen, setRemarkOpen] = useState(false);
+    const [pendingValue, setPendingValue] = useState<boolean | null>(null);
+    const [remark, setRemark] = useState(insuranceRequiredRemark);
+    const [saving, setSaving] = useState(false);
 
     const policies = useMemo(() => data ?? [], [data]);
+
+    const handleToggle = async (checked: boolean) => {
+        if (!projectId) return;
+        if (!checked) {
+            setPendingValue(false);
+            setRemarkOpen(true);
+            return;
+        }
+        setSaving(true);
+        try {
+            await projectMasterService.update(projectId, {
+                insuranceRequired: true,
+                insuranceRequiredRemark: null,
+            });
+            await queryClient.invalidateQueries({ queryKey: ["projectOverview", projectId] });
+            toast.success("Insurance requirement enabled");
+        } catch {
+            toast.error("Failed to update insurance requirement");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleRemarkConfirm = async () => {
+        if (!projectId || pendingValue === null) return;
+        setSaving(true);
+        try {
+            await projectMasterService.update(projectId, {
+                insuranceRequired: false,
+                insuranceRequiredRemark: remark || null,
+            });
+            await queryClient.invalidateQueries({ queryKey: ["projectOverview", projectId] });
+            setRemarkOpen(false);
+            setPendingValue(null);
+            toast.success("Insurance requirement disabled");
+        } catch {
+            toast.error("Failed to update insurance requirement");
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const checklistRows = useMemo<InsuranceChecklistRow[]>(() =>
         CATEGORY_NAMES.map(categoryName => ({
@@ -238,7 +298,19 @@ export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ projectId })
                             {coveredCount} of {TOTAL_CATEGORIES} insurance types covered
                         </CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
+                        {canToggle && (
+                            <div className="flex items-center gap-2 border rounded-md px-3 py-1.5">
+                                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                                    WC Policy Required
+                                </span>
+                                <Switch
+                                    checked={insuranceRequired}
+                                    onCheckedChange={handleToggle}
+                                    disabled={saving}
+                                />
+                            </div>
+                        )}
                         <Badge variant={coveredCount === TOTAL_CATEGORIES ? "success" : "secondary"}>
                             {coveredCount}/{TOTAL_CATEGORIES}
                         </Badge>
@@ -260,6 +332,33 @@ export const InsuranceSection: React.FC<InsuranceSectionProps> = ({ projectId })
                     }}
                 />
             </CardContent>
+
+            <Dialog open={remarkOpen} onOpenChange={(open) => {
+                if (!open) { setRemarkOpen(false); setPendingValue(null); setRemark(insuranceRequiredRemark); }
+            }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Disable WC Policy Requirement</DialogTitle>
+                        <DialogDescription>
+                            Disabling this will allow PO, VWO, and payment requests without an active WC insurance policy. Please provide a remark.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Input
+                        placeholder="Reason for disabling WC policy requirement (optional)"
+                        value={remark}
+                        onChange={(e) => setRemark(e.target.value)}
+                        maxLength={500}
+                    />
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => { setRemarkOpen(false); setPendingValue(null); setRemark(insuranceRequiredRemark); }}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleRemarkConfirm} disabled={saving}>
+                            {saving ? "Saving..." : "Confirm"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 };

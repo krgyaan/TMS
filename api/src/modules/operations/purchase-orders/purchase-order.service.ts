@@ -9,6 +9,7 @@ import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
 import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
 import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
 import { users } from "@/db/schemas";
+import { projects } from "@/db/schemas/master/projects.schema";
 import { paymentRequests, purchaseInvoices, saleInvoiceItems, saleInvoices } from "@/db/schemas/operations";
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
 import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
@@ -264,11 +265,18 @@ export class PurchaseOrderService {
 
     async createPurchaseOrder(body: any, userId: number) {
         if (body.projectId) {
-            const hasWC = await this.insuranceService.hasActiveWCInsurance(body.projectId);
-            if (!hasWC) {
-                throw new BadRequestException(
-                    "Cannot create Purchase Order: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
-                );
+            const [project] = await this.db
+                .select({ insuranceRequired: projects.insuranceRequired })
+                .from(projects)
+                .where(eq(projects.id, body.projectId))
+                .limit(1);
+            if (project?.insuranceRequired) {
+                const hasWC = await this.insuranceService.hasActiveWCInsurance(body.projectId);
+                if (!hasWC) {
+                    throw new BadRequestException(
+                        "Cannot create Purchase Order: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
+                    );
+                }
             }
         }
 

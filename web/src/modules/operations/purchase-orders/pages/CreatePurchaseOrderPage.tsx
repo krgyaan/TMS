@@ -106,7 +106,7 @@ export default function CreatePurchaseOrderPage() {
   const { teamId } = useAuth();
 
   const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
-  const { hasWC, isLoading: isWCLoading } = useHasWCInsurance(projectId);
+  const { hasWC, isLoading: isWCLoading } = useHasWCInsurance(projectId, overview?.project?.insuranceRequired ?? true);
   const { data: partiesData } = usePoParties();
   const createPOMutation = useCreatePurchaseOrder();
   const createPartyMutation = useCreatePoParty();
