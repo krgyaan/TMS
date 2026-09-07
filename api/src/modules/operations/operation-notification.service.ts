@@ -56,7 +56,7 @@ export class OperationNotificationService {
   ]);
 
   private readonly USER_RESTRICTED_CATEGORIES: Record<string, number[]> = {
-    salary: [7, 21, 42, 26],
+    salary: [7, 21, 26],
     related_party: [7, 21, 26],
     investment: [7, 21, 26],
   };
