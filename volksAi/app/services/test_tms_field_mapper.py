@@ -6,10 +6,7 @@ into TMS DTO-compliant output matching TMS Zod schemas.
 
 import pytest
 
-try:
-    from app.services.tms_field_mapper import map_to_tms_dto
-except ImportError:
-    from backend.app.services.tms_field_mapper import map_to_tms_dto
+from app.services.tms_field_mapper import map_to_tms_dto
 
 
 def test_map_to_tms_dto_clean_full_value():
@@ -211,6 +208,8 @@ def test_map_to_tms_dto_missing_na_fields():
     assert dto["commercialEvaluation"] is None
     assert dto["reverseAuctionApplicable"] == "NO"
     assert dto["mafRequired"] == "NO"
+    assert map_to_tms_dto({"maf_required_display": "NA"})["mafRequired"] is None
+    assert map_to_tms_dto({})["mafRequired"] is None
     assert dto["deliveryTimeSupply"] is None
     assert dto["paymentTermsSupply"] is None
     assert dto["paymentTermsInstallation"] is None
@@ -256,8 +255,16 @@ def test_map_to_tms_dto_currency_with_commas_and_multipliers():
     assert dto["orderValue1"] == 6100000.0  # 61.00 * 100,000
     assert dto["orderValue2"] == 12500000.0 # 1.25 * 10,000,000
     assert dto["avgAnnualTurnoverValue"] == 3200000.0 # 32.00 * 100,000
+    # Strict TE review policy: missing type field is NOT auto-inferred to AMOUNT
+    assert dto["avgAnnualTurnoverType"] is None
     assert dto["workingCapitalValue"] == 1500.25
     assert dto["netWorthValue"] == 0.0
+
+    # Ensure ₹0.00 / 0.0 for tender_value_display evaluates strictly to None
+    dto_zero_tv = map_to_tms_dto({"tender_value_display": "₹0.00"})
+    assert dto_zero_tv["tenderValue"] is None
+    dto_zero_num = map_to_tms_dto({"tender_value_display": "0.00"})
+    assert dto_zero_num["tenderValue"] is None
 
 
 def test_map_to_tms_dto_percentage_strings():

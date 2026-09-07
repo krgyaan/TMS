@@ -230,33 +230,38 @@ def _map_maf_required(val: Any) -> Optional[str]:
     Maps:
     'Yes - Project Specific' -> 'YES_PROJECT_SPECIFIC'
     'Yes' -> 'YES_GENERAL'
-    'No'/'NA' -> 'NO'
+    'No' -> 'NO'
+    NA/None/empty -> None (missing)
     """
     if _is_empty(val):
-        return "NO"
+        return None
     s = str(val).strip().upper()
+    if s in ("NA", "NOT FOUND", "NONE"):
+        return None
     if "PROJECT" in s and "YES" in s:
         return "YES_PROJECT_SPECIFIC"
     if "YES" in s:
         return "YES_GENERAL"
-    return "NO"
+    if "NO" in s or "FALSE" in s:
+        return "NO"
+    return None
 
 
-def _map_turnover_type(val: Any, val_amount: Optional[float] = None) -> Optional[str]:
+def _map_turnover_type(val: Any) -> Optional[str]:
     """
     Maps:
     'Not Applicable' / 'Exempt' -> 'NOT_APPLICABLE'
     'Positive' -> 'POSITIVE'
     numeric / 'Amount' -> 'AMOUNT'
+    
+    Strict Non-Destructive Design: If the type string is empty/missing, returns
+    None (null) without auto-inferring 'AMOUNT', preserving reviewer transparency
+    so the Tender Executive (TE) can explicitly confirm the requirement during review.
     """
     if val is None:
-        if val_amount is not None and val_amount > 0:
-            return "AMOUNT"
         return None
     s = str(val).strip().upper()
     if not s or s in ("NOT FOUND", "NIL", "-", "--") or "MISSING" in s or "⚠️" in s:
-        if val_amount is not None and val_amount > 0:
-            return "AMOUNT"
         return None
     if "EXEMPT" in s or "NOT APPLICABLE" in s or s in ("NA", "N/A"):
         return "NOT_APPLICABLE"
@@ -427,7 +432,11 @@ def map_to_tms_dto(raw_infosheet_data: Dict[str, Any]) -> Dict[str, Any]:
 
     # Turnover values
     turnover_val = _parse_float(raw.get("avg_annual_turnover_value_display"))
-    turnover_type = _map_turnover_type(raw.get("avg_annual_turnover_type_display"), turnover_val)
+    turnover_type = _map_turnover_type(raw.get("avg_annual_turnover_type_display"))
+
+    # Tender value: a tender worth <= 0 is invalid/non-existent and must map to None
+    raw_tender_val = _parse_float(raw.get("tender_value_display"))
+    tender_value = raw_tender_val if (raw_tender_val is not None and raw_tender_val > 0) else None
 
     dto: Dict[str, Any] = {
         # Processing Fee
@@ -444,7 +453,7 @@ def map_to_tms_dto(raw_infosheet_data: Dict[str, Any]) -> Dict[str, Any]:
         "emdModes": _normalize_emd_modes(raw.get("emd_mode_display")),
 
         # Tender Value
-        "tenderValue": _parse_float(raw.get("tender_value_display")),
+        "tenderValue": tender_value,
 
         # Terms & Evaluation
         "bidValidityDays": _parse_int(raw.get("bid_validity_days_display")),

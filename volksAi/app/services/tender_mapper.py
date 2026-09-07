@@ -53,7 +53,7 @@ _RE_PRS_BODY_RATE_MAX = re.compile(
     r"(\u00bd|\xbd|1/2|\d+(?:\.\d+)?)\s*(?:%|percent)(?:[\s\S]*?)(?:per\s+(?:complete\s+)?week)[\s\S]*?maximum\s+(?:of\s+)?(\d+(?:\.\d+)?)\s*(?:%|percent)",
     re.IGNORECASE,
 )
-_RE_PRS_FALLBACK_KW = re.compile(r"(?:PRICE REDUCTION SCHEDULE|PRS)", re.IGNORECASE)
+_RE_PRS_FALLBACK_KW = re.compile(r"\b(?:PRICE REDUCTION SCHEDULE|PRS)\b", re.IGNORECASE)
 _RE_SD_KW = re.compile(r"(?:CONTRACT PERFORMANCE SECURITY|SECURITY DEPOSIT|CPS/SD)", re.IGNORECASE)
 _RE_SD_CLAUSE38 = re.compile(
     r"(\d+(?:\.\d+)?)\s*%\s*(?:of\s+(?:Total\s+Order|Contract\s+Value|Purchase\s+Order)|within\s+\d+\s+days)",
@@ -424,7 +424,7 @@ def resolve_atc_anchor_fields(
     if _RE_BEC_MAF_PATTERN.search(full_text) or any(kw in full_text.lower() for kw in ["oem authorization", "manufacturer authorization", "authorization certificate"]):
         res["maf_required"] = True
     else:
-        res["maf_required"] = False
+        res["maf_required"] = None
 
     # 2. Payment Terms
     for m in _RE_PAYMENT_TERMS_HDG.finditer(full_text):
@@ -460,9 +460,6 @@ def resolve_atc_anchor_fields(
         res["max_ld_percentage"] = 5.0
 
     # 4. Security Deposit Mode, Required, Percentage, Duration
-    if _RE_SD_KW.search(full_text):
-        res["sd_mode"] = "Bank Guarantee / DD / FDR / Online Transfer / Insurance Surety Bond"
-        
     sd_alias_pattern = r"(?:" + "|".join([re.escape(a).replace(r"\ ", r"\s+") for a in ATC_CLAUSE_ALIASES["security_deposit"]]) + r")"
     c38_match = None
     for sd_section_match in re.finditer(
@@ -936,7 +933,9 @@ def generate_bidder_readiness_summary(
 
     # 11. Penalty / Risk Exposure
     ld_rate = res_dict.get("ld_percentage_display", "0.5% per week")
-    ld_max = res_dict.get("max_ld_percentage_display", "5%")
+    is_gem = "GEM/" in str(res_dict.get("tender_id_display", "") or "") or "gem" in str(res_dict.get("organization", "")).lower()
+    ld_max_default = "10%" if is_gem else "5%"
+    ld_max = res_dict.get("max_ld_percentage_display", ld_max_default)
     summary["readiness_penalty_risk_display"] = f"LD / PRS: {ld_rate}  |  Max Penalty Cap: {ld_max}"
 
     return summary
@@ -1269,9 +1268,9 @@ def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[Li
         m_val = re.search(r"(?:Estimated\s+Bid\s+Value|Estimated\s+Tender\s+Value|Tender\s+Value)[^\d\n]*?(\d[\d,]+(?:\.\d+)?)", full_text, re.IGNORECASE)
         if m_val:
             tv_extracted = parse_money(m_val.group(1))
-            tender_value_display = format_currency(tv_extracted) if tv_extracted else "₹0.00"
+            tender_value_display = format_currency(tv_extracted) if (tv_extracted and tv_extracted >= 100) else "NA"
         else:
-            tender_value_display = "₹0.00"
+            tender_value_display = "NA"
 
     # 15. EMD Mode (Clause 16.1 & 16.2 instrument mapping: DD, BT, SB, FDR, BG)
     # BUG FIX 5: Exclude bank name cell-pair leaks (e.g. "State Bank of India" / Advisory Bank)
@@ -1401,8 +1400,10 @@ def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[Li
         else:
             maf_required_display = "Yes"
         logger.info(f"[ATC_ANCHOR] Resolved field 'maf_required' via dynamic BEC check ({maf_required_display})")
+    elif not _is_missing(maf_required_display) and maf_required_display not in ("NA", "Not Found"):
+        pass
     else:
-        maf_required_display = "No"
+        maf_required_display = "NA"
 
     # 20. Delivery Time (Supply/Total)
     # NOTE: Do NOT include 'contract_period' or 'Period of Work' here — those are ATC service-period
@@ -1548,11 +1549,7 @@ def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[Li
         or re.search(r"(?:within|period\s+of|time\s+for)\s+(\d+)\s*(?:days?|day)\s+(?:for|of)?\s*installation", full_text, re.IGNORECASE)
     )
 
-    if "Part A:" in str(delivery_time_supply_display):
-        delivery_time_installation_display = "365 Days"
-        installation_inclusive_display = "No"
-        logger.info("[ATC_ANCHOR] Resolved field 'delivery_time_installation' for multi-scope (365 Days)")
-    elif _is_missing(delivery_time_installation_display) or delivery_time_installation_display in ("NA", "Not Found"):
+    if _is_missing(delivery_time_installation_display) or delivery_time_installation_display in ("NA", "Not Found"):
         if _install_tot_m and _install_tot_m.group(1):
             raw_s = _install_tot_m.group(1).lower()
             num_val = {"twelve": 12, "12": 12, "six": 6, "06": 6}.get(raw_s, int(re.sub(r"\D", "", raw_s) or 12))
@@ -1710,23 +1707,12 @@ def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[Li
     )
 
     if _is_missing(payment_terms_installation_display) or payment_terms_installation_display in ("NA", "Not Found"):
-        if payment_terms_supply_display == "95%":
-            payment_terms_installation_display = "5%"
-        elif payment_terms_supply_display == "90%":
-            payment_terms_installation_display = "10%"
-        elif payment_terms_supply_display == "80%":
-            payment_terms_installation_display = "20%"
-        elif payment_terms_supply_display == "70%":
-            payment_terms_installation_display = "30%"
-        else:
-            payment_terms_installation_display = "NA"
+        payment_terms_installation_display = "NA"
 
     # 25. SD (in form of)
     sd_mode_display = resolve_field(["Security Deposit Mode", "sd_mode"], r"Security Deposit Mode[:\-\s]+([^\n]+)")
-    if _is_missing(sd_mode_display) or sd_mode_display == "NA":
-        if re.search(r"(?:CONTRACT PERFORMANCE SECURITY|SECURITY DEPOSIT|CPS/SD)", full_text, re.IGNORECASE) and not re.search(r"(?:no|nil|not\s+applicable|exempt)\s+(?:security\s+deposit|cps|sd)", full_text, re.IGNORECASE):
-            sd_mode_display = "Bank Guarantee / DD / FDR / Online Transfer / Insurance Surety Bond"
-            logger.info("[ATC_ANCHOR] Resolved field 'sd_mode' via SECTION_HEADING: CONTRACT PERFORMANCE SECURITY")
+    if _is_missing(sd_mode_display):
+        sd_mode_display = "NA"
 
     # 26. LD/PRS %age (per week) & 27. Max LD %age
     # Task 4: Primary search by section heading "PRICE REDUCTION SCHEDULE (PRS) FOR DELAYED DELIVERY", secondary by clause number
@@ -1772,13 +1758,15 @@ def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[Li
             logger.info(f"[ATC_ANCHOR] Resolved field 'prs_ld' via CLAUSE_NUMBER_FALLBACK: Clause 26.0 ({ld_percentage_display}, max {max_ld_percentage_display})")
         else:
             ld_percentage_display = "0.5% per week"
-            max_ld_percentage_display = "5%"
-            logger.info("[ATC_ANCHOR] Resolved field 'prs_ld' via GeM GTC default (0.5% per week, max 5%)")
+            is_gem = "GEM/" in str(tender_id_display or "") or "gem.gov.in" in full_text.lower() or "ld charges as per gem" in full_text.lower()
+            max_ld_percentage_display = "10%" if is_gem else "5%"
+            logger.info(f"[ATC_ANCHOR] Resolved field 'prs_ld' via {'GeM GTC' if is_gem else 'GAIL GCC'} default (0.5% per week, max {max_ld_percentage_display})")
 
     if _is_missing(ld_percentage_display) or ld_percentage_display in ("NA", "Not Found"):
         ld_percentage_display = "0.5% per week"
     if _is_missing(max_ld_percentage_display) or max_ld_percentage_display in ("NA", "Not Found"):
-        max_ld_percentage_display = "5%"
+        is_gem = "GEM/" in str(tender_id_display or "") or "gem.gov.in" in full_text.lower() or "ld charges as per gem" in full_text.lower()
+        max_ld_percentage_display = "10%" if is_gem else "5%"
 
     # PBG Required & Checkbox Matching
     pbg_required_raw = resolve_field(

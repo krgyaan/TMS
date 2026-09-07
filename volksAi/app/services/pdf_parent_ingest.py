@@ -326,6 +326,8 @@ def ingest_parent_tender_pdf(
             if atc_sections:
                 sec_to_update = atc_sections[0]
                 for key, val in resolved_atc.items():
+                    if val is None:
+                        continue
                     lbl = schema_label_map.get(key, key.replace("_", " ").title())
                     sec_to_update.setdefault("fields", []).append({
                         "id": f"f-{key}",
@@ -354,7 +356,7 @@ def ingest_parent_tender_pdf(
                     if isinstance(val, bool):
                         is_val_valid = True
                     else:
-                        is_val_valid = val not in (None, "", "Not Found", "Out of Scope (Stage 1)", 0, 0.0, "0", "0.0", "0.00")
+                        is_val_valid = val not in (None, "", "None", "Not Found", "Out of Scope (Stage 1)", 0, 0.0, "0", "0.0", "0.00")
                     if is_val_valid:
                         # BUG 3 FIX: MAIN_SOURCED_LABELS and Requirements are never overridden by ATC
                         if lbl in MAIN_SOURCED_LABELS or (lbl and lbl.startswith("Requirement")):
