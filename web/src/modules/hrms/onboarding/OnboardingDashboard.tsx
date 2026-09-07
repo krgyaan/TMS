@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 import {
   useOnboardingDashboard,
   useUpdateOnboardingStatus,
-} from "./useOnboarding";
+} from "@/hooks/api/useOnboarding";
 import { type OnboardingRequest } from "@/services/api/onboarding.service";
 import { paths } from "@/app/routes/paths";
 import { StatusBadge } from "./components/StatusBadge";

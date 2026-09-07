@@ -628,6 +628,24 @@ export class OnboardingService {
         return [];
       }
 
+      const requestIds = rows.map((r) => r.id);
+      const userIds = rows.map((r) => r.userId).filter(Boolean) as number[];
+
+      // Only the Passport Size Photo document per request (no full doc list)
+      const [docPhotos, oauthAvatars] = await Promise.all([
+        this.db
+          .select({ onboardingId: onboardingDocuments.onboardingId, fileUrl: onboardingDocuments.fileUrl })
+          .from(onboardingDocuments)
+          .where(and(
+            inArray(onboardingDocuments.onboardingId, requestIds),
+            eq(onboardingDocuments.docType, 'Passport Size Photo')
+          )),
+        // Only avatar per oauth account (no token/raw payload)
+        userIds.length > 0
+          ? this.db.select({ userId: oauthAccounts.userId, avatar: oauthAccounts.avatar }).from(oauthAccounts).where(inArray(oauthAccounts.userId, userIds))
+          : Promise.resolve([] as { userId: number; avatar: string | null }[]),
+      ]);
+
       const result = rows.map((row) => {
         const statuses = [
           row.profileStatus,
@@ -636,14 +654,19 @@ export class OnboardingService {
           row.experienceStatus,
           row.bankStatus,
         ];
-        const submittedCount = statuses.filter((s) => s == 'submitted').length;
+        const submittedCount = statuses.filter((s) => s === 'submitted' || s === 'resubmitted' || s === 'approved').length;
         const employeeProgress = Math.round((submittedCount / statuses.length) * 100);
         const progress = row.progress === 'pending' || !row.progress ? 0 : Number(row.progress) || 0;
+
+        const oauthPhoto = oauthAvatars.find((o) => o.userId === row.userId)?.avatar ?? null;
+        const docPhoto = docPhotos.find((d) => d.onboardingId === row.id)?.fileUrl ?? null;
+        const profilePhoto = docPhoto || oauthPhoto || null;
 
         return {
           ...row,
           progress,
           employeeProgress,
+          profilePhoto,
         };
       });
 
@@ -1089,12 +1112,13 @@ export class OnboardingService {
         lastName: onboardingProfiles.lastName,
         middleName: onboardingProfiles.middleName,
         designation: onboardingProfiles.employeeType,
-        department: onboardingProfiles.departmentId, 
+        department: teams.name, 
         dateOfJoining: onboardingProfiles.dateOfJoining,
       })
       .from(onboardingRequests)
       .leftJoin(onboardingProfiles, eq(onboardingProfiles.onboardingId, onboardingRequests.id))
-      .where(eq(onboardingRequests.status, 'approved'))
+      .leftJoin(teams, eq(onboardingProfiles.departmentId, teams.id))
+      .where(inArray(onboardingRequests.status, ['approved', 'fully_completed']))
       .orderBy(desc(onboardingRequests.approvedAt));
 
     const requestIds = rows.map((r) => r.id);
@@ -1346,7 +1370,7 @@ export class OnboardingService {
 
   // ─── Per-Section HR Approval ───────────────────────────────────────────────
 
-  async approveProfileSection(id: number, hrStatus: 'approved' | 'rejected', hrRemark: string, adminId: number) {
+  async approveProfileSection(id: number, hrStatus: 'approved' | 'rejected' | 'pending', hrRemark: string, adminId: number) {
     return this.db.transaction(async (tx) => {
       const [latestProfile] = await tx.select().from(onboardingProfiles)
         .where(eq(onboardingProfiles.onboardingId, id))
@@ -1359,6 +1383,7 @@ export class OnboardingService {
         hrStatus,
         hrRemark,
         hrCompleted: hrStatus === 'approved',
+        status: hrStatus === 'pending' ? 'submitted' : latestProfile.status,
         updatedAt: new Date(),
       }).where(eq(onboardingProfiles.id, latestProfile.id));
 
@@ -1371,7 +1396,7 @@ export class OnboardingService {
 
       await tx.insert(onboardingActivityLogs).values({
         onboardingId: id,
-        action: hrStatus === 'approved' ? 'PROFILE_APPROVED' : 'PROFILE_REJECTED',
+        action: hrStatus === 'approved' ? 'PROFILE_APPROVED' : hrStatus === 'rejected' ? 'PROFILE_REJECTED' : 'PROFILE_REVERTED',
         performedBy: adminId,
         metadata: {
           data: {
@@ -1389,7 +1414,7 @@ export class OnboardingService {
     });
   }
 
-  async approveEducationRecord(id: number, eduId: number, hrStatus: 'approved' | 'rejected', adminId: number, hrRemark?: string, ) {
+  async approveEducationRecord(id: number, eduId: number, hrStatus: 'approved' | 'rejected' | 'pending', adminId: number, hrRemark?: string, ) {
     return this.db.transaction(async (tx) => {
       const [edu] = await tx.select().from(onboardingEducation).where(eq(onboardingEducation.id, eduId)).limit(1);
       if (!edu) throw new NotFoundException('Education record not found');
@@ -1397,6 +1422,7 @@ export class OnboardingService {
       await tx.update(onboardingEducation).set({
         hrStatus,
         hrRemark,
+        status: hrStatus === 'pending' ? 'submitted' : edu.status,
         updatedAt: new Date(),
       }).where(eq(onboardingEducation.id, eduId));
 
@@ -1410,7 +1436,7 @@ export class OnboardingService {
 
       await tx.insert(onboardingActivityLogs).values({
         onboardingId: id,
-        action: hrStatus === 'approved' ? 'EDUCATION_APPROVED' : 'EDUCATION_REJECTED',
+        action: hrStatus === 'approved' ? 'EDUCATION_APPROVED' : hrStatus === 'rejected' ? 'EDUCATION_REJECTED' : 'EDUCATION_REVERTED',
         performedBy: adminId,
         metadata: {
           data: {
@@ -1428,7 +1454,7 @@ export class OnboardingService {
     });
   }
 
-  async approveExperienceRecord(id: number, expId: number, hrStatus: 'approved' | 'rejected', hrRemark: string, adminId: number) {
+  async approveExperienceRecord(id: number, expId: number, hrStatus: 'approved' | 'rejected' | 'pending', hrRemark: string, adminId: number) {
     return this.db.transaction(async (tx) => {
       const [exp] = await tx.select().from(onboardingExperience).where(eq(onboardingExperience.id, expId)).limit(1);
       if (!exp) throw new NotFoundException('Experience record not found');
@@ -1436,6 +1462,7 @@ export class OnboardingService {
       await tx.update(onboardingExperience).set({
         hrStatus,
         hrRemark,
+        status: hrStatus === 'pending' ? 'submitted' : exp.status,
         updatedAt: new Date(),
       }).where(eq(onboardingExperience.id, expId));
 
@@ -1449,7 +1476,7 @@ export class OnboardingService {
 
       await tx.insert(onboardingActivityLogs).values({
         onboardingId: id,
-        action: hrStatus === 'approved' ? 'EXPERIENCE_APPROVED' : 'EXPERIENCE_REJECTED',
+        action: hrStatus === 'approved' ? 'EXPERIENCE_APPROVED' : hrStatus === 'rejected' ? 'EXPERIENCE_REJECTED' : 'EXPERIENCE_REVERTED',
         performedBy: adminId,
         metadata: {
           data: {
@@ -1467,7 +1494,7 @@ export class OnboardingService {
     });
   }
 
-  async approveBankRecord(id: number, bankId: number, hrStatus: 'approved' | 'rejected', hrRemark: string, adminId: number) {
+  async approveBankRecord(id: number, bankId: number, hrStatus: 'approved' | 'rejected' | 'pending', hrRemark: string, adminId: number) {
     return this.db.transaction(async (tx) => {
       const [bank] = await tx.select().from(onboardingBankDetails).where(eq(onboardingBankDetails.id, bankId)).limit(1);
       if (!bank) throw new NotFoundException('Bank record not found');
@@ -1475,6 +1502,7 @@ export class OnboardingService {
       await tx.update(onboardingBankDetails).set({
         hrStatus,
         hrRemark,
+        status: hrStatus === 'pending' ? 'submitted' : bank.status,
         updatedAt: new Date(),
       }).where(eq(onboardingBankDetails.id, bankId));
 
@@ -1487,7 +1515,7 @@ export class OnboardingService {
 
       await tx.insert(onboardingActivityLogs).values({
         onboardingId: id,
-        action: hrStatus === 'approved' ? 'BANK_APPROVED' : 'BANK_REJECTED',
+        action: hrStatus === 'approved' ? 'BANK_APPROVED' : hrStatus === 'rejected' ? 'BANK_REJECTED' : 'BANK_REVERTED',
         performedBy: adminId,
         metadata: {
           data: {
@@ -1506,9 +1534,46 @@ export class OnboardingService {
     });
   }
 
+  // ─── Section-Level Approval (approve/reject all records of a stage) ─────────
 
-  async verifyDocument(id: number, docId: number, status: string, reason: string | undefined, adminId: number) {
-    return this.db.transaction(async (tx) => {
+  async approveEducationSection(id: number, status: 'approved' | 'rejected' | 'pending', remark: string, adminId: number) {
+    const records = await this.db.select().from(onboardingEducation).where(eq(onboardingEducation.onboardingId, id));
+    if (records.length === 0) throw new NotFoundException('No education records found');
+    for (const r of records) {
+      await this.approveEducationRecord(id, r.id, status, adminId, remark);
+    }
+    return { success: true, count: records.length };
+  }
+
+  async approveExperienceSection(id: number, status: 'approved' | 'rejected' | 'pending', remark: string, adminId: number) {
+    const records = await this.db.select().from(onboardingExperience).where(eq(onboardingExperience.onboardingId, id));
+    if (records.length === 0) throw new NotFoundException('No experience records found');
+    for (const r of records) {
+      await this.approveExperienceRecord(id, r.id, status, remark, adminId);
+    }
+    return { success: true, count: records.length };
+  }
+
+  async approveBankSection(id: number, status: 'approved' | 'rejected' | 'pending', remark: string, adminId: number) {
+    const records = await this.db.select().from(onboardingBankDetails).where(eq(onboardingBankDetails.onboardingId, id));
+    if (records.length === 0) throw new NotFoundException('No bank details found');
+    for (const r of records) {
+      await this.approveBankRecord(id, r.id, status, remark, adminId);
+    }
+    return { success: true, count: records.length };
+  }
+
+  async verifyDocumentSection(id: number, status: 'approved' | 'rejected' | 'pending', remark: string, adminId: number) {
+    const records = await this.db.select().from(onboardingDocuments).where(eq(onboardingDocuments.onboardingId, id));
+    if (records.length === 0) throw new NotFoundException('No documents found');
+    for (const r of records) {
+      await this.verifyDocument(id, r.id, status, remark, adminId);
+    }
+    return { success: true, count: records.length };
+  }
+
+
+  async verifyDocument(id: number, docId: number, status: string, reason: string | undefined, adminId: number) {    return this.db.transaction(async (tx) => {
       const [doc] = await tx.select().from(onboardingDocuments).where(eq(onboardingDocuments.id, docId)).limit(1);
       if (!doc) throw new NotFoundException('Document record not found');
 
@@ -1544,7 +1609,7 @@ export class OnboardingService {
       }
 
       await tx.update(onboardingDocuments).set({
-        status: status === 'approved' ? 'submitted' : 'pending', // map internal status
+        status: status === 'approved' ? 'submitted' : status === 'pending' ? 'submitted' : 'pending', // map internal status
         hrStatus: status,
         hrRemark: reason || null,
         verifiedBy: adminId,
@@ -1554,7 +1619,7 @@ export class OnboardingService {
 
       await tx.insert(onboardingActivityLogs).values({
         onboardingId: id,
-        action: status === 'approved' ? 'DOCUMENT_APPROVED' : 'DOCUMENT_REJECTED',
+        action: status === 'approved' ? 'DOCUMENT_APPROVED' : status === 'rejected' ? 'DOCUMENT_REJECTED' : 'DOCUMENT_REVERTED',
         performedBy: adminId,
         metadata: {
           data: {
