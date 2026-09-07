@@ -2,14 +2,9 @@ import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import {
   OpenWAApiError,
-  OpenWAAuthError,
   OpenWAClient,
-  OpenWAConflictError,
-  OpenWAForbiddenError,
-  OpenWANotFoundError,
   OpenWARateLimitError,
-  OpenWAServiceUnavailableError,
-  OpenWATimeoutError
+  OpenWAServiceUnavailableError
 } from '@rmyndharis/openwa';
 import { openwaConfig } from '../config/openwa.config';
 
@@ -115,7 +110,8 @@ export class OpenwaService implements OnModuleInit {
     } catch (error) {
       const isRetryable =
         error instanceof OpenWAServiceUnavailableError || // 503
-        error instanceof OpenWARateLimitError; // 429
+        error instanceof OpenWARateLimitError || // 429
+        (error instanceof OpenWAApiError && error.status === 500); // 500
 
       if (!isRetryable || attempt >= this.maxRetries) {
         this.logger.error(
