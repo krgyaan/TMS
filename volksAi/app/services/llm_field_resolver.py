@@ -363,10 +363,13 @@ def extract_scoped_context(full_text: str, field_name: str) -> str:
     """
     Extracts scoped document sections relevant to specific ambiguous fields
     to keep token usage minimal and focus Claude on relevant clauses.
+    Instruments and logs section names and character counts per field.
     """
     if not full_text:
+        logger.info("[SCOPED_CONTEXT] Field '%s': empty full_text provided (0 chars)", field_name)
         return ""
     snippets = []
+    section_names = []
 
     if "net_worth" in field_name:
         # 1. Section-II / BEC block
@@ -376,22 +379,36 @@ def extract_scoped_context(full_text: str, field_name: str) -> str:
         )
         if bec_m:
             snippets.append("=== SECTION-II / BID EVALUATION CRITERIA (BEC) ===\n" + bec_m.group(0).strip())
+            section_names.append("SECTION-II / BEC")
 
         # 2. Occurrences of net worth and financial criteria
         for m in re.finditer(r"\b(?:net\s*worth|financial\s+criteria|financial\s+exemption)\b", full_text, re.IGNORECASE):
             start = max(0, m.start() - 300)
             end = min(len(full_text), m.end() + 600)
             snippets.append(f"=== Clause Context: '{m.group(0)}' ===\n" + full_text[start:end].strip())
+            section_names.append(f"Clause: '{m.group(0)}'")
 
     elif "payment" in field_name:
-        # Search for payment terms clauses
+        # Search for payment terms clauses with prioritized milestone matching
+        found_matches = []
         for m in re.finditer(
             r"(?:TERMS\s+OF\s+PAYMENT|PAYMENT\s+TERMS|PAYMENT\s+SCHEDULE|MILESTONE\s+PAYMENT|REVISED\s+TERMS\s+OF\s+PAYMENT)",
             full_text, re.IGNORECASE
         ):
             start = max(0, m.start() - 200)
             end = min(len(full_text), m.end() + 1500)
-            snippets.append(f"=== Payment Clause: '{m.group(0)}' ===\n" + full_text[start:end].strip())
+            clause_text = full_text[start:end].strip()
+            # Prioritize clauses with milestone percentages (70/30, 80/20, 90/10) over generic boilerplate
+            has_milestone_pct = bool(re.search(r"\b(?:70|80|90|30|20|10|95|5)\s*%", clause_text))
+            has_supply_install = bool(re.search(r"\b(?:supply|installation|receipt|commissioning)\b", clause_text, re.IGNORECASE))
+            score = (2 if has_milestone_pct else 0) + (1 if has_supply_install else 0)
+            found_matches.append((score, m.start(), m.group(0), clause_text))
+
+        # Sort higher-relevance milestone clauses first
+        found_matches.sort(key=lambda x: (x[0], -x[1]), reverse=True)
+        for score, pos, header, clause_text in found_matches:
+            snippets.append(f"=== Payment Clause: '{header}' (pos {pos}) ===\n{clause_text}")
+            section_names.append(f"Payment Clause: '{header}' (score={score})")
 
         # Special Conditions / SCC
         scc_m = re.search(
@@ -400,23 +417,45 @@ def extract_scoped_context(full_text: str, field_name: str) -> str:
         )
         if scc_m:
             snippets.append("=== SPECIAL CONDITIONS OF CONTRACT (SCC) ===\n" + scc_m.group(0)[:3000].strip())
+            section_names.append("SCC Section")
 
     elif "delivery" in field_name:
+        found_delivery = []
         for m in re.finditer(
             r"(?:DELIVERY\s+PERIOD|PERIOD\s+OF\s+WORK|TIME\s+FOR\s+COMPLETION|COMPLETION\s+SCHEDULE|DELIVERY\s+SCHEDULE)",
             full_text, re.IGNORECASE
         ):
             start = max(0, m.start() - 200)
             end = min(len(full_text), m.end() + 1200)
-            snippets.append(f"=== Delivery / Completion Clause: '{m.group(0)}' ===\n" + full_text[start:end].strip())
+            d_text = full_text[start:end].strip()
+            has_days_months = bool(re.search(r"\b\d+\s*(?:days|months|weeks)\b", d_text, re.IGNORECASE))
+            score = 2 if has_days_months else 0
+            found_delivery.append((score, m.start(), m.group(0), d_text))
+
+        found_delivery.sort(key=lambda x: (x[0], -x[1]), reverse=True)
+        for score, pos, header, d_text in found_delivery:
+            snippets.append(f"=== Delivery / Completion Clause: '{header}' (pos {pos}) ===\n{d_text}")
+            section_names.append(f"Delivery Clause: '{header}' (score={score})")
 
     if not snippets:
         # Fallback to first 8000 characters if no specialized section matched
-        return full_text[:8000]
+        fallback_text = full_text[:8000]
+        logger.warning(
+            "[SCOPED_CONTEXT] Field '%s': NO specific section matched! Falling back to first 8000 characters (%d chars).",
+            field_name, len(fallback_text)
+        )
+        return fallback_text
 
-    # Combine up to 6 distinct snippet blocks, capping total character length
+    # Combine top distinct snippet blocks, capping total character length at 15000
     combined = "\n\n".join(snippets[:6])
-    return combined[:15000]
+    final_scoped = combined[:15000]
+
+    logger.info(
+        "[SCOPED_CONTEXT] Field '%s': Selected %d sections (%s) -> Total %d characters sent (full doc: %d chars, %.1f%% of full doc)",
+        field_name, len(section_names[:6]), section_names[:6], len(final_scoped), len(full_text),
+        (len(final_scoped) / max(len(full_text), 1)) * 100
+    )
+    return final_scoped
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -790,8 +829,15 @@ class LLMFieldResolver:
             "Review each field below against the provided scoped tender clauses:\n"
             "1. If the candidate value is accurate and matches the tender-specific criteria, choose action='confirm'.\n"
             "2. If the candidate value is wrong (e.g. GCC boilerplate 'Positive' when BEC declares financial criteria exempt; "
-            "or contract completion days instead of goods supply days; or general dispatch % instead of milestone supply %), "
-            "choose action='override', provide the corrected 'resolved_value', and a clear one-line 'reasoning'.\n\n"
+            "or general dispatch % instead of milestone supply %), "
+            "choose action='override', provide the corrected 'resolved_value', and a clear one-line 'reasoning'.\n"
+            "3. SPECIAL RULE FOR DELIVERY TIME FIELDS (delivery_time_supply_display, delivery_time_installation_display):\n"
+            "   - If the tender clauses state an overall contract completion or delivery period (e.g. 150 Days, 90 Days, 140 Days, 365 Days) "
+            "but do NOT isolate a distinct supply-only figure, DO NOT collapse the value to a bare 'Not Specified' or null!\n"
+            "   - Instead, choose action='override' and return the total period accompanied by a clear qualification, e.g.:\n"
+            "     '{candidate_days} (total completion) — no distinct supply-only figure found in scoped clauses'.\n"
+            "   - For installation delivery time, if included in total contract or not separated: "
+            "'{candidate_days} (total completion) — installation included in total period'.\n\n"
             "Fields to review:\n" + "\n\n".join(field_prompts) + "\n\n"
             "Scoped Tender Clauses:\n--- START OF RELEVANT CLAUSES ---\n"
             f"{combined_scoped_text}\n--- END OF RELEVANT CLAUSES ---"
@@ -826,10 +872,27 @@ class LLMFieldResolver:
                 f_name = d.get("field_name")
                 if not f_name or f_name not in fields_to_check:
                     continue
+                action = d.get("action", "confirm")
+                resolved_val = d.get("resolved_value")
+                reasoning = d.get("reasoning", "")
+
+                # ISSUE 5 FALLBACK GUARD FOR DELIVERY TIME:
+                # When Claude returns 'Not Specified' or empty for delivery_time fields,
+                # but a candidate exists from Layer 1 regex, return candidate with qualification
+                # rather than collapsing to a bare "Not Specified".
+                if f_name in ("delivery_time_supply_display", "delivery_time_installation_display"):
+                    cand_val = candidates.get(f_name)
+                    if (not resolved_val or str(resolved_val).strip() in ("Not Specified", "None", "NA", "null")) and cand_val and str(cand_val) not in ("NA", "Not Found", "None"):
+                        target_type = "supply-only" if "supply" in f_name else "installation-only"
+                        resolved_val = f"{cand_val} (total completion) — no distinct {target_type} figure found in scoped clauses"
+                        action = "override"
+                        if not reasoning:
+                            reasoning = f"Total completion period retained as fallback: no separate {target_type} schedule isolated in scoped clauses."
+
                 results[f_name] = {
-                    "action": d.get("action", "confirm"),
-                    "resolved_value": d.get("resolved_value"),
-                    "reasoning": d.get("reasoning", ""),
+                    "action": action,
+                    "resolved_value": resolved_val,
+                    "reasoning": reasoning,
                 }
 
             logger.info("[LLM_AMBIGUITY][Role 2] Successfully evaluated %d decisions via Claude", len(results))

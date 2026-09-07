@@ -1,0 +1,86 @@
+{
+  "version": 2,
+  "examples_by_field": {
+    "sd_percentage_display": [
+      {
+        "anchor_text": "5.0",
+        "value": "5%",
+        "doc_type": "GAIL_AMC",
+        "confidence": 0.85,
+        "timestamp": "2026-09-07T06:56:32.548214+00:00"
+      }
+    ],
+    "sd_duration_display": [
+      {
+        "anchor_text": "21",
+        "value": "21",
+        "doc_type": "GAIL_AMC",
+        "confidence": 0.85,
+        "timestamp": "2026-09-07T06:56:32.549645+00:00"
+      }
+    ],
+    "avg_annual_turnover_value_display": [
+      {
+        "anchor_text": "Not Applicable",
+        "value": "Not Applicable",
+        "doc_type": "GAIL_AMC",
+        "confidence": 0.85,
+        "timestamp": "2026-09-07T06:56:32.550632+00:00"
+      }
+    ],
+    "working_capital_value_display": [
+      {
+        "anchor_text": "Not Applicable",
+        "value": "Not Applicable",
+        "doc_type": "GAIL_AMC",
+        "confidence": 0.85,
+        "timestamp": "2026-09-07T06:56:32.551706+00:00"
+      }
+    ],
+    "net_worth_value_display": [
+      {
+        "anchor_text": "Not Applicable",
+        "value": "Not Applicable",
+        "doc_type": "GAIL_AMC",
+        "confidence": 0.85,
+        "timestamp": "2026-09-07T06:56:32.552215+00:00"
+      }
+    ],
+    "solvency_certificate_value_display": [
+      {
+        "anchor_text": "Not Applicable",
+        "value": "Not Applicable",
+        "doc_type": "GAIL_AMC",
+        "confidence": 0.85,
+        "timestamp": "2026-09-07T06:56:32.553338+00:00"
+      }
+    ],
+    "client_phone_1_display": [
+      {
+        "anchor_text": "0141-2230347/617/698 (Extn. 860-1385)",
+        "value": "0141-2230347/617/698 (Extn. 860-1385)",
+        "doc_type": "GAIL_AMC",
+        "confidence": 0.85,
+        "timestamp": "2026-09-07T06:56:32.554389+00:00"
+      }
+    ],
+    "custom_eligibility_criteria_display": [
+      {
+        "anchor_text": "The bidder must have successfully executed a job in a single order of valuing not less than Rs. 62.14 lakhs for \"Supply and Installation of Ni-Cd battery bank\" in any Government/PSU/Private Sector Organizations in previous seven (07) years (to be reckoned from the final due date of bid submission). ",
+        "value": "The bidder must have successfully executed a job in a single order of valuing not less than Rs. 62.14 lakhs for \"Supply and Installation of Ni-Cd battery bank\" in any Government/PSU/Private Sector Organizations in previous seven (07) years (to be reckoned from the final due date of bid submission). The bidder must be a \"Manufacturer\" or an \"Authorized Partner/Distributor/Dealer/Reseller\" of \"Battery banks\".",
+        "doc_type": "GAIL_AMC",
+        "confidence": 0.85,
+        "timestamp": "2026-09-07T06:56:32.554907+00:00"
+      }
+    ],
+    "eligibility_criterion_years_display": [
+      {
+        "anchor_text": "7",
+        "value": "7",
+        "doc_type": "GAIL_AMC",
+        "confidence": 0.85,
+        "timestamp": "2026-09-07T06:56:32.556175+00:00"
+      }
+    ]
+  }
+}

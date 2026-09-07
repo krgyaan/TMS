@@ -459,7 +459,7 @@ def ingest_parent_tender_pdf(
     infosheet_data = {}
     try:
         from app.services.tender_mapper import build_infosheet_data
-        infosheet_data = build_infosheet_data(sections, all_pages, job_id=job_id)
+        infosheet_data = build_infosheet_data(sections, all_pages, job_id=job_id, atc_full_text=atc_full_text)
 
         # 4a. LLM Fallback Post-Pass — resolve remaining NA fields via LLM (Gemini / OpenAI-compatible)
         import os
@@ -688,6 +688,8 @@ def ingest_parent_tender_pdf(
                             if reasoning:
                                 infosheet_data[f"{f_name}_reasoning"] = reasoning
                                 logger.info("[LLM_AMBIGUITY][Role 2] Field '%s' reasoning: %s", f_name, reasoning)
+                                # Crucial: Claude reviewed this field, mark provenance as llm_override
+                                infosheet_data.setdefault("_info_sheet_sources", {})[f_name] = "llm_override"
 
                             if action == "override" and resolved_val and resolved_val not in _stub_vals:
                                 prev_val = infosheet_data.get(f_name)
@@ -698,28 +700,33 @@ def ingest_parent_tender_pdf(
                                 field_statuses[f_name] = FIELD_STATUS_OK_FALLBACK
                                 infosheet_data.setdefault("_info_sheet_sources", {})[f_name] = "llm_override"
 
-                                # Sync to infoSheetSections for UI preview
-                                target_label = _DISPLAY_KEY_TO_LABEL.get(f_name, f_name.replace("_display", "").replace("_", " ").title())
-                                if sections:
-                                    field_found = False
-                                    raw_key_name = f_name.replace("_display", "")
-                                    for sec in sections:
-                                        for f in sec.get("fields", []):
-                                            f_name_sec = f.get("field_name", "")
-                                            f_lbl = f.get("label", "")
-                                            if f_lbl == target_label or f_name_sec == f_name or f_name_sec == raw_key_name or f.get("id") == f"f-{f_name}":
+                            # Sync to infoSheetSections for UI preview
+                            target_label = _DISPLAY_KEY_TO_LABEL.get(f_name, f_name.replace("_display", "").replace("_", " ").title())
+                            if sections:
+                                field_found = False
+                                raw_key_name = f_name.replace("_display", "")
+                                for sec in sections:
+                                    for f in sec.get("fields", []):
+                                        f_name_sec = f.get("field_name", "")
+                                        f_lbl = f.get("label", "")
+                                        if f_lbl == target_label or f_name_sec == f_name or f_name_sec == raw_key_name or f.get("id") == f"f-{f_name}":
+                                            if action == "override" and resolved_val and resolved_val not in _stub_vals:
                                                 f["value"] = resolved_val
-                                                f["status"] = "extracted"
+                                            f["status"] = "extracted"
+                                            if "(total completion)" in str(resolved_val):
+                                                f["confidence"] = "fallback"
+                                                field_statuses[f_name] = FIELD_STATUS_OK_FALLBACK
+                                            else:
                                                 f["confidence"] = 90.0
-                                                f["source"] = "atc_llm_override"
-                                                f["resolution_source"] = "claude_ambiguity_override"
-                                                f["resolution_layer"] = "layer_2"
-                                                if reasoning:
-                                                    f["reasoning"] = reasoning
-                                                field_found = True
-                                                break
-                                        if field_found:
+                                            f["source"] = "atc_llm_override"
+                                            f["resolution_source"] = "claude_ambiguity_override" if action == "override" else "claude_ambiguity_confirm"
+                                            f["resolution_layer"] = "layer_2"
+                                            if reasoning:
+                                                f["reasoning"] = reasoning
+                                            field_found = True
                                             break
+                                    if field_found:
+                                        break
 
                     # Record token usage & cost summary
                     infosheet_data["_llm_usage"] = resolver.get_usage_summary()

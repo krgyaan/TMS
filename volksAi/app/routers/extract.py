@@ -90,6 +90,11 @@ def _format_field_object(
             else:
                 source = None
 
+    # Invariant: any field with non-null reasoning was processed/reviewed by Claude
+    # and MUST have source in ('llm', 'llm_override') — never 'regex' or 'atc'.
+    if reasoning and source not in ("llm", "llm_override"):
+        source = "llm_override"
+
     field_obj: Dict[str, Any] = {
         "value": clean_value,
         "confidence": confidence,

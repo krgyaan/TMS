@@ -434,12 +434,14 @@ def resolve_atc_anchor_fields(
             _RE_PAYMENT_INSTALL_PCT_1.search(window)
             or _RE_PAYMENT_INSTALL_PCT_2.search(window)
         )
-        if s_pct and _RE_DIGIT.search(s_pct.group(1)):
+        if s_pct and i_pct and _RE_DIGIT.search(s_pct.group(1)) and _RE_DIGIT.search(i_pct.group(1)):
             res["payment_terms_supply_percent"] = float(s_pct.group(1))
-        if i_pct and _RE_DIGIT.search(i_pct.group(1)):
             res["payment_terms_installation_percent"] = float(i_pct.group(1))
-        if "payment_terms_supply_percent" in res:
             break
+        elif s_pct and _RE_DIGIT.search(s_pct.group(1)) and "payment_terms_supply_percent" not in res:
+            res["payment_terms_supply_percent"] = float(s_pct.group(1))
+        if i_pct and _RE_DIGIT.search(i_pct.group(1)) and "payment_terms_installation_percent" not in res:
+            res["payment_terms_installation_percent"] = float(i_pct.group(1))
 
     # 3. LD/PRS % per week & Max LD %
     prs_heading_match = _RE_PRS_HEADING.search(full_text)
@@ -940,7 +942,7 @@ def generate_bidder_readiness_summary(
     return summary
 
 
-def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[List[Dict[str, Any]]] = None, job_id: str = "Unknown") -> Dict[str, str]:
+def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[List[Dict[str, Any]]] = None, job_id: str = "Unknown", atc_full_text: Optional[str] = None) -> Dict[str, str]:
     """
     Flattens the extracted sections and runs regex match fallbacks on the raw page texts
     to resolve all Visual Layout variables defined in INFOSHEET_DATA_KEYS.
@@ -1047,30 +1049,35 @@ def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[Li
                 if p_blocks:
                     grid_matrix.extend(reconstruct_grid(p_blocks))
 
-    # Append ATC child PDF text if available on disk for job_id
-    try:
-        import fitz
-        from pathlib import Path
-        candidate_dirs = []
-        if job_id and job_id != "Unknown":
-            from app.core.constants import STORAGE_ROOT
-            candidate_dirs.append(Path(STORAGE_ROOT) / "jobs" / job_id / "extracted_children")
-        candidate_dirs.extend([
-            Path(r"C:\Users\Asus\Desktop\extracted_children"),
-            Path("extracted_children")
-        ])
-        for c_dir in candidate_dirs:
-            if c_dir.exists():
-                for atc_file in c_dir.glob("*.pdf"):
-                    try:
-                        doc = fitz.open(str(atc_file))
-                        for page in doc:
-                            full_text += "\n" + (page.get_text() or "")
-                    except Exception:
-                        pass
-                break
-    except Exception:
-        pass
+    # Append ATC child PDF text if provided directly or available on disk
+    if atc_full_text:
+        full_text += "\n\n" + atc_full_text
+    else:
+        try:
+            import fitz
+            from pathlib import Path
+            candidate_dirs = []
+            if job_id and job_id != "Unknown":
+                from app.core.constants import STORAGE_ROOT
+                candidate_dirs.append(Path(STORAGE_ROOT) / "jobs" / job_id / "extracted_children")
+                candidate_dirs.append(Path("storage/jobs") / job_id / "extracted_children")
+            candidate_dirs.extend([
+                Path("gold_standard/tenders/extracted_children"),
+                Path(r"C:\Users\Asus\Desktop\extracted_children"),
+                Path("extracted_children")
+            ])
+            for c_dir in candidate_dirs:
+                if c_dir.exists():
+                    for atc_file in c_dir.glob("*.pdf"):
+                        try:
+                            doc = fitz.open(str(atc_file))
+                            for page in doc:
+                                full_text += "\n" + (page.get_text() or "")
+                        except Exception:
+                            pass
+                    break
+        except Exception:
+            pass
 
     # Helper to extract using regex from full_text
     def extract_regex(pattern, default: Optional[str] = "NA"):
@@ -1662,7 +1669,14 @@ def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[Li
             re.search(r"(?:balance\s+|remaining\s+)?(?:(?:Twenty|Thirty|Ten|Fifteen|Five)\s+percent\s*\()?(50|40|30|25|20|15|10|5)\s*%\s*(?:\))?(?:[^\n\.\;]{0,60}?\b(?:payment|released|paid|payable|remaining|balance)\b)?[^\n\.\;]{0,60}?\b(?:install|installation|commission|commissioning|final\s+acceptance|handover)\b", ptext, re.IGNORECASE)
             or re.search(r"(?:remaining|balance)\s*(50|40|30|25|20|15|10|5)\s*%\s*(?:will\s+be\s+released\s+after\s+installation|of\s+(?:the\s+)?)?(?:install|commission)", ptext, re.IGNORECASE)
         )
-        if s_pct and re.search(r"\d", s_pct.group(1)):
+        if s_pct and i_pct:
+            s_val = f"{int(float(s_pct.group(1)))}%"
+            i_val = f"{int(float(i_pct.group(1)))}%"
+            payment_terms_supply_display = s_val
+            payment_terms_installation_display = i_val
+            logger.info(f"[ATC_ANCHOR] Resolved dual milestone payment terms: supply={s_val}, install={i_val}")
+            break
+        elif s_pct and re.search(r"\d", s_pct.group(1)):
             s_val = f"{int(float(s_pct.group(1)))}%"
             if _is_missing(payment_terms_supply_display) or payment_terms_supply_display in ("NA", "Not Found", "100%", "100.0", "5.0", "5%", "10%", "15%", "20%", "50%"):
                 payment_terms_supply_display = s_val
