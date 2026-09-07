@@ -90,7 +90,8 @@ export class MakerRequestService {
         this.notifications.notifyNewPaymentRequest({
           requestNo: mr.requestNo ?? '',
           amount: mr.amount ?? 0,
-          partyName: mr.partyName ?? '',
+          partyName: mr.partyName ?? null,
+          portalLink: mr.portalLink ?? null,
           requestedBy: userId,
         }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
 
@@ -142,6 +143,36 @@ export class MakerRequestService {
         )[0];
 
         this.logger.info(`Maker Request #${id} status updated to "${body.status}"`);
+
+        if (body.status === 'payment_done') {
+          this.notifications.notifyPaymentDone({
+            amount: updated.amount ?? 0,
+            partyName: updated.partyName ?? null,
+            portalLink: updated.portalLink ?? null,
+            utrNumber: updated.utrNumber ?? null,
+            requestedBy: existing.requestedBy ?? 0,
+          }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+        }
+
+        if (body.status === 'rejected') {
+          this.notifications.notifyRejection({
+            amount: updated.amount ?? 0,
+            partyName: updated.partyName ?? null,
+            portalLink: updated.portalLink ?? null,
+            rejectionReason: body.rejectionReason ?? null,
+            requestedBy: existing.requestedBy ?? 0,
+          }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+        }
+
+        if (body.status === 'maker_done') {
+          this.notifications.notifyMakerDone({
+            amount: updated.amount ?? 0,
+            partyName: updated.partyName ?? null,
+            portalLink: updated.portalLink ?? null,
+            requestedBy: existing.requestedBy ?? 0,
+          }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+        }
+
         return updated;
     }
 
