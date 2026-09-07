@@ -345,7 +345,7 @@ export class CourierService {
                             to: Array.isArray(toEmail) ? toEmail : [toEmail],
                             cc: Array.isArray(ccMail) ? ccMail : [ccMail],
                             subject: "Courier Dispatch Request",
-                            attachments: courierDocs.length ? { files: courierDocs, baseDir: "courier" } : undefined,
+                            attachments: courierDocs.length ? { files: courierDocs.map(d => d.split("/").pop() ?? d), baseDir: "courier" } : undefined,
                         },
                         googleConnection
                     );
