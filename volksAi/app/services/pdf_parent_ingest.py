@@ -285,11 +285,11 @@ def ingest_parent_tender_pdf(
                     p = Path(l["local_path"])
                     if p not in valid_child_pdfs and p != pdf_path and p != atc_path:
                         valid_child_pdfs.append(p)
-            for c_dir in [job_dir / "extracted_children", Path(r"C:\Users\Asus\Desktop\extracted_children")]:
-                if c_dir.exists():
-                    for p in c_dir.glob("*.pdf"):
-                        if p not in valid_child_pdfs and p != pdf_path and p != atc_path and p.stat().st_size > 0:
-                            valid_child_pdfs.append(p)
+            c_dir = job_dir / "extracted_children"
+            if c_dir.exists():
+                for p in c_dir.glob("*.pdf"):
+                    if p not in valid_child_pdfs and p != pdf_path and p != atc_path and p.stat().st_size > 0:
+                        valid_child_pdfs.append(p)
 
             for c_pdf in valid_child_pdfs:
                 try:
@@ -469,6 +469,9 @@ def ingest_parent_tender_pdf(
                     LLMFieldResolver,
                     FIELD_PROMPT_MAP,
                     AMBIGUITY_PRONE_FIELDS,
+                    AMBIGUITY_FIELD_PRIORITY,
+                    LLM_TOKEN_BUDGET_PER_TENDER,
+                    is_unambiguous_layer1,
                 )
                 from app.services.tender_mapper import FIELD_STATUS_OK_FALLBACK, FIELD_STATUS_MISSING
                 _DISPLAY_KEY_TO_LABEL = {
@@ -657,11 +660,54 @@ def ingest_parent_tender_pdf(
                                         })
 
                     # ─── ROLE 2: Ambiguity Resolution ───────────────────────────
-                    ambig_candidates = {
+                    raw_candidates = {
                         k: infosheet_data.get(k)
                         for k in AMBIGUITY_PRONE_FIELDS
                         if k in infosheet_data and infosheet_data.get(k) not in _stub_vals
                     }
+
+                    # Pre-Role-2 Checkpoint: Budget Guard & Unambiguity Filtering
+                    current_raw_tokens = resolver.total_raw_processing_tokens
+                    remaining_budget = LLM_TOKEN_BUDGET_PER_TENDER - current_raw_tokens
+                    logger.info(
+                        "[LLM_BUDGET] Pre-Role-2 check: %d raw tokens consumed, %d remaining of %d budget",
+                        current_raw_tokens, remaining_budget, LLM_TOKEN_BUDGET_PER_TENDER
+                    )
+
+                    ambig_dispositions: Dict[str, str] = {}
+                    ambig_candidates: Dict[str, Any] = {}
+
+                    for f_name, c_val in raw_candidates.items():
+                        # Change 6: Filter out unambiguous Layer 1 extractions
+                        if is_unambiguous_layer1(f_name, c_val, target_text):
+                            ambig_dispositions[f_name] = "skipped_unambiguous_layer1"
+                            logger.info(
+                                "[LLM_AMBIGUITY][Role 2] Skipping '%s': exactly one unambiguous candidate in Layer 1 (%r)",
+                                f_name, c_val
+                            )
+                            continue
+
+                        # Change 5: Actionable budget guard (integer raw_processing_tokens)
+                        f_prio = AMBIGUITY_FIELD_PRIORITY.get(f_name, 3)
+                        if remaining_budget < 4000 and f_prio > 1:
+                            ambig_dispositions[f_name] = "skipped_budget_exhaustion"
+                            logger.warning(
+                                "[LLM_BUDGET][Role 2] Deferring '%s' (priority %d) due to budget exhaustion (consumed: %d, remaining: %d < 4000)",
+                                f_name, f_prio, current_raw_tokens, remaining_budget
+                            )
+                            continue
+                        elif remaining_budget <= 0:
+                            ambig_dispositions[f_name] = "skipped_budget_exhaustion"
+                            logger.warning(
+                                "[LLM_BUDGET][Role 2] Deferring '%s' due to total budget exhaustion (consumed: %d >= %d)",
+                                f_name, current_raw_tokens, LLM_TOKEN_BUDGET_PER_TENDER
+                            )
+                            continue
+
+                        # Eligible for Role 2 evaluation
+                        ambig_candidates[f_name] = c_val
+                        ambig_dispositions[f_name] = "evaluated_role2"
+
                     if ambig_candidates:
                         logger.info("[LLM_AMBIGUITY][Role 2] Reviewing %d ambiguity-prone fields: %s", len(ambig_candidates), list(ambig_candidates.keys()))
                         ambig_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
@@ -728,8 +774,11 @@ def ingest_parent_tender_pdf(
                                     if field_found:
                                         break
 
-                    # Record token usage & cost summary
-                    infosheet_data["_llm_usage"] = resolver.get_usage_summary()
+                    # Record token usage & cost summary including ambiguity dispositions
+                    usage_summary = resolver.get_usage_summary()
+                    usage_summary["ambiguity_dispositions"] = ambig_dispositions
+                    infosheet_data["_llm_usage"] = usage_summary
+                    logger.info("[LLM_USAGE] Summary for tender %s: %s", job_id, usage_summary)
 
                 elif missing_keys and not atc_full_text:
                     logger.info("[LLM_FALLBACK] Skipping LLM — no ATC text available (ATC not downloaded)")

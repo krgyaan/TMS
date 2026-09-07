@@ -32,15 +32,104 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 logger = logging.getLogger(__name__)
 
-# Model and pricing constants (Sonnet 5 standard pricing)
-SONNET_MODEL_DEFAULT = "claude-sonnet-5"
-SONNET_INPUT_PRICE_PER_M = 2.00    # $2.00 per million input tokens
-SONNET_OUTPUT_PRICE_PER_M = 10.00  # $10.00 per million output tokens
+# =============================================================================
+# MODEL IDENTIFIERS & PRICING CONSTANTS
+# Verified on 2026-09-07 via https://docs.claude.com/en/docs/about-claude/pricing
+# If updating models or pricing, re-verify against the official docs URL above.
+# =============================================================================
+ROLE_1_MODEL_DEFAULT = os.getenv("ANTHROPIC_ROLE1_MODEL", "claude-haiku-4-5-20251001")
+ROLE_2_MODEL_DEFAULT = os.getenv("ANTHROPIC_ROLE2_MODEL", "claude-sonnet-5")
+
+# Capped max output token ceilings (tight ceilings preventing runaway output cost)
+ROLE_1_MAX_TOKENS = int(os.getenv("ANTHROPIC_ROLE1_MAX_TOKENS", "600"))
+ROLE_2_MAX_TOKENS = int(os.getenv("ANTHROPIC_ROLE2_MAX_TOKENS", "800"))
+ROLE_1_MAX_TOKENS_RETRY = 1000  # Automatic single retry cap on truncation
+
+# Claude Haiku 4.5 Pricing ($ per million tokens)
+# Live pricing: $1.00 / MTok base input, $5.00 / MTok output
+HAIKU_45_INPUT_PRICE_PER_M = 1.00
+HAIKU_45_OUTPUT_PRICE_PER_M = 5.00
+HAIKU_45_CACHE_WRITE_5M_PER_M = 1.25
+HAIKU_45_CACHE_WRITE_1H_PER_M = 2.00
+HAIKU_45_CACHE_READ_PER_M = 0.10
+
+# Claude Sonnet 5 Pricing ($ per million tokens)
+# Permanent rate: $2.00 / MTok base input, $10.00 / MTok output
+SONNET_5_INPUT_PRICE_PER_M = 2.00
+SONNET_5_OUTPUT_PRICE_PER_M = 10.00
+SONNET_5_CACHE_WRITE_5M_PER_M = 2.50
+SONNET_5_CACHE_WRITE_1H_PER_M = 4.00
+SONNET_5_CACHE_READ_PER_M = 0.20
+
+# Token budget per tender (gates strictly on integer raw_processing_tokens = in + out + cache_create + cache_read)
+LLM_TOKEN_BUDGET_PER_TENDER = int(os.getenv("LLM_TOKEN_BUDGET_PER_TENDER", "20000"))
 
 # Path where few-shot examples accumulate across all parsed documents
 _MEMORY_DIR = Path(__file__).parent.parent / "storage" / "llm_memory"
 _MEMORY_FILE = _MEMORY_DIR / "extraction_memory.json"
 _MEMORY_MAX_EXAMPLES_PER_FIELD = int(os.getenv("LLM_MAX_EXAMPLES_PER_FIELD", "5"))
+
+# Category mappings for Role 1 scoped batching (avoids sending full text or paying repeated overhead)
+FIELD_SECTION_CATEGORY: Dict[str, str] = {
+    # 1. Contacts & Addresses
+    "client_name_1_display": "contacts_bds",
+    "client_email_1_display": "contacts_bds",
+    "client_phone_1_display": "contacts_bds",
+    "client_name_2_display": "contacts_bds",
+    "client_email_2_display": "contacts_bds",
+    "client_phone_2_display": "contacts_bds",
+    "client_name_3_display": "contacts_bds",
+    "client_email_3_display": "contacts_bds",
+    "client_phone_3_display": "contacts_bds",
+    "courier_address_display": "contacts_bds",
+
+    # 2. BEC Technical & Financial Criteria
+    "custom_eligibility_criteria_display": "bec_criteria",
+    "maf_required_display": "bec_criteria",
+    "order_value_1_display": "bec_criteria",
+    "order_value_2_display": "bec_criteria",
+    "order_value_3_display": "bec_criteria",
+    "avg_annual_turnover_value_display": "bec_criteria",
+    "working_capital_value_display": "bec_criteria",
+    "solvency_certificate_value_display": "bec_criteria",
+    "net_worth_value_display": "bec_criteria",
+    "net_worth_type_display": "bec_criteria",
+    "eligibility_criterion_years_display": "bec_criteria",
+
+    # 3. Payment Terms
+    "payment_terms_supply_display": "payment_terms",
+    "payment_terms_installation_display": "payment_terms",
+
+    # 4. PBG & Security Deposit
+    "pbg_percentage_display": "pbg_sd",
+    "pbg_duration_display": "pbg_sd",
+    "pbg_mode_display": "pbg_sd",
+    "sd_required_display": "pbg_sd",
+    "sd_mode_display": "pbg_sd",
+    "sd_percentage_display": "pbg_sd",
+    "sd_duration_display": "pbg_sd",
+
+    # 5. PRS & LD
+    "ld_percentage_display": "prs_ld",
+    "max_ld_percentage_display": "prs_ld",
+
+    # 6. Delivery Timeline
+    "delivery_time_supply_display": "delivery_timeline",
+    "delivery_time_installation_display": "delivery_timeline",
+
+    # 7. Commercial & Reverse Auction
+    "commercial_evaluation_display": "commercial_ra",
+    "reverse_auction_applicable_display": "commercial_ra",
+}
+
+# Priority ranking for Role 2 ambiguity resolution when budget is constrained
+AMBIGUITY_FIELD_PRIORITY: Dict[str, int] = {
+    "net_worth_type_display": 1,        # Priority 1: High disqualification risk
+    "payment_terms_supply_display": 2,  # Priority 2: Direct commercial milestone payments
+    "payment_terms_installation_display": 2,
+    "delivery_time_supply_display": 3,  # Priority 3: Can safely fall back with candidate qualification
+    "delivery_time_installation_display": 3,
+}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Configurable Ambiguity-Prone Fields & Semantic Definitions (Role 2)
@@ -62,13 +151,18 @@ AMBIGUITY_FIELD_DEFINITIONS: Dict[str, str] = {
     ),
     "payment_terms_supply_display": (
         "Percentage of contract/order value paid for goods supply milestone upon receipt/delivery of materials. "
-        "Differentiate milestone-based terms (e.g. '70%', '80%', '85%') from general dispatch terms (e.g. '95%'). "
-        "If the tender specifies a milestone schedule (e.g. 70% on supply, 30% on installation; or 80% on supply, 20% on installation; "
-        "or 85% on supply, 15% on installation), extract the supply milestone percentage. Return as percentage string (e.g. '80%')."
+        "CRITICAL RULE: If the scoped tender clauses specify a milestone schedule (such as 70% on supply, 30% on installation; "
+        "or 80% on supply, 20% on installation; or 85% on supply, 15% on installation), extract the supply milestone percentage. "
+        "If the candidate value matches the milestone percentage explicitly specified in the scoped clauses (e.g. '70%', '80%', '85%'), "
+        "choose action='confirm'. NEVER override with numbers (such as 95% or 5%) not literally present in the scoped text. "
+        "Return as percentage string (e.g. '70%', '80%', '85%')."
     ),
     "payment_terms_installation_display": (
         "Percentage of contract/order value paid upon completion of installation, testing, and commissioning milestone "
-        "(e.g. '30%', '20%', '15%', '5%'). Must pair with the supply milestone. Return as percentage string (e.g. '20%')."
+        "(e.g. '30%', '20%', '15%'). Must pair with the supply milestone. "
+        "CRITICAL RULE: If the candidate value matches the installation milestone in the scoped clauses (e.g. '30%', '20%', '15%'), "
+        "choose action='confirm'. NEVER override with figures not explicitly present in the scoped text. "
+        "Return as percentage string (e.g. '30%', '20%', '15%')."
     ),
     "delivery_time_supply_display": (
         "Goods supply delivery timeline in days (e.g. '90 Days', '140 Days', '150 Days'). "
@@ -357,38 +451,74 @@ FIELD_PROMPT_MAP: Dict[str, Tuple[str, str, str, Any]] = {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Scoped Context Extractor for Role 2 (Ambiguity Resolution)
+# Scoped Context Extractor for Role 1 & Role 2
 # ─────────────────────────────────────────────────────────────────────────────
-def extract_scoped_context(full_text: str, field_name: str) -> str:
+def extract_scoped_context(full_text: str, target: str) -> str:
     """
-    Extracts scoped document sections relevant to specific ambiguous fields
+    Extracts scoped document sections relevant to specific ambiguous fields or categories
     to keep token usage minimal and focus Claude on relevant clauses.
-    Instruments and logs section names and character counts per field.
+    Instruments and logs section names and character counts.
     """
     if not full_text:
-        logger.info("[SCOPED_CONTEXT] Field '%s': empty full_text provided (0 chars)", field_name)
+        logger.info("[SCOPED_CONTEXT] Target '%s': empty full_text provided (0 chars)", target)
         return ""
+    
     snippets = []
     section_names = []
+    t_lower = target.lower()
 
-    if "net_worth" in field_name:
+    # Determine category matching
+    is_contacts = "contacts" in t_lower or "client" in t_lower or "courier" in t_lower or "address" in t_lower
+    is_bec = (
+        "bec" in t_lower or "eligibility" in t_lower or "net_worth" in t_lower
+        or "order_value" in t_lower or "turnover" in t_lower or "working_capital" in t_lower
+        or "solvency" in t_lower or "maf" in t_lower or "years" in t_lower
+    )
+    is_payment = "payment" in t_lower
+    is_pbg_sd = "pbg" in t_lower or "epbg" in t_lower or "sd" in t_lower or "security" in t_lower or "cps" in t_lower
+    is_prs_ld = "prs" in t_lower or "ld" in t_lower or "liquidated" in t_lower or "delay" in t_lower
+    is_delivery = "delivery" in t_lower or "timeline" in t_lower or "completion" in t_lower or "period" in t_lower
+    is_commercial = "commercial" in t_lower or "reverse_auction" in t_lower or "ra" in t_lower or "evaluation" in t_lower
+
+    if is_contacts:
+        # 1. IFB Tag (G)/(H), Contact details, dealing officer
+        for m in re.finditer(
+            r"(?:TAG\s*[\(\[]?[GgHh][\)\]]?|CONTACT\s+DETAILS|TENDER\s+DEALING\s+OFFICER|NODAL\s+OFFICER|OFFICER\s+DETAILS|COURIER\s+ADDRESS|COMMUNICATION\s+ADDRESS|OFFICE\s+ADDRESS|DEALING\s+GAIL['’]?S\s+OFFICE)[\s\S]{0,2500}",
+            full_text, re.IGNORECASE
+        ):
+            snippets.append(f"=== Contacts & Address Block (pos {m.start()}) ===\n" + m.group(0).strip())
+            section_names.append(f"Contacts Block (pos {m.start()})")
+
+        # 2. Section-III BDS / Bidding Data Sheet
+        bds_m = re.search(
+            r"(?:SECTION\s*[-–—]?\s*III\b|BIDDING\s+DATA\s+SHEET|\bBDS\b)[\s\S]{0,6000}?(?=(?:SECTION\s*[-–—]?\s*IV|\Z))",
+            full_text, re.IGNORECASE
+        )
+        if bds_m:
+            snippets.append("=== SECTION-III / BIDDING DATA SHEET (BDS) ===\n" + bds_m.group(0).strip())
+            section_names.append("SECTION-III / BDS")
+
+    if is_bec:
         # 1. Section-II / BEC block
         bec_m = re.search(
-            r"(?:SECTION\s*[-–—]?\s*II\b|BID\s+EVALUATION\s+CRITERIA|\bBEC\b)[\s\S]{0,5000}?(?=(?:SECTION\s*[-–—]?\s*III|BIDDING\s+DATA\s+SHEET|\bBDS\b|\Z))",
+            r"(?:SECTION\s*[-–—]?\s*II\b|BID\s+EVALUATION\s+CRITERIA|\bBEC\b)[\s\S]{0,7000}?(?=(?:SECTION\s*[-–—]?\s*III|BIDDING\s+DATA\s+SHEET|\bBDS\b|\Z))",
             full_text, re.IGNORECASE
         )
         if bec_m:
             snippets.append("=== SECTION-II / BID EVALUATION CRITERIA (BEC) ===\n" + bec_m.group(0).strip())
             section_names.append("SECTION-II / BEC")
 
-        # 2. Occurrences of net worth and financial criteria
-        for m in re.finditer(r"\b(?:net\s*worth|financial\s+criteria|financial\s+exemption)\b", full_text, re.IGNORECASE):
+        # 2. Occurrences of net worth, turnover, working capital, solvency, MAF
+        for m in re.finditer(
+            r"\b(?:net\s*worth|financial\s+criteria|annual\s+turnover|working\s+capital|solvency\s+certificate|manufacturer\s+authorization|executed\s+order)\b",
+            full_text, re.IGNORECASE
+        ):
             start = max(0, m.start() - 300)
-            end = min(len(full_text), m.end() + 600)
+            end = min(len(full_text), m.end() + 700)
             snippets.append(f"=== Clause Context: '{m.group(0)}' ===\n" + full_text[start:end].strip())
             section_names.append(f"Clause: '{m.group(0)}'")
 
-    elif "payment" in field_name:
+    if is_payment:
         # Search for payment terms clauses with prioritized milestone matching
         found_matches = []
         for m in re.finditer(
@@ -398,13 +528,11 @@ def extract_scoped_context(full_text: str, field_name: str) -> str:
             start = max(0, m.start() - 200)
             end = min(len(full_text), m.end() + 1500)
             clause_text = full_text[start:end].strip()
-            # Prioritize clauses with milestone percentages (70/30, 80/20, 90/10) over generic boilerplate
             has_milestone_pct = bool(re.search(r"\b(?:70|80|90|30|20|10|95|5)\s*%", clause_text))
             has_supply_install = bool(re.search(r"\b(?:supply|installation|receipt|commissioning)\b", clause_text, re.IGNORECASE))
             score = (2 if has_milestone_pct else 0) + (1 if has_supply_install else 0)
             found_matches.append((score, m.start(), m.group(0), clause_text))
 
-        # Sort higher-relevance milestone clauses first
         found_matches.sort(key=lambda x: (x[0], -x[1]), reverse=True)
         for score, pos, header, clause_text in found_matches:
             snippets.append(f"=== Payment Clause: '{header}' (pos {pos}) ===\n{clause_text}")
@@ -419,7 +547,23 @@ def extract_scoped_context(full_text: str, field_name: str) -> str:
             snippets.append("=== SPECIAL CONDITIONS OF CONTRACT (SCC) ===\n" + scc_m.group(0)[:3000].strip())
             section_names.append("SCC Section")
 
-    elif "delivery" in field_name:
+    if is_pbg_sd:
+        for m in re.finditer(
+            r"(?:ePBG\s+Detail|CONTRACT\s+PERFORMANCE\s+SECURITY|PERFORMANCE\s+BANK\s+GUARANTEE|SECURITY\s+DEPOSIT|\bPBG\b|\bCPS\b)[\s\S]{0,3500}",
+            full_text, re.IGNORECASE
+        ):
+            snippets.append(f"=== PBG / Security Deposit Block (pos {m.start()}) ===\n" + m.group(0).strip())
+            section_names.append(f"PBG/SD Block (pos {m.start()})")
+
+    if is_prs_ld:
+        for m in re.finditer(
+            r"(?:PRICE\s+REDUCTION\s+SCHEDULE|\bPRS\b|LIQUIDATED\s+DAMAGES|\bLD\b)[\s\S]{0,2500}",
+            full_text, re.IGNORECASE
+        ):
+            snippets.append(f"=== PRS / LD Block (pos {m.start()}) ===\n" + m.group(0).strip())
+            section_names.append(f"PRS/LD Block (pos {m.start()})")
+
+    if is_delivery:
         found_delivery = []
         for m in re.finditer(
             r"(?:DELIVERY\s+PERIOD|PERIOD\s+OF\s+WORK|TIME\s+FOR\s+COMPLETION|COMPLETION\s+SCHEDULE|DELIVERY\s+SCHEDULE)",
@@ -437,25 +581,69 @@ def extract_scoped_context(full_text: str, field_name: str) -> str:
             snippets.append(f"=== Delivery / Completion Clause: '{header}' (pos {pos}) ===\n{d_text}")
             section_names.append(f"Delivery Clause: '{header}' (score={score})")
 
+    if is_commercial:
+        for m in re.finditer(
+            r"(?:COMMERCIAL\s+EVALUATION|EVALUATION\s+METHOD|REVERSE\s+AUCTION|BID\s+TO\s+RA)[\s\S]{0,2500}",
+            full_text, re.IGNORECASE
+        ):
+            snippets.append(f"=== Commercial / Evaluation Block (pos {m.start()}) ===\n" + m.group(0).strip())
+            section_names.append(f"Commercial Block (pos {m.start()})")
+
     if not snippets:
-        # Fallback to first 8000 characters if no specialized section matched
         fallback_text = full_text[:8000]
         logger.warning(
-            "[SCOPED_CONTEXT] Field '%s': NO specific section matched! Falling back to first 8000 characters (%d chars).",
-            field_name, len(fallback_text)
+            "[SCOPED_CONTEXT] Target '%s': NO specific section matched! Falling back to first 8000 characters (%d chars).",
+            target, len(fallback_text)
         )
         return fallback_text
 
-    # Combine top distinct snippet blocks, capping total character length at 15000
     combined = "\n\n".join(snippets[:6])
-    final_scoped = combined[:15000]
+    final_scoped = combined[:12000]
 
     logger.info(
-        "[SCOPED_CONTEXT] Field '%s': Selected %d sections (%s) -> Total %d characters sent (full doc: %d chars, %.1f%% of full doc)",
-        field_name, len(section_names[:6]), section_names[:6], len(final_scoped), len(full_text),
+        "[SCOPED_CONTEXT] Target '%s': Selected %d sections (%s) -> Total %d characters sent (full doc: %d chars, %.1f%% of full doc)",
+        target, len(section_names[:6]), section_names[:6], len(final_scoped), len(full_text),
         (len(final_scoped) / max(len(full_text), 1)) * 100
     )
     return final_scoped
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Ambiguity Filter (Change 6: Skip Role 2 on Unambiguous Layer 1 Candidates)
+# ─────────────────────────────────────────────────────────────────────────────
+def is_unambiguous_layer1(field_name: str, candidate_val: Any, doc_text: str) -> bool:
+    """
+    Check if Layer 1 found exactly one unambiguous candidate in doc_text.
+    Returns True if candidate is unambiguous (safe to skip Role 2).
+    Returns False if conflicting or multiple candidate clauses exist.
+    """
+    if not candidate_val or str(candidate_val).strip() in ("NA", "Not Found", "None", "", "⚠️ MISSING"):
+        return True  # Nothing to disambiguate
+
+    t_lower = doc_text.lower()
+    if field_name == "net_worth_type_display":
+        # Conflict exists if document has positive requirement AND financial exemption/not-applicable
+        has_positive = bool(re.search(r"\b(?:must\s+be\s+positive|positive\s+net\s*worth|net\s*worth[^\.\n]{0,30}positive)\b", t_lower))
+        has_exempt = bool(re.search(r"\b(?:financial\s+criteria[^\.\n]{0,50}not\s+applicable|net\s*worth[^\.\n]{0,50}(?:not\s+applicable|exempt))\b", t_lower))
+        if has_positive and has_exempt:
+            return False
+        return True
+
+    elif field_name in ("payment_terms_supply_display", "payment_terms_installation_display"):
+        # Find distinct milestone percentages in payment clauses
+        pay_matches = set(re.findall(r"(?:terms\s+of\s+payment|payment\s+terms)[\s\S]{0,1000}?\b(95|90|85|80|75|70|60|50|40|30|20|15|10|5)\s*%", t_lower))
+        if len(pay_matches) > 2:
+            return False
+        return True
+
+    elif field_name in ("delivery_time_supply_display", "delivery_time_installation_display"):
+        # Check if multiple distinct delivery periods appear
+        delivery_nums = set(re.findall(r"(?:delivery|completion)[^\.\n]{0,50}?\b(\d+)\s*(?:days|months|weeks)\b", t_lower))
+        if len(delivery_nums) > 1:
+            return False
+        return True
+
+    return True
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -501,6 +689,10 @@ def _save_memory(field_key: str, anchor_text: str, value: Any, doc_type: str, co
         logger.info("[LLM_MEMORY] Saved example for field '%s': %r", field_key, str(value)[:60])
     except Exception as e:
         logger.warning("[LLM_MEMORY] Could not save example: %s", e)
+
+def record_correction(field_key: str, value: Any, anchor_text: str, doc_type: str = "GAIL_GOODS", confidence: float = 0.99):
+    """Record a user or gold-standard correction into few-shot memory."""
+    _save_memory(field_key, anchor_text, value, doc_type, confidence)
 
 def _anonymize_few_shot_value(display_key: str, val: Any) -> Any:
     """Anonymize literal field values to prevent cross-tender value leakage during few-shot prompting."""
@@ -619,16 +811,18 @@ def _build_ambiguity_tool_schema() -> Dict[str, Any]:
 class LLMFieldResolver:
     """
     Sole LLM Resolver for VolksAI / Tender Volks.
-    Powered by Anthropic Claude (claude-sonnet-5) with strict tool use output.
-    Executes:
-      Role 1: Missing-field fallback
-      Role 2: Ambiguity resolution on AMBIGUITY_PRONE_FIELDS
+    Role 1: Missing-field fallback via schema-constrained Anthropic Tool Use (Claude Haiku 4.5)
+            Batched by category slices with scoped context and 600-token cap + 1000-token retry.
+    Role 2: Ambiguity resolution via scoped clause evaluation (Claude Sonnet 5)
+            Runs on configured AMBIGUITY_PRONE_FIELDS with 800-token cap and sibling reasoning.
     """
 
     def __init__(
         self,
         *,
         model: Optional[str] = None,
+        role1_model: Optional[str] = None,
+        role2_model: Optional[str] = None,
         api_key: Optional[str] = None,
         timeout: float = 25.0,
     ):
@@ -642,41 +836,108 @@ class LLMFieldResolver:
         if not anthropic_key or "placeholder" in anthropic_key.lower() or "your_claude" in anthropic_key.lower():
             raise RuntimeError(
                 "FATAL: ANTHROPIC_API_KEY is not configured or is a placeholder. "
-                "Claude (claude-sonnet-5) is required for tender field resolution."
+                "Anthropic Claude API key is required for tender field resolution."
             )
 
         self.api_key = anthropic_key
         self.provider = "anthropic"
-        self.model_name = model or os.getenv("ANTHROPIC_MODEL", SONNET_MODEL_DEFAULT)
+        self.role1_model = role1_model or os.getenv("ANTHROPIC_ROLE1_MODEL") or model or ROLE_1_MODEL_DEFAULT
+        self.role2_model = role2_model or os.getenv("ANTHROPIC_ROLE2_MODEL") or model or ROLE_2_MODEL_DEFAULT
+        self.model_name = self.role1_model  # Backwards compatibility attribute
         self.timeout = float(timeout)
         self.enabled = os.getenv("LLM_FALLBACK_ENABLED", "true").lower() == "true"
 
         import anthropic
         self.client = anthropic.Anthropic(api_key=self.api_key, timeout=self.timeout)
 
-        # Token and cost tracking
+        # Token and cost tracking (Multi-metric tracking)
         self.total_input_tokens: int = 0
         self.total_output_tokens: int = 0
+        self.total_cache_creation_tokens: int = 0
+        self.total_cache_read_tokens: int = 0
+        self.total_raw_processing_tokens: int = 0
         self.total_cost_usd: float = 0.0
+        self.role1_retries: int = 0
 
-    def record_usage(self, in_tok: int, out_tok: int):
-        """Record token counts and update estimated cost in USD."""
+    def record_usage(
+        self,
+        usage_or_in_tok: Any,
+        out_tok_or_role: Any = None,
+        role: str = "role1",
+    ):
+        """
+        Record token counts and update estimated cost in USD.
+        Gated integer tracking relies strictly on raw_processing_tokens (in + out + cache_create + cache_read).
+        """
+        if usage_or_in_tok is None:
+            return
+
+        if isinstance(usage_or_in_tok, (int, float)):
+            in_tok = int(usage_or_in_tok)
+            out_tok = int(out_tok_or_role) if isinstance(out_tok_or_role, (int, float)) else 0
+            cache_create = 0
+            cache_read = 0
+            effective_role = role
+        else:
+            usage = usage_or_in_tok
+            in_tok = int(getattr(usage, "input_tokens", 0) or 0)
+            out_tok = int(getattr(usage, "output_tokens", 0) or 0)
+            cache_create = int(getattr(usage, "cache_creation_input_tokens", 0) or 0)
+            cache_read = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
+            effective_role = out_tok_or_role if isinstance(out_tok_or_role, str) else role
+
         self.total_input_tokens += in_tok
         self.total_output_tokens += out_tok
-        cost = (in_tok / 1_000_000 * SONNET_INPUT_PRICE_PER_M) + (out_tok / 1_000_000 * SONNET_OUTPUT_PRICE_PER_M)
-        self.total_cost_usd += cost
+        self.total_cache_creation_tokens += cache_create
+        self.total_cache_read_tokens += cache_read
+
+        raw_toks = in_tok + out_tok + cache_create + cache_read
+        self.total_raw_processing_tokens += raw_toks
+
+        # Calculate cost based on role pricing constants
+        if effective_role == "role2":
+            in_rate = SONNET_5_INPUT_PRICE_PER_M
+            out_rate = SONNET_5_OUTPUT_PRICE_PER_M
+            cache_write_rate = SONNET_5_CACHE_WRITE_5M_PER_M
+            cache_read_rate = SONNET_5_CACHE_READ_PER_M
+        else:
+            in_rate = HAIKU_45_INPUT_PRICE_PER_M
+            out_rate = HAIKU_45_OUTPUT_PRICE_PER_M
+            cache_write_rate = HAIKU_45_CACHE_WRITE_5M_PER_M
+            cache_read_rate = HAIKU_45_CACHE_READ_PER_M
+
+        call_cost = (
+            (in_tok / 1_000_000 * in_rate)
+            + (out_tok / 1_000_000 * out_rate)
+            + (cache_create / 1_000_000 * cache_write_rate)
+            + (cache_read / 1_000_000 * cache_read_rate)
+        )
+        self.total_cost_usd += call_cost
 
     def get_usage_summary(self) -> Dict[str, Any]:
-        """Return cumulative token usage and estimated cost."""
+        """Return cumulative token usage, cache metrics, and estimated cost."""
+        total_in_cache_eligible = self.total_input_tokens + self.total_cache_read_tokens
+        cache_hit_rate = (
+            round((self.total_cache_read_tokens / total_in_cache_eligible) * 100, 1)
+            if total_in_cache_eligible > 0 else 0.0
+        )
         return {
+            "role1_model": self.role1_model,
+            "role2_model": self.role2_model,
             "input_tokens": self.total_input_tokens,
             "output_tokens": self.total_output_tokens,
-            "total_tokens": self.total_input_tokens + self.total_output_tokens,
+            "cache_creation_tokens": self.total_cache_creation_tokens,
+            "cache_read_tokens": self.total_cache_read_tokens,
+            "raw_tokens": self.total_raw_processing_tokens,
+            "raw_processing_tokens": self.total_raw_processing_tokens,
+            "total_tokens": self.total_raw_processing_tokens,  # alias for backwards compatibility
+            "cache_hit_rate_pct": cache_hit_rate,
+            "role1_retries": self.role1_retries,
             "estimated_cost_usd": round(self.total_cost_usd, 5),
         }
 
     # ─────────────────────────────────────────────────────────────────────────
-    # ROLE 1: Missing-Field Fallback (Tool Use)
+    # ROLE 1: Missing-Field Fallback (Category Batching & Tool Use)
     # ─────────────────────────────────────────────────────────────────────────
     def resolve_missing_fields(
         self,
@@ -685,7 +946,10 @@ class LLMFieldResolver:
         doc_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Role 1: Extracts missing fields using schema-constrained tool use.
+        Role 1: Extracts missing fields using schema-constrained tool use on Claude Haiku 4.5.
+        Batches missing fields by section category and uses extract_scoped_context() to keep context minimal.
+        Enforces ROLE_1_MAX_TOKENS (600) with a single 1000-token retry on truncation.
+        Uses ephemeral prompt caching on static system instruction and tool schema.
         """
         if not self.enabled:
             logger.info("[LLM_FALLBACK] LLM resolution is disabled via LLM_FALLBACK_ENABLED=false")
@@ -697,83 +961,117 @@ class LLMFieldResolver:
 
         logger.info(
             "[LLM_FALLBACK][Role 1] Resolving %d missing fields via Claude (%s): %s",
-            len(known_missing), self.model_name, known_missing,
+            len(known_missing), self.role1_model, known_missing,
         )
 
         detected_type = doc_type or self._detect_doc_type(atc_full_text)
         memory = _load_memory()
-        few_shot_section = _build_few_shot_section(known_missing, memory)
 
-        system_instruction = GAIL_GEM_SYSTEM_INSTRUCTION.format(few_shot_section=few_shot_section)
-        
-        # Build tool schema
-        tool_spec = _build_missing_fields_tool_schema(known_missing)
+        # Group missing fields into categories
+        category_batches: Dict[str, List[str]] = {}
+        for f in known_missing:
+            cat = FIELD_SECTION_CATEGORY.get(f, "bec_criteria")
+            category_batches.setdefault(cat, []).append(f)
 
-        field_descriptions = "\n".join(
-            f"- `{entry[0]}`: {entry[2]}"
-            for f in known_missing
-            for entry in [FIELD_PROMPT_MAP[f]]
-        )
-        user_prompt = (
-            f"Extract the following missing fields from this government procurement tender document.\n\n"
-            f"Fields to extract:\n{field_descriptions}\n\n"
-            f"Tender Document Text:\n--- START OF DOCUMENT ---\n{atc_full_text[:120000]}\n--- END OF DOCUMENT ---"
-        )
+        prompt_to_display = {entry[0]: disp_key for disp_key, entry in FIELD_PROMPT_MAP.items()}
+        results: Dict[str, Any] = {}
 
-        try:
-            response = self.client.messages.create(
-                model=self.model_name,
-                max_tokens=2048,
-                system=system_instruction,
-                messages=[{"role": "user", "content": user_prompt}],
-                tools=[tool_spec],
-                tool_choice={"type": "tool", "name": "extract_missing_fields"},
+        for cat, cat_fields in category_batches.items():
+            scoped_text = extract_scoped_context(atc_full_text, cat)
+            logger.info(
+                "[SCOPED_CONTEXT][Role 1] Category '%s' (%d fields: %s): Scoped %d chars from %d full doc chars",
+                cat, len(cat_fields), cat_fields, len(scoped_text), len(atc_full_text)
             )
 
-            # Record tokens
-            if hasattr(response, "usage") and response.usage:
-                self.record_usage(response.usage.input_tokens, response.usage.output_tokens)
-                logger.info(
-                    "[LLM_FALLBACK][Role 1] Token usage: %d in / %d out (Est. cost: $%.5f USD)",
-                    response.usage.input_tokens, response.usage.output_tokens, self.total_cost_usd
-                )
+            few_shot_section = _build_few_shot_section(cat_fields, memory)
+            system_instruction_text = GAIL_GEM_SYSTEM_INSTRUCTION.format(few_shot_section=few_shot_section)
 
-            extracted_dict: Dict[str, Any] = {}
-            for block in response.content:
-                if getattr(block, "type", "") == "tool_use" and getattr(block, "name", "") == "extract_missing_fields":
-                    extracted_dict = getattr(block, "input", {}) or {}
+            system_blocks = [
+                {
+                    "type": "text",
+                    "text": system_instruction_text,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
+
+            tool_spec = _build_missing_fields_tool_schema(cat_fields)
+            tool_spec["cache_control"] = {"type": "ephemeral"}
+
+            field_descriptions = "\n".join(
+                f"- `{entry[0]}`: {entry[2]}"
+                for f in cat_fields
+                for entry in [FIELD_PROMPT_MAP[f]]
+            )
+            user_prompt = (
+                f"Extract the following missing fields from the scoped procurement tender section below.\n\n"
+                f"Category: {cat}\n"
+                f"Fields to extract:\n{field_descriptions}\n\n"
+                f"Scoped Tender Clauses:\n--- START OF RELEVANT CLAUSES ---\n{scoped_text}\n--- END OF RELEVANT CLAUSES ---"
+            )
+
+            # Execution with truncation recovery
+            max_tokens_to_use = ROLE_1_MAX_TOKENS
+            for attempt in range(2):
+                try:
+                    response = self.client.messages.create(
+                        model=self.role1_model,
+                        max_tokens=max_tokens_to_use,
+                        system=system_blocks,
+                        messages=[{"role": "user", "content": user_prompt}],
+                        tools=[tool_spec],
+                        tool_choice={"type": "tool", "name": "extract_missing_fields"},
+                    )
+
+                    if hasattr(response, "usage") and response.usage:
+                        self.record_usage(response.usage, role="role1")
+                        logger.info(
+                            "[LLM_FALLBACK][Role 1] Category '%s' token usage: %d in / %d out (Est. total cost: $%.5f USD)",
+                            cat, response.usage.input_tokens, response.usage.output_tokens, self.total_cost_usd
+                        )
+
+                    stop_reason = getattr(response, "stop_reason", None)
+                    if stop_reason == "max_tokens" and attempt == 0:
+                        self.role1_retries += 1
+                        max_tokens_to_use = ROLE_1_MAX_TOKENS_RETRY
+                        logger.warning(
+                            "[LLM_FALLBACK][Role 1] Output truncated (stop_reason='max_tokens') for category '%s'! Retrying once with max_tokens=%d...",
+                            cat, max_tokens_to_use
+                        )
+                        continue
+
+                    extracted_dict: Dict[str, Any] = {}
+                    for block in response.content:
+                        if getattr(block, "type", "") == "tool_use" and getattr(block, "name", "") == "extract_missing_fields":
+                            extracted_dict = getattr(block, "input", {}) or {}
+                            break
+
+                    for prompt_field, raw_val in extracted_dict.items():
+                        if raw_val is None:
+                            continue
+                        display_key = prompt_to_display.get(prompt_field)
+                        if not display_key or display_key not in cat_fields:
+                            continue
+
+                        formatter = FIELD_PROMPT_MAP[display_key][3]
+                        formatted_val = formatter(raw_val) if callable(formatter) else str(raw_val)
+
+                        if formatted_val is not None and str(formatted_val).strip():
+                            results[display_key] = {
+                                "value": formatted_val,
+                                "raw_value": raw_val,
+                                "confidence": 0.85,
+                                "source": "llm",
+                            }
+                            _save_memory(display_key, str(raw_val), formatted_val, detected_type, confidence=0.85)
+
+                    break  # Successful attempt, exit attempt loop
+
+                except Exception as exc:
+                    logger.error("[LLM_FALLBACK][Role 1] Claude extraction failed for category '%s': %s", cat, exc)
                     break
 
-            # Map raw tool outputs to formatted display values
-            prompt_to_display = {entry[0]: disp_key for disp_key, entry in FIELD_PROMPT_MAP.items()}
-            results: Dict[str, Any] = {}
-
-            for prompt_field, raw_val in extracted_dict.items():
-                if raw_val is None:
-                    continue
-                display_key = prompt_to_display.get(prompt_field)
-                if not display_key or display_key not in known_missing:
-                    continue
-
-                formatter = FIELD_PROMPT_MAP[display_key][3]
-                formatted_val = formatter(raw_val) if callable(formatter) else str(raw_val)
-
-                if formatted_val is not None and str(formatted_val).strip():
-                    results[display_key] = {
-                        "value": formatted_val,
-                        "raw_value": raw_val,
-                        "confidence": 0.85,
-                        "source": "llm",
-                    }
-                    # Save to few-shot memory
-                    _save_memory(display_key, str(raw_val), formatted_val, detected_type, confidence=0.85)
-
-            logger.info("[LLM_FALLBACK][Role 1] Successfully resolved %d/%d fields via Claude", len(results), len(known_missing))
-            return results
-
-        except Exception as exc:
-            logger.error("[LLM_FALLBACK][Role 1] Claude extraction failed: %s", exc)
-            return {}
+        logger.info("[LLM_FALLBACK][Role 1] Successfully resolved %d/%d fields via Claude", len(results), len(known_missing))
+        return results
 
     # ─────────────────────────────────────────────────────────────────────────
     # ROLE 2: Ambiguity Resolution (Clause Scoping & Reasoning)
@@ -785,8 +1083,9 @@ class LLMFieldResolver:
         doc_type: Optional[str] = None,
     ) -> Dict[str, Dict[str, Any]]:
         """
-        Role 2: Re-evaluates ambiguity-prone fields against scoped document clauses.
+        Role 2: Re-evaluates ambiguity-prone fields against scoped document clauses using Claude Sonnet 5.
         Either confirms the regex candidate or overrides it with a corrected value and reasoning.
+        Enforces ROLE_2_MAX_TOKENS (800) and prompt caching.
         """
         if not self.enabled:
             return {}
@@ -797,7 +1096,7 @@ class LLMFieldResolver:
 
         logger.info(
             "[LLM_AMBIGUITY][Role 2] Reviewing %d ambiguity-prone fields via Claude (%s): %s",
-            len(fields_to_check), self.model_name, fields_to_check,
+            len(fields_to_check), self.role2_model, fields_to_check,
         )
 
         # Build scoped context for all requested fields
@@ -812,6 +1111,7 @@ class LLMFieldResolver:
             combined_scoped_text = full_text[:15000]
 
         tool_spec = _build_ambiguity_tool_schema()
+        tool_spec["cache_control"] = {"type": "ephemeral"}
 
         field_prompts = []
         for f in fields_to_check:
@@ -823,14 +1123,24 @@ class LLMFieldResolver:
                 f"  Target Meaning & Business Rule: {desc}"
             )
 
+        system_blocks = [
+            {
+                "type": "text",
+                "text": (
+                    "You are an expert procurement auditor reviewing candidate fields extracted from an Indian government tender.\n"
+                    "Layer 1 regex extraction may have matched legal boilerplate or the wrong milestone schedule.\n"
+                    "Evaluate each candidate value against the scoped clauses to either confirm or override with reasoning."
+                ),
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
+
         user_prompt = (
-            "You are an expert procurement auditor reviewing candidate fields extracted from an Indian government tender.\n"
-            "Layer 1 regex extraction may have matched legal boilerplate or the wrong milestone schedule.\n\n"
-            "Review each field below against the provided scoped tender clauses:\n"
+            "Review each candidate field below against the provided scoped tender clauses:\n"
             "1. If the candidate value is accurate and matches the tender-specific criteria, choose action='confirm'.\n"
-            "2. If the candidate value is wrong (e.g. GCC boilerplate 'Positive' when BEC declares financial criteria exempt; "
-            "or general dispatch % instead of milestone supply %), "
-            "choose action='override', provide the corrected 'resolved_value', and a clear one-line 'reasoning'.\n"
+            "2. If the candidate value is wrong (e.g. GCC boilerplate 'Positive' when BEC declares financial criteria exempt), "
+            "choose action='override', provide the corrected 'resolved_value', and a clear one-line 'reasoning'. "
+            "CRITICAL: Never invent, extrapolate, or hallucinate figures (such as 95% or 5%) not literally present in the scoped clauses.\n"
             "3. SPECIAL RULE FOR DELIVERY TIME FIELDS (delivery_time_supply_display, delivery_time_installation_display):\n"
             "   - If the tender clauses state an overall contract completion or delivery period (e.g. 150 Days, 90 Days, 140 Days, 365 Days) "
             "but do NOT isolate a distinct supply-only figure, DO NOT collapse the value to a bare 'Not Specified' or null!\n"
@@ -845,18 +1155,18 @@ class LLMFieldResolver:
 
         try:
             response = self.client.messages.create(
-                model=self.model_name,
-                max_tokens=2048,
+                model=self.role2_model,
+                max_tokens=ROLE_2_MAX_TOKENS,
+                system=system_blocks,
                 messages=[{"role": "user", "content": user_prompt}],
                 tools=[tool_spec],
                 tool_choice={"type": "tool", "name": "resolve_ambiguous_fields"},
             )
 
-            # Record tokens
             if hasattr(response, "usage") and response.usage:
-                self.record_usage(response.usage.input_tokens, response.usage.output_tokens)
+                self.record_usage(response.usage, role="role2")
                 logger.info(
-                    "[LLM_AMBIGUITY][Role 2] Token usage: %d in / %d out (Est. cost: $%.5f USD)",
+                    "[LLM_AMBIGUITY][Role 2] Token usage: %d in / %d out (Est. total cost: $%.5f USD)",
                     response.usage.input_tokens, response.usage.output_tokens, self.total_cost_usd
                 )
 

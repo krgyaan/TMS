@@ -1056,17 +1056,9 @@ def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[Li
         try:
             import fitz
             from pathlib import Path
-            candidate_dirs = []
             if job_id and job_id != "Unknown":
                 from app.core.constants import STORAGE_ROOT
-                candidate_dirs.append(Path(STORAGE_ROOT) / "jobs" / job_id / "extracted_children")
-                candidate_dirs.append(Path("storage/jobs") / job_id / "extracted_children")
-            candidate_dirs.extend([
-                Path("gold_standard/tenders/extracted_children"),
-                Path(r"C:\Users\Asus\Desktop\extracted_children"),
-                Path("extracted_children")
-            ])
-            for c_dir in candidate_dirs:
+                c_dir = Path(STORAGE_ROOT) / "jobs" / job_id / "extracted_children"
                 if c_dir.exists():
                     for atc_file in c_dir.glob("*.pdf"):
                         try:
@@ -1075,7 +1067,6 @@ def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[Li
                                 full_text += "\n" + (page.get_text() or "")
                         except Exception:
                             pass
-                    break
         except Exception:
             pass
 
