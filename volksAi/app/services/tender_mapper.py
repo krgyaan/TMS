@@ -716,9 +716,21 @@ def resolve_field_staged(
     Pass 4: Fallback Assignment (NA)
     """
     # Pass 1: Check 2D Table Matrix for label and extract adjacent cell value
+    def _match_synonym(syn: str, cell_text: str) -> bool:
+        syn_clean = syn.strip().lower().replace("_", " ")
+        cell_clean = cell_text.strip().lower().replace("_", " ")
+        if not syn_clean or not cell_clean:
+            return False
+        pattern = rf"(?<![a-zA-Z0-9]){re.escape(syn_clean)}(?![a-zA-Z0-9])"
+        return bool(re.search(pattern, cell_clean))
+
     for row in grid_matrix:
         for idx, cell in enumerate(row):
-            if any(syn.lower() in cell.lower() for syn in synonyms):
+            cell_lower = cell.lower()
+            if any(k in canonical_key.lower() for k in ["pbg_required", "pbg required"]):
+                if any(w in cell_lower for w in ["duration", "month", "माह", "percentage", "%", "5ितशत", "प्रतिशत"]):
+                    continue
+            if any(_match_synonym(syn, cell) for syn in synonyms):
                 if idx + 1 < len(row) and row[idx+1].strip():
                     val = row[idx+1].strip()
                     if val.lower() not in ["na", "n/a", "nil", "—"]:
@@ -1765,20 +1777,20 @@ def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[Li
 
     # PBG Required & Checkbox Matching
     pbg_required_raw = resolve_field(
-        ["PBG Required", "pbg_required", "pbg_percentage", "ePBG Percentage"],
-        r"ePBG Percentage[:\-\s]+([^\n]+)",
+        ["PBG Required", "pbg_required"],
+        r"(?:ePBG|PBG)\s+Required[:\-\s]+([^\n]+)",
         None
     )
     if _is_missing(pbg_required_raw) or pbg_required_raw == "Not Found":
         pbg_required_display = "NA"
     else:
         pbg_req_str = str(pbg_required_raw).strip().lower()
-        if pbg_req_str in ("false", "no", "not required", "n"):
+        if pbg_req_str in ("false", "no", "not required", "n") or pbg_req_str.startswith("no"):
             pbg_required_display = "No"
-        elif pbg_req_str in ("true", "yes", "required", "y") or any(c.isdigit() for c in pbg_req_str):
+        elif pbg_req_str in ("true", "yes", "required", "y") or pbg_req_str.startswith("yes"):
             pbg_required_display = "Yes"
         else:
-            pbg_required_display = str(pbg_required_raw)
+            pbg_required_display = "NA"
 
     # In GeM tenders, check ePBG Detail ... Required: No
     m_pbg_gem = re.search(r"(?:ePBG\s+Detail|ईपीबीजी\s+विवरण)[\s\S]{0,100}?(?:Required|आवश्यकता)[:\-\s/]+(No|Yes|न/|हाँ)", full_text, re.IGNORECASE)
@@ -1803,7 +1815,7 @@ def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[Li
 
     # 28. PBG %age
     pbg_pct_raw = resolve_field(
-        ["PBG Percentage", "pbg_percentage", "ePBG Percentage", "Percentage (%)"],
+        ["PBG Percentage", "pbg_percentage", "ePBG Percentage"],
         r"PBG Percentage[:\-\s]+([^\n]+)",
         None
     )
@@ -1815,7 +1827,11 @@ def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[Li
         else:
             pbg_percentage_display = str(pbg_pct_raw)
     else:
-        pbg_percentage_display = "NA" if pbg_required_display == "Yes" else "Not Applicable"
+        pbg_percentage_display = "Not Applicable" if pbg_required_display == "No" else "NA"
+
+    if pbg_required_display in ("NA", "Not Found", None, ""):
+        if pbg_percentage_display not in ("NA", "Not Found", "Not Applicable", "0%", "0.0%", None, ""):
+            pbg_required_display = "Yes"
 
     # 29. Security Deposit
     sd_percentage_display = resolve_field(["Security Deposit %", "sd_percentage"], r"Security Deposit %[:\-\s]+([^\n]+)")
@@ -1833,7 +1849,7 @@ def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[Li
         else:
             pbg_duration_display = str(pbg_duration_raw)
     else:
-        pbg_duration_display = "NA" if pbg_required_display == "Yes" else "Not Applicable"
+        pbg_duration_display = "Not Applicable" if pbg_required_display == "No" else "NA"
 
     if pbg_required_display == "No":
         pbg_percentage_display = "Not Applicable"
@@ -2062,7 +2078,7 @@ def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[Li
         working_capital_value_display = "₹0.00"
         solvency_certificate_type_display = "Not Applicable"
         solvency_certificate_value_display = "₹0.00"
-        net_worth_type_display = "Positive"
+        net_worth_type_display = "Not Applicable"
         net_worth_value_display = "₹0.00"
         if _is_missing(order_value_1_display) or order_value_1_display == "NA":
             order_value_1_display = "Not Applicable"

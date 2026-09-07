@@ -216,7 +216,7 @@ FIELD_ANCHORS = {
     "pbg_advisory_bank": {"section": "ePBG Detail", "anchors": ["Advisory Bank"]},
     "emd_amount": {"section": None, "anchors": ["EMD Amount", "EMD Amount (In INR)"]},
     "emd_required": {"section": "EMD Detail", "anchors": ["Required", "Required/आवश्यकता"]},
-    "pbg_percentage": {"section": None, "anchors": ["ePBG Percentage", "Percentage (%)", "ePBG Percentage(%)"]},
+    "pbg_percentage": {"section": None, "anchors": ["ePBG Percentage", "ePBG Percentage(%)"]},
     "pbg_duration_months": {"section": None, "anchors": ["Duration of ePBG required", "Duration of ePBG required (Months)", "Duration of ePBG"]},
     # unnamespaced (single occurrence per document)
     "tender_id": {"section": None, "anchors": ["Bid Number", "Bid Number/बोली क्रमांक"]},

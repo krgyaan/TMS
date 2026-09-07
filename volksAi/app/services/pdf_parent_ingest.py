@@ -270,9 +270,8 @@ def ingest_parent_tender_pdf(
         try:
             logger.info(f"[ATC_RESOLVER] Ingest pipeline parsing downloaded ATC child PDF: '{atc_path}'...")
             if str(atc_path) == str(pdf_path):
-                import copy
                 atc_page_texts = page_texts
-                atc_sections = copy.deepcopy(sections)
+                atc_sections = [{"id": "sec-atc", "title": "ATC-Sourced Fields", "fields": []}]
             else:
                 atc_pages_dir = job_dir / "atc_pages"
                 atc_page_texts = extract_pdf_text_hybrid(str(atc_path), atc_pages_dir)
@@ -357,8 +356,8 @@ def ingest_parent_tender_pdf(
                     else:
                         is_val_valid = val not in (None, "", "Not Found", "Out of Scope (Stage 1)", 0, 0.0, "0", "0.0", "0.00")
                     if is_val_valid:
-                        # BUG 3 FIX: MAIN_SOURCED_LABELS are never overridden by ATC
-                        if lbl in MAIN_SOURCED_LABELS:
+                        # BUG 3 FIX: MAIN_SOURCED_LABELS and Requirements are never overridden by ATC
+                        if lbl in MAIN_SOURCED_LABELS or (lbl and lbl.startswith("Requirement")):
                             continue
 
                         f_copy = dict(f)
@@ -466,7 +465,11 @@ def ingest_parent_tender_pdf(
         import os
         if os.getenv("LLM_FALLBACK_ENABLED", "true").lower() == "true":
             try:
-                from app.services.llm_field_resolver import LLMFieldResolver, FIELD_PROMPT_MAP
+                from app.services.llm_field_resolver import (
+                    LLMFieldResolver,
+                    FIELD_PROMPT_MAP,
+                    AMBIGUITY_PRONE_FIELDS,
+                )
                 from app.services.tender_mapper import FIELD_STATUS_OK_FALLBACK, FIELD_STATUS_MISSING
                 _DISPLAY_KEY_TO_LABEL = {
                     "payment_terms_supply_display": "Payment Terms Supply",
@@ -490,6 +493,9 @@ def ingest_parent_tender_pdf(
                     "custom_eligibility_criteria_display": "Custom Eligibility Criteria",
                     "courier_address_display": "Courier Address",
                     "delivery_time_supply_display": "Delivery Time Supply (Days)",
+                    "delivery_time_installation_display": "Delivery Time Installation (Days)",
+                    "pbg_percentage_display": "PBG Percentage",
+                    "pbg_duration_display": "PBG Duration (Months)",
                     "pbg_mode_display": "PBG Mode",
                     "commercial_evaluation_display": "Commercial Evaluation Type",
                     "reverse_auction_applicable_display": "Reverse Auction Applicable",
@@ -500,6 +506,7 @@ def ingest_parent_tender_pdf(
                     "working_capital_value_display": "Working Capital Value",
                     "solvency_certificate_value_display": "Solvency Certificate Value",
                     "net_worth_value_display": "Net Worth Value",
+                    "net_worth_type_display": "Net Worth Requirement",
                     "eligibility_criterion_years_display": "Eligibility Criterion Years",
                 }
                 COMPLEX_BEC_KEYS = [
@@ -543,102 +550,180 @@ def ingest_parent_tender_pdf(
                             if is_suspicious or bec_key == "custom_eligibility_criteria_display":
                                 keys_to_resolve.append(bec_key)
 
-                if keys_to_resolve and target_text:
-                    logger.info("[LLM_FALLBACK][Layer 2] %d fields queued for LLM resolution (has_bec=%s): %s", len(keys_to_resolve), has_bec_content, keys_to_resolve)
-                    resolver = LLMFieldResolver()
+                resolver = LLMFieldResolver()
+                if target_text and resolver.enabled:
                     import concurrent.futures
-                    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-                    try:
-                        future = executor.submit(resolver.resolve, target_text, keys_to_resolve)
-                        llm_resolved = future.result(timeout=30.0)
-                    except concurrent.futures.TimeoutError:
-                        logger.warning("[LLM_FALLBACK] LLM fallback resolution exceeded 30s defensive timeout guard; aborting stage and preserving missing status.")
-                        llm_resolved = {}
-                    except Exception as llm_exc:
-                        logger.warning("[LLM_FALLBACK] LLM fallback failed: %s", llm_exc)
-                        llm_resolved = {}
-                    finally:
-                        executor.shutdown(wait=False, cancel_futures=True)
-                    
-                    field_statuses = cast(Dict[str, str], infosheet_data.get("_info_sheet_statuses", {}))
-                    missing_fields = cast(List[str], infosheet_data.get("missing_fields", []))
-                    status_summary = cast(Dict[str, int], infosheet_data.get("status_summary", {}))
-                    
-                    for key, item in llm_resolved.items():
-                        if key.startswith("_") or not isinstance(item, dict):
-                            continue
-                        val = item.get("value")
-                        if not val or val in _stub_vals:
-                            continue
 
-                        current_val = infosheet_data.get(key)
-                        is_stub = current_val in _stub_vals or (isinstance(current_val, str) and not current_val.strip())
+                    # ─── ROLE 1: Missing-Field Fallback ─────────────────────────
+                    if keys_to_resolve:
+                        logger.info("[LLM_FALLBACK][Role 1] %d fields queued for LLM resolution (has_bec=%s): %s", len(keys_to_resolve), has_bec_content, keys_to_resolve)
+                        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+                        try:
+                            future = executor.submit(resolver.resolve_missing_fields, target_text, keys_to_resolve)
+                            llm_resolved = future.result(timeout=60.0)
+                        except concurrent.futures.TimeoutError:
+                            logger.warning("[LLM_FALLBACK][Role 1] LLM resolution exceeded 60s timeout guard; aborting missing-field pass.")
+                            llm_resolved = {}
+                        except Exception as llm_exc:
+                            logger.warning("[LLM_FALLBACK][Role 1] Resolution failed: %s", llm_exc)
+                            llm_resolved = {}
+                        finally:
+                            executor.shutdown(wait=False, cancel_futures=True)
+                        
+                        field_statuses = cast(Dict[str, str], infosheet_data.get("_info_sheet_statuses", {}))
+                        missing_fields = cast(List[str], infosheet_data.get("missing_fields", []))
+                        status_summary = cast(Dict[str, int], infosheet_data.get("status_summary", {}))
+                        
+                        for key, item in llm_resolved.items():
+                            if key.startswith("_") or not isinstance(item, dict):
+                                continue
+                            val = item.get("value")
+                            if not val or val in _stub_vals:
+                                continue
 
-                        is_bec_override = False
-                        if key in COMPLEX_BEC_KEYS:
-                            # Rule: If eligibility_criterion_years_display is already a clean integer from main_tender, preserve it (MAIN_SOURCED_LABELS)
-                            if key == "eligibility_criterion_years_display":
-                                if is_stub or not str(current_val).strip().isdigit():
+                            current_val = infosheet_data.get(key)
+                            is_stub = current_val in _stub_vals or (isinstance(current_val, str) and not current_val.strip())
+
+                            is_bec_override = False
+                            if key in COMPLEX_BEC_KEYS:
+                                # Rule: If eligibility_criterion_years_display is already a clean integer from main_tender, preserve it (MAIN_SOURCED_LABELS)
+                                if key == "eligibility_criterion_years_display":
+                                    if is_stub or not str(current_val).strip().isdigit():
+                                        is_bec_override = True
+                                elif is_stub:
                                     is_bec_override = True
-                            elif is_stub:
-                                is_bec_override = True
-                            elif any(kw in str(current_val).lower() for kw in ["make in india", "local content", "purchase preference", "etc."]):
-                                is_bec_override = True
-                            elif key == "custom_eligibility_criteria_display":
-                                # LLM technical BEC overrides regex which often picks up MII or boilerplate
-                                is_bec_override = True
-                            elif key in ("order_value_1_display", "order_value_2_display", "avg_annual_turnover_value_display"):
-                                # If existing value lacked units (e.g. bare "₹32.00") and LLM has unit multiplier, override
-                                curr_has_unit = any(u in str(current_val).lower() for u in ["lakh", "lac", "cr", "crore", ",00", "000"])
-                                val_has_unit = any(u in str(val).lower() for u in ["lakh", "lac", "cr", "crore", ",00", "000"])
-                                if not curr_has_unit and val_has_unit:
+                                elif any(kw in str(current_val).lower() for kw in ["make in india", "local content", "purchase preference", "etc."]):
                                     is_bec_override = True
+                                elif key == "custom_eligibility_criteria_display":
+                                    # LLM technical BEC overrides regex which often picks up MII or boilerplate
+                                    is_bec_override = True
+                                elif key in ("order_value_1_display", "order_value_2_display", "avg_annual_turnover_value_display"):
+                                    # If existing value lacked units (e.g. bare "₹32.00") and LLM has unit multiplier, override
+                                    curr_has_unit = any(u in str(current_val).lower() for u in ["lakh", "lac", "cr", "crore", ",00", "000"])
+                                    val_has_unit = any(u in str(val).lower() for u in ["lakh", "lac", "cr", "crore", ",00", "000"])
+                                    if not curr_has_unit and val_has_unit:
+                                        is_bec_override = True
 
-                        if is_stub or is_bec_override:
-                            infosheet_data[key] = val
-                            logger.info("[LLM_FALLBACK][Layer 2] Merged '%s' = %r into infosheet_data (override=%s, prev=%r)", key, val, is_bec_override, current_val)
-                            
-                            # 1. Update status tracking dicts
-                            field_statuses[key] = FIELD_STATUS_OK_FALLBACK
-                            infosheet_data.setdefault("_info_sheet_sources", {})[key] = "llm"
-                            if key in missing_fields:
-                                missing_fields.remove(key)
-                            if FIELD_STATUS_MISSING in status_summary and status_summary[FIELD_STATUS_MISSING] > 0:
-                                status_summary[FIELD_STATUS_MISSING] -= 1
-                            status_summary[FIELD_STATUS_OK_FALLBACK] = status_summary.get(FIELD_STATUS_OK_FALLBACK, 0) + 1
-                            
-                            # 2. Sync to infoSheetSections for UI preview
-                            target_label = _DISPLAY_KEY_TO_LABEL.get(key, key.replace("_display", "").replace("_", " ").title())
-                            if sections:
-                                field_found = False
-                                raw_key_name = key.replace("_display", "")
-                                for sec in sections:
-                                    for f in sec.get("fields", []):
-                                        f_name = f.get("field_name", "")
-                                        f_lbl = f.get("label", "")
-                                        if f_lbl == target_label or f_name == key or f_name == raw_key_name or f.get("id") == f"f-{key}":
-                                            f["value"] = val
-                                            f["status"] = "extracted"
-                                            f["confidence"] = 90.0
-                                            f["source"] = "atc_llm"
-                                            f["resolution_source"] = item.get("source", "unknown")
-                                            f["resolution_layer"] = item.get("layer", "layer_2")
-                                            field_found = True
+                            if is_stub or is_bec_override:
+                                infosheet_data[key] = val
+                                logger.info("[LLM_FALLBACK][Role 1] Merged '%s' = %r into infosheet_data (override=%s, prev=%r)", key, val, is_bec_override, current_val)
+                                
+                                # If PBG percentage or duration resolved, derive pbg_required_display = 'Yes' if unknown
+                                if key in ("pbg_percentage_display", "pbg_duration_display") and val not in _stub_vals:
+                                    if infosheet_data.get("pbg_required_display") in ("NA", "Not Found", None, ""):
+                                        infosheet_data["pbg_required_display"] = "Yes"
+                                        field_statuses["pbg_required_display"] = FIELD_STATUS_OK_FALLBACK
+
+                                # 1. Update status tracking dicts
+                                field_statuses[key] = FIELD_STATUS_OK_FALLBACK
+                                infosheet_data.setdefault("_info_sheet_sources", {})[key] = "llm"
+                                if key in missing_fields:
+                                    missing_fields.remove(key)
+                                if FIELD_STATUS_MISSING in status_summary and status_summary[FIELD_STATUS_MISSING] > 0:
+                                    status_summary[FIELD_STATUS_MISSING] -= 1
+                                status_summary[FIELD_STATUS_OK_FALLBACK] = status_summary.get(FIELD_STATUS_OK_FALLBACK, 0) + 1
+                                
+                                # 2. Sync to infoSheetSections for UI preview
+                                target_label = _DISPLAY_KEY_TO_LABEL.get(key, key.replace("_display", "").replace("_", " ").title())
+                                if sections:
+                                    field_found = False
+                                    raw_key_name = key.replace("_display", "")
+                                    for sec in sections:
+                                        for f in sec.get("fields", []):
+                                            f_name = f.get("field_name", "")
+                                            f_lbl = f.get("label", "")
+                                            if f_lbl == target_label or f_name == key or f_name == raw_key_name or f.get("id") == f"f-{key}":
+                                                f["value"] = val
+                                                f["status"] = "extracted"
+                                                f["confidence"] = 90.0
+                                                f["source"] = "atc_llm"
+                                                f["resolution_source"] = item.get("source", "claude_tool_use")
+                                                f["resolution_layer"] = "layer_2"
+                                                field_found = True
+                                                break
+                                        if field_found:
                                             break
-                                    if field_found:
-                                        break
-                                if not field_found and sections:
-                                    sections[0].setdefault("fields", []).append({
-                                        "id": f"f-{key}",
-                                        "label": target_label,
-                                        "field_name": key,
-                                        "value": val,
-                                        "status": "extracted",
-                                        "confidence": 90.0,
-                                        "source": "atc_llm",
-                                        "resolution_source": item.get("source", "unknown"),
-                                        "resolution_layer": item.get("layer", "layer_2")
-                                    })
+                                    if not field_found and sections:
+                                        sections[0].setdefault("fields", []).append({
+                                            "id": f"f-{key}",
+                                            "label": target_label,
+                                            "field_name": key,
+                                            "value": val,
+                                            "status": "extracted",
+                                            "confidence": 90.0,
+                                            "source": "atc_llm",
+                                            "resolution_source": item.get("source", "claude_tool_use"),
+                                            "resolution_layer": "layer_2"
+                                        })
+
+                    # ─── ROLE 2: Ambiguity Resolution ───────────────────────────
+                    ambig_candidates = {
+                        k: infosheet_data.get(k)
+                        for k in AMBIGUITY_PRONE_FIELDS
+                        if k in infosheet_data and infosheet_data.get(k) not in _stub_vals
+                    }
+                    if ambig_candidates:
+                        logger.info("[LLM_AMBIGUITY][Role 2] Reviewing %d ambiguity-prone fields: %s", len(ambig_candidates), list(ambig_candidates.keys()))
+                        ambig_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+                        try:
+                            ambig_future = ambig_executor.submit(resolver.resolve_ambiguous_fields, target_text, ambig_candidates)
+                            ambig_decisions = ambig_future.result(timeout=60.0)
+                        except concurrent.futures.TimeoutError:
+                            logger.warning("[LLM_AMBIGUITY][Role 2] Ambiguity resolution exceeded 60s timeout guard; skipping.")
+                            ambig_decisions = {}
+                        except Exception as ambig_exc:
+                            logger.warning("[LLM_AMBIGUITY][Role 2] Ambiguity resolution failed: %s", ambig_exc)
+                            ambig_decisions = {}
+                        finally:
+                            ambig_executor.shutdown(wait=False, cancel_futures=True)
+
+                        field_statuses = cast(Dict[str, str], infosheet_data.get("_info_sheet_statuses", {}))
+
+                        for f_name, decision in ambig_decisions.items():
+                            action = decision.get("action", "confirm")
+                            resolved_val = decision.get("resolved_value")
+                            reasoning = decision.get("reasoning", "")
+
+                            # Always record sibling reasoning for auditability
+                            if reasoning:
+                                infosheet_data[f"{f_name}_reasoning"] = reasoning
+                                logger.info("[LLM_AMBIGUITY][Role 2] Field '%s' reasoning: %s", f_name, reasoning)
+
+                            if action == "override" and resolved_val and resolved_val not in _stub_vals:
+                                prev_val = infosheet_data.get(f_name)
+                                infosheet_data[f_name] = resolved_val
+                                logger.info("[LLM_AMBIGUITY][Role 2] Overriding '%s': %r -> %r (Reason: %s)", f_name, prev_val, resolved_val, reasoning)
+
+                                # Update status and source tracking
+                                field_statuses[f_name] = FIELD_STATUS_OK_FALLBACK
+                                infosheet_data.setdefault("_info_sheet_sources", {})[f_name] = "llm_override"
+
+                                # Sync to infoSheetSections for UI preview
+                                target_label = _DISPLAY_KEY_TO_LABEL.get(f_name, f_name.replace("_display", "").replace("_", " ").title())
+                                if sections:
+                                    field_found = False
+                                    raw_key_name = f_name.replace("_display", "")
+                                    for sec in sections:
+                                        for f in sec.get("fields", []):
+                                            f_name_sec = f.get("field_name", "")
+                                            f_lbl = f.get("label", "")
+                                            if f_lbl == target_label or f_name_sec == f_name or f_name_sec == raw_key_name or f.get("id") == f"f-{f_name}":
+                                                f["value"] = resolved_val
+                                                f["status"] = "extracted"
+                                                f["confidence"] = 90.0
+                                                f["source"] = "atc_llm_override"
+                                                f["resolution_source"] = "claude_ambiguity_override"
+                                                f["resolution_layer"] = "layer_2"
+                                                if reasoning:
+                                                    f["reasoning"] = reasoning
+                                                field_found = True
+                                                break
+                                        if field_found:
+                                            break
+
+                    # Record token usage & cost summary
+                    infosheet_data["_llm_usage"] = resolver.get_usage_summary()
+
                 elif missing_keys and not atc_full_text:
                     logger.info("[LLM_FALLBACK] Skipping LLM — no ATC text available (ATC not downloaded)")
             except Exception as llm_err:

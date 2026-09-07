@@ -99,6 +99,7 @@ def extract_tender_fields(
         "reverse_auction_enabled": "Reverse Auction Applicable",
         "ra_qualification_rule": "RA Qualification Rule",
         "pbg_percentage": "PBG Percentage",
+        "pbg_required": "PBG Required",
         "pbg_duration_months": "PBG Duration (Months)",
         "evaluation_method": "Commercial Evaluation Type",
         "NIT No": "Reference ID / NIT No",
@@ -193,14 +194,29 @@ def extract_tender_fields(
     # 4. Handle products
     products = extractor.extract_products(mock_results)
     for idx, p in enumerate(products):
+        category = (p.get("normalized_category") or p.get("category") or p.get("product_name") or "ITEM").replace("_", " ").strip().upper()
+        prod_name = p.get("product_name") or ""
+        qty = p.get("quantity") or p.get("qty") or ""
+        unit = p.get("unit") or ""
+        brand = p.get("brand_or_oem_if_present") or p.get("brand") or ""
+        evidence = p.get("evidence_text") or p.get("evidence") or ""
+        val_parts = []
+        if prod_name:
+            val_parts.append(f"Name: {prod_name}")
+        if qty:
+            val_parts.append(f"Qty: {qty} {unit}".strip())
+        if brand:
+            val_parts.append(f"OEM: {brand}")
+        val_str = " | ".join(val_parts) if val_parts else (p.get("raw_text") or "")
+
         fields.append({
             "id": f"prod-{idx}",
-            "label": f"Requirement: {p.get('category', '').upper()}",
-            "value": f"Name: {p.get('product_name', '')} | Qty: {p.get('qty', '')} {p.get('unit', '')} | OEM: {p.get('brand', '')}",
+            "label": f"Requirement {idx + 1}: {category}",
+            "value": val_str,
             "confidence": 90.0,
             "critical": False,
             "sourcePage": p.get("page_number", 1),
-            "sourceSnippet": p.get("evidence", ""),
+            "sourceSnippet": evidence,
             "status": "extracted",
             "source": "main_tender"
         })

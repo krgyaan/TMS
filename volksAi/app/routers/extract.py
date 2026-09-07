@@ -27,6 +27,8 @@ SOURCE_MAP: Dict[str, str] = {
     "ambiguous_preserved": "atc",
     "atc_llm": "llm",
     "llm": "llm",
+    "llm_override": "llm_override",
+    "atc_llm_override": "llm_override",
 }
 
 
@@ -34,13 +36,15 @@ def _format_field_object(
     field_name: str,
     raw_val: Any,
     field_statuses: Dict[str, str],
-    field_sources: Dict[str, str]
+    field_sources: Dict[str, str],
+    reasoning: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Transforms an extracted field into a structured object containing:
     - value: Any (None for missing fields)
     - confidence: "high" | "fallback" | "missing" | "not_applicable"
-    - source: "regex" | "atc" | "llm" | None
+    - source: "regex" | "atc" | "llm" | "llm_override" | None
+    - reasoning: Optional[str] (populated if field was evaluated/overridden by LLM)
     """
     status_val = field_statuses.get(field_name)
     raw_source = field_sources.get(field_name)
@@ -67,7 +71,7 @@ def _format_field_object(
             confidence = "high"
             clean_value = raw_val
 
-    # 2. Determine source: 'regex' | 'atc' | 'llm' | None
+    # 2. Determine source: 'regex' | 'atc' | 'llm' | 'llm_override' | None
     # Truly missing or unrecorded fields surface as None (null in JSON) rather than guessing "regex"
     if confidence == "missing" or not raw_source:
         source: Optional[str] = None
@@ -75,7 +79,9 @@ def _format_field_object(
         source_key = str(raw_source).lower().strip()
         source = SOURCE_MAP.get(source_key)
         if source is None:
-            if "llm" in source_key:
+            if "override" in source_key:
+                source = "llm_override"
+            elif "llm" in source_key:
                 source = "llm"
             elif "atc" in source_key:
                 source = "atc"
@@ -84,11 +90,15 @@ def _format_field_object(
             else:
                 source = None
 
-    return {
+    field_obj: Dict[str, Any] = {
         "value": clean_value,
         "confidence": confidence,
-        "source": source
+        "source": source,
     }
+    if reasoning:
+        field_obj["reasoning"] = reasoning
+
+    return field_obj
 
 
 @router.post("/extract")
@@ -151,11 +161,13 @@ async def extract_tender(pdf_file: UploadFile = File(...)) -> Dict[str, Any]:
                 if field_name.startswith("_") or field_name in ("status_summary", "missing_fields"):
                     continue
 
+                reasoning = infosheet_data.get(f"{field_name}_reasoning")
                 response[field_name] = _format_field_object(
                     field_name=field_name,
                     raw_val=value,
                     field_statuses=field_statuses,
-                    field_sources=field_sources
+                    field_sources=field_sources,
+                    reasoning=reasoning,
                 )
 
             logger.info(

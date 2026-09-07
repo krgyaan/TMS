@@ -12,7 +12,6 @@ MAIN_FIELD_ALIASES: Dict[str, List[str]] = {
         "ePBG Detail",
         "Performance Bank Guarantee",
         "PBG %",
-        "Percentage (%)",
         "pbg_percentage_display"
     ],
     "pbg_duration": [
