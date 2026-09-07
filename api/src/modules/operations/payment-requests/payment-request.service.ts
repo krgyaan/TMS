@@ -192,8 +192,10 @@ export class PaymentRequestService {
         this.notifications.notifyNewPaymentRequest({
           requestNo: pr.requestNo ?? '',
           amount: pr.amount ?? 0,
-          partyName: pr.partyName ?? '',
+          partyName: pr.partyName ?? null,
+          portalLink: pr.portalLink ?? null,
           requestedBy: userId,
+          category: pr.paymentAgainst ?? '',
         }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
 
         return pr;
@@ -288,6 +290,39 @@ export class PaymentRequestService {
             }
 
             this.logger.info(`Payment Request #${id} status updated to "${body.status}"`);
+
+            if (body.status === 'payment_done') {
+              this.notifications.notifyPaymentDone({
+                amount: updated.amount ?? 0,
+                partyName: updated.partyName ?? null,
+                portalLink: updated.portalLink ?? null,
+                utrNumber: updated.utrNumber ?? null,
+                requestedBy: existing.requestedBy ?? 0,
+                category: existing.paymentAgainst ?? '',
+              }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+            }
+
+            if (body.status === 'rejected') {
+              this.notifications.notifyRejection({
+                amount: updated.amount ?? 0,
+                partyName: updated.partyName ?? null,
+                portalLink: updated.portalLink ?? null,
+                rejectionReason: body.rejectionReason ?? null,
+                requestedBy: existing.requestedBy ?? 0,
+                category: existing.paymentAgainst ?? '',
+              }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+            }
+
+            if (body.status === 'maker_done') {
+              this.notifications.notifyMakerDone({
+                amount: updated.amount ?? 0,
+                partyName: updated.partyName ?? null,
+                portalLink: updated.portalLink ?? null,
+                requestedBy: existing.requestedBy ?? 0,
+                category: existing.paymentAgainst ?? '',
+              }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+            }
+
             return updated;
         });
     }
