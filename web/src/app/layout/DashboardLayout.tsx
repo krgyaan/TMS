@@ -1,4 +1,3 @@
-import { useCallback } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ModeToggle } from "@/components/mode-toggle";
 import { DocumentTitle } from "@/components/document-title";
@@ -8,10 +7,8 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useProfileContext } from "@/modules/profile/contexts/ProfileContext";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, CheckCircle2, Smartphone, XCircle, Video } from "lucide-react";
-import { toast } from "sonner";
+import { AlertCircle, CheckCircle2, XCircle, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import {
     Tooltip,
     TooltipContent,
@@ -31,27 +28,6 @@ export default function DashboardLayout() {
     const isRejected = isOnboarding && (onboardingStatus?.hrStatus === "rejected" || onboardingStatus?.status === "rejected");
     const isSubmitted = isOnboarding && onboardingStatus?.employeeCompleted;
     const isPending = isOnboarding && !isSubmitted && !isRejected;
-
-    const { canInstall, isInstalled, isIOS, promptInstall } = useInstallPrompt();
-
-    const handleInstall = useCallback(async () => {
-        if (canInstall) {
-            const outcome = await promptInstall();
-            if (outcome === "dismissed") {
-                toast.info("You can install the TMS Field App anytime from this button.");
-            }
-            return;
-        }
-        if (isIOS) {
-            toast.info("Install the TMS Field App", {
-                description: "Tap the Share button in Safari, then choose \u201cAdd to Home Screen\u201d.",
-            });
-            return;
-        }
-        toast.info("Install the TMS Field App", {
-            description: "Use the install icon in your browser's address bar to install the app.",
-        });
-    }, [canInstall, isIOS, promptInstall]);
 
     return (
         <TooltipProvider>
@@ -74,17 +50,6 @@ export default function DashboardLayout() {
                                     </BreadcrumbItem>
                                 </BreadcrumbList>
                             </Breadcrumb>
-                            {!isInstalled && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 cursor-pointer"
-                                    onClick={handleInstall}
-                                >
-                                    <Smartphone className="size-4" />
-                                    <span className="hidden sm:inline">Install App</span>
-                                </Button>
-                            )}
                         </div>
                         
                         <div className="flex items-center gap-4">
