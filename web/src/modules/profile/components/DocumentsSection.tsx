@@ -578,7 +578,7 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, onView, onReuplo
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            {isOnboarding && doc.verificationStatus === "rejected" && (
+            {isOnboarding && doc.verificationStatus !== "approved" && (
               <>
                 <Button
                   size="sm"
@@ -607,7 +607,7 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, onView, onReuplo
                 </TooltipProvider>
               </>
             )}
-            {doc.verificationStatus !== "rejected" && (
+            {(!isOnboarding || doc.verificationStatus === "approved") && (
               <div className="h-9 w-9 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 bg-emerald-100/40 dark:bg-emerald-950/20 shrink-0" title="Locked">
                 <Lock className="h-3.5 w-3.5" />
               </div>
