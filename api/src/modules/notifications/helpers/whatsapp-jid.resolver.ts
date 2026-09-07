@@ -17,7 +17,7 @@ export class WhatsappJidResolver {
     }
 
     /**
-     * Resolve a user id to a WhatsApp JID (`<phone>@s.whatsapp.net`).
+     * Resolve a user id to a WhatsApp JID (`<phone>@c.us`).
      * Returns null when the user has no mobile number.
      */
     async toJid(userId: number): Promise<string | null> {
@@ -29,6 +29,6 @@ export class WhatsappJidResolver {
             return null;
         }
 
-        return `${this.normalizePhone(mobile)}@s.whatsapp.net`;
+        return `${this.normalizePhone(mobile)}@c.us`;
     }
 }
