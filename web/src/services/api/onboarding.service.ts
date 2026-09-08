@@ -231,31 +231,6 @@ export const onboardingService = {
 
   // ─── Stage Specific Methods ───────────────────────────────────────────────────
 
-  getOnboardingList: async (): Promise<OnboardingRequest[]> => {
-    const { data } = await axiosInstance.get("/hrms/onboarding/dashboard");
-    return data;
-  },
-
-  getStageEducation: async (id: number): Promise<any> => {
-    const { data } = await axiosInstance.get(`/hrms/onboarding/${id}/education`);
-    return data;
-  },
-
-  getStageExperience: async (id: number): Promise<any> => {
-    const { data } = await axiosInstance.get(`/hrms/onboarding/${id}/experience`);
-    return data;
-  },
-
-  getStageDocuments: async (id: number): Promise<any> => {
-    const { data } = await axiosInstance.get(`/hrms/onboarding/${id}/documents`);
-    return data;
-  },
-
-  getStageBankDetails: async (id: number): Promise<any> => {
-    const { data } = await axiosInstance.get(`/hrms/onboarding/${id}/bank-details`);
-    return data;
-  },
-
   updateStageEntryStatus: async (
     id: number,
     stageEndpoint: string,
