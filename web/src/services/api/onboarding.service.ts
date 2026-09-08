@@ -93,6 +93,8 @@ export interface FullProfile {
   designation: string | null;
   department: string | null;
   departmentId: number | null;
+  roleId: number | null;
+  teamId: number | null;
   reportingTl: string | null;
   employeeType: string | null;
   workLocation: string | null;
@@ -127,6 +129,8 @@ export interface UpdateProfileDto {
   designationId?: number;
   departmentId?: number;
   reportingTl?: number;
+  designationRoleId?: number;
+  departmentTeamId?: number;
   salaryType?: string;
   basicSalary?: string;
   hra?: string;

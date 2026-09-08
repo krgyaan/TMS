@@ -21,6 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useProfile, useUpdateProfile } from "@/hooks/api/useOnboarding";
+import { useRoles } from "@/hooks/api/useRoles";
+import { useTeams } from "@/hooks/api/useTeams";
 import { useUsers } from "@/hooks/api/useUsers";
 import { addMonths } from "../helpers/induction.helpers";
 import type { EmployeeInduction } from "../helpers/induction.helpers";
@@ -29,6 +31,8 @@ const EMPLOYEE_TYPE_OPTIONS = ["Full Time", "Part Time", "Intern", "Contract"];
 const SALARY_TYPE_OPTIONS = ["Monthly", "Annual"];
 
 interface WorkDetailsFormState {
+  designationRoleId?: number;
+  departmentTeamId?: number;
   reportingTl?: number;
   dateOfJoining: string;
   employeeType: string;
@@ -45,6 +49,8 @@ interface WorkDetailsFormState {
 }
 
 const EMPTY_FORM: WorkDetailsFormState = {
+  designationRoleId: undefined,
+  departmentTeamId: undefined,
   reportingTl: undefined,
   dateOfJoining: "",
   employeeType: "",
@@ -72,7 +78,14 @@ export const WorkDetailsModal: React.FC<{
     open && employee ? employee.id : null
   );
   const { data: users = [] } = useUsers();
+  const { data: roles = [] } = useRoles();
+  const { data: teams = [] } = useTeams();
   const { mutate: saveProfile, isPending: saving } = useUpdateProfile(onboardingId);
+
+  // Designation / Department are editable only when the candidate's Users record
+  // does not have them yet (they are normally set on the Users page).
+  const designationLocked = profile?.roleId != null;
+  const departmentLocked = profile?.teamId != null;
 
   const [form, setForm] = useState<WorkDetailsFormState>(EMPTY_FORM);
 
@@ -84,6 +97,9 @@ export const WorkDetailsModal: React.FC<{
         ? users.find((u) => u.name === profile.reportingTl)
         : undefined;
     setForm({
+      designationRoleId: profile.roleId ?? undefined,
+      departmentTeamId:
+        profile.teamId ?? profile.departmentId ?? undefined,
       reportingTl: tlUser?.id,
       // Fall back to the tracker's date (which itself falls back to approvedAt),
       // matching what the dashboard column shows
@@ -126,6 +142,15 @@ export const WorkDetailsModal: React.FC<{
   const handleSave = () => {
     saveProfile(
       {
+        designationRoleId: designationLocked
+          ? undefined
+          : form.designationRoleId,
+        departmentTeamId: departmentLocked
+          ? undefined
+          : form.departmentTeamId,
+        departmentId: departmentLocked
+          ? undefined
+          : form.departmentTeamId,
         reportingTl: form.reportingTl,
         dateOfJoining: form.dateOfJoining || undefined,
         employeeType: form.employeeType || undefined,
@@ -190,6 +215,64 @@ export const WorkDetailsModal: React.FC<{
                   Work Information
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1">
+                      Designation
+                      {designationLocked && (
+                        <span className="text-[9px] text-muted-foreground font-normal">
+                          (set on Users page)
+                        </span>
+                      )}
+                    </Label>
+                    <Select
+                      disabled={designationLocked}
+                      value={form.designationRoleId ? String(form.designationRoleId) : undefined}
+                      onValueChange={(v) => setField("designationRoleId", Number(v))}
+                    >
+                      <SelectTrigger className="h-9 text-sm rounded-xl w-full">
+                        <SelectValue placeholder="Select designation" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {roles
+                          .filter((r) => r.name)
+                          .map((r) => (
+                            <SelectItem key={r.id} value={String(r.id)}>
+                              {r.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1">
+                      Department
+                      {departmentLocked && (
+                        <span className="text-[9px] text-muted-foreground font-normal">
+                          (set on Users page)
+                        </span>
+                      )}
+                    </Label>
+                    <Select
+                      disabled={departmentLocked}
+                      value={form.departmentTeamId ? String(form.departmentTeamId) : undefined}
+                      onValueChange={(v) => setField("departmentTeamId", Number(v))}
+                    >
+                      <SelectTrigger className="h-9 text-sm rounded-xl w-full">
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teams
+                          .filter((t) => t.name)
+                          .map((t) => (
+                            <SelectItem key={t.id} value={String(t.id)}>
+                              {t.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div className="space-y-1.5">
                     <Label className="text-xs">Reporting TL</Label>
                     <Select

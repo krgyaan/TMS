@@ -16,7 +16,7 @@ import {
 import { teams } from '@/db/schemas/master/teams.schema';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import * as argon2 from 'argon2';
-import { aliasedTable, and, desc, eq, inArray } from 'drizzle-orm';
+import { aliasedTable, and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
 
@@ -37,6 +37,9 @@ export interface UpdateProfileDto {
   // Core HR
   departmentId?: number;
   reportingTl?: number;
+  // Designation / Department synced to users table (only when currently null)
+  designationRoleId?: number;
+  departmentTeamId?: number;
   // Compensation
   salaryType?: string;
   basicSalary?: string;
@@ -897,6 +900,9 @@ export class OnboardingService {
         progress: onboardingRequests.progress,
         approvedAt: onboardingRequests.approvedAt,
         reviewedBy: users.name,
+        employeeUserId: employeeUser.id,
+        employeeRoleId: employeeUser.roleId,
+        employeeTeamId: employeeUser.team,
         employeeRoleName: roles.name,
         employeeTeamName: employeeTeam.name,
       })
@@ -962,6 +968,8 @@ export class OnboardingService {
       // (roleId -> roles.name, team -> teams.name)
       designation: request.employeeRoleName ?? null,
       department: request.employeeTeamName ?? null,
+      roleId: request.employeeUserId != null ? request.employeeRoleId ?? null : null,
+      teamId: request.employeeUserId != null ? request.employeeTeamId ?? null : null,
       reportingTl: profileRow.reportingTlName,
       education,
       experience,
@@ -980,14 +988,40 @@ export class OnboardingService {
    */
   async updateProfile(id: number, dto: UpdateProfileDto, adminId: number): Promise<any> {
     return this.db.transaction(async (tx) => {
+      const { designationRoleId, departmentTeamId, ...profileDto } = dto;
+
       // Update the profile row
       const [updated] = await tx
         .update(onboardingProfiles)
-        .set({ ...dto, updatedAt: new Date() })
+        .set({ ...profileDto, updatedAt: new Date() })
         .where(eq(onboardingProfiles.onboardingId, id))
         .returning();
 
       if (!updated) throw new NotFoundException(`Profile not found for onboarding #${id}`);
+
+      // ── Sync designation / department to the candidate's Users record ──────
+      // Only fills values that are currently NULL — existing values (set on the
+      // Users page) are never overwritten here.
+      const [reqRow] = await tx
+        .select({ userId: onboardingRequests.userId })
+        .from(onboardingRequests)
+        .where(eq(onboardingRequests.id, id))
+        .limit(1);
+
+      if (reqRow?.userId) {
+        if (designationRoleId !== undefined) {
+          await tx
+            .update(users)
+            .set({ roleId: designationRoleId, updatedAt: new Date() })
+            .where(and(eq(users.id, reqRow.userId), isNull(users.roleId)));
+        }
+        if (departmentTeamId !== undefined) {
+          await tx
+            .update(users)
+            .set({ team: departmentTeamId, primaryTeamId: departmentTeamId, updatedAt: new Date() })
+            .where(and(eq(users.id, reqRow.userId), isNull(users.team)));
+        }
+      }
 
       // We rely on recalculateProgress to handle the progress % and status changes
       await this.recalculateProgress(tx, id);
