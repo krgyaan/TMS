@@ -127,44 +127,6 @@ export const useVerifyDocument = (onboardingId: number) => {
   });
 };
 
-// ─── List all onboarding users with their stage statuses ──────────────────────
-
-export const useOnboardingList = () =>
-  useQuery({
-    queryKey: ["onboarding", "list"],
-    queryFn: onboardingService.getOnboardingList,
-  });
-
-// ─── Fetch entries per stage ──────────────────────────────────────────────────
-
-export const useEducation = (onboardingId: number | null) =>
-  useQuery({
-    queryKey: ["onboarding", "education", onboardingId],
-    queryFn: () => onboardingService.getStageEducation(onboardingId!),
-    enabled: !!onboardingId,
-  });
-
-export const useExperience = (onboardingId: number | null) =>
-  useQuery({
-    queryKey: ["onboarding", "experience", onboardingId],
-    queryFn: () => onboardingService.getStageExperience(onboardingId!),
-    enabled: !!onboardingId,
-  });
-
-export const useDocuments = (onboardingId: number | null) =>
-  useQuery({
-    queryKey: ["onboarding", "documents", onboardingId],
-    queryFn: () => onboardingService.getStageDocuments(onboardingId!),
-    enabled: !!onboardingId,
-  });
-
-export const useBankDetails = (onboardingId: number | null) =>
-  useQuery({
-    queryKey: ["onboarding", "bankDetails", onboardingId],
-    queryFn: () => onboardingService.getStageBankDetails(onboardingId!),
-    enabled: !!onboardingId,
-  });
-
 // ─── Approve / Reject mutations ───────────────────────────────────────────────
 
 type StageKey = "profile" | "education" | "experience" | "documents" | "bankDetails";
