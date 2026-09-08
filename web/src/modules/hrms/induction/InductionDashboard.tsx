@@ -13,19 +13,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Search,
   Users,
-  Clock,
   CheckCircle2,
   CircleDashed,
-  ArrowUpDown,
   ListChecks,
   ClipboardList,
   Activity,
@@ -334,7 +325,6 @@ const EmployeeRow: React.FC<{
 const InductionDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<EmployeeInductionTab>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"name" | "progress" | "joined" | "pending">("pending");
   const [viewEmployee, setViewEmployee] = useState<EmployeeInduction | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
   const [workDetailsEmployee, setWorkDetailsEmployee] = useState<EmployeeInduction | null>(null);
@@ -368,22 +358,6 @@ const InductionDashboard: React.FC = () => {
     return rawEmployeeTasks.map(mapApiTask);
   }, [rawEmployeeTasks]);
 
-  // ── Global stats ──────────────────────────────────────────────────────────
-  const globalStats = useMemo(() => {
-    const perEmpTotal = DEFAULT_TASKS.length;
-    const totalTasks = employees.length * perEmpTotal;
-    const completedTasks = employees.reduce(
-      (acc, e) => acc + e.tasks.filter((t) => t.status === "completed").length,
-      0
-    );
-    const pendingTasks = totalTasks - completedTasks;
-    const fullyDone = employees.filter((e) => {
-      if (e.tasks.length === 0) return false;
-      return computeInductionStats(e.tasks).pct === 100;
-    }).length;
-    return { totalTasks, completedTasks, pendingTasks, fullyDone };
-  }, [employees]);
-
   // ── Tab counts ─────────────────────────────────────────────────────────────
   const tabCounts = useMemo(
     () => ({
@@ -395,9 +369,9 @@ const InductionDashboard: React.FC = () => {
     [employees]
   );
 
-  // ── Filtered & sorted list ─────────────────────────────────────────────────
+  // ── Filtered list (newest onboarding first) ────────────────────────────────
   const filtered = useMemo(() => {
-    let list = employees.filter((e) => {
+    const list = employees.filter((e) => {
       const matchTab = activeTab === "all" || getInductionStatus(e) === activeTab;
       const q = searchQuery.toLowerCase();
       const matchSearch =
@@ -410,26 +384,11 @@ const InductionDashboard: React.FC = () => {
       return matchTab && matchSearch;
     });
 
-    list = [...list].sort((a, b) => {
-      if (sortBy === "name")
-        return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
-      if (sortBy === "progress") {
-        const statsA = computeInductionStats(a.tasks.length > 0 ? a.tasks : DEFAULT_TASKS);
-        const statsB = computeInductionStats(b.tasks.length > 0 ? b.tasks : DEFAULT_TASKS);
-        return statsB.pct - statsA.pct;
-      }
-      if (sortBy === "joined")
-        return new Date(a.dateOfJoining).getTime() - new Date(b.dateOfJoining).getTime();
-      if (sortBy === "pending") {
-        const pendA = a.tasks.length > 0 ? computeInductionStats(a.tasks).pending : DEFAULT_TASKS.length;
-        const pendB = b.tasks.length > 0 ? computeInductionStats(b.tasks).pending : DEFAULT_TASKS.length;
-        return pendB - pendA;
-      }
-      return 0;
-    });
-
-    return list;
-  }, [employees, activeTab, searchQuery, sortBy]);
+    // Newest employees at the top (by approval date)
+    return [...list].sort(
+      (a, b) => new Date(b.approvedAt).getTime() - new Date(a.approvedAt).getTime()
+    );
+  }, [employees, activeTab, searchQuery]);
 
   const visibleItems = useStaggeredEntrance(filtered.length, 40);
 
@@ -484,16 +443,6 @@ const InductionDashboard: React.FC = () => {
               Track onboarding induction tasks for new joiners
             </CardDescription>
           </div>
-          {!isLoadingTracker && globalStats.pendingTasks > 0 && (
-            <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/15 border border-amber-200/50 dark:border-amber-800/25 text-xs ind-fade-in">
-              <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-              </div>
-              <span className="text-amber-800 dark:text-amber-300 font-medium">
-                {globalStats.pendingTasks} task{globalStats.pendingTasks > 1 ? "s" : ""} pending
-              </span>
-            </div>
-          )}
         </CardHeader>
 
         <CardContent className="flex-1 min-h-0 flex flex-col gap-5">
@@ -529,19 +478,6 @@ const InductionDashboard: React.FC = () => {
               </Tabs>
 
               <div className="flex items-center gap-2 ml-auto flex-wrap">
-                <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-                  <SelectTrigger className="h-9 w-40 text-xs rounded-xl">
-                    <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Most pending</SelectItem>
-                    <SelectItem value="progress">Progress</SelectItem>
-                    <SelectItem value="name">Name</SelectItem>
-                    <SelectItem value="joined">Joining date</SelectItem>
-                  </SelectContent>
-                </Select>
-
                 <div className="relative w-full sm:w-56">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                   <Input
