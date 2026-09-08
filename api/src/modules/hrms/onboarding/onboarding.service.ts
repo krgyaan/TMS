@@ -1753,20 +1753,14 @@ export class OnboardingService {
     const empData = {
       userId,
       employeeType: onProf.employeeType === '' || !onProf.employeeType ? undefined : onProf.employeeType,
-      status: onProf.employeeStatus === '' || !onProf.employeeStatus ? undefined : onProf.employeeStatus,
+      employeeStatus: onProf.employeeStatus === '' || !onProf.employeeStatus ? undefined : onProf.employeeStatus,
       reportingTl: sanitizeNum(onProf.reportingTl),
       workLocation: sanitize(onProf.workLocation),
-      dateOfJoining: sanitize(onProf.dateOfJoining),
       probationMonths: sanitizeNum(onProf.probationMonths),
       probationEndDate: sanitize(onProf.probationEndDate),
       salaryType: sanitize(onProf.salaryType),
       basicSalary: sanitize(onProf.basicSalary),
       pfNumber: sanitize(onProf.pfNumber),
-      hra: sanitize(onProf.hra),
-      allowances: sanitize(onProf.allowances),
-      bonus: sanitize(onProf.bonus),
-      pfApplicable: onProf.pfApplicable ?? false,
-      esicApplicable: onProf.esicApplicable ?? false,
       updatedAt: new Date(),
     };
 

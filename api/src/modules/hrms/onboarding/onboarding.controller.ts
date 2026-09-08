@@ -23,6 +23,11 @@ const UpdateProfileSchema = z.object({
   // Compensation
   salaryType: z.string().optional(),
   basicSalary: z.coerce.string().optional(),
+  hra: z.coerce.string().optional(),
+  allowances: z.coerce.string().optional(),
+  bonus: z.coerce.string().optional(),
+  pfApplicable: z.boolean().optional(),
+  esicApplicable: z.boolean().optional(),
   // Bank
   bankName: z.string().optional(),
   accountNumber: z.string().optional(),
