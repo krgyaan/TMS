@@ -86,6 +86,11 @@ export function TenderInformationForm({
             return;
         }
 
+        if (!tender?.documents || !tender.documents.toLowerCase().includes('.pdf')) {
+            toast.error('No PDF document uploaded for this tender.');
+            return;
+        }
+
         if (isExtracting) return;
 
         setIsExtracting(true);
@@ -306,8 +311,9 @@ export function TenderInformationForm({
                         <Button
                             type="button"
                             variant="default"
-                            className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-sm transition-all cursor-pointer"
-                            disabled={isExtracting || isTenderLoading || isInfoSheetLoading}
+                            className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={isExtracting || isTenderLoading || isInfoSheetLoading || !tender?.documents?.toLowerCase().includes('.pdf')}
+                            title={!tender?.documents?.toLowerCase().includes('.pdf') ? 'A PDF document must be uploaded to the tender for AI extraction' : undefined}
                             onClick={handleAutoExtract}
                         >
                             {isExtracting ? (

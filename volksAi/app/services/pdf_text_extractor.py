@@ -131,12 +131,12 @@ def build_text_blocks_from_words(words: list) -> list[dict]:
     return blocks
 
 def extract_pdf_text_hybrid(pdf_path: str, pages_dir: Path, max_pages: int = 50) -> List[Dict[str, Any]]:
-    import fitz
     """
     Hybrid PDF extraction.
     Determines if a page is a text-based digital PDF or a scanned image page.
     Applies image preprocessing before running Tesseract on scanned pages.
     """
+    import fitz
     doc = fitz.open(pdf_path)
     ocr_engine = None
     results = []

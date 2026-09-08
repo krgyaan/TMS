@@ -17,7 +17,7 @@ import { FileUploader } from "@/components/file-upload";
 import { useCreateTender, useUpdateTender, useGenerateTenderName } from "@/hooks/api/useTenders";
 import type { TenderInfoWithNames } from "../helpers/tenderInfo.types";
 import { paths } from "@/app/routes/paths";
-import { ArrowLeft, Sparkles, FileText, CheckCircle2, ArrowRight, FileSpreadsheet, FileUp } from "lucide-react";
+import { ArrowLeft, Sparkles, CheckCircle2, ArrowRight, FileSpreadsheet, FileUp } from "lucide-react";
 import { useTeamOptions, useOrganizationOptions, useUserOptions, useLocationOptions, useWebsiteOptions, useItemOptions } from "@/hooks/useSelectOptions";
 import { useAuth } from "@/contexts/AuthContext";
 import { TenderNameWarningAlert } from "./TenderNameWarningAlert";

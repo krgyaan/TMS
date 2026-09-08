@@ -8,3 +8,4 @@ __pycache__/
 .env.*
 .git/
 .gitignore
+app/storage/

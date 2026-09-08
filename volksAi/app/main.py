@@ -32,15 +32,18 @@ load_dotenv(_ROOT.parent.parent / ".env")
 logger = logging.getLogger("volksAi")
 
 def verify_anthropic_api_key():
+    if os.getenv("LLM_FALLBACK_ENABLED", "true").lower() != "true":
+        logger.info("[STARTUP] LLM fallback disabled; skipping Anthropic API key validation.")
+        return
     key = os.getenv("ANTHROPIC_API_KEY", "").strip()
     placeholder_vals = ["your_claude_api_key_here", "your_anthropic_api_key_here", "your_key_here", "placeholder", "xxx"]
     if not key or any(p in key.lower() for p in placeholder_vals):
         raise RuntimeError("FATAL: ANTHROPIC_API_KEY is not configured or is a placeholder. Claude is required for tender field resolution.")
+    logger.info("[STARTUP] Anthropic API key validated successfully. Claude Sonnet 5 is active.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     verify_anthropic_api_key()
-    logger.info("[STARTUP] Anthropic API key validated successfully. Claude Sonnet 5 is active.")
     yield
 
 app = FastAPI(

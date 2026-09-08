@@ -5,13 +5,13 @@ def convert_pdf_to_images(
     output_dir: Path,
     dpi: int = 200
 ) -> list[Path]:
-    import fitz  # PyMuPDF
     """
     Step 1: Open the PDF document.
     Step 2: Iterate pages, render each to a pixmap at target DPI.
     Step 3: Save each pixmap as PNG.
     Step 4: Return ordered list of image paths.
     """
+    import fitz  # PyMuPDF
     output_dir.mkdir(parents=True, exist_ok=True)
     image_paths: list[Path] = []
 

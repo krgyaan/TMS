@@ -119,7 +119,6 @@ def _download_with_retry(
     raise RuntimeError(f"ATC download failed after {max_retries} attempts") from last_exc
 
 def extract_links_and_mentions(pdf_path: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    import fitz
     """
     Hardened layer-based link extractor for tender PDFs.
     Layer 1: Standard machine-readable page links via page.get_links()
@@ -127,6 +126,7 @@ def extract_links_and_mentions(pdf_path: str) -> Tuple[List[Dict[str, Any]], Lis
     Layer 3: Regular expression textual file reference fallback
     Layer 4: Deduplication, confidence scoring, and mapping
     """
+    import fitz
     from pathlib import Path
     
     parent_dir = Path(pdf_path).parent

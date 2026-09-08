@@ -32,6 +32,11 @@ RUN python -c "from paddleocr import PaddleOCR; PaddleOCR(use_angle_cls=True, la
 # Copy application source code into the image
 COPY app/ ./app
 
+# Exposure Note:
+# Inside the container namespace, Uvicorn listens on 0.0.0.0 to receive traffic forwarded
+# across Docker's bridge network. To enforce the internal-only / loopback guarantee
+# (preventing public exposure), host port bindings must be restricted to 127.0.0.1:
+# e.g., `docker run -p 127.0.0.1:8000:8000 ...` or joined to a private internal Docker bridge.
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
