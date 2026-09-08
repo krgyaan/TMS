@@ -5,11 +5,8 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "dev:pwa": "vite --config vite.pwa.config.ts",
         "build": "vite build",
-        "build:pwa": "vite build --config vite.pwa.config.ts && node -e \"const fs=require('fs');fs.copyFileSync('dist-pwa/index.pwa.html','dist-pwa/index.html')\"",
         "preview": "vite preview",
-        "preview:pwa": "vite preview --config vite.pwa.config.ts",
         "type-check": "tsc --noEmit",
         "type-check:watch": "tsc --noEmit --watch",
         "lint": "eslint ."
