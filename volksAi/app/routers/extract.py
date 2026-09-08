@@ -2,9 +2,10 @@ import asyncio
 import logging
 import sys
 import tempfile
+import time
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 
@@ -117,6 +118,18 @@ def _format_field_object(
     status_val = field_statuses.get(source_field_name) if source_field_name else None
     raw_source = field_sources.get(source_field_name) if source_field_name else None
 
+    # Derive not-applicable status for fee amounts if sibling mode is not-applicable
+    if (
+        source_field_name == "processing_fee_amount_display"
+        and field_statuses.get("processing_fee_mode_display") == FIELD_STATUS_NOT_APPLICABLE
+    ):
+        status_val = FIELD_STATUS_NOT_APPLICABLE
+    elif (
+        source_field_name == "tender_fee_amount_display"
+        and field_statuses.get("tender_fee_mode_display") == FIELD_STATUS_NOT_APPLICABLE
+    ):
+        status_val = FIELD_STATUS_NOT_APPLICABLE
+
     # 1. Determine confidence & clean value using exact status constants & DTO value
     if dto_value is None:
         if (
@@ -133,13 +146,17 @@ def _format_field_object(
     else:
         if dto_value == "NOT_APPLICABLE" or status_val == FIELD_STATUS_NOT_APPLICABLE:
             confidence = "not_applicable"
+            # Numeric zero or dummy placeholder paired with not_applicable must map to null
+            clean_value = None if (isinstance(dto_value, (int, float)) and dto_value == 0.0) else dto_value
         elif status_val == FIELD_STATUS_OK_FALLBACK:
             confidence = "fallback"
+            clean_value = dto_value
         elif status_val == FIELD_STATUS_OK:
             confidence = "high"
+            clean_value = dto_value
         else:
             confidence = "high"
-        clean_value = dto_value
+            clean_value = dto_value
 
     # 2. Determine source: 'regex' | 'atc' | 'llm' | None
     if confidence == "missing" or clean_value is None:
@@ -193,6 +210,7 @@ async def extract_tender(pdf_file: UploadFile = File(...)) -> Dict[str, Any]:
         )
 
     job_id = f"job_{uuid.uuid4().hex[:12]}"
+    start_time = time.time()
     logger.info(f"[EXTRACT_API] Starting extraction request for '{filename}' (job_id: {job_id})")
 
     # Use TemporaryDirectory as context manager so all generated files
@@ -223,25 +241,42 @@ async def extract_tender(pdf_file: UploadFile = File(...)) -> Dict[str, Any]:
             # 1. Transform raw extraction dictionary into TMS DTO shape
             tms_dto: Dict[str, Any] = map_to_tms_dto(infosheet_data)
 
-            # 2. Construct structured response with top-level version tag
-            response: Dict[str, Any] = {
-                "extraction_version": "1.0.0"
-            }
+            fields: Dict[str, Any] = {}
+            missing_fields: List[str] = []
 
-            # 3. Merge DTO-shaped values with confidence and source metadata
+            # 2. Merge DTO-shaped values with confidence and source metadata
             for tms_key, dto_val in tms_dto.items():
                 source_key = TMS_TO_SOURCE_KEY_MAP.get(tms_key)
 
-                response[tms_key] = _format_field_object(
+                field_obj = _format_field_object(
                     tms_key=tms_key,
                     dto_value=dto_val,
                     source_field_name=source_key,
                     field_statuses=field_statuses,
                     field_sources=field_sources,
                 )
+                fields[tms_key] = field_obj
+
+                if (
+                    field_obj.get("confidence") == "missing"
+                    or (field_obj.get("value") is None and field_obj.get("confidence") != "not_applicable")
+                    or field_obj.get("value") == []
+                ):
+                    missing_fields.append(tms_key)
+
+            processing_time_ms = int((time.time() - start_time) * 1000)
+
+            # 3. Construct final response envelope matching TMS specification
+            response: Dict[str, Any] = {
+                "extraction_version": "1.0.0",
+                "fields": fields,
+                "missing_fields": missing_fields,
+                "processing_time_ms": processing_time_ms,
+            }
 
             logger.info(
-                f"[EXTRACT_API] Extraction complete for '{filename}' ({len(response) - 1} TMS fields returned)"
+                f"[EXTRACT_API] Extraction complete for '{filename}' "
+                f"({len(fields)} fields, {len(missing_fields)} missing, {processing_time_ms}ms)"
             )
             return response
 

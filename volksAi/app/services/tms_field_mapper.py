@@ -430,9 +430,29 @@ def map_to_tms_dto(raw_infosheet_data: Dict[str, Any]) -> Dict[str, Any]:
         exp_years = raw.get("age_in_yrs")
     tech_eligibility_age = _parse_int(exp_years)
 
-    # Turnover values
-    turnover_val = _parse_float(raw.get("avg_annual_turnover_value_display"))
+    # Turnover values: when turnover type is NOT_APPLICABLE, requirement is not applicable -> None
     turnover_type = _map_turnover_type(raw.get("avg_annual_turnover_type_display"))
+    turnover_val = None if turnover_type == "NOT_APPLICABLE" else _parse_float(raw.get("avg_annual_turnover_value_display"))
+
+    # Working capital, net worth, and solvency certificate: None when NOT_APPLICABLE
+    wc_type = _map_criteria_type(raw.get("working_capital_type_display"))
+    wc_val = None if wc_type == "NOT_APPLICABLE" else _parse_float(raw.get("working_capital_value_display"))
+
+    nw_type = _map_criteria_type(raw.get("net_worth_type_display"))
+    nw_val = None if nw_type == "NOT_APPLICABLE" else _parse_float(raw.get("net_worth_value_display"))
+
+    solv_type = _map_criteria_type(raw.get("solvency_certificate_type_display"))
+    solv_val = None if solv_type == "NOT_APPLICABLE" else _parse_float(raw.get("solvency_certificate_value_display"))
+
+    # Processing Fee: None when mode is empty/NA and amount is 0 or absent
+    proc_modes = _parse_modes(raw.get("processing_fee_mode_display"))
+    raw_proc_amt = _parse_float(raw.get("processing_fee_amount_display"))
+    proc_amount = None if (proc_modes is None and (raw_proc_amt is None or raw_proc_amt <= 0)) else raw_proc_amt
+
+    # Tender Fee: None when mode is empty/NA and amount is 0 or absent
+    tender_fee_modes = _parse_modes(raw.get("tender_fee_mode_display"), delimiters=r"[/]+")
+    raw_tender_fee_amt = _parse_float(raw.get("tender_fee_amount_display"))
+    tender_fee_amount = None if (tender_fee_modes is None and (raw_tender_fee_amt is None or raw_tender_fee_amt <= 0)) else raw_tender_fee_amt
 
     # Tender value: a tender worth <= 0 is invalid/non-existent and must map to None
     raw_tender_val = _parse_float(raw.get("tender_value_display"))
@@ -440,12 +460,12 @@ def map_to_tms_dto(raw_infosheet_data: Dict[str, Any]) -> Dict[str, Any]:
 
     dto: Dict[str, Any] = {
         # Processing Fee
-        "processingFeeAmount": _parse_float(raw.get("processing_fee_amount_display")),
-        "processingFeeModes": _parse_modes(raw.get("processing_fee_mode_display")),
+        "processingFeeAmount": proc_amount,
+        "processingFeeModes": proc_modes,
 
         # Tender Fee
-        "tenderFeeAmount": _parse_float(raw.get("tender_fee_amount_display")),
-        "tenderFeeModes": _parse_modes(raw.get("tender_fee_mode_display"), delimiters=r"[/]+"),
+        "tenderFeeAmount": tender_fee_amount,
+        "tenderFeeModes": tender_fee_modes,
 
         # EMD
         "emdAmount": _parse_float(raw.get("emd_amount_display")),
@@ -497,14 +517,14 @@ def map_to_tms_dto(raw_infosheet_data: Dict[str, Any]) -> Dict[str, Any]:
         "avgAnnualTurnoverType": turnover_type,
         "avgAnnualTurnoverValue": turnover_val,
 
-        "workingCapitalType": _map_criteria_type(raw.get("working_capital_type_display")),
-        "workingCapitalValue": _parse_float(raw.get("working_capital_value_display")),
+        "workingCapitalType": wc_type,
+        "workingCapitalValue": wc_val,
 
-        "netWorthType": _map_criteria_type(raw.get("net_worth_type_display")),
-        "netWorthValue": _parse_float(raw.get("net_worth_value_display")),
+        "netWorthType": nw_type,
+        "netWorthValue": nw_val,
 
-        "solvencyCertificateType": _map_criteria_type(raw.get("solvency_certificate_type_display")),
-        "solvencyCertificateValue": _parse_float(raw.get("solvency_certificate_value_display")),
+        "solvencyCertificateType": solv_type,
+        "solvencyCertificateValue": solv_val,
 
         "customEligibilityCriteria": None if _is_empty(raw.get("custom_eligibility_criteria_display")) else str(raw.get("custom_eligibility_criteria_display")).strip(),
         "techEligibilityAge": tech_eligibility_age,

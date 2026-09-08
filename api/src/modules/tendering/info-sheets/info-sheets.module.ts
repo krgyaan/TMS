@@ -7,11 +7,23 @@ import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-his
 import { EmailModule } from '@/modules/email/email.module';
 import { TimersModule } from '@/modules/timers/timers.module';
 import { ClientDirectoryModule } from '@/modules/shared/client-directory/client-directory.module';
-
+import { FileUploadModule } from '@/modules/file-upload/file-upload.module';
+import { PdfExtractionProducer } from './pdf-extraction.producer';
+import { PdfExtractionProcessor } from './pdf-extraction.processor';
 
 @Module({
-    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, EmailModule, TimersModule, ClientDirectoryModule],
+    imports: [
+        DatabaseModule,
+        TendersModule,
+        TenderStatusHistoryModule,
+        EmailModule,
+        TimersModule,
+        ClientDirectoryModule,
+        FileUploadModule,
+    ],
     controllers: [TenderInfoSheetsController],
-    providers: [TenderInfoSheetsService],
+    providers: [TenderInfoSheetsService, PdfExtractionProducer, PdfExtractionProcessor],
+    exports: [PdfExtractionProducer, PdfExtractionProcessor],
 })
 export class TenderInfoSheetsModule { }
+
