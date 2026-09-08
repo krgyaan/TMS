@@ -1,85 +1,112 @@
 {
   "version": 2,
   "examples_by_field": {
+    "sd_required_display": [
+      {
+        "anchor_text": "False",
+        "value": "No",
+        "doc_type": "METRO_RAIL",
+        "confidence": 0.85,
+        "timestamp": "2026-09-08T11:10:50.308671+00:00"
+      }
+    ],
+    "sd_mode_display": [
+      {
+        "anchor_text": "Bank Guarantee",
+        "value": "Bank Guarantee",
+        "doc_type": "METRO_RAIL",
+        "confidence": 0.85,
+        "timestamp": "2026-09-08T11:10:50.308671+00:00"
+      }
+    ],
     "sd_percentage_display": [
       {
         "anchor_text": "5.0",
         "value": "5%",
-        "doc_type": "GAIL_AMC",
+        "doc_type": "METRO_RAIL",
         "confidence": 0.85,
-        "timestamp": "2026-09-07T06:56:32.548214+00:00"
+        "timestamp": "2026-09-08T11:10:50.308671+00:00"
       }
     ],
     "sd_duration_display": [
       {
-        "anchor_text": "21",
-        "value": "21",
-        "doc_type": "GAIL_AMC",
+        "anchor_text": "30",
+        "value": "30",
+        "doc_type": "METRO_RAIL",
         "confidence": 0.85,
-        "timestamp": "2026-09-07T06:56:32.549645+00:00"
-      }
-    ],
-    "avg_annual_turnover_value_display": [
-      {
-        "anchor_text": "Not Applicable",
-        "value": "Not Applicable",
-        "doc_type": "GAIL_AMC",
-        "confidence": 0.85,
-        "timestamp": "2026-09-07T06:56:32.550632+00:00"
-      }
-    ],
-    "working_capital_value_display": [
-      {
-        "anchor_text": "Not Applicable",
-        "value": "Not Applicable",
-        "doc_type": "GAIL_AMC",
-        "confidence": 0.85,
-        "timestamp": "2026-09-07T06:56:32.551706+00:00"
-      }
-    ],
-    "net_worth_value_display": [
-      {
-        "anchor_text": "Not Applicable",
-        "value": "Not Applicable",
-        "doc_type": "GAIL_AMC",
-        "confidence": 0.85,
-        "timestamp": "2026-09-07T06:56:32.552215+00:00"
-      }
-    ],
-    "solvency_certificate_value_display": [
-      {
-        "anchor_text": "Not Applicable",
-        "value": "Not Applicable",
-        "doc_type": "GAIL_AMC",
-        "confidence": 0.85,
-        "timestamp": "2026-09-07T06:56:32.553338+00:00"
-      }
-    ],
-    "client_phone_1_display": [
-      {
-        "anchor_text": "0141-2230347/617/698 (Extn. 860-1385)",
-        "value": "0141-2230347/617/698 (Extn. 860-1385)",
-        "doc_type": "GAIL_AMC",
-        "confidence": 0.85,
-        "timestamp": "2026-09-07T06:56:32.554389+00:00"
+        "timestamp": "2026-09-08T11:10:50.314809+00:00"
       }
     ],
     "custom_eligibility_criteria_display": [
       {
-        "anchor_text": "The bidder must have successfully executed a job in a single order of valuing not less than Rs. 62.14 lakhs for \"Supply and Installation of Ni-Cd battery bank\" in any Government/PSU/Private Sector Organizations in previous seven (07) years (to be reckoned from the final due date of bid submission). ",
-        "value": "The bidder must have successfully executed a job in a single order of valuing not less than Rs. 62.14 lakhs for \"Supply and Installation of Ni-Cd battery bank\" in any Government/PSU/Private Sector Organizations in previous seven (07) years (to be reckoned from the final due date of bid submission). The bidder must be a \"Manufacturer\" or an \"Authorized Partner/Distributor/Dealer/Reseller\" of \"Battery banks\".",
-        "doc_type": "GAIL_AMC",
+        "anchor_text": "BEC-Technical Criteria: Supply, Installation, Testing and Commissioning of 2.0 Ton Split Air-Conditioners for Electrical Room in Admin Building, HMI Room and Fire Control Room at Kailaras Compressor Station. Bidders must submit evidence of prior execution of similar air-conditioning supply and insta",
+        "value": "BEC-Technical Criteria: Supply, Installation, Testing and Commissioning of 2.0 Ton Split Air-Conditioners for Electrical Room in Admin Building, HMI Room and Fire Control Room at Kailaras Compressor Station. Bidders must submit evidence of prior execution of similar air-conditioning supply and installation jobs through purchase orders or other supporting documents.",
+        "doc_type": "METRO_RAIL",
         "confidence": 0.85,
-        "timestamp": "2026-09-07T06:56:32.554907+00:00"
+        "timestamp": "2026-09-08T11:10:56.631751+00:00"
       }
     ],
-    "eligibility_criterion_years_display": [
+    "avg_annual_turnover_type_display": [
       {
-        "anchor_text": "7",
-        "value": "7",
-        "doc_type": "GAIL_AMC",
+        "anchor_text": "Exempt",
+        "value": "Exempt",
+        "doc_type": "METRO_RAIL",
         "confidence": 0.85,
-        "timestamp": "2026-09-07T06:56:32.556175+00:00"
+        "timestamp": "2026-09-08T11:10:56.631751+00:00"
+      }
+    ],
+    "working_capital_type_display": [
+      {
+        "anchor_text": "Not Applicable",
+        "value": "Not Applicable",
+        "doc_type": "METRO_RAIL",
+        "confidence": 0.85,
+        "timestamp": "2026-09-08T11:10:56.636089+00:00"
+      }
+    ],
+    "net_worth_type_display": [
+      {
+        "anchor_text": "Not Applicable",
+        "value": "Not Applicable",
+        "doc_type": "METRO_RAIL",
+        "confidence": 0.85,
+        "timestamp": "2026-09-08T11:10:56.636592+00:00"
+      }
+    ],
+    "solvency_certificate_type_display": [
+      {
+        "anchor_text": "Not Applicable",
+        "value": "Not Applicable",
+        "doc_type": "METRO_RAIL",
+        "confidence": 0.85,
+        "timestamp": "2026-09-08T11:10:56.638357+00:00"
+      }
+    ],
+    "emd_amount_display": [
+      {
+        "anchor_text": "0",
+        "value": "0",
+        "doc_type": "METRO_RAIL",
+        "confidence": 0.85,
+        "timestamp": "2026-09-08T11:10:58.897998+00:00"
+      }
+    ],
+    "tender_fee_amount_display": [
+      {
+        "anchor_text": "0",
+        "value": "0",
+        "doc_type": "METRO_RAIL",
+        "confidence": 0.85,
+        "timestamp": "2026-09-08T11:10:58.899031+00:00"
+      }
+    ],
+    "processing_fee_amount_display": [
+      {
+        "anchor_text": "0",
+        "value": "0",
+        "doc_type": "METRO_RAIL",
+        "confidence": 0.85,
+        "timestamp": "2026-09-08T11:10:58.899544+00:00"
       }
     ]
   }

@@ -247,6 +247,8 @@ async def extract_tender(pdf_file: UploadFile = File(...)) -> Dict[str, Any]:
             # 2. Merge DTO-shaped values with confidence and source metadata
             for tms_key, dto_val in tms_dto.items():
                 source_key = TMS_TO_SOURCE_KEY_MAP.get(tms_key)
+                if tms_key == "techEligibilityAge" and "eligibility_criterion_years_display" in field_statuses:
+                    source_key = "eligibility_criterion_years_display"
 
                 field_obj = _format_field_object(
                     tms_key=tms_key,

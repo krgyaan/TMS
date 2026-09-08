@@ -477,10 +477,27 @@ def ingest_parent_tender_pdf(
                 )
                 from app.services.tender_mapper import FIELD_STATUS_OK_FALLBACK, FIELD_STATUS_MISSING
                 _DISPLAY_KEY_TO_LABEL = {
+                    "tender_value_display": "Tender Value",
+                    "emd_amount_display": "EMD Amount",
+                    "emd_required_display": "EMD Required",
+                    "emd_mode_display": "EMD Modes",
+                    "tender_fee_amount_display": "Tender Fee Amount",
+                    "tender_fee_mode_display": "Tender Fee Modes",
+                    "processing_fee_amount_display": "Processing Fee Amount",
+                    "processing_fee_mode_display": "Processing Fee Modes",
+                    "bid_validity_days_display": "Bid Validity (Days)",
+                    "delivery_time_installation_display": "Delivery Time Installation (Days)",
+                    "installation_inclusive_display": "Installation Inclusive",
+                    "physical_docs_required_display": "Physical Docs Required",
+                    "physical_docs_deadline_display": "Physical Docs Deadline",
                     "payment_terms_supply_display": "Payment Terms Supply",
                     "payment_terms_installation_display": "Payment Terms Installation",
                     "ld_percentage_display": "LD Percentage Per Week",
                     "max_ld_percentage_display": "Max LD Percentage",
+                    "pbg_required_display": "PBG Required",
+                    "pbg_percentage_display": "PBG Percentage",
+                    "pbg_duration_display": "PBG Duration (Months)",
+                    "pbg_mode_display": "PBG Mode",
                     "sd_required_display": "Security Deposit Required",
                     "sd_mode_display": "Security Deposit Mode",
                     "sd_percentage_display": "Security Deposit %",
@@ -498,17 +515,16 @@ def ingest_parent_tender_pdf(
                     "custom_eligibility_criteria_display": "Custom Eligibility Criteria",
                     "courier_address_display": "Courier Address",
                     "delivery_time_supply_display": "Delivery Time Supply (Days)",
-                    "delivery_time_installation_display": "Delivery Time Installation (Days)",
-                    "pbg_percentage_display": "PBG Percentage",
-                    "pbg_duration_display": "PBG Duration (Months)",
-                    "pbg_mode_display": "PBG Mode",
                     "commercial_evaluation_display": "Commercial Evaluation Type",
                     "reverse_auction_applicable_display": "Reverse Auction Applicable",
                     "order_value_1_display": "Order Value 1",
                     "order_value_2_display": "Order Value 2",
                     "order_value_3_display": "Order Value 3",
+                    "avg_annual_turnover_type_display": "Average Annual Turnover Type",
                     "avg_annual_turnover_value_display": "Average Annual Turnover Value",
+                    "working_capital_type_display": "Working Capital Type",
                     "working_capital_value_display": "Working Capital Value",
+                    "solvency_certificate_type_display": "Solvency Certificate Type",
                     "solvency_certificate_value_display": "Solvency Certificate Value",
                     "net_worth_value_display": "Net Worth Value",
                     "net_worth_type_display": "Net Worth Requirement",
@@ -528,9 +544,16 @@ def ingest_parent_tender_pdf(
                 _stub_vals = ("NA", "N/A", None, "", "Not Found", "NOT_APPLICABLE", "Not Applicable", "0", "0.0", "0.00", "₹0.00", 0, 0.0, "⚠️ MISSING")
                 # Dynamically collect ALL infosheet fields that are still NA / missing after Layer 1 regex pass
                 missing_keys = [
-                    k for k, v in infosheet_data.items()
-                    if not k.startswith("_") and (v in _stub_vals or (isinstance(v, str) and not v.strip()))
+                    k for k in FIELD_PROMPT_MAP.keys()
+                    if k not in infosheet_data
+                    or infosheet_data.get(k) in _stub_vals
+                    or (isinstance(infosheet_data.get(k), str) and not str(infosheet_data.get(k)).strip())
                 ]
+                # Also include any remaining non-display keys from infosheet_data that are stub
+                for k, v in infosheet_data.items():
+                    if not k.startswith("_") and k not in missing_keys and (v in _stub_vals or (isinstance(v, str) and not v.strip())):
+                        if k in FIELD_PROMPT_MAP:
+                            missing_keys.append(k)
                 # Combine parent and ATC child texts to ensure LLM has full context
                 parent_text = "\n".join([p.get("text", "") for p in all_pages])
                 target_text = f"{parent_text}\n\n{atc_full_text}".strip() if atc_full_text else parent_text.strip()

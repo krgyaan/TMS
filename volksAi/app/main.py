@@ -72,3 +72,4 @@ app.add_middleware(
 # Mount health and extraction routers
 app.include_router(health.router)
 app.include_router(extract.router)
+

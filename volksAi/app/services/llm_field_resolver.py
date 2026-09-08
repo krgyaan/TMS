@@ -71,6 +71,17 @@ _MEMORY_MAX_EXAMPLES_PER_FIELD = int(os.getenv("LLM_MAX_EXAMPLES_PER_FIELD", "5"
 
 # Category mappings for Role 1 scoped batching (avoids sending full text or paying repeated overhead)
 FIELD_SECTION_CATEGORY: Dict[str, str] = {
+    # 0. Basic Bid Summary & Fees
+    "tender_value_display": "bid_summary",
+    "emd_amount_display": "bid_summary",
+    "emd_required_display": "bid_summary",
+    "emd_mode_display": "bid_summary",
+    "tender_fee_amount_display": "bid_summary",
+    "tender_fee_mode_display": "bid_summary",
+    "processing_fee_amount_display": "bid_summary",
+    "processing_fee_mode_display": "bid_summary",
+    "bid_validity_days_display": "bid_summary",
+
     # 1. Contacts & Addresses
     "client_name_1_display": "contacts_bds",
     "client_email_1_display": "contacts_bds",
@@ -82,6 +93,8 @@ FIELD_SECTION_CATEGORY: Dict[str, str] = {
     "client_email_3_display": "contacts_bds",
     "client_phone_3_display": "contacts_bds",
     "courier_address_display": "contacts_bds",
+    "physical_docs_required_display": "contacts_bds",
+    "physical_docs_deadline_display": "contacts_bds",
 
     # 2. BEC Technical & Financial Criteria
     "custom_eligibility_criteria_display": "bec_criteria",
@@ -90,8 +103,11 @@ FIELD_SECTION_CATEGORY: Dict[str, str] = {
     "order_value_2_display": "bec_criteria",
     "order_value_3_display": "bec_criteria",
     "avg_annual_turnover_value_display": "bec_criteria",
+    "avg_annual_turnover_type_display": "bec_criteria",
     "working_capital_value_display": "bec_criteria",
+    "working_capital_type_display": "bec_criteria",
     "solvency_certificate_value_display": "bec_criteria",
+    "solvency_certificate_type_display": "bec_criteria",
     "net_worth_value_display": "bec_criteria",
     "net_worth_type_display": "bec_criteria",
     "eligibility_criterion_years_display": "bec_criteria",
@@ -101,6 +117,7 @@ FIELD_SECTION_CATEGORY: Dict[str, str] = {
     "payment_terms_installation_display": "payment_terms",
 
     # 4. PBG & Security Deposit
+    "pbg_required_display": "pbg_sd",
     "pbg_percentage_display": "pbg_sd",
     "pbg_duration_display": "pbg_sd",
     "pbg_mode_display": "pbg_sd",
@@ -116,6 +133,7 @@ FIELD_SECTION_CATEGORY: Dict[str, str] = {
     # 6. Delivery Timeline
     "delivery_time_supply_display": "delivery_timeline",
     "delivery_time_installation_display": "delivery_timeline",
+    "installation_inclusive_display": "delivery_timeline",
 
     # 7. Commercial & Reverse Auction
     "commercial_evaluation_display": "commercial_ra",
@@ -179,55 +197,28 @@ AMBIGUITY_FIELD_DEFINITIONS: Dict[str, str] = {
 # GAIL / GeM ATC Anchor Knowledge Base
 # Compiled from: GAIL GCC-Goods Rev.1 (2022), BDS Section-III, all ATC samples
 # ─────────────────────────────────────────────────────────────────────────────
-GAIL_GEM_SYSTEM_INSTRUCTION = """You are an expert at extracting structured data from Indian government procurement tender documents — specifically GAIL/PSU Additional Terms & Conditions (ATC) PDFs procured on the GeM portal.
+UNIVERSAL_TENDER_SYSTEM_INSTRUCTION = """You are an expert procurement auditor and document parsing AI specialized in Indian Government, PSU, GeM (Government e-Marketplace), Metro Rail Corporations (e.g. DMRC, BMRC, MMRDA), Indian Railways, Defence, and State Procurement tenders.
 
-## GAIL / GeM Document Structure Knowledge
-
-### Section & Clause Map (GAIL GCC-Goods Rev.1, April 2022)
-- **SECTION-I (IFB Summary)**: IFB Tags (A)–(H) — fixed-format summary rows
-  - Tag (E): BID SECURITY / EMD AMOUNT — extract exact ₹ amount here, NOT from Clause 16
-  - Tag (G): CONTACT DETAILS OF TENDER DEALING OFFICER — primary contact block (name, phone, email)
-  - Tag (H): DEALING GAIL'S OFFICE ADDRESS — courier/physical submission address
-- **SECTION-II**: BID EVALUATION CRITERIA (BEC) — eligibility, MAF, technical & financial criteria
-  - **Technical Criteria (custom_eligibility_criteria)**:
-    - Extract the core technical experience requirement (e.g., "Bidder should have supplied / executed SITC of...").
-    - DO NOT extract Make-in-India (MII) or Public Procurement / MSE Purchase Preference clauses here. MII is NOT technical BEC.
-  - **Single / Multiple Work Order Values (order_value_1, order_value_2, order_value_3)**:
-    - Extract the required executed order values from BEC technical criteria.
-    - PRESERVE THE UNIT: If the table column is "(Rs. in Lakhs)" and the row says "32.00", output "Rs. 32.00 Lakh" or "₹32,00,000". Never output bare "32.00" without units.
-  - **Eligibility Experience Period (eligibility_criterion_years)**:
-    - Extract ONLY the integer number of years required (e.g. "7" or "3"). Do not output "etc.", sentences, or vague text.
-  - **Financial Criteria (Turnover, Working Capital, Net Worth, Solvency)**:
-    - Only mark as "Not Applicable" if UNCONDITIONALLY NOT APPLICABLE for ALL bidders.
-    - If financial criteria is exempt ONLY for MSE / Startups, extract the standard threshold values applicable to general bidders (e.g., "Rs. 61.00 Lakh").
-  - MAF/OEM: "Manufacturer Authorization", "Authorized Dealer/Partner" → maf_required=true
-- **SECTION-III (BDS)**: BIDDING DATA SHEET — second occurrence (ignore TOC listing near front)
-  - Find the SECOND occurrence of "BIDDING DATA SHEET (BDS)" and slice to next SECTION-
-  - BDS 8.1 / 22.2: Courier/Submission address — also called 'Consignee Address' or 'Delivery Address'
-  - BDS 39.2 / 39.3: Nodal Officer / second contact block
-
-### Terms of Payment & Guarantees
-- **CLAUSE 9.0 / 26.0 (Goods/SITC)** or **CLAUSE 21.0 / 3.1 (Services/AMC)**: TERMS OF PAYMENT
-  - For Goods/SITC contracts: typically 70% or 80% on supply receipt, 30% or 20% on installation/commissioning
-  - Differentiate milestone payments from general dispatch/acceptance terms
-- **CLAUSE 38.0 / 39.0**: CONTRACT PERFORMANCE SECURITY / SECURITY DEPOSIT / PBG
-  - Extract: percentage (%), duration in months, accepted instrument types
-  - Common instruments: Bank Guarantee, Demand Draft, FDR, Online Transfer, Insurance Surety Bond
-- **PRICE REDUCTION SCHEDULE (PRS) FOR DELAYED DELIVERY**:
-  - Typically: 0.5% per complete week of delay, maximum 5% of total order value
-
-## CRITICAL EXTRACTION RULES
-1. Extract ONLY values explicitly present in the provided document text.
-2. Do NOT infer, guess, or hallucinate values.
-3. Return null for any field not found in the text.
-4. For payment terms: return INTEGER percentages (e.g. 70, not "70%").
-5. For LD/PRS: return DECIMAL rate (e.g. 0.5, not "0.5%").
-6. For SD/PBG mode: list all accepted instruments as a human-readable string.
-7. For custom_eligibility_criteria: Extract technical scope of past experience only; never extract Make in India / Local Content preference text.
-8. For order values and turnover: Always preserve currency and multiplier units (e.g. 'Rs. 32.00 Lakh' or '₹32,00,000').
-9. For eligibility_criterion_years: Output a clean single integer string (e.g. '7', '5', '3').
+## Core Extraction Principles:
+1. STRICT ADHERENCE TO THE DOCUMENT: Extract ONLY values explicitly stated in the provided tender text. NEVER guess, extrapolate, or hallucinate organization names, officer names, emails, phone numbers, or addresses.
+2. If a field is not present or mentioned in the text, return null. Do not use default, speculative, or placeholder values.
+3. Multiple Organizations: The document may be issued by DMRC, GAIL, Indian Railways, NTPC, IOCL, State Governments (e.g. Rajasthan, UP, Maharashtra), CPWD, or any other authority. Extract the exact authority, buyer, and officers named in THIS specific document.
+4. Numerical Precision:
+   - For Estimated Value & EMD: Extract exact amounts (e.g. "₹15,00,000" or "1500000"). If EMD is exempt or not required, indicate accordingly.
+   - For Experience Years: Extract single clean integer (e.g. 3, 5, 7).
+   - For Work Order Values & Turnover: Always preserve units (e.g. "Rs. 62.14 Lakhs", "₹62,14,000").
+   - For Payment Terms: Extract supply percentage (e.g. 70, 80) and installation percentage (e.g. 30, 20).
+   - For PBG / Security Deposit: Extract exact percentage (e.g. 3%, 5%, 10%) and validity period in months.
+   - For Liquidated Damages (LD / PRS): Extract weekly rate (e.g. 0.5%) and maximum cap (e.g. 5.0% or 10.0%).
+   - For MAF (Manufacturer Authorization Form): Return true if required from OEM/Manufacturer, otherwise false.
+5. Contacts & Submission:
+   - Extract primary dealing officer / contact person name, email, phone from the document.
+   - Extract physical documents submission / courier address from the document.
+   - NEVER inject external names or emails. If not in the text, return null.
 
 {few_shot_section}"""
+
+GAIL_GEM_SYSTEM_INSTRUCTION = UNIVERSAL_TENDER_SYSTEM_INSTRUCTION
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Field Map: display_key → (prompt_field_name, json_type, description, display_format)
@@ -448,6 +439,97 @@ FIELD_PROMPT_MAP: Dict[str, Tuple[str, str, str, Any]] = {
         "Number of years of prior experience required in BEC technical criteria (e.g. '7' or '3'). Return clean integer number string only.",
         _fmt_years,
     ),
+    # Bid Summary, Identity, Values, Fees, Timing & EMD
+    "tender_value_display": (
+        "tender_value", "number",
+        "Total Estimated Tender/Bid Value in Rupees. Extract exact numeric amount (e.g. 1500000.00). Search for 'Estimated Bid Value', 'Estimated Cost', 'Tender Value', 'Total Value'. If not stated or exempt, return null.",
+        _fmt_str,
+    ),
+    "emd_amount_display": (
+        "emd_amount", "number",
+        "Earnest Money Deposit (EMD) / Bid Security amount in Rupees (e.g. 50000). Look for 'EMD Amount', 'Bid Security'. If EMD is exempt or nil, return 0.",
+        _fmt_str,
+    ),
+    "emd_required_display": (
+        "emd_required", "string",
+        "Is EMD / Bid Security required? Return 'Yes', 'No', or 'Exempt'. If EMD amount is > 0, return 'Yes'.",
+        _fmt_str,
+    ),
+    "emd_mode_display": (
+        "emd_mode", "string",
+        "Accepted payment instruments for EMD (e.g. 'Bank Guarantee / Demand Draft / FDR / Online / Insurance Surety Bond').",
+        _fmt_str,
+    ),
+    "tender_fee_amount_display": (
+        "tender_fee_amount", "number",
+        "Tender document fee / cost in Rupees (e.g. 1000). If exempt or nil, return null or 0.",
+        _fmt_str,
+    ),
+    "tender_fee_mode_display": (
+        "tender_fee_mode", "string",
+        "Accepted payment instruments for Tender Fee (e.g. 'Demand Draft / Banker Cheque / Online').",
+        _fmt_str,
+    ),
+    "processing_fee_amount_display": (
+        "processing_fee_amount", "number",
+        "Portal processing / transaction fee in Rupees. If nil or not applicable, return null or 0.",
+        _fmt_str,
+    ),
+    "processing_fee_mode_display": (
+        "processing_fee_mode", "string",
+        "Accepted payment instruments for Processing Fee.",
+        _fmt_str,
+    ),
+    "bid_validity_days_display": (
+        "bid_validity_days", "integer",
+        "Bid offer validity period in number of days (integer, e.g. 90, 120, 180). Look for 'Bid Offer Validity (From End Date)' or 'Bid Validity'.",
+        _fmt_int,
+    ),
+    "delivery_time_installation_display": (
+        "delivery_time_installation_days", "integer",
+        "Installation and commissioning timeline in days (integer, e.g. 30, 60). If installation period is included in supply period, return null.",
+        _fmt_int,
+    ),
+    "installation_inclusive_display": (
+        "installation_inclusive", "boolean",
+        "Is installation and commissioning period inclusive within the total supply delivery time? (true/false)",
+        _fmt_bool,
+    ),
+    "physical_docs_required_display": (
+        "physical_docs_required", "boolean",
+        "Are physical / original paper documents required to be submitted offline / by courier? (true/false)",
+        _fmt_bool,
+    ),
+    "physical_docs_deadline_display": (
+        "physical_docs_deadline", "string",
+        "Date and time deadline for submission of physical offline documents (e.g. '2025-01-15 15:00:00' or verbatim timestamp).",
+        _fmt_str,
+    ),
+    "pbg_required_display": (
+        "pbg_required", "boolean",
+        "Is Performance Bank Guarantee (PBG) / ePBG / Performance Security required? (true/false). If PBG % > 0, return true.",
+        _fmt_bool,
+    ),
+    "avg_annual_turnover_type_display": (
+        "avg_annual_turnover_type", "string",
+        "Average annual turnover requirement status: return 'Amount' (if numeric value required), 'Exempt' or 'Not Applicable' (if exempt).",
+        _fmt_str,
+    ),
+    "working_capital_type_display": (
+        "working_capital_type", "string",
+        "Working capital requirement status: return 'Amount' (if monetary requirement), 'Positive' (if positive), or 'Not Applicable' / 'Exempt'.",
+        _fmt_str,
+    ),
+    "net_worth_type_display": (
+        "net_worth_type", "string",
+        "Net worth requirement status: return 'Positive' (if net worth must be positive), 'Amount' (if numeric threshold), or 'Not Applicable' / 'Exempt'.",
+        _fmt_str,
+    ),
+    "solvency_certificate_type_display": (
+        "solvency_certificate_type", "string",
+        "Bank Solvency Certificate requirement status: return 'Amount' (if numeric solvency required), or 'Not Applicable' / 'Exempt'.",
+        _fmt_str,
+    ),
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -468,6 +550,14 @@ def extract_scoped_context(full_text: str, target: str) -> str:
     t_lower = target.lower()
 
     # Determine category matching
+    is_bid_summary = (
+        "bid_summary" in t_lower
+        or "tender_value" in t_lower
+        or "emd" in t_lower
+        or "fee" in t_lower
+        or "validity" in t_lower
+        or "identity" in t_lower
+    )
     is_contacts = "contacts" in t_lower or "client" in t_lower or "courier" in t_lower or "address" in t_lower
     is_bec = (
         "bec" in t_lower or "eligibility" in t_lower or "net_worth" in t_lower
@@ -480,10 +570,24 @@ def extract_scoped_context(full_text: str, target: str) -> str:
     is_delivery = "delivery" in t_lower or "timeline" in t_lower or "completion" in t_lower or "period" in t_lower
     is_commercial = "commercial" in t_lower or "reverse_auction" in t_lower or "ra" in t_lower or "evaluation" in t_lower
 
-    if is_contacts:
-        # 1. IFB Tag (G)/(H), Contact details, dealing officer
+    if is_bid_summary:
+        # 1. Opening 18,000 characters contains GeM Bid Details, NIT, Estimated Value, EMD, Validity
+        snippets.append("=== Tender Document Opening & Bid Summary (Pages 1-5) ===\n" + full_text[:18000].strip())
+        section_names.append("Document Opening / Bid Details (pos 0)")
+
+        # 2. Search for any NIT, IFB, EMD, Fee, or Value clauses in the remainder of text
         for m in re.finditer(
-            r"(?:TAG\s*[\(\[]?[GgHh][\)\]]?|CONTACT\s+DETAILS|TENDER\s+DEALING\s+OFFICER|NODAL\s+OFFICER|OFFICER\s+DETAILS|COURIER\s+ADDRESS|COMMUNICATION\s+ADDRESS|OFFICE\s+ADDRESS|DEALING\s+GAIL['’]?S\s+OFFICE)[\s\S]{0,2500}",
+            r"(?:NOTICE\s+INVITING\s+TENDER|INVITATION\s+FOR\s+BIDS|\bNIT\b|\bIFB\b|EMD\s+DETAIL|EARNEST\s+MONEY|TENDER\s+FEE|PROCESSING\s+FEE|ESTIMATED\s+(?:BID\s+)?VALUE|BID\s+SECURITY)[\s\S]{0,2500}",
+            full_text, re.IGNORECASE
+        ):
+            if m.start() > 18000:
+                snippets.append(f"=== EMD / Fee / Value Clause (pos {m.start()}) ===\n" + m.group(0).strip())
+                section_names.append(f"EMD/Fee Clause (pos {m.start()})")
+
+    if is_contacts:
+        # 1. IFB Tag (G)/(H), Contact details, dealing officer, buyer address
+        for m in re.finditer(
+            r"(?:TAG\s*[\(\[]?[GgHh][\)\]]?|CONTACT\s+DETAILS|TENDER\s+DEALING\s+OFFICER|NODAL\s+OFFICER|OFFICER\s+DETAILS|BUYER\s+DETAILS|BUYER\s+CONTACT|CONSIGNEE\s+DETAILS|COURIER\s+ADDRESS|COMMUNICATION\s+ADDRESS|OFFICE\s+ADDRESS|SUBMISSION\s+ADDRESS)[\s\S]{0,2500}",
             full_text, re.IGNORECASE
         ):
             snippets.append(f"=== Contacts & Address Block (pos {m.start()}) ===\n" + m.group(0).strip())
@@ -501,7 +605,7 @@ def extract_scoped_context(full_text: str, target: str) -> str:
     if is_bec:
         # 1. Section-II / BEC block
         bec_m = re.search(
-            r"(?:SECTION\s*[-–—]?\s*II\b|BID\s+EVALUATION\s+CRITERIA|\bBEC\b)[\s\S]{0,7000}?(?=(?:SECTION\s*[-–—]?\s*III|BIDDING\s+DATA\s+SHEET|\bBDS\b|\Z))",
+            r"(?:SECTION\s*[-–—]?\s*II\b|BID\s+EVALUATION\s+CRITERIA|\bBEC\b|TECHNICAL\s+CRITERIA|ELIGIBILITY\s+CRITERIA)[\s\S]{0,7000}?(?=(?:SECTION\s*[-–—]?\s*III|BIDDING\s+DATA\s+SHEET|\bBDS\b|\Z))",
             full_text, re.IGNORECASE
         )
         if bec_m:
@@ -590,19 +694,19 @@ def extract_scoped_context(full_text: str, target: str) -> str:
             section_names.append(f"Commercial Block (pos {m.start()})")
 
     if not snippets:
-        fallback_text = full_text[:8000]
+        fallback_text = full_text[:20000]
         logger.warning(
-            "[SCOPED_CONTEXT] Target '%s': NO specific section matched! Falling back to first 8000 characters (%d chars).",
+            "[SCOPED_CONTEXT] Target '%s': NO specific section matched! Falling back to first 20000 characters (%d chars).",
             target, len(fallback_text)
         )
         return fallback_text
 
-    combined = "\n\n".join(snippets[:6])
-    final_scoped = combined[:12000]
+    combined = "\n\n".join(snippets[:10])
+    final_scoped = combined[:25000]
 
     logger.info(
         "[SCOPED_CONTEXT] Target '%s': Selected %d sections (%s) -> Total %d characters sent (full doc: %d chars, %.1f%% of full doc)",
-        target, len(section_names[:6]), section_names[:6], len(final_scoped), len(full_text),
+        target, len(section_names[:10]), section_names[:10], len(final_scoped), len(full_text),
         (len(final_scoped) / max(len(full_text), 1)) * 100
     )
     return final_scoped
@@ -695,41 +799,26 @@ def record_correction(field_key: str, value: Any, anchor_text: str, doc_type: st
     _save_memory(field_key, anchor_text, value, doc_type, confidence)
 
 def _anonymize_few_shot_value(display_key: str, val: Any) -> Any:
-    """Anonymize literal field values to prevent cross-tender value leakage during few-shot prompting."""
+    """Anonymize literal field values to prevent cross-tender value leakage."""
     if val is None or isinstance(val, (bool, int, float)):
         return val
     s = str(val)
     if "email" in display_key:
-        return "officer@gail.co.in"
+        return "officer@procurement.gov.in"
     if "phone" in display_key:
         return "+91-98XXXXXXXX"
     if "name" in display_key:
-        return "Shri Officer Name"
+        return "Shri Dealing Officer"
     if "address" in display_key or "courier" in display_key:
-        return "GAIL Office Address, City, State - Pin Code"
+        return "Buyer Tender Office Address, City, State - Pin Code"
     return s
 
 def _build_few_shot_section(missing_fields: List[str], memory: Dict[str, List[Dict]]) -> str:
-    """Build the few-shot examples section of the prompt from memory with anonymized values."""
-    lines = []
-    for display_key in missing_fields:
-        entry = FIELD_PROMPT_MAP.get(display_key)
-        if not entry:
-            continue
-        prompt_field = entry[0]
-        if display_key == "custom_eligibility_criteria_display":
-            continue
-        examples = memory.get(display_key, []) or memory.get(prompt_field, [])
-        if not examples:
-            continue
-        lines.append(f"\n## Learned Examples for `{prompt_field}`:")
-        for ex in examples[:2]:
-            anon_val = _anonymize_few_shot_value(display_key, ex["value"])
-            lines.append(f"  - Anchor: \"{ex['anchor_text'][:120]}\"")
-            lines.append(f"    → Value Format Example: {json.dumps(anon_val)}")
-    if not lines:
-        return ""
-    return "\n## Few-Shot Extraction Examples (Formatting guidelines from historical tenders):\n" + "\n".join(lines)
+    """
+    Zero few-shot injection to strictly prevent cross-tender hallucination or leakage.
+    Every tender document is evaluated purely on its own literal text.
+    """
+    return ""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1225,10 +1314,12 @@ class LLMFieldResolver:
     def _detect_doc_type(self, text: str) -> str:
         """Detect tender domain/type from text keywords."""
         t = text.lower()
+        if "metro" in t or "railway" in t or "dmrc" in t:
+            return "METRO_RAIL"
         if "amc" in t or "annual maintenance" in t:
-            return "GAIL_AMC"
+            return "AMC_SERVICES"
         if "battery" in t or "vrla" in t or "nicd" in t:
-            return "GAIL_BATTERY"
+            return "BATTERY_ELECTRICAL"
         if "pipe" in t or "pipeline" in t:
-            return "GAIL_PIPELINE"
-        return "GAIL_GOODS"
+            return "PIPELINE_MECHANICAL"
+        return "GENERAL_PROCUREMENT"

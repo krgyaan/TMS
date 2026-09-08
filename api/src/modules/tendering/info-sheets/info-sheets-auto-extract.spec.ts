@@ -24,9 +24,11 @@ describe('TenderInfoSheetsService Auto-Extract & Path Resolution', () => {
         };
 
         mockLogger = {
+            log: jest.fn(),
             info: jest.fn(),
             warn: jest.fn(),
             error: jest.fn(),
+            debug: jest.fn(),
         };
 
         const mockAppLogger = {

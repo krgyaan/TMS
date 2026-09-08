@@ -35,7 +35,6 @@ class InfoSheetsService extends BaseApiService {
         missing_fields?: string[];
         extraction_version?: string;
         processing_time_ms?: number;
-        error?: string;
     }> {
         return this.get(`/auto-extract/${jobId}`)
     }

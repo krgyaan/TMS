@@ -23,7 +23,7 @@ import { PdfExtractionProcessor } from './pdf-extraction.processor';
     ],
     controllers: [TenderInfoSheetsController],
     providers: [TenderInfoSheetsService, PdfExtractionProducer, PdfExtractionProcessor],
-    exports: [PdfExtractionProducer, PdfExtractionProcessor],
+    exports: [TenderInfoSheetsService, PdfExtractionProducer, PdfExtractionProcessor],
 })
 export class TenderInfoSheetsModule { }
 

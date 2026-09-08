@@ -12,11 +12,8 @@ export interface PopulateResult {
     populatedKeys: string[];
 }
 
-export interface FieldIndicator {
-    type: 'fallback' | 'missing' | 'low';
-    label: string;
-    message: string;
-}
+import type { FieldIndicator } from '@/components/form/AiIndicatorsContext';
+export type { FieldIndicator };
 
 // Maps VolksAI extraction field keys to corresponding TenderInfoSheet form field keys
 export const EXTRACTION_TO_FORM_FIELD_MAP: Record<string, keyof TenderInfoSheetFormValues> = {
@@ -83,17 +80,32 @@ export function extractFieldIndicators(
             const formKey = EXTRACTION_TO_FORM_FIELD_MAP[key] || key;
             const confidence = String(field?.confidence || '').toLowerCase();
 
-            if (confidence === 'fallback') {
+            if (confidence === 'high') {
+                indicators[formKey] = {
+                    type: 'high',
+                    label: 'High Confidence',
+                    message: `Extracted with high confidence (${field.source || 'document'}).`,
+                    confidenceValue: 'High',
+                    suggestedValue: field.value,
+                    source: field.source,
+                };
+            } else if (confidence === 'fallback') {
                 indicators[formKey] = {
                     type: 'fallback',
                     label: 'AI Fallback',
                     message: `Extracted using AI fallback logic (${field.source || 'heuristic'}). Please verify.`,
+                    confidenceValue: 'Fallback',
+                    suggestedValue: field.value,
+                    source: field.source,
                 };
             } else if (confidence === 'low') {
                 indicators[formKey] = {
                     type: 'low',
                     label: 'Low Confidence',
                     message: `Extracted with low confidence (${field.source || 'regex'}). Please verify.`,
+                    confidenceValue: 'Low',
+                    suggestedValue: field.value,
+                    source: field.source,
                 };
             }
         }

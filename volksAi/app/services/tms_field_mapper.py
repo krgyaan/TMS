@@ -427,6 +427,8 @@ def map_to_tms_dto(raw_infosheet_data: Dict[str, Any]) -> Dict[str, Any]:
     # Experience years / tech eligibility age
     exp_years = raw.get("experience_years_display")
     if _is_empty(exp_years):
+        exp_years = raw.get("eligibility_criterion_years_display")
+    if _is_empty(exp_years):
         exp_years = raw.get("age_in_yrs")
     tech_eligibility_age = _parse_int(exp_years)
 

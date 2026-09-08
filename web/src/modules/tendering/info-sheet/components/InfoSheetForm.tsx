@@ -369,30 +369,44 @@ export function TenderInformationForm({
                     </Alert>
                 )}
 
-                {Object.keys(fieldIndicators).length > 0 && (
-                    <Alert className="mt-6 mb-6 border-amber-500 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200">
-                        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-2">
-                            <div>
-                                <p className="font-semibold text-sm">
-                                    AI Auto-Extraction Review ({Object.keys(fieldIndicators).length} fields flagged)
-                                </p>
-                                <AlertDescription className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
-                                    Amber indicators (<span className="inline-flex items-center gap-1 font-medium"><span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse inline-block" /> AI Fallback / Missing in PDF</span>) highlight fields where AI used fallback clauses or couldn't find an explicit value. Please verify before saving.
-                                </AlertDescription>
+                {Object.keys(fieldIndicators).length > 0 && (() => {
+                    const highCount = Object.values(fieldIndicators).filter(i => i.type === 'high').length;
+                    const flaggedCount = Object.values(fieldIndicators).filter(i => i.type !== 'high').length;
+                    return (
+                        <Alert className="mt-6 mb-6 border-amber-500/60 bg-gradient-to-r from-amber-50/70 via-emerald-50/40 to-transparent dark:from-amber-950/40 dark:via-emerald-950/20 dark:to-transparent text-amber-900 dark:text-amber-200">
+                            <Sparkles className="h-4 w-4 text-violet-600 dark:text-violet-400 shrink-0 mt-0.5" />
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-2">
+                                <div>
+                                    <p className="font-semibold text-sm flex items-center gap-2 flex-wrap">
+                                        <span>AI Auto-Extraction Complete</span>
+                                        {highCount > 0 && (
+                                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                                                ✓ {highCount} High Confidence
+                                            </span>
+                                        )}
+                                        {flaggedCount > 0 && (
+                                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                                                ⚠ {flaggedCount} Review Needed
+                                            </span>
+                                        )}
+                                    </p>
+                                    <AlertDescription className="text-xs text-muted-foreground mt-1">
+                                        Green indicators show high-confidence extraction. Amber and red badges mark fallback clauses or missing values needing verification. Dropdowns also highlight AI-suggested choices.
+                                    </AlertDescription>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs border-muted-foreground/30 hover:bg-accent self-start sm:self-auto cursor-pointer"
+                                    onClick={() => setFieldIndicators({})}
+                                >
+                                    Dismiss Badges
+                                </Button>
                             </div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-xs border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900 text-amber-800 dark:text-amber-200 self-start sm:self-auto cursor-pointer"
-                                onClick={() => setFieldIndicators({})}
-                            >
-                                Dismiss Flags
-                            </Button>
-                        </div>
-                    </Alert>
-                )}
+                        </Alert>
+                    );
+                })()}
 
                 <AiIndicatorsContext.Provider value={fieldIndicators}>
                     <Form {...form}>

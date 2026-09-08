@@ -1645,7 +1645,7 @@ export class TenderInfoSheetsService {
         const tender = await this.tenderInfosService.validateExists(tenderId);
         const pdfPath = this.resolveTenderPdfPath(tender.documents);
 
-        this.logger.info(`Initiating auto-extraction for tender ${tenderId} from document '${pdfPath}'`, {
+        this.logger.log(`Initiating auto-extraction for tender ${tenderId} from document '${pdfPath}'`, {
             tenderId,
             pdfPath,
             userId,
