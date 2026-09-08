@@ -77,7 +77,7 @@ import { ConfigService } from "@nestjs/config";
             inject: ["REDIS_CONNECTION"],
             useFactory: (connection: IORedis | null) => {
                 if (!connection) {
-                    return { add: async () => {} } as unknown as Queue;
+                    return { add: async () => ({} as any), getJob: async () => null } as unknown as Queue;
                 }
                 return new Queue("pdf-extraction-queue", { connection });
             },
