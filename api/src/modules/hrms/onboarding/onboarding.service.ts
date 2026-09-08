@@ -1157,6 +1157,8 @@ export class OnboardingService {
         designation: onboardingProfiles.employeeType,
         department: teams.name, 
         dateOfJoining: onboardingProfiles.dateOfJoining,
+        workLocation: onboardingProfiles.workLocation,
+        salaryType: onboardingProfiles.salaryType,
       })
       .from(onboardingRequests)
       .leftJoin(onboardingProfiles, eq(onboardingProfiles.onboardingId, onboardingRequests.id))

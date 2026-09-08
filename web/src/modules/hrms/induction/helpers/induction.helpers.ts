@@ -57,6 +57,8 @@ export interface EmployeeInduction {
   department: string;
   dateOfJoining: string;
   approvedAt: string;
+  workLocation?: string;
+  salaryType?: string;
   tasks: InductionTask[];
   inductionCoordinator?: string;
   profilePhoto?: string;
@@ -92,6 +94,8 @@ export interface RawInductionEmployee {
   departmentId?: number;
   dateOfJoining?: string;
   approvedAt?: string;
+  workLocation?: string;
+  salaryType?: string;
   tasks?: RawInductionTask[];
   inductionCoordinator?: string;
   profilePhoto?: string;
@@ -232,18 +236,39 @@ export const mapApiEmployee = (raw: RawInductionEmployee): EmployeeInduction => 
   return {
     id: raw.id,
     employeeId: raw.employeeId ?? `EMP-${String(raw.id).padStart(4, "0")}`,
-    firstName: raw.firstName ?? (nameParts.length > 0 ? nameParts[0] : "—"),
+    firstName: raw.firstName ?? (nameParts.length > 0 ? nameParts[0] : "-"),
     lastName: raw.lastName ?? (nameParts.length > 1 ? nameParts[nameParts.length - 1] : ""),
     middleName: raw.middleName ?? undefined,
     email: raw.email ?? "",
-    designation: raw.designation ?? raw.employeeType ?? "—",
-    department: String(raw.department ?? raw.departmentId ?? "—"),
+    designation: raw.designation ?? raw.employeeType ?? "-",
+    department: String(raw.department ?? raw.departmentId ?? "-"),
     dateOfJoining: raw.dateOfJoining ?? raw.approvedAt ?? new Date().toISOString(),
     approvedAt: raw.approvedAt ?? new Date().toISOString(),
+    workLocation: raw.workLocation ?? undefined,
+    salaryType: raw.salaryType ?? undefined,
     tasks: Array.isArray(raw.tasks) ? raw.tasks.map(mapApiTask) : [],
     inductionCoordinator: raw.inductionCoordinator ?? undefined,
     profilePhoto: raw.profilePhoto ?? undefined,
   };
+};
+
+/**
+ * Work Details progress — counts how many of the key employment fields
+ * (joining date, employee type, department, work location, salary type)
+ * are filled, e.g. via the Work Details modal or the Users page.
+ */
+export const getWorkDetailsProgress = (emp: EmployeeInduction) => {
+  const fields = [
+    Boolean(emp.dateOfJoining),
+    Boolean(emp.designation && emp.designation !== "-"),
+    Boolean(emp.department && emp.department !== "-"),
+    Boolean(emp.workLocation),
+    Boolean(emp.salaryType),
+  ];
+  const total = fields.length;
+  const filled = fields.filter(Boolean).length;
+  const pct = total === 0 ? 0 : Math.round((filled / total) * 100);
+  return { filled, total, pct };
 };
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
