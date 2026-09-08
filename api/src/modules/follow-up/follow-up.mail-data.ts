@@ -54,7 +54,7 @@ export class FollowupMailDataBuilder {
             to,
             cc,
             subject: `Follow Up for ${fu.followupFor ?? fu.partyName}`,
-            attachments: fu.attachments?.length ? { files: fu.attachments.map(a => a.split("/").pop() ?? a), baseDir: "accounts" } : undefined,
+            attachments: fu.attachments?.length ? { files: fu.attachments.map(a => `accounts/${a}`), baseDir: "" } : undefined,
             assignedToUserId: fu.assignedToId,
         };
     }
