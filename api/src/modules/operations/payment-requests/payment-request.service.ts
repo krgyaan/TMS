@@ -14,6 +14,7 @@ import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
 import { insurancePayloadSchema, insurancePolicySchema, type InsurancePayload } from "@/modules/insurance/zod/insurance-policy.schema";
+import { OperationNotificationService } from "@/modules/operations/operation-notification.service";
 
 @Injectable()
 export class PaymentRequestService {
@@ -21,6 +22,7 @@ export class PaymentRequestService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
         private readonly insurancePolicyService: InsurancePolicyService,
+        private readonly notifications: OperationNotificationService,
     ) {}
 
     async generateNumber(projectName?: string) {
@@ -52,17 +54,15 @@ export class PaymentRequestService {
     async create(body: any, userId: number) {
         const requestNo = body.requestNo || await this.generateNumber(body.projectName);
 
-        // WC_POLICY_LOCK: start — disabled WC insurance gate
         // WC insurance gate: block PO/VWO/Others payment requests if no active WC policy
-        // if (body.projectId && body.paymentAgainst && !["insurance", "imprest"].includes(body.paymentAgainst)) {
-        //     const hasWC = await this.insurancePolicyService.hasActiveWCInsurance(body.projectId);
-        //     if (!hasWC) {
-        //         throw new BadRequestException(
-        //             "Cannot create Payment Request: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
-        //         );
-        //     }
-        // }
-        // WC_POLICY_LOCK: end
+        if (body.projectId && body.paymentAgainst && !["insurance", "imprest"].includes(body.paymentAgainst)) {
+            const hasWC = await this.insurancePolicyService.hasActiveWCInsurance(body.projectId);
+            if (!hasWC) {
+                throw new BadRequestException(
+                    "Cannot create Payment Request: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
+                );
+            }
+        }
 
         // Validate against PO TDS cap
         if (body.purchaseOrderId) {
@@ -180,6 +180,15 @@ export class PaymentRequestService {
         });
 
         this.logger.info(`Payment Request created: ${requestNo}`);
+
+        // Fire-and-forget WhatsApp notification
+        this.notifications.notifyNewPaymentRequest({
+          requestNo: pr.requestNo ?? '',
+          amount: pr.amount ?? 0,
+          partyName: pr.partyName ?? '',
+          requestedBy: userId,
+        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+
         return pr;
     }
 

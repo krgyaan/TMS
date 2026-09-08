@@ -3,8 +3,15 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
   TooltipContent,
@@ -32,28 +39,33 @@ import {
   FileText,
   Download,
   ExternalLink,
-  Activity,
   DollarSign,
   Users,
   ArrowLeft,
   CheckCircle2,
   XCircle,
+  Clock,
+  ListChecks,
+  ChevronDown,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   useOnboardingDashboard,
   useProfile,
   useUpdateOnboardingStatus,
-} from "./useOnboarding";
+  useUpdateEntryStatus,
+  useUpdateSectionStatus,
+} from "@/hooks/api/useOnboarding";
+import { useEmployeeInduction } from "@/hooks/api/useInduction";
 import { type OnboardingRequest } from "@/services/api/onboarding.service";
 import { paths } from "@/app/routes/paths";
 import { StatusBadge } from "./components/StatusBadge";
 import { HrStatusBadge } from "./components/HrStatusBadge";
-import { ProgressIndicator } from "./components/ProgressIndicator";
-import { ProgressStage } from "./components/ProgressStage";
 import { DataItem } from "./components/DataItem";
 import { SectionHeader } from "./components/SectionHeader";
 import { ActionModal } from "./components/ActionModal";
+import { SectionApproveModal } from "./components/SectionApproveModal";
 import {
   formatDate,
   timeAgo,
@@ -66,17 +78,200 @@ import {
   type ProfileBankItem,
 } from "./helpers/onboarding.type";
 
+type SectionStage = "profile" | "education" | "experience" | "documents" | "bankDetails";
+
+const TAB_STATUS_META: Record<
+  string,
+  { icon: React.ElementType; className: string; label: string }
+> = {
+  approved: {
+    icon: CheckCircle2,
+    className: "text-emerald-700 dark:text-emerald-400",
+    label: "Approved",
+  },
+  completed: {
+    icon: CheckCircle2,
+    className: "text-emerald-700 dark:text-emerald-400",
+    label: "Completed",
+  },
+  rejected: {
+    icon: XCircle,
+    className: "text-red-700 dark:text-red-400",
+    label: "Rejected",
+  },
+  pending: {
+    icon: Clock,
+    className: "text-amber-700 dark:text-amber-400",
+    label: "Pending",
+  },
+  in_progress: {
+    icon: Clock,
+    className: "text-amber-700 dark:text-amber-400",
+    label: "In Progress",
+  },
+  submitted: {
+    icon: Clock,
+    className: "text-amber-700 dark:text-amber-400",
+    label: "Submitted",
+  },
+  resubmitted: {
+    icon: Clock,
+    className: "text-amber-700 dark:text-amber-400",
+    label: "Resubmitted",
+  },
+};
+
+const TabStatusDot: React.FC<{ status: string }> = ({ status }) => {
+  const meta = TAB_STATUS_META[status];
+  const Icon = meta?.icon ?? Clock;
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Icon
+            aria-label={`Status: ${meta?.label ?? status}`}
+            className={cn(
+              "h-3.5 w-3.5 flex-shrink-0 cursor-default",
+              meta?.className ?? "text-slate-500 dark:text-slate-400"
+            )}
+          />
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="text-xs">
+          {meta?.label ?? status.replace(/_/g, " ")}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
+
+type InductionTabPhase = "before_joining" | "after_joining";
+
+interface InductionTabTask {
+  id: string;
+  name: string;
+  phase: InductionTabPhase;
+  status: "pending" | "completed";
+  required: boolean;
+  remarks?: string;
+  completedAt?: string;
+}
+
+const normalizeInductionPhase = (v?: string | null): InductionTabPhase =>
+  (v ?? "").toLowerCase().includes("after") ? "after_joining" : "before_joining";
+
+const mapInductionTasks = (data: unknown): InductionTabTask[] => {
+  const source: unknown[] = Array.isArray(data)
+    ? data
+    : data && typeof data === "object" && Array.isArray((data as { tasks?: unknown[] }).tasks)
+      ? (data as { tasks: unknown[] }).tasks
+      : [];
+  return source.map((raw, i) => {
+    const t = (raw ?? {}) as Record<string, unknown>;
+    const status = String(t.status ?? "pending").toLowerCase();
+    return {
+      id: String(t.id ?? i),
+      name: String(t.name ?? t.taskName ?? "Unknown Task"),
+      phase: normalizeInductionPhase(String(t.phase ?? t.taskType ?? "")),
+      status: status === "completed" ? "completed" : "pending",
+      required: Boolean(t.required ?? false),
+      remarks: t.remarks ? String(t.remarks) : undefined,
+      completedAt: t.completedAt ? String(t.completedAt) : undefined,
+    };
+  });
+};
+
+const SectionActionBar: React.FC<{
+  status?: string;
+  loading?: boolean;
+  hasData?: boolean;
+  onAction: (action: "approved" | "rejected" | "pending") => void;
+}> = ({ status, loading, hasData = true, onAction }) => {
+  const actions: {
+    value: "approved" | "rejected" | "pending";
+    label: string;
+    icon: React.ElementType;
+    className: string;
+  }[] = [
+    {
+      value: "approved",
+      label: "Approve",
+      icon: CheckCircle2,
+      className: "text-emerald-600 focus:text-emerald-600",
+    },
+    {
+      value: "rejected",
+      label: "Reject",
+      icon: XCircle,
+      className: "text-red-600 focus:text-red-600",
+    },
+    {
+      value: "pending",
+      label: "Revert",
+      icon: RotateCcw,
+      className: "text-amber-600 focus:text-amber-600",
+    },
+  ];
+
+  return (
+    <div className="flex items-center gap-2 flex-shrink-0">
+      {status === "approved" && (
+        <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-300 bg-emerald-50 dark:text-emerald-400 dark:border-emerald-500/30 dark:bg-emerald-500/10 gap-1 rounded-lg px-2 py-1">
+          <CheckCircle2 className="h-3 w-3" />
+          Approved
+        </Badge>
+      )}
+      {status === "rejected" && (
+        <Badge variant="outline" className="text-[10px] text-red-600 border-red-300 bg-red-50 dark:text-red-400 dark:border-red-500/30 dark:bg-red-500/10 gap-1 rounded-lg px-2 py-1">
+          <XCircle className="h-3 w-3" />
+          Rejected
+        </Badge>
+      )}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={loading || !hasData}
+            title={!hasData ? "No details submitted yet" : undefined}
+            className="gap-1.5 rounded-lg h-8 text-xs"
+          >
+            Action
+            <ChevronDown className="h-3.5 w-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-36">
+          {actions.map(({ value, label, icon: Icon, className }) => (
+            <DropdownMenuItem
+              key={value}
+              disabled={loading || status === value}
+              onClick={() => onAction(value)}
+              className={cn("gap-2 text-xs cursor-pointer", className)}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+    </div>
+  );
+};
+
 export default function CandidateDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const candidateId = Number(id);
-
   const { data: joinees } = useOnboardingDashboard();
   const joinee = joinees?.find((j) => j.id === candidateId);
 
   const { data: profile, isLoading: profileLoading } = useProfile(
     Number.isNaN(candidateId) ? null : candidateId
   );
+
+  // ── Induction tasks (view-only tab) ──────────────────────────────────────
+  const { data: rawInduction, isLoading: inductionLoading } =
+    useEmployeeInduction(Number.isNaN(candidateId) ? null : candidateId);
   const updateStatus = useUpdateOnboardingStatus();
   const [actionType, setActionType] = useState<"approved" | "rejected" | null>(
     null
@@ -104,6 +299,81 @@ export default function CandidateDetailPage() {
         },
       }
     );
+  };
+
+  // ── Section-level approve/reject ─────────────────────────────────────────
+  const [sectionAction, setSectionAction] = useState<{
+    stage: "profile" | "education" | "experience" | "documents" | "bankDetails";
+    type: "approved" | "rejected";
+  } | null>(null);
+
+  const sectionMutations = {
+    education: useUpdateSectionStatus("education"),
+    experience: useUpdateSectionStatus("experience"),
+    documents: useUpdateSectionStatus("documents"),
+    bankDetails: useUpdateSectionStatus("bankDetails"),
+  };
+  const profileMutation = useUpdateEntryStatus("profile");
+
+  const handleConfirmSectionAction = (note: string) => {
+    if (!sectionAction) return;
+    const { stage, type } = sectionAction;
+    const onSuccess = () => setSectionAction(null);
+    if (stage === "profile") {
+      profileMutation.mutate(
+        { onboardingId: candidateId, status: type, reason: note },
+        { onSuccess }
+      );
+    } else {
+      sectionMutations[stage].mutate(
+        { onboardingId: candidateId, status: type, reason: note },
+        { onSuccess }
+      );
+    }
+  };
+
+  const isSectionLoading =
+    sectionAction !== null &&
+    (sectionAction.stage === "profile"
+      ? profileMutation.isPending
+      : sectionMutations[sectionAction.stage].isPending);
+
+  const openSectionApprove = (stage: SectionStage) => {
+    setSectionAction({ stage, type: "approved" });
+  };
+  const openSectionReject = (stage: SectionStage) => {
+    setSectionAction({ stage, type: "rejected" });
+  };
+
+  const runSectionMutation = (
+    stage: SectionStage,
+    type: "approved" | "rejected" | "pending",
+    note: string
+  ) => {
+    if (stage === "profile") {
+      profileMutation.mutate(
+        { onboardingId: candidateId, status: type, reason: note }
+      );
+    } else {
+      sectionMutations[stage].mutate(
+        { onboardingId: candidateId, status: type, reason: note }
+      );
+    }
+  };
+
+  const handleSectionAction = (
+    stage: SectionStage,
+    action: "approved" | "rejected" | "pending"
+  ) => {
+    if (action === "pending") {
+      runSectionMutation(stage, "pending", "");
+      return;
+    }
+    if (action === "approved") {
+      openSectionApprove(stage);
+    } else {
+      openSectionReject(stage);
+    }
   };
 
   if (!joinee) {
@@ -193,29 +463,6 @@ export default function CandidateDetailPage() {
 
         {/* Body */}
         <div className="px-8 py-6 space-y-8 overflow-y-auto">
-          {/* Progress Pipeline */}
-          <div className="space-y-4">
-            <SectionHeader icon={Activity} title="Onboarding Progress" />
-            <div className="p-6 rounded-2xl bg-muted/30 border border-dashed">
-              <div className="flex items-start gap-1">
-                <ProgressStage label="Profile" status={joinee.profileStatus} />
-                <div className="flex-shrink-0 h-px w-4 bg-border mt-[18px]" />
-                <ProgressStage label="Documents" status={joinee.documentStatus} />
-                <div className="flex-shrink-0 h-px w-4 bg-border mt-[18px]" />
-                <ProgressStage label="Education" status={joinee.educationStatus} />
-                <div className="flex-shrink-0 h-px w-4 bg-border mt-[18px]" />
-                <ProgressStage label="Experience" status={joinee.experienceStatus} />
-                <div className="flex-shrink-0 h-px w-4 bg-border mt-[18px]" />
-                <ProgressStage label="Bank" status={joinee.bankStatus} />
-                <div className="flex-shrink-0 h-px w-4 bg-border mt-[18px]" />
-                <ProgressStage label="Induction" status={joinee.inductionStatus} />
-              </div>
-              <div className="mt-5">
-                <ProgressIndicator value={joinee.progress} />
-              </div>
-            </div>
-          </div>
-
           {profileLoading ? (
             <div className="py-16 flex flex-col items-center justify-center gap-4">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -226,18 +473,33 @@ export default function CandidateDetailPage() {
           ) : (
             <div className="space-y-6">
               <Tabs defaultValue="personal" className="w-full space-y-6">
-                <TabsList className="grid w-full grid-cols-4 rounded-xl bg-muted/60 p-1">
-                  <TabsTrigger value="personal" className="rounded-lg text-xs font-semibold py-2">
+                <TabsList className="grid w-full grid-cols-7 rounded-xl bg-muted/60 p-1">
+                  <TabsTrigger value="personal" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
                     Personal
+                    <TabStatusDot status={joinee.profileStatus} />
                   </TabsTrigger>
-                  <TabsTrigger value="education_experience" className="rounded-lg text-xs font-semibold py-2">
-                    Edu & Exp
+                  <TabsTrigger value="education" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
+                    Education
+                    <TabStatusDot status={joinee.educationStatus} />
+                  </TabsTrigger>
+                  <TabsTrigger value="experience" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
+                    Experience
+                    <TabStatusDot status={joinee.experienceStatus} />
+                  </TabsTrigger>
+                  <TabsTrigger value="documents" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
+                    Documents
+                    <TabStatusDot status={joinee.documentStatus} />
+                  </TabsTrigger>
+                  <TabsTrigger value="bank" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
+                    Bank
+                    <TabStatusDot status={joinee.bankStatus} />
+                  </TabsTrigger>
+                  <TabsTrigger value="induction" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
+                    Induction
+                    <TabStatusDot status={joinee.inductionStatus} />
                   </TabsTrigger>
                   <TabsTrigger value="work_compensation" className="rounded-lg text-xs font-semibold py-2">
                     Work & Salary
-                  </TabsTrigger>
-                  <TabsTrigger value="documents_bank" className="rounded-lg text-xs font-semibold py-2">
-                    Docs & Bank
                   </TabsTrigger>
                 </TabsList>
 
@@ -245,7 +507,15 @@ export default function CandidateDetailPage() {
                   {/* Tab: Personal */}
                   <TabsContent value="personal" className="space-y-6 mt-4 outline-none">
                     <div className="space-y-4">
-                      <SectionHeader icon={User} title="Personal Information" />
+                      <div className="flex items-center justify-between">
+                        <SectionHeader icon={User} title="Personal Information" />
+                        <SectionActionBar
+                          status={joinee.profileStatus}
+                          loading={sectionAction?.stage === "profile" && isSectionLoading}
+                          hasData={!!profile?.firstName}
+                          onAction={(action) => handleSectionAction("profile", action)}
+                        />
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5 pl-1">
                         <DataItem icon={User} label="First Name" value={profile?.firstName} />
                         <DataItem icon={User} label="Middle Name" value={profile?.middleName} />
@@ -333,10 +603,18 @@ export default function CandidateDetailPage() {
                     </div>
                   </TabsContent>
 
-                  {/* Tab: Edu & Exp */}
-                  <TabsContent value="education_experience" className="space-y-6 mt-4 outline-none">
+                  {/* Tab: Education */}
+                  <TabsContent value="education" className="space-y-6 mt-4 outline-none">
                     <div className="space-y-4">
-                      <SectionHeader icon={GraduationCap} title="Education" count={profile?.education?.length} />
+                      <div className="flex items-center justify-between">
+                        <SectionHeader icon={GraduationCap} title="Education" count={profile?.education?.length} />
+                        <SectionActionBar
+                          status={joinee.educationStatus}
+                          loading={sectionAction?.stage === "education" && isSectionLoading}
+                          hasData={(profile?.education?.length ?? 0) > 0}
+                          onAction={(action) => handleSectionAction("education", action)}
+                        />
+                      </div>
                       {(profile?.education?.length ?? 0) > 0 ? (
                         <div className="space-y-3">
                           {profile?.education?.map((edu: ProfileEducationItem) => (
@@ -347,7 +625,7 @@ export default function CandidateDetailPage() {
                                     <GraduationCap className="h-4 w-4 text-primary" />
                                   </div>
                                   <div>
-                                    <p className="text-sm font-semibold">{edu.degree}</p>
+                                    <p className="text-sm font-semibold">{edu.degree}{edu.fieldOfStudy ? ` (${edu.fieldOfStudy})` : ""}</p>
                                     <p className="text-xs text-muted-foreground">{edu.institution}</p>
                                   </div>
                                 </div>
@@ -375,11 +653,20 @@ export default function CandidateDetailPage() {
                         </p>
                       )}
                     </div>
+                  </TabsContent>
 
-                    <Separator />
-
+                  {/* Tab: Experience */}
+                  <TabsContent value="experience" className="space-y-6 mt-4 outline-none">
                     <div className="space-y-4">
-                      <SectionHeader icon={Briefcase} title="Work Experience" count={profile?.experience?.length} />
+                      <div className="flex items-center justify-between">
+                        <SectionHeader icon={Briefcase} title="Work Experience" count={profile?.experience?.length} />
+                        <SectionActionBar
+                          status={joinee.experienceStatus}
+                          loading={sectionAction?.stage === "experience" && isSectionLoading}
+                          hasData={(profile?.experience?.length ?? 0) > 0}
+                          onAction={(action) => handleSectionAction("experience", action)}
+                        />
+                      </div>
                       {(profile?.experience?.length ?? 0) > 0 ? (
                         <div className="space-y-3">
                           {profile?.experience?.map((exp: ProfileExperienceItem) => (
@@ -428,6 +715,103 @@ export default function CandidateDetailPage() {
                     </div>
                   </TabsContent>
 
+                  {/* Tab: Induction */}
+                  <TabsContent value="induction" className="space-y-6 mt-4 outline-none">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <SectionHeader icon={UserCheck} title="Induction Tasks" />
+                        {(() => {
+                          const tasks = mapInductionTasks(rawInduction);
+                          const done = tasks.filter((t) => t.status === "completed").length;
+                          return (
+                            <Badge variant="secondary" className="text-[10px] font-semibold rounded-full">
+                              {done} / {tasks.length} completed
+                            </Badge>
+                          );
+                        })()}
+                      </div>
+
+                      {inductionLoading ? (
+                        <div className="space-y-2">
+                          {[0, 1, 2, 3].map((i) => (
+                            <Skeleton key={i} className="h-12 w-full rounded-xl" />
+                          ))}
+                        </div>
+                      ) : mapInductionTasks(rawInduction).length === 0 ? (
+                        <p className="text-sm text-muted-foreground italic">
+                          No induction tasks assigned yet
+                        </p>
+                      ) : (
+                        (["before_joining", "after_joining"] as InductionTabPhase[]).map((phase) => {
+                          const phaseTasks = mapInductionTasks(rawInduction).filter(
+                            (t) => t.phase === phase
+                          );
+                          if (phaseTasks.length === 0) return null;
+                          return (
+                            <div key={phase} className="space-y-2">
+                              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                {phase === "before_joining" ? "Before Joining" : "After Joining"}
+                              </p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                                {phaseTasks.map((task) => {
+                                  const isDone = task.status === "completed";
+                                  return (
+                                    <div
+                                      key={task.id}
+                                      className={cn(
+                                        "flex items-center gap-2.5 px-3 py-3 rounded-xl border",
+                                        isDone
+                                          ? "bg-emerald-50/40 dark:bg-emerald-950/10 border-emerald-200/40 dark:border-emerald-900/30"
+                                          : "bg-card border-border/40"
+                                      )}
+                                    >
+                                      <div
+                                        className={cn(
+                                          "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0",
+                                          isDone ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-muted/60"
+                                        )}
+                                      >
+                                        {isDone ? (
+                                          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                        ) : (
+                                          <ListChecks className="h-4 w-4 text-muted-foreground" />
+                                        )}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p
+                                          className={cn(
+                                            "text-xs font-medium",
+                                            isDone && "line-through text-muted-foreground/70"
+                                          )}
+                                        >
+                                          {task.name}
+                                        </p>
+                                        {(task.remarks || (isDone && task.completedAt)) && (
+                                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                            {isDone && task.completedAt && (
+                                              <span className="text-[10px] text-muted-foreground/70">
+                                                {formatDate(task.completedAt)}
+                                              </span>
+                                            )}
+                                            {task.remarks && (
+                                              <span className="text-[10px] text-muted-foreground/60 italic line-clamp-1">
+                                                {task.remarks}
+                                              </span>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </TabsContent>
+
                   {/* Tab: Work & Salary */}
                   <TabsContent value="work_compensation" className="space-y-6 mt-4 outline-none">
                     <div className="space-y-4">
@@ -470,10 +854,18 @@ export default function CandidateDetailPage() {
                     </div>
                   </TabsContent>
 
-                  {/* Tab: Docs & Bank */}
-                  <TabsContent value="documents_bank" className="space-y-6 mt-4 outline-none">
+                  {/* Tab: Documents */}
+                  <TabsContent value="documents" className="space-y-6 mt-4 outline-none">
                     <div className="space-y-4">
-                      <SectionHeader icon={FileText} title="Documents" count={profile?.documents?.length} />
+                      <div className="flex items-center justify-between">
+                        <SectionHeader icon={FileText} title="Documents" count={profile?.documents?.length} />
+                        <SectionActionBar
+                          status={joinee.documentStatus}
+                          loading={sectionAction?.stage === "documents" && isSectionLoading}
+                          hasData={(profile?.documents?.length ?? 0) > 0}
+                          onAction={(action) => handleSectionAction("documents", action)}
+                        />
+                      </div>
                       {(profile?.documents?.length ?? 0) > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {profile?.documents?.map((doc: ProfileDocumentItem) => (
@@ -557,11 +949,20 @@ export default function CandidateDetailPage() {
                         </p>
                       )}
                     </div>
+                  </TabsContent>
 
-                    <Separator />
-
+                  {/* Tab: Bank */}
+                  <TabsContent value="bank" className="space-y-6 mt-4 outline-none">
                     <div className="space-y-4">
-                      <SectionHeader icon={CreditCard} title="Bank Details" count={profile?.bankDetails?.length} />
+                      <div className="flex items-center justify-between">
+                        <SectionHeader icon={CreditCard} title="Bank Details" count={profile?.bankDetails?.length} />
+                        <SectionActionBar
+                          status={joinee.bankStatus}
+                          loading={sectionAction?.stage === "bankDetails" && isSectionLoading}
+                          hasData={(profile?.bankDetails?.length ?? 0) > 0}
+                          onAction={(action) => handleSectionAction("bankDetails", action)}
+                        />
+                      </div>
                       {(profile?.bankDetails?.length ?? 0) > 0 ? (
                         <div className="space-y-3">
                           {profile?.bankDetails?.map((bank: ProfileBankItem) => (
@@ -651,6 +1052,19 @@ export default function CandidateDetailPage() {
           }}
           onConfirm={handleConfirmAction}
           isLoading={updateStatus.isPending}
+        />
+
+        <SectionApproveModal
+          open={!!sectionAction}
+          type={sectionAction?.type ?? null}
+          title={
+            sectionAction?.stage === "profile"
+              ? "Approve / Reject Personal Details"
+              : `Approve / Reject ${sectionAction?.stage ? sectionAction.stage.charAt(0).toUpperCase() + sectionAction.stage.slice(1) : ""}`
+          }
+          onClose={() => setSectionAction(null)}
+          onConfirm={handleConfirmSectionAction}
+          isLoading={isSectionLoading}
         />
       </div>
     </TooltipProvider>

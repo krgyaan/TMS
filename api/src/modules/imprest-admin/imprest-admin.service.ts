@@ -1,7 +1,24 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
+
+/** A Drizzle db handle or an in-flight transaction handle. */
+type Tx = Parameters<Parameters<DbInstance["transaction"]>[0]>[0];
+export type DbOrTx = DbInstance | Tx;
+
+/**
+ * Voucher accounting.
+ *
+ * The `employee_imprest_vouchers` table is the single source of truth for
+ * vouchers: every row is one voucher and approval is tracked by the
+ * accounts_signed_by / admin_signed_by columns. List and summary queries count
+ * the table directly (rather than deriving ISO-week buckets from imprest dates)
+ * so historic vouchers — including legacy ones whose valid_from is not a
+ * Monday, or which aggregate imprests across several ISO weeks — all remain
+ * visible and correctly counted. From 2026-08-01 onwards new vouchers are
+ * created with an ISO week Monday boundary via isoWeekBounds().
+ */
 import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-voucher";
 import { employeeImprestVoucherItems } from "@/db/schemas/accounts/employee-imprest-voucher-item.schema";
 import { users } from "@/db/schemas/auth/users.schema";
@@ -54,9 +71,9 @@ export class ImprestAdminService {
                 WITH imprest_agg AS (
                     SELECT
                         user_id,
-                        CASE WHEN EXTRACT(MONTH FROM COALESCE(approved_date, created_at)) >= 4 
-                             THEN EXTRACT(YEAR FROM COALESCE(approved_date, created_at)) 
-                             ELSE EXTRACT(YEAR FROM COALESCE(approved_date, created_at)) - 1 
+                        CASE WHEN EXTRACT(MONTH FROM date_of_expense) >= 4 
+                             THEN EXTRACT(YEAR FROM date_of_expense) 
+                             ELSE EXTRACT(YEAR FROM date_of_expense) - 1 
                         END::int AS fy_start_year,
                         COALESCE(SUM(amount), 0) AS amount_spent,
                         COALESCE(SUM(CASE WHEN approval_status = 1 THEN amount ELSE 0 END), 0) AS amount_approved
@@ -74,46 +91,25 @@ export class ImprestAdminService {
                     FROM employee_imprest_transactions
                     GROUP BY user_id, fy_start_year
                 ),
-                voucher_base AS (
-                    SELECT
-                        user_id,
-                        COALESCE(approved_date, created_at)::date AS effective_date
-                    FROM employee_imprests
-                    WHERE approval_status = 1
-                ),
-                voucher_amounts AS (
-                    SELECT
-                        user_id,
-                        EXTRACT(ISOYEAR FROM effective_date)::int AS year,
-                        EXTRACT(WEEK FROM effective_date)::int AS week,
-                        MIN(effective_date) AS start_date,
-                        (
-                            MIN(effective_date)
-                            + (
-                                (6 - ((EXTRACT(DOW FROM MIN(effective_date)) + 6) % 7))
-                                * INTERVAL '1 day'
-                            )
-                        )::date AS end_date,
-                        MAX(effective_date) AS max_effective_date
-                    FROM voucher_base
-                    GROUP BY user_id, year, week
-                ),
                 voucher_agg AS (
+                    -- Every voucher row is one voucher; approved = the signed
+                    -- columns. Counting the table directly (instead of deriving
+                    -- ISO-week buckets from imprest dates) keeps the totals
+                    -- identical to what listVouchersRaw returns, so the
+                    -- consolidated page can never disagree with the voucher list.
                     SELECT
-                        a.user_id,
-                        CASE WHEN EXTRACT(MONTH FROM a.max_effective_date) >= 4 
-                             THEN EXTRACT(YEAR FROM a.max_effective_date) 
-                             ELSE EXTRACT(YEAR FROM a.max_effective_date) - 1 
+                        u.id AS user_id,
+                        CASE WHEN EXTRACT(MONTH FROM v.valid_from) >= 4
+                             THEN EXTRACT(YEAR FROM v.valid_from)
+                             ELSE EXTRACT(YEAR FROM v.valid_from) - 1
                         END::int AS fy_start_year,
-                        COUNT(a.year) AS total_vouchers,
-                        SUM(CASE WHEN v.accounts_signed_by IS NOT NULL AND TRIM(v.accounts_signed_by) <> '' THEN 1 ELSE 0 END) AS accounts_approved,
-                        SUM(CASE WHEN v.admin_signed_by IS NOT NULL AND TRIM(v.admin_signed_by) <> '' THEN 1 ELSE 0 END) AS admin_approved
-                    FROM voucher_amounts a
-                    LEFT JOIN employee_imprest_vouchers v
-                        ON v.beneficiary_name = a.user_id::text
-                        AND v.valid_from::date = a.start_date
-                        AND v.valid_to::date   = a.end_date
-                    GROUP BY a.user_id, fy_start_year
+                        COUNT(*) AS total_vouchers,
+                        COUNT(*) FILTER (WHERE TRIM(COALESCE(v.accounts_signed_by, '')) <> '') AS accounts_approved,
+                        COUNT(*) FILTER (WHERE TRIM(COALESCE(v.admin_signed_by, '')) <> '') AS admin_approved
+                    FROM employee_imprest_vouchers v
+                    INNER JOIN users u
+                        ON u.id = v.beneficiary_name::int
+                    GROUP BY u.id, fy_start_year
                 ),
                 all_user_fy AS (
                     SELECT user_id, fy_start_year FROM imprest_agg
@@ -137,6 +133,9 @@ export class ImprestAdminService {
                 LEFT JOIN imprest_agg i ON i.user_id = f.user_id AND i.fy_start_year = f.fy_start_year
                 LEFT JOIN txn_agg t ON t.user_id = f.user_id AND t.fy_start_year = f.fy_start_year
                 LEFT JOIN voucher_agg v ON v.user_id = f.user_id AND v.fy_start_year = f.fy_start_year
+                WHERE EXISTS (
+                    SELECT 1 FROM employee_imprests ei WHERE ei.user_id = u.id
+                )
                 ORDER BY u.name, f.fy_start_year DESC
             `;
 
@@ -322,79 +321,40 @@ export class ImprestAdminService {
         const offset = (page - 1) * limit;
         const search = params?.search?.trim();
 
-        const whereSql = userId ? sql`AND ei.user_id = ${userId}` : sql``;
+        const whereSql = userId ? sql`AND v.beneficiary_name = ${String(userId)}` : sql``;
         const searchCondition = search
             ? sql`
                 AND (
                     u.name ILIKE ${`%${search}%`}
                     OR v.voucher_code ILIKE ${`%${search}%`}
-                    OR a.week::text ILIKE ${`%${search}%`}
-                    OR a.total_amount::text ILIKE ${`%${search}%`}
+                    OR EXTRACT(WEEK FROM v.valid_from)::text ILIKE ${`%${search}%`}
+                    OR v.amount::text ILIKE ${`%${search}%`}
                     OR v.accounts_remark ILIKE ${`%${search}%`}
                     OR v.admin_remark ILIKE ${`%${search}%`}
                 )
             `
             : sql``;
-        const fyCondition = params?.fy ? sql`AND EXTRACT(YEAR FROM a.start_date - INTERVAL '3 months') = ${params.fy}` : sql``;
+        const fyCondition = params?.fy ? sql`AND EXTRACT(YEAR FROM v.valid_from::date - INTERVAL '3 months') = ${params.fy}` : sql``;
 
         const selectSql = sql`
-                WITH base AS (
+                WITH proofs AS (
                     SELECT
-                        ei.id AS imprest_id,
-                        ei.user_id,
-
-                        /* Grouping by expense date; legacy fallback */
-                        COALESCE(ei.approved_date, ei.created_at)::date AS effective_date,
-
-                        ei.amount,
-                        ei.invoice_proof
-                    FROM employee_imprests ei
-                    WHERE ei.approval_status = 1
-                    ${whereSql}
-                ),
-                amounts AS (
-                    SELECT
-                        user_id,
-
-                        EXTRACT(ISOYEAR FROM effective_date)::int AS year,
-                        EXTRACT(WEEK FROM effective_date)::int AS week,
-
-                        MIN(effective_date) AS start_date,
-
-                        (
-                            MIN(effective_date)
-                            + (
-                                (6 - ((EXTRACT(DOW FROM MIN(effective_date)) + 6) % 7))
-                                * INTERVAL '1 day'
-                            )
-                        )::date AS end_date,
-
-                        SUM(amount)::numeric AS total_amount
-                    FROM base
-                    GROUP BY user_id, year, week
-                ),
-
-                proofs AS (
-                    SELECT
-                        user_id,
-                        EXTRACT(ISOYEAR FROM effective_date)::int AS year,
-                        EXTRACT(WEEK FROM effective_date)::int AS week,
+                        vi.voucher_id,
                         array_agg(DISTINCT proof)
                             FILTER (WHERE proof IS NOT NULL) AS all_invoice_proofs
-                    FROM (
+                    FROM employee_imprest_voucher_items vi
+                    JOIN employee_imprests ei ON ei.id = vi.imprest_id
+                    CROSS JOIN LATERAL (
                         SELECT
-                            user_id,
-                            effective_date,
                             jsonb_array_elements_text(
                                 CASE
-                                    WHEN jsonb_typeof(invoice_proof) = 'array'
-                                    THEN invoice_proof
+                                    WHEN jsonb_typeof(ei.invoice_proof) = 'array'
+                                    THEN ei.invoice_proof
                                     ELSE '[]'::jsonb
                                 END
                             ) AS proof
-                        FROM base
                     ) p
-                    GROUP BY user_id, year, week
+                    GROUP BY vi.voucher_id
                 )
 
                 SELECT
@@ -404,33 +364,28 @@ export class ImprestAdminService {
                     u.name AS "beneficiaryName",
                     u.id   AS "beneficiaryId",
 
-                    a.year,
-                    a.week,
-                    a.start_date AS "validFrom",
-                    a.end_date   AS "validTo",
+                    EXTRACT(ISOYEAR FROM v.valid_from)::int AS year,
+                    EXTRACT(WEEK FROM v.valid_from)::int AS week,
+                    v.valid_from::date AS "validFrom",
+                    v.valid_to::date   AS "validTo",
 
-                    a.total_amount AS "amount",
-                    p.all_invoice_proofs AS "allInvoiceProofs",
+                    v.amount AS "amount",
+                    pv.all_invoice_proofs AS "allInvoiceProofs",
 
                     v.accounts_signed_by,
                     v.admin_signed_by,
                     v.accounts_remark,
                     v.admin_remark
-                FROM amounts a
+                FROM employee_imprest_vouchers v
                 INNER JOIN users u
-                    ON u.id = a.user_id
-                LEFT JOIN proofs p
-                    ON p.user_id = a.user_id
-                AND p.year = a.year
-                AND p.week = a.week
-                LEFT JOIN employee_imprest_vouchers v
-                    ON v.beneficiary_name = a.user_id::text
-                AND v.valid_from::date = a.start_date
-                AND v.valid_to::date   = a.end_date
+                    ON u.id = v.beneficiary_name::int
+                LEFT JOIN proofs pv
+                    ON pv.voucher_id = v.id
                 WHERE 1 = 1
+                ${whereSql}
                 ${searchCondition}
                 ${fyCondition}
-                ORDER BY a.year DESC, a.week DESC
+                ORDER BY EXTRACT(ISOYEAR FROM v.valid_from) DESC, EXTRACT(WEEK FROM v.valid_from) DESC, v.id DESC
         `;
 
         const countResult = await this.db.execute(sql`SELECT COUNT(*)::int AS "total" FROM (${selectSql}) t`);
@@ -441,10 +396,9 @@ export class ImprestAdminService {
         const fyOptionsResult = await this.db.execute(
             sql`
                 SELECT DISTINCT
-                    EXTRACT(YEAR FROM (COALESCE(ei.approved_date, ei.created_at)::date - INTERVAL '3 months'))::int AS "fy"
-                FROM employee_imprests ei
-                WHERE ei.approval_status = 1
-                ${userId ? sql`AND ei.user_id = ${userId}` : sql``}
+                    EXTRACT(YEAR FROM (v.valid_from::date - INTERVAL '3 months'))::int AS "fy"
+                FROM employee_imprest_vouchers v
+                ${userId ? sql`WHERE v.beneficiary_name = ${String(userId)}` : sql``}
                 ORDER BY "fy" DESC
             `
         );
@@ -488,14 +442,24 @@ export class ImprestAdminService {
         };
     }
 
-    async createVoucher({ user, userId, validFrom, validTo }: { user: any; userId: number; validFrom: Date; validTo: Date }) {
-        // ✅ THIS is where buildVoucherIfMissing is used
-        return this.buildVoucherIfMissing({
-            userId,
-            from: new Date(validFrom),
-            to: new Date(validTo),
-            createdBy: String(user.sub),
-        });
+    async createVoucher({ user, userId, validFrom }: { user: any; userId: number; validFrom: Date; validTo: Date }) {
+        // Normalize the requested period to the ISO week (Monday-Sunday) so a
+        // mid-week start (e.g. Tuesday) maps to the canonical Monday voucher and
+        // cannot create a duplicate overlapping the same ISO week.
+        const { monday, sunday } = this.isoWeekBounds(new Date(validFrom));
+        // Transaction-wrapped so the advisory lock in buildVoucherIfMissing is
+        // held until commit (prevents concurrent duplicate voucher creation).
+        return this.db.transaction(tx =>
+            this.buildVoucherIfMissing(
+                {
+                    userId,
+                    from: monday,
+                    to: sunday,
+                    createdBy: String(user.sub),
+                },
+                tx
+            )
+        );
     }
 
     async getVoucherProofs({ user, userId, year, week }: { user: any; userId: number; year: number; week: number }) {
@@ -503,8 +467,8 @@ export class ImprestAdminService {
         SELECT invoice_proof
         FROM employee_imprests
         WHERE user_id = ${userId}
-          AND EXTRACT(ISOYEAR FROM COALESCE(approved_date, created_at)) = ${year}
-          AND EXTRACT(WEEK FROM COALESCE(approved_date, created_at)) = ${week}
+          AND EXTRACT(ISOYEAR FROM date_of_expense) = ${year}
+          AND EXTRACT(WEEK FROM date_of_expense) = ${week}
     `);
 
         const files = rows.rows.flatMap(r => (Array.isArray(r.invoice_proof) ? r.invoice_proof : [])).filter(Boolean);
@@ -529,13 +493,22 @@ export class ImprestAdminService {
         return String(year).slice(-2);
     }
 
-    async getVoucherByPeriod({ user, userId, from, to }: { user: any; userId: number; from: Date; to: Date }) {
-        const voucher = await this.buildVoucherIfMissing({
-            userId,
-            from,
-            to,
-            createdBy: String(user.sub),
-        });
+    async getVoucherByPeriod({ user, userId, from }: { user: any; userId: number; from: Date; to: Date }) {
+        // Normalize the requested period to the ISO week (Monday-Sunday) so a
+        // mid-week start maps to the canonical voucher and cannot spawn a
+        // duplicate for the same week.
+        const { monday, sunday } = this.isoWeekBounds(new Date(from));
+        const voucher = await this.db.transaction(tx =>
+            this.buildVoucherIfMissing(
+                {
+                    userId,
+                    from: monday,
+                    to: sunday,
+                    createdBy: String(user.sub),
+                },
+                tx
+            )
+        );
 
         return this.getVoucherById({
             user,
@@ -610,7 +583,7 @@ export class ImprestAdminService {
                 sql`TRUE`
             )
             .where(and(eq(employeeImprestVoucherItems.voucherId, voucher.id), eq(employeeImprests.approvalStatus, 1)))
-            .orderBy(sql`COALESCE(${employeeImprests.approvedDate}), ${employeeImprests.id}`);
+            .orderBy(sql`${employeeImprests.dateOfExpense}, ${employeeImprests.id}`);
 
         const proofFiles = items.flatMap(item => (Array.isArray(item.invoiceProof) ? item.invoiceProof : [])).filter(Boolean);
 
@@ -624,6 +597,30 @@ export class ImprestAdminService {
                 url: `/uploads/employee-imprest/${file}`,
             };
         });
+
+        // Amount integrity: stored voucher.amount must equal the sum of the
+        // linked approved imprests. Auto-correct unsigned vouchers (with a
+        // warning); a signed week cannot be silently rewritten — 409 instead.
+        const computedAmount = items.reduce((sum, item) => sum + Number(item.amount), 0);
+        const storedAmount = Number(voucher.amount);
+        const isAccountsSigned = typeof voucher.accountsSignedBy === "string" && voucher.accountsSignedBy.trim() !== "";
+
+        if (Math.abs(computedAmount - storedAmount) > 0.001) {
+            if (isAccountsSigned) {
+                throw new ConflictException(
+                    `Voucher ${voucher.voucherCode} amount mismatch: stored ${storedAmount}, linked ${computedAmount}. ` +
+                        "Week is already approved by accounts and cannot be auto-corrected."
+                );
+            }
+
+            await this.recomputeVoucherAmount(voucher.id);
+            voucher.amount = computedAmount;
+            this.logger.warn(`Auto-corrected voucher ${voucher.voucherCode} amount ${storedAmount} -> ${computedAmount} (drifted from linked imprests)`, {
+                voucherId: voucher.id,
+                storedAmount,
+                computedAmount,
+            });
+        }
 
         return {
             voucher: {
@@ -658,8 +655,16 @@ export class ImprestAdminService {
         };
     }
 
-    async buildVoucherIfMissing({ userId, from, to, createdBy }: { userId: number; from: Date; to: Date; createdBy: string }) {
-        const [existing] = await this.db
+    async buildVoucherIfMissing(
+        { userId, from, to, createdBy }: { userId: number; from: Date; to: Date; createdBy: string },
+        tx: DbOrTx = this.db
+    ) {
+        // Serialize concurrent creation for the same (beneficiary, week window).
+        // pg_advisory_xact_lock is released when the enclosing transaction
+        // commits/rolls back, so two racing approvals cannot create duplicates.
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`imprest-voucher|${userId}|${from.getTime()}|${to.getTime()}`})::bigint)`);
+
+        const [existing] = await tx
             .select()
             .from(employeeImprestVouchers)
             .where(
@@ -675,7 +680,7 @@ export class ImprestAdminService {
             return existing;
         }
 
-        const imprests = await this.db
+        const imprests = await tx
             .select({ id: employeeImprests.id, amount: employeeImprests.amount })
             .from(employeeImprests)
             .where(
@@ -683,7 +688,7 @@ export class ImprestAdminService {
                     eq(employeeImprests.userId, userId),
                     eq(employeeImprests.approvalStatus, 1),
                     sql`
-                    COALESCE(${employeeImprests.approvedDate})::date
+                    ${employeeImprests.dateOfExpense}::date
                     BETWEEN ${from}::date AND ${to}::date
                 `
                 )
@@ -695,10 +700,10 @@ export class ImprestAdminService {
 
         const totalAmount = imprests.reduce((sum, r) => sum + Number(r.amount), 0);
 
-        const [voucher] = await this.db
+        const [voucher] = await tx
             .insert(employeeImprestVouchers)
             .values({
-                voucherCode: await this.generateVoucherCode(),
+                voucherCode: await this.generateVoucherCode(tx),
                 beneficiaryName: String(userId),
                 amount: totalAmount,
                 validFrom: from, // time no longer matters
@@ -712,7 +717,8 @@ export class ImprestAdminService {
         if (imprests.length > 0) {
             await this.linkImprestsToVoucher(
                 voucher.id,
-                imprests.map(r => r.id)
+                imprests.map(r => r.id),
+                tx
             );
         }
 
@@ -722,23 +728,35 @@ export class ImprestAdminService {
     /* ----------------------- VOUCHER <-> IMPREST LINKS ------------------------ */
 
     private isoWeekBounds(date: Date): { monday: Date; sunday: Date } {
-        const d = new Date(date);
-        d.setHours(0, 0, 0, 0);
-        const day = (d.getDay() + 6) % 7; // Monday = 0 ... Sunday = 6
-        const monday = new Date(d);
-        monday.setDate(d.getDate() - day);
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
+        // Derive the ISO week boundary from the Asia/Kolkata (IST) wall-clock,
+        // not the server's local timezone. IST is a fixed +05:30 offset (no DST),
+        // so shifting the instant by +5.5h makes the UTC components represent the
+        // IST calendar date. This ensures an expense made near IST midnight on a
+        // Monday never lands in the previous ISO week.
+        const istMs = date.getTime() + 5.5 * 3600 * 1000;
+        const ist = new Date(istMs);
+        const y = ist.getUTCFullYear();
+        const m = ist.getUTCMonth();
+        const d = ist.getUTCDate();
+        const weekday = ist.getUTCDay(); // 0=Sun ... 6=Sat
+        const day = (weekday + 6) % 7; // Monday = 0 ... Sunday = 6
+
+        // Monday 00:00 IST expressed as a UTC instant.
+        const monday = new Date(Date.UTC(y, m, d - day, 0, 0, 0) - 5.5 * 3600 * 1000);
+        const sunday = new Date(monday.getTime() + 6 * 24 * 3600 * 1000);
         return { monday, sunday };
     }
 
-    private async linkImprestsToVoucher(voucherId: number, imprestIds: number[]) {
+    private async linkImprestsToVoucher(voucherId: number, imprestIds: number[], tx: DbOrTx = this.db) {
         if (imprestIds.length === 0) return;
-        await this.db.insert(employeeImprestVoucherItems).values(imprestIds.map(imprestId => ({ voucherId, imprestId }))).onConflictDoNothing();
+        await tx
+            .insert(employeeImprestVoucherItems)
+            .values(imprestIds.map(imprestId => ({ voucherId, imprestId })))
+            .onConflictDoNothing();
     }
 
-    private async recomputeVoucherAmount(voucherId: number) {
-        await this.db.execute(sql`
+    private async recomputeVoucherAmount(voucherId: number, tx: DbOrTx = this.db) {
+        await tx.execute(sql`
             UPDATE employee_imprest_vouchers v
             SET amount = COALESCE(
                     (
@@ -754,11 +772,15 @@ export class ImprestAdminService {
         `);
     }
 
-    private async deleteVoucherIfEmpty(voucherId: number) {
-        await this.db.execute(sql`
+    private async deleteVoucherIfEmpty(voucherId: number, tx: DbOrTx = this.db) {
+        // A voucher is only auto-removable when it holds no linked imprests AND
+        // has not been approved by accounts or admin (signed weeks are retained
+        // even if all items later leave).
+        await tx.execute(sql`
             DELETE FROM employee_imprest_vouchers v
             WHERE v.id = ${voucherId}
               AND TRIM(COALESCE(v.accounts_signed_by, '')) = ''
+              AND TRIM(COALESCE(v.admin_signed_by, '')) = ''
               AND NOT EXISTS (
                   SELECT 1 FROM employee_imprest_voucher_items vi WHERE vi.voucher_id = ${voucherId}
               )
@@ -767,45 +789,48 @@ export class ImprestAdminService {
 
     /**
      * Ensures an approved imprest is linked to (and, if needed, creates) the
-     * voucher whose valid_from..valid_to window covers its approval date.
+     * voucher whose valid_from..valid_to window covers its expense date.
      */
-    async ensureVoucherForImprest({ imprestId, userId, approvedDate, createdBy }: { imprestId: number; userId: number; approvedDate: Date; createdBy: string }) {
-        if (!userId || !approvedDate) {
+    async ensureVoucherForImprest({ imprestId, userId, effectiveDate, createdBy }: { imprestId: number; userId: number; effectiveDate: Date; createdBy: string }, tx: DbOrTx = this.db) {
+        if (!userId) {
             return null;
         }
 
-        const { monday, sunday } = this.isoWeekBounds(approvedDate);
+        if (!effectiveDate) {
+            throw new BadRequestException("Imprest has no date of expense — cannot assign to a voucher.");
+        }
 
-        const voucher = await this.buildVoucherIfMissing({
-            userId,
-            from: monday,
-            to: sunday,
-            createdBy,
-        });
+        const { monday, sunday } = this.isoWeekBounds(effectiveDate);
+
+        const voucher = await this.buildVoucherIfMissing(
+            {
+                userId,
+                from: monday,
+                to: sunday,
+                createdBy,
+            },
+            tx
+        );
 
         const isVoucherSigned = voucher.accountsSignedBy && voucher.accountsSignedBy.trim() !== "";
 
         // Already linked? Nothing to do.
-        const [existingLink] = await this.db
+        const [existingLink] = await tx
             .select({ id: employeeImprestVoucherItems.imprestId })
             .from(employeeImprestVoucherItems)
             .where(and(eq(employeeImprestVoucherItems.voucherId, voucher.id), eq(employeeImprestVoucherItems.imprestId, imprestId)))
             .limit(1);
 
         if (!existingLink) {
-            // Mutating a signed voucher is not allowed — an approved entry that
-            // arrives after accounts sign-off will be surfaced by verification.
+            // Mutating a signed voucher is not allowed. Approving into an
+            // accounts-signed week is a week-lock violation — fail fast rather
+            // than leave the imprest approved but excluded from its voucher.
             if (isVoucherSigned) {
-                this.logger.warn("Skipped linking imprest to signed voucher", {
-                    imprestId,
-                    voucherId: voucher.id,
-                    voucherCode: voucher.voucherCode,
-                });
-                return voucher;
+                throw new ForbiddenException(`Cannot link imprest to voucher ${voucher.voucherCode} — expense week is already approved by accounts.`);
             }
 
-            await this.linkImprestsToVoucher(voucher.id, [imprestId]);
-            await this.recomputeVoucherAmount(voucher.id);
+            await this.linkImprestsToVoucher(voucher.id, [imprestId], tx);
+            await this.recomputeVoucherAmount(voucher.id, tx);
         }
 
         return voucher;
@@ -816,14 +841,14 @@ export class ImprestAdminService {
      * voucher amount, and drops the voucher if it became empty (and unsigned).
      * Throws if the imprest is part of an accounts-signed voucher.
      */
-    async removeImprestFromVoucher(imprestId: number) {
-        const links = await this.db
+    async removeImprestFromVoucher(imprestId: number, tx: DbOrTx = this.db) {
+        const links = await tx
             .select({ voucherId: employeeImprestVoucherItems.voucherId })
             .from(employeeImprestVoucherItems)
             .where(eq(employeeImprestVoucherItems.imprestId, imprestId));
 
         for (const link of links) {
-            const [voucher] = await this.db
+            const [voucher] = await tx
                 .select({ id: employeeImprestVouchers.id, accountsSignedBy: employeeImprestVouchers.accountsSignedBy })
                 .from(employeeImprestVouchers)
                 .where(eq(employeeImprestVouchers.id, link.voucherId))
@@ -833,21 +858,25 @@ export class ImprestAdminService {
                 throw new BadRequestException("This imprest is part of a voucher already approved by accounts and cannot be modified.");
             }
 
-            await this.db
+            await tx
                 .delete(employeeImprestVoucherItems)
                 .where(and(eq(employeeImprestVoucherItems.voucherId, link.voucherId), eq(employeeImprestVoucherItems.imprestId, imprestId)));
 
             if (voucher) {
-                await this.recomputeVoucherAmount(voucher.id);
-                await this.deleteVoucherIfEmpty(voucher.id);
+                await this.recomputeVoucherAmount(voucher.id, tx);
+                await this.deleteVoucherIfEmpty(voucher.id, tx);
             }
         }
     }
 
-    private async generateVoucherCode() {
+    private async generateVoucherCode(tx: DbOrTx = this.db) {
         const year = this.getFinancialYear();
 
-        const result = await this.db.execute<{
+        // Serialize code allocation for the FY across concurrent creators.
+        // Must run inside a transaction (advisory lock releases at commit).
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`imprest-voucher-code|${year}`})::bigint)`);
+
+        const result = await tx.execute<{
             max: number | null;
         }>(sql`
         SELECT
@@ -881,17 +910,23 @@ export class ImprestAdminService {
         const [profile] = await this.db.select({ signature: userProfiles.signature }).from(userProfiles).where(eq(userProfiles.userId, user.id)).limit(1);
         console.log("profile", profile);
 
-        await this.db
-            .update(employeeImprestVouchers)
-            .set({
-                accountsRemark: remark ?? voucher.accountsRemark,
+        await this.db.transaction(async tx => {
+            // Amount must reflect the linked imprests before the week gets
+            // locked by this signature.
+            await this.recomputeVoucherAmount(voucherId, tx);
 
-                ...(approve && {
-                    accountsSignedBy: profile?.signature ?? "kailash.jpg",
-                    accountsSignedAt: new Date(),
-                }),
-            })
-            .where(eq(employeeImprestVouchers.id, voucherId));
+            await tx
+                .update(employeeImprestVouchers)
+                .set({
+                    accountsRemark: remark ?? voucher.accountsRemark,
+
+                    ...(approve && {
+                        accountsSignedBy: profile?.signature ?? "kailash.jpg",
+                        accountsSignedAt: new Date(),
+                    }),
+                })
+                .where(eq(employeeImprestVouchers.id, voucherId));
+        });
 
         return {
             success: true,
@@ -917,17 +952,21 @@ export class ImprestAdminService {
 
         const [profile] = await this.db.select({ signature: userProfiles.signature }).from(userProfiles).where(eq(userProfiles.userId, user.id)).limit(1);
 
-        await this.db
-            .update(employeeImprestVouchers)
-            .set({
-                adminRemark: remark ?? voucher.adminRemark,
+        await this.db.transaction(async tx => {
+            await this.recomputeVoucherAmount(voucherId, tx);
 
-                ...(approve && {
-                    adminSignedBy: profile?.signature ?? "piyush.jpeg",
-                    adminSignedAt: new Date(),
-                }),
-            })
-            .where(eq(employeeImprestVouchers.id, voucherId));
+            await tx
+                .update(employeeImprestVouchers)
+                .set({
+                    adminRemark: remark ?? voucher.adminRemark,
+
+                    ...(approve && {
+                        adminSignedBy: profile?.signature ?? "piyush.jpeg",
+                        adminSignedAt: new Date(),
+                    }),
+                })
+                .where(eq(employeeImprestVouchers.id, voucherId));
+        });
 
         return {
             success: true,

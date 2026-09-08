@@ -10,6 +10,7 @@ import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
 import { insurancePayloadSchema, insurancePolicySchema, type InsurancePayload } from "@/modules/insurance/zod/insurance-policy.schema";
+import { OperationNotificationService } from "@/modules/operations/operation-notification.service";
 
 const INSURANCE_CATEGORY = "insurance";
 
@@ -18,7 +19,8 @@ export class MakerRequestService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
-        private readonly insurancePolicyService: InsurancePolicyService
+        private readonly insurancePolicyService: InsurancePolicyService,
+        private readonly notifications: OperationNotificationService
     ) {}
 
     async generateNumber(): Promise<string> {
@@ -83,6 +85,15 @@ export class MakerRequestService {
         });
 
         this.logger.info(`Maker Request created: ${requestNo}`);
+        
+        // Fire-and-forget WhatsApp notification
+        this.notifications.notifyNewPaymentRequest({
+          requestNo: mr.requestNo ?? '',
+          amount: mr.amount ?? 0,
+          partyName: mr.partyName ?? '',
+          requestedBy: userId,
+        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+
         return mr;
     }
 

@@ -133,7 +133,6 @@ import { TenderExecutivePerformanceModule } from "./modules/performance/tender-e
 import { ProfileModule } from "./modules/profile/profile.module";
 import { RequestExtensionsModule } from "./modules/tendering/request_extensions/request-extension.module";
 import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-queries.module";
-import { TenderNotificationService } from "./modules/tendering/tender-notification.service";
 import { OpenwaModule } from "./openwa/openwa.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { WebhookController } from "./webhook/webhook.controller";
@@ -300,8 +299,7 @@ import { WebhookController } from "./webhook/webhook.controller";
             useClass: AllExceptionsFilter,
         },
         AllExceptionsFilter,
-        TenderNotificationService,
     ],
-    exports: [TenderNotificationService],
+    exports: [],
 })
 export class AppModule {}

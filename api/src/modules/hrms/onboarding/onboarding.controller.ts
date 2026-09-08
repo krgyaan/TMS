@@ -33,6 +33,8 @@ const UpdateProfileSchema = z.object({
 
 // ─── Controller ───────────────────────────────────────────────────────────────
 
+type SectionActionStatus = 'approved' | 'rejected' | 'pending';
+
 @Controller('hrms/onboarding')
 export class OnboardingController {
   constructor(private readonly onboardingService: OnboardingService) {}
@@ -211,7 +213,7 @@ export class OnboardingController {
   @Patch(':id/approve-profile')
   async approveProfile(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { status: 'approved' | 'rejected'; remark: string },
+    @Body() body: { status: SectionActionStatus; remark: string },
     @Req() req: any,
   ) {
     return this.onboardingService.approveProfileSection(id, body.status, body.remark, req.user.id);
@@ -219,14 +221,14 @@ export class OnboardingController {
 
   /**
    * PATCH /hrms/onboarding/:id/:stage/:entryId/approve
-   * Dynamic endpoint for approving or rejecting stage entries (education, experience, bank-details, documents)
+   * Dynamic endpoint for approving, rejecting or reverting stage entries (education, experience, bank-details, documents)
    */
   @Patch(':id/:stage/:entryId/approve')
   async approveStageEntry(
     @Param('id', ParseIntPipe) id: number,
     @Param('stage') stage: string,
     @Param('entryId', ParseIntPipe) entryId: number,
-    @Body() body: { status: 'approved' | 'rejected'; remark?: string },
+    @Body() body: { status: SectionActionStatus; remark?: string },
     @Req() req: any,
   ) {
     const adminId = req.user.id;
@@ -245,5 +247,66 @@ export class OnboardingController {
       default:
         throw new BadRequestException(`Invalid stage endpoint: ${stage}`);
     }
+  }
+
+  /**
+   * PATCH /hrms/onboarding/:id/education/approve-all
+   * Approve or reject all education records for a request.
+   */
+  @Patch(':id/education/approve-all')
+  async approveEducationSection(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status: SectionActionStatus; remark?: string },
+    @Req() req: any,
+  ) {
+    if (!body.status || (body.status === 'rejected' && !body.remark?.trim())) {
+      throw new BadRequestException('A remark is required when rejecting.');
+    }
+    return this.onboardingService.approveEducationSection(id, body.status, body.remark || '', req.user.id);
+  }
+
+  /**
+   * PATCH /hrms/onboarding/:id/experience/approve-all
+   */
+  @Patch(':id/experience/approve-all')
+  async approveExperienceSection(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status: SectionActionStatus; remark?: string },
+    @Req() req: any,
+  ) {
+    if (!body.status || (body.status === 'rejected' && !body.remark?.trim())) {
+      throw new BadRequestException('A remark is required when rejecting.');
+    }
+    return this.onboardingService.approveExperienceSection(id, body.status, body.remark || '', req.user.id);
+  }
+
+  /**
+   * PATCH /hrms/onboarding/:id/bank-details/approve-all
+   */
+  @Patch(':id/bank-details/approve-all')
+  async approveBankSection(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status: SectionActionStatus; remark?: string },
+    @Req() req: any,
+  ) {
+    if (!body.status || (body.status === 'rejected' && !body.remark?.trim())) {
+      throw new BadRequestException('A remark is required when rejecting.');
+    }
+    return this.onboardingService.approveBankSection(id, body.status, body.remark || '', req.user.id);
+  }
+
+  /**
+   * PATCH /hrms/onboarding/:id/documents/approve-all
+   */
+  @Patch(':id/documents/approve-all')
+  async verifyDocumentSection(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status: SectionActionStatus; remark?: string },
+    @Req() req: any,
+  ) {
+    if (!body.status || (body.status === 'rejected' && !body.remark?.trim())) {
+      throw new BadRequestException('A remark is required when rejecting.');
+    }
+    return this.onboardingService.verifyDocumentSection(id, body.status, body.remark || '', req.user.id);
   }
 }

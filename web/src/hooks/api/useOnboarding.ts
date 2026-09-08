@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { onboardingService } from "@/services/api/onboarding.service";
-import type { OnboardingRequest, UpdateStatusDto, UpdateProfileDto } from "@/services/api/onboarding.service";
+import type { UpdateStatusDto, UpdateProfileDto } from "@/services/api/onboarding.service";
 import { toast } from "sonner";
 
 // ─── Dashboard hooks ──────────────────────────────────────────────────────────
@@ -127,41 +127,6 @@ export const useVerifyDocument = (onboardingId: number) => {
   });
 };
 
-// ─── Induction hooks ──────────────────────────────────────────────────────────
-
-export const useInductionTrackerList = () => {
-  return useQuery({
-    queryKey: ["onboarding", "induction-tracker"],
-    queryFn: onboardingService.getInductionTrackerList,
-  });
-};
-
-export const useEmployeeInduction = (id: number | null) => {
-  return useQuery({
-    queryKey: ["onboarding", "induction", id],
-    queryFn: () => onboardingService.getEmployeeInduction(id!),
-    enabled: !!id,
-  });
-};
-
-export const useUpdateInductionTask = (onboardingId: number) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ taskId, updates }: { taskId: number; updates: { status?: string; remarks?: string } }) =>
-      onboardingService.updateInductionTask(onboardingId, taskId, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["onboarding", "induction-tracker"] });
-      queryClient.invalidateQueries({ queryKey: ["onboarding", "induction", onboardingId] });
-      toast.success("Task updated successfully");
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || "Failed to update task");
-    },
-  });
-};
-
-
 // ─── List all onboarding users with their stage statuses ──────────────────────
 
 export const useOnboardingList = () =>
@@ -222,7 +187,7 @@ export const useUpdateEntryStatus = (stageKey: StageKey) => {
     }: {
       entryId?: number;
       onboardingId: number;
-      status: 'approved' | 'rejected';
+      status: 'approved' | 'rejected' | 'pending';
       reason?: string;
     }) => {
       if (stageKey === "profile") {
@@ -235,13 +200,43 @@ export const useUpdateEntryStatus = (stageKey: StageKey) => {
       qc.invalidateQueries({
         queryKey: ["onboarding", stageKey, onboardingId],
       });
+      qc.invalidateQueries({ queryKey: ["onboarding", "dashboard"] });
       qc.invalidateQueries({ queryKey: ["onboarding", "list"] });
       qc.invalidateQueries({ queryKey: ["onboarding", "profiles"] });
       qc.invalidateQueries({ queryKey: ["onboarding", "profile", onboardingId] });
-      toast.success(`Entry ${status} successfully`);
+      toast.success(`Entry ${status === "pending" ? "reverted" : status} successfully`);
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || "Failed to update entry status");
+    },
+  });
+};
+
+/** Approve or reject ALL records of a section (education, experience, documents, bankDetails) */
+export const useUpdateSectionStatus = (stageKey: Exclude<StageKey, "profile">) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      onboardingId,
+      status,
+      reason,
+    }: {
+      onboardingId: number;
+      status: 'approved' | 'rejected' | 'pending';
+      reason?: string;
+    }) => {
+      return onboardingService.approveSection(onboardingId, STAGE_ENDPOINTS[stageKey], status, reason);
+    },
+    onSuccess: (_, { onboardingId, status }) => {
+      qc.invalidateQueries({ queryKey: ["onboarding", stageKey, onboardingId] });
+      qc.invalidateQueries({ queryKey: ["onboarding", "dashboard"] });
+      qc.invalidateQueries({ queryKey: ["onboarding", "list"] });
+      qc.invalidateQueries({ queryKey: ["onboarding", "profiles"] });
+      qc.invalidateQueries({ queryKey: ["onboarding", "profile", onboardingId] });
+      toast.success(`Section ${status === "pending" ? "reverted" : status} successfully`);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || "Failed to update section status");
     },
   });
 };

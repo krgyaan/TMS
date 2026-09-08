@@ -147,6 +147,7 @@ const UserImprestsPage: React.FC = () => {
     const { pagination, setPagination, search, setSearch, debouncedSearch } = usePersistentTableState({
         storageKey: "user-imprests",
         defaultTab: "" as const,
+        debounceDelay: 500,
     });
     const { data, isLoading, error } = useImprestList(
         numericUserId,
@@ -331,9 +332,20 @@ const UserImprestsPage: React.FC = () => {
         return [
             {
                 field: "createdAt",
-                headerName: "Date",
+                headerName: "Expense Date",
                 width: 100,
-                valueGetter: p => formatDate(p.data?.createdAt),
+                cellRenderer: (p: { data: ImprestRow }) => (
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span>{formatDate(p.data?.dateOfExpense)}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            Added on {formatDate(p.data?.createdAt)}
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+                ),
             },
             {
                 field: "partyName",

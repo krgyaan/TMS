@@ -6,7 +6,7 @@ import { useAccountApproveVoucher, useAdminApproveVoucher, useImprestVoucherView
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import html2pdf from "html2pdf.js";
-import { AlertCircle, ArrowLeft, CheckCircle, FileQuestion, Loader2, MessageSquare, Printer, ShieldAlert } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle, FileQuestion, Loader2, MessageSquare, Printer, ShieldAlert, Lock } from "lucide-react";
 import React, { useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import type { InvoiceProof } from "./helpers/imprest.types";
@@ -38,7 +38,7 @@ const ImprestVoucherView: React.FC = () => {
 
     const [preview, setPreview] = React.useState<InvoiceProof | null>(null);
 
-    const { data, isLoading, refetch } = useImprestVoucherView({ userId, from: from ?? '', to: to ?? '' });
+    const { data, isLoading, refetch, error: queryError } = useImprestVoucherView({ userId, from: from ?? '', to: to ?? '' });
 
     const voucher = data?.voucher;
     const items = data?.items || [];
@@ -56,6 +56,28 @@ const ImprestVoucherView: React.FC = () => {
             setPreview(proofs[0]);
         }
     }, [proofs, preview])
+
+    // 409 amount mismatch (signed voucher) — show a dedicated error instead of the generic boundary.
+    if (queryError) {
+        const ax = queryError as { response?: { status?: number; data?: { message?: string | string[] } } };
+        const errStatus = ax?.response?.status;
+        const rawMsg = ax?.response?.data?.message;
+        const errText = Array.isArray(rawMsg) ? rawMsg.filter(Boolean).join(", ") : rawMsg ?? "";
+        if (errStatus === 409) {
+            return (
+                <div className="flex h-[80vh] flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-300">
+                    <div className="bg-destructive/10 p-4 rounded-full mb-4">
+                        <AlertCircle className="h-10 w-10 text-destructive" />
+                    </div>
+                    <h2 className="text-2xl font-semibold tracking-tight">Voucher Amount Mismatch</h2>
+                    <p className="text-muted-foreground mt-2 max-w-md text-sm">{errText || "The stored voucher total does not match its linked imprests, and the week is signed — cannot auto-correct."}</p>
+                    <Button variant="outline" className="mt-6" onClick={() => navigate(-1)}>
+                        <ArrowLeft className="h-4 w-4 mr-2" /> Go Back
+                    </Button>
+                </div>
+            );
+        }
+    }
 
     if (!canRead("shared.imprests")) {
         return (
@@ -257,6 +279,31 @@ const ImprestVoucherView: React.FC = () => {
                     Back
                 </Button>
             </div>
+
+            {/* -------- Week-locked banner -------- */}
+            {voucher.accountsSignedBy && (
+                <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 rounded-xl px-4 py-3 mb-4 print:hidden">
+                    <Lock className="h-4 w-4 shrink-0" />
+                    <p className="text-sm">
+                        This expense week is locked — accounts has approved this voucher on{" "}
+                        <b>{formatDate(voucher.accountsSignedAt)}</b>.
+                        No new entries may be created or modified in this week.
+                    </p>
+                </div>
+            )}
+
+            {/* -------- Amount-mismatch warning (unsigned, auto-corrected) -------- */}
+            {voucher && items.length > 0 && Math.abs(items.reduce((s, i) => s + i.amount, 0) - Number(voucher.amount)) > 0.01 && !voucher.accountsSignedBy && (
+                <div className="flex items-center gap-3 bg-blue-500/10 border border-blue-500/30 text-blue-900 dark:text-blue-200 rounded-xl px-4 py-3 mb-4 print:hidden">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <p className="text-sm">
+                        This voucher's total was auto-corrected from{" "}
+                        <b>{formatINR(Number(voucher.amount))}</b> to{" "}
+                        <b>{formatINR(items.reduce((s, i) => s + i.amount, 0))}</b> to
+                        match its linked imprests.
+                    </p>
+                </div>
+            )}
 
             {/* ================= PRINTABLE AREA ================= */}
             <div id="printableArea" className="voucher-container">
