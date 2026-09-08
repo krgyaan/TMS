@@ -335,3 +335,12 @@ export const getInductionStatus = (emp: EmployeeInduction): EmployeeInductionTab
   if (pct === 100) return "completed";
   return "in_progress";
 };
+
+/** Add N months to a YYYY-MM-DD string, returning YYYY-MM-DD. */
+export const addMonths = (dateStr: string, months: number): string => {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  const dt = new Date(y, m - 1, d);
+  dt.setMonth(dt.getMonth() + months);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+};

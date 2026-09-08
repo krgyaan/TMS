@@ -129,6 +129,11 @@ export interface UpdateProfileDto {
   reportingTl?: number;
   salaryType?: string;
   basicSalary?: string;
+  hra?: string;
+  allowances?: string;
+  bonus?: string;
+  pfApplicable?: boolean;
+  esicApplicable?: boolean;
   bankName?: string;
   accountNumber?: string;
   ifscCode?: string;

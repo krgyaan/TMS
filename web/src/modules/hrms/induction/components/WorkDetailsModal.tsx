@@ -21,15 +21,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useProfile, useUpdateProfile } from "@/hooks/api/useOnboarding";
-import { useTeams } from "@/hooks/api/useTeams";
 import { useUsers } from "@/hooks/api/useUsers";
+import { addMonths } from "../helpers/induction.helpers";
 import type { EmployeeInduction } from "../helpers/induction.helpers";
 
 const EMPLOYEE_TYPE_OPTIONS = ["Full Time", "Part Time", "Intern", "Contract"];
 const SALARY_TYPE_OPTIONS = ["Monthly", "Annual"];
 
 interface WorkDetailsFormState {
-  departmentId?: number;
   reportingTl?: number;
   dateOfJoining: string;
   employeeType: string;
@@ -38,10 +37,14 @@ interface WorkDetailsFormState {
   probationEndDate: string;
   salaryType: string;
   basicSalary: string;
+  hra: string;
+  allowances: string;
+  bonus: string;
+  pfApplicable: boolean;
+  esicApplicable: boolean;
 }
 
 const EMPTY_FORM: WorkDetailsFormState = {
-  departmentId: undefined,
   reportingTl: undefined,
   dateOfJoining: "",
   employeeType: "",
@@ -50,6 +53,11 @@ const EMPTY_FORM: WorkDetailsFormState = {
   probationEndDate: "",
   salaryType: "",
   basicSalary: "",
+  hra: "",
+  allowances: "",
+  bonus: "",
+  pfApplicable: false,
+  esicApplicable: false,
 };
 
 export const WorkDetailsModal: React.FC<{
@@ -63,7 +71,6 @@ export const WorkDetailsModal: React.FC<{
   const { data: profile, isLoading: profileLoading } = useProfile(
     open && employee ? employee.id : null
   );
-  const { data: teams = [] } = useTeams();
   const { data: users = [] } = useUsers();
   const { mutate: saveProfile, isPending: saving } = useUpdateProfile(onboardingId);
 
@@ -77,9 +84,13 @@ export const WorkDetailsModal: React.FC<{
         ? users.find((u) => u.name === profile.reportingTl)
         : undefined;
     setForm({
-      departmentId: profile.departmentId ?? undefined,
       reportingTl: tlUser?.id,
-      dateOfJoining: profile.dateOfJoining?.slice(0, 10) ?? "",
+      // Fall back to the tracker's date (which itself falls back to approvedAt),
+      // matching what the dashboard column shows
+      dateOfJoining:
+        profile.dateOfJoining?.slice(0, 10) ||
+        employee?.dateOfJoining?.slice(0, 10) ||
+        "",
       employeeType: profile.employeeType ?? "",
       workLocation: profile.workLocation ?? "",
       probationMonths:
@@ -87,8 +98,13 @@ export const WorkDetailsModal: React.FC<{
       probationEndDate: profile.probationEndDate?.slice(0, 10) ?? "",
       salaryType: profile.salaryType ?? "",
       basicSalary: profile.basicSalary ?? "",
+      hra: profile.hra ?? "",
+      allowances: profile.allowances ?? "",
+      bonus: profile.bonus ?? "",
+      pfApplicable: profile.pfApplicable ?? false,
+      esicApplicable: profile.esicApplicable ?? false,
     });
-  }, [profile, users]);
+  }, [profile, users, employee]);
 
   if (!employee) return null;
 
@@ -110,7 +126,6 @@ export const WorkDetailsModal: React.FC<{
   const handleSave = () => {
     saveProfile(
       {
-        departmentId: form.departmentId,
         reportingTl: form.reportingTl,
         dateOfJoining: form.dateOfJoining || undefined,
         employeeType: form.employeeType || undefined,
@@ -121,6 +136,11 @@ export const WorkDetailsModal: React.FC<{
         probationEndDate: form.probationEndDate || undefined,
         salaryType: form.salaryType || undefined,
         basicSalary: form.basicSalary || undefined,
+        hra: form.hra || undefined,
+        allowances: form.allowances || undefined,
+        bonus: form.bonus || undefined,
+        pfApplicable: form.pfApplicable,
+        esicApplicable: form.esicApplicable,
       },
       {
         onSuccess: () => {
@@ -171,27 +191,6 @@ export const WorkDetailsModal: React.FC<{
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Department</Label>
-                    <Select
-                      value={form.departmentId ? String(form.departmentId) : undefined}
-                      onValueChange={(v) => setField("departmentId", Number(v))}
-                    >
-                      <SelectTrigger className="h-9 text-sm rounded-xl w-full">
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {teams
-                          .filter((t) => t.name)
-                          .map((t) => (
-                            <SelectItem key={t.id} value={String(t.id)}>
-                              {t.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1.5">
                     <Label className="text-xs">Reporting TL</Label>
                     <Select
                       value={form.reportingTl ? String(form.reportingTl) : undefined}
@@ -217,7 +216,14 @@ export const WorkDetailsModal: React.FC<{
                     <Input
                       type="date"
                       value={form.dateOfJoining}
-                      onChange={(e) => setField("dateOfJoining", e.target.value)}
+                      onChange={(e) => {
+                        const doj = e.target.value;
+                        const next: Partial<WorkDetailsFormState> = { dateOfJoining: doj };
+                        if (doj && form.probationMonths !== "") {
+                          next.probationEndDate = addMonths(doj, Number(form.probationMonths));
+                        }
+                        setForm((prev) => ({ ...prev, ...next }));
+                      }}
                       className="h-9 text-sm rounded-xl"
                     />
                   </div>
@@ -257,7 +263,14 @@ export const WorkDetailsModal: React.FC<{
                       type="number"
                       min={0}
                       value={form.probationMonths}
-                      onChange={(e) => setField("probationMonths", e.target.value)}
+                      onChange={(e) => {
+                        const months = e.target.value;
+                        const next: Partial<WorkDetailsFormState> = { probationMonths: months };
+                        if (months !== "" && form.dateOfJoining) {
+                          next.probationEndDate = addMonths(form.dateOfJoining, Number(months));
+                        }
+                        setForm((prev) => ({ ...prev, ...next }));
+                      }}
                       placeholder="e.g. 6"
                       className="h-9 text-sm rounded-xl"
                     />
@@ -308,6 +321,68 @@ export const WorkDetailsModal: React.FC<{
                       placeholder="e.g. 45000"
                       className="h-9 text-sm rounded-xl"
                     />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">HRA</Label>
+                    <Input
+                      value={form.hra}
+                      onChange={(e) => setField("hra", e.target.value)}
+                      placeholder="e.g. 5000"
+                      className="h-9 text-sm rounded-xl"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Allowances</Label>
+                    <Input
+                      value={form.allowances}
+                      onChange={(e) => setField("allowances", e.target.value)}
+                      placeholder="e.g. 3000"
+                      className="h-9 text-sm rounded-xl"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Bonus</Label>
+                    <Input
+                      value={form.bonus}
+                      onChange={(e) => setField("bonus", e.target.value)}
+                      placeholder="e.g. 10000"
+                      className="h-9 text-sm rounded-xl"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">PF Applicable</Label>
+                    <Select
+                      value={form.pfApplicable ? "true" : "false"}
+                      onValueChange={(v) => setField("pfApplicable", v === "true")}
+                    >
+                      <SelectTrigger className="h-9 text-sm rounded-xl w-full">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">ESIC Applicable</Label>
+                    <Select
+                      value={form.esicApplicable ? "true" : "false"}
+                      onValueChange={(v) => setField("esicApplicable", v === "true")}
+                    >
+                      <SelectTrigger className="h-9 text-sm rounded-xl w-full">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
