@@ -1,6 +1,7 @@
 import type { DbInstance } from '@/db';
 import { DRIZZLE } from '@/db/database.module';
 import { oauthAccounts } from '@/db/schemas';
+import { roles } from '@/db/schemas/auth/roles.schema';
 import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
 import { users } from '@/db/schemas/auth/users.schema';
 import { employeeBankDetails } from '@/db/schemas/hrms/employee-bank-details.schema';
@@ -865,15 +866,15 @@ export class OnboardingService {
    */
   async getProfile(id: number): Promise<any> {
     const reportingTl = aliasedTable(users, 'reportingTl');
+    const employeeUser = aliasedTable(users, 'employeeUser');
+    const employeeTeam = aliasedTable(teams, 'employeeTeam');
 
     const [profileRow] = await this.db
       .select({
         profile: onboardingProfiles,
-        departmentName: teams.name,
         reportingTlName: reportingTl.name,
       })
       .from(onboardingProfiles)
-      .leftJoin(teams, eq(onboardingProfiles.departmentId, teams.id))
       .leftJoin(reportingTl, eq(onboardingProfiles.reportingTl, reportingTl.id))
       .where(eq(onboardingProfiles.onboardingId, id))
       .limit(1);
@@ -896,9 +897,14 @@ export class OnboardingService {
         progress: onboardingRequests.progress,
         approvedAt: onboardingRequests.approvedAt,
         reviewedBy: users.name,
+        employeeRoleName: roles.name,
+        employeeTeamName: employeeTeam.name,
       })
       .from(onboardingRequests)
       .leftJoin(users, eq(onboardingRequests.approvedBy, users.id))
+      .leftJoin(employeeUser, eq(onboardingRequests.userId, employeeUser.id))
+      .leftJoin(roles, eq(employeeUser.roleId, roles.id))
+      .leftJoin(employeeTeam, eq(employeeUser.team, employeeTeam.id))
       .where(eq(onboardingRequests.id, id))
       .limit(1);
 
@@ -952,7 +958,10 @@ export class OnboardingService {
       hrStatus: profileRow.profile.hrStatus,
       hrRemark: profileRow.profile.hrRemark,
       
-      department: profileRow.departmentName,
+      // Designation & Department come from the candidate's Users record
+      // (roleId -> roles.name, team -> teams.name)
+      designation: request.employeeRoleName ?? null,
+      department: request.employeeTeamName ?? null,
       reportingTl: profileRow.reportingTlName,
       education,
       experience,
