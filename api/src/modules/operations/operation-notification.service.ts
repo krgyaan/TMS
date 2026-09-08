@@ -56,7 +56,7 @@ export class OperationNotificationService {
   ]);
 
   private readonly USER_RESTRICTED_CATEGORIES: Record<string, number[]> = {
-    salary: [7, 21, 42, 26],
+    salary: [7, 21, 26],
     related_party: [7, 21, 26],
     investment: [7, 21, 26],
   };
@@ -114,7 +114,7 @@ export class OperationNotificationService {
 
   private async buildText(
     header: string,
-    data: { amount: string | number; partyName: string | null; portalLink: string | null; utrNumber?: string | null; rejectionReason?: string | null },
+    data: { amount: string | number; partyName: string | null; portalLink: string | null; requestNo?: string; utrNumber?: string | null; rejectionReason?: string | null },
     userName: string,
     isPaymentDone: boolean = false,
     isRejection: boolean = false,
@@ -131,6 +131,7 @@ export class OperationNotificationService {
       lines.push(header);
     }
 
+    lines.push(`Request: ${data.requestNo || 'N/A'}`);
     lines.push(`Amount: ₹${data.amount}`);
     lines.push(`Party: ${data.partyName || data.portalLink || 'N/A'}`);
 
@@ -142,7 +143,7 @@ export class OperationNotificationService {
       lines.push(`Reason: ${data.rejectionReason}`);
     }
 
-    if (header === 'New Payment Request') {
+    if (header === '*New Payment Request*') {
       lines.push(`Requested by: ${userName}`);
     }
 
@@ -173,6 +174,7 @@ export class OperationNotificationService {
         amount: data.amount,
         partyName: data.partyName,
         portalLink: data.portalLink,
+        requestNo: data.requestNo,
       }, userName);
 
       await this.sendToTargets(text, target);
