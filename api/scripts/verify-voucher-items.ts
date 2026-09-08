@@ -1,17 +1,22 @@
 /**
- * Verify that employee_imprest_voucher_items reproduces the legacy approval-date
- * voucher grouping exactly:
+ * Verify that employee_imprest_voucher_items reproduces the voucher grouping:
  *
- *   - per voucher: expected item count & sum (approval date BETWEEN validFrom/To)
+ *   - per voucher: expected item count & sum (effective date BETWEEN validFrom/To)
  *     must equal actual count & sum (linked via the join table)
  *   - voucher.amount must equal the sum of its linked imprests
  *   - every approved imprest covered by a voucher window must be linked (no orphans)
  *   - no linked imprest may fall outside its voucher's window (no strays)
  *
+ * The effective date defaults to date_of_expense (strict Phase 1 grouping).
+ * Pass --legacy to compare against the old approval-date grouping (audit only:
+ * historical vouchers bucketed by approval week will then match, expense-week
+ * vouchers will not). Use --report-only to surface drift without failing.
+ *
  * Exits 1 on any mismatch unless --report-only is passed.
  *
  * Usage:
  *   pnpm run verify:voucher-items
+ *   pnpm run verify:voucher-items -- --legacy
  *   pnpm run verify:voucher-items -- --report-only
  */
 import "dotenv/config";
@@ -19,6 +24,9 @@ import { sql } from "drizzle-orm";
 import { createPool, createDb } from "../src/db";
 
 const REPORT_ONLY = process.argv.includes("--report-only");
+const LEGACY = process.argv.includes("--legacy");
+
+const effectiveDate = LEGACY ? sql`COALESCE(ei.approved_date)` : sql`ei.date_of_expense`;
 
 async function main() {
     const dbUrl = process.env.DATABASE_URL;
@@ -30,7 +38,7 @@ async function main() {
     const pool = createPool(dbUrl, 2, process.env.PGSSL === "true");
     const db = createDb(pool);
 
-    console.log(`Verify voucher items (${REPORT_ONLY ? "report-only" : "strict"})`);
+    console.log(`Verify voucher items (${REPORT_ONLY ? "report-only" : "strict"}, ${LEGACY ? "approval-date" : "expense-date"} window)`);
 
     try {
         const expected = await db.execute(sql`
@@ -44,7 +52,7 @@ async function main() {
             LEFT JOIN employee_imprests ei
                 ON ei.user_id = v.beneficiary_name::int
                AND ei.approval_status = 1
-               AND COALESCE(ei.approved_date)::date BETWEEN v.valid_from::date AND v.valid_to::date
+               AND ${effectiveDate}::date BETWEEN v.valid_from::date AND v.valid_to::date
             WHERE v.beneficiary_name ~ '^[0-9]+$'
             GROUP BY v.id, v.voucher_code, v.amount
             ORDER BY v.id
@@ -121,7 +129,7 @@ async function main() {
                       SELECT 1
                       FROM employee_imprest_vouchers v
                       WHERE v.beneficiary_name = ei.user_id::text
-                        AND COALESCE(ei.approved_date)::date BETWEEN v.valid_from::date AND v.valid_to::date
+                        AND ${effectiveDate}::date BETWEEN v.valid_from::date AND v.valid_to::date
                   )
                   AND NOT EXISTS (
                       SELECT 1 FROM employee_imprest_voucher_items vi WHERE vi.imprest_id = ei.id
@@ -138,7 +146,7 @@ async function main() {
                   AND (
                       ei.user_id <> v.beneficiary_name::int
                       OR ei.approval_status <> 1
-                      OR COALESCE(ei.approved_date)::date NOT BETWEEN v.valid_from::date AND v.valid_to::date
+                      OR ${effectiveDate}::date NOT BETWEEN v.valid_from::date AND v.valid_to::date
                   )
             `)
         ).rows;
@@ -152,7 +160,7 @@ async function main() {
         console.log(`  stray links          : ${strayCount}`);
 
         if (mismatchCount === 0 && orphanCount === 0 && strayCount === 0) {
-            console.log("\nRESULT: PASS — join table matches legacy approval-date grouping.");
+            console.log(`\nRESULT: PASS — join table matches ${LEGACY ? "approval-date" : "expense-date"} grouping.`);
         } else {
             console.log("\nRESULT: FAIL — differences found.");
             if (mismatchCount > 0) console.log("  Run `pnpm run backfill:voucher-items -- --fix-amounts` then re-verify.");

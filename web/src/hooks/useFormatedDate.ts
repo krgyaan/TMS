@@ -58,9 +58,8 @@ export const formatDateTime = (date: string | Date | null | undefined) => {
 
 export const formatDate = (date: string | Date | null | undefined) => {
     if (!date) return '—';
-    const d = typeof date === 'string' 
-        ? new Date(date.includes(' ') && !date.includes('T') ? date.replace(' ', 'T') : date) 
-        : date;
+    if (typeof date === 'number') return '—';
+    const d = parseLocalDate(date);
         
     if (isNaN(d.getTime())) return '—';
 

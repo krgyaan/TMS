@@ -1,8 +1,30 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { imprestService } from "@/services/api";
 import type { CreateImprestCreditPayload, EmployeeImprestSummary } from "@/modules/imprest/helpers/imprest-admin.types";
 import type { EmployeeImprestDashboard, EmployeeImprestTransactionRow, ImprestPaymentHistoryRow, ImprestVoucherListResponse, UpdateImprestPayload } from "@/modules/imprest/helpers/imprest.types";
+
+/** Shared helper: extract a human-friendly message + optional status from an axios-like error. */
+const extractError = (err: unknown): { status?: number; message: string } => {
+    const ax = err as { response?: { status?: number; data?: { message?: string | string[] } } };
+    const raw = ax?.response?.data?.message;
+    const text = Array.isArray(raw) ? raw.filter(Boolean).join(", ") : raw ?? "";
+    return { status: ax?.response?.status, message: text };
+};
+
+const mapImprestError = (err: unknown, verb: string): string => {
+    const { status, message } = extractError(err);
+    if (status === 403 && /locked|approved by accounts/i.test(message)) {
+        return `Week locked: ${message}`;
+    }
+    if (status === 409) {
+        return `Amount mismatch: ${message}`;
+    }
+    if (status === 400 && /cannot create an already-approved/i.test(message)) {
+        return "Use the Approve button after saving.";
+    }
+    return message || `Something went wrong during ${verb}.`;
+};
 
 /* ---------------- QUERY KEYS ---------------- */
 
@@ -42,6 +64,8 @@ export const useImprestList = (userId?: number, params?: { page?: number; limit?
             return imprestService.getMyDashboard(params);
         },
 
+        placeholderData: keepPreviousData,
+
         // Enable:
         // - When viewing own page (userId undefined)
         // - When viewing another user (valid userId number)
@@ -78,11 +102,7 @@ export const useCreateImprest = () => {
             qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
         onError: (e) => {
-            const responseMessage = (e as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
-            const errorMessage = Array.isArray(responseMessage)
-                ? responseMessage.filter(Boolean).join(", ")
-                : responseMessage || "Something went wrong";
-            toast.error(`Failed to create imprest: ${errorMessage}`);
+            toast.error(`Failed to create imprest: ${mapImprestError(e, "create")}`);
         },
     });
 };
@@ -100,7 +120,7 @@ export const useDeleteImprest = () => {
             qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
 
-        onError: () => toast.error("Failed to delete imprest"),
+        onError: (e) => toast.error(mapImprestError(e, "delete")),
     });
 };
 
@@ -117,7 +137,7 @@ export const useApproveImprest = () => {
             qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
 
-        onError: () => toast.error("Failed to update approval"),
+        onError: (e) => toast.error(mapImprestError(e, "approval")),
     });
 };
 
@@ -185,7 +205,7 @@ export const useUploadImprestProofs = () => {
             qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
 
-        onError: () => toast.error("Failed to upload proofs"),
+        onError: (e) => toast.error(mapImprestError(e, "proof upload")),
     });
 };
 
@@ -195,6 +215,7 @@ export const useImprestVoucherList = (userId?: number, params?: { page?: number;
     return useQuery<ImprestVoucherListResponse>({
         queryKey: [...imprestVoucherKeys.list(userId), { params }],
         queryFn: () => imprestService.getVouchers({ userId, ...params }),
+        placeholderData: keepPreviousData,
         enabled: userId === undefined || typeof userId === "number",
     });
 };
@@ -203,6 +224,7 @@ export const useImprestVoucherView = (params: { userId: number; from: string; to
     return useQuery({
         queryKey: imprestVoucherKeys.detail(params),
         queryFn: () => imprestService.getVoucherView(params),
+        placeholderData: keepPreviousData,
         enabled: !!params.userId && !!params.from && !!params.to,
     });
 };
@@ -216,6 +238,7 @@ export const useImprestPaymentHistory = (userId?: number) => {
     return useQuery<ImprestPaymentHistoryRow[]>({
         queryKey: imprestPaymentHistoryKeys.list(userId),
         queryFn: () => imprestService.getPaymentHistory(userId),
+        placeholderData: keepPreviousData,
     });
 };
 
@@ -250,7 +273,7 @@ export const useAccountApproveVoucher = () => {
             qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
 
-        onError: () => toast.error("Failed to update voucher"),
+        onError: (e) => toast.error(mapImprestError(e, "accounts approval")),
     });
 };
 
@@ -266,7 +289,7 @@ export const useAdminApproveVoucher = () => {
             qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
 
-        onError: () => toast.error("Failed to update voucher"),
+        onError: (e) => toast.error(mapImprestError(e, "CEO approval")),
     });
 };
 
@@ -282,11 +305,7 @@ export const useUpdateImprest = () => {
         },
 
         onError: (e) => {
-            const responseMessage = (e as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
-            const errorMessage = Array.isArray(responseMessage)
-                ? responseMessage.filter(Boolean).join(", ")
-                : responseMessage || "Something went wrong";
-            toast.error(`Failed to update imprest: ${errorMessage}`);
+            toast.error(`Failed to update imprest: ${mapImprestError(e, "update")}`);
         },
     });
 };
@@ -327,7 +346,7 @@ export const useDeleteImprestProof = () => {
             qc.invalidateQueries({ queryKey: imprestKeys.detail(variables.id) });
             qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
-        onError: () => toast.error("Failed to delete proof"),
+        onError: (e) => toast.error(mapImprestError(e, "proof deletion")),
     });
 };
 
