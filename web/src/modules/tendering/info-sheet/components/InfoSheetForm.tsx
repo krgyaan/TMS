@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { type SubmitHandler, useForm, useFieldArray } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -18,8 +18,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { ArrowLeft, Plus, Trash2, Save, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { paths } from '@/app/routes/paths';
+import { infoSheetsService } from '@/services/api';
+import { populateFormFromExtraction, extractFieldIndicators } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.autoExtract';
+import { AiIndicatorsContext, type FieldIndicator } from '@/components/form/AiIndicatorsContext';
 import { useCreateInfoSheet, useUpdateInfoSheet } from '@/hooks/api/useInfoSheets';
 import { handleInfoSheetFormErrors } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.errors';
 import type { TenderInfoWithNames } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
@@ -62,6 +66,92 @@ export function TenderInformationForm({
     const rejectionReasonOptions = useDnbStatusOptions();
     const pqrOptions = usePqrOptions();
     const financeDocumentOptions = useFinanceDocumentOptions();
+
+    const [isExtracting, setIsExtracting] = useState(false);
+    const [fieldIndicators, setFieldIndicators] = useState<Record<string, FieldIndicator>>({});
+    const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Clean up polling interval when component unmounts
+    useEffect(() => {
+        return () => {
+            if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+            }
+        };
+    }, []);
+
+    const handleAutoExtract = async () => {
+        if (!tenderId) {
+            toast.error('Invalid tender reference.');
+            return;
+        }
+
+        if (isExtracting) return;
+
+        setIsExtracting(true);
+        toast.loading('Initiating AI extraction from tender PDF...', { id: 'auto-extract' });
+
+        try {
+            const res = await infoSheetsService.autoExtract(tenderId);
+            const jobId = res.jobId;
+
+            toast.loading('Analyzing PDF with VolksAI... extracting clauses and values', { id: 'auto-extract' });
+
+            let attempts = 0;
+            const maxAttempts = 65; // ~130 seconds timeout limit
+
+            pollIntervalRef.current = setInterval(async () => {
+                attempts++;
+                try {
+                    const statusRes = await infoSheetsService.getAutoExtractStatus(jobId);
+
+                    if (statusRes.status === 'completed') {
+                        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                        setIsExtracting(false);
+
+                        const populateResult = populateFormFromExtraction(form, statusRes.fields as any);
+                        const indicators = extractFieldIndicators(statusRes.fields as any, statusRes.missing_fields);
+                        setFieldIndicators(indicators);
+
+                        const missingCount = statusRes.missing_fields?.length || 0;
+                        const fallbackCount = Object.values(indicators).filter((i) => i.type === 'fallback').length;
+
+                        toast.success(
+                            `AI Extraction complete! ${populateResult.populatedCount} fields auto-populated.${
+                                fallbackCount > 0 ? ` (${fallbackCount} fallback values)` : ''
+                            }${missingCount > 0 ? ` (${missingCount} missing)` : ''}`,
+                            { id: 'auto-extract', duration: 6000 },
+                        );
+                    } else if (statusRes.status === 'failed') {
+                        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                        setIsExtracting(false);
+                        toast.error(
+                            statusRes.error || 'AI extraction failed for this tender document.',
+                            { id: 'auto-extract', duration: 6000 },
+                        );
+                    } else if (attempts >= maxAttempts) {
+                        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                        setIsExtracting(false);
+                        toast.error('Extraction timed out. You may check back in a moment or retry.', {
+                            id: 'auto-extract',
+                            duration: 6000,
+                        });
+                    }
+                } catch (pollErr: any) {
+                    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                    setIsExtracting(false);
+                    toast.error(
+                        pollErr?.response?.data?.message || pollErr.message || 'Failed to poll extraction status.',
+                        { id: 'auto-extract' },
+                    );
+                }
+            }, 2000);
+        } catch (err: any) {
+            setIsExtracting(false);
+            const msg = err?.response?.data?.message || err.message || 'Failed to initiate PDF auto-extraction.';
+            toast.error(msg, { id: 'auto-extract' });
+        }
+    };
 
     const initialFormValues = useMemo(() => {
         if (mode === 'create') {
@@ -212,7 +302,26 @@ export function TenderInformationForm({
                             )}
                         </CardDescription>
                     </div>
-                    <CardAction>
+                    <CardAction className="flex items-center gap-2">
+                        <Button
+                            type="button"
+                            variant="default"
+                            className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-sm transition-all cursor-pointer"
+                            disabled={isExtracting || isTenderLoading || isInfoSheetLoading}
+                            onClick={handleAutoExtract}
+                        >
+                            {isExtracting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Extracting from PDF...
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles className="mr-2 h-4 w-4" />
+                                    Auto-Extract with AI
+                                </>
+                            )}
+                        </Button>
                         <Button variant="outline" onClick={() => navigate(-1)}>
                             <ArrowLeft className="mr-2 h-4 w-4" /> Back
                         </Button>
@@ -260,7 +369,33 @@ export function TenderInformationForm({
                     </Alert>
                 )}
 
-                <Form {...form}>
+                {Object.keys(fieldIndicators).length > 0 && (
+                    <Alert className="mt-6 mb-6 border-amber-500 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200">
+                        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-2">
+                            <div>
+                                <p className="font-semibold text-sm">
+                                    AI Auto-Extraction Review ({Object.keys(fieldIndicators).length} fields flagged)
+                                </p>
+                                <AlertDescription className="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
+                                    Amber indicators (<span className="inline-flex items-center gap-1 font-medium"><span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse inline-block" /> AI Fallback / Missing in PDF</span>) highlight fields where AI used fallback clauses or couldn't find an explicit value. Please verify before saving.
+                                </AlertDescription>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900 text-amber-800 dark:text-amber-200 self-start sm:self-auto cursor-pointer"
+                                onClick={() => setFieldIndicators({})}
+                            >
+                                Dismiss Flags
+                            </Button>
+                        </div>
+                    </Alert>
+                )}
+
+                <AiIndicatorsContext.Provider value={fieldIndicators}>
+                    <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit, handleInfoSheetFormErrors)}>
                         <div className="space-y-6 pt-4">
                             {/* ──────────────────────────────────────────────
@@ -1779,6 +1914,7 @@ export function TenderInformationForm({
                         </div>
                     </form>
                 </Form>
+                </AiIndicatorsContext.Provider>
             </CardContent>
         </Card>
     );

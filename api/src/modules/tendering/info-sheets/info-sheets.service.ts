@@ -7,6 +7,7 @@ import type { TenderInfoSheetPayload } from '@/modules/tendering/info-sheets/dto
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { TimersService } from '@/modules/timers/timers.service';
+import { PdfExtractionProducer } from './pdf-extraction.producer';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { organizations } from '@db/schemas/master/organizations.schema';
@@ -53,6 +54,7 @@ export class TenderInfoSheetsService {
         private readonly recipientResolver: RecipientResolver,
         private readonly timersService: TimersService,
         private readonly clientDirectorySyncService: ClientDirectorySyncService,
+        private readonly pdfExtractionProducer: PdfExtractionProducer,
     ) {
         this.logger = this.appLogger.withContext(TenderInfoSheetsService.name);
     }
@@ -1596,5 +1598,108 @@ export class TenderInfoSheetsService {
         throw new InternalServerErrorException(
             'Failed to save tender information. Please check your input and try again.'
         );
+    }
+
+    /**
+     * Resolves the tender document path from the tender's documents attribute.
+     */
+    private resolveTenderPdfPath(documents: unknown): string {
+        if (!documents) {
+            throw new BadRequestException('Tender does not have any documents uploaded');
+        }
+
+        let paths: string[] = [];
+        if (Array.isArray(documents)) {
+            paths = documents.filter((p): p is string => typeof p === 'string' && p.trim().length > 0);
+        } else if (typeof documents === 'string') {
+            const trimmed = documents.trim();
+            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                try {
+                    const parsed = JSON.parse(trimmed);
+                    if (Array.isArray(parsed)) {
+                        paths = parsed.filter((p): p is string => typeof p === 'string' && p.trim().length > 0);
+                    }
+                } catch {
+                    // Fall back to treating as comma-separated or raw string
+                }
+            } else if (trimmed.includes(',')) {
+                paths = trimmed.split(',').map((s) => s.trim()).filter(Boolean);
+            } else if (trimmed.length > 0) {
+                paths = [trimmed];
+            }
+        }
+
+        if (paths.length === 0) {
+            throw new BadRequestException('Tender does not have any valid document paths');
+        }
+
+        // Prioritize finding a .pdf document, fallback to first path
+        const pdfFile = paths.find((p) => p.toLowerCase().endsWith('.pdf')) || paths[0];
+        return pdfFile;
+    }
+
+    /**
+     * Enqueues an asynchronous PDF extraction job for the specified tender.
+     */
+    async autoExtractFromPdf(tenderId: number, userId: number) {
+        const tender = await this.tenderInfosService.validateExists(tenderId);
+        const pdfPath = this.resolveTenderPdfPath(tender.documents);
+
+        this.logger.info(`Initiating auto-extraction for tender ${tenderId} from document '${pdfPath}'`, {
+            tenderId,
+            pdfPath,
+            userId,
+        });
+
+        const result = await this.pdfExtractionProducer.enqueueExtraction({
+            tenderId,
+            pdfPath,
+            userId,
+        });
+
+        return {
+            jobId: result.jobId,
+            status: result.status,
+            message:
+                result.status === 'existing_active'
+                    ? 'Extraction job is already active/processing for this tender'
+                    : 'Extraction job enqueued successfully',
+        };
+    }
+
+    /**
+     * Retrieves the current execution status or extraction results for a BullMQ job.
+     */
+    async getAutoExtractStatus(jobId: string) {
+        const jobStatus = await this.pdfExtractionProducer.getJobStatus(jobId);
+        if (!jobStatus) {
+            throw new NotFoundException(`Extraction job with ID '${jobId}' not found`);
+        }
+
+        if (jobStatus.state === 'completed') {
+            return {
+                jobId: jobStatus.jobId,
+                status: 'completed',
+                fields: jobStatus.result?.fields ?? {},
+                missing_fields: jobStatus.result?.missing_fields ?? [],
+                extraction_version: jobStatus.result?.extraction_version ?? '1.0.0',
+                processing_time_ms: jobStatus.result?.processing_time_ms ?? 0,
+            };
+        }
+
+        if (jobStatus.state === 'failed') {
+            return {
+                jobId: jobStatus.jobId,
+                status: 'failed',
+                error: jobStatus.failedReason || 'PDF extraction job encountered an unrecoverable failure',
+            };
+        }
+
+        return {
+            jobId: jobStatus.jobId,
+            status: 'processing',
+            state: jobStatus.state,
+            progress: jobStatus.progress ?? null,
+        };
     }
 }

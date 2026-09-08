@@ -8,6 +8,14 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 export class TenderInfoSheetsController {
     constructor(private readonly infoSheetsService: TenderInfoSheetsService) { }
 
+    @Get('auto-extract/:jobId')
+    async getAutoExtractStatus(
+        @Param('jobId') jobId: string,
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        return this.infoSheetsService.getAutoExtractStatus(jobId);
+    }
+
     @Get(':tenderId')
     async getByTender(@Param('tenderId', ParseIntPipe) tenderId: number) {
         return this.infoSheetsService.findByTenderId(tenderId);
@@ -16,6 +24,15 @@ export class TenderInfoSheetsController {
     @Get(':tenderId/contacts')
     async getTenderContacts(@Param('tenderId', ParseIntPipe) tenderId: number) {
         return this.infoSheetsService.getTenderContacts(tenderId);
+    }
+
+    @Post(':tenderId/auto-extract')
+    @HttpCode(HttpStatus.OK)
+    async autoExtract(
+        @Param('tenderId', ParseIntPipe) tenderId: number,
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        return this.infoSheetsService.autoExtractFromPdf(tenderId, user.sub);
     }
 
     @Post(':tenderId')

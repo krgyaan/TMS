@@ -4,6 +4,11 @@ import { PdfExtractionJobData, PdfExtractionJobResult } from './types/pdf-extrac
 import * as fs from 'fs';
 import * as path from 'path';
 
+jest.mock('uuid', () => ({
+    v4: () => 'mock-uuid-v4',
+}));
+
+
 describe('PDF Extraction Queue Integration (Phase 8)', () => {
     let mockQueue: any;
     let mockLogger: any;
@@ -332,3 +337,5 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
         });
     });
 });
+
+
