@@ -24,6 +24,7 @@ export default defineConfig({
                 scope: "/",
                 start_url: "/",
                 id: "/",
+                related_applications: [{ platform: "webapp", url: "/manifest.webmanifest" }],
                 icons: [
                     {
                         src: "pwa-icons/icon-192x192.png",

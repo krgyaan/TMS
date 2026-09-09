@@ -1,4 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { useFieldMode } from "@/hooks/useFieldMode";
+import { FIELD_DASHBOARD_TILES } from "@/lib/field-mode";
 import { useNavigate } from "react-router-dom";
 import { CircularsWidget } from "./components/CircularsWidget";
 import DashboardCalendar from "./components/DashboardCalendar";
@@ -8,9 +10,30 @@ import { quickActions } from "./helpers/dashboard.constants";
 
 const Dashboard = () => {
     const navigate = useNavigate();
-    const {teamId, isSuperUser, isAdmin} = useAuth();
+    const { teamId, isSuperUser, isAdmin, canRead } = useAuth();
+    const isFieldMode = useFieldMode();
 
     const isTenderingTeam = teamId == 1 || teamId == 2 || isSuperUser || isAdmin;
+
+    if (isFieldMode) {
+        return (
+            <div className="space-y-6 p-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {FIELD_DASHBOARD_TILES.filter(tile => canRead(tile.permission)).map(tile => (
+                        <QuickActionCard
+                            key={tile.title}
+                            title={tile.title}
+                            subtitle={tile.subtitle}
+                            icon={tile.icon}
+                            color={tile.color}
+                            bgColor={tile.bgColor}
+                            onClick={() => navigate(tile.url)}
+                        />
+                    ))}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 p-8">
