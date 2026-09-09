@@ -16,9 +16,11 @@ import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import type { HappyCallingRow } from '@/modules/crm/happy-calling/helpers/happy-calling.types';
 import { paths } from '@/app/routes/paths';
+import { useAuth } from '@/contexts/AuthContext';
 
 const HappyCallingListPage = () => {
     const navigate = useNavigate();
+    const { canCreate, canUpdate } = useAuth();
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState('');
@@ -64,19 +66,22 @@ const HappyCallingListPage = () => {
                 label: 'Edit',
                 onClick: (row) => navigate(paths.crm.happyCallingEdit(row.id)),
                 icon: <Edit className="h-4 w-4" />,
+                visible: () => canUpdate('crm.happy_calling'),
             },
             {
                 label: 'Followup',
                 onClick: (row) => navigate(paths.crm.happyCallingFollowup(row.id)),
                 icon: <PhoneCall className="h-4 w-4" />,
+                visible: () => canUpdate('crm.happy_calling'),
             },
             {
                 label: 'Enquiry Received',
                 onClick: (row) => navigate(paths.crm.happyCallingEnquiryCreate(row.id)),
                 icon: <Mail className="h-4 w-4" />,
+                visible: () => canCreate('crm.enquiries'),
             },
         ],
-        [navigate],
+        [navigate, canCreate, canUpdate],
     );
 
     const colDefs = useMemo<ColDef<HappyCallingRow>[]>(

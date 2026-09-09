@@ -31,6 +31,7 @@ import {
     User,
 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLeads, useDeleteLead, useUpdateLead } from "@/hooks/api/useLeads";
 import type { LeadWithNames } from "@/modules/crm/leads/helpers/leads.type";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
@@ -50,6 +51,7 @@ const PRIORITY_SUBTABS: { key: LeadPriorityTab; label: string }[] = [
 
 const LeadListPage = () => {
     const navigate = useNavigate();
+    const { canCreate, canUpdate, canDelete } = useAuth();
     const deleteLead = useDeleteLead();
     const updateLead = useUpdateLead();
 
@@ -165,45 +167,50 @@ const LeadListPage = () => {
     };
 
     const leadActions: ActionItem<LeadWithNames>[] = [
-        { 
-            label: "Update Followup", 
-            onClick: (row) => navigate(paths.crm.leadFollowup(row.id)), 
-            icon: <Calendar className="h-4 w-4" /> 
+        {
+            label: "Update Followup",
+            onClick: (row) => navigate(paths.crm.leadFollowup(row.id)),
+            icon: <Calendar className="h-4 w-4" />,
+            visible: () => canUpdate("crm.leads")
         },
-        { 
-            label: "Lead Priority", 
-            onClick: (row) => setPriorityModal({ 
-                open: true, 
-                leadId: row.id, 
-                leadName: row.companyName || undefined, 
-                currentPriority: row.leadPriority 
-            }), 
-            icon: <Star className="h-4 w-4" /> 
+        {
+            label: "Lead Priority",
+            onClick: (row) => setPriorityModal({
+                open: true,
+                leadId: row.id,
+                leadName: row.companyName || undefined,
+                currentPriority: row.leadPriority
+            }),
+            icon: <Star className="h-4 w-4" />,
+            visible: () => canUpdate("crm.leads")
         },
-        { 
-            label: "Enquiry Received", 
-            onClick: (row) => navigate(paths.crm.enquiryCreateFromLead(row.id)), 
-            icon: <Mail className="h-4 w-4" /> 
+        {
+            label: "Enquiry Received",
+            onClick: (row) => navigate(paths.crm.enquiryCreateFromLead(row.id)),
+            icon: <Mail className="h-4 w-4" />,
+            visible: () => canCreate("crm.enquiries")
         },
-        { 
-            label: "View Lead", 
-            onClick: (row) => navigate(paths.crm.leadView(row.id)), 
-            icon: <Eye className="h-4 w-4" /> 
+        {
+            label: "View Lead",
+            onClick: (row) => navigate(paths.crm.leadView(row.id)),
+            icon: <Eye className="h-4 w-4" />
         },
-        { 
-            label: "Edit Lead", 
-            onClick: (row) => navigate(paths.crm.leadEdit(row.id)), 
-            icon: <Pencil className="h-4 w-4" /> 
+        {
+            label: "Edit Lead",
+            onClick: (row) => navigate(paths.crm.leadEdit(row.id)),
+            icon: <Pencil className="h-4 w-4" />,
+            visible: () => canUpdate("crm.leads")
         },
-        { 
-            label: "Disqualify", 
-            className: "text-red-600", 
-            onClick: (row) => setDeleteModal({ 
-                open: true, 
-                leadId: row.id, 
-                leadName: row.companyName || undefined 
-            }), 
-            icon: <Trash2 className="h-4 w-4 text-red-600" /> 
+        {
+            label: "Disqualify",
+            className: "text-red-600",
+            onClick: (row) => setDeleteModal({
+                open: true,
+                leadId: row.id,
+                leadName: row.companyName || undefined
+            }),
+            icon: <Trash2 className="h-4 w-4 text-red-600" />,
+            visible: () => canDelete("crm.leads")
         },
     ];
 
@@ -411,12 +418,14 @@ const LeadListPage = () => {
                         <CardDescription>Manage all leads</CardDescription>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button 
-                            onClick={() => navigate(paths.crm.leadCreate)} 
-                            className="flex items-center gap-2"
-                        >
-                            <Plus className="h-4 w-4" /> Add Lead
-                        </Button>
+                        {canCreate("crm.leads") && (
+                            <Button
+                                onClick={() => navigate(paths.crm.leadCreate)}
+                                className="flex items-center gap-2"
+                            >
+                                <Plus className="h-4 w-4" /> Add Lead
+                            </Button>
+                        )}
                     </div>
                 </div>
             </CardHeader>
