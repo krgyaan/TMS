@@ -7,6 +7,7 @@ import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 
 import { EmployeeImprestsSection } from "./sections/EmployeeImprestsSection";
 import { InsuranceSection } from "./sections/InsuranceSection";
+import { InventorySection } from "@/modules/operations/inventory/components/InventorySection";
 import { PaymentRequestsSection } from "./sections/PaymentRequestsSection";
 import { ProjectClosureSection } from "./sections/ProjectClosureSection";
 import { ProjectOverviewSection } from "./sections/ProjectOverviewSection";
@@ -61,6 +62,7 @@ export default function ProjectDashboardPage() {
             <PurchaseOrdersSection projectId={projectId} insuranceRequired={insuranceRequired} />
             <VendorWorkOrdersSection projectId={projectId} insuranceRequired={insuranceRequired} />
             <SaleInvoicesSection projectId={projectId} />
+            <InventorySection projectId={projectId} />
             <PurchaseInvoicesSection projectId={projectId} />
             <PaymentRequestsSection projectId={projectId} insuranceRequired={insuranceRequired} />
             <InsuranceSection projectId={projectId} />
