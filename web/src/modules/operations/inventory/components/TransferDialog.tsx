@@ -40,7 +40,7 @@ export const TransferDialog: React.FC<TransferDialogProps> = ({ item, open, onOp
 
     const TransferSchema = useMemo(() => makeTransferSchema(item.remainingQty), [item.remainingQty]);
 
-const form = useForm<TransferFormValues>({
+    const form = useForm<TransferFormValues>({
         resolver: zodResolver(TransferSchema),
         defaultValues: { toProjectId: undefined, qty: undefined, price: item.price, remark: "" },
     });
