@@ -5,8 +5,10 @@ import { inventory, type NewInventory } from "@/db/schemas/operations/inventory.
 import { inventoryMovements } from "@/db/schemas/operations/inventory-movements.schema";
 import { inventoryTransfers } from "@/db/schemas/operations/inventory-transfers.schema";
 import { users } from "@/db/schemas";
-import { and, desc, eq, sql, isNull } from "drizzle-orm";
+import { and, countDistinct, desc, eq, ilike, or, sql, isNull, type SQL } from "drizzle-orm";
 import { projects } from "@/db/schemas/master/projects.schema";
+import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
+import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -70,6 +72,66 @@ export class InventoryService {
                 qty: Number(r.qty),
                 remainingQty: Number(r.remainingQty),
             })),
+        };
+    }
+
+    async getProjectSummaries(filters: { page?: number; limit?: number; search?: string } = {}) {
+        const page = filters.page && filters.page > 0 ? filters.page : 1;
+        const limit = filters.limit && filters.limit > 0 ? filters.limit : 50;
+        const offset = (page - 1) * limit;
+
+        const whereConditions: SQL[] = [];
+        if (filters.search) {
+            const pattern = `%${filters.search}%`;
+            const searchFilter = or(ilike(projects.projectName, pattern), ilike(projects.projectCode, pattern));
+            if (searchFilter) whereConditions.push(searchFilter);
+        }
+        const projectFilter = whereConditions.length > 0 ? and(...whereConditions) : undefined;
+
+        const approvedPoCount = sql`(
+            SELECT COUNT(*) FROM ${purchaseOrders} WHERE ${purchaseOrders.projectId} = ${projects.id} AND ${purchaseOrders.poApproved} = true
+        )::int`;
+        const approvedVwoCount = sql`(
+            SELECT COUNT(*) FROM ${vendorWorkOrders} WHERE ${vendorWorkOrders.projectId} = ${projects.id} AND ${vendorWorkOrders.woApproved} = true
+        )::int`;
+
+        const [rows, [{ total }]] = await Promise.all([
+            this.db
+                .select({
+                    projectId: projects.id,
+                    projectName: projects.projectName,
+                    projectCode: projects.projectCode,
+                    approvedPoCount,
+                    approvedVwoCount,
+                    totalItems: sql`COUNT(${inventory.id})::int`,
+                })
+                .from(projects)
+                .innerJoin(inventory, eq(inventory.projectId, projects.id))
+                .where(projectFilter)
+                .groupBy(projects.id, projects.projectName, projects.projectCode)
+                .orderBy(projects.projectName, projects.id)
+                .limit(limit)
+                .offset(offset),
+            this.db
+                .select({ total: countDistinct(projects.id) })
+                .from(projects)
+                .innerJoin(inventory, eq(inventory.projectId, projects.id))
+                .where(projectFilter),
+        ]);
+
+        return {
+            data: rows.map(r => ({
+                ...r,
+                projectId: Number(r.projectId),
+                approvedPoCount: Number(r.approvedPoCount),
+                approvedVwoCount: Number(r.approvedVwoCount),
+                totalItems: Number(r.totalItems),
+            })),
+            meta: {
+                total: Number(total ?? 0),
+                page,
+                limit,
+            },
         };
     }
 

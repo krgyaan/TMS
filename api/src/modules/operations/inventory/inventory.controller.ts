@@ -23,6 +23,15 @@ export class InventoryController {
         return this.service.getAllInventory({ includeZero: includeZero === "true" });
     }
 
+    @Get("projects")
+    getProjectSummaries(@Query("page") page?: string, @Query("limit") limit?: string, @Query("search") search?: string) {
+        return this.service.getProjectSummaries({
+            page: page ? Number(page) : undefined,
+            limit: limit ? Number(limit) : undefined,
+            search: search || undefined,
+        });
+    }
+
     @Get("transfers")
     getTransfers(@Query("fromProject") fromProject?: string, @Query("toProject") toProject?: string) {
         return this.service.getTransfers(fromProject ? Number(fromProject) : undefined, toProject ? Number(toProject) : undefined);
