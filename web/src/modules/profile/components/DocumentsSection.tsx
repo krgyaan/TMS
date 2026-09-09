@@ -51,7 +51,35 @@ import { useProfileContext } from "../contexts/ProfileContext";
 import { useOnboardingContext } from "./onboarding/contexts/OnboardingContext";
 import type { ProfileResponse, DocumentData } from "../types";
 import { formatDate } from "../utils";
-import { getStatusConfig } from "./ui-helpers";
+
+const getStatusConfig = (status: string) => {
+  switch (status) {
+    case "approved":
+      return {
+        label: "Approved",
+        icon: FileCheck,
+        className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+      };
+    case "pending":
+      return {
+        label: "Pending",
+        icon: FileClock,
+        className: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+      };
+    case "rejected":
+      return {
+        label: "Rejected",
+        icon: FileX,
+        className: "bg-destructive/10 text-destructive border-destructive/20",
+      };
+    default:
+      return {
+        label: status,
+        icon: Info,
+        className: "bg-muted text-muted-foreground border-border",
+      };
+  }
+};
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 

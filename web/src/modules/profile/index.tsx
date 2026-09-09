@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  User, 
-  FileText, 
-  Bell, 
-  Laptop, 
+import {
+  FileText,
+  Laptop,
   MessageSquare,
   Loader2
 } from "lucide-react";
@@ -13,9 +11,7 @@ import { cn } from "@/lib/utils";
 import { ProfileProvider, useProfileContext } from "./contexts/ProfileContext";
 
 import { ProfileHeader } from "./components/ProfileHeader";
-import { OverviewTab } from "./components/OverviewTab";
 import { DocumentsSection } from "./components/DocumentsSection";
-import { NotificationsSection } from "./components/NotificationsSection";
 import { AssetsSection } from "./components/AssetsSection";
 import { ComplaintsSection } from "./components/ComplaintsSection";
 
@@ -29,15 +25,10 @@ import { OnboardingProvider } from "./components/onboarding/contexts/OnboardingC
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StandardProfileView() {
-  const { data } = useProfileContext();
-  const [activeTab, setActiveTab] = useState("overview");
-
-  const unreadNotifCount = data?.notifications?.filter((n) => !n.read).length || 0;
+  const [activeTab, setActiveTab] = useState("documents");
 
   const tabs = [
-    { value: "overview",       label: "Overview",  icon: User },
     { value: "documents",      label: "Documents", icon: FileText },
-    { value: "notifications",  label: "Activity",  icon: Bell, badge: unreadNotifCount },
     { value: "assets",         label: "Assets",    icon: Laptop },
     { value: "complaints",     label: "Support",   icon: MessageSquare },
   ];
@@ -67,30 +58,15 @@ function StandardProfileView() {
                 <tab.icon className="h-4 w-4" />
                 <span className="hidden sm:inline">{tab.label}</span>
                 <span className="sm:hidden">{tab.label.slice(0, 3)}</span>
-                {tab.badge ? (
-                  <span className="ml-0.5 min-w-[20px] h-5 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold px-1.5">
-                    {tab.badge}
-                  </span>
-                ) : null}
               </TabsTrigger>
             ))}
           </TabsList>
 
           {/* Tab Contents */}
           <div className="mt-6">
-            {activeTab === "overview" && (
-              <TabsContent value="overview" className="outline-none m-0" forceMount>
-                <OverviewTab setActiveTab={setActiveTab} />
-              </TabsContent>
-            )}
             {activeTab === "documents" && (
               <TabsContent value="documents" className="outline-none m-0" forceMount>
                 <DocumentsSection />
-              </TabsContent>
-            )}
-            {activeTab === "notifications" && (
-              <TabsContent value="notifications" className="outline-none m-0" forceMount>
-                <NotificationsSection />
               </TabsContent>
             )}
             {activeTab === "assets" && (
