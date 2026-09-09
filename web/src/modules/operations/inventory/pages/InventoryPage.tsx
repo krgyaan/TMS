@@ -9,7 +9,9 @@ import type { ColDef, ValueFormatterParams } from "ag-grid-community";
 import { useAllInventory } from "@/hooks/api/useInventory";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { InventoryItem } from "../helpers/inventory.types";
-import { Search } from "lucide-react";
+import { Eye, Search } from "lucide-react";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
 
 interface RowType extends InventoryItem {
     projectName?: string;
@@ -35,6 +37,16 @@ export default function InventoryPage() {
                 i.projectName?.toLowerCase().includes(q)
         );
     }, [inventoryItems, search]);
+
+    const inventoryActions: ActionItem<InventoryItem>[] = [
+        {
+            label: "View Details",
+            onClick: () => {
+                // Implement view details action
+            },
+            icon: <Eye className="h-4 w-4" />,
+        },
+    ];
 
     const columns = useMemo<ColDef<RowType>[]>(
         () => [
@@ -88,6 +100,14 @@ export default function InventoryPage() {
                 valueFormatter: (p: ValueFormatterParams<RowType>) =>
                     formatINR(p.value || 0),
             },
+            {
+                headerName: "",
+                filter: false,
+                sortable: false,
+                cellRenderer: createActionColumnRenderer(inventoryActions),
+                pinned: "right",
+                width: 57,
+            },
         ],
         []
     );
@@ -116,6 +136,9 @@ export default function InventoryPage() {
                         <div className="flex justify-between items-center gap-2">
                             <CardTitle className="text-base font-semibold">
                                 All Inventory
+                                <Badge variant="secondary" className="ml-2">
+                                    {filtered.length} item{filtered.length > 1 ? "s" : ""}
+                                </Badge>
                             </CardTitle>
                             <div className="flex items-center gap-2">
                                 <div className="relative">
@@ -137,9 +160,7 @@ export default function InventoryPage() {
                             </div>
                         </div>
                         <CardDescription>
-                            {filtered.length} item
-                            {filtered.length !== 1 ? "s" : ""} across all
-                            projects
+                            View and manage project-wise inventory across all projects.
                         </CardDescription>
                     </div>
                 </CardHeader>
