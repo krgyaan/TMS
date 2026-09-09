@@ -121,27 +121,17 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
             ),
         },
         {
-            field: "shipToName",
-            headerName: "Shipping",
+            field: "projectName",
+            headerName: "Project Name",
             sortable: true,
             filter: true,
-            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => (
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span className="truncate block max-w-[200px]">{p.value || "-"}</span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" align="start" className="max-w-xs">
-                            <div className="space-y-1 text-xs">
-                                <p><strong>Address:</strong> {p.data?.shippingAddress || "—"}</p>
-                                <p><strong>GST:</strong> {p.data?.shipToGst || "—"}</p>
-                                <p><strong>PAN:</strong> {p.data?.shipToPan || "—"}</p>
-                            </div>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            ),
+            minWidth: 150,
+            flex: 1,
+            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => {
+                return <span className="capitalize">{p.value || "-"}</span>;
+            },
         },
+        
         {
             field: "grandTotal",
             headerName: "PO Amount",

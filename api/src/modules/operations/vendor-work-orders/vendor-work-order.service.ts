@@ -382,6 +382,7 @@ export class VendorWorkOrderService {
             .select({
                 id: vendorWorkOrders.id,
                 projectId: vendorWorkOrders.projectId,
+                projectName: vendorWorkOrders.projectName,
                 woNumber: vendorWorkOrders.woNumber,
                 sellerName: vendorWorkOrders.sellerName,
                 sellerEmail: vendorWorkOrders.sellerEmail,
@@ -512,6 +513,7 @@ export class VendorWorkOrderService {
             .select({
                 id: vendorWorkOrders.id,
                 projectId: vendorWorkOrders.projectId,
+                projectName: vendorWorkOrders.projectName,
                 woNumber: vendorWorkOrders.woNumber,
                 woDate: vendorWorkOrders.woDate,
                 sellerName: vendorWorkOrders.sellerName,

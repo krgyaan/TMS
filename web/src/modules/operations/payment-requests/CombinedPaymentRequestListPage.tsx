@@ -202,12 +202,23 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <span className="font-mono">{referenceName(p.value)}</span>
+                            <span>{referenceName(p.value)}</span>
                         </TooltipTrigger>
                         <TooltipContent>{p.value}</TooltipContent>
                     </Tooltip>
                 </TooltipProvider>
             ),
+        },
+        {
+            field: "projectName",
+            headerName: "Project Name",
+            sortable: true,
+            filter: true,
+            width: 200,
+            cellRenderer: ({ value }: CustomCellRendererProps<PaymentRequestRow>) => {
+                if (!value) return <span className="text-muted-foreground">Maker Request</span>;
+                return <span className="capitalize">{value}</span>;
+            },
         },
         { 
             field: "partyName", 
@@ -258,9 +269,9 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             headerName: "Mode",
             sortable: true,
             filter: true,
-            width: 120,
+            maxWidth: 80,
             cellRenderer: (p: CustomCellRendererProps<PaymentRequestRow>) => {
-                const mode = p.value.replaceAll('_', ' ').toLowerCase();
+                const mode = p.value == 'BANK_TRANSFER' ? "NEFT" : p.value?.toLowerCase();
                 return <span className="capitalize">{mode}</span>;
             },
         },

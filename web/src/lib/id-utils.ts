@@ -10,13 +10,14 @@ export function getShortId(fullId?: string | null): string {
 export function referenceName(fullId?: string | null): string {
     if (!fullId) return "-";
     const parts = fullId.split("/");
-    const initials = parts[0];
+    const initials = parts[parts.length - 1];
 
-    if (initials == 'VE') {
-        return "Project Payment"
-    } else if (initials == 'MR') {
-        return "Maker Request"
-    } else {
-        return fullId
-    }
+    // if (initials == 'VE') {
+    //     return "Project Payment"
+    // } else if (initials == 'MR') {
+    //     return "Maker Request"
+    // } else {
+    //     return fullId
+    // }
+    return initials || fullId;
 }

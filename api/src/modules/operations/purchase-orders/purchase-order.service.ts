@@ -36,6 +36,7 @@ export class PurchaseOrderService {
                 .select({
                     id: purchaseOrders.id,
                     projectId: purchaseOrders.projectId,
+                    projectName: purchaseOrders.projectName,
                     poNumber: purchaseOrders.poNumber,
                     sellerName: purchaseOrders.sellerName,
                     sellerEmail: purchaseOrders.sellerEmail,
@@ -155,6 +156,7 @@ export class PurchaseOrderService {
                 .select({
                     id: purchaseOrders.id,
                     projectId: purchaseOrders.projectId,
+                    projectName: purchaseOrders.projectName,
                     poNumber: purchaseOrders.poNumber,
                     sellerName: purchaseOrders.sellerName,
                     sellerEmail: purchaseOrders.sellerEmail,
