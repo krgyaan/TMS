@@ -488,7 +488,6 @@ export const paths = {
         onboardingCandidate: (id: number | string) => `/hrms/onboarding/candidate/${id}`,
         profileDetailsDashboard: "/hrms/onboarding/profile-details",
         documentDashboard: "/hrms/onboarding/documents",
-        approvalDashboard: "/hrms/onboarding/approval",
         inductionDashboard: "/hrms/onboarding/induction",
 
         // =========================training =======================//

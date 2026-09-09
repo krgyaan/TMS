@@ -93,6 +93,8 @@ export interface FullProfile {
   designation: string | null;
   department: string | null;
   departmentId: number | null;
+  roleId: number | null;
+  teamId: number | null;
   reportingTl: string | null;
   employeeType: string | null;
   workLocation: string | null;
@@ -127,8 +129,15 @@ export interface UpdateProfileDto {
   designationId?: number;
   departmentId?: number;
   reportingTl?: number;
+  designationRoleId?: number;
+  departmentTeamId?: number;
   salaryType?: string;
   basicSalary?: string;
+  hra?: string;
+  allowances?: string;
+  bonus?: string;
+  pfApplicable?: boolean;
+  esicApplicable?: boolean;
   bankName?: string;
   accountNumber?: string;
   ifscCode?: string;
@@ -230,31 +239,6 @@ export const onboardingService = {
   },
 
   // ─── Stage Specific Methods ───────────────────────────────────────────────────
-
-  getOnboardingList: async (): Promise<OnboardingRequest[]> => {
-    const { data } = await axiosInstance.get("/hrms/onboarding/dashboard");
-    return data;
-  },
-
-  getStageEducation: async (id: number): Promise<any> => {
-    const { data } = await axiosInstance.get(`/hrms/onboarding/${id}/education`);
-    return data;
-  },
-
-  getStageExperience: async (id: number): Promise<any> => {
-    const { data } = await axiosInstance.get(`/hrms/onboarding/${id}/experience`);
-    return data;
-  },
-
-  getStageDocuments: async (id: number): Promise<any> => {
-    const { data } = await axiosInstance.get(`/hrms/onboarding/${id}/documents`);
-    return data;
-  },
-
-  getStageBankDetails: async (id: number): Promise<any> => {
-    const { data } = await axiosInstance.get(`/hrms/onboarding/${id}/bank-details`);
-    return data;
-  },
 
   updateStageEntryStatus: async (
     id: number,
