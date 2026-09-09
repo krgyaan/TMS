@@ -14,8 +14,7 @@ import { paymentRequests, purchaseInvoices, saleInvoiceItems, saleInvoices } fro
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
 import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
-import { inventory } from "@/db/schemas/operations/inventory.schema";
-import { inventoryMovements } from "@/db/schemas/operations/inventory-movements.schema";
+import { materializeApprovalLines } from "@/modules/operations/inventory/inventory.materialize";
 import { woBasicDetails } from "@/db/schemas/operations/work-order.schema";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -527,7 +526,7 @@ export class PurchaseOrderService {
         }
     }
 
-    async setTdsPercentage(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }) {
+    async setTdsPercentage(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }, userId?: number) {
         const po = await this.db
             .select()
             .from(purchaseOrders)
@@ -564,7 +563,13 @@ export class PurchaseOrderService {
                     .returning()
                     .then(rows => rows[0]);
 
-                await this.materializeInventory(tx, po, products);
+                await materializeApprovalLines(tx, {
+                    docType: "po",
+                    projectId: po.projectId,
+                    referenceId: po.id,
+                    lines: products,
+                    createdBy: userId ?? po.poRaisedBy,
+                });
 
                 return updatedPo;
             });
@@ -584,83 +589,6 @@ export class PurchaseOrderService {
 
             this.logger.info(`TDS rejected for PO #${id}: ${remark || 'no remark'}`);
             return updated;
-        }
-    }
-
-    private async materializeInventory(tx: any, po: any, products: any[]) {
-        if (!po.projectId || products.length === 0) return;
-
-        const existing = await tx
-            .select({ id: inventoryMovements.id })
-            .from(inventoryMovements)
-            .where(and(eq(inventoryMovements.movementType, "po_approval"), eq(inventoryMovements.poId, po.id)));
-
-        if (existing.length > 0) return;
-
-        const createdById = po.approvedBy ?? po.createdBy ?? null;
-
-        for (const product of products) {
-            const itemName = product.description ?? "Unnamed item";
-            const hsn = product.hsnSac ?? null;
-            const price = Number(product.rate);
-            const qty = Number(product.qty);
-
-            const existingRow = await tx
-                .select()
-                .from(inventory)
-                .where(
-                    and(
-                        eq(inventory.projectId, po.projectId),
-                        eq(inventory.itemName, itemName),
-                        sql`COALESCE(${inventory.hsn}, '') = COALESCE(${hsn ?? ""}, '')`,
-                        eq(inventory.price, price.toString())
-                    )
-                )
-                .then(rows => rows[0]);
-
-            let inventoryId: number;
-            if (existingRow) {
-                const updatedRows = await tx
-                    .update(inventory)
-                    .set({
-                        qty: (Number(existingRow.qty) + qty).toString(),
-                        remainingQty: (Number(existingRow.remainingQty) + qty).toString(),
-                        updatedAt: new Date(),
-                    })
-                    .where(eq(inventory.id, existingRow.id))
-                    .returning();
-                inventoryId = updatedRows[0].id;
-            } else {
-                const inserted = await tx
-                    .insert(inventory)
-                    .values({
-                        projectId: po.projectId,
-                        itemName,
-                        hsn,
-                        price: price.toString(),
-                        qty: qty.toString(),
-                        remainingQty: qty.toString(),
-                        lineItem: null,
-                        createdBy: createdById,
-                    })
-                    .returning();
-                inventoryId = inserted[0].id;
-            }
-
-            await tx.insert(inventoryMovements).values({
-                inventoryId,
-                projectId: po.projectId,
-                movementType: "po_approval",
-                referenceId: po.id,
-                poId: po.id,
-                fromProjectId: null,
-                toProjectId: null,
-                qty: qty.toString(),
-                price: price.toString(),
-                itemName,
-                hsn,
-                createdBy: createdById,
-            });
         }
     }
 

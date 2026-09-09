@@ -166,8 +166,9 @@ export class PurchaseOrderController {
   setTdsPercentage(
       @Param("id", ParseIntPipe) id: number,
       @Body() body: { approve: boolean; tdsPercentage?: number; remark?: string },
+      @CurrentUser() user: ValidatedUser,
   ) {
-      return this.service.setTdsPercentage(id, body);
+      return this.service.setTdsPercentage(id, body, user?.id);
   }
 
   @Put(":id")
