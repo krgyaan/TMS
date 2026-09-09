@@ -2,21 +2,13 @@
  * Field-mode configuration — single source of truth.
  *
  * Field mode = the app running inside an installed standalone window
- * (see useFieldMode). In field mode the sidebar narrows to the exact
- * items below (each still gated by the user's own permissions) and
- * the route guard allows only these URL prefixes.
+ * (see useFieldMode). In field mode the sidebar flattens to Dashboard +
+ * the five field pages (see FIELD_DASHBOARD_TILES, each gated by the
+ * user's own permissions) and the route guard allows only these URL
+ * prefixes.
  */
 import { BookUser, Mail, PhoneCall, Users, Wallet, type LucideIcon } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-
-/** Sidebar items shown in field mode (exact URLs from app-sidebar navMain). */
-export const FIELD_ITEM_URLS = [
-    "/document-dashboard/client-directory", // Client Directory
-    "/crm/happy-calling", // Happy Calling
-    "/crm/leads", // Leads
-    "/crm/enquiries", // Enquiries
-    "/shared/imprests", // Imprests
-] as const;
 
 /** URL prefixes reachable in field mode (besides "/" and "/profile").
  *  Covers the create/edit/detail/followup sub-pages of each field module. */

@@ -11,7 +11,7 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail } fr
 
 import { useCurrentUser, useLogout } from "@/hooks/api/useAuth";
 import { useFieldMode } from "@/hooks/useFieldMode";
-import { FIELD_ITEM_URLS } from "@/lib/field-mode";
+import { FIELD_DASHBOARD_TILES } from "@/lib/field-mode";
 import { getStoredUser } from "@/lib/auth";
 
 import type { AuthUser } from "@/types/auth.types";
@@ -201,23 +201,29 @@ const navMain: NavGroup[] = [
 /*                            MENU FILTER FUNCTION                             */
 /* -------------------------------------------------------------------------- */
 
-function filterMenu(user: AuthUser | null, menu: NavGroup[], isFieldMode: boolean): NavGroup[] {
+function filterMenu(user: AuthUser | null, menu: NavGroup[]): NavGroup[] {
     return menu
         .map(group => {
             if (group.title === "Dashboard") return group;
             if (!group.items) return group;
 
-            const visibleItems = group.items.filter(item => {
-                if (isFieldMode && !FIELD_ITEM_URLS.includes(item.url as (typeof FIELD_ITEM_URLS)[number])) {
-                    return false;
-                }
-                return !item.permission || canRead(user, item.permission);
-            });
+            const visibleItems = group.items.filter(item => !item.permission || canRead(user, item.permission));
 
             if (visibleItems.length === 0) return null;
             return { ...group, items: visibleItems };
         })
         .filter(Boolean) as NavGroup[];
+}
+
+function buildFieldMenu(user: AuthUser | null): NavGroup[] {
+    return [
+        ...navMain.filter(group => group.title === "Dashboard"),
+        ...FIELD_DASHBOARD_TILES.filter(tile => canRead(user, tile.permission)).map(tile => ({
+            title: tile.title,
+            url: tile.url,
+            icon: tile.icon,
+        })),
+    ];
 }
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
@@ -234,7 +240,10 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
             mobile: null,
         };
 
-    const filteredMenuItems = React.useMemo(() => filterMenu(currentUser, navMain, isFieldMode), [currentUser, isFieldMode]);
+    const filteredMenuItems = React.useMemo(
+        () => (isFieldMode ? buildFieldMenu(currentUser) : filterMenu(currentUser, navMain)),
+        [currentUser, isFieldMode]
+    );
 
     const logoutMutation = useLogout();
 
