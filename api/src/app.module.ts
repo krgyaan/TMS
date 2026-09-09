@@ -116,6 +116,7 @@ import { PaymentRequestModule } from "./modules/operations/payment-requests/paym
 import { ProjectDashboardModule } from "./modules/operations/projects/project-dashboard.module";
 import { PurchaseInvoiceModule } from "./modules/operations/purchase-invoices/purchase-invoice.module";
 import { PurchaseOrderModule } from "./modules/operations/purchase-orders/purchase-order.module";
+import { InventoryModule } from "./modules/operations/inventory/inventory.module";
 import { SaleInvoiceModule } from "./modules/operations/sale-invoices/sale-invoice.module";
 import { VendorWorkOrderModule } from "./modules/operations/vendor-work-orders/vendor-work-order.module";
 import { WoAmendmentsModule } from "./modules/operations/wo-amendments/wo-amendments.module";
@@ -259,6 +260,7 @@ import { WebhookController } from "./webhook/webhook.controller";
         SaleInvoiceModule,
         PurchaseOrderModule,
         PurchaseInvoiceModule,
+        InventoryModule,
         PaymentRequestModule,
         MakerRequestModule,
         EmployeeProfilesModule,
