@@ -40,11 +40,9 @@ async function main() {
         // --- Step 1: Identify duplicate groups ---
         // A group = same beneficiary_name, same ISO week (ISOYEAR+WEEK) of valid_from, same amount.
         // We use a numeric cast on beneficiary_name per the existing schema convention.
-        const groups = await db.execute(sql`
+const groups = await db.execute(sql`
             SELECT
                 v.beneficiary_name,
-                v.id AS voucher_id,
-                v.voucher_code,
                 v.amount,
                 EXTRACT(ISOYEAR FROM v.valid_from)::int AS iy,
                 EXTRACT(WEEK FROM v.valid_from)::int AS wk,
@@ -67,7 +65,7 @@ async function main() {
         // We'll process groups iteratively to avoid huge memory usage
         for (let i = 0; i < totalGroups; i++) {
             const g = groups.rows[i];
-            const { beneficiary_name, voucher_id, voucher_code, amount, iy, wk, group_size } = g;
+            const { beneficiary_name, amount, iy, wk, group_size } = g;
 
             // Find all vouchers in this group
             const vouchersInGroup = await db.execute(sql`
