@@ -8,6 +8,21 @@ export interface InventoryItem {
     remainingQty: number;
 }
 
+export interface InventoryProjectSummary {
+    projectId: number;
+    projectName: string | null;
+    projectCode: string | null;
+    approvedPoCount: number;
+    approvedVwoCount: number;
+    totalItems: number;
+}
+
+export interface InventoryProjectSummaryFilters {
+    page?: number;
+    limit?: number;
+    search?: string;
+}
+
 export interface InventoryTransfer {
     id: number;
     itemId: number;
