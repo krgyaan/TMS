@@ -30,6 +30,14 @@ const markInstalled = () => {
     }
 };
 
+const clearInstalledFlag = () => {
+    try {
+        localStorage.removeItem(INSTALLED_FLAG_KEY);
+    } catch {
+        return;
+    }
+};
+
 const getInstalledRelatedApp = async (): Promise<boolean> => {
     const nav = navigator as Navigator & {
         getInstalledRelatedApps?: () => Promise<Array<{ platform: string; id?: string; url?: string }>>;
@@ -47,15 +55,27 @@ export function useInstallPrompt() {
     const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
     const [isStandalone, setIsStandalone] = useState(getIsStandalone);
     const [relatedAppInstalled, setRelatedAppInstalled] = useState(false);
+    const [relatedAppCheckDone, setRelatedAppCheckDone] = useState(false);
     const [flagInstalled, setFlagInstalled] = useState(getStoredInstalledFlag);
     const isIOS = getIsIOS();
 
-    const isInstalled = isStandalone || flagInstalled || relatedAppInstalled;
+    // Browsers with getInstalledRelatedApps (Chrome/Edge): the browser's own
+    // record is authoritative — it becomes false after uninstall, so the app
+    // can re-show the install button. Until the async check resolves, fall
+    // back to the flag to avoid a flash for installed users. Browsers without
+    // the API (iOS Safari, Firefox) keep using the flag alone.
+    const isInstalled = isStandalone || (relatedAppCheckDone ? relatedAppInstalled : flagInstalled);
 
     useEffect(() => {
         let cancelled = false;
         getInstalledRelatedApp().then(installed => {
-            if (!cancelled) setRelatedAppInstalled(installed);
+            if (cancelled) return;
+            setRelatedAppInstalled(installed);
+            setRelatedAppCheckDone(true);
+            if (!installed && getStoredInstalledFlag()) {
+                clearInstalledFlag();
+                setFlagInstalled(false);
+            }
         });
 
         return () => {
