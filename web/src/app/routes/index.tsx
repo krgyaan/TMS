@@ -8,6 +8,7 @@ import SignUp from "@/modules/auth/sign-up"
 import ForgotPasswordPage from "@/modules/auth/forgot-password";
 import Dashboard from "@/modules/dashboard";
 import { RouteWrapper } from "./components/RouteWrapper";
+import { FieldGate } from "./components/FieldGate";
 import { paths } from "./paths";
 
 // Auth
@@ -66,7 +67,8 @@ export default function AppRoutes() {
 
             {/* ==================== PROTECTED ROUTES ==================== */}
             <Route element={<ProtectedRoute />}>
-                <Route element={<ProfileProvider><DashboardLayout /></ProfileProvider>}>
+                <Route element={<FieldGate />}>
+                    <Route element={<ProfileProvider><DashboardLayout /></ProfileProvider>}>
                     {/* Dashboard */}
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/dashboard" element={<Navigate to="/" replace />} />
@@ -219,6 +221,7 @@ export default function AppRoutes() {
                             </RouteWrapper>
                         }
                     />
+                    </Route>
                 </Route>
             </Route>
 

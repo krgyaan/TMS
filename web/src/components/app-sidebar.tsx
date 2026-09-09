@@ -10,6 +10,8 @@ import { TeamSwitcher } from "@/components/team-switcher";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail } from "@/components/ui/sidebar";
 
 import { useCurrentUser, useLogout } from "@/hooks/api/useAuth";
+import { useFieldMode } from "@/hooks/useFieldMode";
+import { FIELD_DASHBOARD_TILES } from "@/lib/field-mode";
 import { getStoredUser } from "@/lib/auth";
 
 import type { AuthUser } from "@/types/auth.types";
@@ -213,9 +215,21 @@ function filterMenu(user: AuthUser | null, menu: NavGroup[]): NavGroup[] {
         .filter(Boolean) as NavGroup[];
 }
 
+function buildFieldMenu(user: AuthUser | null): NavGroup[] {
+    return [
+        ...navMain.filter(group => group.title === "Dashboard"),
+        ...FIELD_DASHBOARD_TILES.filter(tile => canRead(user, tile.permission)).map(tile => ({
+            title: tile.title,
+            url: tile.url,
+            icon: tile.icon,
+        })),
+    ];
+}
+
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     const { data: currentUser } = useCurrentUser();
     const storedUser = getStoredUser();
+    const isFieldMode = useFieldMode();
 
     const displayUser = currentUser ??
         storedUser ?? {
@@ -226,7 +240,10 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
             mobile: null,
         };
 
-    const filteredMenuItems = React.useMemo(() => filterMenu(currentUser, navMain), [currentUser]);
+    const filteredMenuItems = React.useMemo(
+        () => (isFieldMode ? buildFieldMenu(currentUser) : filterMenu(currentUser, navMain)),
+        [currentUser, isFieldMode]
+    );
 
     const logoutMutation = useLogout();
 

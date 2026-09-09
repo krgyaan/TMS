@@ -23,7 +23,6 @@
         "noUncheckedSideEffectImports": true
     },
     "include": [
-        "vite.config.ts",
-        "vite.pwa.config.ts"
+        "vite.config.ts"
     ]
 }
