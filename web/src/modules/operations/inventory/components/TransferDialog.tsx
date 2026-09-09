@@ -1,26 +1,32 @@
-import { useState } from "react";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
+import { useEffect, useMemo } from "react";
+import { type SubmitHandler, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { Form } from "@/components/ui/form";
+import { FieldWrapper } from "@/components/form/FieldWrapper";
+import { NumberInput } from "@/components/form/NumberInput";
+import SelectField from "@/components/form/SelectField";
 import { useProjectsMaster } from "@/hooks/api/useProjects";
 import { useCreateTransfer } from "@/hooks/api/useInventory";
 import type { InventoryItem } from "../helpers/inventory.types";
 import { ArrowRightLeft } from "lucide-react";
+
+function makeTransferSchema(maxQty: number) {
+    return z.object({
+        toProjectId: z.number().int().positive({ message: "Destination project is required" }),
+        qty: z
+            .number()
+            .positive({ message: "Quantity must be positive" })
+            .refine(v => v <= maxQty, { message: `Quantity cannot exceed remaining (${maxQty})` }),
+        price: z.number().nonnegative({ message: "Unit price cannot be negative" }),
+        remark: z.string().max(500, { message: "Remark too long" }).optional(),
+    });
+}
+
+type TransferFormValues = z.infer<ReturnType<typeof makeTransferSchema>>;
 
 interface TransferDialogProps {
     item: InventoryItem;
@@ -28,40 +34,35 @@ interface TransferDialogProps {
     onOpenChange: (open: boolean) => void;
 }
 
-export const TransferDialog: React.FC<TransferDialogProps> = ({
-    item,
-    open,
-    onOpenChange,
-}) => {
+export const TransferDialog: React.FC<TransferDialogProps> = ({ item, open, onOpenChange }) => {
     const { data: projects } = useProjectsMaster();
     const createTransfer = useCreateTransfer();
-    const [toProjectId, setToProjectId] = useState<string>("");
-    const [qty, setQty] = useState<string>("");
-    const [price, setPrice] = useState<string>(String(item.price));
-    const [remark, setRemark] = useState<string>("");
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!toProjectId || !qty || Number(qty) <= 0) return;
+    const TransferSchema = useMemo(() => makeTransferSchema(item.remainingQty), [item.remainingQty]);
 
+const form = useForm<TransferFormValues>({
+        resolver: zodResolver(TransferSchema),
+        defaultValues: { toProjectId: undefined, qty: undefined, price: item.price, remark: "" },
+    });
+
+    useEffect(() => {
+        if (!open) return;
+        form.reset({ toProjectId: undefined, qty: undefined, price: item.price, remark: "" });
+    }, [open, item, form]);
+
+    const filteredProjects = useMemo(() => projects?.filter(p => p.id !== item.projectId) ?? [], [projects, item.projectId]);
+
+    const onSubmit: SubmitHandler<TransferFormValues> = async values => {
         await createTransfer.mutateAsync({
             itemId: item.id,
             fromProject: item.projectId,
-            toProject: Number(toProjectId),
-            qty: Number(qty),
-            price: Number(price) || undefined,
-            remark: remark || undefined,
+            toProject: values.toProjectId,
+            qty: values.qty,
+            price: values.price || undefined,
+            remark: values.remark || undefined,
         });
-
-        setToProjectId("");
-        setQty("");
-        setRemark("");
         onOpenChange(false);
     };
-
-    const filteredProjects = projects?.filter(
-        (p: { id: number }) => p.id !== item.projectId
-    ) ?? [];
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -72,96 +73,53 @@ export const TransferDialog: React.FC<TransferDialogProps> = ({
                         Transfer Item
                     </DialogTitle>
                     <DialogDescription>
-                        Transfer <strong>{item.itemName}</strong> from this
-                        project to another warehouse.
+                        Transfer <strong>{item.itemName}</strong> from this project to another warehouse.
                     </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="toProject">Transfer To Project</Label>
-                        <Select
-                            value={toProjectId}
-                            onValueChange={setToProjectId}
-                        >
-                            <SelectTrigger id="toProject">
-                                <SelectValue placeholder="Select destination project" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {filteredProjects.map((p) => (
-                                    <SelectItem
-                                        key={p.id}
-                                        value={String(p.id)}
-                                    >
-                                        {p.projectName}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="qty">
-                                Quantity (Max: {item.remainingQty})
-                            </Label>
-                            <Input
-                                id="qty"
-                                type="number"
-                                min="0.01"
-                                max={item.remainingQty}
-                                step="0.01"
-                                value={qty}
-                                onChange={(e) => setQty(e.target.value)}
-                                required
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="price">Unit Price</Label>
-                            <Input
-                                id="price"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={price}
-                                onChange={(e) => setPrice(e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="remark">Remark (optional)</Label>
-                        <Input
-                            id="remark"
-                            value={remark}
-                            onChange={(e) => setRemark(e.target.value)}
-                            placeholder="Reason for transfer"
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <SelectField
+                            control={form.control}
+                            name="toProjectId"
+                            label="Transfer To Project"
+                            options={filteredProjects.map(p => ({ id: String(p.id), name: p.projectName }))}
+                            placeholder="Select destination project"
                         />
-                    </div>
 
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => onOpenChange(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            disabled={
-                                !toProjectId ||
-                                !qty ||
-                                Number(qty) <= 0 ||
-                                createTransfer.isPending
-                            }
-                        >
-                            {createTransfer.isPending
-                                ? "Transferring..."
-                                : "Transfer"}
-                        </Button>
-                    </DialogFooter>
-                </form>
+                        <div className="grid grid-cols-2 gap-4">
+                            <FieldWrapper
+                                control={form.control}
+                                name="qty"
+                                label={`Quantity (Max: ${item.remainingQty})`}
+                            >
+                                {field => <NumberInput value={field.value} onChange={field.onChange} min="0.01" max={item.remainingQty} step="0.01" />}
+                            </FieldWrapper>
+                            <FieldWrapper control={form.control} name="price" label="Unit Price">
+                                {field => <NumberInput value={field.value} onChange={field.onChange} min="0" step="0.01" />}
+                            </FieldWrapper>
+                        </div>
+
+                        <FieldWrapper control={form.control} name="remark" label="Remark (optional)">
+                            {field => (
+                                <Input
+                                    placeholder="Reason for transfer"
+                                    value={field.value ?? ""}
+                                    onChange={field.onChange}
+                                />
+                            )}
+                        </FieldWrapper>
+
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={createTransfer.isPending}>
+                                {createTransfer.isPending ? "Transferring..." : "Transfer"}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
             </DialogContent>
         </Dialog>
     );
