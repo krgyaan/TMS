@@ -664,20 +664,23 @@ export class ImprestAdminService {
         // commits/rolls back, so two racing approvals cannot create duplicates.
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`imprest-voucher|${userId}|${from.getTime()}|${to.getTime()}`})::bigint)`);
 
-        const [existing] = await tx
+        const [existingByWeek] = await tx
             .select()
             .from(employeeImprestVouchers)
             .where(
                 and(
                     eq(employeeImprestVouchers.beneficiaryName, String(userId)),
-                    sql`${employeeImprestVouchers.validFrom}::date = ${from}::date`,
-                    sql`${employeeImprestVouchers.validTo}::date = ${to}::date`
+                    sql`
+                    EXTRACT(ISOYEAR FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(ISOYEAR FROM CAST(${from} AS TIMESTAMP))
+                    AND EXTRACT(WEEK FROM ${employeeImprestVouchers.validFrom}) = EXTRACT(WEEK FROM CAST(${from} AS TIMESTAMP))
+                `,
                 )
             )
+            .orderBy(sql`CASE WHEN TRIM(COALESCE(${employeeImprestVouchers.accountsSignedBy}, '')) <> '' OR TRIM(COALESCE(${employeeImprestVouchers.adminSignedBy}, '')) <> '' THEN 0 ELSE 1 END`)
             .limit(1);
 
-        if (existing) {
-            return existing;
+        if (existingByWeek) {
+            return existingByWeek;
         }
 
         const imprests = await tx
