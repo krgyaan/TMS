@@ -78,7 +78,7 @@ define(['./workbox-caf3a6a6'], (function (workbox) { 'use strict';
    */
   workbox.precacheAndRoute([{
     "url": "/index.html",
-    "revision": "0.5upded64ao"
+    "revision": "0.ej1d8k3g3vo"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
@@ -87,7 +87,7 @@ define(['./workbox-caf3a6a6'], (function (workbox) { 'use strict';
   }));
   workbox.registerRoute(({
     url
-  }) => url.origin === self.location.origin && url.pathname.startsWith("/assets/"), new workbox.CacheFirst({
+  }) => url.pathname.startsWith("/assets/"), new workbox.CacheFirst({
     "cacheName": "tms-assets",
     plugins: [new workbox.ExpirationPlugin({
       maxEntries: 200,
@@ -97,7 +97,7 @@ define(['./workbox-caf3a6a6'], (function (workbox) { 'use strict';
   workbox.registerRoute(({
     url
   }) => url.pathname.startsWith("/api/"), new workbox.NetworkFirst({
-    "cacheName": "tms-api",
+    "cacheName": "tms-api-cache",
     "networkTimeoutSeconds": 10,
     plugins: [new workbox.ExpirationPlugin({
       maxEntries: 100,
@@ -107,10 +107,10 @@ define(['./workbox-caf3a6a6'], (function (workbox) { 'use strict';
   workbox.registerRoute(({
     url
   }) => url.pathname.startsWith("/uploads/"), new workbox.CacheFirst({
-    "cacheName": "tms-uploads",
+    "cacheName": "tms-uploads-cache",
     plugins: [new workbox.ExpirationPlugin({
-      maxEntries: 100,
-      maxAgeSeconds: 2592000
+      maxEntries: 50,
+      maxAgeSeconds: 604800
     })]
   }), 'GET');
 
