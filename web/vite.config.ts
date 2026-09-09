@@ -14,7 +14,7 @@ export default defineConfig(({ command }) => ({
             injectRegister: "auto",
             includeAssets: ["ve_favicon.png", "pwa-icons/*.png"],
             manifest: {
-                name: "TMS Field App",
+                name: "TMS App",
                 short_name: "TMS",
                 description: "Tender Management System",
                 theme_color: "#ffffff",

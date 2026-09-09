@@ -3,8 +3,11 @@ import {
     Bell,
     ChevronsUpDown,
     LogOut,
+    Smartphone,
     User,
 } from "lucide-react";
+import { toast } from "sonner";
+import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 
 import {
     Avatar,
@@ -64,13 +67,30 @@ type NavUserProps = {
 export function NavUser({ user, onLogout }: NavUserProps) {
     const navigate = useNavigate();
     const { isMobile } = useSidebar();
+    const { canInstall, isStandalone, isIOS, promptInstall } = useInstallPrompt();
 
     const handleLogout = useCallback(() => {
         onLogout?.();
     }, [onLogout]);
 
+    const handleInstall = useCallback(async () => {
+        if (canInstall) {
+            await promptInstall();
+            return;
+        }
+        if (isIOS) {
+            toast.info("Install the TMS App", {
+                description: "Tap the Share button in Safari, then choose \u201cAdd to Home Screen\u201d.",
+            });
+            return;
+        }
+        toast.info("Install the TMS App", {
+            description: "Use the install icon in your browser's address bar to install the app.",
+        });
+    }, [canInstall, isIOS, promptInstall]);
+
     const initials = getInitials(user?.name) || getInitials(user?.email);
-    const avatarUrl = user?.profile?.profilePhoto || user?.profile?.googlePhoto || null;
+    const avatarUrl = user?.profile?.profilePhoto || user?.profile?.googlePhoto || undefined;
 
     return (
         <SidebarMenu>
@@ -129,6 +149,14 @@ export function NavUser({ user, onLogout }: NavUserProps) {
                                 Profile
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
+                        {!isStandalone && (canInstall || isIOS) && (
+                            <DropdownMenuGroup>
+                                <DropdownMenuItem className="cursor-pointer" onClick={handleInstall}>
+                                    <Smartphone />
+                                    Install TMS App
+                                </DropdownMenuItem>
+                            </DropdownMenuGroup>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="cursor-pointer" variant="destructive" onClick={handleLogout}>
                             <LogOut />
