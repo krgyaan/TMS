@@ -1,5 +1,5 @@
 import { type Control, type FieldPath, type FieldValues } from 'react-hook-form';
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useContext } from 'react';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Badge } from '@/components/ui/badge';
 import { Check, ChevronsUpDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AiIndicatorsContext, AiFieldIndicator } from './AiIndicatorsContext';
 
 interface MultiSelectFieldProps<
     TFieldValues extends FieldValues,
@@ -14,7 +15,7 @@ interface MultiSelectFieldProps<
 > {
     control: Control<TFieldValues>;
     name: TName;
-    label: string;
+    label: React.ReactNode;
     options: { value: string; label: string }[];
     placeholder?: string;
     className?: string;
@@ -53,6 +54,9 @@ export function MultiSelectField<
         return () => window.removeEventListener('resize', updateWidth);
     }, []);
 
+    const indicators = useContext(AiIndicatorsContext);
+    const indicator = indicators?.[name as string];
+
     return (
         <FormField
             control={control}
@@ -72,7 +76,10 @@ export function MultiSelectField<
 
                 return (
                     <FormItem className={className}>
-                        <FormLabel>{label}</FormLabel>
+                        <FormLabel className="inline-flex items-center flex-wrap">
+                            {label}
+                            {indicator && <AiFieldIndicator indicator={indicator} />}
+                        </FormLabel>
 
                         <Popover>
                             <PopoverTrigger asChild>

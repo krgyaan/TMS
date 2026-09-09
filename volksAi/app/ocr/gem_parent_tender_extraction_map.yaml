@@ -1,0 +1,321 @@
+# =============================================================================
+# GeM Parent Tender PDF — Stage 1 Extraction Map
+# =============================================================================
+# Purpose: Extract everything reliably available from the PARENT bid document
+# (the auto-generated "बिड दस्तावेज़ / Bid Document") BEFORE touching the
+# buyer-uploaded ATC PDF. ATC-only fields (eligibility years, LD%, financial
+# thresholds, client contact, tender value) are intentionally NOT mapped here
+# — route those to a separate Stage 2 (ATC) extraction pass.
+#
+# Structure notes for the parser:
+# - This document is a bilingual (Hindi/English) label-value table generated
+#   by the GeM portal. Every field appears as "हिन्दी लेबल/English Label"
+#   followed by its value in the adjacent cell — this format is consistent
+#   across ALL GeM bids, so anchor on the ENGLISH half of the label with a
+#   fuzzy/substring match (OCR and PDF-text extraction can mangle Hindi glyphs
+#   but the English label is stable).
+# - "multi_instance: true" means the field repeats once per Schedule and must
+#   be collected into a list/dict keyed by schedule_number, not overwritten.
+# - "source" tags every field so downstream storage/UI can show provenance
+#   instead of a bare NA (which today can mean "not present in this tender"
+#   OR "not yet extracted" OR "lives in ATC" — those are different things).
+# =============================================================================
+
+document_type: gem_parent_tender_bid_document
+source: parent_pdf
+
+fields:
+
+  # ---------------------------------------------------------------------
+  # Basic Information
+  # ---------------------------------------------------------------------
+  tender_id:
+    anchor_labels: ["Bid Number"]
+    pattern: 'Bid Number[/:]?\s*(GEM/[A-Z0-9/]+)'
+    multi_instance: false
+    notes: "Also appears in header top-right of page 1."
+
+  bid_published_date:
+    anchor_labels: ["Dated"]
+    pattern: 'Dated:?\s*(\d{2}-\d{2}-\d{4})'
+
+  organization_name:
+    anchor_labels: ["Organisation Name"]
+
+  department_name:
+    anchor_labels: ["Department Name"]
+
+  ministry_state_name:
+    anchor_labels: ["Ministry/State Name"]
+
+  office_name:
+    anchor_labels: ["Office Name"]
+    notes: "Useful seed for courier address — combine with Beneficiary block below."
+
+  item_category:
+    anchor_labels: ["Item Category", "Primary product category"]
+
+  total_quantity:
+    anchor_labels: ["Total Quantity"]
+    type: integer
+
+  # ---------------------------------------------------------------------
+  # Bid Timeline
+  # ---------------------------------------------------------------------
+  bid_end_datetime:
+    anchor_labels: ["Bid End Date/Time"]
+    pattern: '(\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}:\d{2})'
+
+  bid_opening_datetime:
+    anchor_labels: ["Bid Opening Date/Time"]
+    pattern: '(\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}:\d{2})'
+
+  bid_validity_days:
+    anchor_labels: ["Bid Offer Validity"]
+    pattern: '(\d+)\s*\(Days\)'
+    type: integer
+
+  auto_extension_days:
+    anchor_labels: ["Number of days for which Bid would be auto-extended"]
+    type: integer
+
+  auto_extension_max_count:
+    anchor_labels: ["Number of Auto Extension count"]
+    type: integer
+
+  min_bids_to_disable_auto_extension:
+    anchor_labels: ["Minimum number of bids required to disable automatic bid extension"]
+    type: integer
+
+  # ---------------------------------------------------------------------
+  # Pre-Bid Meeting
+  # ---------------------------------------------------------------------
+  pre_bid_meeting:
+    anchor_labels: ["Pre-Bid Date and Time", "Pre-Bid Venue"]
+    fields:
+      datetime: 'pattern: (\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}:\d{2})'
+      platform: "e.g. Microsoft Teams meeting"
+      join_url: 'pattern: (https?://\S+)'
+      meeting_id: 'pattern: Meeting ID:\s*([\d\s]+)'
+      passcode: 'pattern: Passcode:\s*(\S+)'
+
+  # ---------------------------------------------------------------------
+  # EMD — MULTI-SCHEDULE, must aggregate not overwrite
+  # ---------------------------------------------------------------------
+  emd_by_schedule:
+    anchor_labels: ["Schedule 1 EMD Amount", "Schedule 2 EMD Amount", "Schedule {n} EMD Amount (In INR)"]
+    multi_instance: true
+    key: schedule_number
+    value_type: number
+    notes: >
+      Iterate ALL "Schedule N EMD Amount" rows (N can exceed 2). Store as
+      {1: 43000, 2: 7000, ...}. This was the main bug found in the current
+      pipeline — only Schedule 1 was captured.
+
+  emd_total:
+    derived: true
+    formula: "sum(emd_by_schedule.values())"
+    notes: "Compute, don't extract directly — no single 'total EMD' label exists in the doc."
+
+  emd_required:
+    derived: true
+    formula: "true if any(emd_by_schedule.values()) > 0 else false"
+    notes: >
+      No explicit Yes/No label for this exists in the parent doc; infer from
+      presence of non-zero EMD amounts. Exemption eligibility text is
+      boilerplate GTC language, not schedule-specific — don't treat as No.
+
+  emd_advisory_bank:
+    anchor_labels: ["Advisory Bank"]
+    notes: "Appears once under 'EMD Detail' block — same bank usually reused for ePBG."
+
+  # ---------------------------------------------------------------------
+  # ePBG
+  # ---------------------------------------------------------------------
+  pbg_percentage:
+    anchor_labels: ["ePBG Percentage(%)"]
+    type: float
+
+  pbg_duration_months:
+    anchor_labels: ["Duration of ePBG required (Months)"]
+    type: integer
+
+  pbg_advisory_bank:
+    anchor_labels: ["Advisory Bank"]
+    notes: "Second occurrence, under 'ePBG Detail' block — disambiguate by preceding section header."
+
+  # ---------------------------------------------------------------------
+  # Beneficiary / Courier seed (partial — pincode/floor usually only in ATC)
+  # ---------------------------------------------------------------------
+  beneficiary_name:
+    anchor_labels: ["Beneficiary"]
+    notes: "e.g. 'GAIL (INDIA) LIMITED / GAIL RANCHI' — pairs with office_name for a partial courier address."
+
+  # ---------------------------------------------------------------------
+  # Evaluation & Preference Policies
+  # ---------------------------------------------------------------------
+  evaluation_method:
+    anchor_labels: ["Evaluation Method"]
+
+  reverse_auction_enabled:
+    anchor_labels: ["Bid to RA enabled"]
+    type: boolean
+
+  bid_type:
+    anchor_labels: ["Type of Bid"]
+    notes: "e.g. 'Two Packet Bid'"
+
+  inspection_required:
+    anchor_labels: ["Inspection Required"]
+    type: boolean
+
+  arbitration_clause:
+    anchor_labels: ["Arbitration Clause"]
+    type: boolean
+
+  mediation_clause:
+    anchor_labels: ["Mediation Clause"]
+    type: boolean
+
+  mse_relaxation_experience_turnover:
+    anchor_labels: ["MSE Relaxation for Years of Experience and Turnover"]
+    type: boolean
+
+  startup_relaxation_experience_turnover:
+    anchor_labels: ["Startup Relaxation for Years Of Experience and Turnover"]
+    notes: "Value often 'Yes | Complete' or 'Yes | Partial' — keep as string, don't collapse to boolean."
+
+  mse_purchase_preference:
+    anchor_labels: ["MSE Purchase Preference"]
+    type: boolean
+
+  mse_preference_price_band_percent:
+    anchor_labels: ["Purchase Preference to MSE OEMs available upto price within L1+X%"]
+    type: float
+
+  mse_preference_max_qty_percent:
+    anchor_labels: ["Maximum Percentage of Bid quantity for MSE purchase preference"]
+    type: float
+
+  mii_purchase_preference:
+    anchor_labels: ["MII Purchase Preference"]
+    type: boolean
+
+  mii_non_applicability_reason:
+    anchor_labels: ["Brief Description of the Approval Granted by Competent Authority"]
+    notes: "Only present when MII = No; explains why (e.g. value below MII threshold)."
+
+  # ---------------------------------------------------------------------
+  # Required Documents (checklist — currently left manual in template)
+  # ---------------------------------------------------------------------
+  required_documents:
+    anchor_labels: ["Document required from seller"]
+    type: list
+    split_on: ","
+    notes: >
+      Split the comma-separated value into a checklist array, e.g.
+      ["Experience Criteria", "Certificate (Requested in ATC)",
+      "Additional Doc 1 (Requested in ATC)", ..., "Compliance of BoQ
+      specification and supporting document"]. Flag items containing
+      "(Requested in ATC)" separately — they signal the actual document
+      NAME/spec still needs Stage 2 parsing.
+
+  # ---------------------------------------------------------------------
+  # Per-Schedule Item & Consignee Detail — MULTI-SCHEDULE
+  # ---------------------------------------------------------------------
+  schedules:
+    multi_instance: true
+    key: schedule_number
+    fields:
+      item_description:
+        anchor_labels: ["Stationary Valve Regulated..."]
+        notes: "Section header per schedule names the item + pack quantity, e.g. '(445 pieces)'."
+      quantity:
+        anchor_labels: ["Quantity", "मात्रा"]
+        type: integer
+      technical_specs:
+        anchor_labels: ["Nominal Battery Voltage", "Battery Capacity at 10-h Rate [C 10]"]
+        notes: "Key spec params differ per schedule (e.g. 65Ah vs 100Ah) — capture per-schedule, not global."
+      consignee_name:
+        anchor_labels: ["Consignee Reporting/Officer"]
+      consignee_address:
+        anchor_labels: ["Address", "पता"]
+      delivery_days:
+        anchor_labels: ["Delivery Days"]
+        type: integer
+
+  # ---------------------------------------------------------------------
+  # Buyer-Added Bid-Specific ATC — DO NOT deep-parse here (Stage 2 territory)
+  # ---------------------------------------------------------------------
+  atc_document_link_present:
+    anchor_labels: ["Buyer uploaded ATC document"]
+    type: boolean
+    notes: >
+      Just detect presence + capture the "Click here to view the file" link
+      target if extractable. The clause TEXT itself (option clause, zero
+      deviation, doc-stamping requirements, etc.) should be parsed in Stage 2
+      against the actual ATC PDF, not this summary page.
+
+  land_border_clause_present:
+    anchor_labels: ["Restrictions on procurement from a bidder of a country which shares a land border with India"]
+    type: boolean
+    notes: "Standard GeM GTC clause 26 — boilerplate, present on virtually every bid; low extraction priority."
+
+  pbg_required:
+    derived: true
+    rule: "true if pbg_percentage_value > 0 else false"
+
+  buyer_added_text_atc_clauses:
+    extraction_type: layout_region
+    region_type: "list"
+    anchor_heading:
+      - "Buyer Added Bid Specific Terms and Conditions"
+      - "Buyer Added text based ATC clauses"
+    pattern: numbered_list
+
+
+# =============================================================================
+# Fields deliberately OUT OF SCOPE for Stage 1 (parent PDF does not contain
+# these — confirmed by direct comparison against GAIL_Ranchi_SMF__1_.pdf).
+# Route to Stage 2 (ATC PDF) or Stage 3 (GeM portal bid-summary page / manual).
+#
+# NOTE TO FUTURE ENGINEERS: These fields are intentionally deferred to Stage 2
+# parsing (against the ATC PDF document) or manual entry because they are not
+# part of the auto-generated GeM parent bid document. Do not attempt to add
+# extraction patterns for them in Stage 1.
+# =============================================================================
+out_of_scope_stage1:
+  - field: tender_value_gst_inclusive
+    likely_source: gem_portal_bid_summary_page
+  - field: eligibility_criterion_years
+    likely_source: atc_pdf
+  - field: annual_avg_turnover_value
+    likely_source: atc_pdf
+  - field: working_capital_value
+    likely_source: atc_pdf
+  - field: net_worth_type_value
+    likely_source: atc_pdf
+  - field: solvency_certificate_value
+    likely_source: atc_pdf
+  - field: ld_applicable
+    likely_source: atc_pdf
+  - field: ld_percentage_per_week
+    likely_source: atc_pdf
+  - field: max_ld_percentage
+    likely_source: atc_pdf
+  - field: payment_terms_supply_percent
+    likely_source: atc_pdf
+  - field: payment_terms_installation_percent
+    likely_source: atc_pdf
+  - field: maf_required
+    likely_source: atc_pdf
+  - field: client_contact_person
+    likely_source: atc_pdf
+    notes: "Parent PDF only has the schedule-level Consignee/Reporting Officer, which may differ from the buyer's actual nodal contact in the ATC."
+  - field: full_courier_address_with_pincode
+    likely_source: atc_pdf_or_manual
+  - field: tender_fee_amount
+    likely_source: gem_portal_or_default
+    notes: "GeM bids generally levy no tender fee per standard GTC; consider defaulting to 0 rather than leaving NA, but flag as inferred not extracted."
+  - field: processing_fee_amount
+    likely_source: manual

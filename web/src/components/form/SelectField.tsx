@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { FieldWrapper } from "./FieldWrapper";
+import { AiIndicatorsContext, type FieldIndicator } from "./AiIndicatorsContext";
+import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type SelectOption = { id: string; name: string; description?: string };
@@ -27,6 +29,8 @@ export function SelectField<TFieldValues extends FieldValues, TName extends Fiel
     disabled,
     valueType = 'auto',
 }: SelectFieldProps<TFieldValues, TName>) {
+    const indicators = React.useContext(AiIndicatorsContext);
+    const indicator = indicators?.[name as string];
     const normalizedOptions = React.useMemo<SelectOption[]>(() => (options || []).map(option => ("id" in option ? option : { id: option.value, name: option.label })), [options]);
 
     return (
@@ -60,6 +64,7 @@ export function SelectField<TFieldValues extends FieldValues, TName extends Fiel
                     options={normalizedOptions}
                     placeholder={placeholder}
                     disabled={disabled}
+                    aiIndicator={indicator}
                 />
             )}
         </FieldWrapper>
@@ -72,12 +77,14 @@ export function Combobox({
     options,
     placeholder,
     disabled,
+    aiIndicator,
 }: {
     value: string;
     onChange: (v: string) => void;
     options: SelectOption[];
     placeholder: string;
     disabled?: boolean;
+    aiIndicator?: FieldIndicator | null;
 }) {
     const [open, setOpen] = React.useState(false);
     const [query, setQuery] = React.useState("");
@@ -133,6 +140,14 @@ export function Combobox({
                     {filtered.map(o => {
                         const isSelected = value === o.id;
                         const isCreateNew = o.id === "__create_new__";
+                        const isAiSuggested = Boolean(
+                            aiIndicator &&
+                            aiIndicator.suggestedValue !== undefined &&
+                            aiIndicator.suggestedValue !== null &&
+                            (String(o.id).trim().toLowerCase() === String(aiIndicator.suggestedValue).trim().toLowerCase() ||
+                             String(o.name).trim().toLowerCase() === String(aiIndicator.suggestedValue).trim().toLowerCase())
+                        );
+
                         return (
                             <DropdownMenuItem
                                 key={`${o.id}-${o.name}`}
@@ -142,24 +157,41 @@ export function Combobox({
                                     setOpen(false);
                                     setQuery("");
                                 }}
-                                className={cn("flex items-center gap-2", isCreateNew && "text-primary font-semibold")}
+                                className={cn("flex items-center justify-between gap-2", isCreateNew && "text-primary font-semibold")}
                             >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                    className={cn("mr-1 h-4 w-4", isSelected ? "opacity-100" : "opacity-0")}
-                                >
-                                    <path
-                                        fillRule="evenodd"
-                                        d="M16.707 5.293a1 1 0 010 1.414l-7.778 7.778a1 1 0 01-1.414 0L3.293 10.95a1 1 0 011.414-1.414l3.394 3.394 7.071-7.071a1 1 0 011.414 0z"
-                                        clipRule="evenodd"
-                                    />
-                                </svg>
-                                <div className="flex flex-col">
-                                    <span>{o.name}</span>
-                                    {o.description && <span className="text-xs text-muted-foreground">{o.description}</span>}
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        viewBox="0 0 20 20"
+                                        fill="currentColor"
+                                        className={cn("mr-1 h-4 w-4 shrink-0", isSelected ? "opacity-100" : "opacity-0")}
+                                    >
+                                        <path
+                                            fillRule="evenodd"
+                                            d="M16.707 5.293a1 1 0 010 1.414l-7.778 7.778a1 1 0 01-1.414 0L3.293 10.95a1 1 0 011.414-1.414l3.394 3.394 7.071-7.071a1 1 0 011.414 0z"
+                                            clipRule="evenodd"
+                                        />
+                                    </svg>
+                                    <div className="flex flex-col truncate">
+                                        <span className="truncate">{o.name}</span>
+                                        {o.description && <span className="text-xs text-muted-foreground truncate">{o.description}</span>}
+                                    </div>
                                 </div>
+
+                                {isAiSuggested && (
+                                    <span
+                                        className={cn(
+                                            "shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium select-none shadow-2xs",
+                                            aiIndicator?.type === "high"
+                                                ? "bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700"
+                                                : "bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700"
+                                        )}
+                                        title={aiIndicator?.message}
+                                    >
+                                        <Sparkles className="h-2.5 w-2.5" />
+                                        <span>AI Suggested {aiIndicator?.confidenceValue ? `(${aiIndicator.confidenceValue})` : ""}</span>
+                                    </span>
+                                )}
                             </DropdownMenuItem>
                         );
                     })}

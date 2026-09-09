@@ -6,6 +6,7 @@ import dbConfig, { validateDbEnv } from "@/config/db.config";
 import googleConfig, { validateGoogleEnv } from "@/config/google.config";
 import openwaConfig, { validateOpenwaEnv } from "@/config/openwa.config";
 import redisConfig, { validateRedisEnv } from "@/config/redis.config";
+import volksAiConfig, { validateVolksAiEnv } from "@/config/volks-ai.config";
 import { DatabaseModule } from "@/db/database.module";
 import { LoggerModule } from "@/logger/logger.module";
 import { MailerModule } from "@/mailer/mailer.module";
@@ -150,7 +151,7 @@ import { WebhookController } from "./webhook/webhook.controller";
         ConfigModule.forRoot({
             isGlobal: true,
             expandVariables: true,
-            load: [appConfig, dbConfig, googleConfig, authConfig, redisConfig, openwaConfig],
+            load: [appConfig, dbConfig, googleConfig, authConfig, redisConfig, openwaConfig, volksAiConfig],
             validate: env => ({
                 ...validateAppEnv(env),
                 ...validateDbEnv(env),
@@ -158,6 +159,7 @@ import { WebhookController } from "./webhook/webhook.controller";
                 ...validateAuthEnv(env),
                 ...validateRedisEnv(env),
                 ...validateOpenwaEnv(env),
+                ...validateVolksAiEnv(env),
             }),
         }),
         LoggerModule,
