@@ -5,7 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
     plugins: [
         react(),
         tailwindcss(),
@@ -47,9 +47,11 @@ export default defineConfig({
                 ],
             },
             workbox: {
-                // Lean precache: only the shell. Route chunks are cached
-                // at runtime as users visit them (CacheFirst for hashed assets).
-                globPatterns: ["index.html", "manifest.webmanifest"],
+                // Lean precache: only the shell, and only for production
+                // builds. Route chunks are cached at runtime as users visit
+                // them (CacheFirst for hashed assets). Empty in dev — the
+                // dev service worker has nothing to precache.
+                globPatterns: command === "build" ? ["index.html", "manifest.webmanifest"] : [],
                 navigateFallback: "/index.html",
                 navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//],
                 runtimeCaching: [
@@ -106,4 +108,4 @@ export default defineConfig({
             },
         },
     },
-});
+}));
