@@ -477,6 +477,13 @@
                         "when":  1788400000000,
                         "tag":  "0133_add_insurance_required_to_projects",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  92,
+                        "version":  "7",
+                        "when":  1788520000000,
+                        "tag":  "0134_create_inventory_tables",
+                        "breakpoints":  true
                     }
                 ]
 }
