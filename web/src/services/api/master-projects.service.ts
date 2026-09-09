@@ -4,6 +4,7 @@ import api from "@/lib/axios";
 export interface ProjectMaster {
     id: number;
     projectName: string;
+    projectCode: string;
     // add other fields from your DB schema
 }
 

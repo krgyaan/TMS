@@ -66,7 +66,7 @@ export const TransferDialog: React.FC<TransferDialogProps> = ({ item, open, onOp
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[480px]">
+            <DialogContent className="sm:max-w-[480px] md:max-w-[600px] lg:max-w-[700px]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <ArrowRightLeft className="h-5 w-5" />
@@ -83,7 +83,7 @@ export const TransferDialog: React.FC<TransferDialogProps> = ({ item, open, onOp
                             control={form.control}
                             name="toProjectId"
                             label="Transfer To Project"
-                            options={filteredProjects.map(p => ({ id: String(p.id), name: p.projectName }))}
+                            options={filteredProjects.map(p => ({ id: String(p.id), name: `${p.projectName} (${p.projectCode})` }))}
                             placeholder="Select destination project"
                         />
 
