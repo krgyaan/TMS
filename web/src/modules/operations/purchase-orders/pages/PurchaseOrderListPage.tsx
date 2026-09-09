@@ -152,30 +152,15 @@ const PurchaseOrderListPage: React.FC<PurchaseOrderListPageProps> = ({
             ),
         },
         {
-            field: "shipToName",
-            headerName: "Shipping",
+            field: "projectName",
+            headerName: "Project Name",
             sortable: true,
             filter: true,
-            getQuickFilterText: (params) => {
-                const d = params.data;
-                return `${d.shipToName} ${d.shippingAddress || ""} ${d.shipToGst || ""} ${d.shipToPan || ""}`;
+            minWidth: 150,
+            flex: 1,
+            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => {
+                return <span className="capitalize">{p.value || "-"}</span>;
             },
-            cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => (
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span className="truncate block max-w-[200px]">{p.value || "-"}</span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" align="start" className="max-w-xs">
-                            <div className="space-y-1 text-xs">
-                                <p><strong>Address:</strong> {p.data?.shippingAddress || "—"}</p>
-                                <p><strong>GST:</strong> {p.data?.shipToGst || "—"}</p>
-                                <p><strong>PAN:</strong> {p.data?.shipToPan || "—"}</p>
-                            </div>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            ),
         },
         {
             field: "grandTotal",

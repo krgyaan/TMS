@@ -6,6 +6,7 @@ export interface TermRow {
 export interface VendorWorkOrderRow {
     id: number;
     projectId: number;
+    projectName?: string;
     woNumber: string;
     category?: string;
     sellerName: string;

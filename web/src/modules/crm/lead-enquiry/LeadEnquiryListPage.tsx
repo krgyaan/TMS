@@ -10,6 +10,7 @@ import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
 import { Plus, Search, Pencil, Eye, XCircle, MapPin, FileText, MessageCircle } from "lucide-react";
 import { paths } from "@/app/routes/paths";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLeadEnquiries, useUpdateLeadEnquiry, useCreateSiteVisit, useUpdateSiteVisitDetails, useCreateSiteVisitContacts } from "@/hooks/api/useLeadEnquiry";
 import { LeadEnquiryRejectModal } from "./components/LeadEnquiryRejectModal";
 import { LeadEnquirySiteVisitModal } from "./components/LeadEnquirySiteVisitModal";
@@ -49,6 +50,7 @@ const mapTeamForBackend = (frontendTeam: string): string => {
 
 const EnquiryListPage = () => {
     const navigate = useNavigate();
+    const { canCreate, canUpdate, canDelete } = useAuth();
     const updateEnquiry = useUpdateLeadEnquiry();
     const createSiteVisit = useCreateSiteVisit();
     const updateSiteVisitDetails = useUpdateSiteVisitDetails();
@@ -191,12 +193,13 @@ const EnquiryListPage = () => {
                 navigate(paths.tendering.infoSheetCreate(row.tenderId));
             },
             icon: <FileText className="h-4 w-4" />,
+            visible: () => canUpdate("crm.enquiries"),
         },
         {
             label: "Quotation Followup",
             onClick: (row) => navigate(paths.crm.enquiryQuotationFollowup(row.id)),
             icon: <MessageCircle className="h-4 w-4" />,
-            visible: (row) => row.tenderStatusId === 17,
+            visible: (row) => row.tenderStatusId === 17 && canUpdate("crm.enquiries"),
         },
         {
             label: "View",
@@ -207,17 +210,19 @@ const EnquiryListPage = () => {
             label: "Edit",
             onClick: (row) => navigate(paths.crm.enquiryEdit(row.id)),
             icon: <Pencil className="h-4 w-4" />,
+            visible: () => canUpdate("crm.enquiries"),
         },
         {
             label: "Reject Enquiry",
             className: "text-red-600",
             onClick: (row) => setRejectModal({ open: true, enquiryId: row.id, enquiryName: row.enqName }),
             icon: <XCircle className="h-4 w-4 text-red-600" />,
+            visible: () => canDelete("crm.enquiries"),
         },
         {
             label: "Allocate Site Visit",
             icon: <MapPin className="h-4 w-4" />,
-            visible: (row) => row.siteVisitRequired === true && !row.hasSiteVisit,
+            visible: (row) => row.siteVisitRequired === true && !row.hasSiteVisit && canUpdate("crm.enquiries"),
             onClick: (row) => setSiteVisitModal({ open: true, enquiryId: row.id, enquiryName: row.enqName }),
         },
         {
@@ -359,12 +364,14 @@ const EnquiryListPage = () => {
 
                     {/* Right: Add Enquiry button */}
                     <div className="flex justify-end flex-1">
-                        <Button
-                            onClick={() => navigate(paths.crm.enquiryCreate)}
-                            className="flex items-center gap-2"
-                        >
-                            <Plus className="h-4 w-4" /> Add Enquiry
-                        </Button>
+                        {canCreate("crm.enquiries") && (
+                            <Button
+                                onClick={() => navigate(paths.crm.enquiryCreate)}
+                                className="flex items-center gap-2"
+                            >
+                                <Plus className="h-4 w-4" /> Add Enquiry
+                            </Button>
+                        )}
                     </div>
                 </div>
             </CardHeader>

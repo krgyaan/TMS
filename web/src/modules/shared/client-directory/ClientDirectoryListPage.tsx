@@ -25,9 +25,11 @@ import { ClientDirectoryModal } from '@/modules/shared/client-directory/componen
 import { ClientDirectoryViewModal } from '@/modules/shared/client-directory/components/ClientDirectoryViewModal';
 import { ConfirmDeleteModal } from '@/components/ui/ConfirmDeleteModal';
 import { paths } from '@/app/routes/paths';
+import { useAuth } from '@/contexts/AuthContext';
 
 const ClientDirectoryListPage = () => {
     const navigate = useNavigate();
+    const { canCreate, canUpdate, canDelete } = useAuth();
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState('');
@@ -89,19 +91,22 @@ const ClientDirectoryListPage = () => {
                 label: 'Edit',
                 onClick: (row) => setModalState({ open: true, recordId: row.id }),
                 icon: <Edit className="h-4 w-4" />,
+                visible: () => canUpdate('shared.client-directory'),
             },
             {
                 label: 'Happy Calling',
                 onClick: (row) => navigate(paths.crm.happyCallingCreate(row.id)),
                 icon: <PhoneCall className="h-4 w-4" />,
+                visible: () => canCreate('crm.happy_calling'),
             },
             {
                 label: 'Delete',
                 onClick: (row) => setDeleteState({ open: true, record: row }),
                 icon: <Trash2 className="h-4 w-4 text-red-500" />,
+                visible: () => canDelete('shared.client-directory'),
             },
         ],
-        [navigate, setDeleteState],
+        [navigate, setDeleteState, canUpdate, canCreate, canDelete],
     );
 
     const colDefs = useMemo<ColDef<ClientDirectoryRow>[]>(
@@ -319,22 +324,26 @@ const ClientDirectoryListPage = () => {
                                 View and manage client contacts from across the system
                             </CardDescription>
                         </div>
-                        <Button onClick={() => setModalState({ open: true, recordId: null })}>
-                            <Plus className="mr-2 h-4 w-4" /> Add Contact
-                        </Button>
+                        {canCreate('shared.client-directory') && (
+                            <Button onClick={() => setModalState({ open: true, recordId: null })}>
+                                <Plus className="mr-2 h-4 w-4" /> Add Contact
+                            </Button>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">
                     <div className="flex justify-between items-center gap-4 px-6 pb-4">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => syncMutation.mutate()}
-                            disabled={syncMutation.isPending}
-                        >
-                            <RefreshCw className={`mr-2 h-4 w-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-                            {syncMutation.isPending ? 'Syncing...' : 'Sync All Contacts'}
-                        </Button>
+                        {canUpdate('shared.client-directory') && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => syncMutation.mutate()}
+                                disabled={syncMutation.isPending}
+                            >
+                                <RefreshCw className={`mr-2 h-4 w-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                                {syncMutation.isPending ? 'Syncing...' : 'Sync All Contacts'}
+                            </Button>
+                        )}
                         <div className="relative flex-1 max-w-sm">
                             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input

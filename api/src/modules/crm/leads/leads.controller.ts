@@ -25,13 +25,19 @@ import type {
     DeleteLeadDto,
 } from './dto/lead.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import { UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '@/modules/auth/guards/permission.guard';
+import { CanRead, CanCreate, CanUpdate, CanDelete } from '@/modules/auth/decorators/permissions.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
+@UseGuards(JwtAuthGuard, PermissionGuard)
 @Controller('leads')
 export class LeadsController {
     constructor(private readonly leadsService: LeadsService) {}
 
     @Get()
+    @CanRead('crm.leads')
     async list(
         @Query('page')      page?:      string,
         @Query('limit')     limit?:     string,
@@ -61,11 +67,13 @@ export class LeadsController {
     }
 
     @Get(':id')
+    @CanRead('crm.leads')
     async getById(@Param('id', ParseIntPipe) id: number) {
         return this.leadsService.findById(id);
     }
 
     @Post()
+    @CanCreate('crm.leads')
     @HttpCode(HttpStatus.CREATED)
     async create(
         @ValidatedBody(CreateLeadSchema) body: CreateLeadDto,
@@ -75,6 +83,7 @@ export class LeadsController {
     }
 
     @Patch(':id')
+    @CanUpdate('crm.leads')
     async update(
         @Param('id', ParseIntPipe) id: number,
         @ValidatedBody(UpdateLeadSchema) body: UpdateLeadDto,
@@ -83,6 +92,7 @@ export class LeadsController {
     }
 
     @Patch(':id/allocate')
+    @CanUpdate('crm.leads')
     async allocate(
         @Param('id', ParseIntPipe) id: number,
         @ValidatedBody(AllocateLeadSchema) body: AllocateLeadDto,
@@ -92,6 +102,7 @@ export class LeadsController {
     }
 
     @Patch(':id/disqualify')
+    @CanDelete('crm.leads')
     @HttpCode(HttpStatus.NO_CONTENT)
     async disqualify(
         @Param('id', ParseIntPipe) id: number,
@@ -101,6 +112,7 @@ export class LeadsController {
     }
 
     @Delete(':id')
+    @CanDelete('crm.leads')
     @HttpCode(HttpStatus.NO_CONTENT)
     async delete(@Param('id', ParseIntPipe) id: number) {
         await this.leadsService.delete(id);
