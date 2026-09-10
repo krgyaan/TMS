@@ -28,8 +28,7 @@ export type ProfileData = {
   employeeCode: string;
   altEmail: string;
   bloodGroup: string;
-  linkedinProfile: string;
-};
+  linkedinProfile: string;  pfNumber?: string | null;  hrStatus?: string;  hrRemark?: string | null;};
 
 export type EmployeeProfileData = {
   employeeType: string;
@@ -109,10 +108,7 @@ export type EducationData = {
   fieldOfStudy: string | null;
   startDate: string | null;
   endDate: string | null;
-  grade: string | null;
-  status: string;
-  hrStatus : hrStatus;
-};
+  grade: string | null;  status: string;  hrStatus : hrStatus;  hrRemark?: string | null;};
 
 export type ExperienceData = {
   id: number;
@@ -121,10 +117,7 @@ export type ExperienceData = {
   fromDate: string;
   toDate: string | null;
   currentlyWorking: boolean;
-  responsibilities: string | null;
-  status: string;
-  hrStatus : hrStatus;
-};
+  responsibilities: string | null;  status: string;  hrStatus : hrStatus;  hrRemark?: string | null;  remarks?: string | null;};
 
 export type BankDetailData = {
   id: number;
@@ -135,10 +128,7 @@ export type BankDetailData = {
   branchName: string | null;
   branchAddress: string | null;
   upiId: string | null;
-  isPrimary: boolean;
-  status: string;
-  hrStatus : hrStatus;
-};
+  isPrimary: boolean;  status: string;  hrStatus : hrStatus;  hrRemark?: string | null;};
 
 export type ProfileResponse = {
   currentUser: UserData;

@@ -141,4 +141,6 @@ export const bankFormSchema = z.object({
   bankAccounts: z.array(bankEntrySchema).min(1, "Add at least one bank account"),
 });
 
+export type BankFormInput = z.input<typeof bankFormSchema>;
+
 export type BankFormValues = z.infer<typeof bankFormSchema>;
