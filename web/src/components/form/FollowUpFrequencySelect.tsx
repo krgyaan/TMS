@@ -28,7 +28,7 @@ export function FollowUpFrequencySelect<TFieldValues extends Record<string, any>
             control={control}
             name={name as any}
             label={label}
-            valueType="number"
+            valueType="string"
             options={Object.entries(FREQUENCY_LABELS).map(([value, label]) => ({ value, label }))}
             placeholder="Choose frequency"
         />

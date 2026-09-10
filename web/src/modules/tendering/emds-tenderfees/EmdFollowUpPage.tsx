@@ -217,7 +217,7 @@ const EmdFollowUpPage = () => {
                     phone: c.phone || null,
                 })) || [],
                 followup_start_date: values.startFrom,
-                frequency: values.frequency,
+                frequency: String(values.frequency ?? ''),
                 amount: rawAmount ?? 0,
                 emailBody,
                 attachments: attachments.map(a => (a.baseDir ? `${a.baseDir}/${a.fileName}` : a.fileName)),
