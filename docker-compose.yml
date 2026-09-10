@@ -17,6 +17,7 @@ services:
     user: root
     volumes:
       - ./logs:/logs:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - ./promtail-config.yml:/etc/promtail/config.yml
       - ./promtail-cache:/tmp
     command: -config.file=/etc/promtail/config.yml
