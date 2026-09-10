@@ -39,6 +39,27 @@ services:
     networks:
       - monitoring
 
+  volksai:
+    build:
+      context: ./volksAi
+      dockerfile: Dockerfile
+    image: volksai:staging
+    container_name: volksai
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8001:8000"
+    env_file:
+      - ./volksAi/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - OMP_NUM_THREADS=1
+    deploy:
+      resources:
+        limits:
+          memory: 3500M
+    networks:
+      - monitoring
+
 volumes:
   loki-data:
   promtail-cache:
