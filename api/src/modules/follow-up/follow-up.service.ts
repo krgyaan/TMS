@@ -621,8 +621,14 @@ export class FollowUpService {
                             teamMember: assigneeUser?.name ?? "Team Member",
                         };
 
-                        // ✅ Now correctly uses proofImage from param
-                        const attachments = proofImage ? { files: [proofImage.split('/').pop() ?? proofImage], baseDir: "accounts" } : undefined;
+                        const normalizeAttachmentPath = (p: string | null) => {
+                            if (!p) return null;
+                            return p.replace(/\\/g, "/").replace(/^\.\//, "").replace(/^uploads\//, "");
+                        };
+
+                        const attachments = proofImage
+                            ? { files: [normalizeAttachmentPath(proofImage) ?? proofImage] }
+                            : undefined;
 
                         await this.mailerService.sendMail(
                             FollowupMailTemplates.STOP,
@@ -805,7 +811,14 @@ export class FollowUpService {
                         teamMember: assigneeUser?.name ?? "Team Member",
                     };
 
-                    const attachments = proofImage ? { files: [proofImage.split('/').pop() ?? proofImage], baseDir: "accounts" } : undefined;
+                    const normalizeAttachmentPath = (p: string | null) => {
+                        if (!p) return null;
+                        return p.replace(/\\/g, "/").replace(/^\.\//, "").replace(/^uploads\//, "");
+                    };
+
+                    const attachments = proofImage
+                        ? { files: [normalizeAttachmentPath(proofImage) ?? proofImage] }
+                        : undefined;
 
                     await this.mailerService.sendMail(
                         FollowupMailTemplates.STOP,
