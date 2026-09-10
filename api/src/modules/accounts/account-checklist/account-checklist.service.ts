@@ -45,6 +45,19 @@ export interface DayResult {
 
 @Injectable()
 export class AccountChecklistService {
+    private get allowedChecklistMailUserIds(): number[] {
+        const raw = process.env.ALLOWED_CHECKLIST_MAIL_USER_ID ?? "44";
+        return raw
+            .split(",")
+            .map(value => Number(value.trim()))
+            .filter((value): value is number => !Number.isNaN(value));
+    }
+
+    private shouldSendChecklistMailForUser(userId?: number | null) {
+        if (userId === undefined || userId === null) return false;
+        return this.allowedChecklistMailUserIds.includes(userId);
+    }
+
     constructor(
         @Inject(WINSTON_MODULE_PROVIDER)
         private readonly logger: Logger,
@@ -956,14 +969,27 @@ export class AccountChecklistService {
 
             // Enqueue individual accountable-user mails
             let enqueuedCount = 0;
+            const filteredGrouped: typeof grouped = {};
+
             for (const [accountableId, responsibleGroups] of Object.entries(grouped)) {
+                const accountableUserId = parseInt(accountableId);
+                if (!this.shouldSendChecklistMailForUser(accountableUserId)) {
+                    this.logger.info("[MAIL-ENQUEUE] Skipping checklist mail for non-allowed accountable user", {
+                        accountableId: accountableUserId,
+                        allowedUserIds: this.allowedChecklistMailUserIds,
+                    });
+                    continue;
+                }
+
+                filteredGrouped[accountableId] = responsibleGroups;
+
                 const responsibleCount = Object.keys(responsibleGroups).length;
                 const totalTasks = Object.values(responsibleGroups).reduce((sum, tasks) => sum + tasks.length, 0);
 
                 await queue.add(
                     "send-checklist-mail",
                     {
-                        accountableId: parseInt(accountableId),
+                        accountableId: accountableUserId,
                         responsibleGroups,
                         date: dateStr,
                     },
@@ -977,7 +1003,7 @@ export class AccountChecklistService {
                 this.logger.info(
                     `[MAIL-ENQUEUE] ✉ Queued 'send-checklist-mail' for accountableId=${accountableId}`,
                     {
-                        accountableId,
+                        accountableId: accountableUserId,
                         responsibleUserCount: responsibleCount,
                         totalTaskCount: totalTasks,
                     }
@@ -985,14 +1011,20 @@ export class AccountChecklistService {
             }
 
             // Enqueue admin consolidated mail
-            const totalTasksAll = Object.values(grouped).reduce(
+            const totalTasksAll = Object.values(filteredGrouped).reduce(
                 (sum, rg) => sum + Object.values(rg).reduce((s, tasks) => s + tasks.length, 0),
                 0
             );
+
+            if (enqueuedCount === 0) {
+                this.logger.warn("[MAIL-ENQUEUE] No allowed accountable users matched the checklist mail allowlist — skipping admin mail");
+                return;
+            }
+
             await queue.add(
                 "send-checklist-admin-mail",
                 {
-                    grouped,
+                    grouped: filteredGrouped,
                     date: dateStr,
                 },
                 {
@@ -1056,6 +1088,15 @@ export class AccountChecklistService {
 
             for (const [responsibleIdStr, tasks] of Object.entries(responsibleGroups)) {
                 const responsibleId = parseInt(responsibleIdStr);
+
+                if (!this.shouldSendChecklistMailForUser(accountableId) && !this.shouldSendChecklistMailForUser(responsibleId)) {
+                    this.logger.info("[MAIL-WORKER] Skipping checklist mail for non-allowed user", {
+                        accountableId,
+                        responsibleId,
+                        allowedUserIds: this.allowedChecklistMailUserIds,
+                    });
+                    continue;
+                }
 
                 this.logger.info(`[MAIL-WORKER] Resolving responsible user id=${responsibleId}`);
 
