@@ -109,10 +109,6 @@ export class FollowupMailDataBuilder {
         return [];
     }
 
-    // private resolveCc(area: string) {
-    //     return ["abhigaur.test@gmail.com"];
-    // }
-
     private async getRecipients(id: number): Promise<string[]> {
         const rows = await this.db.execute(sql`
             SELECT email
@@ -123,10 +119,6 @@ export class FollowupMailDataBuilder {
 
         return rows.rows.map((r: any) => r.email as string);
     }
-
-    // private async getRecipients(id: number): Promise<string[]> {
-    //     return ["abhijeetgaur.dev@gmail.com" as string];
-    // }
 
     private async resolveInstrumentData(instrumentId: number) {
         const rows = await this.db.execute(sql`

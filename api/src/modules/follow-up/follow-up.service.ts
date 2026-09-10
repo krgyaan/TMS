@@ -936,7 +936,6 @@ export class FollowUpService {
                 {
                     to: payload.to,
                     cc: payload.cc,
-                    bcc: ["abhigaur.test@gmail.com"],
                     subject: payload.subject,
                     attachments: payload.attachments,
                 },

@@ -1162,7 +1162,6 @@ export class AccountChecklistService {
                             {
                                 to: [accountableUser.email],
                                 cc,
-                                bcc: ["abhigaur.test@gmail.com"],
                                 subject: `Account Checklist - ${date} - ${responsibleUser.name}`,
                             },
                             googleConnection
@@ -1282,7 +1281,6 @@ export class AccountChecklistService {
                         },
                         {
                             to: adminEmails,
-                            bcc: ["abhigaur.test@gmail.com"],
                             subject: `Account Checklist Consolidated Report - ${date}`,
                         },
                         googleConnection
