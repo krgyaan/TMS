@@ -8,4 +8,7 @@ export * from "./payment-requests.schema";
 export * from "./beneficiaries.schema";
 export * from "./maker-requests.schema";
 export * from "./sale-invoices.schema";
+export * from "./inventory.schema";
+export * from "./inventory-movements.schema";
+export * from "./inventory-transfers.schema";
 // export * from "../master/projects.schema";

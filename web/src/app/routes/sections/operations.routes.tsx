@@ -50,6 +50,7 @@ const Operations_CreatePaymentRequest = lazy(() => import("@/modules/operations/
 const Operations_EditPaymentRequest = lazy(() => import("@/modules/operations/payment-requests/EditPaymentRequestPage"));
 const Operations_PaymentRequestTabs = lazy(() => import("@/modules/operations/payment-requests/PaymentRequestTabsPage"));
 const Operations_CreateProjectInsurance = lazy(() => import("@/modules/operations/project-dashboard/pages/CreateProjectInsurancePage"));
+const Operations_InventoryPage = lazy(() => import("@/modules/operations/inventory/pages/InventoryPage"));
 
 export default function OperationsRoutes() {
     return (
@@ -98,6 +99,7 @@ export default function OperationsRoutes() {
             <Route path="project-dashboard/:projectId/project-payment-request/create" element={<RouteWrapper><Operations_CreatePaymentRequest /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/project-payment-request/:prId/edit" element={<RouteWrapper><Operations_EditPaymentRequest /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/insurance/create" element={<RouteWrapper><Operations_CreateProjectInsurance /></RouteWrapper>} />
+            <Route path="inventory" element={<RouteWrapper><Operations_InventoryPage /></RouteWrapper>} />
             <Route path="payment-requests" element={<RouteWrapper><Operations_PaymentRequestTabs /></RouteWrapper>} />
         </Routes>
     );

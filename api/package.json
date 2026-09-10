@@ -24,6 +24,7 @@
         "drizzle:generate": "drizzle-kit generate --config ./drizzle.config.ts",
         "drizzle:migrate": "drizzle-kit migrate --config ./drizzle.config.ts",
         "db:seed": "tsx src/db/seed.ts",
+        "backfill:inventory": "tsx src/db/backfill-inventory.ts",
         "migrate:uploads": "ts-node -r tsconfig-paths/register scripts/migrate-file-upload-dirs.ts",
         "dedupe:vouchers": "ts-node -r tsconfig-paths/register scripts/dedupe-imprest-vouchers.ts",
         "migrate:uploads:v2": "ts-node -r tsconfig-paths/register scripts/migrate-upload-dirs-v2.ts",

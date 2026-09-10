@@ -14,6 +14,7 @@ import { paymentRequests, purchaseInvoices, saleInvoiceItems, saleInvoices } fro
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
 import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
+import { materializeApprovalLines } from "@/modules/operations/inventory/inventory.materialize";
 import { woBasicDetails } from "@/db/schemas/operations/work-order.schema";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -525,7 +526,7 @@ export class PurchaseOrderService {
         }
     }
 
-    async setTdsPercentage(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }) {
+    async setTdsPercentage(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }, userId?: number) {
         const po = await this.db
             .select()
             .from(purchaseOrders)
@@ -547,18 +548,31 @@ export class PurchaseOrderService {
             const tdsAmt = (subtotal * tdsPercentage) / 100;
             const amountAfterTds = grandTotal - tdsAmt;
 
-            const [updated] = await this.db
-                .update(purchaseOrders)
-                .set({
-                    tdsPercentage: tdsPercentage.toString(),
-                    tdsAmount: tdsAmt.toString(),
-                    amountAfterTds: amountAfterTds.toString(),
-                    poApproved: true,
-                    poApprovalRemark: remark || null,
-                    updatedAt: new Date(),
-                })
-                .where(eq(purchaseOrders.id, id))
-                .returning();
+            const updated = await this.db.transaction(async tx => {
+                const updatedPo = await tx
+                    .update(purchaseOrders)
+                    .set({
+                        tdsPercentage: tdsPercentage.toString(),
+                        tdsAmount: tdsAmt.toString(),
+                        amountAfterTds: amountAfterTds.toString(),
+                        poApproved: true,
+                        poApprovalRemark: remark || null,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(purchaseOrders.id, id))
+                    .returning()
+                    .then(rows => rows[0]);
+
+                await materializeApprovalLines(tx, {
+                    docType: "po",
+                    projectId: po.projectId,
+                    referenceId: po.id,
+                    lines: products,
+                    createdBy: userId ?? po.poRaisedBy,
+                });
+
+                return updatedPo;
+            });
 
             this.logger.info(`TDS approved for PO #${id}: ${tdsPercentage}%, TDS Amount: ${tdsAmt}, After TDS: ${amountAfterTds}`);
             return updated;

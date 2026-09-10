@@ -52,4 +52,5 @@ export { conferenceService } from './conference.service';
 export { serviceVisitService } from './service-visit.service';
 export { serviceFeedbackService } from './service-feedback.service';
 export { healthService } from './health.service';
+export { inventoryApi } from './inventory.api';
 

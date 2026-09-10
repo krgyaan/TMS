@@ -144,7 +144,8 @@ export const paths = {
         editPoPage: (poId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/${poId}/edit`,
         poPdfVersions: (poId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/${poId}/pdf-versions`,
         purchaseOrders: "/operations/purchase-orders",
-
+        inventory: "/operations/inventory",
+        inventoryProject: (projectId: number) => `/operations/inventory?projectId=${projectId}`,
         vendorWorkOrders: "/operations/vendor-work-orders",
         raiseVendorWoForm: (projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/create`,
         viewVendorWoPage: (woId: number, projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/${woId}`,
@@ -281,6 +282,7 @@ export const paths = {
         vendorWorkOrders: "/accounts/vendor-work-orders",
         vwoClosure: (id: number) => `/accounts/vendor-work-orders/${id}/closure`,
         paymentRequests: "/accounts/payment-requests",
+        inventory: "/accounts/inventory",
         vendorMaster: "/accounts/vendor-master",
     },
 
