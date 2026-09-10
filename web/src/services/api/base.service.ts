@@ -8,9 +8,10 @@ export class BaseApiService {
         this.basePath = basePath
     }
 
-    protected async get<T>(endpoint: string = ''): Promise<T> {
+    protected async get<T>(endpoint: string = '', config?: Record<string, any>): Promise<T> {
         const response: AxiosResponse<T> = await axiosInstance.get(
-            `${this.basePath}${endpoint}`
+            `${this.basePath}${endpoint}`,
+            config
         )
         return response.data
     }

@@ -14,6 +14,9 @@ export class AppLogger {
       log: (message: string, meta?: Record<string, unknown>) =>
         this.logger.info(message, { context, ...meta }),
 
+      info: (message: string, meta?: Record<string, unknown>) =>
+        this.logger.info(message, { context, ...meta }),
+
       error: (message: string, meta?: Record<string, unknown>) =>
         this.logger.error(message, { context, ...meta }),
 
@@ -26,6 +29,10 @@ export class AppLogger {
   }
 
   log(message: string, meta?: unknown) {
+    this.logger.info(message, meta);
+  }
+
+  info(message: string, meta?: unknown) {
     this.logger.info(message, meta);
   }
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
@@ -17,7 +17,7 @@ import { FileUploader } from "@/components/file-upload";
 import { useCreateTender, useUpdateTender, useGenerateTenderName } from "@/hooks/api/useTenders";
 import type { TenderInfoWithNames } from "../helpers/tenderInfo.types";
 import { paths } from "@/app/routes/paths";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles, CheckCircle2, ArrowRight, FileSpreadsheet, FileUp } from "lucide-react";
 import { useTeamOptions, useOrganizationOptions, useUserOptions, useLocationOptions, useWebsiteOptions, useItemOptions } from "@/hooks/useSelectOptions";
 import { useAuth } from "@/contexts/AuthContext";
 import { TenderNameWarningAlert } from "./TenderNameWarningAlert";
@@ -68,6 +68,8 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
     const updateTender = useUpdateTender();
     const generateTenderName = useGenerateTenderName();
     const { user, roleId, effectiveTeamId } = useAuth();
+
+    const [activeTab, setActiveTab] = useState("manually");
 
     const teamOptions = useTeamOptions([1, 2]);
     const organizationOptions = useOrganizationOptions();
@@ -296,71 +298,70 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                 </CardAction>
             </CardHeader>
             <CardContent>
-                <Tabs defaultValue="manually" className="w-full">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <TabsList className={mode == "edit" ? "hidden" : "m-auto mb-6"}>
                         <TabsTrigger value="manually">Manually Enter Details</TabsTrigger>
-                        <TabsTrigger value="useAi">
-                            Use AI <Sparkles className="ml-1 h-4 w-4" />
+                        <TabsTrigger value="useAi" className="flex items-center gap-1.5">
+                            <Sparkles className="h-4 w-4 text-violet-500" />
+                            How AI Works
                         </TabsTrigger>
                     </TabsList>
 
-                    {/* AI FORM TAB */}
+                    {/* AI INFORMATIONAL TAB */}
                     <TabsContent value="useAi">
-                        <Form {...aiForm}>
-                            <form onSubmit={aiForm.handleSubmit(handleAiSubmit)} className="space-y-8">
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                    <SelectField<AiFormValues, "team">
-                                        control={aiForm.control}
-                                        name="team"
-                                        label="Team"
-                                        options={teamOptions}
-                                        placeholder="Select Team"
-                                    />
-
-                                    <FieldWrapper<AiFormValues, "tenderNo">
-                                        control={aiForm.control}
-                                        name="tenderNo"
-                                        label="Tender No"
-                                    >
-                                        {field => <Input placeholder="Tender No" {...field} />}
-                                    </FieldWrapper>
-
-                                    <FieldWrapper<AiFormValues, "startDate">
-                                        control={aiForm.control}
-                                        name="startDate"
-                                        label="Start Date"
-                                    >
-                                        {field => <DateInput value={field.value ?? ""} onChange={field.onChange} />}
-                                    </FieldWrapper>
-
-                                    <FieldWrapper<AiFormValues, "closingDate">
-                                        control={aiForm.control}
-                                        name="closingDate"
-                                        label="Closing Date"
-                                    >
-                                        {field => <DateInput value={field.value ?? ""} onChange={field.onChange} />}
-                                    </FieldWrapper>
+                        <div className="max-w-3xl mx-auto py-4 space-y-6">
+                            <div className="rounded-xl border border-violet-500/20 bg-gradient-to-br from-violet-500/5 via-primary/5 to-transparent p-6 shadow-xs">
+                                <div className="flex items-start gap-4">
+                                    <div className="p-3 rounded-lg bg-violet-600/10 text-violet-600 dark:text-violet-400">
+                                        <Sparkles className="h-6 w-6" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h3 className="text-lg font-semibold tracking-tight">VolksAI Intelligent Info Sheet Engine</h3>
+                                        <p className="text-sm text-muted-foreground">
+                                            Tender registration stays focused and clean. Full document intelligence and Excel generation are integrated directly into the Tender Info Sheet.
+                                        </p>
+                                    </div>
                                 </div>
 
-                                <div className="w-full md:w-1/2">
-                                    <FileUploader
-                                        context="tender-documents"
-                                        value={aiFiles}
-                                        onChange={(paths) => aiForm.setValue("files", paths)}
-                                        label="Choose Files (PDF only for AI processing)"
-                                    />
+                                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="p-4 rounded-lg bg-card border space-y-2">
+                                        <div className="flex items-center gap-2 font-medium text-sm">
+                                            <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">1</div>
+                                            <span>Step 1: Register Basic Details</span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                            Fill out team, tender number, due date, and upload the official tender document (PDF) on the <strong>Manually Enter Details</strong> tab.
+                                        </p>
+                                    </div>
+
+                                    <div className="p-4 rounded-lg bg-card border space-y-2">
+                                        <div className="flex items-center gap-2 font-medium text-sm">
+                                            <div className="h-6 w-6 rounded-full bg-violet-500/10 text-violet-600 flex items-center justify-center text-xs font-bold">2</div>
+                                            <span>Step 2: Auto-Extract & Export Excel</span>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                            In the <strong>Tender Info Sheet</strong>, click <em>Auto-Extract with AI</em>. Over 50+ fields are populated with confidence indicators and ready for one-click Excel download.
+                                        </p>
+                                    </div>
                                 </div>
 
-                                <div className="w-full flex items-center justify-center gap-2">
-                                    <Button type="submit" disabled={true} title="AI-based tender creation is not yet available">
-                                        Coming Soon - Submit with AI
-                                    </Button>
-                                    <Button type="button" variant="outline" onClick={() => aiForm.reset()} disabled={saving}>
-                                        Reset
+                                <div className="mt-6 pt-4 border-t flex flex-wrap items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                        <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> High Confidence Badges</span>
+                                        <span className="flex items-center gap-1.5"><FileSpreadsheet className="h-4 w-4 text-emerald-600" /> OpenPyXL Excel Export</span>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        onClick={() => setActiveTab("manually")}
+                                        className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white gap-2 cursor-pointer shadow-sm"
+                                    >
+                                        <FileUp className="h-4 w-4" />
+                                        Continue to Manual Registration
+                                        <ArrowRight className="h-4 w-4" />
                                     </Button>
                                 </div>
-                            </form>
-                        </Form>
+                            </div>
+                        </div>
                     </TabsContent>
 
                     {/* MANUAL FORM TAB */}
