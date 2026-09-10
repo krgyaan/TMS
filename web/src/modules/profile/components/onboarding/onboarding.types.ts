@@ -1,6 +1,6 @@
 import z from "zod";
 
-export type StageStatus = "pending" | "in_progress" | "submitted" | "resubmitted";
+export type StageStatus = "pending" | "in_progress" | "submitted" | "completed" | "resubmitted";
 export type ApprovalStatus = "pending" | "approved" | "rejected" | null;
 
 export type RejectionInfo = {
