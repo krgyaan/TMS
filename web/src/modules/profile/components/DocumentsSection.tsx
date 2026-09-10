@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +31,6 @@ import {
   GraduationCap,
   Briefcase,
   FolderOpen,
-  ChevronRight,
   ImageIcon,
   File,
   FileArchive,
@@ -41,7 +40,6 @@ import {
   Search,
   Plus,
   CloudUpload,
-  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
@@ -87,7 +85,6 @@ interface DocumentType {
   id: string;
   docType: string;
   docCategory: string;
-  required: boolean;
   uploaded: boolean;
 }
 
@@ -99,29 +96,29 @@ interface UploadedDocument extends DocumentData {
 
 const REQUIRED_DOCUMENTS: DocumentType[] = [
   // Identity Documents
-  { id: "aadhar", docType: "Aadhar Card", docCategory: "Identity Documents", required: true, uploaded: false },
-  { id: "pan", docType: "PAN Card", docCategory: "Identity Documents", required: true, uploaded: false },
-  { id: "passport", docType: "Passport", docCategory: "Identity Documents", required: false, uploaded: false },
-  { id: "driving-license", docType: "Driving License", docCategory: "Identity Documents", required: false, uploaded: false },
-  { id: "voter-id", docType: "Voter ID", docCategory: "Identity Documents", required: false, uploaded: false },
+  { id: "aadhar", docType: "Aadhar Card", docCategory: "Identity Documents", uploaded: false },
+  { id: "pan", docType: "PAN Card", docCategory: "Identity Documents", uploaded: false },
+  { id: "passport", docType: "Passport", docCategory: "Identity Documents", uploaded: false },
+  { id: "driving-license", docType: "Driving License", docCategory: "Identity Documents", uploaded: false },
+  { id: "voter-id", docType: "Voter ID", docCategory: "Identity Documents", uploaded: false },
   // Educational Documents
-  { id: "10th-cert", docType: "10th Certificate", docCategory: "Educational Documents", required: false, uploaded: false },
-  { id: "12th-cert", docType: "12th Certificate", docCategory: "Educational Documents", required: false, uploaded: false },
-  { id: "graduation-cert", docType: "Graduation Certificate", docCategory: "Educational Documents", required: true, uploaded: false },
-  { id: "pg-cert", docType: "Post Graduation Certificate", docCategory: "Educational Documents", required: false, uploaded: false },
-  { id: "prof-cert", docType: "Professional Certifications", docCategory: "Educational Documents", required: false, uploaded: false },
+  { id: "10th-cert", docType: "10th Certificate", docCategory: "Educational Documents", uploaded: false },
+  { id: "12th-cert", docType: "12th Certificate", docCategory: "Educational Documents", uploaded: false },
+  { id: "graduation-cert", docType: "Graduation Certificate", docCategory: "Educational Documents", uploaded: false },
+  { id: "pg-cert", docType: "Post Graduation Certificate", docCategory: "Educational Documents", uploaded: false },
+  { id: "prof-cert", docType: "Professional Certifications", docCategory: "Educational Documents", uploaded: false },
   // Employment Documents
-  // { id: "offer-letter", docType: "Offer Letter", docCategory: "Employment Documents", required: true, uploaded: false },
-  // { id: "appointment-letter", docType: "Appointment Letter", docCategory: "Employment Documents", required: false, uploaded: false },
-  { id: "relieving-letter", docType: "Previous Employment Relieving Letter", docCategory: "Employment Documents", required: false, uploaded: false },
-  { id: "experience-cert", docType: "Experience Certificates", docCategory: "Employment Documents", required: false, uploaded: false },
-  { id: "salary-slips", docType: "Salary Slips (Last 3 months)", docCategory: "Employment Documents", required: false, uploaded: false },
+  // { id: "offer-letter", docType: "Offer Letter", docCategory: "Employment Documents", uploaded: false },
+  // { id: "appointment-letter", docType: "Appointment Letter", docCategory: "Employment Documents", uploaded: false },
+  { id: "relieving-letter", docType: "Previous Employment Relieving Letter", docCategory: "Employment Documents", uploaded: false },
+  { id: "experience-cert", docType: "Experience Certificates", docCategory: "Employment Documents", uploaded: false },
+  { id: "salary-slips", docType: "Salary Slips (Last 3 months)", docCategory: "Employment Documents", uploaded: false },
   // Other Documents
-  { id: "resume", docType: "Resume / CV", docCategory: "Other Documents", required: false, uploaded: false },
-  { id: "photo", docType: "Passport Size Photo", docCategory: "Other Documents", required: true, uploaded: false },
-  { id: "bank-proof", docType: "Bank Passbook / Cancelled Cheque", docCategory: "Other Documents", required: true, uploaded: false },
-  { id: "nda", docType: "NDA (signed)", docCategory: "Other Documents", required: false, uploaded: false },
-  { id: "code-of-conduct", docType: "Code of Conduct Agreement (signed)", docCategory: "Other Documents", required: false, uploaded: false },
+  { id: "resume", docType: "Resume / CV", docCategory: "Other Documents", uploaded: false },
+  { id: "photo", docType: "Passport Size Photo", docCategory: "Other Documents", uploaded: false },
+  { id: "bank-proof", docType: "Bank Passbook / Cancelled Cheque", docCategory: "Other Documents", uploaded: false },
+  { id: "nda", docType: "NDA (signed)", docCategory: "Other Documents", uploaded: false },
+  { id: "code-of-conduct", docType: "Code of Conduct Agreement (signed)", docCategory: "Other Documents", uploaded: false },
 ];
 
 const CATEGORY_CONFIG: Record<string, { icon: React.ElementType; color: string; bg: string; borderColor: string }> = {
@@ -150,7 +147,6 @@ interface UploadDialogProps {
   isReupload?: boolean;
   existingDoc?: UploadedDocument | null;
   onSuccess: () => void;
-  isOnboarding?: boolean;
 }
 
 const UploadDialog: React.FC<UploadDialogProps> = ({
@@ -160,7 +156,6 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
   isReupload = false,
   existingDoc,
   onSuccess,
-  isOnboarding = false,
 }) => {
   const [files, setFiles] = useState<string[]>([]);
   const [issueDate, setIssueDate] = useState(existingDoc?.issueDate || "");
@@ -177,7 +172,9 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
         expiryDate: expiryDate || undefined,
       };
 
-      const urlPrefix = isOnboarding ? "/hrms/employee-onboarding" : "/profile";
+      // Documents always live on the employee-onboarding endpoints (the
+      // /profile/documents* routes do not exist)
+      const urlPrefix = "/hrms/employee-onboarding";
       if (isReupload && existingDoc) {
         await api.patch(`${urlPrefix}/documents/${existingDoc.id}`, payload);
       } else if (documentType) {
@@ -321,9 +318,10 @@ interface PreviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   document: UploadedDocument | null;
+  onReupload: (doc: UploadedDocument) => void;
 }
 
-const PreviewDialog: React.FC<PreviewDialogProps> = ({ open, onOpenChange, document: doc }) => {
+const PreviewDialog: React.FC<PreviewDialogProps> = ({ open, onOpenChange, document: doc, onReupload }) => {
   if (!doc) return null;
   const status = getStatusConfig(doc.verificationStatus);
   const StatusIcon = status.icon;
@@ -383,12 +381,14 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({ open, onOpenChange, docum
             ))}
           </div>
 
-          {/* Rejection Remarks */}
-          {doc.verificationStatus === "rejected" && doc.remarks && (
+          {/* HR Remarks (rejected or reverted-to-pending) */}
+          {doc.remarks && doc.verificationStatus !== "approved" && (
             <div className="flex items-start gap-3 p-3.5 rounded-xl bg-destructive/5 border border-destructive/15">
               <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
               <div>
-                <p className="text-xs font-semibold text-destructive mb-0.5">Rejection Reason</p>
+                <p className="text-xs font-semibold text-destructive mb-0.5">
+                  {doc.verificationStatus === "rejected" ? "Rejection Reason" : "HR Remark"}
+                </p>
                 <p className="text-xs text-destructive/80 leading-relaxed">{doc.remarks}</p>
               </div>
             </div>
@@ -396,12 +396,23 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({ open, onOpenChange, docum
 
           {/* Actions */}
           <div className="flex items-center gap-3 pt-2">
-            <Button variant="outline" className="flex-1 h-10 rounded-xl font-semibold gap-2" onClick={() => {}}>
+            <Button
+              variant="outline"
+              className="flex-1 h-10 rounded-xl font-semibold gap-2"
+              onClick={() => doc.fileUrl && window.open(doc.fileUrl, "_blank")}
+              disabled={!doc.fileUrl}
+            >
               <Download className="h-4 w-4" />
               Download
             </Button>
-            {doc.verificationStatus === "rejected" && (
-              <Button className="flex-1 h-10 rounded-xl font-semibold gap-2 shadow-lg shadow-primary/20">
+            {doc.verificationStatus !== "approved" && (
+              <Button
+                className="flex-1 h-10 rounded-xl font-semibold gap-2 shadow-lg shadow-primary/20"
+                onClick={() => {
+                  onOpenChange(false);
+                  onReupload(doc);
+                }}
+              >
                 <Upload className="h-4 w-4" />
                 Re-upload
               </Button>
@@ -418,10 +429,10 @@ const PreviewDialog: React.FC<PreviewDialogProps> = ({ open, onOpenChange, docum
 interface PendingUploadCardProps {
   doc: DocumentType;
   onUpload: (doc: DocumentType) => void;
-  isOnboarding?: boolean;
+  canUpload?: boolean;
 }
 
-const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, onUpload, isOnboarding = true }) => {
+const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, onUpload, canUpload = true }) => {
   const catConfig = CATEGORY_CONFIG[doc.docCategory] || CATEGORY_CONFIG["Other Documents"];
   const CatIcon = catConfig.icon;
 
@@ -430,10 +441,10 @@ const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, onUpload, is
       <Card
         className={cn(
           "border-dashed border-2 shadow-none hover:shadow-lg hover:shadow-primary/[0.04] transition-all duration-400 group bg-muted/10 backdrop-blur-sm overflow-hidden",
-          isOnboarding ? "hover:bg-muted/20 cursor-pointer" : "cursor-default",
+          canUpload ? "hover:bg-muted/20 cursor-pointer" : "cursor-default",
           catConfig.borderColor
         )}
-        onClick={() => isOnboarding && onUpload(doc)}
+        onClick={() => canUpload && onUpload(doc)}
       >
         <CardContent className="p-5">
           <div className="flex items-start justify-between mb-4">
@@ -446,16 +457,6 @@ const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, onUpload, is
             >
               <CatIcon className={cn("h-6 w-6", catConfig.color)} />
             </div>
-            <div className="flex items-center gap-2">
-              {doc.required && (
-                <Badge
-                  variant="outline"
-                  className="text-[10px] h-5 font-bold rounded-md bg-destructive/5 text-destructive border-destructive/20"
-                >
-                  Required
-                </Badge>
-              )}
-            </div>
           </div>
 
           <h4 className="font-bold text-sm mb-1 group-hover:text-primary transition-colors">
@@ -465,7 +466,7 @@ const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, onUpload, is
             {doc.docCategory}
           </p>
 
-          {isOnboarding && (
+          {canUpload && (
             <div className="mt-5 pt-4 border-t border-dashed border-border/30">
               <Button
                 size="sm"
@@ -493,13 +494,13 @@ interface UploadedDocCardProps {
   onView: (doc: UploadedDocument) => void;
   onReupload: (doc: UploadedDocument) => void;
   onDelete: (doc: UploadedDocument) => void;
-  isOnboarding?: boolean;
 }
 
-const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, onView, onReupload, onDelete, isOnboarding = true }) => {
+const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, onView, onReupload, onDelete }) => {
   const status = getStatusConfig(doc.verificationStatus);
   const StatusIcon = status.icon;
   const FileIcon = getFileIcon(doc.fileName ?? undefined);
+  const canModify = doc.verificationStatus !== "approved";
 
   return (
     <div>
@@ -606,7 +607,7 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, onView, onReuplo
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            {isOnboarding && doc.verificationStatus !== "approved" && (
+            {canModify && (
               <>
                 <Button
                   size="sm"
@@ -635,8 +636,8 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, onView, onReuplo
                 </TooltipProvider>
               </>
             )}
-            {(!isOnboarding || doc.verificationStatus === "approved") && (
-              <div className="h-9 w-9 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 bg-emerald-100/40 dark:bg-emerald-950/20 shrink-0" title="Locked">
+            {!canModify && (
+              <div className="h-9 w-9 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 bg-emerald-100/40 dark:bg-emerald-950/20 shrink-0" title="Approved by HR">
                 <Lock className="h-3.5 w-3.5" />
               </div>
             )}
@@ -657,7 +658,7 @@ export const DocumentsSection: React.FC = () => {
 
   try {
     const onboarding = useOnboardingContext();
-    if (onboarding && onboarding.data && onboarding.data.isOnboarding) {
+    if (onboarding && onboarding.data) {
       contextData = onboarding.data;
       contextRefetch = onboarding.refetch;
       isOnboarding = true;
@@ -677,13 +678,24 @@ export const DocumentsSection: React.FC = () => {
   const queryClient = useQueryClient();
 
   const [activeCategory, setActiveCategory] = useState<string>("all");
-  const [activeView, setActiveView] = useState<"uploaded" | "pending">(isOnboarding ? "pending" : "uploaded");
+  const [activeView, setActiveView] = useState<"uploaded" | "pending">("uploaded");
   const [searchQuery, setSearchQuery] = useState("");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedDocType, setSelectedDocType] = useState<DocumentType | null>(null);
   const [selectedUploadedDoc, setSelectedUploadedDoc] = useState<UploadedDocument | null>(null);
   const [isReupload, setIsReupload] = useState(false);
+
+  // One-time: if nothing has been uploaded yet, land on the "To Upload" tab
+  const initialViewApplied = useRef(false);
+  useEffect(() => {
+    if (!initialViewApplied.current && data) {
+      initialViewApplied.current = true;
+      if ((data.documents || []).length === 0) {
+        setActiveView("pending");
+      }
+    }
+  }, [data]);
 
   const handleUploadSuccess = () => {
     queryClient.invalidateQueries({ queryKey: [isOnboarding ? 'my-onboarding-draft' : 'my-profile'] });
@@ -697,7 +709,6 @@ export const DocumentsSection: React.FC = () => {
   // Determine pending documents
   const uploadedDocTypes = new Set(DOCUMENTS.map((d) => d.docType));
   const pendingDocuments = REQUIRED_DOCUMENTS.filter((d) => !uploadedDocTypes.has(d.docType));
-  const requiredPendingCount = pendingDocuments.filter((d) => d.required).length;
 
   const categories = [...new Set([...DOCUMENTS.map((d) => d.docCategory), ...REQUIRED_DOCUMENTS.map((d) => d.docCategory)])];
 
@@ -716,18 +727,6 @@ export const DocumentsSection: React.FC = () => {
     const matchesSearch = !searchQuery || d.docType.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
-
-  // Stats
-  const approvedCount = DOCUMENTS.filter((d) => d.verificationStatus === "approved").length;
-  const pendingVerificationCount = DOCUMENTS.filter((d) => d.verificationStatus === "pending").length;
-  const rejectedCount = DOCUMENTS.filter((d) => d.verificationStatus === "rejected").length;
-
-  // Completion
-  const totalRequired = REQUIRED_DOCUMENTS.filter((d) => d.required).length;
-  const uploadedRequired = REQUIRED_DOCUMENTS.filter(
-    (d) => d.required && uploadedDocTypes.has(d.docType)
-  ).length;
-  const completionPct = totalRequired > 0 ? Math.round((uploadedRequired / totalRequired) * 100) : 0;
 
   // Handlers
   const handleUploadClick = (docType: DocumentType) => {
@@ -752,8 +751,7 @@ export const DocumentsSection: React.FC = () => {
   const handleDelete = async (doc: UploadedDocument) => {
     if (!window.confirm(`Delete "${doc.docType}"? This cannot be undone.`)) return;
     try {
-      const urlPrefix = isOnboarding ? "/hrms/employee-onboarding" : "/profile";
-      await api.delete(`${urlPrefix}/documents/${doc.id}`);
+      await api.delete(`/hrms/employee-onboarding/documents/${doc.id}`);
       queryClient.invalidateQueries({ queryKey: [isOnboarding ? 'my-onboarding-draft' : 'my-profile'] });
       refetch?.();
     } catch (err: unknown) {
@@ -765,133 +763,6 @@ export const DocumentsSection: React.FC = () => {
   return (
     <div>
       <div className="space-y-6">
-        {/* ── Progress Banner ──────────────────────────────────────────── */}
-        <div>
-          <Card className="border-border/40 shadow-lg shadow-black/[0.02] bg-gradient-to-r from-primary/[0.03] via-background to-primary/[0.02] backdrop-blur-sm overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                      <Sparkles className="h-7 w-7 text-primary" />
-                    </div>
-                    {completionPct === 100 && (
-                      <div className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-white" />
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold mb-0.5">Document Submission</h3>
-                    <p className="text-xs text-muted-foreground">
-                      {completionPct === 100
-                        ? "All required documents uploaded! 🎉"
-                        : `${requiredPendingCount} required document${requiredPendingCount !== 1 ? "s" : ""} remaining`}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 w-full sm:w-auto">
-                  <div className="flex-1 sm:w-48">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
-                        Progress
-                      </span>
-                      <span className="text-sm font-black text-primary">{completionPct}%</span>
-                    </div>
-                    <div className="h-2.5 rounded-full bg-muted/50 overflow-hidden">
-                      <div
-                        className={cn(
-                          "h-full rounded-full",
-                          completionPct === 100
-                            ? "bg-gradient-to-r from-emerald-500 to-emerald-400"
-                            : "bg-gradient-to-r from-primary to-primary/80"
-                        )}
-                        style={{ width: `${completionPct}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div className="text-right hidden sm:block">
-                    <p className="text-2xl font-black tracking-tight">
-                      {uploadedRequired}/{totalRequired}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
-                      Required
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* ── Stats Grid ──────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {[
-            {
-              label: "Total Uploaded",
-              value: DOCUMENTS.length,
-              icon: FileText,
-              color: "text-primary",
-              bg: "bg-primary/10",
-              borderColor: "border-primary/10",
-            },
-            {
-              label: "Approved",
-              value: approvedCount,
-              icon: FileCheck,
-              color: "text-emerald-600",
-              bg: "bg-emerald-500/10",
-              borderColor: "border-emerald-500/10",
-            },
-            {
-              label: "Pending Review",
-              value: pendingVerificationCount,
-              icon: FileClock,
-              color: "text-amber-600",
-              bg: "bg-amber-500/10",
-              borderColor: "border-amber-500/10",
-            },
-            {
-              label: "Rejected",
-              value: rejectedCount,
-              icon: FileX,
-              color: "text-destructive",
-              bg: "bg-destructive/10",
-              borderColor: "border-destructive/10",
-            },
-            {
-              label: "Not Uploaded",
-              value: pendingDocuments.length,
-              icon: CloudUpload,
-              color: "text-muted-foreground",
-              bg: "bg-muted/30",
-              borderColor: "border-border/30",
-            },
-          ].map((stat) => (
-            <Card
-              key={stat.label}
-              className={cn(
-                "border shadow-lg shadow-black/[0.02] bg-muted/20 backdrop-blur-sm hover:bg-muted/30 transition-all duration-300",
-                stat.borderColor
-              )}
-            >
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", stat.bg)}>
-                  <stat.icon className={cn("h-4.5 w-4.5", stat.color)} />
-                </div>
-                <div>
-                  <p className="text-xl font-black tracking-tight">
-                    {stat.value}
-                  </p>
-                  <p className="text-[9px] uppercase tracking-[0.1em] text-muted-foreground font-semibold leading-tight">
-                    {stat.label}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
         {/* ── View Toggle + Search + Filters ─────────────────────────── */}
         <div className="space-y-4">
           {/* View Toggle */}
@@ -920,11 +791,6 @@ export const DocumentsSection: React.FC = () => {
               >
                 <CloudUpload className="h-3.5 w-3.5" />
                 To Upload ({pendingDocuments.length})
-                {requiredPendingCount > 0 && (
-                  <span className="ml-0.5 min-w-[18px] h-[18px] rounded-full bg-destructive text-destructive-foreground text-[9px] flex items-center justify-center font-bold px-1">
-                    {requiredPendingCount}
-                  </span>
-                )}
               </Button>
             </div>
 
@@ -944,6 +810,10 @@ export const DocumentsSection: React.FC = () => {
             {[{ label: "All", value: "all" }, ...categories.map((c) => ({ label: c, value: c }))].map((cat) => {
               const catConf = cat.value !== "all" ? CATEGORY_CONFIG[cat.value] : null;
               const CIcon = catConf?.icon;
+              const sourceDocs = activeView === "uploaded" ? DOCUMENTS : pendingDocuments;
+              const count = cat.value === "all"
+                ? sourceDocs.length
+                : sourceDocs.filter((d) => d.docCategory === cat.value).length;
               return (
                 <Button
                   key={cat.value}
@@ -957,6 +827,9 @@ export const DocumentsSection: React.FC = () => {
                 >
                   {CIcon && <CIcon className="h-3 w-3" />}
                   {cat.label}
+                  <span className="ml-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-muted-foreground/10 text-[9px] flex items-center justify-center font-bold">
+                    {count}
+                  </span>
                 </Button>
               );
             })}
@@ -976,7 +849,6 @@ export const DocumentsSection: React.FC = () => {
                         onView={handleView}
                         onReupload={handleReupload}
                         onDelete={handleDelete}
-                        isOnboarding={data.isOnboarding}
                       />
                     ))}
                   </div>
@@ -1006,34 +878,15 @@ export const DocumentsSection: React.FC = () => {
               </div>
           ) : (
               <div>
-                {/* Required Docs Alert */}
-                {requiredPendingCount > 0 && activeCategory === "all" && !searchQuery && (
-                  <div className="mb-4 flex items-start gap-3 p-4 rounded-2xl bg-amber-500/5 border border-amber-500/15">
-                    <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-sm font-bold text-amber-700 mb-0.5">
-                        {requiredPendingCount} Required Document{requiredPendingCount !== 1 ? "s" : ""} Missing
-                      </p>
-                      <p className="text-xs text-amber-600/80">
-                        Please upload all required documents marked with a red badge to complete your onboarding.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
                 {filteredPending.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {/* Sort: required first */}
-                    {[...filteredPending]
-                      .sort((a, b) => (a.required === b.required ? 0 : a.required ? -1 : 1))
-                      .map((doc) => (
-                        <PendingUploadCard
-                          key={doc.id}
-                          doc={doc}
-                          onUpload={handleUploadClick}
-                          isOnboarding={data.isOnboarding}
-                        />
-                      ))}
+                    {filteredPending.map((doc) => (
+                      <PendingUploadCard
+                        key={doc.id}
+                        doc={doc}
+                        onUpload={handleUploadClick}
+                      />
+                    ))}
                   </div>
                 ) : (
                   <Card className="bg-emerald-500/5 border-emerald-500/15">
@@ -1045,7 +898,7 @@ export const DocumentsSection: React.FC = () => {
                       <p className="text-xs text-emerald-600/70">
                         {searchQuery || activeCategory !== "all"
                           ? "No pending documents match your filter"
-                          : "You've uploaded all required and optional documents"}
+                          : "You've uploaded all documents from the list"}
                       </p>
                     </CardContent>
                   </Card>
@@ -1053,66 +906,6 @@ export const DocumentsSection: React.FC = () => {
               </div>
           )}
         </div>
-
-        {/* ── Category-wise Summary (Collapsed) ──────────────────────── */}
-        {activeView === "uploaded" && DOCUMENTS.length > 0 && (
-          <div>
-            <Card className="border-border/30 bg-muted/10 backdrop-blur-sm">
-              <CardContent className="p-5">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
-                  <Info className="h-3.5 w-3.5" />
-                  Category Summary
-                </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {Object.entries(CATEGORY_CONFIG).map(([category, config]) => {
-                    const CIcon = config.icon;
-                    const catDocs = DOCUMENTS.filter((d) => d.docCategory === category);
-                    const catTotal = REQUIRED_DOCUMENTS.filter((d) => d.docCategory === category).length;
-                    const catApproved = catDocs.filter((d) => d.verificationStatus === "approved").length;
-
-                    return (
-                      <div
-                        key={category}
-                        className={cn(
-                          "p-3 rounded-xl border transition-all duration-200 hover:bg-muted/20 cursor-pointer",
-                          config.borderColor
-                        )}
-                        onClick={() => {
-                          setActiveCategory(category);
-                          setActiveView("uploaded");
-                        }}
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className={cn("h-7 w-7 rounded-lg flex items-center justify-center", config.bg)}>
-                            <CIcon className={cn("h-3.5 w-3.5", config.color)} />
-                          </div>
-                          <ChevronRight className="h-3 w-3 text-muted-foreground/30 ml-auto" />
-                        </div>
-                        <p className="text-[10px] font-semibold text-muted-foreground truncate mb-1">
-                          {category}
-                        </p>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-black">
-                            {catDocs.length}/{catTotal}
-                          </span>
-                          <span className="text-[9px] text-muted-foreground">uploaded</span>
-                        </div>
-                        {catDocs.length > 0 && (
-                          <div className="h-1.5 rounded-full bg-muted/50 mt-2 overflow-hidden">
-                            <div
-                              className={cn("h-full rounded-full transition-all duration-500", config.bg.replace("/10", ""))}
-                              style={{ width: `${(catApproved / catDocs.length) * 100}%` }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
 
       {/* ── Dialogs ─────────────────────────────────────────────────── */}
@@ -1123,13 +916,13 @@ export const DocumentsSection: React.FC = () => {
         isReupload={isReupload}
         existingDoc={selectedUploadedDoc}
         onSuccess={handleUploadSuccess}
-        isOnboarding={isOnboarding}
       />
 
       <PreviewDialog
         open={previewDialogOpen}
         onOpenChange={setPreviewDialogOpen}
         document={selectedUploadedDoc}
+        onReupload={handleReupload}
       />
     </div>
   );

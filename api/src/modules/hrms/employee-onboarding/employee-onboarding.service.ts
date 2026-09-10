@@ -288,8 +288,12 @@ export class EmployeeOnboardingService {
       .limit(1);
     
     const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed'; 
-    if (!isOnboarding) {
-      throw new BadRequestException('No active onboarding request found for this user.');
+    // Fully-completed users still get their onboarding data back so the profile
+    // page can prefill the per-stage tabs; `isOnboarding` only tells the client
+    // whether the wizard flow is still in progress. Edit guards further below
+    // still prevent modifying HR-approved entries.
+    if (activeReqs.length === 0) {
+      throw new BadRequestException('No onboarding request found for this user.');
     }
 
     const onboardingId = activeReqs[0].id;
@@ -560,7 +564,7 @@ export class EmployeeOnboardingService {
 
     return {
       currentUser,
-      isOnboarding: true,
+      isOnboarding,
       onboardingStatus,
       profile,
       address,
@@ -581,10 +585,10 @@ export class EmployeeOnboardingService {
       .orderBy(desc(onboardingRequests.createdAt))
       .limit(1);
     
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-
-    if (!isOnboarding) {
-      throw new BadRequestException('No active onboarding request found.');
+    // Stage-level approved guards below are the lock; a fully_completed
+    // request must not block editing a stage that is still pending/rejected.
+    if (activeReqs.length === 0) {
+      throw new BadRequestException('No onboarding request found for this user.');
     }
 
     const onboardingId = activeReqs[0].id;
@@ -1021,7 +1025,7 @@ export class EmployeeOnboardingService {
 
     const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
 
-    if (!isOnboarding) {
+    if (activeReqs.length === 0) {
       throw new BadRequestException('Bank details can only be modified during onboarding.');
     }
 
@@ -1112,9 +1116,7 @@ export class EmployeeOnboardingService {
       .orderBy(desc(onboardingRequests.createdAt))
       .limit(1);
 
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-
-    if (!isOnboarding) {
+    if (activeReqs.length === 0) {
       throw new BadRequestException('Education details can only be modified during onboarding.');
     }
 
@@ -1285,9 +1287,7 @@ export class EmployeeOnboardingService {
       .orderBy(desc(onboardingRequests.createdAt))
       .limit(1);
 
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-
-    if (!isOnboarding) {
+    if (activeReqs.length === 0) {
       throw new BadRequestException('Experience details can only be modified during onboarding.');
     }
 
@@ -1460,9 +1460,9 @@ export class EmployeeOnboardingService {
       .limit(1);
     
     const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-    const onboardingId = isOnboarding ? activeReqs[0].id : null;
+    const onboardingId = activeReqs.length > 0 ? activeReqs[0].id : null;
 
-    if (!isOnboarding) {
+    if (activeReqs.length === 0) {
       throw new BadRequestException('Documents can only be uploaded during onboarding.');
     }
 
@@ -1543,9 +1543,7 @@ export class EmployeeOnboardingService {
       .orderBy(desc(onboardingRequests.createdAt))
       .limit(1);
     
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-
-    if (!isOnboarding) {
+    if (activeReqs.length === 0) {
       throw new BadRequestException('Documents can only be modified during onboarding.');
     }
 
@@ -1631,9 +1629,7 @@ export class EmployeeOnboardingService {
       .orderBy(desc(onboardingRequests.createdAt))
       .limit(1);
     
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-
-    if (!isOnboarding) {
+    if (activeReqs.length === 0) {
       throw new BadRequestException('Documents can only be deleted during onboarding.');
     }
 
