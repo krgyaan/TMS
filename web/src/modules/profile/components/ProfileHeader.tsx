@@ -7,7 +7,6 @@ import {
   Mail,
   Phone,
   MapPin,
-  Shield,
   BadgeCheck,
   Hash,
   Briefcase,
@@ -220,16 +219,6 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = () => {
                   <KeyRound className="mr-2 h-3.5 w-3.5" />
                   Change Password
                 </Button>
-
-                <div className="rounded-xl border border-border/40 bg-muted/25 px-3.5 py-3">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-foreground/80">
-                    <Shield className="h-3.5 w-3.5 text-primary/60" />
-                    Keep details accurate
-                  </div>
-                  <p className="mt-1 text-[11px] text-muted-foreground/60 leading-relaxed">
-                    Updated info helps HR verify your onboarding faster.
-                  </p>
-                </div>
               </div>
             </div>
           </div>
