@@ -300,6 +300,19 @@ export const TenderInfoSheetPayloadSchema = z
                 });
             }
         }
+
+        // Each client requires a name (enforced in ClientSchema) and email OR phone
+        if (data.clients) {
+            data.clients.forEach((client, index) => {
+                if (!client.clientEmail && !client.clientMobile) {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message: "Either email or phone is required",
+                        path: ["clients", index, "clientMobile"],
+                    });
+                }
+            });
+        }
     });
 
 export type TenderInfoSheetPayload = z.infer<typeof TenderInfoSheetPayloadSchema>;

@@ -1124,6 +1124,64 @@ export class TenderInfoSheetsService {
                         : 'Tender info sheet updated',
             );
 
+            // Timer transition: when re-filling after TL marked the sheet incomplete,
+            // stop the resumed info-sheet timer and resume the TL approval timer with
+            // its remaining time.
+            if (prevStatus === 29) {
+                try {
+                    try {
+                        await this.timersService.stopTimer({
+                            entityType: 'TENDER',
+                            entityId: tenderId,
+                            stage: 'tender_info_sheet',
+                            userId: changedBy,
+                            reason: 'Tender info sheet completed (re-filled)',
+                        });
+                    } catch (error) {
+                        if (error instanceof ConflictException) {
+                            this.logger.warn(`Timer conflict for tender_info_sheet for tender ${tenderId} — skipping`);
+                        } else {
+                            this.logger.warn(
+                                `Failed to stop tender_info_sheet timer for tender ${tenderId}:`,
+                                error
+                            );
+                        }
+                    }
+                    try {
+                        const prevApprovalTimer = await this.timersService.getTimer(
+                            'TENDER',
+                            tenderId,
+                            'tender_approval'
+                        );
+                        const resumeMs = prevApprovalTimer?.remainingTimeMs ?? 0;
+                        const tenderForTimer = await this.tenderInfosService.findById(tenderId);
+
+                        await this.timersService.startTimer({
+                            entityType: 'TENDER',
+                            entityId: tenderId,
+                            stage: 'tender_approval',
+                            userId: changedBy,
+                            assignedUserId: tenderForTimer?.teamMember ?? changedBy,
+                            allocatedTimeMs: resumeMs,
+                        });
+                    } catch (error) {
+                        if (error instanceof ConflictException) {
+                            this.logger.warn(`Timer conflict for tender_approval for tender ${tenderId} — skipping`);
+                        } else {
+                            this.logger.warn(
+                                `Failed to start tender_approval timer for tender ${tenderId}:`,
+                                error
+                            );
+                        }
+                    }
+                } catch (error) {
+                    this.logger.error(
+                        `Failed to transition timers for tender ${tenderId}:`,
+                        error
+                    );
+                }
+            }
+
             await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
 
             return result;
