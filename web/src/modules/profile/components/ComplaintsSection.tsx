@@ -29,10 +29,12 @@ import {
   Shield,
   Sparkles,
   Tag,
+  Trash2,
   X,
 } from "lucide-react";
 import React, { useState } from "react";
 import { useProfileContext } from "../contexts/ProfileContext";
+import { useDeleteComplaint } from "@/hooks/api/useComplaints";
 import { formatDate } from "../utils";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -45,11 +47,14 @@ import { formatDate } from "../utils";
 interface ComplaintCardProps {
   complaint: Complaint;
   onClick: (c: Complaint) => void;
+  /** Only rendered for open complaints (server rejects the rest) */
+  onDelete?: (c: Complaint) => void;
 }
 
 const ComplaintCard: React.FC<ComplaintCardProps> = ({
   complaint: c,
   onClick,
+  onDelete,
 }) => {
   const statusConfig = STATUS_CONFIG[c.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.open;
   const priorityConfig =
@@ -177,6 +182,26 @@ const ComplaintCard: React.FC<ComplaintCardProps> = ({
             {c.attachments.length}
           </span>
         )}
+
+        {c.status === "open" && onDelete && (
+          <button
+            type="button"
+            aria-label="Delete complaint"
+            className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (
+                window.confirm(
+                  `Delete "${c.subject}"? This cannot be undone.`
+                )
+              ) {
+                onDelete(c);
+              }
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -189,6 +214,7 @@ export const ComplaintsSection: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<string>("all");
+  const deleteComplaint = useDeleteComplaint();
 
   // Complaints live in the HRMS complaints module — fetched directly
   const { data: myComplaints, isLoading: complaintsLoading } = useQuery({
@@ -249,6 +275,10 @@ export const ComplaintsSection: React.FC = () => {
 
   const handleComplaintClick = (c: Complaint) => {
     navigate(`/profile/support/complaints/${c.id}`);
+  };
+
+  const handleDeleteComplaint = (c: Complaint) => {
+    deleteComplaint.mutate(c.id);
   };
 
   // ─── EMPTY STATE ────────────────────────────────────────────────────────
@@ -464,6 +494,7 @@ export const ComplaintsSection: React.FC = () => {
                   key={c.id}
                   complaint={c}
                   onClick={handleComplaintClick}
+                  onDelete={handleDeleteComplaint}
                 />
               ))}
             </div>

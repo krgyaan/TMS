@@ -62,6 +62,19 @@ export const useCreateComplaint = () => {
   });
 };
 
+/** Delete own complaint — server allows only while status is "open". */
+export const useDeleteComplaint = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => complaintsService.remove(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: complaintsKey.all });
+      toast.success("Complaint deleted successfully");
+    },
+    onError: showErrorToast,
+  });
+};
+
 /** HR/admin lifecycle status update. */
 export const useUpdateComplaintStatus = () => {
   const queryClient = useQueryClient();

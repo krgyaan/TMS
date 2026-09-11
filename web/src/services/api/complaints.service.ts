@@ -66,6 +66,11 @@ class ComplaintsService extends BaseApiService {
   async create(data: CreateComplaintDto): Promise<Complaint> {
     return this.post<Complaint>("", data);
   }
+
+  /** Delete own complaint — server allows only while status is "open". */
+  async remove(id: number): Promise<{ success: boolean; message: string }> {
+    return this.delete<{ success: boolean; message: string }>(`/${id}`);
+  }
 }
 
 export const complaintsService = new ComplaintsService();
