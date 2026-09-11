@@ -38,7 +38,7 @@ export default function ComplaintViewPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-6 max-w-4xl">
+      <div className="space-y-4">
         <Card>
           <CardContent className="p-6 space-y-4">
             <Skeleton className="h-8 w-2/3" />
@@ -74,7 +74,7 @@ export default function ComplaintViewPage() {
   const TypeIcon = typeConfig?.icon || HelpCircle;
 
   return (
-    <div className="container mx-auto py-6 max-w-4xl space-y-4">
+    <div className="space-y-4">
       <Button
         variant="ghost"
         onClick={() => navigate(-1)}
@@ -138,7 +138,7 @@ export default function ComplaintViewPage() {
 
 function InvalidIdState({ onBack }: { onBack: () => void }) {
   return (
-    <div className="container mx-auto py-6 max-w-4xl">
+    <div className="space-y-4">
       <Card>
         <CardContent className="flex flex-col items-center justify-center h-64">
           <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
@@ -162,7 +162,7 @@ export function NotFoundState({
   onBack: () => void;
 }) {
   return (
-    <div className="container mx-auto py-6 max-w-4xl">
+    <div className="space-y-4">
       <Card>
         <CardContent className="flex flex-col items-center justify-center h-64">
           <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />

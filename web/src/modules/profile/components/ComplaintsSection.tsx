@@ -1,19 +1,11 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/axios";
 import { useNavigate } from "react-router-dom";
-import ComplaintView from "@/modules/hrms/complaints/components/ComplaintView";
 import {
   COMPLAINT_TYPES,
   PRIORITY_CONFIG,
@@ -26,7 +18,6 @@ import {
   ChevronRight,
   Clock,
   Filter,
-  HelpCircle,
   MessageSquare,
   Paperclip,
   Plus,
@@ -43,91 +34,6 @@ import { formatDate } from "../utils";
 
 // (Complaint type + status/priority/type configs live in
 //  @/modules/hrms/complaints/helpers/types)
-
-// ─── COMPLAINT DETAIL DIALOG ────────────────────────────────────────────────
-
-interface ComplaintDetailDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  complaint: Complaint | null;
-}
-
-const ComplaintDetailDialog: React.FC<ComplaintDetailDialogProps> = ({
-  open,
-  onOpenChange,
-  complaint: c,
-}) => {
-
-  if (!c) return null;
-
-  const statusConfig = STATUS_CONFIG[c.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.open;
-  const StatusIcon = statusConfig.icon;
-  const priorityConfig =
-    PRIORITY_CONFIG[c.priority as keyof typeof PRIORITY_CONFIG] || PRIORITY_CONFIG.medium;
-  const PriorityIcon = priorityConfig.icon;
-  const typeConfig = COMPLAINT_TYPES.find((t) => t.value === c.complaintType);
-  const TypeIcon = typeConfig?.icon || HelpCircle;
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl rounded-2xl border-border/40 bg-background/95 backdrop-blur-xl p-0 overflow-hidden max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="relative px-6 pt-6 pb-4 shrink-0">
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.03] to-transparent" />
-          <DialogHeader className="relative">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shadow-lg shadow-primary/10">
-                  <TypeIcon className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <DialogTitle className="text-lg font-bold leading-tight">
-                    {c.subject}
-                  </DialogTitle>
-                  <DialogDescription className="text-xs mt-1 flex items-center gap-2">
-                    <span className="font-mono font-semibold">
-                      {c.complaintCode}
-                    </span>
-                    <span className="text-primary/20">•</span>
-                    <span>{typeConfig?.label || c.complaintType}</span>
-                  </DialogDescription>
-                </div>
-              </div>
-            </div>
-            {/* Status + Priority */}
-            <div className="flex items-center gap-2 mt-3">
-              <Badge
-                variant="outline"
-                className={cn(
-                  "text-[10px] h-6 font-bold rounded-lg",
-                  statusConfig.className
-                )}
-              >
-                <StatusIcon className="h-3 w-3 mr-1" />
-                {statusConfig.label}
-              </Badge>
-              <Badge
-                variant="outline"
-                className={cn(
-                  "text-[10px] h-6 font-bold rounded-lg capitalize",
-                  priorityConfig.className
-                )}
-              >
-                <PriorityIcon className="h-3 w-3 mr-1" />
-                {priorityConfig.label} Priority
-              </Badge>
-            </div>
-          </DialogHeader>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 pb-6 pt-2">
-          <ComplaintView complaint={c} />
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
 
 // ─── COMPLAINT CARD ─────────────────────────────────────────────────────────
 
@@ -253,10 +159,6 @@ export const ComplaintsSection: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(
-    null
-  );
 
   // Complaints live in the HRMS complaints module — fetched directly
   const { data: myComplaints, isLoading: complaintsLoading } = useQuery({
@@ -296,8 +198,7 @@ export const ComplaintsSection: React.FC = () => {
   const totalCount = COMPLAINTS.length;
 
   const handleComplaintClick = (c: Complaint) => {
-    setSelectedComplaint(c);
-    setDetailDialogOpen(true);
+    navigate(`/profile/support/complaints/${c.id}`);
   };
 
   // ─── EMPTY STATE ────────────────────────────────────────────────────────
@@ -645,11 +546,6 @@ export const ComplaintsSection: React.FC = () => {
       </div>
 
       {/* ── Dialogs ─────────────────────────────────────────────────── */}
-      <ComplaintDetailDialog
-        open={detailDialogOpen}
-        onOpenChange={setDetailDialogOpen}
-        complaint={selectedComplaint}
-      />
     </div>
   );
 };
