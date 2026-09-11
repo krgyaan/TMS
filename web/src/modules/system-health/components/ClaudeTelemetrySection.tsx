@@ -31,7 +31,6 @@ import {
     ExternalLink,
     ChevronDown,
     ChevronRight,
-    ArrowUpDown,
     CheckCircle2,
     AlertTriangle,
     ShieldCheck,
@@ -54,6 +53,17 @@ function relativeTime(value?: string | null): string {
     if (h < 24) return `${h}h ago`;
     const d = Math.floor(h / 24);
     return `${d}d ago`;
+}
+
+const inrFormatter = new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+});
+
+function formatInr(value?: number | null): string {
+    return inrFormatter.format(value ?? 0);
 }
 
 function getInitials(name: string): string {
@@ -86,7 +96,7 @@ function CallTypeBadge({ callType }: { callType: string }) {
 }
 
 export function ClaudeTelemetrySection() {
-    const { data: telemetry, isLoading, error, refetch, isFetching } = useClaudeTelemetry();
+    const { data: telemetry, error, refetch, isFetching } = useClaudeTelemetry();
     const [tenderSortBy, setTenderSortBy] = useState<'cost' | 'tokens' | 'recent'>('cost');
     const { data: tendersData, isLoading: tendersLoading, refetch: refetchTenders } = useClaudeTenders(tenderSortBy);
 
@@ -328,10 +338,16 @@ export function ClaudeTelemetrySection() {
                     </div>
                     <div>
                         <div className="text-2xl font-bold tracking-tight text-emerald-600">
-                            ${summary ? summary.estimatedCostUsd.toFixed(4) : '0.0000'}
+                            {formatInr(summary?.estimatedCostInr)}
+                        </div>
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                            ${summary ? summary.estimatedCostUsd.toFixed(4) : '0.0000'} USD
                         </div>
                         <div className="mt-1 text-[11px] text-muted-foreground">
-                            Haiku 4.5 ($1.00/M) · Sonnet 5 ($3.00/M)
+                            Haiku 4.5 ($1.00/M) · Sonnet 5 ($2.00/M)
+                        </div>
+                        <div className="mt-0.5 text-[10px] text-muted-foreground/80">
+                            @ ₹{summary?.currency?.usdToInrRate ?? '—'}/USD (rate as of {summary?.currency?.usdToInrRateAsOf ?? 'unknown'} — update periodically)
                         </div>
                     </div>
                 </Card>
@@ -434,7 +450,7 @@ export function ClaudeTelemetrySection() {
                                     <TableHead className="text-xs">Share</TableHead>
                                     <TableHead className="text-xs">In / Out</TableHead>
                                     <TableHead className="text-xs">Requests</TableHead>
-                                    <TableHead className="text-xs">Cost (USD)</TableHead>
+                                    <TableHead className="text-xs">Cost (₹ / $)</TableHead>
                                     <TableHead className="text-xs text-right">Last Active</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -474,8 +490,9 @@ export function ClaudeTelemetrySection() {
                                                     {u.inputTokens.toLocaleString()} / {u.outputTokens.toLocaleString()}
                                                 </TableCell>
                                                 <TableCell className="text-xs">{u.requests}</TableCell>
-                                                <TableCell className="text-xs font-medium text-emerald-600">
-                                                    ${u.estimatedCostUsd.toFixed(4)}
+                                                <TableCell className="text-xs">
+                                                    <div className="font-medium text-emerald-600">{formatInr(u.estimatedCostInr)}</div>
+                                                    <div className="text-[10px] text-muted-foreground">${u.estimatedCostUsd.toFixed(4)}</div>
                                                 </TableCell>
                                                 <TableCell className="text-right text-xs text-muted-foreground">
                                                     {relativeTime(u.lastActiveAt)}
@@ -537,7 +554,7 @@ export function ClaudeTelemetrySection() {
                                     <TableHead className="w-8"></TableHead>
                                     <TableHead className="text-xs">Tender ID</TableHead>
                                     <TableHead className="text-xs">Total Tokens</TableHead>
-                                    <TableHead className="text-xs">Total Cost (USD)</TableHead>
+                                    <TableHead className="text-xs">Total Cost (₹ / $)</TableHead>
                                     <TableHead className="text-xs">Calls Count</TableHead>
                                     <TableHead className="text-xs">Last Extracted</TableHead>
                                     <TableHead className="text-xs text-right">Action</TableHead>
@@ -577,8 +594,9 @@ export function ClaudeTelemetrySection() {
                                                             {item.totalTokens.toLocaleString()}
                                                         </Badge>
                                                     </TableCell>
-                                                    <TableCell className="text-xs font-semibold text-emerald-600">
-                                                        ${item.estimatedCostUsd.toFixed(4)}
+                                                    <TableCell className="text-xs">
+                                                        <div className="font-semibold text-emerald-600">{formatInr(item.estimatedCostInr)}</div>
+                                                        <div className="text-[10px] text-muted-foreground">${item.estimatedCostUsd.toFixed(4)}</div>
                                                     </TableCell>
                                                     <TableCell className="text-xs">{item.totalCalls} pass(es)</TableCell>
                                                     <TableCell className="text-xs text-muted-foreground">
@@ -610,7 +628,7 @@ export function ClaudeTelemetrySection() {
                                                                             <TableHead className="text-[11px] h-7">Input</TableHead>
                                                                             <TableHead className="text-[11px] h-7">Output</TableHead>
                                                                             <TableHead className="text-[11px] h-7">Total</TableHead>
-                                                                            <TableHead className="text-[11px] h-7">Cost</TableHead>
+                                                                            <TableHead className="text-[11px] h-7">Cost (₹ / $)</TableHead>
                                                                             <TableHead className="text-[11px] h-7">Duration</TableHead>
                                                                             <TableHead className="text-[11px] h-7 text-right">Timestamp</TableHead>
                                                                         </TableRow>
@@ -629,8 +647,9 @@ export function ClaudeTelemetrySection() {
                                                                                 <TableCell className="py-1.5 font-semibold">
                                                                                     {c.totalTokens.toLocaleString()}
                                                                                 </TableCell>
-                                                                                <TableCell className="py-1.5 text-emerald-600 font-medium">
-                                                                                    ${c.estimatedCostUsd.toFixed(4)}
+                                                                                <TableCell className="py-1.5">
+                                                                                    <div className="text-emerald-600 font-medium">{formatInr(c.estimatedCostInr)}</div>
+                                                                                    <div className="text-[10px] text-muted-foreground">${c.estimatedCostUsd.toFixed(4)}</div>
                                                                                 </TableCell>
                                                                                 <TableCell className="py-1.5 text-muted-foreground">
                                                                                     {c.durationMs ? `${c.durationMs}ms` : '—'}

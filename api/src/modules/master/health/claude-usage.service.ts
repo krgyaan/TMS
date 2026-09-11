@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { sql, desc, eq, and, gte } from 'drizzle-orm';
 import type { DbInstance } from '@/db';
 import { DRIZZLE } from '@/db/database.module';
@@ -64,6 +65,7 @@ export interface UserUsageItem {
     outputTokens: number;
     requests: number;
     estimatedCostUsd: number;
+    estimatedCostInr: number;
     lastActiveAt: string | null;
 }
 
@@ -76,6 +78,7 @@ export interface TenderCallDetail {
     outputTokens: number;
     totalTokens: number;
     estimatedCostUsd: number;
+    estimatedCostInr: number;
     durationMs: number | null;
     createdAt: string;
 }
@@ -84,9 +87,15 @@ export interface TenderBreakdownItem {
     tenderId: number;
     totalTokens: number;
     estimatedCostUsd: number;
+    estimatedCostInr: number;
     totalCalls: number;
     lastActiveAt: string;
     calls: TenderCallDetail[];
+}
+
+export interface CurrencyMeta {
+    usdToInrRate: number;
+    usdToInrRateAsOf: string;
 }
 
 const TPM_ZSET_KEY = 'claude:tpm:zset';
@@ -103,7 +112,27 @@ export class ClaudeUsageService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         @Inject('REDIS_CONNECTION') private readonly redis: IORedis | null,
+        private readonly configService: ConfigService,
     ) {}
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // USD -> INR CONVERSION (display only; claude_token_usage stays USD)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Reads the configured USD->INR rate + its "as of" date from currency.config.ts.
+     * This is a manually-set snapshot, not a live rate -- logged/returned alongside
+     * every conversion so a stale rate is never mistaken for a live one.
+     */
+    private getCurrencyMeta(): CurrencyMeta {
+        const usdToInrRate = this.configService.get<number>('currency.usdToInrRate') ?? 94.83;
+        const usdToInrRateAsOf = this.configService.get<string>('currency.usdToInrRateAsOf') ?? 'unknown';
+        return { usdToInrRate, usdToInrRateAsOf };
+    }
+
+    private toInr(usdAmount: number, rate: number): number {
+        return Number((usdAmount * rate).toFixed(4));
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // SLIDING WINDOW TPM IMPLEMENTATION (ZSET with ZREMRANGEBYSCORE)
@@ -280,13 +309,18 @@ export class ClaudeUsageService {
     // ─────────────────────────────────────────────────────────────────────────
 
     async getClaudeTelemetry() {
+        const currencyMeta = this.getCurrencyMeta();
         const [currentTpm, statsRes, timeline, userBreakdown, recentCalls] = await Promise.all([
             this.getCurrentTpm(),
-            this.getAggregateStats(),
+            this.getAggregateStats(currencyMeta),
             this.getMinuteTimeline(60),
-            this.getUserBreakdown(),
-            this.getRecentCalls(20),
+            this.getUserBreakdown(currencyMeta),
+            this.getRecentCalls(20, currencyMeta),
         ]);
+
+        this.logger.log(
+            `[CURRENCY] Claude telemetry cost converted using USD->INR rate ${currencyMeta.usdToInrRate} (as of ${currencyMeta.usdToInrRateAsOf}). Update USD_TO_INR_RATE periodically.`,
+        );
 
         return {
             status: 'ok',
@@ -298,11 +332,13 @@ export class ClaudeUsageService {
                 outputTokens: statsRes.outputTokens,
                 cacheTokens: statsRes.cacheTokens,
                 estimatedCostUsd: statsRes.estimatedCostUsd,
+                estimatedCostInr: statsRes.estimatedCostInr,
                 totalRequests: statsRes.totalRequests,
                 activeUsersCount: userBreakdown.length,
                 tpmLimit: 80000,
                 tpmUtilizationPct: Number(((currentTpm / 80000) * 100).toFixed(1)),
                 models: CLAUDE_PRICING,
+                currency: currencyMeta,
             },
             timeline,
             userBreakdown,
@@ -310,10 +346,10 @@ export class ClaudeUsageService {
         };
     }
 
-    private async getAggregateStats() {
+    private async getAggregateStats(currencyMeta: CurrencyMeta) {
         try {
             const res = await this.db.execute(sql`
-                SELECT 
+                SELECT
                     COALESCE(SUM(total_tokens), 0)::bigint as total_tokens,
                     COALESCE(SUM(input_tokens), 0)::bigint as input_tokens,
                     COALESCE(SUM(output_tokens), 0)::bigint as output_tokens,
@@ -323,12 +359,14 @@ export class ClaudeUsageService {
                 FROM claude_token_usage
             `);
             const row = (res.rows?.[0] as Record<string, unknown>) || {};
+            const estimatedCostUsd = Number(parseFloat(String(row.estimated_cost_usd || 0)).toFixed(4));
             return {
                 totalTokens: Number(row.total_tokens || 0),
                 inputTokens: Number(row.input_tokens || 0),
                 outputTokens: Number(row.output_tokens || 0),
                 cacheTokens: Number(row.cache_tokens || 0),
-                estimatedCostUsd: Number(parseFloat(String(row.estimated_cost_usd || 0)).toFixed(4)),
+                estimatedCostUsd,
+                estimatedCostInr: this.toInr(estimatedCostUsd, currencyMeta.usdToInrRate),
                 totalRequests: Number(row.total_requests || 0),
                 peakTpm: 0,
             };
@@ -339,6 +377,7 @@ export class ClaudeUsageService {
                 outputTokens: 0,
                 cacheTokens: 0,
                 estimatedCostUsd: 0,
+                estimatedCostInr: 0,
                 totalRequests: 0,
                 peakTpm: 0,
             };
@@ -405,10 +444,10 @@ export class ClaudeUsageService {
         return timeline;
     }
 
-    private async getUserBreakdown(): Promise<UserUsageItem[]> {
+    private async getUserBreakdown(currencyMeta: CurrencyMeta): Promise<UserUsageItem[]> {
         try {
             const res = await this.db.execute(sql`
-                SELECT 
+                SELECT
                     c.user_id,
                     COALESCE(u.name, 'Unassigned User') as user_name,
                     COALESCE(u.email, 'system@volks.ai') as user_email,
@@ -424,26 +463,31 @@ export class ClaudeUsageService {
                 ORDER BY total_tokens DESC
             `);
 
-            return ((res.rows as Array<Record<string, unknown>>) || []).map((row) => ({
-                userId: Number(row.user_id || 0),
-                name: String(row.user_name),
-                email: String(row.user_email),
-                totalTokens: Number(row.total_tokens || 0),
-                inputTokens: Number(row.input_tokens || 0),
-                outputTokens: Number(row.output_tokens || 0),
-                requests: Number(row.total_requests || 0),
-                estimatedCostUsd: Number(parseFloat(String(row.estimated_cost_usd || 0)).toFixed(4)),
-                lastActiveAt: row.last_active_at ? new Date(String(row.last_active_at)).toISOString() : null,
-            }));
+            return ((res.rows as Array<Record<string, unknown>>) || []).map((row) => {
+                const estimatedCostUsd = Number(parseFloat(String(row.estimated_cost_usd || 0)).toFixed(4));
+                return {
+                    userId: Number(row.user_id || 0),
+                    name: String(row.user_name),
+                    email: String(row.user_email),
+                    totalTokens: Number(row.total_tokens || 0),
+                    inputTokens: Number(row.input_tokens || 0),
+                    outputTokens: Number(row.output_tokens || 0),
+                    requests: Number(row.total_requests || 0),
+                    estimatedCostUsd,
+                    estimatedCostInr: this.toInr(estimatedCostUsd, currencyMeta.usdToInrRate),
+                    lastActiveAt: row.last_active_at ? new Date(String(row.last_active_at)).toISOString() : null,
+                };
+            });
         } catch {
             return [];
         }
     }
 
-    private async getRecentCalls(limit = 20) {
+    private async getRecentCalls(limit = 20, currencyMeta?: CurrencyMeta) {
+        const currency = currencyMeta ?? this.getCurrencyMeta();
         try {
             const res = await this.db.execute(sql`
-                SELECT 
+                SELECT
                     c.id,
                     c.job_id,
                     c.tender_id,
@@ -462,20 +506,24 @@ export class ClaudeUsageService {
                 LIMIT ${limit}
             `);
 
-            return ((res.rows as Array<Record<string, unknown>>) || []).map((row) => ({
-                id: Number(row.id),
-                jobId: row.job_id ? String(row.job_id) : null,
-                tenderId: row.tender_id ? Number(row.tender_id) : null,
-                callType: String(row.call_type),
-                model: String(row.model),
-                userName: String(row.user_name),
-                inputTokens: Number(row.input_tokens || 0),
-                outputTokens: Number(row.output_tokens || 0),
-                totalTokens: Number(row.total_tokens || 0),
-                estimatedCostUsd: Number(parseFloat(String(row.estimated_cost_usd || 0)).toFixed(4)),
-                durationMs: row.duration_ms ? Number(row.duration_ms) : null,
-                createdAt: new Date(String(row.created_at)).toISOString(),
-            }));
+            return ((res.rows as Array<Record<string, unknown>>) || []).map((row) => {
+                const estimatedCostUsd = Number(parseFloat(String(row.estimated_cost_usd || 0)).toFixed(4));
+                return {
+                    id: Number(row.id),
+                    jobId: row.job_id ? String(row.job_id) : null,
+                    tenderId: row.tender_id ? Number(row.tender_id) : null,
+                    callType: String(row.call_type),
+                    model: String(row.model),
+                    userName: String(row.user_name),
+                    inputTokens: Number(row.input_tokens || 0),
+                    outputTokens: Number(row.output_tokens || 0),
+                    totalTokens: Number(row.total_tokens || 0),
+                    estimatedCostUsd,
+                    estimatedCostInr: this.toInr(estimatedCostUsd, currency.usdToInrRate),
+                    durationMs: row.duration_ms ? Number(row.duration_ms) : null,
+                    createdAt: new Date(String(row.created_at)).toISOString(),
+                };
+            });
         } catch {
             return [];
         }
@@ -486,6 +534,7 @@ export class ClaudeUsageService {
     // ─────────────────────────────────────────────────────────────────────────
 
     async getTendersBreakdown(sortBy: 'cost' | 'tokens' | 'recent' = 'cost'): Promise<TenderBreakdownItem[]> {
+        const currencyMeta = this.getCurrencyMeta();
         try {
             // First fetch all calls ordered by tender
             const res = await this.db.execute(sql`
@@ -510,6 +559,7 @@ export class ClaudeUsageService {
 
             for (const row of (res.rows as Array<Record<string, unknown>>) || []) {
                 const tId = Number(row.tender_id);
+                const estimatedCostUsd = Number(parseFloat(String(row.estimated_cost_usd || 0)).toFixed(4));
                 const callDetail: TenderCallDetail = {
                     id: Number(row.id),
                     jobId: row.job_id ? String(row.job_id) : null,
@@ -518,7 +568,8 @@ export class ClaudeUsageService {
                     inputTokens: Number(row.input_tokens || 0),
                     outputTokens: Number(row.output_tokens || 0),
                     totalTokens: Number(row.total_tokens || 0),
-                    estimatedCostUsd: Number(parseFloat(String(row.estimated_cost_usd || 0)).toFixed(4)),
+                    estimatedCostUsd,
+                    estimatedCostInr: this.toInr(estimatedCostUsd, currencyMeta.usdToInrRate),
                     durationMs: row.duration_ms ? Number(row.duration_ms) : null,
                     createdAt: new Date(String(row.created_at)).toISOString(),
                 };
@@ -528,6 +579,7 @@ export class ClaudeUsageService {
                         tenderId: tId,
                         totalTokens: 0,
                         estimatedCostUsd: 0,
+                        estimatedCostInr: 0,
                         totalCalls: 0,
                         lastActiveAt: callDetail.createdAt,
                         calls: [],
@@ -537,6 +589,7 @@ export class ClaudeUsageService {
                 const item = grouped.get(tId)!;
                 item.totalTokens += callDetail.totalTokens;
                 item.estimatedCostUsd = Number((item.estimatedCostUsd + callDetail.estimatedCostUsd).toFixed(4));
+                item.estimatedCostInr = this.toInr(item.estimatedCostUsd, currencyMeta.usdToInrRate);
                 item.totalCalls += 1;
                 item.calls.push(callDetail);
             }

@@ -7,6 +7,11 @@ pillow
 anthropic
 requests
 httpx
+# paddlepaddle 2.6.x and its opencv-python/opencv-contrib-python dependencies
+# ship compiled extensions built against the numpy 1.x ABI; numpy>=2 breaks
+# `import cv2` (and therefore `import paddleocr`) with a hard RuntimeError.
+# Pin below numpy 2 until upgrading to a numpy2-compatible paddle/paddleocr line.
+numpy<2.0
 paddlepaddle>=2.6.0
 paddleocr>=2.8.0
 pyyaml

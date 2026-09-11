@@ -32,6 +32,11 @@ export interface SubHealth<T = Record<string, unknown>> {
     error?: string
 }
 
+export interface ClaudeCurrencyMeta {
+    usdToInrRate: number
+    usdToInrRateAsOf: string
+}
+
 export interface ClaudeTelemetrySummary {
     currentTpm: number
     peakTpm: number
@@ -40,11 +45,13 @@ export interface ClaudeTelemetrySummary {
     outputTokens: number
     cacheTokens: number
     estimatedCostUsd: number
+    estimatedCostInr: number
     totalRequests: number
     activeUsersCount: number
     tpmLimit: number
     tpmUtilizationPct: number
-    models: Record<string, { modelId: string; displayName: string }>
+    models: Record<string, { modelId: string; displayName: string; inputPricePerMillion: number; outputPricePerMillion: number }>
+    currency: ClaudeCurrencyMeta
 }
 
 export interface ClaudeMinuteUsage {
@@ -65,6 +72,7 @@ export interface ClaudeUserUsage {
     outputTokens: number
     requests: number
     estimatedCostUsd: number
+    estimatedCostInr: number
     lastActiveAt: string | null
 }
 
@@ -79,6 +87,7 @@ export interface ClaudeRecentCall {
     outputTokens: number
     totalTokens: number
     estimatedCostUsd: number
+    estimatedCostInr: number
     durationMs: number | null
     createdAt: string
 }
@@ -116,6 +125,7 @@ export interface TenderCallDetail {
     outputTokens: number
     totalTokens: number
     estimatedCostUsd: number
+    estimatedCostInr: number
     durationMs: number | null
     createdAt: string
 }
@@ -124,6 +134,7 @@ export interface TenderBreakdownItem {
     tenderId: number
     totalTokens: number
     estimatedCostUsd: number
+    estimatedCostInr: number
     totalCalls: number
     lastActiveAt: string
     calls: TenderCallDetail[]

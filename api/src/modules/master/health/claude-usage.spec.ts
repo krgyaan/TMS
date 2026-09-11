@@ -16,10 +16,19 @@ describe('ClaudeUsageService & Health Controller RBAC Security', () => {
     let adminUsageService: AdminUsageService;
     let mockRedis: any;
     let mockDb: any;
+    let mockConfigService: any;
     let reflector: Reflector;
     let rolesGuard: RolesGuard;
 
     beforeEach(async () => {
+        mockConfigService = {
+            get: jest.fn((key: string) => {
+                if (key === 'currency.usdToInrRate') return 94.83;
+                if (key === 'currency.usdToInrRateAsOf') return '2026-09-08';
+                return undefined;
+            }),
+        };
+
         mockRedis = {
             pipeline: jest.fn().mockReturnValue({
                 zadd: jest.fn().mockReturnThis(),
@@ -51,7 +60,7 @@ describe('ClaudeUsageService & Health Controller RBAC Security', () => {
                 },
                 {
                     provide: ClaudeUsageService,
-                    useValue: new ClaudeUsageService(mockDb, mockRedis),
+                    useValue: new ClaudeUsageService(mockDb, mockRedis, mockConfigService),
                 },
                 {
                     provide: AdminUsageService,
@@ -131,7 +140,7 @@ describe('ClaudeUsageService & Health Controller RBAC Security', () => {
         });
 
         it('should correctly sum in-memory sliding window when Redis is null', async () => {
-            const inMemoryService = new ClaudeUsageService(mockDb, null);
+            const inMemoryService = new ClaudeUsageService(mockDb, null, mockConfigService);
             const now = 1000000;
             jest.spyOn(Date, 'now').mockReturnValue(now);
 

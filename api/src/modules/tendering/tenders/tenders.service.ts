@@ -21,6 +21,9 @@ import { tenderInfos, type NewTenderInfo, type TenderInfo } from '@db/schemas/te
 import { leadEnquiries } from '@db/schemas/crm/lead-enquiries.schema';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { FileUploadService } from '@/modules/file-upload/file-upload.service';
+import * as fs from 'fs';
+import * as path from 'path';
 import { and, asc, desc, eq, ilike, inArray, isNull, notInArray, or, sql, SQL } from 'drizzle-orm';
 
 export type TenderListFilters = {
@@ -49,6 +52,7 @@ export class TenderInfosService {
         private readonly recipientResolver: RecipientResolver,
         private readonly timersService: TimersService,
         private readonly configService: ConfigService,
+        private readonly fileUploadService: FileUploadService,
     ) {
         this.logger = this.appLogger.withContext(TenderInfosService.name);
     }
@@ -1483,5 +1487,172 @@ export class TenderInfosService {
                 )
             )
             .orderBy(desc(emailLogs.createdAt));
+    }
+
+    /**
+     * Deterministic document classifier: sends the first 5 pages of the uploaded PDF
+     * to VolksAI /classify-document endpoint. If VolksAI is unavailable or file is not a PDF,
+     * falls back gracefully to deterministic keyword classification without failing.
+     */
+    async classifyDocument(filePath: string): Promise<{
+        suggestedType: 'mainTender' | 'atc' | 'boq' | 'other';
+        confidence: number;
+        needsConfirmation: boolean;
+        reason: string;
+        scores?: Record<string, number>;
+    }> {
+        const volksAiUrl =
+            this.configService.get<string>('volksAi.serviceUrl') ||
+            this.configService.get<string>('volksAi.VOLKS_AI_SERVICE_URL') ||
+            'http://localhost:8000';
+
+        try {
+            let resolvedPath = filePath;
+            if (this.fileUploadService) {
+                try {
+                    resolvedPath = this.fileUploadService.getAbsolutePath(filePath);
+                } catch {
+                    resolvedPath = path.resolve(filePath);
+                }
+            }
+
+            if (!fs.existsSync(resolvedPath)) {
+                return this.fallbackFilenameClassify(filePath);
+            }
+
+            const ext = path.extname(resolvedPath).toLowerCase();
+            if (ext !== '.pdf') {
+                return this.fallbackFilenameClassify(filePath);
+            }
+
+            const fileBuffer = await fs.promises.readFile(resolvedPath);
+            const fileName = path.basename(resolvedPath);
+            const blob = new Blob([fileBuffer], { type: 'application/pdf' });
+
+            const formData = new FormData();
+            formData.append('pdf_file', blob, fileName);
+
+            const response = await fetch(`${volksAiUrl}/classify-document`, {
+                method: 'POST',
+                body: formData,
+                signal: AbortSignal.timeout(10000),
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                this.logger.warn(`VolksAI /classify-document returned ${response.status}: ${errText}`);
+                return this.fallbackFilenameClassify(filePath);
+            }
+
+            const data = (await response.json()) as {
+                suggestedType: 'mainTender' | 'atc' | 'boq' | 'other';
+                confidence: number;
+                needsConfirmation: boolean;
+                reason: string;
+                scores?: Record<string, number>;
+            };
+
+            return {
+                suggestedType: data.suggestedType || 'other',
+                confidence: Number(data.confidence ?? 0),
+                needsConfirmation: Boolean(data.needsConfirmation),
+                reason: data.reason || 'confident',
+                scores: data.scores || {},
+            };
+        } catch (err: unknown) {
+            this.logger.warn(`Classification error via VolksAI: ${(err as Error).message}. Using deterministic fallback.`);
+            return this.fallbackFilenameClassify(filePath);
+        }
+    }
+
+    /**
+     * Fallback deterministic classifier based on keyword lists matching document_classifier.py
+     */
+    fallbackFilenameClassify(filePath: string): {
+        suggestedType: 'mainTender' | 'atc' | 'boq' | 'other';
+        confidence: number;
+        needsConfirmation: boolean;
+        reason: string;
+        scores: Record<string, number>;
+    } {
+        const lowerName = path.basename(filePath).toLowerCase();
+
+        // 1. BOQ (Bill of Quantities) keywords
+        const boqKeywords = [
+            'boq', 'bill of quantities', 'billofquantities', 'bill_of_quantities',
+            'price schedule', 'priceschedule', 'price_schedule',
+            'schedule of rates', 'scheduleofrates', 'schedule_of_rates',
+        ];
+        const isBoq = boqKeywords.some((kw) => lowerName.includes(kw));
+
+        // 2. ATC (Additional Terms & Conditions) keywords & exclusion terms
+        const atcExcludingTerms = [
+            'mse', 'mii', 'gtc', 'rules', 'list-of-categories', 'catalog',
+            'specification', 'spec', 'drawing', 'schedule', 'boq',
+        ];
+        const atcHighPriority = ['atc', 'tendoc', 'buyer1', 'buyer_uploaded'];
+        const atcFallback = ['upload', 'shared', 'doc', 'buyer', 'resource'];
+
+        const hasAtcExclusion = atcExcludingTerms.some((term) => lowerName.includes(term));
+        const isHighAtc = !hasAtcExclusion && atcHighPriority.some((kw) => lowerName.includes(kw));
+        const isFallbackAtc = !hasAtcExclusion && atcFallback.some((kw) => lowerName.includes(kw));
+
+        // 3. Main Tender (NIT) hints
+        const mainTenderHints = ['nit', 'tender', 'rfp', 'invitation', 'bid_document', 'biddocument'];
+        const isMainTender = !isBoq && !isHighAtc && mainTenderHints.some((kw) => lowerName.includes(kw));
+
+        const scores: Record<string, number> = {
+            mainTender: isMainTender ? 85.0 : 0.0,
+            atc: isHighAtc ? 95.0 : isFallbackAtc ? 60.0 : 0.0,
+            boq: isBoq ? 90.0 : 0.0,
+        };
+
+        if (isHighAtc) {
+            return {
+                suggestedType: 'atc',
+                confidence: 95.0,
+                needsConfirmation: false,
+                reason: 'confident',
+                scores,
+            };
+        }
+
+        if (isBoq) {
+            return {
+                suggestedType: 'boq',
+                confidence: 90.0,
+                needsConfirmation: false,
+                reason: 'confident',
+                scores,
+            };
+        }
+
+        if (isMainTender) {
+            return {
+                suggestedType: 'mainTender',
+                confidence: 85.0,
+                needsConfirmation: false,
+                reason: 'confident',
+                scores,
+            };
+        }
+
+        if (isFallbackAtc) {
+            return {
+                suggestedType: 'atc',
+                confidence: 60.0,
+                needsConfirmation: true,
+                reason: 'low_confidence',
+                scores,
+            };
+        }
+
+        return {
+            suggestedType: 'other',
+            confidence: 0.0,
+            needsConfirmation: true,
+            reason: 'low_confidence',
+            scores,
+        };
     }
 }

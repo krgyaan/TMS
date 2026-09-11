@@ -2,6 +2,7 @@ import { AppController } from "@/app.controller";
 import { AppService } from "@/app.service";
 import appConfig, { validateAppEnv } from "@/config/app.config";
 import authConfig, { validateAuthEnv } from "@/config/auth.config";
+import currencyConfig, { validateCurrencyEnv } from "@/config/currency.config";
 import dbConfig, { validateDbEnv } from "@/config/db.config";
 import googleConfig, { validateGoogleEnv } from "@/config/google.config";
 import openwaConfig, { validateOpenwaEnv } from "@/config/openwa.config";
@@ -152,7 +153,7 @@ import { WebhookController } from "./webhook/webhook.controller";
         ConfigModule.forRoot({
             isGlobal: true,
             expandVariables: true,
-            load: [appConfig, dbConfig, googleConfig, authConfig, redisConfig, openwaConfig, volksAiConfig],
+            load: [appConfig, dbConfig, googleConfig, authConfig, redisConfig, openwaConfig, volksAiConfig, currencyConfig],
             validate: env => ({
                 ...validateAppEnv(env),
                 ...validateDbEnv(env),
@@ -161,6 +162,7 @@ import { WebhookController } from "./webhook/webhook.controller";
                 ...validateRedisEnv(env),
                 ...validateOpenwaEnv(env),
                 ...validateVolksAiEnv(env),
+                ...validateCurrencyEnv(env),
             }),
         }),
         LoggerModule,

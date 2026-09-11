@@ -38,6 +38,7 @@ interface FileUploaderProps {
     allowedExtensions?: string[];
     allowedMimeTypes?: string[];
     hint?: string;
+    renderItem?: (filePath: string, onRemove: () => void) => React.ReactNode;
 }
 
 export function FileUploader({
@@ -51,6 +52,7 @@ export function FileUploader({
     allowedExtensions,
     allowedMimeTypes,
     hint,
+    renderItem,
 }: FileUploaderProps) {
     const { data: config, isLoading, error } = useFileConfig(context);
     const { upload, deleteFile, progress, isUploading } = useFileUpload(context);
@@ -170,6 +172,9 @@ export function FileUploader({
             {value.length > 0 && (
                 <div className="space-y-2">
                     {value.map((filePath) => {
+                        if (renderItem) {
+                            return <div key={filePath}>{renderItem(filePath, () => handleRemove(filePath))}</div>;
+                        }
                         const fileName = parseFileMeta(filePath).displayName;
                         return (
                             <div

@@ -91,12 +91,6 @@ const getTenderDocumentItems = (documentsJson: string | null | undefined): Tende
     return items;
 };
 
-/**
- * Parse documents field to array of file paths (supports structured JSON & legacy flat array)
- */
-const parseDocuments = (documents: string | null | undefined): string[] => {
-    return getTenderDocumentItems(documents).map(item => item.filePath);
-};
 
 /**
  * Extract filename from file path

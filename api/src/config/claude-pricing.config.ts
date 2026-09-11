@@ -22,13 +22,17 @@ export const CLAUDE_PRICING: Record<string, ModelPricing> = {
         cacheWritePricePerMillion: 1.25,
         cacheReadPricePerMillion: 0.10,
     },
+    // Corrected 2026-09-11: previous values ($3.00/$15.00/$3.75/$0.30) were stale
+    // and did not match Anthropic's current published Sonnet 5 pricing. Verified
+    // against https://platform.claude.com/docs/en/about-claude/pricing and against
+    // the already-correct rates in volksAi/app/services/llm_field_resolver.py.
     'claude-sonnet-5': {
         modelId: 'claude-sonnet-5',
         displayName: 'Claude Sonnet 5',
-        inputPricePerMillion: 3.00,
-        outputPricePerMillion: 15.00,
-        cacheWritePricePerMillion: 3.75,
-        cacheReadPricePerMillion: 0.30,
+        inputPricePerMillion: 2.00,
+        outputPricePerMillion: 10.00,
+        cacheWritePricePerMillion: 2.50,
+        cacheReadPricePerMillion: 0.20,
     },
 };
 
