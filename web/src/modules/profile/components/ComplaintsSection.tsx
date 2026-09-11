@@ -23,6 +23,7 @@ import {
   Lightbulb,
   MessageSquare,
   Paperclip,
+  Pencil,
   Plus,
   RotateCcw,
   Search,
@@ -48,12 +49,14 @@ interface ComplaintCardProps {
   complaint: Complaint;
   onClick: (c: Complaint) => void;
   /** Only rendered for open complaints (server rejects the rest) */
+  onEdit?: (c: Complaint) => void;
   onDelete?: (c: Complaint) => void;
 }
 
 const ComplaintCard: React.FC<ComplaintCardProps> = ({
   complaint: c,
   onClick,
+  onEdit,
   onDelete,
 }) => {
   const statusConfig = STATUS_CONFIG[c.status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.open;
@@ -176,32 +179,48 @@ const ComplaintCard: React.FC<ComplaintCardProps> = ({
           View Details
         </Button>
 
-        {c.attachments && c.attachments.length > 0 && (
-          <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-            <Paperclip className="h-3.5 w-3.5" />
-            {c.attachments.length}
-          </span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {c.attachments && c.attachments.length > 0 && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Paperclip className="h-3.5 w-3.5" />
+              {c.attachments.length}
+            </span>
+          )}
 
-        {c.status === "open" && onDelete && (
-          <button
-            type="button"
-            aria-label="Delete complaint"
-            className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (
-                window.confirm(
-                  `Delete "${c.subject}"? This cannot be undone.`
-                )
-              ) {
-                onDelete(c);
-              }
-            }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        )}
+          {c.status === "open" && onEdit && (
+            <button
+              type="button"
+              aria-label="Edit complaint"
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(c);
+              }}
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          )}
+
+          {c.status === "open" && onDelete && (
+            <button
+              type="button"
+              aria-label="Delete complaint"
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (
+                  window.confirm(
+                    `Delete "${c.subject}"? This cannot be undone.`
+                  )
+                ) {
+                  onDelete(c);
+                }
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -494,6 +513,9 @@ export const ComplaintsSection: React.FC = () => {
                   key={c.id}
                   complaint={c}
                   onClick={handleComplaintClick}
+                  onEdit={(c) =>
+                    navigate(`/profile/support/complaints/${c.id}/edit`)
+                  }
                   onDelete={handleDeleteComplaint}
                 />
               ))}

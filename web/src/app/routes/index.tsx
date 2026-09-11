@@ -38,6 +38,7 @@ const SystemRoutes = lazy(() => import("./sections/system.routes"));
 // render full-width with the shell's p-4 gap, matching LeadShowPage
 const ComplaintCreatePage = lazy(() => import("@/modules/hrms/complaints/ComplaintCreatePage"));
 const ComplaintViewPage = lazy(() => import("@/modules/hrms/complaints/ComplaintViewPage"));
+const ComplaintEditPage = lazy(() => import("@/modules/hrms/complaints/ComplaintEditPage"));
 
 import { ProfileProvider } from "@/modules/profile/contexts/ProfileContext";
 
@@ -92,6 +93,14 @@ export default function AppRoutes() {
                         element={
                             <RouteWrapper>
                                 <ComplaintViewPage />
+                            </RouteWrapper>
+                        }
+                    />
+                    <Route
+                        path="/profile/support/complaints/:id/edit"
+                        element={
+                            <RouteWrapper>
+                                <ComplaintEditPage />
                             </RouteWrapper>
                         }
                     />

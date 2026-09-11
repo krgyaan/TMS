@@ -1,13 +1,14 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, ArrowLeft, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import api from "@/lib/axios";
+import { useComplaint } from "@/hooks/api/useComplaints";
+import { complaintsService } from "@/services/api/complaints.service";
 import ComplaintForm from "./components/ComplaintForm";
-import type { Complaint, ComplaintFormValues } from "./helpers/types";
+import type { ComplaintFormValues } from "./helpers/types";
 
 function StateCard({
   title,
@@ -36,21 +37,15 @@ function StateCard({
 
 /**
  * Edit complaint page — only allowed while the complaint is still "open".
- * Resolves the complaint from the my-complaints list (no GET /:id yet).
+ * Fetches by id (GET /hrms/complaints/:id/detail).
  */
 export default function ComplaintEditPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const complaintId = Number(id);
+  const complaintId = id ? Number(id) : null;
 
-  const { data: complaints, isLoading } = useQuery({
-    queryKey: ["hrms", "complaints", "mine"],
-    queryFn: async () => {
-      const res = await api.get("/hrms/complaints");
-      return res.data as Complaint[];
-    },
-  });
+  const { data: complaint, isLoading } = useComplaint(complaintId);
 
   if (!id || Number.isNaN(complaintId)) {
     return (
@@ -75,8 +70,6 @@ export default function ComplaintEditPage() {
       </div>
     );
   }
-
-  const complaint = complaints?.find((c) => c.id === complaintId);
 
   if (!complaint) {
     return (
@@ -111,8 +104,9 @@ export default function ComplaintEditPage() {
   }
 
   const handleSave = async (values: ComplaintFormValues) => {
+    if (!complaintId) return;
     try {
-      await api.patch(`/hrms/complaints/${complaintId}`, {
+      await complaintsService.update(complaintId, {
         complaintType: values.complaintType,
         subject: values.subject,
         description: values.description,
@@ -127,7 +121,7 @@ export default function ComplaintEditPage() {
         attachments: values.attachments,
       });
       toast.success("Complaint updated successfully");
-      queryClient.invalidateQueries({ queryKey: ["hrms", "complaints", "mine"] });
+      queryClient.invalidateQueries({ queryKey: ["hrms", "complaints"] });
       navigate(-1);
     } catch (err) {
       const message =

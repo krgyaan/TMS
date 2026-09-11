@@ -67,6 +67,14 @@ class ComplaintsService extends BaseApiService {
     return this.post<Complaint>("", data);
   }
 
+  /** Edit own complaint — server allows only while status is "open". */
+  async update(
+    id: number,
+    data: Record<string, unknown>
+  ): Promise<Complaint> {
+    return this.patch<Complaint>(`/${id}`, data);
+  }
+
   /** Delete own complaint — server allows only while status is "open". */
   async remove(id: number): Promise<{ success: boolean; message: string }> {
     return this.delete<{ success: boolean; message: string }>(`/${id}`);
