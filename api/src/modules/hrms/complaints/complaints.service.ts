@@ -52,12 +52,16 @@ export class ComplaintsService {
   async getMyComplaints(userId: number) {
     const againstUsers = aliasedTable(users, 'against_users');
     const againstTeams = aliasedTable(teams, 'against_teams');
+    const complainantUsers = aliasedTable(users, 'complainant_users');
+    const creatorUsers = aliasedTable(users, 'creator_users');
 
     const rows = await this.db
       .select({
         complaint: complaints,
         againstUserName: againstUsers.name,
         againstTeamName: againstTeams.name,
+        complainantName: complainantUsers.name,
+        createdByName: creatorUsers.name,
       })
       .from(complaints)
       .leftJoin(
@@ -68,9 +72,11 @@ export class ComplaintsService {
         againstTeams,
         and(eq(complaints.complaintAgainstId, againstTeams.id), eq(complaints.complaintAgainstType, 'department')),
       )
+      .leftJoin(complainantUsers, eq(complaints.complainantId, complainantUsers.id))
+      .leftJoin(creatorUsers, eq(complaints.createdBy, creatorUsers.id))
       .where(eq(complaints.complainantId, userId));
 
-    return rows.map(({ complaint: c, againstUserName, againstTeamName }) => ({
+    return rows.map(({ complaint: c, againstUserName, againstTeamName, complainantName, createdByName }) => ({
       id: c.id,
       complaintCode: c.complaintCode,
       complaintType: c.complaintType,
@@ -86,7 +92,10 @@ export class ComplaintsService {
       previousAttempts: c.previousAttempts,
       expectedResolution: c.expectedResolution,
       attachments: (c.supportingDocs as string[] | null) || [],
+      complainantId: c.complainantId,
+      complainantName: complainantName || null,
       createdBy: c.createdBy,
+      createdByName: createdByName || null,
       createdAt: c.createdAt?.toISOString() || null,
       updatedAt: c.updatedAt?.toISOString() || null,
     }));

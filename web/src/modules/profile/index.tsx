@@ -14,8 +14,6 @@ import { OnboardingView } from "./components/onboarding/OnboardingView";
 import { DocumentsSection } from "./components/DocumentsSection";
 import { AssetsSection } from "./components/AssetsSection";
 import { ComplaintsSection } from "./components/ComplaintsSection";
-import ComplaintCreatePage from "@/modules/hrms/complaints/ComplaintCreatePage";
-import ComplaintViewPage from "@/modules/hrms/complaints/ComplaintViewPage";
 import { OnboardingProfileForm } from "./components/onboarding/OnboardingProfileForm";
 import { OnboardingBankForm } from "./components/onboarding/OnboardingBankForm";
 import { OnboardingEducationForm } from "./components/onboarding/OnboardingEducationForm";
@@ -363,8 +361,6 @@ function ProfileLayout() {
             <Route path="documents" element={<DocumentsPage />} />
             <Route path="assets" element={<AssetsPage />} />
             <Route path="support" element={<SupportPage />} />
-            <Route path="support/complaints/create" element={<ComplaintCreatePage />} />
-            <Route path="support/complaints/:id" element={<ComplaintViewPage />} />
             <Route path="*" element={<Navigate to="/profile" replace />} />
           </Routes>
         </OnboardingProvider>

@@ -40,6 +40,10 @@ export interface Complaint {
   complaintType?: string;
   complaintAgainst?: string;
   complaintAgainstName?: string;
+  complainantId?: number | null;
+  complainantName?: string | null;
+  createdBy?: number | null;
+  createdByName?: string | null;
   description?: string;
   incidentDate?: string | null;
   incidentLocation?: string | null;

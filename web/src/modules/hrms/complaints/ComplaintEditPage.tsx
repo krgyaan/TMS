@@ -1,14 +1,38 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Lock } from "lucide-react";
+import { AlertCircle, ArrowLeft, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/lib/axios";
 import ComplaintForm from "./components/ComplaintForm";
-import { NotFoundState } from "./ComplaintViewPage";
 import type { Complaint, ComplaintFormValues } from "./helpers/types";
+
+function StateCard({
+  title,
+  description,
+  onBack,
+}: {
+  title: string;
+  description: string;
+  onBack: () => void;
+}) {
+  return (
+    <div className="container mx-auto py-6 max-w-4xl">
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center h-64">
+          <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+          <p className="text-lg font-medium">{title}</p>
+          <p className="text-sm text-muted-foreground mt-1">{description}</p>
+          <Button variant="outline" className="mt-4" onClick={onBack}>
+            Go Back
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 /**
  * Edit complaint page — only allowed while the complaint is still "open".
@@ -30,7 +54,7 @@ export default function ComplaintEditPage() {
 
   if (!id || Number.isNaN(complaintId)) {
     return (
-      <NotFoundState
+      <StateCard
         title="Invalid complaint ID"
         description="The complaint ID in the URL is not valid."
         onBack={() => navigate(-1)}
@@ -56,7 +80,7 @@ export default function ComplaintEditPage() {
 
   if (!complaint) {
     return (
-      <NotFoundState
+      <StateCard
         title="Complaint not found"
         description="This complaint doesn't exist or doesn't belong to you."
         onBack={() => navigate(-1)}

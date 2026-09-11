@@ -34,6 +34,11 @@ const Profile = lazy(() => import("@/modules/profile"));
 const TrainingRoutes = lazy(() => import("./sections/training.routes"));
 const SystemRoutes = lazy(() => import("./sections/system.routes"));
 
+// Complaints module pages — routed at shell level (like section pages) so they
+// render full-width with the shell's p-4 gap, matching LeadShowPage
+const ComplaintCreatePage = lazy(() => import("@/modules/hrms/complaints/ComplaintCreatePage"));
+const ComplaintViewPage = lazy(() => import("@/modules/hrms/complaints/ComplaintViewPage"));
+
 import { ProfileProvider } from "@/modules/profile/contexts/ProfileContext";
 
 export default function AppRoutes() {
@@ -72,6 +77,24 @@ export default function AppRoutes() {
                     {/* Dashboard */}
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/dashboard" element={<Navigate to="/" replace />} />
+
+                    {/* Complaints — module pages (before /profile/* so they bypass ProfileLayout's container) */}
+                    <Route
+                        path="/profile/support/complaints/create"
+                        element={
+                            <RouteWrapper>
+                                <ComplaintCreatePage />
+                            </RouteWrapper>
+                        }
+                    />
+                    <Route
+                        path="/profile/support/complaints/:id"
+                        element={
+                            <RouteWrapper>
+                                <ComplaintViewPage />
+                            </RouteWrapper>
+                        }
+                    />
 
                     {/* Profile */}
                     <Route

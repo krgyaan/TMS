@@ -1,28 +1,25 @@
+import { useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, ArrowLeft, HelpCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import api from "@/lib/axios";
+import { ShowPageLayout, type StepConfig } from "@/components/layout/ShowPageLayout";
 import { cn } from "@/lib/utils";
-import ComplaintView from "./components/ComplaintView";
+import api from "@/lib/axios";
+import { ComplaintView } from "./components/ComplaintView";
 import {
-  COMPLAINT_TYPES,
-  PRIORITY_CONFIG,
-  STATUS_CONFIG,
+  formatComplaintDate,
   type Complaint,
+  type ComplaintTimelineEvent,
 } from "./helpers/types";
 
 /**
- * Read-only complaint page — resolves the complaint from the
- * my-complaints list (no dedicated GET /:id endpoint yet).
+ * Read-only complaint page — LeadShowPage style: ShowPageLayout with
+ * accordion sections (details + timeline) and a table-based details view.
+ * Rendered at shell level, so it gets the same full-width p-4 gap as leads.
  */
 export default function ComplaintViewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const complaintId = Number(id);
+  const complaintId = id ? Number(id) : null;
 
   const { data: complaints, isLoading } = useQuery({
     queryKey: ["hrms", "complaints", "mine"],
@@ -32,147 +29,129 @@ export default function ComplaintViewPage() {
     },
   });
 
-  if (!id || Number.isNaN(complaintId)) {
-    return <InvalidIdState onBack={() => navigate(-1)} />;
-  }
+  const complaint = complaints?.find((c) => c.id === complaintId) ?? null;
 
-  if (isLoading) {
+  const steps = useMemo<StepConfig[]>(() => {
+    const list: StepConfig[] = [
+      {
+        id: "complaint-details",
+        label: "Complaint Details",
+        shortLabel: "Details",
+        stepNumber: 1,
+        hasData: !!complaint,
+        isLoading,
+        status: isLoading ? "loading" : complaint ? "completed" : "pending",
+      },
+    ];
+    if (complaint?.timeline && complaint.timeline.length > 0) {
+      list.push({
+        id: "activity-timeline",
+        label: "Activity Timeline",
+        shortLabel: "Timeline",
+        stepNumber: 2,
+        hasData: true,
+        isLoading: false,
+        status: "completed",
+      });
+    }
+    return list;
+  }, [complaint, isLoading]);
+
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    () => new Set(["complaint-details"])
+  );
+
+  const toggleSection = useCallback((stepId: string) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(stepId)) next.delete(stepId);
+      else next.add(stepId);
+      return next;
+    });
+  }, []);
+
+  const expandAll = useCallback(
+    () => setExpandedSections(new Set(steps.map((s) => s.id))),
+    [steps]
+  );
+
+  const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
+
+  const renderSectionContent = useCallback(
+    (stepId: string) => {
+      switch (stepId) {
+        case "complaint-details":
+          return <ComplaintView complaint={complaint} />;
+        case "activity-timeline":
+          return complaint?.timeline ? (
+            <TimelineContent timeline={complaint.timeline} />
+          ) : null;
+        default:
+          return null;
+      }
+    },
+    [complaint]
+  );
+
+  if (!id || Number.isNaN(complaintId)) {
     return (
-      <div className="space-y-4">
-        <Card>
-          <CardContent className="p-6 space-y-4">
-            <Skeleton className="h-8 w-2/3" />
-            <Skeleton className="h-4 w-1/3" />
-            <Skeleton className="h-40 w-full" />
-          </CardContent>
-        </Card>
+      <div className="p-8 text-center text-muted-foreground">
+        Invalid complaint ID.
       </div>
     );
   }
 
-  const complaint = complaints?.find((c) => c.id === complaintId);
-
-  if (!complaint) {
+  if (!isLoading && !complaint) {
     return (
-      <NotFoundState
-        title="Complaint not found"
-        description="This complaint doesn't exist or doesn't belong to you."
-        onBack={() => navigate(-1)}
-      />
+      <div className="p-8 text-center text-muted-foreground">
+        Complaint not found or doesn't belong to you.
+      </div>
     );
   }
 
-  const statusConfig =
-    STATUS_CONFIG[complaint.status] || STATUS_CONFIG.open;
-  const StatusIcon = statusConfig.icon;
-  const priorityConfig =
-    PRIORITY_CONFIG[complaint.priority] || PRIORITY_CONFIG.medium;
-  const PriorityIcon = priorityConfig.icon;
-  const typeConfig = COMPLAINT_TYPES.find(
-    (t) => t.value === complaint.complaintType
-  );
-  const TypeIcon = typeConfig?.icon || HelpCircle;
-
   return (
-    <div className="space-y-4">
-      <Button
-        variant="ghost"
-        onClick={() => navigate(-1)}
-        className="rounded-xl gap-2"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back
-      </Button>
+    <ShowPageLayout
+      steps={steps}
+      expandedSections={expandedSections}
+      onToggleSection={toggleSection}
+      onExpandAll={expandAll}
+      onCollapseAll={collapseAll}
+      onBack={() => navigate("/profile/support")}
+      backLabel="Back to Support"
+      renderSectionContent={renderSectionContent}
+    />
+  );
+}
 
-      <Card>
-        <CardContent className="p-6">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-4 mb-6">
-            <div className="flex items-start gap-3">
-              <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <TypeIcon className="h-6 w-6 text-primary" />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-lg font-bold leading-tight">
-                  {complaint.subject}
-                </h1>
-                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
-                  <span className="font-mono font-semibold">
-                    {complaint.complaintCode}
-                  </span>
-                  <span className="text-primary/20">•</span>
-                  <span>{typeConfig?.label || complaint.complaintType}</span>
-                </p>
-              </div>
+/** Timeline for the second accordion section (rendered expanded). */
+function TimelineContent({ timeline }: { timeline: ComplaintTimelineEvent[] }) {
+  return (
+    <div className="relative pl-6 space-y-4">
+      <div className="absolute left-[9px] top-2 bottom-2 w-0.5 bg-border/30" />
+      {timeline.map((event, i) => (
+        <div key={i} className="relative">
+          <div
+            className={cn(
+              "absolute left-[-18px] top-1.5 h-3 w-3 rounded-full border-2 border-background",
+              i === 0 ? "bg-primary" : "bg-border"
+            )}
+          />
+          <div className="p-3 rounded-xl bg-muted/15 border border-border/15">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs font-bold">{event.action}</p>
+              <p className="text-[9px] text-muted-foreground">
+                {formatComplaintDate(event.date)}
+              </p>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Badge
-                variant="outline"
-                className={cn(
-                  "text-[10px] h-6 font-bold rounded-lg",
-                  statusConfig.className
-                )}
-              >
-                <StatusIcon className="h-3 w-3 mr-1" />
-                {statusConfig.label}
-              </Badge>
-              <Badge
-                variant="outline"
-                className={cn(
-                  "text-[10px] h-6 font-bold rounded-lg capitalize",
-                  priorityConfig.className
-                )}
-              >
-                <PriorityIcon className="h-3 w-3 mr-1" />
-                {priorityConfig.label} Priority
-              </Badge>
-            </div>
+            <p className="text-[10px] text-muted-foreground">by {event.by}</p>
+            {event.note && (
+              <p className="text-[11px] text-foreground/70 mt-1.5 leading-relaxed">
+                {event.note}
+              </p>
+            )}
           </div>
-
-          <ComplaintView complaint={complaint} />
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function InvalidIdState({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center h-64">
-          <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-lg font-medium">Invalid complaint ID</p>
-          <Button variant="outline" className="mt-4" onClick={onBack}>
-            Go Back
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-export function NotFoundState({
-  title,
-  description,
-  onBack,
-}: {
-  title: string;
-  description: string;
-  onBack: () => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center h-64">
-          <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-lg font-medium">{title}</p>
-          <p className="text-sm text-muted-foreground mt-1">{description}</p>
-          <Button variant="outline" className="mt-4" onClick={onBack}>
-            Go Back
-          </Button>
-        </CardContent>
-      </Card>
+        </div>
+      ))}
     </div>
   );
 }
