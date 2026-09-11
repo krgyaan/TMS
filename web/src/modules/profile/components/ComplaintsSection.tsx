@@ -1,7 +1,8 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/axios";
@@ -13,11 +14,13 @@ import {
   type Complaint,
 } from "@/modules/hrms/complaints/helpers/types";
 import {
-  ArrowUpRight,
+  ArrowLeft,
+  Calendar,
   CheckCircle2,
-  ChevronRight,
   Clock,
-  Filter,
+  Eye,
+  Hash,
+  Lightbulb,
   MessageSquare,
   Paperclip,
   Plus,
@@ -25,6 +28,8 @@ import {
   Search,
   Shield,
   Sparkles,
+  Tag,
+  X,
 } from "lucide-react";
 import React, { useState } from "react";
 import { useProfileContext } from "../contexts/ProfileContext";
@@ -55,98 +60,124 @@ const ComplaintCard: React.FC<ComplaintCardProps> = ({
 
   return (
     <div
-      
-      
-      
-      
+      className={cn(
+        "group relative rounded-2xl border bg-card transition-all duration-200",
+        "hover:shadow-lg hover:shadow-black/[0.03] hover:-translate-y-0.5 hover:border-border",
+        "cursor-pointer h-full flex flex-col"
+      )}
+      onClick={() => onClick(c)}
     >
-      <Card
-        className="border-border/40 shadow-lg shadow-black/[0.03] hover:shadow-xl hover:shadow-primary/[0.06] hover:border-primary/15 hover:bg-muted/30 transition-all duration-400 group bg-muted/20 backdrop-blur-sm cursor-pointer"
-        onClick={() => onClick(c)}
-      >
-        <CardContent className="p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3.5 flex-1 min-w-0">
-              <div className="w-12 h-12 rounded-2xl bg-primary/5 flex items-center justify-center flex-shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300 group-hover:shadow-lg group-hover:shadow-primary/20">
-                <TypeIcon className="h-5 w-5 text-primary/60 group-hover:text-primary-foreground transition-colors" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold group-hover:text-primary transition-colors truncate">
-                  {c.subject}
-                </p>
-                <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground flex-wrap">
-                  <span className="font-mono font-semibold text-[11px]">
-                    {c.complaintCode}
-                  </span>
-                  <span className="text-primary/20">•</span>
-                  <span className="text-[11px]">
-                    {typeConfig?.label || c.complaintType}
-                  </span>
-                  <span className="text-primary/20">•</span>
-                  <span className="text-[11px]">
-                    {formatDate(c.createdAt)}
-                  </span>
-                </div>
+      <div className="p-5 flex-1">
+        {/* Top row: type tile, subject + against, status/priority badges */}
+        <div className="flex items-start gap-4">
+          <div className="h-12 w-12 rounded-xl bg-primary/5 ring-1 ring-border/50 flex items-center justify-center flex-shrink-0">
+            <TypeIcon className="h-5 w-5 text-primary/60" />
+          </div>
 
-                {/* Description Preview */}
-                {c.description && (
-                  <p className="text-xs text-muted-foreground/70 mt-2 line-clamp-2 leading-relaxed">
-                    {c.description}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold leading-tight truncate">
+                  {c.subject}
+                </h3>
+                {c.complaintAgainst && (
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                    Against: {c.complaintAgainstName || c.complaintAgainst}
                   </p>
                 )}
-
-                {/* Tags Row */}
-                <div className="flex items-center gap-2 mt-3 flex-wrap">
-                  {c.complaintAgainst && (
-                    <span className="text-[10px] text-muted-foreground/60 bg-muted/30 px-2 py-0.5 rounded-md font-medium">
-                      Against: {c.complaintAgainstName || c.complaintAgainst}
-                    </span>
-                  )}
-                  {c.attachments && c.attachments.length > 0 && (
-                    <span className="text-[10px] text-muted-foreground/60 bg-muted/30 px-2 py-0.5 rounded-md font-medium flex items-center gap-1">
-                      <Paperclip className="h-2.5 w-2.5" />
-                      {c.attachments.length}
-                    </span>
-                  )}
-                </div>
               </div>
-            </div>
-
-            <div className="flex flex-col items-end gap-2 shrink-0">
-              <Badge
-                variant="outline"
-                className={cn(
-                  "text-[10px] h-6 font-bold rounded-lg",
-                  statusConfig.className
-                )}
-              >
-                <div
+              <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                <span
                   className={cn(
-                    "h-1.5 w-1.5 rounded-full mr-1.5",
-                    statusConfig.dotColor,
-                    (c.status === "open" || c.status === "in_progress") &&
-                      "animate-pulse"
+                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold",
+                    statusConfig.className
                   )}
-                />
-                {statusConfig.label}
-              </Badge>
-              <Badge
-                variant="outline"
-                className={cn(
-                  "text-[10px] h-5 font-bold rounded-md capitalize border-0",
-                  priorityConfig.badgeBg
-                )}
-              >
-                <PriorityIcon className="h-2.5 w-2.5 mr-1" />
-                {priorityConfig.label}
-              </Badge>
-              <div className="h-6 w-6 rounded-md bg-muted/20 flex items-center justify-center mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <ArrowUpRight className="h-3 w-3 text-muted-foreground" />
+                >
+                  <span
+                    className={cn(
+                      "h-1.5 w-1.5 rounded-full",
+                      statusConfig.dotColor,
+                      (c.status === "open" || c.status === "in_progress") &&
+                        "animate-pulse"
+                    )}
+                  />
+                  {statusConfig.label}
+                </span>
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize",
+                    priorityConfig.className
+                  )}
+                >
+                  <PriorityIcon className="h-3 w-3" />
+                  {priorityConfig.label}
+                </span>
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Details grid: code • date • type */}
+        <div className="mt-4 grid grid-cols-3 gap-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Hash className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="font-mono truncate">{c.complaintCode}</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="truncate">{formatDate(c.createdAt)}</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground justify-end">
+            <Tag className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="truncate">{typeConfig?.label || c.complaintType}</span>
+          </div>
+        </div>
+
+        {/* Divider → description → resolution */}
+        {(c.description || c.expectedResolution) && (
+          <div className="mt-5 pt-4 border-t">
+            {c.description && (
+              <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                {c.description}
+              </p>
+            )}
+            {c.expectedResolution && (
+              <p
+                className={cn(
+                  "text-xs text-muted-foreground/80 leading-relaxed line-clamp-1 flex items-center gap-1",
+                  c.description && "mt-1.5"
+                )}
+              >
+                <Lightbulb className="h-3 w-3 shrink-0" />
+                <span className="truncate">{c.expectedResolution}</span>
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Action footer */}
+      <div className="flex items-center justify-between border-t px-5 py-3 bg-muted/20">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick(c);
+          }}
+        >
+          <Eye className="h-3.5 w-3.5" />
+          View Details
+        </Button>
+
+        {c.attachments && c.attachments.length > 0 && (
+          <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <Paperclip className="h-3.5 w-3.5" />
+            {c.attachments.length}
+          </span>
+        )}
+      </div>
     </div>
   );
 };
@@ -157,8 +188,7 @@ export const ComplaintsSection: React.FC = () => {
   const { data } = useProfileContext();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<string>("all");
 
   // Complaints live in the HRMS complaints module — fetched directly
   const { data: myComplaints, isLoading: complaintsLoading } = useQuery({
@@ -175,16 +205,13 @@ export const ComplaintsSection: React.FC = () => {
 
   // Filters
   const filtered = COMPLAINTS.filter((c) => {
-    const matchesStatus =
-      statusFilter === "all" || c.status === statusFilter;
-    const matchesPriority =
-      priorityFilter === "all" || c.priority === priorityFilter;
+    const matchesTab = activeTab === "all" || c.status === activeTab;
     const matchesSearch =
       !searchQuery ||
       c.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.complaintCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesPriority && matchesSearch;
+    return matchesTab && matchesSearch;
   });
 
   // Stats
@@ -196,6 +223,29 @@ export const ComplaintsSection: React.FC = () => {
     (c) => c.status === "resolved"
   ).length;
   const totalCount = COMPLAINTS.length;
+
+  // Summary tabs (onboarding-dashboard style)
+  const tabs: {
+    value: string;
+    label: string;
+    icon: React.ElementType;
+    count: number;
+  }[] = [
+    { value: "all", label: "All", icon: MessageSquare, count: totalCount },
+    { value: "open", label: "Open", icon: Clock, count: openCount },
+    {
+      value: "in_progress",
+      label: "In Progress",
+      icon: RotateCcw,
+      count: inProgressCount,
+    },
+    {
+      value: "resolved",
+      label: "Resolved",
+      icon: CheckCircle2,
+      count: resolvedCount,
+    },
+  ];
 
   const handleComplaintClick = (c: Complaint) => {
     navigate(`/profile/support/complaints/${c.id}`);
@@ -314,153 +364,92 @@ export const ComplaintsSection: React.FC = () => {
         
         className="space-y-6"
       >
-        {/* ── Stats Grid ──────────────────────────────────────────────── */}
-        <div
-          
-          className="grid grid-cols-2 sm:grid-cols-4 gap-3"
-        >
-          {[
-            {
-              label: "Total",
-              value: totalCount,
-              icon: MessageSquare,
-              color: "text-primary",
-              bg: "bg-primary/10",
-              borderColor: "border-primary/10",
-            },
-            {
-              label: "Open",
-              value: openCount,
-              icon: Clock,
-              color: "text-blue-600",
-              bg: "bg-blue-500/10",
-              borderColor: "border-blue-500/10",
-            },
-            {
-              label: "In Progress",
-              value: inProgressCount,
-              icon: RotateCcw,
-              color: "text-amber-600",
-              bg: "bg-amber-500/10",
-              borderColor: "border-amber-500/10",
-            },
-            {
-              label: "Resolved",
-              value: resolvedCount,
-              icon: CheckCircle2,
-              color: "text-emerald-600",
-              bg: "bg-emerald-500/10",
-              borderColor: "border-emerald-500/10",
-            },
-          ].map((stat) => (
-            <Card
-              key={stat.label}
-              className={cn(
-                "border shadow-lg shadow-black/[0.02] bg-muted/20 backdrop-blur-sm hover:bg-muted/30 transition-all duration-300",
-                stat.borderColor
-              )}
-            >
-              <CardContent className="p-4 flex items-center gap-3">
-                <div
-                  className={cn(
-                    "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-                    stat.bg
-                  )}
-                >
-                  <stat.icon className={cn("h-4.5 w-4.5", stat.color)} />
-                </div>
-                <div>
-                  <p
-                    className="text-xl font-black tracking-tight"
-                    
-                    
-                    
-                  >
-                    {stat.value}
-                  </p>
-                  <p className="text-[9px] uppercase tracking-[0.1em] text-muted-foreground font-semibold leading-tight">
-                    {stat.label}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        {/* ── Back ─────────────────────────────────────────────────────── */}
+        <div>
+          <Button
+            variant="ghost"
+            onClick={() => navigate("/profile")}
+            className="-ml-2 text-muted-foreground hover:text-foreground gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Profile
+          </Button>
         </div>
 
-        {/* ── Search + Filters + Raise Button ─────────────────────────── */}
-        <div  className="space-y-3">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-              <Input
-                placeholder="Search complaints..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 pl-9 rounded-xl border-border/40 bg-muted/20 focus:bg-background text-sm"
-              />
+        {/* ── Page Header ──────────────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <MessageSquare className="h-5 w-5 text-primary" />
             </div>
-            <Button
-              className="gap-2 rounded-xl font-semibold shadow-lg shadow-primary/20 h-9 text-xs shrink-0"
-              onClick={() => navigate("/profile/support/complaints/create")}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Raise Complaint
-            </Button>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Complaints</h1>
+              <p className="text-sm text-muted-foreground">
+                Raise and track your complaints
+              </p>
+            </div>
           </div>
+          <Button
+            onClick={() => navigate("/profile/support/complaints/create")}
+            className="gap-2 rounded-xl shadow-sm h-10"
+          >
+            <Plus className="h-4 w-4" />
+            Raise Complaint
+          </Button>
+        </div>
 
-          {/* Filter Chips */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mr-1 flex items-center gap-1">
-              <Filter className="h-3 w-3" />
-              Status:
-            </span>
-            {[
-              { label: "All", value: "all" },
-              ...Object.entries(STATUS_CONFIG).map(([key, config]) => ({
-                label: config.label,
-                value: key,
-              })),
-            ].map((f) => (
-              <Button
-                key={f.value}
-                variant={statusFilter === f.value ? "default" : "outline"}
-                size="sm"
-                onClick={() => setStatusFilter(f.value)}
-                className={cn(
-                  "h-7 text-[10px] rounded-lg font-semibold transition-all",
-                  statusFilter === f.value && "shadow-sm shadow-primary/20"
-                )}
+        {/* ── Filters Bar: tabs left, search right ────────────────────── */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)}>
+            <TabsList className="h-10 bg-muted/50 p-1 rounded-xl">
+              {tabs.map((tab) => (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className="gap-2 text-xs font-medium px-4 rounded-lg data-[state=active]:shadow-sm"
+                >
+                  <tab.icon className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  <Badge
+                    variant="secondary"
+                    className="ml-0.5 h-5 min-w-[20px] px-1.5 text-[10px] font-semibold rounded-full bg-background/80"
+                  >
+                    {tab.count}
+                  </Badge>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              className="pl-10 h-10 text-sm rounded-xl border-border/60 focus-visible:border-primary/40"
+              placeholder="Search complaints..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               >
-                {f.label}
-              </Button>
-            ))}
-
-            <div className="w-px h-5 bg-border/30 mx-1" />
-
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mr-1">
-              Priority:
-            </span>
-            {[
-              { label: "All", value: "all" },
-              ...Object.entries(PRIORITY_CONFIG).map(([key, config]) => ({
-                label: config.label,
-                value: key,
-              })),
-            ].map((f) => (
-              <Button
-                key={`priority-${f.value}`}
-                variant={priorityFilter === f.value ? "default" : "outline"}
-                size="sm"
-                onClick={() => setPriorityFilter(f.value)}
-                className={cn(
-                  "h-7 text-[10px] rounded-lg font-semibold transition-all",
-                  priorityFilter === f.value && "shadow-sm shadow-primary/20"
-                )}
-              >
-                {f.label}
-              </Button>
-            ))}
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
+        </div>
+
+        {/* ── Results Count ────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between -mt-4">
+          <p className="text-sm text-muted-foreground">
+            Showing{" "}
+            <span className="font-semibold text-foreground">
+              {filtered.length}
+            </span>{" "}
+            {filtered.length === 1 ? "record" : "records"}
+          </p>
         </div>
 
         {/* ── Complaints List ─────────────────────────────────────────── */}
@@ -468,10 +457,7 @@ export const ComplaintsSection: React.FC = () => {
           {filtered.length > 0 ? (
             <div
               key="complaints-list"
-              
-              
-              
-              className="space-y-3"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
             >
                             {filtered.map((c) => (
                 <ComplaintCard
@@ -505,8 +491,7 @@ export const ComplaintsSection: React.FC = () => {
                     className="rounded-xl text-xs font-semibold"
                     onClick={() => {
                       setSearchQuery("");
-                      setStatusFilter("all");
-                      setPriorityFilter("all");
+                      setActiveTab("all");
                     }}
                   >
                     Clear all filters
@@ -517,32 +502,6 @@ export const ComplaintsSection: React.FC = () => {
           )}
         
 
-        {/* ── Raise Complaint CTA ─────────────────────────────────────── */}
-        <div >
-          <Card
-            className="border-dashed border-2 border-border/30 bg-muted/5 hover:border-primary/20 hover:bg-primary/[0.02] transition-all duration-300 cursor-pointer group"
-            onClick={() => navigate("/profile/support/complaints/create")}
-          >
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3.5">
-                  <div className="h-11 w-11 rounded-2xl bg-primary/5 flex items-center justify-center group-hover:bg-primary group-hover:shadow-lg group-hover:shadow-primary/20 transition-all duration-300">
-                    <Plus className="h-5 w-5 text-primary/40 group-hover:text-primary-foreground transition-colors" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold group-hover:text-primary transition-colors">
-                      Have an issue to report?
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Raise a new complaint — it will be handled confidentially
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight className="h-5 w-5 text-muted-foreground/30 group-hover:text-primary/50 transition-colors" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
 
       {/* ── Dialogs ─────────────────────────────────────────────────── */}
