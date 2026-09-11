@@ -1,5 +1,5 @@
 import { Injectable, Inject, NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { eq, desc, aliasedTable, and, sql } from 'drizzle-orm';
+import { eq, desc, aliasedTable, and, sql, isNull, asc } from 'drizzle-orm';
 import { DRIZZLE } from '@/db/database.module';
 import type { DbInstance } from '@/db';
 import * as fs from 'fs';
@@ -39,6 +39,21 @@ import {
 import { complaints } from '@/db/schemas/hrms/complaints.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
 import { OnboardingService } from '../hrms/onboarding/onboarding.service';
+
+export interface CreateComplaintDto {
+  complaintType: string;
+  subject: string;
+  description: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  complaintAgainst?: 'person' | 'department' | 'system' | 'policy' | 'facility';
+  complaintAgainstId?: number | null;
+  incidentDate?: string;
+  incidentLocation?: string;
+  previousAttempts?: string;
+  witnesses?: string;
+  expectedResolution?: string;
+  attachments?: string[];
+}
 
 @Injectable()
 export class ProfileService {
@@ -304,19 +319,46 @@ export class ProfileService {
       assetStatus: a.assetStatus,
     }));
 
-    // 9. Fetch Complaints
+    // 9. Fetch Complaints (resolve the "against" name from users/teams)
+    const againstUsers = aliasedTable(users, 'against_users');
+    const againstTeams = aliasedTable(teams, 'against_teams');
+
     const complaintsRows = await this.db
-      .select()
+      .select({
+        complaint: complaints,
+        againstUserName: againstUsers.name,
+        againstTeamName: againstTeams.name,
+      })
       .from(complaints)
+      .leftJoin(
+        againstUsers,
+        and(eq(complaints.complaintAgainstId, againstUsers.id), eq(complaints.complaintAgainstType, 'person')),
+      )
+      .leftJoin(
+        againstTeams,
+        and(eq(complaints.complaintAgainstId, againstTeams.id), eq(complaints.complaintAgainstType, 'department')),
+      )
       .where(eq(complaints.complainantId, userId));
 
-    const mappedComplaints = complaintsRows.map(c => ({
+    const mappedComplaints = complaintsRows.map(({ complaint: c, againstUserName, againstTeamName }) => ({
       id: c.id,
       complaintCode: c.complaintCode,
+      complaintType: c.complaintType,
+      complaintAgainst: c.complaintAgainstType,
+      complaintAgainstName: againstUserName || againstTeamName || null,
       subject: c.subject,
-      status: c.status,
+      description: c.description,
       priority: c.priority,
+      status: c.status,
+      incidentDate: c.incidentAt?.toISOString() || null,
+      incidentLocation: c.incidentLocation,
+      witnesses: c.witnesses,
+      previousAttempts: c.previousAttempts,
+      expectedResolution: c.expectedResolution,
+      attachments: (c.supportingDocs as string[] | null) || [],
+      createdBy: c.createdBy,
       createdAt: c.createdAt?.toISOString() || null,
+      updatedAt: c.updatedAt?.toISOString() || null,
     }));
 
     return {
@@ -356,5 +398,87 @@ export class ProfileService {
       .returning();
 
     return { success: true, profile: updated };
+  }
+
+  /**
+   * Lookup lists for the complaint form: active employees + departments.
+   */
+  async getComplaintLookups() {
+    const [userRows, teamRows] = await Promise.all([
+      this.db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(and(eq(users.isActive, true), isNull(users.deletedAt)))
+        .orderBy(asc(users.name)),
+      this.db
+        .select({ id: teams.id, name: teams.name })
+        .from(teams)
+        .orderBy(asc(teams.name)),
+    ]);
+    return { users: userRows, departments: teamRows };
+  }
+
+  /**
+   * File a complaint as the authenticated employee (support page).
+   * complainantId + createdBy are both taken from the JWT — never the body.
+   */
+  async createComplaint(userId: number, dto: CreateComplaintDto) {
+    // Resolve + validate the complaint subject
+    let complaintAgainstId: number | null = null;
+    if (dto.complaintAgainstId) {
+      if (dto.complaintAgainst === 'person') {
+        const [subject] = await this.db
+          .select({ id: users.id })
+          .from(users)
+          .where(and(eq(users.id, dto.complaintAgainstId), isNull(users.deletedAt)))
+          .limit(1);
+        if (!subject) throw new NotFoundException('Complaint subject (person) not found');
+        complaintAgainstId = subject.id;
+      } else if (dto.complaintAgainst === 'department') {
+        const [subject] = await this.db
+          .select({ id: teams.id })
+          .from(teams)
+          .where(eq(teams.id, dto.complaintAgainstId))
+          .limit(1);
+        if (!subject) throw new NotFoundException('Complaint subject (department) not found');
+        complaintAgainstId = subject.id;
+      } else {
+        throw new BadRequestException(`complaintAgainstId is not valid for type "${dto.complaintAgainst}"`);
+      }
+    }
+
+    // Generate sequential complaint code: CMP-0001
+    const [row] = await this.db.select({ maxCode: sql<string>`MAX(complaint_code)` }).from(complaints);
+    const maxCode = row?.maxCode;
+    let num = 0;
+    if (maxCode) {
+      const parsed = parseInt(maxCode.replace('CMP-', ''), 10);
+      if (!isNaN(parsed)) num = parsed;
+    }
+    const complaintCode = `CMP-${String(num + 1).padStart(4, '0')}`;
+
+    const [created] = await this.db
+      .insert(complaints)
+      .values({
+        complaintCode,
+        complainantId: userId,
+        createdBy: userId,
+        complaintType: dto.complaintType,
+        complaintAgainstType: dto.complaintAgainst || null,
+        complaintAgainstId,
+        subject: dto.subject,
+        description: dto.description,
+        priority: dto.priority,
+        incidentAt: dto.incidentDate ? new Date(dto.incidentDate) : null,
+        incidentLocation: dto.incidentLocation || null,
+        previousAttempts: dto.previousAttempts || null,
+        witnesses: dto.witnesses || null,
+        expectedResolution: dto.expectedResolution || null,
+        supportingDocs: dto.attachments ?? [],
+        status: 'open',
+      })
+      .returning();
+
+    return created;
   }
 }

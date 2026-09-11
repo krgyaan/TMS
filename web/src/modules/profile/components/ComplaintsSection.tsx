@@ -20,6 +20,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import api from "@/lib/axios";
+import { toast } from "sonner";
+import { fileUploadService } from "@/services/api/file-upload.service";
 import {
   AlertCircle,
   AlertTriangle,
@@ -81,7 +85,7 @@ interface Complaint extends ComplaintData {
   expectedResolution?: string;
   updatedAt?: string;
   resolvedAt?: string;
-  attachments?: { name: string; size: string; type: string }[];
+  attachments?: string[];
   remarks?: string;
   assignedTo?: string;
   timeline?: {
@@ -185,7 +189,7 @@ interface ComplaintFormData {
   complaintType: string;
   subject: string;
   complaintAgainst: string;
-  complaintAgainstName: string;
+  complaintAgainstId: number | null;
   priority: string;
   incidentDate: string;
   incidentLocation: string;
@@ -200,7 +204,7 @@ const INITIAL_FORM: ComplaintFormData = {
   complaintType: "",
   subject: "",
   complaintAgainst: "",
-  complaintAgainstName: "",
+  complaintAgainstId: null,
   priority: "",
   incidentDate: "",
   incidentLocation: "",
@@ -222,7 +226,7 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
   open,
   onOpenChange,
 }) => {
-  const { data } = useProfileContext();
+  const { data, refetch } = useProfileContext();
   const user = data?.currentUser;
   const empProfile = data?.employeeProfile;
   const [form, setForm] = useState<ComplaintFormData>({ ...INITIAL_FORM });
@@ -231,17 +235,54 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
 
   const totalSteps = 3;
 
+  // Employee / department lists for the "complaint against" select
+  const { data: lookups } = useQuery({
+    queryKey: ["complaint-lookups"],
+    queryFn: async () => {
+      const res = await api.get("/profile/complaint-lookups");
+      return res.data as {
+        users: { id: number; name: string }[];
+        departments: { id: number; name: string }[];
+      };
+    },
+    enabled: open,
+  });
+
     const updateForm = (field: keyof ComplaintFormData, value: ComplaintFormData[keyof ComplaintFormData]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async () => {
+    if (!canSubmit) return;
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 2000));
-    setSubmitting(false);
-    setForm({ ...INITIAL_FORM });
-    setStep(1);
-    onOpenChange(false);
+    try {
+      await api.post("/profile/me/complaints", {
+        complaintType: form.complaintType,
+        subject: form.subject,
+        description: form.description,
+        priority: form.priority || undefined,
+        complaintAgainst: form.complaintAgainst || undefined,
+        complaintAgainstId: form.complaintAgainstId ?? undefined,
+        incidentDate: form.incidentDate || undefined,
+        incidentLocation: form.incidentLocation || undefined,
+        previousAttempts: form.previousAttempts || undefined,
+        witnesses: form.witnesses || undefined,
+        expectedResolution: form.expectedResolution || undefined,
+        attachments: form.attachments,
+      });
+      toast.success("Complaint submitted successfully");
+      setForm({ ...INITIAL_FORM });
+      setStep(1);
+      onOpenChange(false);
+      refetch();
+    } catch (err) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        "Failed to submit complaint";
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const canProceedStep1 = form.complaintType && form.subject && form.priority;
@@ -427,7 +468,10 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
                     </Label>
                     <Select
                       value={form.complaintAgainst}
-                      onValueChange={(v) => updateForm("complaintAgainst", v)}
+                      onValueChange={(v) => {
+                        updateForm("complaintAgainst", v);
+                        updateForm("complaintAgainstId", null);
+                      }}
                     >
                       <SelectTrigger className="h-11 rounded-xl border-border/50 bg-muted/20 text-sm">
                         <SelectValue placeholder="Select type" />
@@ -480,21 +524,33 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
                   >
                     <Label className="text-xs font-semibold text-muted-foreground">
                       {form.complaintAgainst === "person"
-                        ? "Person Name"
-                        : "Department Name"}
+                        ? "Select Person"
+                        : "Select Department"}
                     </Label>
-                    <Input
-                      placeholder={
-                        form.complaintAgainst === "person"
-                          ? "Enter person's name"
-                          : "Enter department name"
-                      }
-                      value={form.complaintAgainstName}
-                      onChange={(e) =>
-                        updateForm("complaintAgainstName", e.target.value)
-                      }
-                      className="h-11 rounded-xl border-border/50 bg-muted/20 focus:bg-background text-sm"
-                    />
+                    <Select
+                      value={form.complaintAgainstId ? String(form.complaintAgainstId) : ""}
+                      onValueChange={(v) => updateForm("complaintAgainstId", Number(v))}
+                    >
+                      <SelectTrigger className="h-11 rounded-xl border-border/50 bg-muted/20 text-sm">
+                        <SelectValue
+                          placeholder={
+                            form.complaintAgainst === "person"
+                              ? "Select employee"
+                              : "Select department"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl max-h-60">
+                        {(form.complaintAgainst === "person"
+                          ? lookups?.users
+                          : lookups?.departments
+                        )?.map((opt) => (
+                          <SelectItem key={opt.id} value={String(opt.id)} className="rounded-lg">
+                            {opt.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 )}
 
@@ -980,28 +1036,30 @@ const ComplaintDetailDialog: React.FC<ComplaintDetailDialogProps> = ({
                 Attachments ({c.attachments.length})
               </p>
               <div className="grid grid-cols-2 gap-2">
-                {c.attachments.map((att, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2.5 p-3 rounded-xl bg-muted/20 border border-border/20 hover:bg-muted/30 cursor-pointer transition-colors"
-                  >
-                    <div className="h-8 w-8 rounded-lg bg-primary/5 flex items-center justify-center shrink-0">
-                      {att.type.startsWith("image") ? (
-                        <ImageIcon className="h-4 w-4 text-primary/60" />
-                      ) : (
-                        <FileText className="h-4 w-4 text-primary/60" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-semibold truncate">
-                        {att.name}
+                {c.attachments.map((att, i) => {
+                  const fileName = att.split("/").pop() || att;
+                  const isImage = /\.(jpe?g|png|webp)$/i.test(att);
+                  return (
+                    <a
+                      key={i}
+                      href={fileUploadService.getFileUrl(att)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2.5 p-3 rounded-xl bg-muted/20 border border-border/20 hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="h-8 w-8 rounded-lg bg-primary/5 flex items-center justify-center shrink-0">
+                        {isImage ? (
+                          <ImageIcon className="h-4 w-4 text-primary/60" />
+                        ) : (
+                          <FileText className="h-4 w-4 text-primary/60" />
+                        )}
+                      </div>
+                      <p className="text-[11px] font-semibold truncate min-w-0">
+                        {fileName}
                       </p>
-                      <p className="text-[9px] text-muted-foreground">
-                        {att.size}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                    </a>
+                  );
+                })}
               </div>
             </div>
           )}
