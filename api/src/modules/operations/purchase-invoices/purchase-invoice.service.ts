@@ -3,7 +3,7 @@ import { eq, like, desc, sql } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
-import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
+import { tryMaterializePoInventory } from "@/modules/operations/inventory/inventory.materialize";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -43,9 +43,10 @@ export class PurchaseInvoiceService {
     async create(body: any, userId: number) {
         const series = body.vendorWorkOrderId ? "WOI" : "PI";
         const invoiceNo = await this.generateNumber(body.projectName, series);
+        const isPoInvoice = !!body.purchaseOrderId && !body.vendorWorkOrderId;
 
-        const pi = (
-            await this.db
+        const pi = await this.db.transaction(async tx => {
+            const [row] = await tx
                 .insert(purchaseInvoices)
                 .values({
                     projectId: body.projectId,
@@ -60,8 +61,14 @@ export class PurchaseInvoiceService {
                     purchaseOrderId: body.purchaseOrderId || null,
                     vendorWorkOrderId: body.vendorWorkOrderId || null,
                 })
-                .returning()
-        )[0];
+                .returning();
+
+            if (isPoInvoice) {
+                await tryMaterializePoInventory(tx, Number(body.purchaseOrderId), userId);
+            }
+
+            return row;
+        });
 
         this.logger.info(`Purchase Invoice created: ${invoiceNo}`);
         return pi;
