@@ -1,16 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import {
-    Card,
-    CardAction,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import DataTable from "@/components/ui/data-table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ColDef, ValueFormatterParams } from "ag-grid-community";
@@ -35,7 +27,7 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
     const [warehouseTab, setWarehouseTab] = useState<InventoryWarehouseFilter>("all");
     const { data, isLoading } = useProjectInventory(projectId!, showZero, warehouseTab);
 
-    const inventoryItems = data?.items ?? [];
+    const inventoryItems = useMemo(() => data?.items ?? [], [data]);
 
     const columns = useMemo<ColDef<InventoryItem>[]>(
         () => [
@@ -44,15 +36,11 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
                 headerName: "Item",
                 sortable: true,
                 filter: true,
-                flex: 1,
-                minWidth: 200,
-            },
-            {
-                field: "hsn",
-                headerName: "HSN",
-                sortable: true,
-                filter: true,
-                width: 110,
+                width: 400,
+                minWidth: 350,
+                wrapText: true,
+                cellStyle: { wordBreak: "break-word", lineHeight: "16px" },
+                cellClass: "pt-1",
             },
             {
                 field: "sourcePoNumber",
@@ -74,33 +62,22 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
                 field: "qty",
                 headerName: "Qty",
                 sortable: true,
-                width: 90,
-                valueFormatter: (p: ValueFormatterParams<InventoryItem>) =>
-                    Number(p.value).toFixed(2),
+                width: 70
             },
             {
                 field: "remainingQty",
                 headerName: "Available",
                 sortable: true,
-                width: 100,
-                cellRenderer: (p: { value: number }) => (
-                    <Badge
-                        variant={
-                            Number(p.value) > 0 ? "default" : "secondary"
-                        }
-                    >
-                        {Number(p.value).toFixed(2)}
-                    </Badge>
-                ),
+                width: 70
             },
             {
                 field: "price",
                 headerName: "Price",
                 sortable: true,
-                width: 120,
+                width: 100,
                 valueFormatter: (p: ValueFormatterParams<InventoryItem>) =>
                     formatINR(p.value || 0),
-            },
+            }
         ],
         []
     );
@@ -150,6 +127,7 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
                         {warehouseTab !== "all"
                             ? ` — ${WAREHOUSE_TABS.find(t => t.value === warehouseTab)?.label}`
                             : ""}
+                        {" · Total: "}
                     </CardDescription>
                 </div>
             </CardHeader>
@@ -176,6 +154,7 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
         </Card>
     );
 };
+
 
 function warehouseTypeLabel(type: string | null | undefined): string {
     switch (type) {
