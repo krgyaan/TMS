@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { FileText, ExternalLink, Download } from 'lucide-react';
-import type { TenderInfoWithNames } from '../helpers/tenderInfo.types'
+import { type TenderInfoWithNames, parseTenderDocuments } from '../helpers/tenderInfo.types';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { fileUploadService } from '@/services/api/file-upload.service';
@@ -28,17 +28,74 @@ interface TenderViewProps {
     className?: string;
 }
 
+interface TenderDocumentDisplayItem {
+    filePath: string;
+    category: "mainTender" | "atc" | "boq" | "other";
+    categoryLabel: string;
+    badgeText: string;
+    badgeClass: string;
+}
+
 /**
- * Parse documents field from JSON string to array of file paths
+ * Parse documents field into categorized display items (supports structured JSON & legacy flat array)
  */
-const parseDocuments = (documents: string | null): string[] => {
-    if (!documents) return [];
-    try {
-        const parsed = JSON.parse(documents);
-        return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
-    } catch {
-        return [];
+const getTenderDocumentItems = (documentsJson: string | null | undefined): TenderDocumentDisplayItem[] => {
+    if (!documentsJson) return [];
+    const structured = parseTenderDocuments(documentsJson);
+    const items: TenderDocumentDisplayItem[] = [];
+
+    if (structured.mainTender) {
+        items.push({
+            filePath: structured.mainTender,
+            category: "mainTender",
+            categoryLabel: "Main Tender / NIT",
+            badgeText: "AI: Main Terms",
+            badgeClass: "bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20",
+        });
     }
+
+    if (structured.atc && structured.atc.length > 0) {
+        structured.atc.forEach((path, idx) => {
+            items.push({
+                filePath: path,
+                category: "atc",
+                categoryLabel: `ATC Document ${structured.atc.length > 1 ? idx + 1 : ""}`.trim(),
+                badgeText: "AI: Terms Override",
+                badgeClass: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20",
+            });
+        });
+    }
+
+    if (structured.boq) {
+        items.push({
+            filePath: structured.boq,
+            category: "boq",
+            categoryLabel: "BOQ / Price Schedule",
+            badgeText: "AI: Item Precedence",
+            badgeClass: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+        });
+    }
+
+    if (structured.otherDocuments && structured.otherDocuments.length > 0) {
+        structured.otherDocuments.forEach((path, idx) => {
+            items.push({
+                filePath: path,
+                category: "other",
+                categoryLabel: `Supporting Doc ${structured.otherDocuments.length > 1 ? idx + 1 : ""}`.trim(),
+                badgeText: "Reference Only",
+                badgeClass: "bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/20",
+            });
+        });
+    }
+
+    return items;
+};
+
+/**
+ * Parse documents field to array of file paths (supports structured JSON & legacy flat array)
+ */
+const parseDocuments = (documents: string | null | undefined): string[] => {
+    return getTenderDocumentItems(documents).map(item => item.filePath);
 };
 
 /**
@@ -61,7 +118,7 @@ export function TenderView({
     const tender = manualTender || tenderData;
     const isLoading = manualLoading || queryLoading;
 
-    const documents = parseDocuments(tender?.documents || "");
+    const documentItems = getTenderDocumentItems(tender?.documents);
     if (isLoading) {
         return (
             <Card className={className}>
@@ -237,47 +294,57 @@ export function TenderView({
                         {/* Documents */}
                         <TableRow className="bg-muted/50">
                             <TableCell colSpan={4} className="font-semibold text-sm">
-                                Documents ({documents.length})
+                                Documents ({documentItems.length})
                             </TableCell>
                         </TableRow>
-                        {documents.length > 0 ? (
+                        {documentItems.length > 0 ? (
                             <TableRow>
                                 <TableCell colSpan={4} className="p-4">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-                                        {documents.map((filePath, index) => (
-                                            <div key={index} className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
-                                                <div className="flex items-start gap-2 overflow-hidden">
-                                                    <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                        {documentItems.map((doc, index) => (
+                                            <div key={index} className="flex flex-col border rounded-md p-3 bg-card shadow-2xs gap-2">
+                                                <div className="flex items-start justify-between gap-1">
+                                                    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-medium ${doc.badgeClass}`}>
+                                                        {doc.badgeText}
+                                                    </Badge>
+                                                    <span className="text-[10px] text-muted-foreground uppercase font-mono">
+                                                        {doc.filePath.split('.').pop() || 'FILE'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-start gap-2 overflow-hidden my-1">
+                                                    <FileText className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
                                                     <div className="flex flex-col overflow-hidden">
-                                                        <span className="font-medium text-sm truncate" title={getFileName(filePath)}>
-                                                            {getFileName(filePath)}
+                                                        <span className="font-medium text-sm truncate" title={getFileName(doc.filePath)}>
+                                                            {getFileName(doc.filePath)}
                                                         </span>
                                                         <span className="text-xs text-muted-foreground truncate">
-                                                            {filePath.split('.').pop()?.toUpperCase() || `Document ${index + 1}`}
+                                                            {doc.categoryLabel}
                                                         </span>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2 mt-auto">
+                                                <div className="flex items-center gap-2 mt-auto pt-1 border-t">
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="flex-1 h-8 text-xs gap-1"
-                                                        onClick={() => window.open(fileUploadService.getFileUrl(filePath), '_blank')}
+                                                        className="flex-1 h-7 text-xs gap-1"
+                                                        onClick={() => window.open(fileUploadService.getFileUrl(doc.filePath), '_blank')}
+                                                        title="Open file"
                                                     >
-                                                        <ExternalLink className="h-3 w-3" />
+                                                        <ExternalLink className="h-3.5 w-3.5" /> View
                                                     </Button>
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="flex-1 h-8 text-xs gap-1"
+                                                        className="flex-1 h-7 text-xs gap-1"
                                                         onClick={() => {
                                                             const a = document.createElement('a');
-                                                            a.href = fileUploadService.getFileUrl(filePath);
-                                                            a.download = getFileName(filePath);
+                                                            a.href = fileUploadService.getFileUrl(doc.filePath);
+                                                            a.download = getFileName(doc.filePath);
                                                             a.click();
                                                         }}
+                                                        title="Download file"
                                                     >
-                                                        <Download className="h-3 w-3" />
+                                                        <Download className="h-3.5 w-3.5" /> Save
                                                     </Button>
                                                 </div>
                                             </div>

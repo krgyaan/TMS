@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
@@ -15,9 +16,9 @@ import { DateTimeInput } from "@/components/form/DateTimeInput";
 import { DateInput } from "@/components/form/DateInput";
 import { FileUploader } from "@/components/file-upload";
 import { useCreateTender, useUpdateTender, useGenerateTenderName } from "@/hooks/api/useTenders";
-import type { TenderInfoWithNames } from "../helpers/tenderInfo.types";
+import { type TenderInfoWithNames, type StructuredTenderDocuments, parseTenderDocuments } from "../helpers/tenderInfo.types";
 import { paths } from "@/app/routes/paths";
-import { ArrowLeft, Sparkles, CheckCircle2, ArrowRight, FileSpreadsheet, FileUp } from "lucide-react";
+import { ArrowLeft, Sparkles, CheckCircle2, ArrowRight, FileSpreadsheet, FileUp, FileText, AlertTriangle } from "lucide-react";
 import { useTeamOptions, useOrganizationOptions, useUserOptions, useLocationOptions, useWebsiteOptions, useItemOptions } from "@/hooks/useSelectOptions";
 import { useAuth } from "@/contexts/AuthContext";
 import { TenderNameWarningAlert } from "./TenderNameWarningAlert";
@@ -36,7 +37,10 @@ const ManualFormSchema = z.object({
     website: z.coerce.number().int().positive().optional(),
     item: z.coerce.number().int().positive({ message: "Item is required" }),
     status: z.coerce.number().int().min(0).default(1),
-    documents: z.array(z.string()).default([]),
+    mainTender: z.array(z.string()).min(1, { message: "Main Tender Document / NIT (PDF) is required" }).max(1, { message: "Only 1 Main Tender document is allowed" }),
+    atc: z.array(z.string()).default([]),
+    boq: z.array(z.string()).max(1, { message: "Only 1 BOQ document is allowed" }).default([]),
+    otherDocuments: z.array(z.string()).default([]),
     remarks: z.string().max(200).optional(),
 
     deleteStatus: z.enum(["0", "1"]).optional(),
@@ -93,7 +97,10 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
             website: undefined,
             item: undefined as any,
             status: 1,
-            documents: [],
+            mainTender: [],
+            atc: [],
+            boq: [],
+            otherDocuments: [],
             remarks: "",
         },
     });
@@ -119,7 +126,10 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
     console.log({watchTenderName});
 
     // Watch documents for display
-    const documents = useWatch({ control: manualForm.control, name: "documents" });
+    const mainTender = useWatch({ control: manualForm.control, name: "mainTender" }) || [];
+    const atc = useWatch({ control: manualForm.control, name: "atc" }) || [];
+    const boq = useWatch({ control: manualForm.control, name: "boq" }) || [];
+    const otherDocuments = useWatch({ control: manualForm.control, name: "otherDocuments" }) || [];
     const aiFiles = useWatch({ control: aiForm.control, name: "files" });
 
     const userOptions = useUserOptions(team);
@@ -146,14 +156,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
             return;
         }
         try {
-            let parsedDocuments: string[] = [];
-            if (tender.documents) {
-                try {
-                    parsedDocuments = JSON.parse(tender.documents);
-                } catch {
-                    parsedDocuments = [];
-                }
-            }
+            const parsedDocs = parseTenderDocuments(tender.documents);
 
             const resetValues = {
                 team: Number(tender.team) || (undefined as any),
@@ -169,7 +172,10 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                 website: tender.website ? Number(tender.website) : undefined,
                 item: Number(tender.item) || (undefined as any),
                 status: Number(tender.status) ?? 1,
-                documents: parsedDocuments,
+                mainTender: parsedDocs.mainTender ? [parsedDocs.mainTender] : [],
+                atc: parsedDocs.atc || [],
+                boq: parsedDocs.boq ? [parsedDocs.boq] : [],
+                otherDocuments: parsedDocs.otherDocuments || [],
                 remarks: tender.remarks || "",
             };
             manualForm.reset(resetValues);
@@ -251,6 +257,20 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
 
     const handleManualSubmit: SubmitHandler<ManualFormValues> = async values => {
         try {
+            const structuredDocuments: StructuredTenderDocuments = {
+                schemaVersion: 1,
+                mainTender: values.mainTender?.[0] || null,
+                atc: values.atc || [],
+                boq: values.boq?.[0] || null,
+                otherDocuments: values.otherDocuments || [],
+            };
+            const hasAnyDocs = Boolean(
+                structuredDocuments.mainTender ||
+                structuredDocuments.atc.length > 0 ||
+                structuredDocuments.boq ||
+                structuredDocuments.otherDocuments.length > 0
+            );
+
             const payload = {
                 team: values.team,
                 tenderNo: values.tenderNo,
@@ -266,7 +286,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                 item: values.item,
                 status: values.status,
                 remarks: values.remarks || undefined,
-                documents: values.documents.length > 0 ? JSON.stringify(values.documents) : null,
+                documents: hasAnyDocs ? JSON.stringify(structuredDocuments) : null,
             };
 
             if (mode === "create") {
@@ -516,17 +536,158 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                         options={websiteOptions}
                                         placeholder="Select Website"
                                     />
-                                    <div className="space-y-2">
-                                        <FileUploader
-                                            context="tender-documents"
-                                            value={documents}
-                                            onChange={(paths) => manualForm.setValue("documents", paths)}
-                                            label="Upload Documents"
-                                            disabled={saving}
-                                        />
-                                        <p className="text-xs text-muted-foreground">
-                                            Upload relevant tender documents (optional)
-                                        </p>
+                                    {/* 4 Distinct Upload Slots */}
+                                    <div className="col-span-full space-y-4 rounded-xl border bg-muted/20 p-5 my-2 shadow-2xs">
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b pb-3">
+                                            <div>
+                                                <h4 className="text-sm font-semibold tracking-tight flex items-center gap-2">
+                                                    <FileUp className="h-4 w-4 text-primary" />
+                                                    Tender Documents Ingestion
+                                                </h4>
+                                                <p className="text-xs text-muted-foreground mt-0.5">
+                                                    Upload documents into structured ingestion slots. VolksAI applies strict precedence across slots during clause and BOQ extraction.
+                                                </p>
+                                            </div>
+                                            <Badge variant="outline" className="text-xs font-mono self-start sm:self-auto bg-background/80 text-muted-foreground">
+                                                Multi-Slot Ingestion
+                                            </Badge>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                                            {/* Slot 1: Main Tender Document / NIT (PDF) */}
+                                            <div className="rounded-lg border bg-card p-4 space-y-3 transition-colors hover:border-violet-500/30">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-sm font-semibold">
+                                                                1. Main Tender Document / NIT (PDF)
+                                                            </span>
+                                                            <span className="text-destructive font-bold text-sm">*</span>
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Single primary PDF. Required baseline terms and scope.
+                                                        </p>
+                                                    </div>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="shrink-0 text-xs font-semibold bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20"
+                                                    >
+                                                        AI: Main Terms
+                                                    </Badge>
+                                                </div>
+                                                <FileUploader
+                                                    context="tender-documents"
+                                                    value={mainTender}
+                                                    onChange={(paths) => manualForm.setValue("mainTender", paths, { shouldValidate: true })}
+                                                    maxFiles={1}
+                                                    allowedExtensions={[".pdf"]}
+                                                    allowedMimeTypes={["application/pdf"]}
+                                                    hint=".pdf only • Single file (Required)"
+                                                    disabled={saving}
+                                                />
+                                                {manualForm.formState.errors.mainTender && (
+                                                    <p className="text-xs font-medium text-destructive">
+                                                        {manualForm.formState.errors.mainTender.message}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            {/* Slot 2: Additional Terms & Conditions (ATC) (PDF) */}
+                                            <div className="rounded-lg border bg-card p-4 space-y-3 transition-colors hover:border-blue-500/30">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-sm font-semibold">
+                                                                2. Additional Terms & Conditions (ATC) (PDF)
+                                                            </span>
+                                                            <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Multiple PDFs allowed. Commercial and special terms override Main Tender.
+                                                        </p>
+                                                    </div>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="shrink-0 text-xs font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20"
+                                                    >
+                                                        AI: Terms Override
+                                                    </Badge>
+                                                </div>
+                                                <FileUploader
+                                                    context="tender-documents"
+                                                    value={atc}
+                                                    onChange={(paths) => manualForm.setValue("atc", paths, { shouldValidate: true })}
+                                                    allowedExtensions={[".pdf"]}
+                                                    allowedMimeTypes={["application/pdf"]}
+                                                    hint=".pdf only • Multiple files allowed"
+                                                    disabled={saving}
+                                                />
+                                            </div>
+
+                                            {/* Slot 3: Bill of Quantities (BOQ) / Price Schedule (PDF) */}
+                                            <div className="rounded-lg border bg-card p-4 space-y-3 transition-colors hover:border-emerald-500/30">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-sm font-semibold">
+                                                                3. Bill of Quantities (BOQ) / Price Schedule (PDF)
+                                                            </span>
+                                                            <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Single PDF file. Overrides line items and quantities.
+                                                        </p>
+                                                    </div>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="shrink-0 text-xs font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20"
+                                                    >
+                                                        AI: Item Precedence
+                                                    </Badge>
+                                                </div>
+                                                <FileUploader
+                                                    context="tender-documents"
+                                                    value={boq}
+                                                    onChange={(paths) => manualForm.setValue("boq", paths, { shouldValidate: true })}
+                                                    maxFiles={1}
+                                                    allowedExtensions={[".pdf"]}
+                                                    allowedMimeTypes={["application/pdf"]}
+                                                    hint=".pdf only • Single file"
+                                                    disabled={saving}
+                                                />
+                                            </div>
+
+                                            {/* Slot 4: Other / Supporting Documents */}
+                                            <div className="rounded-lg border bg-card p-4 space-y-3 transition-colors hover:border-muted-foreground/30">
+                                                <div className="flex flex-col gap-1.5">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-sm font-semibold">
+                                                                4. Other / Supporting Documents
+                                                            </span>
+                                                            <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                                                        </div>
+                                                        <Badge
+                                                            variant="secondary"
+                                                            className="shrink-0 text-[11px] font-medium bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/20"
+                                                        >
+                                                            Reference Only
+                                                        </Badge>
+                                                    </div>
+                                                    <div className="rounded-md bg-muted/60 px-2.5 py-1.5 text-xs text-muted-foreground border border-dashed flex items-center gap-1.5">
+                                                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                                                        <span>Stored for team reference only — excluded from OCR, parsing, and LLM processing</span>
+                                                    </div>
+                                                </div>
+                                                <FileUploader
+                                                    context="tender-documents"
+                                                    value={otherDocuments}
+                                                    onChange={(paths) => manualForm.setValue("otherDocuments", paths, { shouldValidate: true })}
+                                                    hint="Drawings, certificates, vendor specs, etc. (Multi-file)"
+                                                    disabled={saving}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {/* Remarks */}

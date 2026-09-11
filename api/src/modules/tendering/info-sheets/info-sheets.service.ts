@@ -8,6 +8,7 @@ import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-hi
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { TimersService } from '@/modules/timers/timers.service';
 import { PdfExtractionProducer } from './pdf-extraction.producer';
+import type { VolksAiExtractionPayload } from './types/pdf-extraction.types';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { organizations } from '@db/schemas/master/organizations.schema';
@@ -39,6 +40,14 @@ export type TenderInfoSheetWithRelations = Omit<TenderInformation, 'pbgMode' | '
     technicalWorkOrders: TechnicalDocument[];
     commercialDocuments: FinancialDocument[];
 };
+
+export interface ResolvedTenderDocuments {
+    schemaVersion: number;
+    mainTenderPath: string;
+    atcPaths: string[];
+    boqPath: string | null;
+    otherDocumentsPaths: string[];
+}
 
 @Injectable()
 export class TenderInfoSheetsService {
@@ -1601,41 +1610,92 @@ export class TenderInfoSheetsService {
     }
 
     /**
-     * Resolves the tender document path from the tender's documents attribute.
+     * Resolves structured tender documents from the tender's documents attribute.
+     * Handles both the new structured JSON shape (with schemaVersion: 1)
+     * and legacy flat arrays / strings (treating paths[0] as mainTender, rest as otherDocuments).
      */
-    private resolveTenderPdfPath(documents: unknown): string {
+    resolveTenderDocuments(documents: unknown): ResolvedTenderDocuments {
         if (!documents) {
             throw new BadRequestException('Tender does not have any documents uploaded');
         }
 
-        let paths: string[] = [];
-        if (Array.isArray(documents)) {
-            paths = documents.filter((p): p is string => typeof p === 'string' && p.trim().length > 0);
-        } else if (typeof documents === 'string') {
+        let parsed: any = documents;
+        if (typeof documents === 'string') {
             const trimmed = documents.trim();
-            if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-                try {
-                    const parsed = JSON.parse(trimmed);
-                    if (Array.isArray(parsed)) {
-                        paths = parsed.filter((p): p is string => typeof p === 'string' && p.trim().length > 0);
-                    }
-                } catch {
-                    // Fall back to treating as comma-separated or raw string
+            if (!trimmed) {
+                throw new BadRequestException('Tender does not have any documents uploaded');
+            }
+            try {
+                parsed = JSON.parse(trimmed);
+            } catch {
+                // Not valid JSON; fall back to comma-separated or raw string
+                if (trimmed.includes(',')) {
+                    parsed = trimmed.split(',').map((s) => s.trim()).filter(Boolean);
+                } else {
+                    parsed = [trimmed];
                 }
-            } else if (trimmed.includes(',')) {
-                paths = trimmed.split(',').map((s) => s.trim()).filter(Boolean);
-            } else if (trimmed.length > 0) {
-                paths = [trimmed];
             }
         }
 
-        if (paths.length === 0) {
-            throw new BadRequestException('Tender does not have any valid document paths');
+        // Case 1: Structured JSON Object (schemaVersion 1 or duck-typed structured shape)
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            const schemaVersion = typeof parsed.schemaVersion === 'number' ? parsed.schemaVersion : 1;
+            const mainTender = typeof parsed.mainTender === 'string' && parsed.mainTender.trim().length > 0
+                ? parsed.mainTender.trim()
+                : null;
+            const atc = Array.isArray(parsed.atc)
+                ? parsed.atc.filter((p: unknown): p is string => typeof p === 'string' && p.trim().length > 0)
+                : [];
+            const boq = typeof parsed.boq === 'string' && parsed.boq.trim().length > 0
+                ? parsed.boq.trim()
+                : null;
+            const otherDocuments = Array.isArray(parsed.otherDocuments)
+                ? parsed.otherDocuments.filter((p: unknown): p is string => typeof p === 'string' && p.trim().length > 0)
+                : [];
+
+            if (!mainTender && atc.length === 0 && !boq && otherDocuments.length === 0) {
+                throw new BadRequestException('Tender does not have any valid document paths');
+            }
+
+            const resolvedMainTender = mainTender || atc[0] || boq || otherDocuments[0];
+            if (!resolvedMainTender) {
+                throw new BadRequestException('Tender does not have any valid document paths');
+            }
+
+            return {
+                schemaVersion,
+                mainTenderPath: resolvedMainTender,
+                atcPaths: atc,
+                boqPath: boq,
+                otherDocumentsPaths: otherDocuments,
+            };
         }
 
-        // Prioritize finding a .pdf document, fallback to first path
-        const pdfFile = paths.find((p) => p.toLowerCase().endsWith('.pdf')) || paths[0];
-        return pdfFile;
+        // Case 2: Legacy Flat Array (or parsed comma-separated/single string array)
+        if (Array.isArray(parsed)) {
+            const validPaths = parsed.filter((p: unknown): p is string => typeof p === 'string' && p.trim().length > 0);
+            if (validPaths.length === 0) {
+                throw new BadRequestException('Tender does not have any valid document paths');
+            }
+
+            const [mainTender, ...otherDocuments] = validPaths;
+            return {
+                schemaVersion: 1,
+                mainTenderPath: mainTender,
+                atcPaths: [],
+                boqPath: null,
+                otherDocumentsPaths: otherDocuments,
+            };
+        }
+
+        throw new BadRequestException('Tender documents data is in an unparseable format');
+    }
+
+    /**
+     * Resolves the primary tender document path from the tender's documents attribute.
+     */
+    resolveTenderPdfPath(documents: unknown): string {
+        return this.resolveTenderDocuments(documents).mainTenderPath;
     }
 
     /**
@@ -1643,19 +1703,27 @@ export class TenderInfoSheetsService {
      */
     async autoExtractFromPdf(tenderId: number, userId: number) {
         const tender = await this.tenderInfosService.validateExists(tenderId);
-        const pdfPath = this.resolveTenderPdfPath(tender.documents);
+        const resolvedDocs = this.resolveTenderDocuments(tender.documents);
 
-        this.logger.log(`Initiating auto-extraction for tender ${tenderId} from document '${pdfPath}'`, {
+        this.logger.log(`Initiating auto-extraction for tender ${tenderId} from document '${resolvedDocs.mainTenderPath}'`, {
             tenderId,
-            pdfPath,
+            mainTenderPath: resolvedDocs.mainTenderPath,
+            atcCount: resolvedDocs.atcPaths.length,
+            hasBoq: Boolean(resolvedDocs.boqPath),
             userId,
         });
 
-        const result = await this.pdfExtractionProducer.enqueueExtraction({
+        // VolksAI extraction payload: otherDocuments is strictly EXCLUDED to maintain security boundary
+        const volksAiPayload: VolksAiExtractionPayload = {
             tenderId,
-            pdfPath,
+            pdfPath: resolvedDocs.mainTenderPath,
+            mainTenderPath: resolvedDocs.mainTenderPath,
+            atcPaths: resolvedDocs.atcPaths,
+            boqPath: resolvedDocs.boqPath,
             userId,
-        });
+        };
+
+        const result = await this.pdfExtractionProducer.enqueueExtraction(volksAiPayload);
 
         return {
             jobId: result.jobId,

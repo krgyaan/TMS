@@ -1,6 +1,18 @@
+export interface VolksAiExtractionPayload {
+    tenderId: number;
+    pdfPath: string;
+    mainTenderPath: string;
+    atcPaths: string[];
+    boqPath: string | null;
+    userId: number;
+}
+
 export interface PdfExtractionJobData {
     tenderId: number;
     pdfPath: string;
+    mainTenderPath?: string;
+    atcPaths?: string[];
+    boqPath?: string | null;
     userId: number;
 }
 

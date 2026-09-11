@@ -83,19 +83,22 @@ export class PdfExtractionProcessor implements OnModuleInit {
         serviceUrl: string,
         timeoutMs: number,
     ): Promise<PdfExtractionJobResult> {
-        const { tenderId, pdfPath, userId } = job.data;
+        const { tenderId, pdfPath, mainTenderPath, atcPaths, boqPath, userId } = job.data;
+        const primaryPdf = mainTenderPath || pdfPath;
 
         this.logger.info(`[PdfExtractionProcessor] Starting extraction for tender ${tenderId}`, {
             jobId: job.id,
             tenderId,
-            pdfPath,
+            primaryPdf,
+            atcCount: atcPaths?.length || 0,
+            hasBoq: Boolean(boqPath),
             userId,
         });
 
         // Resolve absolute path from existing file storage
-        const resolvedPath = this.resolvePdfPath(pdfPath);
+        const resolvedPath = this.resolvePdfPath(primaryPdf);
         if (!fs.existsSync(resolvedPath)) {
-            const errorMsg = `PDF file not found at path: '${pdfPath}' (resolved to '${resolvedPath}')`;
+            const errorMsg = `PDF file not found at path: '${primaryPdf}' (resolved to '${resolvedPath}')`;
             this.logger.error(`[PdfExtractionProcessor] ${errorMsg}`);
             throw new Error(errorMsg);
         }
@@ -112,6 +115,37 @@ export class PdfExtractionProcessor implements OnModuleInit {
 
         const formData = new FormData();
         formData.append('pdf_file', blob, fileName);
+
+        // Attach ATC files if provided
+        if (atcPaths && Array.isArray(atcPaths)) {
+            for (const atcPath of atcPaths) {
+                try {
+                    const resolvedAtc = this.resolvePdfPath(atcPath);
+                    if (fs.existsSync(resolvedAtc)) {
+                        const atcBuffer = await fs.promises.readFile(resolvedAtc);
+                        const atcBlob = new Blob([atcBuffer], { type: 'application/pdf' });
+                        formData.append('atc_files', atcBlob, path.basename(resolvedAtc));
+                    }
+                } catch (atcErr) {
+                    this.logger.warn(`[PdfExtractionProcessor] Could not load ATC file '${atcPath}': ${(atcErr as Error).message}`);
+                }
+            }
+        }
+
+        // Attach BOQ file if provided
+        if (boqPath) {
+            try {
+                const resolvedBoq = this.resolvePdfPath(boqPath);
+                if (fs.existsSync(resolvedBoq)) {
+                    const boqBuffer = await fs.promises.readFile(resolvedBoq);
+                    const boqBlob = new Blob([boqBuffer], { type: 'application/pdf' });
+                    formData.append('boq_file', boqBlob, path.basename(resolvedBoq));
+                }
+            } catch (boqErr) {
+                this.logger.warn(`[PdfExtractionProcessor] Could not load BOQ file '${boqPath}': ${(boqErr as Error).message}`);
+            }
+        }
+
         if (userId) {
             formData.append('user_id', String(userId));
         }

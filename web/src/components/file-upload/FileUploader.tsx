@@ -34,6 +34,10 @@ interface FileUploaderProps {
     disabled?: boolean;
     className?: string;
     label?: string;
+    maxFiles?: number;
+    allowedExtensions?: string[];
+    allowedMimeTypes?: string[];
+    hint?: string;
 }
 
 export function FileUploader({
@@ -43,6 +47,10 @@ export function FileUploader({
     disabled = false,
     className,
     label,
+    maxFiles,
+    allowedExtensions,
+    allowedMimeTypes,
+    hint,
 }: FileUploaderProps) {
     const { data: config, isLoading, error } = useFileConfig(context);
     const { upload, deleteFile, progress, isUploading } = useFileUpload(context);
@@ -51,11 +59,16 @@ export function FileUploader({
     const effectiveConfig = config || DEFAULT_CONFIG;
     const isUsingFallback = !config && !isLoading;
 
+    const effectiveMaxFiles = maxFiles !== undefined ? maxFiles : effectiveConfig.maxFiles;
+    const effectiveExtensions = allowedExtensions !== undefined ? allowedExtensions : effectiveConfig.allowedExtensions;
+    const effectiveMimeTypes = allowedMimeTypes !== undefined ? allowedMimeTypes : effectiveConfig.allowedMimeTypes;
+
     const onDrop = useCallback(
         async (acceptedFiles: File[]) => {
             if (!effectiveConfig || disabled) return;
 
-            const remaining = effectiveConfig.maxFiles - value.length;
+            const remaining = effectiveMaxFiles - value.length;
+            if (remaining <= 0) return;
             const filesToUpload = acceptedFiles.slice(0, remaining);
 
             const result = await upload(filesToUpload);
@@ -64,7 +77,7 @@ export function FileUploader({
                 onChange?.([...value, ...newPaths]);
             }
         },
-        [effectiveConfig, disabled, value, upload, onChange],
+        [effectiveConfig, disabled, value, upload, onChange, effectiveMaxFiles],
     );
 
     const handleRemove = useCallback(
@@ -77,10 +90,11 @@ export function FileUploader({
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
-        disabled: disabled || isUploading || !effectiveConfig || value.length >= effectiveConfig.maxFiles,
+        disabled: disabled || isUploading || !effectiveConfig || value.length >= effectiveMaxFiles,
         maxSize: effectiveConfig.maxSizeBytes,
-        accept: effectiveConfig.allowedMimeTypes
-            ? effectiveConfig.allowedMimeTypes.reduce(
+        maxFiles: effectiveMaxFiles,
+        accept: effectiveMimeTypes
+            ? effectiveMimeTypes.reduce(
                 (acc, mime) => ({ ...acc, [mime]: [] }),
                 {} as Record<string, string[]>,
             )
@@ -91,7 +105,7 @@ export function FileUploader({
         return <div className={cn('h-32 bg-muted animate-pulse rounded-lg', className)} />;
     }
 
-    const canUploadMore = value.length < effectiveConfig.maxFiles;
+    const canUploadMore = value.length < effectiveMaxFiles;
 
     return (
         <div className={cn('space-y-3', className)}>
@@ -131,11 +145,11 @@ export function FileUploader({
                         {isDragActive ? 'Drop here' : 'Drag & drop or click to upload'}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                        {effectiveConfig.allowedExtensions.join(', ')} • Max {effectiveConfig.maxSizeFormatted}
+                        {hint ? hint : `${effectiveExtensions.join(', ')} • Max ${effectiveConfig.maxSizeFormatted}`}
                     </p>
-                    {effectiveConfig.maxFiles > 1 && (
+                    {effectiveMaxFiles > 1 && (
                         <p className="text-xs text-muted-foreground">
-                            {effectiveConfig.maxFiles - value.length} of {effectiveConfig.maxFiles} remaining
+                            {effectiveMaxFiles - value.length} of {effectiveMaxFiles} remaining
                         </p>
                     )}
                 </div>

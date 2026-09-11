@@ -213,7 +213,7 @@ droppedColumns.forEach((dc) => {
                     laterIdx: f.idx,
                     laterJournalPos: f.journalPos,
                 });
-                console.log(`INVERSION: Column "${dc.table}"."${dc.droppedColumn}" dropped in ${dc.file} (idx ${dc.idx}, pos ${dc.dropJournalPos}) but referenced later in ${f.file} (idx ${f.idx}, pos ${f.laterJournalPos})`);
+                console.log(`INVERSION: Column "${dc.table}"."${dc.column}" dropped in ${dc.file} (idx ${dc.idx}, pos ${dc.journalPos}) but referenced later in ${f.file} (idx ${f.idx}, pos ${f.journalPos})`);
             }
         }
     });
