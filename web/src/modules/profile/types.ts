@@ -137,11 +137,11 @@ export type ProfileResponse = {
   employeeProfile: EmployeeProfileData | null;
   address: AddressData | null;
   emergencyContact: EmergencyContactData | null;
-  profileStatus: String;
-  documentStatus: String;
-  inductionStatus: String;
-  bankStatus : String;
-  educationStatus: String;
+  profileStatus: string;
+  documentStatus: string;
+  inductionStatus: string;
+  bankStatus : string;
+  educationStatus: string;
   documents: DocumentData[];
   education: EducationData[];
   experience: ExperienceData[];

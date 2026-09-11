@@ -1,7 +1,6 @@
-import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Link, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { FileText, Laptop, MessageSquare, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { ProfileProvider, useProfileContext } from "./contexts/ProfileContext";
@@ -15,6 +14,10 @@ import { OnboardingView } from "./components/onboarding/OnboardingView";
 import { DocumentsSection } from "./components/DocumentsSection";
 import { AssetsSection } from "./components/AssetsSection";
 import { ComplaintsSection } from "./components/ComplaintsSection";
+import { OnboardingProfileForm } from "./components/onboarding/OnboardingProfileForm";
+import { OnboardingBankForm } from "./components/onboarding/OnboardingBankForm";
+import { OnboardingEducationForm } from "./components/onboarding/OnboardingEducationForm";
+import { OnboardingExperienceForm } from "./components/onboarding/OnboardingExperienceForm";
 import type { ProfileData, AddressData, EmergencyContactData } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -45,33 +48,195 @@ function ReadOnlyField({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Minimal view — users WITHOUT any onboarding request (admin-created accounts)
-// ─────────────────────────────────────────────────────────────────────────────
-
-const TAB_VALUES = ["documents", "assets", "support"];
-
-function MinimalStandardView() {
-  const { data } = useProfileContext();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState(
-    tabParam && TAB_VALUES.includes(tabParam) ? tabParam : "documents"
+function PageLoader() {
+  return (
+    <div className="rounded-2xl border border-border/50 bg-card p-6 flex items-center gap-3">
+      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+      <p className="text-sm text-muted-foreground">Loading details…</p>
+    </div>
   );
+}
 
-  const handleTabChange = (value: string) => {
-    setActiveTab(value);
-    setSearchParams({ tab: value }, { replace: true });
-  };
+function BackToDashboardButton() {
+  const navigate = useNavigate();
+  return (
+    <Button
+      variant="ghost"
+      onClick={() => navigate("/profile")}
+      className="rounded-xl"
+    >
+      Back to Dashboard
+    </Button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Onboarding stage editors — /profile/personal | bank | education | experience
+// ─────────────────────────────────────────────────────────────────────────────
+
+const STAGE_EDITOR_META = {
+  profile: {
+    title: "Profile Details",
+    description: "Please provide your personal and professional information",
+  },
+  bank: {
+    title: "Bank Details",
+    description: "Please provide your bank account information for salary processing",
+  },
+  education: {
+    title: "Education Details",
+    description: "Please provide your academic details",
+  },
+  experience: {
+    title: "Work Experience",
+    description: "Please provide your previous employment history",
+  },
+} as const;
+
+type StageEditorKey = keyof typeof STAGE_EDITOR_META;
+
+function ProfileEditorPage({ stage }: { stage: StageEditorKey }) {
+  const navigate = useNavigate();
+  const { data: obData, isLoading: obLoading, refetch } = useOnboardingContext();
+  const [searchParams] = useSearchParams();
+  const viewOnly = searchParams.get("mode") === "view";
+  const meta = STAGE_EDITOR_META[stage];
+
+  if (obLoading) return <PageLoader />;
+  if (!obData) return <Navigate to="/profile" replace />;
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-border/40 bg-background/50 backdrop-blur-xl p-6 sm:p-8 shadow-2xl">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">{meta.title}</h2>
+            <p className="text-muted-foreground mt-1 text-sm">{meta.description}</p>
+          </div>
+          <BackToDashboardButton />
+        </div>
+
+        {stage === "profile" && (
+          <OnboardingProfileForm
+            onCancel={() => navigate("/profile")}
+            onSuccess={() => {
+              refetch?.();
+              navigate("/profile");
+            }}
+          />
+        )}
+        {stage === "bank" && (
+          <OnboardingBankForm
+            readOnly={viewOnly}
+            onCancel={() => navigate("/profile")}
+            onSuccess={() => {
+              refetch?.();
+              navigate("/profile");
+            }}
+          />
+        )}
+        {stage === "education" && (
+          <OnboardingEducationForm
+            readOnly={viewOnly}
+            onCancel={() => navigate("/profile")}
+            onSuccess={() => {
+              refetch?.();
+              navigate("/profile");
+            }}
+          />
+        )}
+        {stage === "experience" && (
+          <OnboardingExperienceForm
+            readOnly={viewOnly}
+            onCancel={() => navigate("/profile")}
+            onSuccess={() => {
+              refetch?.();
+              navigate("/profile");
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Documents — /profile/documents (onboarding editor + minimal accounts)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DocumentsPage() {
+  const { data: obData, isLoading: obLoading } = useOnboardingContext();
+
+  if (obLoading) return <PageLoader />;
+
+  return (
+    <div className="space-y-6">
+      {obData ? (
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">Documents</h2>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Upload required identity and academic documents
+            </p>
+          </div>
+          <BackToDashboardButton />
+        </div>
+      ) : null}
+      <DocumentsSection />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Assets / Support — /profile/assets | support
+// ─────────────────────────────────────────────────────────────────────────────
+
+function AssetsPage() {
+  return (
+    <div className="space-y-6">
+      <AssetsSection />
+    </div>
+  );
+}
+
+function SupportPage() {
+  return (
+    <div className="space-y-6">
+      <ComplaintsSection />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dashboard — /profile
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ProfileHome() {
+  const { data: obData, isLoading: obLoading } = useOnboardingContext();
+
+  if (obLoading) return <PageLoader />;
+
+  if (obData) {
+    return <OnboardingView />;
+  }
+
+  return <MinimalHome />;
+}
+
+// Minimal view — users WITHOUT any onboarding request (admin-created accounts)
+
+function MinimalHome() {
+  const location = useLocation();
+  const { data } = useProfileContext();
 
   const profile = (data?.profile ?? {}) as ProfileData;
   const address = (data?.address ?? {}) as AddressData;
   const emergency = (data?.emergencyContact ?? {}) as EmergencyContactData;
 
   const tabs = [
-    { value: "documents", label: "Documents", icon: FileText },
-    { value: "assets", label: "Assets", icon: Laptop },
-    { value: "support", label: "Support", icon: MessageSquare },
+    { to: "/profile/documents", label: "Documents", icon: FileText },
+    { to: "/profile/assets", label: "Assets", icon: Laptop },
+    { to: "/profile/support", label: "Support", icon: MessageSquare },
   ];
 
   return (
@@ -116,84 +281,39 @@ function MinimalStandardView() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Section links */}
       <div>
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="w-full justify-start h-auto p-1.5 bg-background/60 rounded-2xl overflow-x-auto flex-nowrap backdrop-blur-xl border border-border/40 shadow-lg">
-            {tabs.map((tab) => (
-              <TabsTrigger
-                key={tab.value}
-                value={tab.value}
+        <div className="w-full justify-start h-auto p-1.5 bg-background/60 rounded-2xl overflow-x-auto flex-nowrap backdrop-blur-xl border border-border/40 shadow-lg flex">
+          {tabs.map((tab) => {
+            const active = location.pathname.startsWith(tab.to);
+            return (
+              <Link
+                key={tab.to}
+                to={tab.to}
                 className={cn(
-                  "relative gap-2 rounded-xl text-xs sm:text-sm px-4 sm:px-6 py-2.5 flex-shrink-0 font-semibold transition-all duration-300",
-                  "data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:shadow-black/[0.04]"
+                  "relative gap-2 rounded-xl text-xs sm:text-sm px-4 sm:px-6 py-2.5 flex-shrink-0 font-semibold transition-all duration-300 inline-flex items-center",
+                  active && "bg-background text-primary shadow-md shadow-black/[0.04]"
                 )}
               >
                 <tab.icon className="h-4 w-4" />
                 <span className="hidden sm:inline">{tab.label}</span>
                 <span className="sm:hidden">{tab.label.slice(0, 3)}</span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          <div className="mt-6">
-            {activeTab === "documents" && (
-              <TabsContent value="documents" className="outline-none m-0" forceMount>
-                <DocumentsSection />
-              </TabsContent>
-            )}
-            {activeTab === "assets" && (
-              <TabsContent value="assets" className="outline-none m-0" forceMount>
-                <AssetsSection />
-              </TabsContent>
-            )}
-            {activeTab === "support" && (
-              <TabsContent value="support" className="outline-none m-0" forceMount>
-                <ComplaintsSection />
-              </TabsContent>
-            )}
-          </div>
-        </Tabs>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Branch router — decides which view the employee gets
+// Layout + Routes
 // ─────────────────────────────────────────────────────────────────────────────
 
-function OnboardingBranch() {
-  const { data: obData, isLoading: obLoading } = useOnboardingContext();
+function ProfileLayout() {
+  const { isLoading, error } = useProfileContext();
 
-  // Draft still loading
-  if (obLoading) {
-    return (
-      <div className="rounded-2xl border border-border/50 bg-card p-6 flex items-center gap-3">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Loading details…</p>
-      </div>
-    );
-  }
-
-  // Onboarding request exists (any status) → previous stage-card view.
-  // Pending/rejected stages stay editable; approved stages are locked.
-  if (obData) {
-    return <OnboardingView />;
-  }
-
-  // No onboarding request at all → minimal read-only profile
-  return <MinimalStandardView />;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Profile Page Content
-// ─────────────────────────────────────────────────────────────────────────────
-
-function ProfilePageContent() {
-  const { data, isLoading, error } = useProfileContext();
-
-  // ── Loading State ──────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -205,14 +325,13 @@ function ProfilePageContent() {
     );
   }
 
-  // ── Error State ────────────────────────────────────────────────────────────
-  if (error || !data) {
+  if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-destructive text-center p-6">
         <div className="max-w-md">
           <h2 className="text-xl font-bold mb-2">Error Loading Profile</h2>
           <p className="text-muted-foreground">
-            {error?.message || "Failed to load profile data"}
+            {error.message || "Failed to load profile data"}
           </p>
         </div>
       </div>
@@ -222,10 +341,18 @@ function ProfilePageContent() {
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 relative">
-        {/* ProfileHeader shows on the minimal branch; the stage-card view has
-            its own header inside OnboardingView */}
         <OnboardingProvider>
-          <OnboardingBranch />
+          <Routes>
+            <Route index element={<ProfileHome />} />
+            <Route path="personal" element={<ProfileEditorPage stage="profile" />} />
+            <Route path="bank" element={<ProfileEditorPage stage="bank" />} />
+            <Route path="education" element={<ProfileEditorPage stage="education" />} />
+            <Route path="experience" element={<ProfileEditorPage stage="experience" />} />
+            <Route path="documents" element={<DocumentsPage />} />
+            <Route path="assets" element={<AssetsPage />} />
+            <Route path="support" element={<SupportPage />} />
+            <Route path="*" element={<Navigate to="/profile" replace />} />
+          </Routes>
         </OnboardingProvider>
       </div>
     </div>
@@ -236,7 +363,7 @@ function ProfilePageContent() {
 export default function ProfilePage() {
   return (
     <ProfileProvider>
-      <ProfilePageContent />
+      <ProfileLayout />
     </ProfileProvider>
   );
 }

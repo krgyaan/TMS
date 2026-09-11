@@ -75,7 +75,7 @@ export default function AppRoutes() {
 
                     {/* Profile */}
                     <Route
-                        path="/profile"
+                        path="/profile/*"
                         element={
                             <RouteWrapper>
                                 <Profile />
