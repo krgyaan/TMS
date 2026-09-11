@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { User, FileText, ClipboardCheck, CheckCircle2, Sparkles, ArrowRight, CreditCard, GraduationCap, Briefcase } from "lucide-react";
+import { User, FileText, ClipboardCheck, CheckCircle2, Sparkles, ArrowRight, CreditCard, GraduationCap, Briefcase, Laptop, MessageSquare, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useOnboardingContext } from "./contexts/OnboardingContext";
 import type { ProfileResponse, DocumentData, ProfileData, AddressData, EmergencyContactData } from "../../types";
 import { OnboardingStageCard } from "./OnboardingStageCard";
@@ -232,6 +233,55 @@ function WelcomeState({ onBegin }: { onBegin: () => void }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Navigation Card (Assets / Support) — matches the closed stage-card styling
+// ─────────────────────────────────────────────────────────────────────────────
+
+function NavCard({
+    label,
+    description,
+    icon: Icon,
+    onClick,
+}: {
+    label: string;
+    description: string;
+    icon: LucideIcon;
+    onClick: () => void;
+}) {
+    return (
+        <div className="group/card">
+            <button
+                type="button"
+                onClick={onClick}
+                className={cn(
+                    "w-full text-left rounded-2xl border border-border/50 transition-all duration-300 overflow-hidden",
+                    "bg-background/70 backdrop-blur-sm shadow-sm hover:shadow-md hover:shadow-black/[0.04]",
+                    "hover:border-primary/20",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-1",
+                    "p-5 sm:p-6"
+                )}
+            >
+                <div className="flex items-start gap-4">
+                    <div className="shrink-0 rounded-xl p-2.5 bg-muted/60">
+                        <Icon className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-3 mb-1">
+                            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover/card:text-primary transition-colors duration-300 truncate">
+                                {label}
+                            </h3>
+                            <ArrowRight className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed mb-3 line-clamp-2">
+                            {description}
+                        </p>
+                    </div>
+                </div>
+            </button>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -358,6 +408,22 @@ export function OnboardingView() {
                         />
                     );
                 })}
+            </div>
+
+            {/* Assets & Support — below the stage cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <NavCard
+                    label="Assets"
+                    description="Company assets assigned to you"
+                    icon={Laptop}
+                    onClick={() => navigate("/profile/assets")}
+                />
+                <NavCard
+                    label="Support"
+                    description="Raise and track complaints"
+                    icon={MessageSquare}
+                    onClick={() => navigate("/profile/support")}
+                />
             </div>
         </div>
     );

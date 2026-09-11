@@ -171,18 +171,20 @@ function DocumentsPage() {
 
   return (
     <div className="space-y-6">
-      {obData ? (
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">Documents</h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Upload required identity and academic documents
-            </p>
+      <div className="rounded-3xl border border-border/40 bg-background/50 backdrop-blur-xl p-6 sm:p-8 shadow-2xl">
+        {obData ? (
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-2xl font-bold text-foreground">Documents</h2>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Upload required identity and academic documents
+              </p>
+            </div>
+            <BackToDashboardButton />
           </div>
-          <BackToDashboardButton />
-        </div>
-      ) : null}
-      <DocumentsSection />
+        ) : null}
+        <DocumentsSection />
+      </div>
     </div>
   );
 }
@@ -194,7 +196,9 @@ function DocumentsPage() {
 function AssetsPage() {
   return (
     <div className="space-y-6">
-      <AssetsSection />
+      <div className="rounded-3xl border border-border/40 bg-background/50 backdrop-blur-xl p-6 sm:p-8 shadow-2xl">
+        <AssetsSection />
+      </div>
     </div>
   );
 }
@@ -202,7 +206,9 @@ function AssetsPage() {
 function SupportPage() {
   return (
     <div className="space-y-6">
-      <ComplaintsSection />
+      <div className="rounded-3xl border border-border/40 bg-background/50 backdrop-blur-xl p-6 sm:p-8 shadow-2xl">
+        <ComplaintsSection />
+      </div>
     </div>
   );
 }
@@ -241,66 +247,70 @@ function MinimalHome() {
 
   return (
     <div className="space-y-6">
-      {/* Header Card */}
-      <ProfileHeader />
+      <div className="rounded-3xl border border-border/40 bg-background/50 backdrop-blur-xl p-6 sm:p-8 shadow-2xl">
+        <div className="space-y-6">
+          {/* Header Card */}
+          <ProfileHeader />
 
-      {/* Read-only personal card */}
-      <div className="rounded-2xl border border-border/50 bg-card p-5">
-        <h3 className="text-sm font-bold text-foreground mb-4">
-          Personal Information
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-          <ReadOnlyField label="Date of Birth" value={profile.dateOfBirth ? new Date(profile.dateOfBirth).toLocaleDateString("en-GB") : null} />
-          <ReadOnlyField label="Gender" value={profile.gender} />
-          <ReadOnlyField label="Marital Status" value={profile.maritalStatus} />
-          <ReadOnlyField label="Nationality" value={profile.nationality} />
-          <ReadOnlyField label="Blood Group" value={profile.bloodGroup} />
-          <ReadOnlyField label="Personal Email" value={profile.personalEmail} />
-          <ReadOnlyField label="Phone" value={profile.phone} />
-          <ReadOnlyField label="Aadhar Number" value={profile.aadharNumber} />
-          <ReadOnlyField label="PAN Number" value={profile.panNumber} />
-          <ReadOnlyField label="Current City" value={address.currentCity} />
-          <ReadOnlyField
-            label="Current Address"
-            value={
-              address.currentAddressLine1
-                ? [
-                    address.currentAddressLine1,
-                    address.currentAddressLine2,
-                    address.currentCity,
-                    address.currentState,
-                    address.currentPostalCode,
-                  ]
-                    .filter(Boolean)
-                    .join(", ")
-                : null
-            }
-          />
-          <ReadOnlyField label="Emergency Contact" value={emergency.name} />
-          <ReadOnlyField label="Emergency Phone" value={emergency.phone} />
-        </div>
-      </div>
+          {/* Read-only personal card */}
+          <div className="rounded-2xl border border-border/50 bg-card p-5">
+            <h3 className="text-sm font-bold text-foreground mb-4">
+              Personal Information
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+              <ReadOnlyField label="Date of Birth" value={profile.dateOfBirth ? new Date(profile.dateOfBirth).toLocaleDateString("en-GB") : null} />
+              <ReadOnlyField label="Gender" value={profile.gender} />
+              <ReadOnlyField label="Marital Status" value={profile.maritalStatus} />
+              <ReadOnlyField label="Nationality" value={profile.nationality} />
+              <ReadOnlyField label="Blood Group" value={profile.bloodGroup} />
+              <ReadOnlyField label="Personal Email" value={profile.personalEmail} />
+              <ReadOnlyField label="Phone" value={profile.phone} />
+              <ReadOnlyField label="Aadhar Number" value={profile.aadharNumber} />
+              <ReadOnlyField label="PAN Number" value={profile.panNumber} />
+              <ReadOnlyField label="Current City" value={address.currentCity} />
+              <ReadOnlyField
+                label="Current Address"
+                value={
+                  address.currentAddressLine1
+                    ? [
+                        address.currentAddressLine1,
+                        address.currentAddressLine2,
+                        address.currentCity,
+                        address.currentState,
+                        address.currentPostalCode,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")
+                    : null
+                }
+              />
+              <ReadOnlyField label="Emergency Contact" value={emergency.name} />
+              <ReadOnlyField label="Emergency Phone" value={emergency.phone} />
+            </div>
+          </div>
 
-      {/* Section links */}
-      <div>
-        <div className="w-full justify-start h-auto p-1.5 bg-background/60 rounded-2xl overflow-x-auto flex-nowrap backdrop-blur-xl border border-border/40 shadow-lg flex">
-          {tabs.map((tab) => {
-            const active = location.pathname.startsWith(tab.to);
-            return (
-              <Link
-                key={tab.to}
-                to={tab.to}
-                className={cn(
-                  "relative gap-2 rounded-xl text-xs sm:text-sm px-4 sm:px-6 py-2.5 flex-shrink-0 font-semibold transition-all duration-300 inline-flex items-center",
-                  active && "bg-background text-primary shadow-md shadow-black/[0.04]"
-                )}
-              >
-                <tab.icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{tab.label}</span>
-                <span className="sm:hidden">{tab.label.slice(0, 3)}</span>
-              </Link>
-            );
-          })}
+          {/* Section links */}
+          <div>
+            <div className="w-full justify-start h-auto p-1.5 bg-background/60 rounded-2xl overflow-x-auto flex-nowrap backdrop-blur-xl border border-border/40 shadow-lg flex">
+              {tabs.map((tab) => {
+                const active = location.pathname.startsWith(tab.to);
+                return (
+                  <Link
+                    key={tab.to}
+                    to={tab.to}
+                    className={cn(
+                      "relative gap-2 rounded-xl text-xs sm:text-sm px-4 sm:px-6 py-2.5 flex-shrink-0 font-semibold transition-all duration-300 inline-flex items-center",
+                      active && "bg-background text-primary shadow-md shadow-black/[0.04]"
+                    )}
+                  >
+                    <tab.icon className="h-4 w-4" />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                    <span className="sm:hidden">{tab.label.slice(0, 3)}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
     </div>
