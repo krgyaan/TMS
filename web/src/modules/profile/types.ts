@@ -29,7 +29,11 @@ export type ProfileData = {
   employeeCode: string;
   altEmail: string;
   bloodGroup: string;
-  linkedinProfile: string;  pfNumber?: string | null;  hrStatus?: string;  hrRemark?: string | null;};
+  linkedinProfile: string;    pfNumber?: string | null;
+  hrStatus?: string;
+  hrRemark?: string | null;
+  profilePhoto?: string | null;
+};
 
 export type EmployeeProfileData = {
   employeeType: string;

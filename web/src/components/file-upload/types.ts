@@ -39,7 +39,7 @@ export const KNOWN_CONTEXTS = [
     'follow-ups', 'delegation-attachment', 'delegation-proof',
 
     // hrms
-    'complaints',
+    'complaints', 'profile-photos',
 
     // insurance
     'insurances',

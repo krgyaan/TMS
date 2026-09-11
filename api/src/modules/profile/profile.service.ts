@@ -183,6 +183,7 @@ export class ProfileService {
       linkedinProfile: (upr as any).linkedinProfile || null,
       employeeCode: upr.employeeCode || null,
       altEmail: upr.altEmail || null,
+      profilePhoto: upr.image || null,
     } : null;
 
     address = upr ? {

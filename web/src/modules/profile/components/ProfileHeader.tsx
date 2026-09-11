@@ -1,23 +1,23 @@
 import React, { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Mail,
   Phone,
   MapPin,
-  BadgeCheck,
   Hash,
   Briefcase,
   Building2,
   CheckCircle2,
   KeyRound,
+  Camera,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProfileContext } from "../contexts/ProfileContext";
 import { getInitials } from "../utils";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
+import { ProfilePhotoDialog } from "./ProfilePhotoDialog";
 import type { ProfileData, EmployeeProfileData, AddressData } from "../types";
 
 interface ProfileHeaderProps {
@@ -31,6 +31,7 @@ interface ProfileHeaderProps {
 export const ProfileHeader: React.FC<ProfileHeaderProps> = () => {
   const { data } = useProfileContext();
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
 
   if (!data) return null;
 
@@ -50,36 +51,6 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = () => {
   const status = (
     EMPLOYEE_PROFILE?.employeeStatus || "pending"
   ).toLowerCase();
-
-  const statusConfig: Record<string, { classes: string; label: string }> = {
-    active: {
-      classes:
-        "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-      label: "Active",
-    },
-    approved: {
-      classes:
-        "bg-primary/10 text-primary border-primary/20",
-      label: "Approved",
-    },
-    in_progress: {
-      classes:
-        "bg-primary/10 text-primary border-primary/20",
-      label: "In Progress",
-    },
-    rejected: {
-      classes:
-        "bg-destructive/10 text-destructive border-destructive/20",
-      label: "Rejected",
-    },
-    pending: {
-      classes:
-        "bg-muted text-muted-foreground border-border",
-      label: "Pending",
-    },
-  };
-
-  const currentStatus = statusConfig[status] || statusConfig.pending;
 
   // ─── Info chips ──────────────────────────────────────────────────────────
 
@@ -122,11 +93,30 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = () => {
                   <div className="relative shrink-0 self-center sm:self-start">
                     <div className="absolute -inset-1 rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 blur-xl" />
                     <Avatar className="relative h-28 w-28 sm:h-32 sm:w-32 rounded-3xl border-4 border-background shadow-xl">
-                      <AvatarImage src="" />
+                      <AvatarImage
+                        src={PROFILE.profilePhoto || undefined}
+                        alt={fullName}
+                        className="object-cover"
+                      />
                       <AvatarFallback className="rounded-[calc(1.5rem-4px)] bg-gradient-to-br from-primary/10 to-primary/25 text-2xl sm:text-3xl font-black text-primary">
                         {initials}
                       </AvatarFallback>
                     </Avatar>
+
+                    {/* Edit photo */}
+                    <button
+                      type="button"
+                      onClick={() => setPhotoDialogOpen(true)}
+                      aria-label="Update profile photo"
+                      className={cn(
+                        "absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full",
+                        "border-2 border-background bg-primary text-primary-foreground shadow-md",
+                        "transition-transform duration-150 hover:scale-105 focus-visible:outline-none",
+                        "focus-visible:ring-2 focus-visible:ring-primary/40"
+                      )}
+                    >
+                      <Camera className="h-4 w-4" />
+                    </button>
 
                     {status === "active" && (
                       <div className="absolute -top-1 -left-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-emerald-500 shadow-md">
@@ -137,19 +127,6 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = () => {
 
                   {/* Name & Role */}
                   <div className="min-w-0 flex-1 text-center sm:text-left">
-                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-2">
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em]",
-                          currentStatus.classes
-                        )}
-                      >
-                        <BadgeCheck className="mr-1 h-3 w-3" />
-                        {currentStatus.label}
-                      </Badge>
-                    </div>
-
                     <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground truncate">
                       {fullName}
                     </h1>
@@ -217,6 +194,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = () => {
         </div>
 
         <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
+        <ProfilePhotoDialog open={photoDialogOpen} onOpenChange={setPhotoDialogOpen} />
       </Card>
     </div>
   );
