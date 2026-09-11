@@ -47,6 +47,15 @@ export class InventoryService {
                 price: inventory.price,
                 qty: inventory.qty,
                 remainingQty: inventory.remainingQty,
+                sourcePoNumber: sql<string | null>`(
+                    SELECT po.po_number
+                    FROM ${inventoryMovements} im
+                    JOIN ${purchaseOrders} po ON po.id = im.po_id
+                    WHERE im.inventory_id = ${inventory.id}
+                      AND im.movement_type = 'po_approval'
+                    ORDER BY im.id
+                    LIMIT 1
+                )`,
             })
             .from(inventory)
             .leftJoin(warehouses, eq(warehouses.id, inventory.warehouseId))
@@ -76,6 +85,15 @@ export class InventoryService {
                 price: inventory.price,
                 qty: inventory.qty,
                 remainingQty: inventory.remainingQty,
+                sourcePoNumber: sql<string | null>`(
+                    SELECT po.po_number
+                    FROM ${inventoryMovements} im
+                    JOIN ${purchaseOrders} po ON po.id = im.po_id
+                    WHERE im.inventory_id = ${inventory.id}
+                      AND im.movement_type = 'po_approval'
+                    ORDER BY im.id
+                    LIMIT 1
+                )`,
             })
             .from(inventory)
             .leftJoin(projects, eq(projects.id, inventory.projectId))

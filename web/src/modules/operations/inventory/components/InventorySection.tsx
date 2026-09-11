@@ -55,6 +55,14 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
                 width: 110,
             },
             {
+                field: "sourcePoNumber",
+                headerName: "PO No.",
+                sortable: true,
+                filter: true,
+                width: 170,
+                valueGetter: p => p.data?.sourcePoNumber ?? "—",
+            },
+            {
                 field: "warehouseType",
                 headerName: "Warehouse",
                 sortable: true,

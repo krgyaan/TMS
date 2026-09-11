@@ -12,6 +12,7 @@ export interface InventoryItem {
     price: number;
     qty: number;
     remainingQty: number;
+    sourcePoNumber?: string | null;
 }
 
 export interface InventoryProjectSummary {
