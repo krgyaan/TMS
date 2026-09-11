@@ -312,117 +312,24 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
   );
 };
 
-// ─── DOCUMENT PREVIEW DIALOG ────────────────────────────────────────────────
-
-interface PreviewDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  document: UploadedDocument | null;
-  onReupload: (doc: UploadedDocument) => void;
+async function downloadDocument(doc: UploadedDocument) {
+  if (!doc.fileUrl) return;
+  try {
+    const res = await fetch(doc.fileUrl);
+    if (!res.ok) throw new Error("fetch failed");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = doc.fileName || doc.docType || "document";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch {
+    window.open(doc.fileUrl, "_blank");
+  }
 }
-
-const PreviewDialog: React.FC<PreviewDialogProps> = ({ open, onOpenChange, document: doc, onReupload }) => {
-  if (!doc) return null;
-  const status = getStatusConfig(doc.verificationStatus);
-  const StatusIcon = status.icon;
-  const catConfig = CATEGORY_CONFIG[doc.docCategory] || CATEGORY_CONFIG["Other Documents"];
-  const CatIcon = catConfig.icon;
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg rounded-2xl border-border/40 bg-background/95 backdrop-blur-xl p-0 overflow-hidden">
-        <div className="relative px-6 pt-6 pb-4">
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/[0.03] to-transparent" />
-          <DialogHeader className="relative">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center", catConfig.bg)}>
-                  <CatIcon className={cn("h-5 w-5", catConfig.color)} />
-                </div>
-                <div>
-                  <DialogTitle className="text-lg font-bold">{doc.docType}</DialogTitle>
-                  <DialogDescription className="text-xs mt-0.5">{doc.docCategory}</DialogDescription>
-                </div>
-              </div>
-              <Badge variant="outline" className={cn("text-[10px] h-6 font-bold rounded-lg", status.className)}>
-                <StatusIcon className="h-3 w-3 mr-1" />
-                {status.label}
-              </Badge>
-            </div>
-          </DialogHeader>
-        </div>
-
-        <div className="px-6 pb-6 space-y-5">
-          {/* Document Preview Area */}
-          <div className="h-48 rounded-2xl bg-muted/30 border border-border/30 flex items-center justify-center">
-            <div className="text-center">
-              <FileText className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-xs text-muted-foreground">Document Preview</p>
-              <p className="text-[10px] text-muted-foreground/60 mt-1">{doc.fileName || "document.pdf"}</p>
-            </div>
-          </div>
-
-          {/* Document Details */}
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: "Document Number", value: doc.docNumber || "—" },
-              { label: "Uploaded On", value: doc.uploadedAt ? formatDate(doc.uploadedAt) : "—" },
-              { label: "Issue Date", value: doc.issueDate ? formatDate(doc.issueDate) : "—" },
-              { label: "Expiry Date", value: doc.expiryDate ? formatDate(doc.expiryDate) : "—" },
-              { label: "Verified By", value: doc.verifiedBy || "—" },
-              { label: "Verification Date", value: doc.verificationDate ? formatDate(doc.verificationDate) : "—" },
-            ].map((item) => (
-              <div key={item.label} className="p-3 rounded-xl bg-muted/20 border border-border/20">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
-                  {item.label}
-                </p>
-                <p className="text-sm font-semibold">{item.value}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* HR Remarks (rejected or reverted-to-pending) */}
-          {doc.remarks && doc.verificationStatus !== "approved" && (
-            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-destructive/5 border border-destructive/15">
-              <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-              <div>
-                <p className="text-xs font-semibold text-destructive mb-0.5">
-                  {doc.verificationStatus === "rejected" ? "Rejection Reason" : "HR Remark"}
-                </p>
-                <p className="text-xs text-destructive/80 leading-relaxed">{doc.remarks}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex items-center gap-3 pt-2">
-            <Button
-              variant="outline"
-              className="flex-1 h-10 rounded-xl font-semibold gap-2"
-              onClick={() => doc.fileUrl && window.open(doc.fileUrl, "_blank")}
-              disabled={!doc.fileUrl}
-            >
-              <Download className="h-4 w-4" />
-              Download
-            </Button>
-            {doc.verificationStatus !== "approved" && (
-              <Button
-                className="flex-1 h-10 rounded-xl font-semibold gap-2 shadow-lg shadow-primary/20"
-                onClick={() => {
-                  onOpenChange(false);
-                  onReupload(doc);
-                }}
-              >
-                <Upload className="h-4 w-4" />
-                Re-upload
-              </Button>
-            )}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
 
 // ─── PENDING UPLOAD CARD ────────────────────────────────────────────────────
 
@@ -535,17 +442,6 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, onView, onReuplo
             )}
           </div>
 
-          {/* File info */}
-          {doc.fileName && (
-            <div className="flex items-center gap-2 mt-2.5 p-2 rounded-lg bg-muted/30">
-              <FileText className="h-3.5 w-3.5 text-muted-foreground/50" />
-              <span className="text-[11px] text-muted-foreground truncate flex-1">{doc.fileName}</span>
-              {doc.fileSize && (
-                <span className="text-[10px] text-muted-foreground/50 shrink-0">{doc.fileSize}</span>
-              )}
-            </div>
-          )}
-
           {doc.issueDate && (
             <p className="text-[10px] text-muted-foreground/60 mt-2">
               Issued {formatDate(doc.issueDate)}
@@ -568,18 +464,6 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, onView, onReuplo
             </div>
           )}
 
-          {doc.verificationStatus === "approved" && doc.verifiedBy && (
-            <div className="mt-3 p-2.5 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-              <div className="flex items-start gap-2">
-                <CheckCircle2 className="h-3 w-3 text-emerald-600 mt-0.5 shrink-0" />
-                <p className="text-[10px] text-emerald-600/80 leading-relaxed">
-                  Approved by {doc.verifiedBy}
-                  {doc.verificationDate && <> on {formatDate(doc.verificationDate)}</>}
-                </p>
-              </div>
-            </div>
-          )}
-
           <div className="flex items-center gap-2 mt-5 pt-4 border-t border-border/30">
             <Button
               variant="secondary"
@@ -596,7 +480,7 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, onView, onReuplo
                     variant="outline"
                     size="icon"
                     className="shrink-0 rounded-xl h-9 w-9"
-                    onClick={() => doc.fileUrl && window.open(doc.fileUrl, "_blank")}
+                    onClick={() => downloadDocument(doc)}
                     disabled={!doc.fileUrl}
                   >
                     <Download className="h-3.5 w-3.5" />
@@ -681,7 +565,6 @@ export const DocumentsSection: React.FC = () => {
   const [activeView, setActiveView] = useState<"uploaded" | "pending">("uploaded");
   const [searchQuery, setSearchQuery] = useState("");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedDocType, setSelectedDocType] = useState<DocumentType | null>(null);
   const [selectedUploadedDoc, setSelectedUploadedDoc] = useState<UploadedDocument | null>(null);
   const [isReupload, setIsReupload] = useState(false);
@@ -744,8 +627,7 @@ export const DocumentsSection: React.FC = () => {
   };
 
   const handleView = (doc: UploadedDocument) => {
-    setSelectedUploadedDoc(doc);
-    setPreviewDialogOpen(true);
+    if (doc.fileUrl) window.open(doc.fileUrl, "_blank");
   };
 
   const handleDelete = async (doc: UploadedDocument) => {
@@ -916,13 +798,6 @@ export const DocumentsSection: React.FC = () => {
         isReupload={isReupload}
         existingDoc={selectedUploadedDoc}
         onSuccess={handleUploadSuccess}
-      />
-
-      <PreviewDialog
-        open={previewDialogOpen}
-        onOpenChange={setPreviewDialogOpen}
-        document={selectedUploadedDoc}
-        onReupload={handleReupload}
       />
     </div>
   );
