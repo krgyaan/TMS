@@ -50,6 +50,13 @@ const IconAction: React.FC<{
     </TooltipProvider>
 );
 
+function abbreviatedCode(code: string | null | undefined): string {
+    if (!code) return "";
+    const parts = code.split("/");
+    if (parts.length <= 3) return code;
+    return `${parts.slice(0, 3).join("/")}/...`;
+}
+
 function Stat({ label, value }: { label: string; value: number }) {
     return (
         <div className="rounded-md border bg-muted/40 px-2 py-2 text-center">
@@ -183,23 +190,30 @@ function ProjectSummariesView() {
                                     <Card
                                         key={row.projectId}
                                         className="cursor-pointer transition-colors hover:border-primary/50 hover:bg-accent/40"
-                                        onClick={() => navigate(paths.operations.inventoryProject(row.projectId))}
+                                        onClick={() => navigate(paths.accounts.inventoryProject(row.projectId))}
                                     >
                                         <CardHeader className="pb-3">
                                             <div className="flex items-start justify-between gap-2">
-                                                <div className="min-w-0">
-                                                    <CardTitle className="text-sm font-semibold leading-snug line-clamp-2">
+                                                <div className="min-w-0 flex-1 overflow-hidden">
+                                                    <CardTitle className="text-sm font-semibold leading-snug line-clamp-2 break-words">
                                                         {row.projectName ?? "—"}
                                                     </CardTitle>
-                                                    <CardDescription className="mt-1 font-mono text-xs">
-                                                        {row.projectCode ?? ""}
+                                                    <CardDescription className="mt-1 font-mono text-xs truncate">
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <span>{abbreviatedCode(row.projectCode)}</span>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent side="bottom">{row.projectCode}</TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
                                                     </CardDescription>
                                                 </div>
                                                 <div className="flex items-center shrink-0">
                                                     <IconAction
                                                         icon={LayoutDashboard}
                                                         label="Open Inventory"
-                                                        onClick={() => navigate(paths.operations.inventoryProject(row.projectId))}
+                                                        onClick={() => navigate(paths.accounts.inventoryProject(row.projectId))}
                                                     />
                                                     <IconAction
                                                         icon={Eye}
@@ -311,7 +325,7 @@ function ProjectInventoryView({ projectId }: { projectId: number }) {
                         </div>
                         <Button
                             variant="outline"
-                            onClick={() => navigate(paths.operations.inventory)}
+                            onClick={() => navigate(paths.accounts.inventory)}
                             className="gap-2"
                         >
                             <ArrowLeft className="h-4 w-4" />
