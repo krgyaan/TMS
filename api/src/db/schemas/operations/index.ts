@@ -11,4 +11,5 @@ export * from "./sale-invoices.schema";
 export * from "./inventory.schema";
 export * from "./inventory-movements.schema";
 export * from "./inventory-transfers.schema";
+export * from "./warehouses.schema";
 // export * from "../master/projects.schema";

@@ -484,6 +484,13 @@
                         "when":  1788520000000,
                         "tag":  "0134_create_inventory_tables",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  93,
+                        "version":  "7",
+                        "when":  1788600000000,
+                        "tag":  "0135_add_warehouse_dimension",
+                        "breakpoints":  true
                     }
                 ]
 }
