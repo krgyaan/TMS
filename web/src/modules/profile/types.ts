@@ -153,7 +153,6 @@ export type ProfileResponse = {
   bankAccounts: BankDetailData[];
   inductionTasks: InductionTaskData[];
   assets: AssetData[];
-  complaints: ComplaintData[];
   notifications: NotificationData[];
   onboardingStatus: OnboardingStatus | null;
   hrStatus : hrStatus;
@@ -221,13 +220,4 @@ export type NotificationData = {
   time: string;
   read: boolean;
   type: "success" | "error" | "warning" | "info";
-};
-
-export type ComplaintData = {
-  id: number;
-  complaintCode: string;
-  subject: string;
-  status: string;
-  priority: string;
-  createdAt: string;
 };

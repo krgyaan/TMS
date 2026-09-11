@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/axios";
 import { toast } from "sonner";
 import { fileUploadService } from "@/services/api/file-upload.service";
@@ -68,23 +68,29 @@ import {
 } from "lucide-react";
 import React, { useState } from "react";
 import { useProfileContext } from "../contexts/ProfileContext";
-import type { ComplaintData } from "../types";
 import { formatDate } from "../utils";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
-interface Complaint extends ComplaintData {
+// Mirrors GET /hrms/complaints (owned by the HRMS complaints module)
+interface Complaint {
+  id: number;
+  complaintCode: string;
+  subject: string;
+  status: string;
+  priority: string;
+  createdAt: string;
   complaintType?: string;
   complaintAgainst?: string;
   complaintAgainstName?: string;
   description?: string;
-  incidentDate?: string;
-  incidentLocation?: string;
-  witnesses?: string;
-  previousAttempts?: string;
-  expectedResolution?: string;
-  updatedAt?: string;
-  resolvedAt?: string;
+  incidentDate?: string | null;
+  incidentLocation?: string | null;
+  witnesses?: string | null;
+  previousAttempts?: string | null;
+  expectedResolution?: string | null;
+  updatedAt?: string | null;
+  resolvedAt?: string | null;
   attachments?: string[];
   remarks?: string;
   assignedTo?: string;
@@ -226,7 +232,8 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
   open,
   onOpenChange,
 }) => {
-  const { data, refetch } = useProfileContext();
+  const { data } = useProfileContext();
+  const queryClient = useQueryClient();
   const user = data?.currentUser;
   const empProfile = data?.employeeProfile;
   const [form, setForm] = useState<ComplaintFormData>({ ...INITIAL_FORM });
@@ -237,9 +244,9 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
 
   // Employee / department lists for the "complaint against" select
   const { data: lookups } = useQuery({
-    queryKey: ["complaint-lookups"],
+    queryKey: ["hrms", "complaints", "lookups"],
     queryFn: async () => {
-      const res = await api.get("/profile/complaint-lookups");
+      const res = await api.get("/hrms/complaints/lookups");
       return res.data as {
         users: { id: number; name: string }[];
         departments: { id: number; name: string }[];
@@ -256,7 +263,7 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
     if (!canSubmit) return;
     setSubmitting(true);
     try {
-      await api.post("/profile/me/complaints", {
+      await api.post("/hrms/complaints", {
         complaintType: form.complaintType,
         subject: form.subject,
         description: form.description,
@@ -274,7 +281,7 @@ const RaiseComplaintDialog: React.FC<RaiseComplaintDialogProps> = ({
       setForm({ ...INITIAL_FORM });
       setStep(1);
       onOpenChange(false);
-      refetch();
+      queryClient.invalidateQueries({ queryKey: ["hrms", "complaints", "mine"] });
     } catch (err) {
       const message =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -1274,9 +1281,18 @@ export const ComplaintsSection: React.FC = () => {
     null
   );
 
-  if (!data) return null;
+  // Complaints live in the HRMS complaints module — fetched directly
+  const { data: myComplaints, isLoading: complaintsLoading } = useQuery({
+    queryKey: ["hrms", "complaints", "mine"],
+    queryFn: async () => {
+      const res = await api.get("/hrms/complaints");
+      return res.data as Complaint[];
+    },
+  });
 
-  const COMPLAINTS: Complaint[] = data?.complaints || [];
+  if (!data || complaintsLoading) return null;
+
+  const COMPLAINTS: Complaint[] = myComplaints || [];
 
   // Filters
   const filtered = COMPLAINTS.filter((c) => {
