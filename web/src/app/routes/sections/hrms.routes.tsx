@@ -21,6 +21,10 @@ const InductionDashboard = lazy(() => import('@/modules/hrms/induction/Induction
 const TrainingDashboard = lazy(() => import('@/modules/hrms/training/TrainingDashboard'))
 const UploadVideo = lazy(() => import("@/modules/hrms/training/components/UploadVideo"))
 
+// Complaints (admin)
+const ComplaintListPage = lazy(() => import("@/modules/hrms/complaints/ComplaintListPage"));
+const ComplaintCreatePage = lazy(() => import("@/modules/hrms/complaints/ComplaintCreatePage"));
+
 
 export default function HrmsRoutes() {
     return (
@@ -44,6 +48,9 @@ export default function HrmsRoutes() {
 
             <Route path="training" element={<TrainingDashboard />} />
             <Route path="training/upload-video" element={ <UploadVideo />} />
+
+            <Route path="complaints" element={<ComplaintListPage />} />
+            <Route path="complaints/create" element={<ComplaintCreatePage redirectTo="/hrms/complaints" />} />
         </Routes>
     );
 }

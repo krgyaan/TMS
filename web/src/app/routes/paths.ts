@@ -482,6 +482,11 @@ export const paths = {
             status: (id: number) => `/hrms/admin/assets/status/${id}`,
             my: "/hrms/assets/my",
         },
+
+        complaints: {
+            list: "/hrms/complaints",
+            create: "/hrms/complaints/create",
+        },
         
         //================ onboarding  ==============================//
         onboardingDashboard: "/hrms/onboarding/dashboard",

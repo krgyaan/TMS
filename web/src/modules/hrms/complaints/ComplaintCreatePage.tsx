@@ -8,9 +8,16 @@ import api from "@/lib/axios";
 import ComplaintForm from "./components/ComplaintForm";
 import type { ComplaintFormValues } from "./helpers/types";
 
-export default function ComplaintCreatePage() {
+/**
+ * Create complaint page. Two entry points:
+ *  - Employee flow:  /profile/support/complaints/create  → back to /profile/support
+ *  - Admin flow:     /hrms/complaints/create             → back to /hrms/complaints
+ */
+export default function ComplaintCreatePage({ redirectTo }: { redirectTo?: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const backTarget = redirectTo ?? "/profile/support";
+  const backLabel = redirectTo ? "Back to Complaints" : "Back to Support";
 
   const handleSubmit = async (values: ComplaintFormValues) => {
     try {
@@ -29,10 +36,8 @@ export default function ComplaintCreatePage() {
         attachments: values.attachments,
       });
       toast.success("Complaint submitted successfully");
-      queryClient.invalidateQueries({
-        queryKey: ["hrms", "complaints", "mine"],
-      });
-      navigate("/profile/support");
+      queryClient.invalidateQueries({ queryKey: ["hrms", "complaints"] });
+      navigate(backTarget);
     } catch (err) {
       const message =
         (err as { response?: { data?: { message?: string } } })?.response?.data
@@ -45,11 +50,11 @@ export default function ComplaintCreatePage() {
     <div className="space-y-4">
       <Button
         variant="ghost"
-        onClick={() => navigate("/profile/support")}
+        onClick={() => navigate(backTarget)}
         className="rounded-xl gap-2"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Support
+        {backLabel}
       </Button>
 
       <Card>
@@ -65,7 +70,7 @@ export default function ComplaintCreatePage() {
           <ComplaintForm
             submitLabel="Submit Complaint"
             onSubmit={handleSubmit}
-            onCancel={() => navigate("/profile/support")}
+            onCancel={() => navigate(backTarget)}
           />
         </CardContent>
       </Card>
