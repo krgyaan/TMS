@@ -13,7 +13,6 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { NumberInput } from "@/components/form/NumberInput";
 import { SelectField } from "@/components/form/SelectField";
 import { DateTimeInput } from "@/components/form/DateTimeInput";
-import { DateInput } from "@/components/form/DateInput";
 import { FileUploader } from "@/components/file-upload";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fileUploadService } from "@/services/api/file-upload.service";
@@ -58,16 +57,7 @@ const ManualFormSchema = z.object({
     courierAddress: z.string().optional(),
 });
 
-const AiFormSchema = z.object({
-    team: z.coerce.number().int().positive({ message: "Team is required" }),
-    tenderNo: z.string().min(1, { message: "Tender No is required" }),
-    startDate: z.string().min(1, { message: "Start date is required" }),
-    closingDate: z.string().min(1, { message: "Closing date is required" }),
-    files: z.array(z.string()).default([]),
-});
-
 type ManualFormValues = z.infer<typeof ManualFormSchema>;
-type AiFormValues = z.infer<typeof AiFormSchema>;
 
 interface TenderFormProps {
     tender?: TenderInfoWithNames;
@@ -110,16 +100,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
         },
     });
 
-    const aiForm = useForm<AiFormValues>({
-        resolver: zodResolver(AiFormSchema) as any,
-        defaultValues: {
-            team: undefined as any,
-            tenderNo: "",
-            startDate: "",
-            closingDate: "",
-            files: [],
-        },
-    });
+
 
     // Classification state for uploaded tender documents
     const [fileClassifications, setFileClassifications] = useState<Record<string, ClassifiedDocument>>({});
@@ -135,7 +116,6 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
 
     // Watch documents list
     const documents = useWatch({ control: manualForm.control, name: "documents" }) || [];
-    const aiFiles = useWatch({ control: aiForm.control, name: "files" });
 
     const userOptions = useUserOptions(team);
 
@@ -484,10 +464,6 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
         } catch (error) {
             console.error("Form submission error:", error);
         }
-    };
-
-    const handleAiSubmit: SubmitHandler<AiFormValues> = async _values => {
-        alert("AI-based tender creation is not yet available. Please use the manual form instead.");
     };
 
     const saving = createTender.isPending || updateTender.isPending;
