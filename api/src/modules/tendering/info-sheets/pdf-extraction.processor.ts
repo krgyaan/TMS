@@ -6,6 +6,7 @@ import { Logger } from 'winston';
 import * as path from 'path';
 import * as fs from 'fs';
 import { FileUploadService } from '@/modules/file-upload/file-upload.service';
+import { ClaudeUsageService } from '@/modules/master/health/claude-usage.service';
 import { startHeartbeat } from '@/infra/queue/worker-heartbeat';
 import { PdfExtractionJobData, PdfExtractionJobResult } from './types/pdf-extraction.types';
 
@@ -16,9 +17,11 @@ export class PdfExtractionProcessor implements OnModuleInit {
     constructor(
         private readonly configService: ConfigService,
         private readonly fileUploadService: FileUploadService,
+        private readonly claudeUsageService: ClaudeUsageService,
         @Inject(WINSTON_MODULE_PROVIDER)
         private readonly logger: Logger,
     ) {}
+
 
     onModuleInit() {
         const host = this.configService.get<string>('redis.host') || '127.0.0.1';
@@ -109,6 +112,9 @@ export class PdfExtractionProcessor implements OnModuleInit {
 
         const formData = new FormData();
         formData.append('pdf_file', blob, fileName);
+        if (userId) {
+            formData.append('user_id', String(userId));
+        }
 
         const endpoint = `${serviceUrl.replace(/\/+$/, '')}/extract`;
         this.logger.info(`[PdfExtractionProcessor] Dispatching POST to ${endpoint} with ${timeoutMs}ms timeout...`, {
@@ -161,8 +167,26 @@ export class PdfExtractionProcessor implements OnModuleInit {
             },
         );
 
+        // Record Claude API token usage & per-stage metrics into claude_token_usage & sliding window TPM
+        if (extractionResult.llm_usage) {
+            try {
+                await this.claudeUsageService.recordUsage({
+                    userId,
+                    tenderId,
+                    jobId: job.id,
+                    durationMs: extractionResult.processing_time_ms,
+                    usage: extractionResult.llm_usage,
+                });
+            } catch (usageErr: unknown) {
+                this.logger.warn(
+                    `[PdfExtractionProcessor] Failed to record Claude usage for job ${job.id}: ${(usageErr as Error).message}`,
+                );
+            }
+        }
+
         // Return result directly to BullMQ (stored in Redis returnvalue, non-destructive, no DB writes)
         return extractionResult;
+
     }
 
     /**

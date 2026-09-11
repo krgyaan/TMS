@@ -1,4 +1,4 @@
-CREATE TABLE "employee_imprests" (
+CREATE TABLE IF NOT EXISTS "employee_imprests" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" integer NOT NULL,
 	"party_name" varchar(255),

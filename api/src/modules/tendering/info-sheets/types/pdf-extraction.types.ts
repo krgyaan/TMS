@@ -15,7 +15,9 @@ export interface PdfExtractionJobResult {
     fields: Record<string, PdfExtractionFieldValue>;
     missing_fields: string[];
     processing_time_ms: number;
+    llm_usage?: Record<string, any>;
 }
+
 
 export type PdfExtractionJobState =
     | 'waiting'

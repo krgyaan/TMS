@@ -11,7 +11,6 @@ def clean_val(v: Any) -> str:
         return ""
     return ILLEGAL_CHARACTERS_RE.sub("", str(v))
 
-
 def _canonicalize_lookup_key(value: Any) -> str:
     text = str(value or "").strip().lower()
     return re.sub(r"[^a-z0-9]+", "_", text).strip("_")
