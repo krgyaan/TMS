@@ -5,23 +5,7 @@ import type { DbInstance } from "@/db";
 import { users } from "@/db/schemas/auth/users.schema";
 import { teams } from "@/db/schemas/master/teams.schema";
 import { complaints } from "@/db/schemas/hrms/complaints.schema";
-
-export interface CreateComplaintDto {
-    complaintType: string;
-    subject: string;
-    description: string;
-    priority: "low" | "medium" | "high" | "critical";
-    complaintAgainst?: "person" | "department" | "system" | "policy" | "facility";
-    complaintAgainstId?: number | null;
-    incidentDate?: string;
-    incidentLocation?: string;
-    previousAttempts?: string;
-    witnesses?: string;
-    expectedResolution?: string;
-    attachments?: string[];
-}
-
-export type UpdateComplaintDto = Partial<CreateComplaintDto>;
+import type { CreateComplaintDto, UpdateComplaintDto } from "./dto";
 
 @Injectable()
 export class ComplaintsService {

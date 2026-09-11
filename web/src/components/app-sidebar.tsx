@@ -158,7 +158,8 @@ const navMain: NavGroup[] = [
             { title: "Onboarding", url: paths.hrms.onboardingDashboard, permission: "hrms.admin" },
             { title: "Induction", url: paths.hrms.inductionDashboard, permission: "hrms.admin" },
             { title: "Assets", url: "/hrms/admin/assets", permission: "hrms.admin" },
-            { title: "Training", url: "/hrms/training", permission: "hrms.admin"} // -> naya module hai bhai
+            { title: "Training", url: "/hrms/training", permission: "hrms.admin"}, 
+            { title: "Complaints", url: paths.hrms.complaints.list, permission: "hrms.admin" },
             // { title: "Probation", url: "", permission: "hrms.admin" },
         ],
     },
