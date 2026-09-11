@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { User, FileText, ClipboardCheck, CheckCircle2, Sparkles, ArrowRight, CreditCard, GraduationCap, Briefcase, Laptop, MessageSquare, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import api from "@/lib/axios";
+import { toast } from "sonner";
 import { useOnboardingContext } from "./contexts/OnboardingContext";
 import type { ProfileResponse, DocumentData, ProfileData, AddressData, EmergencyContactData } from "../../types";
 import { OnboardingStageCard } from "./OnboardingStageCard";
@@ -286,9 +288,14 @@ function NavCard({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function OnboardingView() {
-    const { data } = useOnboardingContext();
+    const { data, refetch } = useOnboardingContext();
     const navigate = useNavigate();
     const [expandedStage, setExpandedStage] = useState<StageKey | null>(null);
+    const [creatingRequest, setCreatingRequest] = useState(false);
+
+    // Users created directly via master Users have no onboarding request yet —
+    // it is created only when they click to fill a stage (never on page load).
+    const needsRequest = !!data && !data.onboardingStatus;
 
     const onboardingStatus = data?.onboardingStatus;
     const employeeCompleted = onboardingStatus?.employeeCompleted ?? false;
@@ -325,6 +332,24 @@ export function OnboardingView() {
 
     const stagePath = (key: StageKey, viewOnly = false) =>
         "/profile/" + STAGE_TO_TAB[key] + (viewOnly ? "?mode=view" : "");
+
+    const openStage = async (key: StageKey, viewOnly = false) => {
+        if (creatingRequest) return;
+        if (!needsRequest) {
+            navigate(stagePath(key, viewOnly));
+            return;
+        }
+        setCreatingRequest(true);
+        try {
+            await api.post("/hrms/employee-onboarding/me/request");
+            await refetch();
+            navigate(stagePath(key, viewOnly));
+        } catch {
+            toast.error("Could not start onboarding. Please try again.");
+        } finally {
+            setCreatingRequest(false);
+        }
+    };
 
     const handleBeginOnboarding = () => {
         navigate(stagePath("profile"));
@@ -395,9 +420,9 @@ export function OnboardingView() {
                             isSubmitted={stageStatus === "submitted" || stageStatus === "resubmitted"}
                             index={index}
                             isExpanded={expandedStage === stage.key}
-                            onToggleExpand={() => (stage.key === "induction" ? handleToggleExpand(stage.key) : navigate(stagePath(stage.key, approvalStatus === "approved")))}
-                            onBeginFill={() => navigate(stagePath(stage.key))}
-                            onEdit={() => navigate(stagePath(stage.key))}
+                            onToggleExpand={() => (stage.key === "induction" ? handleToggleExpand(stage.key) : openStage(stage.key, approvalStatus === "approved"))}
+                            onBeginFill={() => openStage(stage.key)}
+                            onEdit={() => openStage(stage.key)}
                             onView={() => setExpandedStage(stage.key)}
                             details={stage.key === "profile" ? profileDetails : undefined}
                             documents={stage.key === "documents" ? documentDetails : undefined}

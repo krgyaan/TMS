@@ -291,13 +291,29 @@ export class EmployeeOnboardingService {
       .orderBy(desc(onboardingRequests.createdAt))
       .limit(1);
     
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed'; 
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
     // Fully-completed users still get their onboarding data back so the profile
     // page can prefill the per-stage tabs; `isOnboarding` only tells the client
     // whether the wizard flow is still in progress. Edit guards further below
     // still prevent modifying HR-approved entries.
+    //
+    // Users created directly via master Users (no onboarding request) get an
+    // EMPTY draft back — no request is created until they explicitly click to
+    // fill (ensureMyOnboardingRequest).
     if (activeReqs.length === 0) {
-      throw new BadRequestException('No onboarding request found for this user.');
+      return {
+        currentUser,
+        isOnboarding: false,
+        onboardingStatus: null,
+        profile: null,
+        address: null,
+        emergencyContact: null,
+        education: [],
+        experience: [],
+        documents: [],
+        inductionTasks: [],
+        bankAccounts: [],
+      };
     }
 
     const onboardingId = activeReqs[0].id;
@@ -579,6 +595,48 @@ export class EmployeeOnboardingService {
       inductionTasks,
       bankAccounts,
     };
+  }
+
+  /**
+   * Ensure the current user has an onboarding request. Created ONLY when the
+   * employee explicitly starts filling their details (never on page load).
+   * Idempotent — returns the existing draft when a request is already present.
+   */
+  async ensureMyOnboardingRequest(userId: number) {
+    const existing = await this.db
+      .select({ id: onboardingRequests.id })
+      .from(onboardingRequests)
+      .where(eq(onboardingRequests.userId, userId))
+      .orderBy(desc(onboardingRequests.createdAt))
+      .limit(1);
+
+    if (existing.length === 0) {
+      const [userRow] = await this.db
+        .select({
+          name: users.name,
+          email: users.email,
+          mobile: users.mobile,
+        })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+      if (!userRow) {
+        throw new NotFoundException('User not found');
+      }
+
+      await this.db.insert(onboardingRequests).values({
+        userId,
+        name: userRow.name,
+        email: userRow.email as string,
+        phone: userRow.mobile || null,
+        status: 'pending',
+        hrStatus: 'pending',
+        requestType: 'new_hire',
+      } as any);
+    }
+
+    return this.getMyOnboardingDraft(userId);
   }
 
   async updateMyOnboardingProfile(userId: number, dto: any) {
