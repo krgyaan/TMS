@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { ArrowRightLeft, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import {
     Card,
     CardAction,
@@ -12,37 +12,30 @@ import { Skeleton } from "@/components/ui/skeleton";
 import DataTable from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import type { ActionItem } from "@/components/ui/ActionMenu";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ColDef, ValueFormatterParams } from "ag-grid-community";
 import { useProjectInventory } from "@/hooks/api/useInventory";
 import { formatINR } from "@/hooks/useINRFormatter";
-import type { InventoryItem } from "../helpers/inventory.types";
-import { TransferDialog } from "./TransferDialog";
+import type { InventoryItem, InventoryWarehouseFilter } from "../helpers/inventory.types";
 
 interface InventorySectionProps {
     projectId: number | null;
 }
 
+const WAREHOUSE_TABS: { value: InventoryWarehouseFilter; label: string }[] = [
+    { value: "all", label: "All Warehouses" },
+    { value: "project_location", label: "At Project Location" },
+    { value: "ho_depot", label: "In VEPL HO" },
+];
+
 export const InventorySection: React.FC<InventorySectionProps> = ({
     projectId,
 }) => {
     const [showZero, setShowZero] = useState(false);
-    const [transferItem, setTransferItem] = useState<InventoryItem | null>(null);
-    const { data, isLoading } = useProjectInventory(projectId!, showZero);
+    const [warehouseTab, setWarehouseTab] = useState<InventoryWarehouseFilter>("all");
+    const { data, isLoading } = useProjectInventory(projectId!, showZero, warehouseTab);
 
     const inventoryItems = data?.items ?? [];
-
-    const inventoryActions: ActionItem<InventoryItem>[] = useMemo(
-        () => [
-            {
-                label: "Transfer",
-                icon: <ArrowRightLeft className="h-4 w-4" />,
-                onClick: (row) => setTransferItem(row),
-            },
-        ],
-        []
-    );
 
     const columns = useMemo<ColDef<InventoryItem>[]>(
         () => [
@@ -59,13 +52,21 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
                 headerName: "HSN",
                 sortable: true,
                 filter: true,
-                width: 120,
+                width: 110,
+            },
+            {
+                field: "warehouseType",
+                headerName: "Warehouse",
+                sortable: true,
+                filter: true,
+                width: 170,
+                valueFormatter: (p: ValueFormatterParams<InventoryItem>) => warehouseTypeLabel(p.value),
             },
             {
                 field: "qty",
                 headerName: "Qty",
                 sortable: true,
-                width: 100,
+                width: 90,
                 valueFormatter: (p: ValueFormatterParams<InventoryItem>) =>
                     Number(p.value).toFixed(2),
             },
@@ -73,7 +74,7 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
                 field: "remainingQty",
                 headerName: "Available",
                 sortable: true,
-                width: 110,
+                width: 100,
                 cellRenderer: (p: { value: number }) => (
                     <Badge
                         variant={
@@ -88,22 +89,12 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
                 field: "price",
                 headerName: "Price",
                 sortable: true,
-                width: 130,
+                width: 120,
                 valueFormatter: (p: ValueFormatterParams<InventoryItem>) =>
                     formatINR(p.value || 0),
             },
-            {
-                headerName: "Actions",
-                filter: false,
-                sortable: false,
-                cellRenderer: createActionColumnRenderer<InventoryItem>(
-                    inventoryActions
-                ),
-                width: 80,
-                pinned: "right" as "right" | "left",
-            },
         ],
-        [inventoryActions]
+        []
     );
 
     if (!projectId) return null;
@@ -148,10 +139,22 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
                     <CardDescription>
                         {inventoryItems.length} item
                         {inventoryItems.length !== 1 ? "s" : ""} in stock
+                        {warehouseTab !== "all"
+                            ? ` — ${WAREHOUSE_TABS.find(t => t.value === warehouseTab)?.label}`
+                            : ""}
                     </CardDescription>
                 </div>
             </CardHeader>
             <CardContent className="pt-0">
+                <Tabs value={warehouseTab} onValueChange={v => setWarehouseTab(v as InventoryWarehouseFilter)} className="mb-3">
+                    <TabsList>
+                        {WAREHOUSE_TABS.map(tab => (
+                            <TabsTrigger key={tab.value} value={tab.value}>
+                                {tab.label}
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                </Tabs>
                 <DataTable
                     data={inventoryItems}
                     columnDefs={columns}
@@ -162,16 +165,19 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
                     }}
                 />
             </CardContent>
-
-            {transferItem && (
-                <TransferDialog
-                    item={transferItem}
-                    open={!!transferItem}
-                    onOpenChange={(open) => {
-                        if (!open) setTransferItem(null);
-                    }}
-                />
-            )}
         </Card>
     );
 };
+
+function warehouseTypeLabel(type: string | null | undefined): string {
+    switch (type) {
+        case "project_location":
+            return "Project Location";
+        case "ho_sub":
+            return "VEPL HO (Project)";
+        case "ho_main":
+            return "VEPL HO (Main)";
+        default:
+            return "—";
+    }
+}

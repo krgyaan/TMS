@@ -1,6 +1,12 @@
+export type InventoryWarehouseType = "ho_main" | "ho_sub" | "project_location";
+export type InventoryWarehouseFilter = "all" | InventoryWarehouseType | "ho_depot";
+
 export interface InventoryItem {
     id: number;
     projectId: number;
+    warehouseId: number | null;
+    warehouseType: InventoryWarehouseType | null;
+    warehouseName: string | null;
     itemName: string;
     hsn: string | null;
     price: number;
@@ -21,27 +27,4 @@ export interface InventoryProjectSummaryFilters {
     page?: number;
     limit?: number;
     search?: string;
-}
-
-export interface InventoryTransfer {
-    id: number;
-    itemId: number;
-    fromProject: number;
-    toProject: number;
-    qty: number;
-    price: number;
-    remark: string | null;
-    transferredBy: string | null;
-    createdAt: string;
-    itemName: string | null;
-    hsn: string | null;
-}
-
-export interface TransferDTO {
-    itemId: number;
-    fromProject: number;
-    toProject: number;
-    qty: number;
-    price?: number;
-    remark?: string;
 }
