@@ -9,6 +9,10 @@ import type { ColDef, ValueFormatterParams } from "ag-grid-community";
 import { useProjectInventory } from "@/hooks/api/useInventory";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { InventoryItem, InventoryWarehouseFilter } from "../helpers/inventory.types";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import type { CustomCellRendererProps } from "ag-grid-react";
+import { getShortId } from "@/lib/id-utils";
+import { Badge } from "@/components/ui/badge";
 
 interface InventorySectionProps {
     projectId: number | null;
@@ -32,6 +36,15 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
     const columns = useMemo<ColDef<InventoryItem>[]>(
         () => [
             {
+                headerName: "Sr.No.",
+                sortable: false,
+                filter: false,
+                maxWidth: 70,
+                cellRenderer: (p: CustomCellRendererProps<InventoryItem>) => (
+                    <span>{(p.node?.rowIndex ?? -1) + 1}</span>
+                ),
+            },
+            {
                 field: "itemName",
                 headerName: "Item",
                 sortable: true,
@@ -47,8 +60,17 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
                 headerName: "PO No.",
                 sortable: true,
                 filter: true,
-                width: 170,
-                valueGetter: p => p.data?.sourcePoNumber ?? "—",
+                maxWidth: 100,
+                cellRenderer: (p: CustomCellRendererProps<InventoryItem>) => (
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span>{getShortId(p.data?.sourcePoNumber)}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>{p.data?.sourcePoNumber}</TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            ),
             },
             {
                 field: "warehouseType",
@@ -56,7 +78,9 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
                 sortable: true,
                 filter: true,
                 width: 170,
-                valueFormatter: (p: ValueFormatterParams<InventoryItem>) => warehouseTypeLabel(p.value),
+                cellRenderer: (p: CustomCellRendererProps<InventoryItem>) => {
+                    return warehouseTypeLabel(p.data?.warehouseType)
+                }
             },
             {
                 field: "qty",
@@ -146,7 +170,7 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
                     columnDefs={columns}
                     gridOptions={{
                         pagination: true,
-                        paginationPageSize: 10,
+                        paginationPageSize: 50,
                         domLayout: "autoHeight",
                     }}
                 />
@@ -156,14 +180,14 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
 };
 
 
-function warehouseTypeLabel(type: string | null | undefined): string {
+function warehouseTypeLabel(type: string | null | undefined): React.ReactNode {
     switch (type) {
         case "project_location":
-            return "Project Location";
+            return <Badge variant={"outline"}>Project Inventory</Badge>;
         case "ho_sub":
-            return "VEPL HO (Project)";
+            return <Badge variant={"secondary"}>HO Sub</Badge>;
         case "ho_main":
-            return "VEPL HO (Main)";
+            return <Badge variant={"outline"}>HO Main</Badge>;
         default:
             return "—";
     }
