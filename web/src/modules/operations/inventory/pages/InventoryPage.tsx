@@ -1,7 +1,7 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, ArrowLeft, ChevronLeft, ChevronRight, Eye, FileText, LayoutDashboard, Search } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight, Eye, FileText, LayoutDashboard, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 import { useInventoryProjectSummaries } from "@/hooks/api/useInventory";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
-import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { InventorySection } from "../components/InventorySection";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
@@ -142,7 +141,7 @@ function ProjectSummariesView() {
                     <div className="flex items-center justify-between gap-2">
                         <div>
                             <CardTitle>
-                                All Inventory
+                                All Inventories
                                 <Badge variant="secondary" className="ml-2">
                                     {totalRows} project{totalRows !== 1 ? "s" : ""}
                                 </Badge>
@@ -306,34 +305,8 @@ function ProjectSummariesView() {
 }
 
 function ProjectInventoryView({ projectId }: { projectId: number }) {
-    const navigate = useNavigate();
-    const { data: overview } = useProjectOverview(projectId);
-    const projectName = overview?.project?.projectName ?? `Project #${projectId}`;
-
     return (
         <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle>
-                                Inventory — {projectName}
-                            </CardTitle>
-                            <CardDescription className="mt-2">
-                                Items in stock for this project.
-                            </CardDescription>
-                        </div>
-                        <Button
-                            variant="outline"
-                            onClick={() => navigate(paths.accounts.inventory)}
-                            className="gap-2"
-                        >
-                            <ArrowLeft className="h-4 w-4" />
-                            All Inventories
-                        </Button>
-                    </div>
-                </CardHeader>
-            </Card>
             <InventorySection projectId={projectId} />
         </div>
     );

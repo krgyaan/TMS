@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import DataTable from "@/components/ui/data-table";
@@ -13,6 +13,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { getShortId } from "@/lib/id-utils";
 import { Badge } from "@/components/ui/badge";
+import { paths } from "@/app/routes/paths";
+import { useNavigate } from "react-router-dom";
 
 interface InventorySectionProps {
     projectId: number | null;
@@ -27,6 +29,7 @@ const WAREHOUSE_TABS: { value: InventoryWarehouseFilter; label: string }[] = [
 export const InventorySection: React.FC<InventorySectionProps> = ({
     projectId,
 }) => {
+    const navigate = useNavigate();
     const [showZero, setShowZero] = useState(false);
     const [warehouseTab, setWarehouseTab] = useState<InventoryWarehouseFilter>("all");
     const { data, isLoading } = useProjectInventory(projectId!, showZero, warehouseTab);
@@ -130,7 +133,15 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
                         <CardTitle className="text-base font-semibold">
                             Project Inventory
                         </CardTitle>
-                        <CardAction>
+                        <CardAction className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => navigate(paths.accounts.inventory)}
+                                className="gap-2"
+                            >
+                                <ArrowLeft className="h-4 w-4" />
+                                All Inventories
+                            </Button>
                             <Button
                                 size="sm"
                                 variant="outline"
@@ -146,12 +157,12 @@ export const InventorySection: React.FC<InventorySectionProps> = ({
                         </CardAction>
                     </div>
                     <CardDescription>
+                        {"Total: "}
                         {inventoryItems.length} item
                         {inventoryItems.length !== 1 ? "s" : ""} in stock
                         {warehouseTab !== "all"
                             ? ` — ${WAREHOUSE_TABS.find(t => t.value === warehouseTab)?.label}`
                             : ""}
-                        {" · Total: "}
                     </CardDescription>
                 </div>
             </CardHeader>
