@@ -53,18 +53,15 @@ import { cn } from "@/lib/utils";
 import {
   useOnboardingDashboard,
   useProfile,
-  useUpdateOnboardingStatus,
   useUpdateEntryStatus,
   useUpdateSectionStatus,
 } from "@/hooks/api/useOnboarding";
 import { useEmployeeInduction } from "@/hooks/api/useInduction";
-import { type OnboardingRequest } from "@/services/api/onboarding.service";
 import { paths } from "@/app/routes/paths";
 import { StatusBadge } from "./components/StatusBadge";
 import { HrStatusBadge } from "./components/HrStatusBadge";
 import { DataItem } from "./components/DataItem";
 import { SectionHeader } from "./components/SectionHeader";
-import { ActionModal } from "./components/ActionModal";
 import { SectionApproveModal } from "./components/SectionApproveModal";
 import {
   formatDate,
@@ -272,35 +269,6 @@ export default function CandidateDetailPage() {
   // ── Induction tasks (view-only tab) ──────────────────────────────────────
   const { data: rawInduction, isLoading: inductionLoading } =
     useEmployeeInduction(Number.isNaN(candidateId) ? null : candidateId);
-  const updateStatus = useUpdateOnboardingStatus();
-  const [actionType, setActionType] = useState<"approved" | "rejected" | null>(
-    null
-  );
-  const [actionJoinee, setActionJoinee] = useState<OnboardingRequest | null>(
-    null
-  );
-
-  const openApprove = (j: OnboardingRequest) => {
-    setActionJoinee(j);
-    setActionType("approved");
-  };
-  const openReject = (j: OnboardingRequest) => {
-    setActionJoinee(j);
-    setActionType("rejected");
-  };
-  const handleConfirmAction = async (note: string) => {
-    if (!actionJoinee || !actionType) return;
-    updateStatus.mutate(
-      { id: actionJoinee.id, dto: { status: actionType, note } },
-      {
-        onSuccess: () => {
-          setActionType(null);
-          setActionJoinee(null);
-        },
-      }
-    );
-  };
-
   // ── Section-level approve/reject ─────────────────────────────────────────
   const [sectionAction, setSectionAction] = useState<{
     stage: "profile" | "education" | "experience" | "documents" | "bankDetails";
@@ -385,8 +353,6 @@ export default function CandidateDetailPage() {
     );
   }
 
-  const isPending = joinee.status === "pending";
-
   return (
     <TooltipProvider>
       <div className="flex flex-col h-full min-h-0">
@@ -442,23 +408,6 @@ export default function CandidateDetailPage() {
             </div>
           </div>
 
-          {isPending && (
-            <div className="flex items-center gap-2 shrink-0">
-              <Button
-                variant="outline"
-                className="rounded-xl border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800 dark:border-red-500/30 dark:text-red-400 dark:hover:bg-red-500/10"
-                onClick={() => openReject(joinee)}
-              >
-                <XCircle className="h-4 w-4 mr-2" /> Reject
-              </Button>
-              <Button
-                onClick={() => openApprove(joinee)}
-                className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
-              </Button>
-            </div>
-          )}
         </div>
 
         {/* Body */}
@@ -820,7 +769,7 @@ export default function CandidateDetailPage() {
                                                 {task.remarks}
                                               </span>
                                             )}
-                                          </div>
+        </div>
                                         )}
                                       </div>
                                     </div>
@@ -1063,18 +1012,6 @@ export default function CandidateDetailPage() {
             </div>
           )}
         </div>
-
-        <ActionModal
-          open={!!actionType}
-          type={actionType}
-          joinee={actionJoinee}
-          onClose={() => {
-            setActionType(null);
-            setActionJoinee(null);
-          }}
-          onConfirm={handleConfirmAction}
-          isLoading={updateStatus.isPending}
-        />
 
         <SectionApproveModal
           open={!!sectionAction}
