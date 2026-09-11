@@ -349,8 +349,8 @@ function ProfileLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground selection:bg-primary/10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 relative">
+    <div className="bg-background text-foreground selection:bg-primary/10">
+      <div className="relative">
         <OnboardingProvider>
           <Routes>
             <Route index element={<ProfileHome />} />
