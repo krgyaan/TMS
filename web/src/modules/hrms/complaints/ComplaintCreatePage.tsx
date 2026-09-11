@@ -18,6 +18,8 @@ export default function ComplaintCreatePage({ redirectTo }: { redirectTo?: strin
   const queryClient = useQueryClient();
   const backTarget = redirectTo ?? "/profile/support";
   const backLabel = redirectTo ? "Back to Complaints" : "Back to Support";
+  // Admin/HR flow — the complaint can be filed on behalf of an employee
+  const onBehalfOf = !!redirectTo;
 
   const handleSubmit = async (values: ComplaintFormValues) => {
     try {
@@ -28,6 +30,7 @@ export default function ComplaintCreatePage({ redirectTo }: { redirectTo?: strin
         priority: values.priority || undefined,
         complaintAgainst: values.complaintAgainst || undefined,
         complaintAgainstId: values.complaintAgainstId ?? undefined,
+        onBehalfOfId: values.onBehalfOfId ?? undefined,
         incidentDate: values.incidentDate || undefined,
         incidentLocation: values.incidentLocation || undefined,
         previousAttempts: values.previousAttempts || undefined,
@@ -68,6 +71,7 @@ export default function ComplaintCreatePage({ redirectTo }: { redirectTo?: strin
           </div>
 
           <ComplaintForm
+            onBehalfOf={onBehalfOf}
             submitLabel="Submit Complaint"
             onSubmit={handleSubmit}
             onCancel={() => navigate(backTarget)}

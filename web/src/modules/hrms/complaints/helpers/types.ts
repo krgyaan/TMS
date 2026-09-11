@@ -89,6 +89,7 @@ export interface ComplaintFormValues {
   subject: string;
   complaintAgainst: string;
   complaintAgainstId: number | null;
+  onBehalfOfId: number | null;
   priority: string;
   incidentDate: string;
   incidentLocation: string;

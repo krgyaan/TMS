@@ -28,6 +28,7 @@ const EMPTY_FORM: ComplaintFormValues = {
   subject: "",
   complaintAgainst: "",
   complaintAgainstId: null,
+  onBehalfOfId: null,
   priority: "",
   incidentDate: "",
   incidentLocation: "",
@@ -45,6 +46,7 @@ const toFormValues = (complaint: Complaint | null | undefined): ComplaintFormVal
         subject: complaint.subject || "",
         complaintAgainst: complaint.complaintAgainst || "",
         complaintAgainstId: null,
+        onBehalfOfId: null,
         priority: complaint.priority || "",
         incidentDate: toDateTimeInput(complaint.incidentDate),
         incidentLocation: complaint.incidentLocation || "",
@@ -59,6 +61,8 @@ const toFormValues = (complaint: Complaint | null | undefined): ComplaintFormVal
 interface ComplaintFormProps {
   /** Pass an existing complaint to prefill the form (edit mode) */
   initialValues?: Complaint | null;
+  /** Admin/HR flow — shows the "On Behalf Of" employee selector */
+  onBehalfOf?: boolean;
   onSubmit: (values: ComplaintFormValues) => Promise<void> | void;
   onCancel?: () => void;
   submitLabel?: string;
@@ -70,6 +74,7 @@ interface ComplaintFormProps {
  */
 const ComplaintForm: React.FC<ComplaintFormProps> = ({
   initialValues,
+  onBehalfOf = false,
   onSubmit,
   onCancel,
   submitLabel = "Submit",
@@ -99,7 +104,11 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
   };
 
   const canSubmit =
-    form.complaintType && form.subject && form.priority && form.description;
+    form.complaintType &&
+    form.subject &&
+    form.priority &&
+    form.description &&
+    (!onBehalfOf || !!form.onBehalfOfId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,6 +123,30 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      {/* On Behalf Of (admin/HR flow only) */}
+      {onBehalfOf && (
+        <div className="space-y-2">
+          <Label className="text-xs font-semibold text-muted-foreground">
+            On Behalf Of <span className="text-destructive">*</span>
+          </Label>
+          <Select
+            value={form.onBehalfOfId ? String(form.onBehalfOfId) : ""}
+            onValueChange={(v) => updateForm("onBehalfOfId", Number(v))}
+          >
+            <SelectTrigger className="h-11 rounded-xl border-border/50 bg-muted/20 text-sm">
+              <SelectValue placeholder="Select employee" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl max-h-60">
+              {lookups?.users?.map((opt) => (
+                <SelectItem key={opt.id} value={String(opt.id)} className="rounded-lg">
+                  {opt.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {/* Subject */}
       <div className="space-y-2">
         <Label className="text-xs font-semibold text-muted-foreground">

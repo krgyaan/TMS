@@ -192,6 +192,21 @@ export class ComplaintsService {
     async createComplaint(userId: number, dto: CreateComplaintDto) {
         const complaintAgainstId = await this.resolveComplaintAgainst(dto);
 
+        // On Behalf Of — HR/admin files for an employee: complainantId becomes
+        // the selected employee while createdBy stays the authenticated filer.
+        let complainantId = userId;
+        if (dto.onBehalfOfId && dto.onBehalfOfId !== userId) {
+            const [onBehalfUser] = await this.db
+                .select({ id: users.id })
+                .from(users)
+                .where(and(eq(users.id, dto.onBehalfOfId), isNull(users.deletedAt)))
+                .limit(1);
+            if (!onBehalfUser) {
+                throw new NotFoundException("On Behalf Of user not found");
+            }
+            complainantId = onBehalfUser.id;
+        }
+
         // Generate sequential complaint code: CMP-0001
         const [row] = await this.db.select({ maxCode: sql<string>`MAX(complaint_code)` }).from(complaints);
         const maxCode = row?.maxCode;
@@ -206,7 +221,7 @@ export class ComplaintsService {
             .insert(complaints)
             .values({
                 complaintCode,
-                complainantId: userId,
+                complainantId,
                 createdBy: userId,
                 complaintType: dto.complaintType,
                 complaintAgainstType: dto.complaintAgainst || null,

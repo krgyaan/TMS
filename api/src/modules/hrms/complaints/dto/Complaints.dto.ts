@@ -15,7 +15,12 @@ const complaintBaseSchema = {
     attachments: z.array(z.string()).max(10).default([]),
 };
 
-export const CreateComplaintSchema = z.object(complaintBaseSchema);
+// On Behalf Of (create only) — lets HR file a complaint on behalf of an
+// employee: complainantId = onBehalfOfId, createdBy = the filer.
+export const CreateComplaintSchema = z.object({
+    ...complaintBaseSchema,
+    onBehalfOfId: z.number().int().positive().optional().nullable(),
+});
 export const UpdateComplaintSchema = z.object(complaintBaseSchema).partial();
 
 export const UpdateStatusSchema = z.object({
