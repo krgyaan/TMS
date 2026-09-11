@@ -18,7 +18,7 @@ import { paymentRequests } from "@/db/schemas/operations";
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
 import { woBasicDetails } from "@/db/schemas/operations/work-order.schema";
 import { users } from "@/db/schemas";
-import { materializeApprovalLines } from "@/modules/operations/inventory/inventory.materialize";
+
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -455,7 +455,7 @@ export class VendorWorkOrderService {
         return { pending, approved, rejected, new: newCount, closed: closedCount, invoicePending: invoicePendingCount };
     }
 
-    async setVwoApproval(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }, userId?: number) {
+    async setVwoApproval(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }) {
         const wo = await this.db
             .select()
             .from(vendorWorkOrders)
@@ -478,30 +478,18 @@ export class VendorWorkOrderService {
             const tdsAmt = (subtotal * tdsPercentage) / 100;
             const amountAfterTds = grandTotal - tdsAmt;
 
-            const [updated] = await this.db.transaction(async tx => {
-                const [row] = await tx
-                    .update(vendorWorkOrders)
-                    .set({
-                        tdsPercentage: tdsPercentage.toString(),
-                        tdsAmount: tdsAmt.toString(),
-                        amountAfterTds: amountAfterTds.toString(),
-                        woApproved: true,
-                        woApprovalRemark: remark || null,
-                        updatedAt: sql`now()`,
-                    })
-                    .where(eq(vendorWorkOrders.id, id))
-                    .returning();
-
-                await materializeApprovalLines(tx, {
-                    docType: "vwo",
-                    projectId: row.projectId,
-                    referenceId: row.id,
-                    lines: items,
-                    createdBy: userId ?? wo.woRaisedBy,
-                });
-
-                return [row];
-            });
+            const [updated] = await this.db
+                .update(vendorWorkOrders)
+                .set({
+                    tdsPercentage: tdsPercentage.toString(),
+                    tdsAmount: tdsAmt.toString(),
+                    amountAfterTds: amountAfterTds.toString(),
+                    woApproved: true,
+                    woApprovalRemark: remark || null,
+                    updatedAt: sql`now()`,
+                })
+                .where(eq(vendorWorkOrders.id, id))
+                .returning();
 
             this.logger.info(`VWO approved #${id}: ${tdsPercentage}%, TDS Amount: ${tdsAmt}, After TDS: ${amountAfterTds}`);
             return updated;
