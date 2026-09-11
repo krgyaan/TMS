@@ -473,32 +473,54 @@ export default function CandidateDetailPage() {
           ) : (
             <div className="space-y-6">
               <Tabs defaultValue="personal" className="w-full space-y-6">
-                <TabsList className="grid w-full grid-cols-7 rounded-xl bg-muted/60 p-1">
-                  <TabsTrigger value="personal" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
+
+                <TabsList className="grid w-full grid-cols-7 rounded-xl bg-muted/60 p-1 overflow-hidden">
+                  <TabsTrigger
+                    value="personal"
+                    className="rounded-lg text-xs font-semibold py-1.5 gap-1.5"
+                  >
                     Personal
                     <TabStatusDot status={joinee.profileStatus} />
                   </TabsTrigger>
-                  <TabsTrigger value="education" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
+                  <TabsTrigger
+                    value="education"
+                    className="rounded-lg text-xs font-semibold py-1.5 gap-1.5"
+                  >
                     Education
                     <TabStatusDot status={joinee.educationStatus} />
                   </TabsTrigger>
-                  <TabsTrigger value="experience" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
+                  <TabsTrigger
+                    value="experience"
+                    className="rounded-lg text-xs font-semibold py-1.5 gap-1.5"
+                  >
                     Experience
                     <TabStatusDot status={joinee.experienceStatus} />
                   </TabsTrigger>
-                  <TabsTrigger value="documents" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
+                  <TabsTrigger
+                    value="documents"
+                    className="rounded-lg text-xs font-semibold py-1.5 gap-1.5"
+                  >
                     Documents
                     <TabStatusDot status={joinee.documentStatus} />
                   </TabsTrigger>
-                  <TabsTrigger value="bank" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
+                  <TabsTrigger
+                    value="bank"
+                    className="rounded-lg text-xs font-semibold py-1.5 gap-1.5"
+                  >
                     Bank
                     <TabStatusDot status={joinee.bankStatus} />
                   </TabsTrigger>
-                  <TabsTrigger value="induction" className="rounded-lg text-xs font-semibold py-2 gap-1.5">
+                  <TabsTrigger
+                    value="induction"
+                    className="rounded-lg text-xs font-semibold py-1.5 gap-1.5"
+                  >
                     Induction
                     <TabStatusDot status={joinee.inductionStatus} />
                   </TabsTrigger>
-                  <TabsTrigger value="work_compensation" className="rounded-lg text-xs font-semibold py-2">
+                  <TabsTrigger
+                    value="work_compensation"
+                    className="rounded-lg text-xs font-semibold py-1.5"
+                  >
                     Work & Salary
                   </TabsTrigger>
                 </TabsList>
