@@ -50,6 +50,19 @@ class ComplaintsService extends BaseApiService {
     return this.get("/lookups");
   }
 
+  /** Single enriched complaint (view page). */
+  async getById(id: number): Promise<Complaint> {
+    return this.get<Complaint>(`/${id}/detail`);
+  }
+
+  /** HR/admin lifecycle status update. */
+  async updateStatus(
+    id: number,
+    data: { status: string; remarks?: string }
+  ): Promise<Complaint> {
+    return this.patch<Complaint>(`/${id}/status`, data);
+  }
+
   async create(data: CreateComplaintDto): Promise<Complaint> {
     return this.post<Complaint>("", data);
   }

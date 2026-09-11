@@ -486,6 +486,7 @@ export const paths = {
         complaints: {
             list: "/hrms/complaints",
             create: "/hrms/complaints/create",
+            view: (id: number | string) => `/hrms/complaints/${id}/view`,
         },
         
         //================ onboarding  ==============================//

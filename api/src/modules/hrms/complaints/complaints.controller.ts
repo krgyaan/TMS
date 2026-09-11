@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query } from "@nestjs/common";
 import { CurrentUser } from "@/decorators/current-user.decorator";
 import { ComplaintsService } from "./complaints.service";
-import { CreateComplaintSchema, UpdateComplaintSchema } from "./dto";
+import { CreateComplaintSchema, UpdateComplaintSchema, UpdateStatusSchema } from "./dto/Complaints.dto";
 
 @Controller("hrms/complaints")
 export class ComplaintsController {
@@ -59,6 +59,28 @@ export class ComplaintsController {
     async create(@CurrentUser("id") userId: number, @Body() body: unknown) {
         const dto = CreateComplaintSchema.parse(body);
         return this.complaintsService.createComplaint(userId, dto);
+    }
+
+    /**
+     * GET /hrms/complaints/:id/detail
+     * Single enriched complaint (view page).
+     */
+    @Get(":id/detail")
+    async getComplaintById(@Param("id", ParseIntPipe) id: number) {
+        return this.complaintsService.getComplaintById(id);
+    }
+
+    /**
+     * PATCH /hrms/complaints/:id/status
+     * HR/admin lifecycle update — moves a complaint between statuses
+     * (open / in_progress / resolved / closed / rejected) with an optional
+     * remark. Not restricted to the owner or to open complaints (unlike the
+     * self-edit endpoints).
+     */
+    @Patch(":id/status")
+    async updateStatus(@Param("id", ParseIntPipe) id: number, @Body() body: unknown) {
+        const dto = UpdateStatusSchema.parse(body);
+        return this.complaintsService.updateComplaintStatus(id, dto);
     }
 
     /**

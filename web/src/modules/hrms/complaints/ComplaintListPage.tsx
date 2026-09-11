@@ -10,24 +10,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
-import { Plus, Search, Eye, Megaphone } from "lucide-react";
+import { Plus, Search, Eye, Megaphone, RotateCcw } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { useAllComplaints } from "@/hooks/api/useComplaints";
+import {
+  useAllComplaints,
+  useUpdateComplaintStatus,
+} from "@/hooks/api/useComplaints";
 import type { Complaint } from "./helpers/types";
 import { COMPLAINT_TYPES, PRIORITY_CONFIG, STATUS_CONFIG } from "./helpers/types";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
-import { ComplaintView } from "./components/ComplaintView";
+import { UpdateStatusModal } from "./components/UpdateStatusModal";
 import { formatComplaintDate } from "./helpers/types";
 import { cn } from "@/lib/utils";
 
@@ -62,7 +58,11 @@ const ComplaintListPage = () => {
     tabParam: "subtab",
   });
 
-  const [viewComplaint, setViewComplaint] = useState<Complaint | null>(null);
+  const [statusModal, setStatusModal] = useState<{
+    open: boolean;
+    complaint: Complaint | null;
+  }>({ open: false, complaint: null });
+  const updateStatus = useUpdateComplaintStatus();
 
   // Tab counts (one lightweight query per status, like the leads page)
   const { data: openCountRes } = useAllComplaints({ page: 1, limit: 1, status: "open" });
@@ -104,10 +104,15 @@ const ComplaintListPage = () => {
       {
         label: "View Complaint",
         icon: <Eye className="h-4 w-4" />,
-        onClick: (row) => setViewComplaint(row),
+        onClick: (row) => navigate(paths.hrms.complaints.view(row.id)),
+      },
+      {
+        label: "Update Status",
+        icon: <RotateCcw className="h-4 w-4" />,
+        onClick: (row) => setStatusModal({ open: true, complaint: row }),
       },
     ],
-    []
+    [navigate]
   );
 
   const colDefs = useMemo<ColDef<Complaint>[]>(
@@ -204,6 +209,14 @@ const ComplaintListPage = () => {
     [complaintActions]
   );
 
+  const handleStatusUpdate = async (
+    id: number,
+    status: string,
+    remarks?: string
+  ) => {
+    await updateStatus.mutateAsync({ id, data: { status, remarks } });
+  };
+
   return (
     <Card className="min-h-[calc(100vh-2rem)] flex flex-col">
       <CardHeader className="flex-none pb-4">
@@ -293,37 +306,13 @@ const ComplaintListPage = () => {
         />
       </CardContent>
 
-      {/* View Complaint Dialog */}
-      <Dialog open={!!viewComplaint} onOpenChange={(open) => !open && setViewComplaint(null)}>
-        <DialogContent className="sm:max-w-2xl rounded-2xl border-border/40 bg-background/95 backdrop-blur-xl p-0 overflow-hidden max-h-[90vh] flex flex-col">
-          <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Megaphone className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <DialogTitle className="text-lg font-bold leading-tight">
-                  {viewComplaint?.subject}
-                </DialogTitle>
-                <DialogDescription className="text-xs mt-0.5 flex items-center gap-2">
-                  <span className="font-mono font-semibold">
-                    {viewComplaint?.complaintCode}
-                  </span>
-                  {viewComplaint?.complainantName && (
-                    <>
-                      <span className="text-primary/20">•</span>
-                      <span>By {viewComplaint.complainantName}</span>
-                    </>
-                  )}
-                </DialogDescription>
-              </div>
-            </div>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto px-6 pb-6 pt-2">
-            {viewComplaint && <ComplaintView complaint={viewComplaint} />}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Update Status Modal */}
+      <UpdateStatusModal
+        open={statusModal.open}
+        onOpenChange={(open) => setStatusModal((prev) => ({ ...prev, open }))}
+        complaint={statusModal.complaint}
+        onConfirm={handleStatusUpdate}
+      />
     </Card>
   );
 };

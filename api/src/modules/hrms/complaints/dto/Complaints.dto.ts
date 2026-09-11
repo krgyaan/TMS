@@ -18,5 +18,11 @@ const complaintBaseSchema = {
 export const CreateComplaintSchema = z.object(complaintBaseSchema);
 export const UpdateComplaintSchema = z.object(complaintBaseSchema).partial();
 
+export const UpdateStatusSchema = z.object({
+    status: z.enum(["open", "in_progress", "resolved", "closed", "rejected"]),
+    remarks: z.string().max(10000).optional(),
+});
+
 export type CreateComplaintDto = z.infer<typeof CreateComplaintSchema>;
 export type UpdateComplaintDto = z.infer<typeof UpdateComplaintSchema>;
+export type UpdateStatusDto = z.infer<typeof UpdateStatusSchema>;

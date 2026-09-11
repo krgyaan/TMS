@@ -15,6 +15,17 @@ export const complaintsKey = {
   lists: () => [...complaintsKey.all, "list"] as const,
   list: (filters?: Record<string, unknown>) =>
     [...complaintsKey.lists(), { filters }] as const,
+  details: () => [...complaintsKey.all, "detail"] as const,
+  detail: (id: number) => [...complaintsKey.details(), id] as const,
+};
+
+/** Single enriched complaint (view page). */
+export const useComplaint = (id: number | null) => {
+  return useQuery({
+    queryKey: id ? complaintsKey.detail(id) : complaintsKey.detail(0),
+    queryFn: () => complaintsService.getById(id!),
+    enabled: !!id,
+  });
 };
 
 /** Admin list — every complaint (Coordinator+ guarded server-side). */
@@ -46,6 +57,25 @@ export const useCreateComplaint = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: complaintsKey.all });
       toast.success("Complaint submitted successfully");
+    },
+    onError: showErrorToast,
+  });
+};
+
+/** HR/admin lifecycle status update. */
+export const useUpdateComplaintStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: number;
+      data: { status: string; remarks?: string };
+    }) => complaintsService.updateStatus(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: complaintsKey.all });
+      toast.success("Status updated successfully");
     },
     onError: showErrorToast,
   });

@@ -1,35 +1,35 @@
 import { useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { ShowPageLayout, type StepConfig } from "@/components/layout/ShowPageLayout";
 import { cn } from "@/lib/utils";
-import api from "@/lib/axios";
 import { ComplaintView } from "./components/ComplaintView";
+import { useComplaint } from "@/hooks/api/useComplaints";
 import {
   formatComplaintDate,
-  type Complaint,
   type ComplaintTimelineEvent,
 } from "./helpers/types";
+
+interface ComplaintViewPageProps {
+  /** Back-navigation target + label (defaults to the employee support flow). */
+  backTo?: string;
+  backLabel?: string;
+}
 
 /**
  * Read-only complaint page — LeadShowPage style: ShowPageLayout with
  * accordion sections (details + timeline) and a table-based details view.
- * Rendered at shell level, so it gets the same full-width p-4 gap as leads.
+ * Shared by the employee support flow and the admin complaints list —
+ * always fetches by id (GET /hrms/complaints/:id/detail).
  */
-export default function ComplaintViewPage() {
+export default function ComplaintViewPage({
+  backTo = "/profile/support",
+  backLabel = "Back to Support",
+}: ComplaintViewPageProps) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const complaintId = id ? Number(id) : null;
 
-  const { data: complaints, isLoading } = useQuery({
-    queryKey: ["hrms", "complaints", "mine"],
-    queryFn: async () => {
-      const res = await api.get("/hrms/complaints");
-      return res.data as Complaint[];
-    },
-  });
-
-  const complaint = complaints?.find((c) => c.id === complaintId) ?? null;
+  const { data: complaint, isLoading } = useComplaint(complaintId);
 
   const steps = useMemo<StepConfig[]>(() => {
     const list: StepConfig[] = [
@@ -116,8 +116,8 @@ export default function ComplaintViewPage() {
       onToggleSection={toggleSection}
       onExpandAll={expandAll}
       onCollapseAll={collapseAll}
-      onBack={() => navigate("/profile/support")}
-      backLabel="Back to Support"
+      onBack={() => navigate(backTo)}
+      backLabel={backLabel}
       renderSectionContent={renderSectionContent}
     />
   );

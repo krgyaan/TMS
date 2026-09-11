@@ -5,7 +5,7 @@ import type { DbInstance } from "@/db";
 import { users } from "@/db/schemas/auth/users.schema";
 import { teams } from "@/db/schemas/master/teams.schema";
 import { complaints } from "@/db/schemas/hrms/complaints.schema";
-import type { CreateComplaintDto, UpdateComplaintDto } from "./dto";
+import type { CreateComplaintDto, UpdateComplaintDto, UpdateStatusDto } from "./dto/Complaints.dto";
 
 @Injectable()
 export class ComplaintsService {
@@ -147,6 +147,42 @@ export class ComplaintsService {
             data,
             meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
+    }
+
+    /**
+     * Single enriched complaint by id (view page).
+     */
+    async getComplaintById(id: number) {
+        const rows = await this.fetchEnrichedComplaints({
+            where: eq(complaints.id, id),
+            limit: 1,
+        });
+        return rows[0] ?? null;
+    }
+
+    /**
+     * HR/admin lifecycle update — moves a complaint between statuses
+     * (open / in_progress / resolved / closed / rejected) with an optional
+     * remark. Not restricted to the owner or to open complaints (unlike the
+     * self-edit endpoints).
+     */
+    async updateComplaintStatus(id: number, dto: UpdateStatusDto) {
+        const [existing] = await this.db.select({ id: complaints.id }).from(complaints).where(eq(complaints.id, id)).limit(1);
+        if (!existing) {
+            throw new NotFoundException("Complaint not found");
+        }
+
+        const patch: Record<string, unknown> = {
+            status: dto.status,
+            statusUpdatedAt: new Date(),
+            updatedAt: new Date(),
+        };
+        if (dto.remarks !== undefined) patch.remarks = dto.remarks || null;
+        if (dto.status === "resolved") patch.resolvedAt = new Date();
+
+        const [updated] = await this.db.update(complaints).set(patch).where(eq(complaints.id, id)).returning();
+
+        return updated;
     }
 
     /**
