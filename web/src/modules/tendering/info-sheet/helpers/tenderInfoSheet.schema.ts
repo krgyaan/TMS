@@ -327,5 +327,14 @@ export const TenderInformationFormSchema = z.object({
                 path: ['clients', index, 'clientName'],
             });
         }
+        const hasEmail = !!client.clientEmail?.trim();
+        const hasPhone = !!client.clientMobile?.trim();
+        if (!hasEmail && !hasPhone) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Either email or phone is required',
+                path: ['clients', index, 'clientMobile'],
+            });
+        }
     });
 });
