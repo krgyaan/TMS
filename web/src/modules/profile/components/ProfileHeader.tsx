@@ -148,24 +148,16 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = () => {
                         <BadgeCheck className="mr-1 h-3 w-3" />
                         {currentStatus.label}
                       </Badge>
-                      {CURRENT_USER?.team && (
-                        <Badge
-                          variant="outline"
-                          className="rounded-full border-border/50 px-3 py-1 text-[10px] font-medium text-muted-foreground"
-                        >
-                          {CURRENT_USER.team}
-                        </Badge>
-                      )}
                     </div>
 
-                    <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground truncate">
+                    <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground truncate">
                       {fullName}
                     </h1>
 
                     <div className="mt-2 flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1 text-sm text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5 font-semibold text-foreground/85">
                         <Briefcase className="h-4 w-4 text-primary/60" />
-                        {EMPLOYEE_PROFILE?.designation || "Designation"}
+                        {CURRENT_USER.role || EMPLOYEE_PROFILE?.designation || "Role"}
                       </span>
                       <span className="hidden sm:inline text-border">
                         •
@@ -177,7 +169,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = () => {
                     </div>
 
                     {/* Info Chips */}
-                    <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+                    <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       {infoChips.map((item, idx) => (
                         <div
                           key={idx}
@@ -210,7 +202,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = () => {
               </div>
 
               {/* Right: Actions */}
-              <div className="w-full xl:w-[250px] space-y-3 flex-shrink-0">
+              <div className="w-full xl:w-[180px] space-y-3 flex-shrink-0">
                 <Button
                   variant="outline"
                   onClick={() => setChangePasswordOpen(true)}

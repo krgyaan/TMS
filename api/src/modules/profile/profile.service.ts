@@ -18,6 +18,7 @@ const REQUIRED_DOC_TYPES = [
 
 
 import { users } from '@/db/schemas/auth/users.schema';
+import { roles } from '@/db/schemas/auth/roles.schema';
 import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
 import { employeeProfiles } from '@/db/schemas/hrms/employee-profiles.schema';
 import { employeeDocuments } from '@/db/schemas/hrms/employee-documents.schema';
@@ -59,9 +60,11 @@ export class ProfileService {
         lastLoginAt: users.lastLoginAt,
         createdAt: users.createdAt,
         teamName: teams.name,
+        roleName: roles.name,
       })
       .from(users)
       .leftJoin(teams, eq(users.team, teams.id))
+      .leftJoin(roles, eq(users.roleId, roles.id))
       .where(eq(users.id, userId))
       .limit(1);
 
@@ -79,6 +82,7 @@ export class ProfileService {
       lastLoginAt: userRow.lastLoginAt?.toISOString() || null,
       createdAt: userRow.createdAt?.toISOString() || null,
       team: userRow.teamName || 'Unassigned',
+      role: userRow.roleName || null,
     };
 
     // CHECK ONBOARDING STATUS

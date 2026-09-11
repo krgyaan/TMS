@@ -21,6 +21,7 @@ import {
   onboardingInduction,
 } from '@/db/schemas/hrms/onboarding';
 import { users } from '@/db/schemas/auth/users.schema';
+import { roles } from '@/db/schemas/auth/roles.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
 import { eq, desc, aliasedTable, and } from 'drizzle-orm';
 import * as fs from 'fs';
@@ -246,9 +247,11 @@ export class EmployeeOnboardingService {
         lastLoginAt: users.lastLoginAt,
         createdAt: users.createdAt,
         teamName: teams.name,
+        roleName: roles.name,
       })
       .from(users)
       .leftJoin(teams, eq(users.team, teams.id))
+      .leftJoin(roles, eq(users.roleId, roles.id))
       .where(eq(users.id, userId))
       .limit(1);
 
@@ -266,6 +269,7 @@ export class EmployeeOnboardingService {
       lastLoginAt: userRow.lastLoginAt?.toISOString() || null,
       createdAt: userRow.createdAt?.toISOString() || null,
       team: userRow.teamName || 'Unassigned',
+      role: userRow.roleName || null,
     };
 
     // CHECK ONBOARDING STATUS

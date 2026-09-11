@@ -10,6 +10,7 @@ export type UserData = {
   lastLoginAt: string;
   createdAt: string;
   team: string;
+  role?: string | null;
 };
 
 export type ProfileData = {
