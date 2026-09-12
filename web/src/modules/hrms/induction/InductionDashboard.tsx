@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -27,6 +28,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDate as formatDateString } from "@/hooks/useFormatedDate";
+import { paths } from "@/app/routes/paths";
 import {
   DEFAULT_TASKS,
   computeInductionStats,
@@ -35,24 +37,15 @@ import {
   getInductionStatus,
   getWorkDetailsProgress,
   mapApiEmployee,
-  mapApiTask,
 } from "./helpers/induction.helpers";
 import type {
   EmployeeInduction,
   EmployeeInductionTab,
-  InductionTask,
 } from "./helpers/induction.helpers";
 import {
   useInductionTrackerList,
-  useEmployeeInduction,
-  useUpdateInductionTask,
   useStaggeredEntrance,
 } from "@/hooks/api/useInduction";
-import {
-  EmployeeInductionModal,
-  CircularProgress,
-} from "./components/EmployeeInductionModal";
-import { WorkDetailsModal } from "./components/WorkDetailsModal";
 
 // ─── CSS Keyframes ─────────────────────────────────────────────────────────────
 const StyleInjector: React.FC = () => (
@@ -243,11 +236,9 @@ const EmployeeCard: React.FC<{
       className={cn(
         "group relative rounded-2xl border bg-card transition-all duration-200",
         "hover:shadow-lg hover:shadow-black/[0.03] hover:-translate-y-0.5 hover:border-border",
-        "cursor-pointer",
         isVisible ? "ind-fade-up" : "opacity-0"
       )}
       style={{ animationDelay: `${index * 40}ms` }}
-      onClick={() => onView(employee)}
     >
       <div className="p-5">
         {/* ── Top row: avatar · name/email · status badge ── */}
@@ -339,17 +330,32 @@ const EmployeeCard: React.FC<{
         </div>
 
         {/* ── Progress section ── */}
-        <div className="mt-5 pt-4 border-t grid grid-cols-2 gap-4 items-center">
-          {/* Induction ring + count */}
-          <div className="flex items-center gap-3">
-            <CircularProgress value={stats.pct} size={42} strokeWidth={3} />
-            <div>
-              <p className="text-xs font-semibold tabular-nums leading-none">
-                {stats.completed}/{stats.total}
-              </p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                induction tasks
-              </p>
+        <div className="mt-5 pt-4 border-t grid grid-cols-2 gap-4 items-start">
+          {/* Induction bar */}
+          <div className="flex flex-col gap-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1">
+                <ListChecks className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                <span className="text-[10px] text-muted-foreground font-medium">
+                  Induction
+                </span>
+              </div>
+              <span className="text-[10px] font-semibold tabular-nums text-muted-foreground">
+                {stats.completed}/{stats.total} · {stats.pct}%
+              </span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-muted/60 overflow-hidden">
+              <div
+                className={cn(
+                  "h-full rounded-full ind-progress-bar",
+                  stats.pct === 100
+                    ? "bg-emerald-500"
+                    : stats.pct > 0
+                    ? "bg-primary"
+                    : "bg-muted-foreground/20"
+                )}
+                style={{ width: `${stats.pct}%` }}
+              />
             </div>
           </div>
 
@@ -364,10 +370,7 @@ const EmployeeCard: React.FC<{
           variant="ghost"
           size="sm"
           className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1.5"
-          onClick={(e) => {
-            e.stopPropagation();
-            onView(employee);
-          }}
+          onClick={() => onView(employee)}
         >
           <ClipboardList className="h-3.5 w-3.5" />
           Induction
@@ -376,10 +379,7 @@ const EmployeeCard: React.FC<{
           variant="ghost"
           size="sm"
           className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1.5"
-          onClick={(e) => {
-            e.stopPropagation();
-            onWorkDetails(employee);
-          }}
+          onClick={() => onWorkDetails(employee)}
         >
           <Briefcase className="h-3.5 w-3.5" />
           Work Details
@@ -391,18 +391,9 @@ const EmployeeCard: React.FC<{
 
 // ─── Main Dashboard ────────────────────────────────────────────────────────────
 const InductionDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<EmployeeInductionTab>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewEmployee, setViewEmployee] =
-    useState<EmployeeInduction | null>(null);
-  const [viewOpen, setViewOpen] = useState(false);
-  const [workDetailsEmployee, setWorkDetailsEmployee] =
-    useState<EmployeeInduction | null>(null);
-  const [workDetailsOpen, setWorkDetailsOpen] = useState(false);
-  const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
-  const [remarkSavingTaskId, setRemarkSavingTaskId] = useState<string | null>(
-    null
-  );
 
   // ── API ───────────────────────────────────────────────────────────────────
   const {
@@ -412,22 +403,11 @@ const InductionDashboard: React.FC = () => {
     refetch: refetchTracker,
   } = useInductionTrackerList();
 
-  const { data: rawEmployeeTasks, isLoading: isLoadingTasks } =
-    useEmployeeInduction(viewOpen && viewEmployee ? viewEmployee.id : null);
-
-  const activeOnboardingId = viewEmployee?.id ?? 0;
-  const { mutate: updateTask } = useUpdateInductionTask(activeOnboardingId);
-
   // ── Derived data ───────────────────────────────────────────────────────────
   const employees: EmployeeInduction[] = useMemo(() => {
     if (!rawTracker) return [];
     return rawTracker.map(mapApiEmployee);
   }, [rawTracker]);
-
-  const liveTasks: InductionTask[] | undefined = useMemo(() => {
-    if (!rawEmployeeTasks) return undefined;
-    return rawEmployeeTasks.map(mapApiTask);
-  }, [rawEmployeeTasks]);
 
   // ── Tab counts ─────────────────────────────────────────────────────────────
   const tabCounts = useMemo(
@@ -468,33 +448,6 @@ const InductionDashboard: React.FC = () => {
   }, [employees, activeTab, searchQuery]);
 
   const visibleItems = useStaggeredEntrance(filtered.length, 40);
-
-  // ── Handlers ───────────────────────────────────────────────────────────────
-  const handleToggleTask = useCallback(
-    (task: InductionTask) => {
-      if (!viewEmployee) return;
-      const newStatus =
-        task.status === "completed" ? "pending" : "completed";
-      setTogglingTaskId(task.id);
-      updateTask(
-        { taskId: Number(task.id), updates: { status: newStatus } },
-        { onSettled: () => setTogglingTaskId(null) }
-      );
-    },
-    [viewEmployee, updateTask]
-  );
-
-  const handleSaveRemark = useCallback(
-    (taskId: string, remark: string) => {
-      if (!viewEmployee) return;
-      setRemarkSavingTaskId(taskId);
-      updateTask(
-        { taskId: Number(taskId), updates: { remarks: remark } },
-        { onSettled: () => setRemarkSavingTaskId(null) }
-      );
-    },
-    [viewEmployee, updateTask]
-  );
 
   const tabs: {
     value: EmployeeInductionTab;
@@ -610,47 +563,18 @@ const InductionDashboard: React.FC = () => {
                     employee={emp}
                     index={idx}
                     isVisible={visibleItems.has(idx)}
-                    onView={(e) => {
-                      setViewEmployee(e);
-                      setViewOpen(true);
-                    }}
-                    onWorkDetails={(e) => {
-                      setWorkDetailsEmployee(e);
-                      setWorkDetailsOpen(true);
-                    }}
+                    onView={(e) =>
+                      navigate(paths.hrms.inductionEmployee(e.id))
+                    }
+                    onWorkDetails={(e) =>
+                      navigate(paths.hrms.inductionWorkDetails(e.id))
+                    }
                   />
                 ))}
               </div>
             )}
           </div>
         </CardContent>
-
-        {/* ── Induction Modal ── */}
-        <EmployeeInductionModal
-          employee={viewEmployee}
-          open={viewOpen}
-          onClose={() => {
-            setViewOpen(false);
-            setViewEmployee(null);
-            setTogglingTaskId(null);
-          }}
-          liveTasks={liveTasks}
-          isLoadingTasks={isLoadingTasks}
-          togglingTaskId={togglingTaskId}
-          onToggleTask={handleToggleTask}
-          onSaveRemark={handleSaveRemark}
-          isRemarkLoading={remarkSavingTaskId !== null}
-        />
-
-        {/* ── Work Details Modal ── */}
-        <WorkDetailsModal
-          employee={workDetailsEmployee}
-          open={workDetailsOpen}
-          onClose={() => {
-            setWorkDetailsOpen(false);
-            setWorkDetailsEmployee(null);
-          }}
-        />
       </Card>
     </TooltipProvider>
   );

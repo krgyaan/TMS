@@ -17,6 +17,8 @@ const CandidateDetailPage = lazy(() => import('@/modules/hrms/onboarding/Candida
 const ProfileDetailsDashboard = lazy(() => import('@/modules/hrms/onboarding/ProfileDetailsDashboard'));
 const DocumentDashboard = lazy(() => import('@/modules/hrms/onboarding/DocumentDashboard'));
 const InductionDashboard = lazy(() => import('@/modules/hrms/induction/InductionDashboard'))
+const InductionDetailsPage = lazy(() => import('@/modules/hrms/induction/InductionDetailsPage'))
+const InductionWorkDetailsPage = lazy(() => import('@/modules/hrms/induction/InductionWorkDetailsPage'))
 
 const TrainingDashboard = lazy(() => import('@/modules/hrms/training/TrainingDashboard'))
 const UploadVideo = lazy(() => import("@/modules/hrms/training/components/UploadVideo"))
@@ -38,6 +40,8 @@ export default function HrmsRoutes() {
             <Route path="onboarding/profile-details" element={<ProfileDetailsDashboard />} />
             <Route path="onboarding/documents" element={<DocumentDashboard />} />
             <Route path="onboarding/induction" element={<InductionDashboard />}/>
+            <Route path="onboarding/induction/:id" element={<InductionDetailsPage />} />
+            <Route path="onboarding/induction/:id/work-details" element={<InductionWorkDetailsPage />} />
             
             <Route path="assets/my" element={<MyAssetsListPage />} />
             

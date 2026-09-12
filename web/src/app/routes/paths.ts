@@ -495,6 +495,8 @@ export const paths = {
         profileDetailsDashboard: "/hrms/onboarding/profile-details",
         documentDashboard: "/hrms/onboarding/documents",
         inductionDashboard: "/hrms/onboarding/induction",
+        inductionEmployee: (id: number | string) => `/hrms/onboarding/induction/${id}`,
+        inductionWorkDetails: (id: number | string) => `/hrms/onboarding/induction/${id}/work-details`,
 
         // =========================training =======================//
         trainingDashboard: "/hrms/training",

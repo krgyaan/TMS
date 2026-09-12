@@ -1,18 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Briefcase, Loader2 } from "lucide-react";
+import { ArrowLeft, Briefcase, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -20,12 +14,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { paths } from "@/app/routes/paths";
 import { useProfile, useUpdateProfile } from "@/hooks/api/useOnboarding";
 import { useRoles } from "@/hooks/api/useRoles";
 import { useTeams } from "@/hooks/api/useTeams";
 import { useUsers } from "@/hooks/api/useUsers";
-import { addMonths } from "../helpers/induction.helpers";
-import type { EmployeeInduction } from "../helpers/induction.helpers";
+import { useInductionTrackerList } from "@/hooks/api/useInduction";
+import { addMonths, mapApiEmployee } from "./helpers/induction.helpers";
 
 const EMPLOYEE_TYPE_OPTIONS = ["Full Time", "Part Time", "Intern", "Contract"];
 const SALARY_TYPE_OPTIONS = ["Monthly", "Annual"];
@@ -66,16 +61,22 @@ const EMPTY_FORM: WorkDetailsFormState = {
   esicApplicable: false,
 };
 
-export const WorkDetailsModal: React.FC<{
-  employee: EmployeeInduction | null;
-  open: boolean;
-  onClose: () => void;
-}> = ({ employee, open, onClose }) => {
+const InductionWorkDetailsPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const onboardingId = employee?.id ?? 0;
+  const onboardingId = Number(id);
+
+  const { data: rawTracker } = useInductionTrackerList();
+  const employee = useMemo(() => {
+    if (!rawTracker) return null;
+    const raw = rawTracker.find((r) => r.id === onboardingId);
+    return raw ? mapApiEmployee(raw) : null;
+  }, [rawTracker, onboardingId]);
+
   const { data: profile, isLoading: profileLoading } = useProfile(
-    open && employee ? employee.id : null
+    Number.isFinite(onboardingId) ? onboardingId : null
   );
   const { data: users = [] } = useUsers();
   const { data: roles = [] } = useRoles();
@@ -122,7 +123,10 @@ export const WorkDetailsModal: React.FC<{
     });
   }, [profile, users, employee]);
 
-  if (!employee) return null;
+  const goBack = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate(paths.hrms.inductionDashboard);
+  };
 
   const setField = <K extends keyof WorkDetailsFormState>(
     key: K,
@@ -172,32 +176,37 @@ export const WorkDetailsModal: React.FC<{
           queryClient.invalidateQueries({
             queryKey: ["onboarding", "induction-tracker"],
           });
-          onClose();
+          goBack();
         },
       }
     );
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl p-0 gap-0 overflow-hidden max-h-[92vh] flex flex-col rounded-2xl">
-        <DialogHeader className="px-6 py-5 border-b bg-muted/10 flex-shrink-0">
+    <div className="space-y-4">
+      <Button variant="ghost" onClick={goBack} className="rounded-xl gap-2">
+        <ArrowLeft className="h-4 w-4" />
+        Back
+      </Button>
+
+      <Card>
+        <CardContent className="p-6 space-y-6">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
               <Briefcase className="h-5 w-5 text-primary" />
             </div>
-            <div>
-              <DialogTitle className="text-base tracking-tight">
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold tracking-tight truncate">
                 Work Details
-              </DialogTitle>
-              <DialogDescription className="text-xs mt-0.5">
-                {employee.firstName} {employee.lastName} · {employee.employeeId}
-              </DialogDescription>
+              </h1>
+              <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                {employee
+                  ? `${employee.firstName} ${employee.lastName} · ${employee.employeeId}`
+                  : `Onboarding #${id}`}
+              </p>
             </div>
           </div>
-        </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6 min-h-0">
           {profileLoading ? (
             <div className="grid grid-cols-2 gap-4">
               {Array.from({ length: 9 }).map((_, i) => (
@@ -208,7 +217,7 @@ export const WorkDetailsModal: React.FC<{
               ))}
             </div>
           ) : (
-            <>
+            <div className="space-y-6">
               {/* ── Work Information ── */}
               <div className="space-y-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -469,17 +478,22 @@ export const WorkDetailsModal: React.FC<{
                   </div>
                 </div>
               </div>
-            </>
+            </div>
           )}
-        </div>
 
-        <DialogFooter className="px-6 py-4 border-t border-border/30 bg-muted/10 flex-shrink-0">
-          <div className="flex items-center justify-between w-full gap-3">
+          {/* Actions */}
+          <div className="pt-4 border-t space-y-3">
             <p className="text-xs text-muted-foreground">
               Saved details sync to the employee profile on approval
             </p>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={onClose} disabled={saving} className="rounded-xl">
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goBack}
+                disabled={saving}
+                className="rounded-xl"
+              >
                 Cancel
               </Button>
               <Button
@@ -493,8 +507,10 @@ export const WorkDetailsModal: React.FC<{
               </Button>
             </div>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
+
+export default InductionWorkDetailsPage;
