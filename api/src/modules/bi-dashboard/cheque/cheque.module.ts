@@ -7,9 +7,10 @@ import { PaymentRequestsModule } from "@/modules/tendering/payment-requests/paym
 import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
 import { TenderStatusHistoryService } from "@/modules/tendering/tender-status-history/tender-status-history.service";
 import { EmailModule } from "@/modules/email/email.module";
+import { FileUploadModule } from "@/modules/file-upload/file-upload.module";
 
 @Module({
-    imports: [DatabaseModule, FollowUpModule, PaymentRequestsModule, EmailModule],
+    imports: [DatabaseModule, FollowUpModule, PaymentRequestsModule, EmailModule, FileUploadModule],
     controllers: [ChequeController],
     providers: [ChequeService, TenderInfosService, TenderStatusHistoryService],
     exports: [ChequeService],
