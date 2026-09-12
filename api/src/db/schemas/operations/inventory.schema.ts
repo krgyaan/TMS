@@ -6,6 +6,7 @@ export const inventory = pgTable(
     {
         id: bigserial("id", { mode: "number" }).primaryKey(),
         projectId: bigint("project_id", { mode: "number" }).notNull(),
+        warehouseId: bigint("warehouse_id", { mode: "number" }),
         itemName: varchar("item_name", { length: 255 }).notNull(),
         hsn: varchar("hsn", { length: 100 }),
         price: numeric("price", { precision: 20, scale: 2 }).notNull(),
@@ -17,7 +18,8 @@ export const inventory = pgTable(
     },
     table => [
         index("idx_inventory_project_id").on(table.projectId),
-        uniqueIndex("idx_inventory_project_item_hsn_price").on(table.projectId, table.itemName, sql`COALESCE(${table.hsn}, '')`, table.price),
+        index("idx_inventory_warehouse_id").on(table.warehouseId),
+        uniqueIndex("idx_inventory_project_wh_item_hsn_price").on(table.projectId, table.warehouseId, table.itemName, sql`COALESCE(${table.hsn}, '')`, table.price),
     ]
 );
 

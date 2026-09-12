@@ -283,10 +283,10 @@ export class PaymentRequestsCommandService {
         });
 
         // Background operations
-        // this.handleBackgroundOperations(results, tenderId, tender, userId, emdRequested, isNonTmsRequest)
-        //     .catch((error) => {
-        //         this.logger.error('Background operations failed:', error);
-        //     });
+        this.handleBackgroundOperations(results, tenderId, tender, userId, emdRequested, isNonTmsRequest)
+            .catch((error) => {
+                this.logger.error('Background operations failed:', error);
+            });
 
         this.logger.log(`Payment request created successfully: ${JSON.stringify(results)}`);
         return results;

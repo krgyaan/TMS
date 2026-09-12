@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service';
-import type { InventoryItem, InventoryTransfer, InventoryProjectSummary, InventoryProjectSummaryFilters, TransferDTO } from '@/modules/operations/inventory/helpers/inventory.types';
+import type { InventoryItem, InventoryProjectSummary, InventoryProjectSummaryFilters, InventoryWarehouseFilter } from '@/modules/operations/inventory/helpers/inventory.types';
 import type { PaginatedResult } from "@/types/api.types";
 
 class InventoryApiService extends BaseApiService {
@@ -7,23 +7,16 @@ class InventoryApiService extends BaseApiService {
         super('/inventory');
     }
 
-    async getProjectInventory(projectId: number, includeZero = false): Promise<{ items: InventoryItem[] }> {
+    async getProjectInventory(
+        projectId: number,
+        includeZero = false,
+        warehouseType: InventoryWarehouseFilter = "all",
+    ): Promise<{ items: InventoryItem[] }> {
         const params = new URLSearchParams();
         if (includeZero) params.set('includeZero', 'true');
+        if (warehouseType !== "all") params.set('warehouseType', warehouseType);
         const qs = params.toString();
         return this.get(`/project/${projectId}${qs ? `?${qs}` : ''}`);
-    }
-
-    async transfer(data: TransferDTO): Promise<InventoryTransfer> {
-        return this.post('/transfer', data);
-    }
-
-    async getTransfers(fromProject?: number, toProject?: number): Promise<{ items: InventoryTransfer[] }> {
-        const params = new URLSearchParams();
-        if (fromProject) params.set('fromProject', String(fromProject));
-        if (toProject) params.set('toProject', String(toProject));
-        const qs = params.toString();
-        return this.get(`/transfers${qs ? `?${qs}` : ''}`);
     }
 
     async getAllInventory(includeZero = false): Promise<{ items: (InventoryItem & { projectName?: string })[] }> {

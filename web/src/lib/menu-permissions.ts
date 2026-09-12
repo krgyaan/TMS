@@ -61,9 +61,6 @@ function getPermissionModule(title: string, parentMenuTitle?: string): string | 
     }
 
     if (title === 'Inventory') {
-        if (parentMenuTitle === 'Operations') {
-            return 'ops.inventory';
-        }
         if (parentMenuTitle === 'Accounts') {
             return 'accounts.inventory';
         }
