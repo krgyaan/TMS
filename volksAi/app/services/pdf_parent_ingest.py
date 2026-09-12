@@ -2,7 +2,7 @@ import time
 import re
 import os
 from pathlib import Path
-from typing import Dict, Any, List, cast
+from typing import Dict, Any, List, Optional, cast
 from app.services.pdf_text_extractor import extract_pdf_text_hybrid
 from app.services.pdf_link_extractor import extract_links_and_mentions
 from app.services.field_extractor import extract_tender_fields
@@ -110,11 +110,18 @@ def _compute_parse_confidence(page_texts: List[Dict[str, Any]], sections: List[D
 def ingest_parent_tender_pdf(
     job_id: str,
     pdf_path: Path,
-    original_filename: str
+    original_filename: str,
+    explicit_atc_paths: Optional[List[Path]] = None,
+    explicit_boq_path: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """
     Coordinates the full OCR, hyperlink extraction, and info-sheet generation pipeline.
     Saves outputs in the job directory and returns structured conforming tender details.
+
+    explicit_atc_paths / explicit_boq_path: files the user explicitly uploaded and
+    tagged as ATC / BOQ (see document_classifier.py). These are a strictly stronger
+    signal than the heuristic hyperlink/filename-based ATC discovery below, so when
+    present they take priority over it rather than being silently ignored.
     """
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Starting ingestion pipeline for '{original_filename}'")
     job_dir = pdf_path.parent
@@ -174,23 +181,19 @@ def ingest_parent_tender_pdf(
                     f["sourceSnippet"] = anchor_snippet
 
     atc_path = None
+    explicit_atc_paths = [p for p in (explicit_atc_paths or []) if p and Path(p).exists()]
 
-    # 1. High-priority search: explicit ATC or TENDOC markers (excluding MSE, MII, GTC, rules, catalogs, specs, drawings)
-    for l in links:
-        if l.get("local_path") and Path(l["local_path"]).exists() and str(l["local_path"]).lower().endswith(".pdf"):
-            confidence = classify_document(
-                name=l.get("name", ""),
-                url=l.get("url", ""),
-                anchor_text=l.get("anchorText", ""),
-                is_atc_anchor=bool(l.get("is_atc_anchor")),
-            )
-            if confidence >= ATC_CONFIDENCE_HIGH_PRIORITY:
-                atc_path = Path(l["local_path"])
-                logger.info(f"[ATC_RESOLVER] Selected high-priority ATC child PDF: '{atc_path}'")
-                break
-
-    # 2. General fallback search if no high-priority match found
-    if not atc_path:
+    if explicit_atc_paths:
+        # Explicit user-tagged ATC upload is a strictly stronger signal than the
+        # heuristic hyperlink/filename discovery below -- use it directly and skip
+        # the heuristic search entirely.
+        atc_path = explicit_atc_paths[0]
+        logger.info(
+            f"[ATC_RESOLVER] Using explicitly uploaded ATC file: '{atc_path}' "
+            f"({len(explicit_atc_paths)} ATC file(s) provided; bypassing heuristic discovery)"
+        )
+    else:
+        # 1. High-priority search: explicit ATC or TENDOC markers (excluding MSE, MII, GTC, rules, catalogs, specs, drawings)
         for l in links:
             if l.get("local_path") and Path(l["local_path"]).exists() and str(l["local_path"]).lower().endswith(".pdf"):
                 confidence = classify_document(
@@ -199,33 +202,48 @@ def ingest_parent_tender_pdf(
                     anchor_text=l.get("anchorText", ""),
                     is_atc_anchor=bool(l.get("is_atc_anchor")),
                 )
-                if confidence >= ATC_CONFIDENCE_GENERAL_FALLBACK:
+                if confidence >= ATC_CONFIDENCE_HIGH_PRIORITY:
                     atc_path = Path(l["local_path"])
-                    logger.info(f"[ATC_RESOLVER] Selected downloaded ATC child PDF: '{atc_path}'")
+                    logger.info(f"[ATC_RESOLVER] Selected high-priority ATC child PDF: '{atc_path}'")
                     break
 
-    if not atc_path:
-        for l in links:
-            if l.get("local_path") and Path(l["local_path"]).exists() and str(l["local_path"]).lower().endswith(".pdf"):
-                atc_path = Path(l["local_path"])
-                logger.info(f"[ATC_RESOLVER] Fallback selected downloaded PDF link: '{atc_path}' (confidence={classify_document_weak_fallback()})")
-                break
+        # 2. General fallback search if no high-priority match found
+        if not atc_path:
+            for l in links:
+                if l.get("local_path") and Path(l["local_path"]).exists() and str(l["local_path"]).lower().endswith(".pdf"):
+                    confidence = classify_document(
+                        name=l.get("name", ""),
+                        url=l.get("url", ""),
+                        anchor_text=l.get("anchorText", ""),
+                        is_atc_anchor=bool(l.get("is_atc_anchor")),
+                    )
+                    if confidence >= ATC_CONFIDENCE_GENERAL_FALLBACK:
+                        atc_path = Path(l["local_path"])
+                        logger.info(f"[ATC_RESOLVER] Selected downloaded ATC child PDF: '{atc_path}'")
+                        break
 
-    if not atc_path:
-        ext_children_dir = job_dir / "extracted_children"
-        # Only scan if job_dir is an isolated per-job folder, never the shared tender-documents root
-        if ext_children_dir.exists() and job_dir.name != "tender-documents":
-            child_pdfs = [p for p in ext_children_dir.glob("*.pdf") if p.is_file() and p.stat().st_size > 0]
-            if child_pdfs:
-                # Also sort to prioritize explicit atc/tendoc filenames
-                atc_candidates = [p for p in child_pdfs if any(k in p.name.lower() for k in ATC_HIGH_PRIORITY_KEYWORDS)]
-                if atc_candidates:
-                    atc_candidates.sort(key=lambda p: p.stat().st_size, reverse=True)
-                    atc_path = atc_candidates[0]
-                else:
-                    child_pdfs.sort(key=lambda p: p.stat().st_size, reverse=True)
-                    atc_path = child_pdfs[0]
-                logger.info(f"[ATC_RESOLVER] Discovered largest extracted child PDF in job directory: '{atc_path}' (size: {atc_path.stat().st_size} bytes, confidence={classify_document_weak_fallback()})")
+        if not atc_path:
+            for l in links:
+                if l.get("local_path") and Path(l["local_path"]).exists() and str(l["local_path"]).lower().endswith(".pdf"):
+                    atc_path = Path(l["local_path"])
+                    logger.info(f"[ATC_RESOLVER] Fallback selected downloaded PDF link: '{atc_path}' (confidence={classify_document_weak_fallback()})")
+                    break
+
+        if not atc_path:
+            ext_children_dir = job_dir / "extracted_children"
+            # Only scan if job_dir is an isolated per-job folder, never the shared tender-documents root
+            if ext_children_dir.exists() and job_dir.name != "tender-documents":
+                child_pdfs = [p for p in ext_children_dir.glob("*.pdf") if p.is_file() and p.stat().st_size > 0]
+                if child_pdfs:
+                    # Also sort to prioritize explicit atc/tendoc filenames
+                    atc_candidates = [p for p in child_pdfs if any(k in p.name.lower() for k in ATC_HIGH_PRIORITY_KEYWORDS)]
+                    if atc_candidates:
+                        atc_candidates.sort(key=lambda p: p.stat().st_size, reverse=True)
+                        atc_path = atc_candidates[0]
+                    else:
+                        child_pdfs.sort(key=lambda p: p.stat().st_size, reverse=True)
+                        atc_path = child_pdfs[0]
+                    logger.info(f"[ATC_RESOLVER] Discovered largest extracted child PDF in job directory: '{atc_path}' (size: {atc_path.stat().st_size} bytes, confidence={classify_document_weak_fallback()})")
 
     page_texts_combined = " ".join([p.get("text", "") for p in page_texts[:30]]).lower()
     is_direct_atc = classify_self_as_atc(original_filename, page_texts_combined) >= ATC_CONFIDENCE_SELF_FILENAME_MATCH
@@ -294,6 +312,16 @@ def ingest_parent_tender_pdf(
                 for p in c_dir.glob("*.pdf"):
                     if p not in valid_child_pdfs and p != pdf_path and p != atc_path and p.stat().st_size > 0:
                         valid_child_pdfs.append(p)
+
+            # Explicit uploads beyond the first ATC file (multiple ATC docs): merge
+            # their text the same way so the content actually participates in
+            # extraction instead of being accepted by the API and then silently
+            # dropped. (Explicit BOQ handling lives outside this `if atc_path:`
+            # block below, since a tender can have a BOQ with no ATC at all.)
+            for extra_atc in explicit_atc_paths[1:]:
+                extra_atc = Path(extra_atc)
+                if extra_atc.exists() and extra_atc not in valid_child_pdfs and extra_atc != pdf_path and extra_atc != atc_path:
+                    valid_child_pdfs.append(extra_atc)
 
             for c_pdf in valid_child_pdfs:
                 try:
@@ -441,6 +469,25 @@ def ingest_parent_tender_pdf(
                 logger.warning(f"[ATC_RESOLVER] ATC_PARSE_NO_FIELDS: ATC PDF '{atc_path}' parsed successfully but yielded 0 mergeable fields.")
         except Exception as atc_err:
             logger.warning(f"[ATC_RESOLVER] ATC_PARSE_FAILED: Error processing ATC PDF '{atc_path}': {atc_err}. Continuing with main tender parsing only.")
+
+    # 3a2. Explicit BOQ upload: merge its text into the extraction context so it
+    # actually participates in extraction instead of being accepted by the API
+    # and then silently dropped. Runs independently of ATC (a tender can have a
+    # BOQ with no ATC at all). There is no BOQ-specific field-precedence system
+    # yet (analogous to ATC_SOURCED_LABELS) -- this only makes the BOQ's content
+    # available to Layer 1 regex/field extraction and the Layer 2 LLM fallback,
+    # it does not add BOQ-specific line-item parsing.
+    boq_full_text = ""
+    if explicit_boq_path:
+        boq_p = Path(explicit_boq_path)
+        if boq_p.exists() and boq_p != pdf_path and boq_p != atc_path:
+            try:
+                boq_page_texts = extract_pdf_text_hybrid(str(boq_p), job_dir / "boq_pages")
+                all_pages.extend(boq_page_texts)
+                boq_full_text = "\n".join([p.get("text", "") for p in boq_page_texts])
+                logger.info(f"[BOQ] Merged explicit BOQ file text: '{boq_p}' ({len(boq_page_texts)} pages)")
+            except Exception as boq_err:
+                logger.warning(f"[BOQ] Failed to parse explicit BOQ file '{boq_p}': {boq_err}. Continuing without it.")
 
     # 3b. Normalize Financial Exemption status if Financial Criteria is NOT APPLICABLE
     from app.services.tender_mapper import is_unconditional_financial_exemption

@@ -64,6 +64,12 @@ SONNET_5_CACHE_READ_PER_M = 0.20
 # Token budget per tender (gates strictly on integer raw_processing_tokens = in + out + cache_create + cache_read)
 LLM_TOKEN_BUDGET_PER_TENDER = int(os.getenv("LLM_TOKEN_BUDGET_PER_TENDER", "20000"))
 
+# STEP 4 fix: extract_scoped_context's opening bid-summary slice and final combined
+# cap previously allowed up to 18,000 / 25,000 characters per category, driving
+# ~7,100 input tokens per Role 1 call. Capped to the 6,000-8,000 char target range.
+SCOPED_CONTEXT_BID_SUMMARY_OPENING_CHARS = 5000
+SCOPED_CONTEXT_MAX_CHARS = 7000
+
 # Path where few-shot examples accumulate across all parsed documents
 _MEMORY_DIR = Path(__file__).parent.parent / "storage" / "llm_memory"
 _MEMORY_FILE = _MEMORY_DIR / "extraction_memory.json"
@@ -215,6 +221,102 @@ UNIVERSAL_TENDER_SYSTEM_INSTRUCTION = """You are an expert procurement auditor a
    - Extract primary dealing officer / contact person name, email, phone from the document.
    - Extract physical documents submission / courier address from the document.
    - NEVER inject external names or emails. If not in the text, return null.
+
+## Indian Tender Terminology Glossary (for disambiguating document jargon):
+- NIT: Notice Inviting Tender -- the primary tender reference document, usually carries the bid/tender number.
+- IFB: Invitation For Bid -- functionally equivalent to NIT on many portals (GeM, World Bank-funded projects).
+- BDS: Bidding Data Sheet -- Section-III on most GeM/PSU tenders; overrides generic GCC/GTC clauses with tender-specific values.
+- GCC / GTC: General Conditions of Contract / General Terms and Conditions -- boilerplate clauses common across an authority's tenders; tender-specific values in BDS/SCC take precedence over these.
+- SCC: Special Conditions of Contract -- tender-specific overrides, usually Section-V; second-highest precedence after BDS.
+- BEC: Bid Evaluation Criteria -- Section-II; contains technical/financial eligibility thresholds (turnover, net worth, experience, order value).
+- EMD: Earnest Money Deposit -- bid security paid at submission; may be exempted for MSE/Startup/certain categories -- check exemption clauses carefully before marking a field missing.
+- PBG: Performance Bank Guarantee -- security deposited by the successful bidder after award, typically 3-10% of contract value.
+- ePBG: Electronic Performance Bank Guarantee -- the GeM-portal digital equivalent of a PBG, functionally identical for extraction purposes.
+- CPS: Contract Performance Security -- an alternate/older label some authorities use in place of "PBG" or "Security Deposit"; treat consistently with PBG/SD fields.
+- SD: Security Deposit -- functions like a PBG on non-GeM tenders; some authorities use SD instead of / alongside PBG.
+- LD: Liquidated Damages -- penalty for delayed delivery, expressed as a weekly/periodic percentage rate with a maximum cap.
+- PRS: Price Reduction Schedule -- the GeM-portal terminology for the LD mechanism; treat PRS and LD as the same concept unless the document distinguishes them.
+- MAF: Manufacturer's Authorization Form -- a letter from the OEM authorizing a bidder (dealer/distributor/reseller) to quote on its behalf; required only when the bidder is not itself the manufacturer.
+- MSE: Micro & Small Enterprise -- a bidder category eligible for EMD exemption and purchase preference under Public Procurement Policy.
+- MII: Make In India -- a local-content purchase-preference policy; look for minimum local-content percentage thresholds.
+- RA: Reverse Auction -- an online post-bid price-negotiation round; "RA Applicable: Yes/No" determines the commercial evaluation method.
+- L1: Lowest bidder by evaluated price -- "Overall L1" evaluates the total bid value; "Item-wise L1" evaluates each line item independently.
+- Consignee: the delivery/destination address for goods -- distinct from the buyer's communication/courier address for physical bid documents.
+
+## Additional Edge-Case Handling Rules:
+- Percentages: always extract the bare numeric percentage value (e.g. 5 for "5%"), never include the "%" symbol in a numeric-typed field.
+- Currency amounts: preserve the original magnitude and unit exactly as written (Lakhs/Crores/Rs./₹); do not silently convert units.
+- Date ranges or "Financial Year" references: extract as written; do not infer a specific calendar date unless one is explicitly stated.
+- Conflicting values across sections: prefer the more specific/later section (BDS/SCC over GCC/GTC; tender-specific clause over generic boilerplate).
+- Table-formatted clauses: read across the full row -- a label and its value may be in adjacent table cells rather than the same sentence.
+- "Not Applicable" vs "Not Mentioned": if the document explicitly states a requirement is not applicable/exempt, that is a definite answer -- do not conflate it with a field that is simply absent from the text.
+- OCR artifacts: tolerate minor spacing/hyphenation irregularities from scanned-document OCR (e.g. "E M D", "Rs .15,00,000") when the intended value is still unambiguous.
+
+## Worked Reasoning Examples Per Category (generic patterns, not tender-specific data):
+
+### Category: bid_summary (Tender No, EMD, Tender Fee, Estimated Value, Bid Validity)
+Clause: "GeM Bid No.: GEM/2025/B/1234567 DATE 01.01.2026. Bid Validity Period: 120 (One Hundred Twenty) Days. EMD Amount: Rs. 2,00,000/- (Rupees Two Lakhs Only) OR Bidder may opt for EMD Exemption if MSE registered."
+Correct reasoning: the bid number is the literal alphanumeric code following "GeM Bid No.:", not the date. Bid validity is the plain integer 120, not the parenthetical spell-out. EMD is conditional on MSE status -- if the document does not state the bidder's MSE status, record the stated default amount (₹2,00,000) rather than assuming exemption applies.
+Common mistake to avoid: capturing "One Hundred Twenty" as a string instead of the integer 120; conflating the GeM bid number with an internal tender reference number if both appear nearby.
+
+### Category: payment_terms (Supply %, Installation %)
+Clause: "Terms of Payment: 70% payment against supply and balance 30% after successful installation and commissioning at site."
+Correct reasoning: supply percentage = 70, installation percentage = 30. These two must sum close to 100 (allowing for a small retention/warranty holdback elsewhere in the clause) -- if they do not, re-read the clause rather than reporting an inconsistent pair.
+Common mistake to avoid: swapping supply and installation percentages when the clause lists installation before supply in a different sentence order; missing a third milestone (e.g. "10% on warranty completion") that changes the supply/installation split.
+
+### Category: pbg_sd (PBG/SD percentage, mode, duration)
+Clause: "Successful bidder shall submit a Performance Bank Guarantee (PBG) of 3% of the contract value, valid for 63 months (60 months warranty + 3 months claim period), in the form of a Bank Guarantee from a Nationalized/Scheduled Bank."
+Correct reasoning: PBG percentage = 3, PBG duration = 63 months (use the total stated duration, not just the warranty component), PBG mode = "Bank Guarantee". If the clause instead says "Security Deposit" with no separate PBG clause, map the same fields to the SD-equivalent display keys instead of leaving both blank.
+Common mistake to avoid: using only the "60 months warranty" figure and dropping the additional claim-period months explicitly added by the clause.
+
+### Category: prs_ld (Liquidated Damages / Price Reduction Schedule)
+Clause: "In case of delay, LD @ 0.5% of the delayed portion per week of delay or part thereof, subject to a maximum of 10% of the total contract value."
+Correct reasoning: LD/PRS weekly rate = 0.5, maximum cap = 10. Do not confuse the weekly rate with the maximum cap -- they are always two distinct numbers in the same clause.
+Common mistake to avoid: reporting only one of the two numbers when both are present in the same sentence; treating "part thereof" as a separate numeric value.
+
+### Category: bec_criteria (Turnover, Net Worth, Experience, Order Value, MAF)
+Clause: "Bidder must have average annual turnover of Rs. 50 Lakhs during last 3 financial years. Financial criteria: Net worth NOT APPLICABLE for this tender. Bidder must submit a valid Manufacturer's Authorization Form if not the OEM."
+Correct reasoning: average annual turnover = "Rs. 50 Lakhs" (3 years), net worth should be marked explicitly not-applicable (a definite answer, not a missing field), and MAF is conditionally required (true) only if the bidder is a reseller/dealer -- report MAF as required since the document states the condition explicitly, regardless of which category the actual bidder falls into.
+Common mistake to avoid: treating an explicit "NOT APPLICABLE" as if the field were simply absent from the document; missing the qualifying condition attached to a requirement (e.g. MAF required "if not OEM").
+
+### Category: delivery_timeline (Supply days, Installation days)
+Clause: "Delivery Period: Goods shall be supplied within 60 days and installed and commissioned within 90 days from the date of Purchase Order, whichever is applicable."
+Correct reasoning: delivery/supply time = 60 days, installation time = 90 days. Note that installation timelines are frequently stated as cumulative from PO date (90 days total), not as an additional 90 days after the 60-day supply window -- extract the number exactly as written without doing arithmetic to convert between cumulative and incremental framing.
+Common mistake to avoid: adding 60+90=150 days when the document intends 90 as the total cumulative figure, not an additional period.
+
+### Category: contacts_bds (Client contacts, courier/submission address)
+Clause: "For any technical clarification, contact: Shri A. Kumar, Dy. General Manager (C&P), Email: a.kumar@gail.co.in, Phone: 011-12345678. Physical bid documents shall be submitted to: The Manager (Contracts), GAIL Bhawan, 16 Bhikaiji Cama Place, New Delhi - 110066."
+Correct reasoning: extract the named officer, designation, email, and phone as a single contact record; extract the courier address as a full postal address string including PIN code. Do not merge the officer's contact details with the courier submission address -- they frequently refer to different people/departments.
+Common mistake to avoid: dropping the PIN code from the courier address; extracting only the department name ("The Manager (Contracts)") without the full address block that follows.
+
+### Category: commercial_ra (Commercial Evaluation Method, Reverse Auction)
+Clause: "Evaluation shall be done on Overall L-1 basis considering total quoted value across all items. Reverse Auction (RA) shall be conducted post technical evaluation, subject to a minimum of 3 technically qualified bidders."
+Correct reasoning: commercial evaluation = "Overall L1 / Total value wise", reverse auction applicable = true. The minimum-bidder condition for RA does not change the "applicable" answer -- it is a procedural precondition, not a reason to mark the field null or false.
+Common mistake to avoid: marking Reverse Auction as false simply because it is conditional on a minimum bidder count; confusing "Overall L-1" with "Item-wise L-1" when the clause explicitly says "across all items".
+
+## Authority-Specific Drafting Patterns (helps disambiguate which clause governs a field):
+- GAIL (India) tenders: typically structured as NIT + GCC (General Conditions of Contract, GAIL's standard boilerplate, largely invariant across GAIL tenders) + Special Conditions of Contract (SCC, tender-specific) + BOQ/Price Schedule. GAIL's PBG/SD, LD/PRS, and Payment Terms clauses are near-universally overridden at the SCC level even when the GCC states a different default -- always prefer the SCC value when both are present. GAIL frequently numbers clauses (e.g. "Clause 39: CONTRACT PERFORMANCE SECURITY / SECURITY DEPOSIT") -- the clause NUMBER is not itself a percentage or duration value, do not extract it as one.
+- DMRC / Metro Rail Corporation tenders: often follow a similar GCC/SCC split but additionally include a "General Conditions of Contract for Works" and a distinct "Special Conditions" per package; PBG is frequently termed "Performance Guarantee" without the word "Bank", still map to the same PBG fields.
+- GeM (Government e-Marketplace) portal tenders: carry a machine-generated "Bidding Data Sheet" (BDS) with a fixed tabular layout -- most core bid_summary and pbg_sd fields appear here as label:value table rows rather than prose sentences; prefer BDS-table values over prose restatements elsewhere in the document when both exist and appear consistent.
+- Indian Railways tenders: frequently use "EMD" interchangeably with "Bid Security" and PBG as "Security Deposit" or "Performance Security" -- treat these as the same underlying fields per the terminology glossary above; Railways tenders also commonly reference the "General Conditions of Contract for Railways" as a separate, older boilerplate document distinct from the tender's own SCC.
+- CPWD / State Government (PWD-pattern) tenders: often nest financial eligibility (turnover/net worth/experience) inside a single consolidated "Eligibility Criteria" clause rather than a distinct BEC section -- when no explicit Section-II/BEC heading exists, search the eligibility clause directly for these fields instead of returning them as missing.
+
+## Response Discipline:
+- Only report a value for fields explicitly listed in the "Fields to extract" section of the user's request for this category batch -- do not attempt to answer fields belonging to a different category, even if you happen to notice their values in the provided scoped text.
+- When two candidate values conflict within the SAME scoped text and neither is clearly the tender-specific override, prefer the one located in a more specific/later section per the precedence rules above, and do not average, sum, or otherwise combine the two into a new value.
+- A partially-stated clause (e.g. a table row that continues onto a page not included in this scoped excerpt) should be treated as insufficient evidence -- return null rather than extrapolating the missing portion.
+
+## Bilingual and Mixed-Script Documents:
+Many Indian government tenders are bilingual, presenting the same clause in both Hindi (Devanagari script) and English, either side-by-side in parallel columns or as consecutive paragraphs. Apply these rules:
+- Prefer the English-language rendering of a clause as the primary source of truth when both are present verbatim; the Hindi text is provided for statutory/administrative completeness and should match the English in substance.
+- Numerals in Hindi text (e.g. "५०,०००") should be read as their Arabic-numeral equivalents (50,000) when the English parallel text is unavailable or unclear for a given field.
+- Do not treat the presence of a Hindi paragraph as a second, independent occurrence of a clause requiring separate extraction -- it is a translation of the same single fact, not additional evidence, and should not be used to "confirm via repetition" a value that is otherwise ambiguous in English.
+- Department and authority names are sometimes given only in Hindi in a document header/letterhead (e.g. "गैस प्राधिकरण" for GAIL-affiliated entities) -- if the English organizational name appears anywhere else in the document (letterhead, footer, NIT number prefix), prefer that as the canonical authority name.
+
+## Scanned-Document OCR Caveats (in addition to the earlier OCR artifact note):
+- Currency symbols may render as "?" or a stray glyph due to font-encoding issues in scanned PDFs (e.g. "?15,00,000" meaning "₹15,00,000") -- treat a lone unexpected symbol immediately preceding a numeral group as a likely currency-symbol OCR artifact, not a literal character to preserve.
+- Table borders and multi-column layouts scanned via OCR sometimes interleave unrelated columns into a single line of extracted text -- if a clause reads as internally inconsistent or grammatically broken in a way explainable by two columns being merged, treat it as lower-confidence evidence and prefer a cleaner restatement of the same fact elsewhere in the document when one exists.
+- Page headers/footers (page numbers, "Tender No. XYZ - Page N of M", watermark text) recur on every page and are never themselves field values -- do not extract a repeating boilerplate fragment as if it were a distinct data point.
 
 {few_shot_section}"""
 
@@ -571,8 +673,13 @@ def extract_scoped_context(full_text: str, target: str) -> str:
     is_commercial = "commercial" in t_lower or "reverse_auction" in t_lower or "ra" in t_lower or "evaluation" in t_lower
 
     if is_bid_summary:
-        # 1. Opening 18,000 characters contains GeM Bid Details, NIT, Estimated Value, EMD, Validity
-        snippets.append("=== Tender Document Opening & Bid Summary (Pages 1-5) ===\n" + full_text[:18000].strip())
+        # 1. Opening slice contains GeM Bid Details, NIT, Estimated Value, EMD, Validity.
+        # Capped well below SCOPED_CONTEXT_MAX_CHARS so the EMD/Fee/Value clause
+        # matches below still have room in the final combined budget.
+        snippets.append(
+            "=== Tender Document Opening & Bid Summary (Pages 1-5) ===\n"
+            + full_text[:SCOPED_CONTEXT_BID_SUMMARY_OPENING_CHARS].strip()
+        )
         section_names.append("Document Opening / Bid Details (pos 0)")
 
         # 2. Search for any NIT, IFB, EMD, Fee, or Value clauses in the remainder of text
@@ -580,7 +687,7 @@ def extract_scoped_context(full_text: str, target: str) -> str:
             r"(?:NOTICE\s+INVITING\s+TENDER|INVITATION\s+FOR\s+BIDS|\bNIT\b|\bIFB\b|EMD\s+DETAIL|EARNEST\s+MONEY|TENDER\s+FEE|PROCESSING\s+FEE|ESTIMATED\s+(?:BID\s+)?VALUE|BID\s+SECURITY)[\s\S]{0,2500}",
             full_text, re.IGNORECASE
         ):
-            if m.start() > 18000:
+            if m.start() > SCOPED_CONTEXT_BID_SUMMARY_OPENING_CHARS:
                 snippets.append(f"=== EMD / Fee / Value Clause (pos {m.start()}) ===\n" + m.group(0).strip())
                 section_names.append(f"EMD/Fee Clause (pos {m.start()})")
 
@@ -694,15 +801,15 @@ def extract_scoped_context(full_text: str, target: str) -> str:
             section_names.append(f"Commercial Block (pos {m.start()})")
 
     if not snippets:
-        fallback_text = full_text[:20000]
+        fallback_text = full_text[:SCOPED_CONTEXT_MAX_CHARS]
         logger.warning(
-            "[SCOPED_CONTEXT] Target '%s': NO specific section matched! Falling back to first 20000 characters (%d chars).",
-            target, len(fallback_text)
+            "[SCOPED_CONTEXT] Target '%s': NO specific section matched! Falling back to first %d characters (%d chars).",
+            target, SCOPED_CONTEXT_MAX_CHARS, len(fallback_text)
         )
         return fallback_text
 
     combined = "\n\n".join(snippets[:10])
-    final_scoped = combined[:25000]
+    final_scoped = combined[:SCOPED_CONTEXT_MAX_CHARS]
 
     logger.info(
         "[SCOPED_CONTEXT] Target '%s': Selected %d sections (%s) -> Total %d characters sent (full doc: %d chars, %.1f%% of full doc)",
@@ -852,6 +959,67 @@ def _build_missing_fields_tool_schema(missing_fields: List[str]) -> Dict[str, An
             "required": required,
         }
     }
+
+
+_STATIC_FULL_MISSING_FIELDS_TOOL_SCHEMA: Optional[Dict[str, Any]] = None
+
+
+def _build_static_full_missing_fields_tool_schema() -> Dict[str, Any]:
+    """
+    STEP 4 caching fix: Anthropic's prompt cache is prefix-based -- tool
+    definitions are part of that prefix ahead of the system block, so any
+    per-call variation in the tool schema breaks the system block's cache
+    reuse too, even though the system text itself is byte-identical across
+    calls (verified empirically: a differing tool schema causes
+    cache_creation instead of cache_read on every subsequent call,
+    regardless of whether the tool itself carries its own cache_control).
+
+    Role 1 previously built a category-scoped tool schema per batch call
+    (_build_missing_fields_tool_schema(cat_fields)), which varies every
+    call and defeated caching entirely. This builds ONE static schema
+    covering every field in FIELD_PROMPT_MAP (all optional, no `required`
+    list) exactly once, reused byte-for-byte across every category batch
+    call in a tender run so the cached system+tools prefix can actually be
+    reused from the 2nd call onward.
+
+    Fields outside the current category batch are still excluded from the
+    result: resolve_missing_fields() already filters
+    `extracted_dict.items()` down to `display_key in cat_fields` before
+    using anything, and the per-call user prompt still explicitly names
+    only the current category's fields to extract -- this schema change
+    only affects which properties CAN appear in the tool call shape, not
+    which ones the caller actually uses.
+    """
+    global _STATIC_FULL_MISSING_FIELDS_TOOL_SCHEMA
+    if _STATIC_FULL_MISSING_FIELDS_TOOL_SCHEMA is not None:
+        return _STATIC_FULL_MISSING_FIELDS_TOOL_SCHEMA
+
+    properties = {}
+    for display_key, entry in FIELD_PROMPT_MAP.items():
+        prompt_field, json_type, desc, _ = entry
+        if json_type == "integer":
+            properties[prompt_field] = {"type": ["integer", "null"], "description": desc}
+        elif json_type == "number":
+            properties[prompt_field] = {"type": ["number", "null"], "description": desc}
+        elif json_type == "boolean":
+            properties[prompt_field] = {"type": ["boolean", "null"], "description": desc}
+        else:
+            properties[prompt_field] = {"type": ["string", "null"], "description": desc}
+
+    _STATIC_FULL_MISSING_FIELDS_TOOL_SCHEMA = {
+        "name": "extract_missing_fields",
+        "description": (
+            "Records extracted tender field values. Only populate the fields explicitly "
+            "named in the current request's 'Fields to extract' list -- leave every other "
+            "property absent/null."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": properties,
+            "required": [],
+        },
+    }
+    return _STATIC_FULL_MISSING_FIELDS_TOOL_SCHEMA
 
 
 def _build_ambiguity_tool_schema() -> Dict[str, Any]:
@@ -1103,7 +1271,35 @@ class LLMFieldResolver:
         prompt_to_display = {entry[0]: disp_key for disp_key, entry in FIELD_PROMPT_MAP.items()}
         results: Dict[str, Any] = {}
 
-        for cat, cat_fields in category_batches.items():
+        # Sort category batches by business criticality so highest-impact fields are resolved first
+        category_order = [
+            "pbg_sd",
+            "payment_terms",
+            "prs_ld",
+            "bec_criteria",
+            "delivery_timeline",
+            "bid_summary",
+            "contacts_bds",
+            "commercial_ra",
+        ]
+        sorted_categories = sorted(
+            category_batches.keys(),
+            key=lambda c: category_order.index(c) if c in category_order else 99
+        )
+
+        for cat in sorted_categories:
+            cat_fields = category_batches[cat]
+            if self.total_raw_processing_tokens >= LLM_TOKEN_BUDGET_PER_TENDER:
+                logger.warning(
+                    "[LLM_FALLBACK][Role 1] Token budget reached (%d / %d raw tokens). Skipping category '%s' (%d fields: %s)",
+                    self.total_raw_processing_tokens,
+                    LLM_TOKEN_BUDGET_PER_TENDER,
+                    cat,
+                    len(cat_fields),
+                    cat_fields
+                )
+                break
+
             scoped_text = extract_scoped_context(atc_full_text, cat)
             logger.info(
                 "[SCOPED_CONTEXT][Role 1] Category '%s' (%d fields: %s): Scoped %d chars from %d full doc chars",
@@ -1121,8 +1317,12 @@ class LLMFieldResolver:
                 }
             ]
 
-            tool_spec = _build_missing_fields_tool_schema(cat_fields)
-            tool_spec["cache_control"] = {"type": "ephemeral"}
+            # STEP 4: use the static, category-invariant tool schema so the
+            # cached system+tools prefix is actually reusable across the
+            # sequential per-category calls in this loop (see docstring on
+            # _build_static_full_missing_fields_tool_schema for why a
+            # per-category schema silently defeated caching before).
+            tool_spec = _build_static_full_missing_fields_tool_schema()
 
             field_descriptions = "\n".join(
                 f"- `{entry[0]}`: {entry[2]}"

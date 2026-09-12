@@ -188,6 +188,8 @@ def _format_field_object(
 @router.post("/extract")
 async def extract_tender(
     pdf_file: UploadFile = File(...),
+    atc_files: List[UploadFile] = File(default=[]),
+    boq_file: Optional[UploadFile] = File(None),
     user_id: Optional[int] = Form(None),
 ) -> Dict[str, Any]:
     """
@@ -198,11 +200,17 @@ async def extract_tender(
     1. Hybrid OCR / native text extraction
     2. Document classification
     3. Spatial & regex field extraction
-    4. ATC child link discovery & download
+    4. ATC child link discovery & download (or explicit atc_files, when provided)
     5. Layer 2 LLM fallback resolution (with socket and defensive timeouts)
     6. Normalization, field precedence, and 4-tier status evaluation
     7. Pure TMS DTO transformation via map_to_tms_dto()
     8. Merging value, confidence, and source metadata under canonical TMS keys
+
+    atc_files / boq_file: explicitly user-tagged ATC/BOQ uploads (see
+    document_classifier.py). Previously accepted as multipart fields by the
+    caller but never declared here, so FastAPI silently dropped them and
+    ingest_parent_tender_pdf() ran on the main PDF alone -- see BUG FIX note
+    below. These now take priority over heuristic ATC discovery.
 
     Cleans up all temporary files (uploaded PDF, page PNGs, child PDFs) upon completion.
     """
@@ -215,7 +223,11 @@ async def extract_tender(
 
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     start_time = time.time()
-    logger.info(f"[EXTRACT_API] Starting extraction request for '{filename}' (job_id: {job_id}, user_id: {user_id})")
+    logger.info(
+        f"[EXTRACT_API] Starting extraction request for '{filename}' "
+        f"(job_id: {job_id}, user_id: {user_id}, atc_files: {len(atc_files or [])}, "
+        f"boq_file: {bool(boq_file and boq_file.filename)})"
+    )
 
     # Use TemporaryDirectory as context manager so all generated files
     # (temp PDF, page PNGs in pages/{job_id}, and downloaded child PDFs)
@@ -231,12 +243,37 @@ async def extract_tender(
 
             logger.info(f"[EXTRACT_API] Uploaded PDF saved to '{temp_pdf_path}' ({len(contents)} bytes)")
 
+            # BUG FIX: atc_files/boq_file were previously accepted by the NestJS
+            # caller's multipart payload but never declared as parameters here,
+            # so FastAPI dropped them silently and the pipeline ran without ATC
+            # content on every extraction. Save them to disk and forward their
+            # paths into ingest_parent_tender_pdf() so they actually participate.
+            atc_paths: List[Path] = []
+            for idx, atc_upload in enumerate(atc_files or []):
+                if not atc_upload or not atc_upload.filename:
+                    continue
+                atc_dest = temp_dir_path / f"atc_{idx}_{atc_upload.filename}"
+                atc_contents = await atc_upload.read()
+                atc_dest.write_bytes(atc_contents)
+                atc_paths.append(atc_dest)
+                logger.info(f"[EXTRACT_API] ATC file saved to '{atc_dest}' ({len(atc_contents)} bytes)")
+
+            boq_path: Optional[Path] = None
+            if boq_file and boq_file.filename:
+                boq_dest = temp_dir_path / f"boq_{boq_file.filename}"
+                boq_contents = await boq_file.read()
+                boq_dest.write_bytes(boq_contents)
+                boq_path = boq_dest
+                logger.info(f"[EXTRACT_API] BOQ file saved to '{boq_dest}' ({len(boq_contents)} bytes)")
+
             # Run orchestrator in threadpool to prevent blocking the async event loop
             infosheet_data: Dict[str, Any] = await asyncio.to_thread(
                 ingest_parent_tender_pdf,
                 job_id=job_id,
                 pdf_path=temp_pdf_path,
-                original_filename=filename
+                original_filename=filename,
+                explicit_atc_paths=atc_paths,
+                explicit_boq_path=boq_path,
             )
 
             field_statuses: Dict[str, str] = infosheet_data.get("_info_sheet_statuses", {})
