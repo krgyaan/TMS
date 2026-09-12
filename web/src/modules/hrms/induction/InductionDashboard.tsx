@@ -21,16 +21,10 @@ import {
   ClipboardList,
   Activity,
   AlertTriangle,
-  MoreVertical,
   Briefcase,
   Calendar,
+  Hash,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { formatDate as formatDateString } from "@/hooks/useFormatedDate";
 import {
@@ -98,24 +92,39 @@ const StyleInjector: React.FC = () => (
 );
 
 // ─── Skeleton ──────────────────────────────────────────────────────────────────
-const EmployeeRowSkeleton: React.FC = () => (
-  <div className="flex items-center gap-4 px-4 py-4 rounded-2xl border border-border/50 bg-card/50">
-    <Skeleton className="h-10 w-10 rounded-xl flex-shrink-0" />
-    <div className="flex-1 min-w-0 space-y-2">
-      <Skeleton className="h-3.5 w-36" />
-      <Skeleton className="h-3 w-20" />
+const EmployeeCardSkeleton: React.FC = () => (
+  <div className="rounded-2xl border border-border/50 bg-card/80 p-5">
+    <div className="flex items-start gap-4">
+      <Skeleton className="h-12 w-12 rounded-xl flex-shrink-0" />
+      <div className="flex-1 min-w-0 space-y-2">
+        <Skeleton className="h-3.5 w-36" />
+        <Skeleton className="h-3 w-24" />
+      </div>
+      <Skeleton className="h-5 w-20 rounded-full" />
     </div>
-    {/* work details bar skeleton */}
-    <div className="hidden sm:flex flex-col gap-1.5 w-32">
-      <Skeleton className="h-2.5 w-16" />
-      <Skeleton className="h-1.5 w-full rounded-full" />
+    <div className="mt-4 grid grid-cols-2 gap-2">
+      <Skeleton className="h-3 w-full" />
+      <Skeleton className="h-3 w-full" />
+      <Skeleton className="h-3 w-2/3" />
+      <Skeleton className="h-3 w-1/2" />
     </div>
-    {/* progress skeleton */}
-    <Skeleton className="hidden sm:block h-10 w-10 rounded-full flex-shrink-0" />
-    {/* joining skeleton */}
-    <Skeleton className="hidden lg:block h-3 w-20" />
-    {/* action skeleton */}
-    <Skeleton className="h-8 w-8 rounded-xl flex-shrink-0" />
+    <div className="mt-5 pt-4 border-t grid grid-cols-2 gap-4 items-center">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
+        <div className="space-y-1.5 flex-1">
+          <Skeleton className="h-3 w-12" />
+          <Skeleton className="h-2.5 w-16" />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Skeleton className="h-2.5 w-full" />
+        <Skeleton className="h-1.5 w-full rounded-full" />
+      </div>
+    </div>
+    <div className="mt-4 pt-3 border-t flex items-center justify-between">
+      <Skeleton className="h-8 w-24 rounded-lg" />
+      <Skeleton className="h-8 w-28 rounded-lg" />
+    </div>
   </div>
 );
 
@@ -150,18 +159,23 @@ const ErrorState: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
     <p className="text-xs text-muted-foreground mt-1.5 mb-5">
       There was an error fetching data from the server.
     </p>
-    <Button variant="outline" size="sm" onClick={onRetry} className="rounded-xl">
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={onRetry}
+      className="rounded-xl"
+    >
       Try Again
     </Button>
   </div>
 );
 
 // ─── Work Details Mini Bar ─────────────────────────────────────────────────────
-const WorkDetailsBar: React.FC<{ pct: number; filled: number; total: number }> = ({
-  pct,
-  filled,
-  total,
-}) => (
+const WorkDetailsBar: React.FC<{
+  pct: number;
+  filled: number;
+  total: number;
+}> = ({ pct, filled, total }) => (
   <div className="flex flex-col gap-1 min-w-0">
     <div className="flex items-center justify-between gap-2">
       <div className="flex items-center gap-1">
@@ -190,64 +204,56 @@ const WorkDetailsBar: React.FC<{ pct: number; filled: number; total: number }> =
   </div>
 );
 
-// ─── Employee Row ──────────────────────────────────────────────────────────────
-const EmployeeRow: React.FC<{
+// ─── Employee Card ─────────────────────────────────────────────────────────────
+const EmployeeCard: React.FC<{
   employee: EmployeeInduction;
   onView: (e: EmployeeInduction) => void;
   onWorkDetails: (e: EmployeeInduction) => void;
   index: number;
   isVisible: boolean;
 }> = ({ employee, onView, onWorkDetails, index, isVisible }) => {
-  const displayTasks = employee.tasks.length > 0 ? employee.tasks : DEFAULT_TASKS;
+  const displayTasks =
+    employee.tasks.length > 0 ? employee.tasks : DEFAULT_TASKS;
   const stats = computeInductionStats(displayTasks);
   const status = getInductionStatus(employee);
   const wd = getWorkDetailsProgress(employee);
 
-  const actionMenu = (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0"
-          aria-label="Actions"
-        >
-          <MoreVertical className="h-4 w-4" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
-        <DropdownMenuItem
-          onClick={() => onView(employee)}
-          className="gap-2 text-xs cursor-pointer"
-        >
-          <ClipboardList className="h-3.5 w-3.5" />
-          Induction
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => onWorkDetails(employee)}
-          className="gap-2 text-xs cursor-pointer"
-        >
-          <Briefcase className="h-3.5 w-3.5" />
-          Work Details
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+  const statusMeta =
+    status === "completed"
+      ? {
+          label: "Completed",
+          badge:
+            "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+          dot: "bg-emerald-500",
+        }
+      : status === "in_progress"
+      ? {
+          label: "In Progress",
+          badge: "bg-primary/10 text-primary border-primary/20",
+          dot: "bg-primary",
+        }
+      : {
+          label: "Not Started",
+          badge: "bg-muted text-muted-foreground border-border/50",
+          dot: "bg-muted-foreground/30",
+        };
 
   return (
     <div
       className={cn(
-        "group relative rounded-2xl border border-border/40 bg-card/80 transition-all duration-300",
-        "hover:bg-muted/40 hover:border-border/80 hover:shadow-md hover:shadow-black/[0.03] dark:hover:shadow-white/[0.02]",
+        "group relative rounded-2xl border bg-card transition-all duration-200",
+        "hover:shadow-lg hover:shadow-black/[0.03] hover:-translate-y-0.5 hover:border-border",
+        "cursor-pointer",
         isVisible ? "ind-fade-up" : "opacity-0"
       )}
       style={{ animationDelay: `${index * 40}ms` }}
+      onClick={() => onView(employee)}
     >
-      {/* ────────────── MOBILE layout (< sm) ────────────── */}
-      <div className="flex sm:hidden flex-col gap-3 px-3 py-3.5">
-        {/* Top row: avatar + name/id + task count + action */}
-        <div className="flex items-center gap-3">
-          {/* Avatar */}
+      <div className="p-5">
+        {/* ── Top row: avatar · name/email · status badge ── */}
+        <div className="flex items-start gap-4">
           <div className="relative flex-shrink-0">
-            <Avatar className="h-10 w-10 rounded-xl ring-2 ring-background shadow-sm">
+            <Avatar className="h-12 w-12 rounded-xl ring-1 ring-border/50">
               {employee.profilePhoto && (
                 <AvatarImage
                   src={employee.profilePhoto}
@@ -257,7 +263,7 @@ const EmployeeRow: React.FC<{
               )}
               <AvatarFallback
                 className={cn(
-                  "rounded-xl text-xs font-bold",
+                  "rounded-xl text-sm font-bold",
                   getAvatarColor(`${employee.firstName} ${employee.lastName}`)
                 )}
               >
@@ -266,139 +272,118 @@ const EmployeeRow: React.FC<{
             </Avatar>
             <div
               className={cn(
-                "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background",
-                status === "completed"
-                  ? "bg-emerald-500"
-                  : status === "in_progress"
-                  ? "bg-primary"
-                  : "bg-muted-foreground/30"
+                "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-background",
+                statusMeta.dot
               )}
             />
           </div>
 
-          {/* Name + ID */}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold leading-none tracking-tight truncate">
-              {employee.firstName}{" "}
-              {employee.middleName ? `${employee.middleName} ` : ""}
-              {employee.lastName}
-            </p>
-            <span className="text-[10px] font-mono text-muted-foreground mt-1 inline-block bg-muted/60 px-1.5 py-0.5 rounded-md border border-border/40">
-              {employee.employeeId}
-            </span>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold leading-tight truncate">
+                  {employee.firstName}{" "}
+                  {employee.middleName ? `${employee.middleName} ` : ""}
+                  {employee.lastName}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                  {employee.email}
+                </p>
+              </div>
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold flex-shrink-0",
+                  statusMeta.badge
+                )}
+              >
+                {statusMeta.label}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Details grid ── */}
+        {/*
+          Row 1: Designation (left)  |  Department (right)
+          Row 2: Emp ID (left)       |  Joining date (right)
+          Each cell is its own flex row so icon + text are always on one line.
+        */}
+        <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5">
+          {/* Designation */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+            <Briefcase className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="truncate">{employee.designation || "—"}</span>
           </div>
 
-          {/* Task count ring */}
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <CircularProgress value={stats.pct} size={34} strokeWidth={2.5} />
-            <div className="text-right">
+          {/* Department */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+            <Users className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="truncate">{employee.department || "—"}</span>
+          </div>
+
+          {/* Employee ID */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+            <Hash className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="font-mono truncate">{employee.employeeId}</span>
+          </div>
+
+          {/* Joining date */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+            <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+            <span className="tabular-nums truncate">
+              {employee.dateOfJoining
+                ? formatDateString(employee.dateOfJoining)
+                : "—"}
+            </span>
+          </div>
+        </div>
+
+        {/* ── Progress section ── */}
+        <div className="mt-5 pt-4 border-t grid grid-cols-2 gap-4 items-center">
+          {/* Induction ring + count */}
+          <div className="flex items-center gap-3">
+            <CircularProgress value={stats.pct} size={42} strokeWidth={3} />
+            <div>
               <p className="text-xs font-semibold tabular-nums leading-none">
                 {stats.completed}/{stats.total}
               </p>
-              <p className="text-[9px] text-muted-foreground">tasks</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                induction tasks
+              </p>
             </div>
           </div>
 
-          {/* Action */}
-          <div onClick={(e) => e.stopPropagation()}>{actionMenu}</div>
-        </div>
-
-        {/* Bottom row: work details bar + joining date */}
-        <div className="flex items-end gap-3 pl-1">
-          <div className="flex-1">
-            <WorkDetailsBar pct={wd.pct} filled={wd.filled} total={wd.total} />
-          </div>
-          {employee.dateOfJoining && (
-            <div className="flex items-center gap-1 flex-shrink-0 pb-0.5">
-              <Calendar className="h-3 w-3 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground tabular-nums">
-                {formatDateString(employee.dateOfJoining)}
-              </span>
-            </div>
-          )}
+          {/* Work details bar */}
+          <WorkDetailsBar pct={wd.pct} filled={wd.filled} total={wd.total} />
         </div>
       </div>
 
-      {/* ────────────── DESKTOP layout (≥ sm) ────────────── */}
-      <div className="hidden sm:flex items-center gap-5 px-5 py-4">
-        {/* Avatar + Name — wide employee column */}
-        <div className="flex items-center gap-3.5 flex-1 min-w-0 lg:min-w-[360px] lg:max-w-[400px]">
-          <div className="relative flex-shrink-0">
-            <Avatar className="h-10 w-10 rounded-xl ring-2 ring-background shadow-sm">
-              {employee.profilePhoto && (
-                <AvatarImage
-                  src={employee.profilePhoto}
-                  alt={`${employee.firstName} ${employee.lastName}`}
-                  className="object-cover"
-                />
-              )}
-              <AvatarFallback
-                className={cn(
-                  "rounded-xl text-xs font-bold",
-                  getAvatarColor(`${employee.firstName} ${employee.lastName}`)
-                )}
-              >
-                {getInitials(employee.firstName, employee.lastName)}
-              </AvatarFallback>
-            </Avatar>
-            <div
-              className={cn(
-                "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-background transition-colors",
-                status === "completed"
-                  ? "bg-emerald-500"
-                  : status === "in_progress"
-                  ? "bg-primary"
-                  : "bg-muted-foreground/30"
-              )}
-            />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm font-semibold leading-none tracking-tight truncate">
-                {employee.firstName}{" "}
-                {employee.middleName ? `${employee.middleName} ` : ""}
-                {employee.lastName}
-              </p>
-              <span className="text-[10px] font-mono bg-muted/70 text-muted-foreground px-1.5 py-0.5 rounded-md border border-border/40 flex-shrink-0">
-                {employee.employeeId}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Work Details bar column */}
-        <div className="flex-shrink-0 w-36">
-          <WorkDetailsBar pct={wd.pct} filled={wd.filled} total={wd.total} />
-        </div>
-
-        {/* Progress ring + task count */}
-        <div className="flex items-center gap-3 flex-shrink-0 w-28 ml-6">
-          <CircularProgress value={stats.pct} size={42} strokeWidth={3} />
-          <div>
-            <p className="text-xs font-semibold tabular-nums leading-none">
-              {stats.completed}/{stats.total}
-            </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">tasks</p>
-          </div>
-        </div>
-
-        {/* Joining date */}
-        <div className="hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground flex-shrink-0 w-28">
-          <Calendar className="h-3 w-3 flex-shrink-0" />
-          <span className="tabular-nums">
-            {employee.dateOfJoining
-              ? formatDateString(employee.dateOfJoining)
-              : "—"}
-          </span>
-        </div>
-
-        {/* Actions */}
-        <div
-          className="flex items-center justify-center flex-shrink-0 w-10"
-          onClick={(e) => e.stopPropagation()}
+      {/* ── Action footer ── */}
+      <div className="flex items-center justify-between border-t bg-muted/20 px-5 py-3 rounded-b-2xl">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+          onClick={(e) => {
+            e.stopPropagation();
+            onView(employee);
+          }}
         >
-          {actionMenu}
-        </div>
+          <ClipboardList className="h-3.5 w-3.5" />
+          Induction
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+          onClick={(e) => {
+            e.stopPropagation();
+            onWorkDetails(employee);
+          }}
+        >
+          <Briefcase className="h-3.5 w-3.5" />
+          Work Details
+        </Button>
       </div>
     </div>
   );
@@ -408,12 +393,16 @@ const EmployeeRow: React.FC<{
 const InductionDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<EmployeeInductionTab>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewEmployee, setViewEmployee] = useState<EmployeeInduction | null>(null);
+  const [viewEmployee, setViewEmployee] =
+    useState<EmployeeInduction | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
-  const [workDetailsEmployee, setWorkDetailsEmployee] = useState<EmployeeInduction | null>(null);
+  const [workDetailsEmployee, setWorkDetailsEmployee] =
+    useState<EmployeeInduction | null>(null);
   const [workDetailsOpen, setWorkDetailsOpen] = useState(false);
   const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
-  const [remarkSavingTaskId, setRemarkSavingTaskId] = useState<string | null>(null);
+  const [remarkSavingTaskId, setRemarkSavingTaskId] = useState<string | null>(
+    null
+  );
 
   // ── API ───────────────────────────────────────────────────────────────────
   const {
@@ -444,9 +433,15 @@ const InductionDashboard: React.FC = () => {
   const tabCounts = useMemo(
     () => ({
       all: employees.length,
-      not_started: employees.filter((e) => getInductionStatus(e) === "not_started").length,
-      in_progress: employees.filter((e) => getInductionStatus(e) === "in_progress").length,
-      completed: employees.filter((e) => getInductionStatus(e) === "completed").length,
+      not_started: employees.filter(
+        (e) => getInductionStatus(e) === "not_started"
+      ).length,
+      in_progress: employees.filter(
+        (e) => getInductionStatus(e) === "in_progress"
+      ).length,
+      completed: employees.filter(
+        (e) => getInductionStatus(e) === "completed"
+      ).length,
     }),
     [employees]
   );
@@ -454,7 +449,8 @@ const InductionDashboard: React.FC = () => {
   // ── Filtered + sorted list ─────────────────────────────────────────────────
   const filtered = useMemo(() => {
     const list = employees.filter((e) => {
-      const matchTab = activeTab === "all" || getInductionStatus(e) === activeTab;
+      const matchTab =
+        activeTab === "all" || getInductionStatus(e) === activeTab;
       const q = searchQuery.toLowerCase();
       const matchSearch =
         !q ||
@@ -466,7 +462,8 @@ const InductionDashboard: React.FC = () => {
       return matchTab && matchSearch;
     });
     return [...list].sort(
-      (a, b) => new Date(b.approvedAt).getTime() - new Date(a.approvedAt).getTime()
+      (a, b) =>
+        new Date(b.approvedAt).getTime() - new Date(a.approvedAt).getTime()
     );
   }, [employees, activeTab, searchQuery]);
 
@@ -476,7 +473,8 @@ const InductionDashboard: React.FC = () => {
   const handleToggleTask = useCallback(
     (task: InductionTask) => {
       if (!viewEmployee) return;
-      const newStatus = task.status === "completed" ? "pending" : "completed";
+      const newStatus =
+        task.status === "completed" ? "pending" : "completed";
       setTogglingTaskId(task.id);
       updateTask(
         { taskId: Number(task.id), updates: { status: newStatus } },
@@ -498,7 +496,11 @@ const InductionDashboard: React.FC = () => {
     [viewEmployee, updateTask]
   );
 
-  const tabs: { value: EmployeeInductionTab; label: string; icon: React.ElementType }[] = [
+  const tabs: {
+    value: EmployeeInductionTab;
+    label: string;
+    icon: React.ElementType;
+  }[] = [
     { value: "all", label: "All", icon: Users },
     { value: "not_started", label: "Not Started", icon: CircleDashed },
     { value: "in_progress", label: "In Progress", icon: Activity },
@@ -527,16 +529,15 @@ const InductionDashboard: React.FC = () => {
         <CardContent className="flex-1 min-h-0 flex flex-col gap-5 px-3 sm:px-6">
           {/* ── Toolbar ── */}
           <div className="flex flex-col gap-2.5">
-            {/* Mobile: tabs row on top, search below */}
-            {/* Desktop: tabs + search on same single row */}
-
-            {/* Row that holds tabs (and search beside them on desktop) */}
+            {/* Row: tabs (+ search beside them on desktop) */}
             <div className="flex items-center gap-3">
-              {/* Tabs — scrollable */}
+              {/* Tabs — horizontally scrollable */}
               <div className="flex-1 min-w-0 overflow-x-auto">
                 <Tabs
                   value={activeTab}
-                  onValueChange={(v) => setActiveTab(v as EmployeeInductionTab)}
+                  onValueChange={(v) =>
+                    setActiveTab(v as EmployeeInductionTab)
+                  }
                 >
                   <TabsList className="h-9 p-1 rounded-xl bg-muted/50 w-max">
                     {tabs.map((tab) => (
@@ -565,7 +566,7 @@ const InductionDashboard: React.FC = () => {
                 </Tabs>
               </div>
 
-              {/* Search — always visible on desktop (sm+), hidden on mobile */}
+              {/* Search — desktop only (beside tabs) */}
               <div className="relative hidden sm:block flex-shrink-0 w-56">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
@@ -577,7 +578,7 @@ const InductionDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Mobile-only: search on its own row below tabs */}
+            {/* Search — mobile only (below tabs) */}
             <div className="relative sm:hidden">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
@@ -589,21 +590,12 @@ const InductionDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* ── Column Headers (desktop only) ── */}
-          <div className="hidden sm:flex items-center gap-5 px-5 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
-            <div className="flex-1 lg:min-w-[360px] lg:max-w-[400px]">Employee</div>
-            <div className="w-36">Work Details</div>
-            <div className="w-28 ml-8">Progress</div>
-            <div className="hidden lg:block w-28">Joining</div>
-            <div className="w-10 text-center">Action</div>
-          </div>
-
-          {/* ── List ── */}
+          {/* ── Card grid ── */}
           <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
             {isLoadingTracker ? (
-              <div className="space-y-2.5">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <EmployeeRowSkeleton key={i} />
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <EmployeeCardSkeleton key={i} />
                 ))}
               </div>
             ) : isTrackerError ? (
@@ -611,9 +603,9 @@ const InductionDashboard: React.FC = () => {
             ) : filtered.length === 0 ? (
               <EmptyState search={searchQuery} tab={activeTab} />
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-4">
                 {filtered.map((emp, idx) => (
-                  <EmployeeRow
+                  <EmployeeCard
                     key={emp.id}
                     employee={emp}
                     index={idx}
