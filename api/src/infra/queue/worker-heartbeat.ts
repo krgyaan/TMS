@@ -29,6 +29,9 @@ export function startHeartbeat(options: StartHeartbeatOptions): void {
     let client: IORedis | null = null;
     try {
         client = new IORedis({ host, port, maxRetriesPerRequest: null });
+        client.on('error', () => {
+            // Suppress unhandled error crash when Redis is offline in local development
+        });
     } catch {
         return;
     }

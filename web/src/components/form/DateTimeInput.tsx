@@ -28,11 +28,15 @@ export function DateTimeInput({ value, onChange, onFocus, onClick, ...rest }: Da
       type="datetime-local"
       value={inner}
       onFocus={(e) => {
-        ;(e.currentTarget as HTMLInputElement).showPicker?.()
+        try {
+          ;(e.currentTarget as HTMLInputElement).showPicker?.()
+        } catch {}
         onFocus?.(e)
       }}
       onClick={(e) => {
-        ;(e.currentTarget as HTMLInputElement).showPicker?.()
+        try {
+          ;(e.currentTarget as HTMLInputElement).showPicker?.()
+        } catch {}
         onClick?.(e)
       }}
       onChange={(e) => {

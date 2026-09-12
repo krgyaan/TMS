@@ -1,0 +1,296 @@
+{
+  "extraction_version": "1.0.0",
+  "fields": {
+    "processingFeeAmount": {
+      "value": null,
+      "confidence": "not_applicable",
+      "source": null
+    },
+    "processingFeeModes": {
+      "value": null,
+      "confidence": "not_applicable",
+      "source": null
+    },
+    "tenderFeeAmount": {
+      "value": null,
+      "confidence": "not_applicable",
+      "source": null
+    },
+    "tenderFeeModes": {
+      "value": null,
+      "confidence": "not_applicable",
+      "source": null
+    },
+    "emdAmount": {
+      "value": 200000.0,
+      "confidence": "high",
+      "source": "regex"
+    },
+    "emdRequired": {
+      "value": "YES",
+      "confidence": "high",
+      "source": "regex"
+    },
+    "emdModes": {
+      "value": [
+        "Bank Transfer",
+        "Demand Draft",
+        "Fixed Deposit",
+        "Bank Guarantee"
+      ],
+      "confidence": "high",
+      "source": "regex"
+    },
+    "tenderValue": {
+      "value": null,
+      "confidence": "missing",
+      "source": null
+    },
+    "bidValidityDays": {
+      "value": 90,
+      "confidence": "high",
+      "source": "regex"
+    },
+    "commercialEvaluation": {
+      "value": null,
+      "confidence": "missing",
+      "source": null
+    },
+    "reverseAuctionApplicable": {
+      "value": "NO",
+      "confidence": "high",
+      "source": "regex"
+    },
+    "mafRequired": {
+      "value": "YES_GENERAL",
+      "confidence": "high",
+      "source": "regex"
+    },
+    "deliveryTimeSupply": {
+      "value": 50,
+      "confidence": "high",
+      "source": "regex"
+    },
+    "deliveryTimeInstallationDays": {
+      "value": 50,
+      "confidence": "high",
+      "source": "regex"
+    },
+    "deliveryTimeInstallationInclusive": {
+      "value": true,
+      "confidence": "high",
+      "source": "regex"
+    },
+    "paymentTermsSupply": {
+      "value": 100,
+      "confidence": "fallback",
+      "source": "regex"
+    },
+    "paymentTermsInstallation": {
+      "value": null,
+      "confidence": "missing",
+      "source": null
+    },
+    "pbgRequired": {
+      "value": "YES",
+      "confidence": "high",
+      "source": "regex"
+    },
+    "pbgMode": {
+      "value": [
+        "Bank Guarantee"
+      ],
+      "confidence": "high",
+      "source": "regex"
+    },
+    "pbgPercentage": {
+      "value": 5.0,
+      "confidence": "high",
+      "source": "regex"
+    },
+    "pbgDurationMonths": {
+      "value": 19,
+      "confidence": "high",
+      "source": "regex"
+    },
+    "sdMode": {
+      "value": [
+        "Bank Guarantee"
+      ],
+      "confidence": "fallback",
+      "source": "llm"
+    },
+    "sdPercentage": {
+      "value": 5.0,
+      "confidence": "fallback",
+      "source": "llm"
+    },
+    "sdDurationMonths": {
+      "value": 19,
+      "confidence": "fallback",
+      "source": "llm"
+    },
+    "ldPercentagePerWeek": {
+      "value": 0.5,
+      "confidence": "high",
+      "source": "regex"
+    },
+    "maxLdPercentage": {
+      "value": 5.0,
+      "confidence": "high",
+      "source": "atc"
+    },
+    "physicalDocsRequired": {
+      "value": "NO",
+      "confidence": "high",
+      "source": "regex"
+    },
+    "physicalDocsDeadline": {
+      "value": "2026-01-20T14:00:00",
+      "confidence": "not_applicable",
+      "source": "regex"
+    },
+    "orderValue1": {
+      "value": null,
+      "confidence": "missing",
+      "source": null
+    },
+    "orderValue2": {
+      "value": null,
+      "confidence": "not_applicable",
+      "source": null
+    },
+    "orderValue3": {
+      "value": null,
+      "confidence": "not_applicable",
+      "source": null
+    },
+    "avgAnnualTurnoverType": {
+      "value": "NOT_APPLICABLE",
+      "confidence": "not_applicable",
+      "source": "regex"
+    },
+    "avgAnnualTurnoverValue": {
+      "value": null,
+      "confidence": "not_applicable",
+      "source": null
+    },
+    "workingCapitalType": {
+      "value": "NOT_APPLICABLE",
+      "confidence": "not_applicable",
+      "source": "regex"
+    },
+    "workingCapitalValue": {
+      "value": null,
+      "confidence": "not_applicable",
+      "source": null
+    },
+    "netWorthType": {
+      "value": "NOT_APPLICABLE",
+      "confidence": "not_applicable",
+      "source": "regex"
+    },
+    "netWorthValue": {
+      "value": null,
+      "confidence": "not_applicable",
+      "source": null
+    },
+    "solvencyCertificateType": {
+      "value": "NOT_APPLICABLE",
+      "confidence": "not_applicable",
+      "source": "regex"
+    },
+    "solvencyCertificateValue": {
+      "value": null,
+      "confidence": "not_applicable",
+      "source": null
+    },
+    "customEligibilityCriteria": {
+      "value": "BEC-Financial Criteria: NOT APPLICABLE. Technical BEC includes: Supply, Installation, Testing and Commissioning of air-conditioners. Documentary evidence required: Purchase order or any other documents clearly evidencing Supply, Installation, Testing and Commissioning of air-conditioners submitted purchase order.",
+      "confidence": "fallback",
+      "source": "llm"
+    },
+    "techEligibilityAge": {
+      "value": null,
+      "confidence": "missing",
+      "source": null
+    },
+    "technicalWorkOrders": {
+      "value": null,
+      "confidence": "not_applicable",
+      "source": null
+    },
+    "commercialDocuments": {
+      "value": null,
+      "confidence": "not_applicable",
+      "source": null
+    },
+    "clients": {
+      "value": [
+        {
+          "clientName": "Dean B George",
+          "clientEmail": "dgeorge@gail.co.in",
+          "clientMobile": "9151402637  \nE-"
+        }
+      ],
+      "confidence": "high",
+      "source": "regex"
+    },
+    "courierAddress": {
+      "value": "GAIL (India) Limited, GAIL complex post Vijaipur, Guna District, Madhya Pradesh- 473112.",
+      "confidence": "high",
+      "source": "regex"
+    }
+  },
+  "missing_fields": [
+    "tenderValue",
+    "commercialEvaluation",
+    "paymentTermsInstallation",
+    "orderValue1",
+    "techEligibilityAge"
+  ],
+  "processing_time_ms": 23376,
+  "llm_usage": {
+    "role1_model": "claude-haiku-4-5-20251001",
+    "role2_model": "claude-sonnet-5",
+    "input_tokens": 28453,
+    "output_tokens": 634,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "raw_tokens": 29087,
+    "raw_processing_tokens": 29087,
+    "total_tokens": 29087,
+    "cache_hit_rate_pct": 0.0,
+    "role1_retries": 0,
+    "estimated_cost_usd": 0.03162,
+    "stages": {
+      "missing_field_fallback": {
+        "call_type": "missing_field_fallback",
+        "model": "claude-haiku-4-5-20251001",
+        "input_tokens": 28453,
+        "output_tokens": 634,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0,
+        "total_tokens": 29087,
+        "estimated_cost_usd": 0.031623,
+        "calls_count": 4
+      },
+      "ambiguity_resolution": {
+        "call_type": "ambiguity_resolution",
+        "model": "claude-sonnet-5",
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_creation_tokens": 0,
+        "cache_read_tokens": 0,
+        "total_tokens": 0,
+        "estimated_cost_usd": 0.0,
+        "calls_count": 0
+      }
+    },
+    "ambiguity_dispositions": {
+      "payment_terms_supply_display": "skipped_unambiguous_layer1",
+      "delivery_time_supply_display": "skipped_unambiguous_layer1",
+      "delivery_time_installation_display": "skipped_unambiguous_layer1"
+    }
+  }
+}

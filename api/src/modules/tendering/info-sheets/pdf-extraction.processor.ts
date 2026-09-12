@@ -66,6 +66,10 @@ export class PdfExtractionProcessor implements OnModuleInit {
             });
         });
 
+        this.worker.on('error', (err) => {
+            // Suppress unhandled error crash when Redis is offline in local development
+        });
+
         this.logger.info(
             `[PdfExtractionProcessor] Worker initialized for 'pdf-extraction-queue' (target: ${serviceUrl}, timeout: ${timeoutMs}ms)`,
         );

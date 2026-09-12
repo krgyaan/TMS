@@ -64,7 +64,8 @@ export class FileUploadService implements OnModuleInit {
      * Derive the context from a stored relative path (`{context}/{fileName}`)
      */
     private getContextFromPath(filePath: string): FileContext {
-        const context = filePath.split('/')[0];
+        const normalized = filePath.replace(/\\/g, '/');
+        const context = normalized.split('/')[0];
         if (!(context in FILE_CONFIGS)) {
             throw new BadRequestException(`Unknown file context: ${context}`);
         }
@@ -339,7 +340,8 @@ export class FileUploadService implements OnModuleInit {
      * Delete a file by path
      */
     async delete(filePath: string): Promise<void> {
-        const absolutePath = path.join(this.getBasePath(this.getContextFromPath(filePath)), filePath);
+        const normalized = filePath.replace(/\\/g, '/');
+        const absolutePath = path.join(this.getBasePath(this.getContextFromPath(normalized)), normalized);
         try {
             await fs.unlink(absolutePath);
         } catch (err) {
@@ -354,7 +356,8 @@ export class FileUploadService implements OnModuleInit {
      * Check if file exists
      */
     async exists(filePath: string): Promise<boolean> {
-        const absolutePath = path.join(this.getBasePath(this.getContextFromPath(filePath)), filePath);
+        const normalized = filePath.replace(/\\/g, '/');
+        const absolutePath = path.join(this.getBasePath(this.getContextFromPath(normalized)), normalized);
         try {
             await fs.access(absolutePath);
             return true;
@@ -367,6 +370,7 @@ export class FileUploadService implements OnModuleInit {
      * Get absolute path for serving
      */
     getAbsolutePath(filePath: string): string {
-        return path.join(this.getBasePath(this.getContextFromPath(filePath)), filePath);
+        const normalized = filePath.replace(/\\/g, '/');
+        return path.join(this.getBasePath(this.getContextFromPath(normalized)), normalized);
     }
 }
