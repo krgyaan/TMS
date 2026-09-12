@@ -68,7 +68,7 @@ LLM_TOKEN_BUDGET_PER_TENDER = int(os.getenv("LLM_TOKEN_BUDGET_PER_TENDER", "2000
 # cap previously allowed up to 18,000 / 25,000 characters per category, driving
 # ~7,100 input tokens per Role 1 call. Capped to the 6,000-8,000 char target range.
 SCOPED_CONTEXT_BID_SUMMARY_OPENING_CHARS = 5000
-SCOPED_CONTEXT_MAX_CHARS = 7000
+SCOPED_CONTEXT_MAX_CHARS = 6000
 
 # Path where few-shot examples accumulate across all parsed documents
 _MEMORY_DIR = Path(__file__).parent.parent / "storage" / "llm_memory"
@@ -1113,6 +1113,17 @@ class LLMFieldResolver:
         self.total_cache_creation_tokens: int = 0
         self.total_cache_read_tokens: int = 0
         self.total_raw_processing_tokens: int = 0
+        # STEP 4 (option b): a SEPARATE running total used only by the Role 1
+        # token-budget gate. Unlike total_raw_processing_tokens (real token
+        # counts, used for DB/cost accounting -- never discounted), this
+        # counts cache_read_tokens at their actual discounted cost ratio
+        # (cache_read_rate / input_rate) rather than full raw weight, so a
+        # cached, 90%-cheaper re-read of the static system+tools prefix
+        # doesn't eat into the budget as if it cost the same as a fresh,
+        # fully-billed read. cache_creation and everything else still counts
+        # at full weight (a cache write is not discounted -- it's actually
+        # priced ABOVE the base input rate).
+        self.total_budget_weighted_tokens: float = 0.0
         self.total_cost_usd: float = 0.0
         self.role1_retries: int = 0
         self.stages_usage: Dict[str, Dict[str, Any]] = {
@@ -1197,6 +1208,14 @@ class LLMFieldResolver:
         )
         self.total_cost_usd += call_cost
 
+        # Budget-gate weighting: discount cache_read by its real cost ratio
+        # relative to a normal (uncached) input token for this role, so the
+        # gate reflects actual spend rather than raw token count.
+        cache_read_discount = cache_read_rate / in_rate if in_rate else 1.0
+        self.total_budget_weighted_tokens += (
+            in_tok + out_tok + cache_create + (cache_read * cache_read_discount)
+        )
+
         # Update stage-specific breakdown
         if stage_key in self.stages_usage:
             st = self.stages_usage[stage_key]
@@ -1225,6 +1244,11 @@ class LLMFieldResolver:
             "raw_tokens": self.total_raw_processing_tokens,
             "raw_processing_tokens": self.total_raw_processing_tokens,
             "total_tokens": self.total_raw_processing_tokens,  # alias for backwards compatibility
+            # STEP 4 (option b): the budget-gate's own view of spend, with
+            # cache_read tokens discounted to their real cost ratio. Exposed
+            # for debugging/telemetry only -- raw_tokens/total_tokens above
+            # remain the true, undiscounted counts used for DB/cost records.
+            "budget_weighted_tokens": round(self.total_budget_weighted_tokens, 1),
             "cache_hit_rate_pct": cache_hit_rate,
             "role1_retries": self.role1_retries,
             "estimated_cost_usd": round(self.total_cost_usd, 5),
@@ -1289,11 +1313,16 @@ class LLMFieldResolver:
 
         for cat in sorted_categories:
             cat_fields = category_batches[cat]
-            if self.total_raw_processing_tokens >= LLM_TOKEN_BUDGET_PER_TENDER:
+            # STEP 4 (option b): gate on cost-weighted tokens, not raw count --
+            # a cached re-read of the static system+tools prefix is ~90%
+            # cheaper than a fresh read and shouldn't consume budget as if it
+            # weren't. See total_budget_weighted_tokens in record_usage().
+            if self.total_budget_weighted_tokens >= LLM_TOKEN_BUDGET_PER_TENDER:
                 logger.warning(
-                    "[LLM_FALLBACK][Role 1] Token budget reached (%d / %d raw tokens). Skipping category '%s' (%d fields: %s)",
-                    self.total_raw_processing_tokens,
+                    "[LLM_FALLBACK][Role 1] Token budget reached (%.0f / %d cost-weighted tokens, %d raw tokens). Skipping category '%s' (%d fields: %s)",
+                    self.total_budget_weighted_tokens,
                     LLM_TOKEN_BUDGET_PER_TENDER,
+                    self.total_raw_processing_tokens,
                     cat,
                     len(cat_fields),
                     cat_fields
