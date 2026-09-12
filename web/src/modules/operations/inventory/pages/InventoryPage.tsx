@@ -1,23 +1,20 @@
-import { useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import type { CustomCellRendererProps } from "ag-grid-react";
 import { paths } from "@/app/routes/paths";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, ArrowLeft, Eye, FileText, LayoutDashboard, Search } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight, Eye, FileText, LayoutDashboard, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import DataTable from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useInventoryProjectSummaries } from "@/hooks/api/useInventory";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
-import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
-import type { InventoryProjectSummary } from "../helpers/inventory.types";
 import { InventorySection } from "../components/InventorySection";
-import type { ColDef } from "ag-grid-community";
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 const IconAction: React.FC<{
     icon: React.ElementType;
@@ -52,6 +49,48 @@ const IconAction: React.FC<{
     </TooltipProvider>
 );
 
+function abbreviatedCode(code: string | null | undefined): string {
+    if (!code) return "";
+    const parts = code.split("/");
+    if (parts.length <= 3) return code;
+    return `${parts.slice(0, 3).join("/")}/...`;
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+    return (
+        <div className="rounded-md border bg-muted/40 px-2 py-2 text-center">
+            <div className="text-lg font-semibold leading-none tabular-nums">{value}</div>
+            <div className="mt-1 text-[11px] leading-tight text-muted-foreground">{label}</div>
+        </div>
+    );
+}
+
+function getPageNumbers(currentPage: number, totalPages: number): (number | "...")[] {
+    if (totalPages <= 7) {
+        return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    const pages = new Set<number>([
+        1,
+        2,
+        currentPage - 1,
+        currentPage,
+        currentPage + 1,
+        totalPages - 1,
+        totalPages,
+    ]);
+    const sorted = [...pages]
+        .filter(p => p >= 1 && p <= totalPages)
+        .sort((a, b) => a - b);
+    const out: (number | "...")[] = [];
+    let prev = 0;
+    for (const p of sorted) {
+        if (p - prev > 1) out.push("...");
+        out.push(p);
+        prev = p;
+    }
+    return out;
+}
+
 function ProjectSummariesView() {
     const navigate = useNavigate();
     const {
@@ -75,76 +114,7 @@ function ProjectSummariesView() {
 
     const rows = apiResponse?.data ?? [];
     const totalRows = apiResponse?.meta?.total ?? 0;
-
-    const colDefs = useMemo<ColDef<InventoryProjectSummary>[]>(
-        () => [
-            {
-                field: "projectName",
-                colId: "projectName",
-                headerName: "Project Name",
-                width: 250,
-                valueGetter: params => params.data?.projectName ?? "—",
-                sortable: true,
-                filter: true,
-            },
-            {
-                field: "projectCode",
-                colId: "projectCode",
-                headerName: "Project Code",
-                width: 250,
-                valueGetter: params => params.data?.projectCode ?? "—",
-                sortable: true,
-                filter: true,
-            },
-            {
-                field: "approvedPoCount",
-                colId: "approvedPoCount",
-                headerName: "Approved PO",
-                width: 150,
-                valueGetter: params => params.data?.approvedPoCount ?? 0,
-            },
-            {
-                field: "approvedVwoCount",
-                colId: "approvedVwoCount",
-                headerName: "Approved VWO",
-                width: 150,
-                valueGetter: params => params.data?.approvedVwoCount ?? 0,
-            },
-            {
-                field: "totalItems",
-                colId: "totalItems",
-                headerName: "Total Items",
-                width: 150,
-                valueGetter: params => params.data?.totalItems ?? 0,
-            },
-            {
-                headerName: "",
-                width: 120,
-                sortable: false,
-                filter: false,
-                pinned: "right",
-                cellRenderer: (params: CustomCellRendererProps<InventoryProjectSummary>) => {
-                    const row = params.data;
-                    if (!row) return null;
-                    return (
-                        <div className="flex items-center justify-end gap-1">
-                            <IconAction
-                                icon={LayoutDashboard}
-                                label="Open Inventory"
-                                onClick={() => navigate(paths.operations.inventoryProject(row.projectId))}
-                            />
-                            <IconAction
-                                icon={Eye}
-                                label="View Project Details"
-                                onClick={() => navigate(paths.operations.projectShowPage(row.projectId))}
-                            />
-                        </div>
-                    );
-                },
-            },
-        ],
-        [navigate],
-    );
+    const totalPages = Math.max(1, Math.ceil(totalRows / pagination.pageSize));
 
     if (error) {
         return (
@@ -171,7 +141,7 @@ function ProjectSummariesView() {
                     <div className="flex items-center justify-between gap-2">
                         <div>
                             <CardTitle>
-                                All Inventory
+                                All Inventories
                                 <Badge variant="secondary" className="ml-2">
                                     {totalRows} project{totalRows !== 1 ? "s" : ""}
                                 </Badge>
@@ -192,14 +162,17 @@ function ProjectSummariesView() {
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent className="px-0">
-                    {isLoading ? (
-                        <div className="p-6">
-                            <Skeleton className="h-10 w-full mb-2" />
-                            <Skeleton className="h-10 w-full mb-2" />
-                            <Skeleton className="h-10 w-full" />
+
+                {isLoading ? (
+                    <CardContent>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                            {Array.from({ length: 6 }).map((_, i) => (
+                                <Skeleton key={i} className="h-36 w-full rounded-xl" />
+                            ))}
                         </div>
-                    ) : rows.length === 0 ? (
+                    </CardContent>
+                ) : rows.length === 0 ? (
+                    <CardContent>
                         <div className="flex flex-col items-center justify-center h-64 text-muted-foreground px-6">
                             <FileText className="h-12 w-12 mb-4" />
                             <p className="text-lg font-medium">No inventory</p>
@@ -207,65 +180,133 @@ function ProjectSummariesView() {
                                 {search ? "Try adjusting your search." : "No projects with inventory are available."}
                             </p>
                         </div>
-                    ) : (
-                        <DataTable
-                            data={rows}
-                            columnDefs={colDefs}
-                            loading={isLoading}
-                            manualPagination
-                            rowCount={totalRows}
-                            paginationState={pagination}
-                            onPaginationChange={setPagination}
-                            onPageSizeChange={handlePageSizeChange}
-                            showTotalCount
-                            showLengthChange
-                            gridOptions={{
-                                defaultColDef: {
-                                    editable: false,
-                                    filter: true,
-                                    sortable: false,
-                                    resizable: true,
-                                },
-                                overlayNoRowsTemplate:
-                                    '<span style="padding: 10px; text-align: center;">No inventory found</span>',
-                            }}
-                        />
-                    )}
-                </CardContent>
+                    </CardContent>
+                ) : (
+                    <>
+                        <CardContent className="pt-0">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                {rows.map(row => (
+                                    <Card
+                                        key={row.projectId}
+                                        className="cursor-pointer transition-colors hover:border-primary/50 hover:bg-accent/40"
+                                        onClick={() => navigate(paths.accounts.inventoryProject(row.projectId))}
+                                    >
+                                        <CardHeader className="pb-3">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="min-w-0 flex-1 overflow-hidden">
+                                                    <CardTitle className="text-sm font-semibold leading-snug line-clamp-2 break-words">
+                                                        {row.projectName ?? "—"}
+                                                    </CardTitle>
+                                                    <CardDescription className="mt-1 font-mono text-xs truncate">
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <span>{abbreviatedCode(row.projectCode)}</span>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent side="bottom">{row.projectCode}</TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                    </CardDescription>
+                                                </div>
+                                                <div className="flex items-center shrink-0">
+                                                    <IconAction
+                                                        icon={LayoutDashboard}
+                                                        label="Open Inventory"
+                                                        onClick={() => navigate(paths.accounts.inventoryProject(row.projectId))}
+                                                    />
+                                                    <IconAction
+                                                        icon={Eye}
+                                                        label="View Project Details"
+                                                        onClick={() => navigate(paths.operations.projectShowPage(row.projectId))}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="pb-3">
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <Stat label="Approved PO" value={row.approvedPoCount} />
+                                                <Stat label="Approved VWO" value={row.approvedVwoCount} />
+                                                <Stat label="Total Items" value={row.totalItems} />
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </CardContent>
+
+                        <div className="flex items-center justify-between px-4 py-3 border-t bg-background shrink-0">
+                            <div className="text-sm text-muted-foreground">
+                                Total: <strong>{totalRows}</strong>
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPagination(p => ({ ...p, pageIndex: p.pageIndex - 1 }))}
+                                    disabled={pagination.pageIndex === 0 || isLoading}
+                                    className="h-8 w-8 p-0"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                {getPageNumbers(pagination.pageIndex + 1, totalPages).map((page, index) =>
+                                    page === "..." ? (
+                                        <span key={`ellipsis-${index}`} className="px-2 text-sm text-muted-foreground">
+                                            ...
+                                        </span>
+                                    ) : (
+                                        <Button
+                                            key={page}
+                                            variant={page === pagination.pageIndex + 1 ? "default" : "outline"}
+                                            size="sm"
+                                            onClick={() => setPagination(p => ({ ...p, pageIndex: page - 1 }))}
+                                            disabled={isLoading}
+                                            className="h-8 min-w-8 px-2"
+                                        >
+                                            {page}
+                                        </Button>
+                                    ),
+                                )}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPagination(p => ({ ...p, pageIndex: p.pageIndex + 1 }))}
+                                    disabled={pagination.pageIndex + 1 >= totalPages || isLoading}
+                                    className="h-8 w-8 p-0"
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">Show per Page:</span>
+                                <Select
+                                    value={pagination.pageSize.toString()}
+                                    onValueChange={v => handlePageSizeChange(Number(v))}
+                                >
+                                    <SelectTrigger className="w-20 h-8">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {PAGE_SIZE_OPTIONS.map(size => (
+                                            <SelectItem key={size} value={size.toString()}>
+                                                {size}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    </>
+                )}
             </Card>
         </div>
     );
 }
 
 function ProjectInventoryView({ projectId }: { projectId: number }) {
-    const navigate = useNavigate();
-    const { data: overview } = useProjectOverview(projectId);
-    const projectName = overview?.project?.projectName ?? `Project #${projectId}`;
-
     return (
         <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle>
-                                Inventory — {projectName}
-                            </CardTitle>
-                            <CardDescription className="mt-2">
-                                Items in stock for this project.
-                            </CardDescription>
-                        </div>
-                        <Button
-                            variant="outline"
-                            onClick={() => navigate(paths.operations.inventory)}
-                            className="gap-2"
-                        >
-                            <ArrowLeft className="h-4 w-4" />
-                            All Inventories
-                        </Button>
-                    </div>
-                </CardHeader>
-            </Card>
             <InventorySection projectId={projectId} />
         </div>
     );

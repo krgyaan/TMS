@@ -83,9 +83,8 @@ export class VendorWorkOrderController {
   setApproval(
     @Param("id", ParseIntPipe) id: number,
     @Body() body: { approve: boolean; tdsPercentage?: number; remark?: string },
-    @CurrentUser() user: ValidatedUser,
   ) {
-    return this.service.setVwoApproval(id, body, user?.id);
+    return this.service.setVwoApproval(id, body);
   }
 
   @Get(":id")

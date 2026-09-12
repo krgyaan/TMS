@@ -9,8 +9,11 @@ export const inventoryMovements = pgTable(
         projectId: bigint("project_id", { mode: "number" }).notNull(),
         movementType: varchar("movement_type", { length: 50 }).notNull(),
         referenceId: bigint("reference_id", { mode: "number" }),
+        warehouseId: bigint("warehouse_id", { mode: "number" }),
         fromProjectId: bigint("from_project_id", { mode: "number" }),
         toProjectId: bigint("to_project_id", { mode: "number" }),
+        fromWarehouseId: bigint("from_warehouse_id", { mode: "number" }),
+        toWarehouseId: bigint("to_warehouse_id", { mode: "number" }),
         poId: bigint("po_id", { mode: "number" }),
         qty: numeric("qty", { precision: 20, scale: 2 }).notNull(),
         price: numeric("price", { precision: 20, scale: 2 }).notNull(),
@@ -19,7 +22,14 @@ export const inventoryMovements = pgTable(
         createdBy: bigint("created_by", { mode: "number" }),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     },
-    table => [index("idx_im_project_id").on(table.projectId), index("idx_im_inventory_id").on(table.inventoryId), index("idx_im_movement_type").on(table.movementType)]
+    table => [
+        index("idx_im_project_id").on(table.projectId),
+        index("idx_im_inventory_id").on(table.inventoryId),
+        index("idx_im_movement_type").on(table.movementType),
+        index("idx_im_warehouse_id").on(table.warehouseId),
+        index("idx_im_from_warehouse_id").on(table.fromWarehouseId),
+        index("idx_im_to_warehouse_id").on(table.toWarehouseId),
+    ]
 );
 
 export type InventoryMovement = typeof inventoryMovements.$inferSelect;
