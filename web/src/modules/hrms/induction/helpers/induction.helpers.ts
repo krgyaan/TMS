@@ -48,6 +48,7 @@ export interface InductionTask {
 
 export interface EmployeeInduction {
   id: number;
+  userId: number | null;
   employeeId: string;
   firstName: string;
   lastName: string;
@@ -82,6 +83,7 @@ export interface RawInductionTask {
 
 export interface RawInductionEmployee {
   id: number;
+  userId?: number | null;
   employeeId?: string;
   name?: string;
   firstName?: string;
@@ -102,6 +104,9 @@ export interface RawInductionEmployee {
 }
 
 // ─── Default task definitions ─────────────────────────────────────────────────
+
+export const isLaptopTask = (name?: string | null): boolean =>
+  /laptop/i.test(name ?? "");
 
 export const DEFAULT_BEFORE_TASKS: Array<{
   name: string;
@@ -235,6 +240,7 @@ export const mapApiEmployee = (raw: RawInductionEmployee): EmployeeInduction => 
   const nameParts = (raw.name ?? "").split(" ");
   return {
     id: raw.id,
+    userId: raw.userId ?? null,
     employeeId: raw.employeeId ?? `EMP-${String(raw.id).padStart(4, "0")}`,
     firstName: raw.firstName ?? (nameParts.length > 0 ? nameParts[0] : "-"),
     lastName: raw.lastName ?? (nameParts.length > 1 ? nameParts[nameParts.length - 1] : ""),

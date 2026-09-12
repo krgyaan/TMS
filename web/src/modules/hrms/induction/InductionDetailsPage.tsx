@@ -42,6 +42,7 @@ import {
   formatDateTime,
   getAvatarColor,
   getInitials,
+  isLaptopTask,
   mapApiEmployee,
   mapApiTask,
 } from "./helpers/induction.helpers";
@@ -55,6 +56,10 @@ import {
   useEmployeeInduction,
   useUpdateInductionTask,
 } from "@/hooks/api/useInduction";
+import { useUpdateHrmsAssetStatus } from "@/hooks/api/useHrmsAssets";
+import { toast } from "sonner";
+import type { EmployeeAsset } from "@/services/api/hrms-assets.service";
+import { LaptopAssetModal } from "./components/LaptopAssetModal";
 
 // ─── CSS Keyframes (shared with the dashboard look) ───────────────────────────
 const StyleInjector: React.FC = () => (
@@ -412,14 +417,27 @@ const InductionDetailsPage: React.FC = () => {
   }, [rawEmployeeTasks]);
 
   const { mutate: updateTask } = useUpdateInductionTask(onboardingId);
+  const { mutateAsync: updateAssetStatus } = useUpdateHrmsAssetStatus();
 
   const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
   const [remarkSavingTaskId, setRemarkSavingTaskId] = useState<string | null>(null);
   const [remarkTask, setRemarkTask] = useState<InductionTask | null>(null);
   const [remarkOpen, setRemarkOpen] = useState(false);
+  const [laptopTask, setLaptopTask] = useState<InductionTask | null>(null);
+  const [assignSaving, setAssignSaving] = useState(false);
 
   const handleToggleTask = useCallback(
     (task: InductionTask) => {
+      if (task.status !== "completed" && isLaptopTask(task.name)) {
+        if (employee?.userId == null) {
+          toast.error(
+            "Employee is not linked to a login account yet — cannot allot an asset."
+          );
+          return;
+        }
+        setLaptopTask(task);
+        return;
+      }
       const newStatus = task.status === "completed" ? "pending" : "completed";
       setTogglingTaskId(task.id);
       updateTask(
@@ -427,7 +445,50 @@ const InductionDetailsPage: React.FC = () => {
         { onSettled: () => setTogglingTaskId(null) }
       );
     },
-    [updateTask]
+    [employee, updateTask]
+  );
+
+  const handleLaptopAssign = useCallback(
+    async (asset: EmployeeAsset, assignedDate: string, note: string) => {
+      if (!laptopTask || employee?.userId == null) return;
+      setAssignSaving(true);
+      try {
+        await updateAssetStatus({
+          id: asset.id,
+          data: {
+            assetStatus: "assigned",
+            userId: employee.userId,
+            assignedDate,
+            purpose: "Induction — new joiner laptop allotment",
+          },
+        });
+      } catch {
+        setAssignSaving(false);
+        return;
+      }
+      const bits = [
+        asset.assetCode,
+        [asset.brand, asset.model].filter(Boolean).join(" "),
+        asset.serialNumber ? `S/N ${asset.serialNumber}` : "",
+        note,
+      ].filter(Boolean);
+      updateTask(
+        {
+          taskId: Number(laptopTask.id),
+          updates: {
+            status: "completed",
+            remarks: `Laptop allotted — ${bits.join(" · ")}`,
+          },
+        },
+        {
+          onSettled: () => {
+            setAssignSaving(false);
+            setLaptopTask(null);
+          },
+        }
+      );
+    },
+    [laptopTask, employee, updateAssetStatus, updateTask]
   );
 
   const handleSaveRemark = useCallback(
@@ -645,8 +706,9 @@ const InductionDetailsPage: React.FC = () => {
               </div>
           </CardContent>
         </Card>
+      </div>
 
-        <RemarkModal
+      <RemarkModal
           task={remarkTask}
           open={remarkOpen}
           onClose={() => {
@@ -660,9 +722,16 @@ const InductionDetailsPage: React.FC = () => {
               setRemarkTask(null);
             }
           }}
-          isLoading={remarkSavingTaskId !== null}
-        />
-      </div>
+        isLoading={remarkSavingTaskId !== null}
+      />
+
+      <LaptopAssetModal
+        open={laptopTask !== null}
+        employeeName={`${employee.firstName} ${employee.lastName}`}
+        onClose={() => setLaptopTask(null)}
+        onConfirm={handleLaptopAssign}
+        isSaving={assignSaving}
+      />
     </TooltipProvider>
   );
 };
