@@ -30,15 +30,9 @@ const IntegrationsRoutes = lazy(() => import("./sections/integrations.routes"));
 const SharedRoutes = lazy(() => import("./sections/shared.routes"));
 const DocumentDashboardRoutes = lazy(() => import("./sections/document-dashboard.routes"));
 const HrmsRoutes = lazy(() => import("./sections/hrms.routes"));
-const Profile = lazy(() => import("@/modules/profile"));
+const ProfileRoutes = lazy(() => import("./sections/profile.routes"));
 const TrainingRoutes = lazy(() => import("./sections/training.routes"));
 const SystemRoutes = lazy(() => import("./sections/system.routes"));
-
-// Complaints module pages — routed at shell level (like section pages) so they
-// render full-width with the shell's p-4 gap, matching LeadShowPage
-const ComplaintCreatePage = lazy(() => import("@/modules/hrms/complaints/ComplaintCreatePage"));
-const ComplaintViewPage = lazy(() => import("@/modules/hrms/complaints/ComplaintViewPage"));
-const ComplaintEditPage = lazy(() => import("@/modules/hrms/complaints/ComplaintEditPage"));
 
 import { ProfileProvider } from "@/modules/profile/contexts/ProfileContext";
 
@@ -79,41 +73,8 @@ export default function AppRoutes() {
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/dashboard" element={<Navigate to="/" replace />} />
 
-                    {/* Complaints — module pages (before /profile/* so they bypass ProfileLayout's container) */}
-                    <Route
-                        path="/profile/support/complaints/create"
-                        element={
-                            <RouteWrapper>
-                                <ComplaintCreatePage />
-                            </RouteWrapper>
-                        }
-                    />
-                    <Route
-                        path="/profile/support/complaints/:id"
-                        element={
-                            <RouteWrapper>
-                                <ComplaintViewPage />
-                            </RouteWrapper>
-                        }
-                    />
-                    <Route
-                        path="/profile/support/complaints/:id/edit"
-                        element={
-                            <RouteWrapper>
-                                <ComplaintEditPage />
-                            </RouteWrapper>
-                        }
-                    />
-
-                    {/* Profile */}
-                    <Route
-                        path="/profile/*"
-                        element={
-                            <RouteWrapper>
-                                <Profile />
-                            </RouteWrapper>
-                        }
-                    />
+                    {/* Profile (incl. employee complaint pages) */}
+                    <Route path="/profile/*" element={<ProfileRoutes />} />
 
                     <Route
                         path="training/*"
