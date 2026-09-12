@@ -23,6 +23,12 @@ export const StatusBadge: React.FC<{
         "bg-emerald-50 text-emerald-700 border-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
       icon: CheckCircle2,
     },
+    fully_completed: {
+      label: "Completed",
+      className:
+        "bg-emerald-50 text-emerald-700 border-emerald-200/60 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20",
+      icon: CheckCircle2,
+    },
     rejected: {
       label: "Rejected",
       className:
