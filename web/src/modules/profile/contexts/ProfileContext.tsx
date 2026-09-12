@@ -28,6 +28,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- standard context pattern: provider + hook in one file
 export const useProfileContext = () => {
   const context = useContext(ProfileContext);
   if (context === undefined) {

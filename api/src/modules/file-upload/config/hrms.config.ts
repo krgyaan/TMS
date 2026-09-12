@@ -1,4 +1,4 @@
-import { MB, DOCS, OFFICE, type FileConfig } from './common';
+import { MB, DOCS, OFFICE, IMAGES, type FileConfig } from './common';
 
 /**
  * HRMS module contexts (assets, employee documents).
@@ -22,5 +22,11 @@ export const hrmsConfigs: Record<string, FileConfig> = {
         maxSizeBytes: MB(10),
         allowedMimeTypes: [...DOCS, ...OFFICE],
         allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx"],
+    },
+    "profile-photos": {
+        maxFiles: 1,
+        maxSizeBytes: MB(5),
+        allowedMimeTypes: [...IMAGES],
+        allowedExtensions: [".jpg", ".jpeg", ".png", ".webp"],
     },
 };

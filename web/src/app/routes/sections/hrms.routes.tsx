@@ -17,9 +17,16 @@ const CandidateDetailPage = lazy(() => import('@/modules/hrms/onboarding/Candida
 const ProfileDetailsDashboard = lazy(() => import('@/modules/hrms/onboarding/ProfileDetailsDashboard'));
 const DocumentDashboard = lazy(() => import('@/modules/hrms/onboarding/DocumentDashboard'));
 const InductionDashboard = lazy(() => import('@/modules/hrms/induction/InductionDashboard'))
+const InductionDetailsPage = lazy(() => import('@/modules/hrms/induction/InductionDetailsPage'))
+const InductionWorkDetailsPage = lazy(() => import('@/modules/hrms/induction/InductionWorkDetailsPage'))
 
 const TrainingDashboard = lazy(() => import('@/modules/hrms/training/TrainingDashboard'))
 const UploadVideo = lazy(() => import("@/modules/hrms/training/components/UploadVideo"))
+
+// Complaints (admin)
+const ComplaintListPage = lazy(() => import("@/modules/hrms/complaints/ComplaintListPage"));
+const ComplaintCreatePage = lazy(() => import("@/modules/hrms/complaints/ComplaintCreatePage"));
+const ComplaintViewPage = lazy(() => import("@/modules/hrms/complaints/ComplaintViewPage"));
 
 
 export default function HrmsRoutes() {
@@ -33,6 +40,8 @@ export default function HrmsRoutes() {
             <Route path="onboarding/profile-details" element={<ProfileDetailsDashboard />} />
             <Route path="onboarding/documents" element={<DocumentDashboard />} />
             <Route path="onboarding/induction" element={<InductionDashboard />}/>
+            <Route path="onboarding/induction/:id" element={<InductionDetailsPage />} />
+            <Route path="onboarding/induction/:id/work-details" element={<InductionWorkDetailsPage />} />
             
             <Route path="assets/my" element={<MyAssetsListPage />} />
             
@@ -44,6 +53,13 @@ export default function HrmsRoutes() {
 
             <Route path="training" element={<TrainingDashboard />} />
             <Route path="training/upload-video" element={ <UploadVideo />} />
+
+            <Route path="complaints" element={<ComplaintListPage />} />
+            <Route path="complaints/create" element={<ComplaintCreatePage redirectTo="/hrms/complaints" />} />
+            <Route
+                path="complaints/:id/view"
+                element={<ComplaintViewPage backTo="/hrms/complaints" backLabel="Back to Complaints" />}
+            />
         </Routes>
     );
 }

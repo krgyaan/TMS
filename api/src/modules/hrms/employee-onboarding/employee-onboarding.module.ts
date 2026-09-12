@@ -3,8 +3,10 @@
 import { Module } from '@nestjs/common';
 import { EmployeeOnboardingService } from './employee-onboarding.service';
 import { EmployeeOnboardingController } from './employee-onboarding.controller';
+import { OnboardingModule } from '../onboarding/onboarding.module';
 
 @Module({
+  imports: [OnboardingModule],
   providers: [EmployeeOnboardingService],
   controllers: [EmployeeOnboardingController],
   exports: [EmployeeOnboardingService],

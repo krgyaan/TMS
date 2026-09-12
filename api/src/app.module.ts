@@ -28,6 +28,7 @@ import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler
 import { LeadFollowupSchedulerModule } from "@/modules/crm/leadfollowup/lead-followup-scheduler.module";
 import { FollowUpModule } from "@/modules/follow-up/follow-up.module";
 import { AssetsModule } from "@/modules/hrms/assets/assets.module";
+import { ComplaintsModule } from "@/modules/hrms/complaints/complaints.module";
 import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employee-profiles.module";
 import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module";
 import { GoogleIntegrationModule } from "@/modules/integrations/google/google.module";
@@ -269,6 +270,7 @@ import { WebhookController } from "./webhook/webhook.controller";
         MakerRequestModule,
         EmployeeProfilesModule,
         AssetsModule,
+        ComplaintsModule,
         AccountChecklistModule,
         SchedulerModule,
         OnboardingModule,

@@ -483,6 +483,12 @@ export const paths = {
             status: (id: number) => `/hrms/admin/assets/status/${id}`,
             my: "/hrms/assets/my",
         },
+
+        complaints: {
+            list: "/hrms/complaints",
+            create: "/hrms/complaints/create",
+            view: (id: number | string) => `/hrms/complaints/${id}/view`,
+        },
         
         //================ onboarding  ==============================//
         onboardingDashboard: "/hrms/onboarding/dashboard",
@@ -490,6 +496,8 @@ export const paths = {
         profileDetailsDashboard: "/hrms/onboarding/profile-details",
         documentDashboard: "/hrms/onboarding/documents",
         inductionDashboard: "/hrms/onboarding/induction",
+        inductionEmployee: (id: number | string) => `/hrms/onboarding/induction/${id}`,
+        inductionWorkDetails: (id: number | string) => `/hrms/onboarding/induction/${id}/work-details`,
 
         // =========================training =======================//
         trainingDashboard: "/hrms/training",
