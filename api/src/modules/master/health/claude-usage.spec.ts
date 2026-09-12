@@ -30,6 +30,7 @@ describe('ClaudeUsageService & Health Controller RBAC Security', () => {
         };
 
         mockRedis = {
+            status: 'ready',
             pipeline: jest.fn().mockReturnValue({
                 zadd: jest.fn().mockReturnThis(),
                 zremrangebyscore: jest.fn().mockReturnThis(),
