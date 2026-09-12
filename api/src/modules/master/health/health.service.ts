@@ -122,8 +122,8 @@ export class HealthService {
     }
 
     private async checkRedis(): Promise<HealthResult> {
-        if (!this.redis) {
-            return { status: "down", data: { error: "redis not configured" } };
+        if (!this.redis || this.redis.status !== 'ready') {
+            return { status: "down", data: { error: "redis connection unavailable" } };
         }
         try {
             const pong = await this.redis.ping();
@@ -140,6 +140,14 @@ export class HealthService {
     }
 
     private async checkQueues(): Promise<HealthResult> {
+        if (!this.redis || this.redis.status !== 'ready') {
+            const details: Record<string, { status: string; error: string }> = {};
+            for (const def of QUEUE_DEFINITIONS) {
+                details[def.key] = { status: "down", error: "redis connection unavailable" };
+            }
+            return { status: "down", data: details };
+        }
+
         const queues = this.queues();
         const details: Record<string, Record<string, number | string | undefined>> = {};
         let degraded = false;
@@ -167,10 +175,10 @@ export class HealthService {
     }
 
     private async checkWorkers(): Promise<HealthResult> {
-        if (!this.redis) {
-            const details: Record<string, { status: string }> = {};
+        if (!this.redis || this.redis.status !== 'ready') {
+            const details: Record<string, { status: string; error: string }> = {};
             for (const key of Object.keys(WORKER_KEYS)) {
-                details[key] = { status: "down" };
+                details[key] = { status: "down", error: "redis connection unavailable" };
             }
             return { status: "down", data: details };
         }

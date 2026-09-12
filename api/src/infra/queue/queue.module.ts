@@ -10,9 +10,20 @@ import { ConfigService } from "@nestjs/config";
             provide: "REDIS_CONNECTION",
             inject: [ConfigService],
             useFactory: (configService: ConfigService) => {
-                const host = configService.get<string>('redis.host');
-                const port = configService.get<number>('redis.port');
-                return new IORedis({ host, port });
+                const host = configService.get<string>('redis.host') || '127.0.0.1';
+                const port = configService.get<number>('redis.port') || 6379;
+                const client = new IORedis({
+                    host,
+                    port,
+                    maxRetriesPerRequest: null,
+                    enableOfflineQueue: false,
+                    connectTimeout: 2000,
+                    retryStrategy: (times) => Math.min(times * 1000, 5000),
+                });
+                client.on('error', () => {
+                    // Suppress unhandled error crash when Redis is offline in local development
+                });
+                return client;
             },
         },
         {
