@@ -223,7 +223,7 @@ const InductionWorkDetailsPage: React.FC = () => {
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Work Information
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs flex items-center gap-1">
                       Designation
@@ -385,7 +385,7 @@ const InductionWorkDetailsPage: React.FC = () => {
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Compensation
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs">Salary Type</Label>
                     <Select

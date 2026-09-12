@@ -2,12 +2,10 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   CheckCircle2,
-  Clock,
   ListChecks,
   UserCog,
   AlertCircle,
   Info,
-  Zap,
   Milestone,
   CheckCheck,
   ChevronDown,
@@ -35,13 +33,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { paths } from "@/app/routes/paths";
 import {
@@ -58,7 +49,6 @@ import type {
   EmployeeInduction,
   InductionTask,
   TaskPhase,
-  TaskStatus,
 } from "./helpers/induction.helpers";
 import {
   useInductionTrackerList,
@@ -425,7 +415,6 @@ const InductionDetailsPage: React.FC = () => {
 
   const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
   const [remarkSavingTaskId, setRemarkSavingTaskId] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<TaskStatus | "all">("all");
   const [remarkTask, setRemarkTask] = useState<InductionTask | null>(null);
   const [remarkOpen, setRemarkOpen] = useState(false);
 
@@ -501,12 +490,8 @@ const InductionDetailsPage: React.FC = () => {
 
   const stats = computeInductionStats(resolvedTasks);
 
-  const filteredTasks = resolvedTasks.filter((t) => {
-    return filterStatus === "all" || t.status === filterStatus;
-  });
-
-  const beforeTasks = filteredTasks.filter((t) => t.phase === "before_joining");
-  const afterTasks = filteredTasks.filter((t) => t.phase === "after_joining");
+  const beforeTasks = resolvedTasks.filter((t) => t.phase === "before_joining");
+  const afterTasks = resolvedTasks.filter((t) => t.phase === "after_joining");
   const isShowingDefaults = defaultTaskIds.size > 0;
 
   return (
@@ -568,65 +553,7 @@ const InductionDetailsPage: React.FC = () => {
                   <span className="flex-shrink-0 inline-flex items-center rounded-full border border-border/50 bg-muted/40 px-2.5 py-1 text-[10px] font-semibold tabular-nums text-muted-foreground">
                     {isLoadingTasks ? "—" : `${stats.pct}% complete`}
                   </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-xl flex-shrink-0"
-                    onClick={() =>
-                      navigate(paths.hrms.inductionWorkDetails(employee.id))
-                    }
-                  >
-                    Work Details
-                  </Button>
                 </div>
-
-                {/* Stats row */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-5 border-t">
-                  {[
-                    { label: "Total", value: stats.total, icon: ListChecks, cls: "" },
-                    { label: "Done", value: stats.completed, icon: CheckCircle2, cls: "text-emerald-700 dark:text-emerald-400" },
-                    { label: "Pending", value: stats.pending, icon: Clock, cls: "text-amber-700 dark:text-amber-400" },
-                    { label: "Required", value: stats.requiredCompleted, icon: Zap, cls: "" },
-                  ].map(({ label, value, icon: SIcon, cls }) => (
-                    <div key={label} className="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-muted/30">
-                      <SIcon className={cn("h-3.5 w-3.5 text-muted-foreground", cls)} />
-                      <div>
-                        <span className={cn("text-base font-bold leading-none tabular-nums", cls)}>
-                          {isLoadingTasks ? "—" : value}
-                        </span>
-                        {label === "Required" && !isLoadingTasks && (
-                          <span className="text-muted-foreground font-normal text-[10px]">
-                            /{stats.requiredTotal}
-                          </span>
-                        )}
-                        <p className="text-[9px] text-muted-foreground mt-0.5">{label}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-              {/* Filters */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <Select
-                  value={filterStatus}
-                  onValueChange={(v) => setFilterStatus(v as TaskStatus | "all")}
-                >
-                  <SelectTrigger className="h-8 w-32 text-xs rounded-xl">
-                    <SelectValue placeholder="All Tasks" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Tasks</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground ml-auto">
-                  <span className="text-destructive/70 font-bold border border-destructive/20 bg-destructive/5 px-1.5 rounded-md text-[8px] uppercase tracking-wider">
-                    Required
-                  </span>
-                  <span>= Mandatory task</span>
-                </div>
-              </div>
 
               {/* Info banner */}
               {isShowingDefaults && !isLoadingTasks && (
@@ -679,14 +606,14 @@ const InductionDetailsPage: React.FC = () => {
                         defaultOpen={true}
                       />
                     )}
-                    {filteredTasks.length === 0 && (
+                    {resolvedTasks.length === 0 && (
                       <div className="flex flex-col items-center justify-center py-14 text-center ind-fade-in">
                         <div className="w-14 h-14 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
                           <ListChecks className="h-7 w-7 text-muted-foreground/40" />
                         </div>
-                        <p className="text-sm font-medium">No tasks match your filters</p>
+                        <p className="text-sm font-medium">No tasks yet</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Try adjusting the status filter
+                          Induction tasks will appear here once initialised
                         </p>
                       </div>
                     )}
