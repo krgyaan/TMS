@@ -28,6 +28,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
+import { OnboardingService } from '../onboarding/onboarding.service';
 
 const EMPLOYEE_DOCS_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'hrms', 'employee-documents');
 
@@ -89,6 +90,7 @@ export class EmployeeOnboardingService {
   constructor(
     @Inject(DRIZZLE) private readonly db: DbInstance,
     @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
+    private readonly onboardingService: OnboardingService,
   ) {}
 
   // ── Helpers ──────────────────────────────────────────────────────────────
@@ -625,15 +627,24 @@ export class EmployeeOnboardingService {
         throw new NotFoundException('User not found');
       }
 
-      await this.db.insert(onboardingRequests).values({
-        userId,
-        name: userRow.name,
-        email: userRow.email as string,
-        phone: userRow.mobile || null,
-        status: 'pending',
-        hrStatus: 'pending',
-        requestType: 'new_hire',
-      } as any);
+      // The user account was already created by HR — registration approval is
+      // implicit, so the request starts approved; only section-level review
+      // remains. Induction tasks are seeded here (normally done on approve).
+      const [request] = await this.db
+        .insert(onboardingRequests)
+        .values({
+          userId,
+          name: userRow.name,
+          email: userRow.email as string,
+          phone: userRow.mobile || null,
+          status: 'approved',
+          hrStatus: 'approved',
+          approvedAt: new Date(),
+          requestType: 'new_hire',
+        } as any)
+        .returning({ id: onboardingRequests.id });
+
+      await this.onboardingService.seedInductionTasks(this.db, request.id);
     }
 
     return this.getMyOnboardingDraft(userId);
