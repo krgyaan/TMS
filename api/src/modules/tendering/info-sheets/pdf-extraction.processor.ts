@@ -6,6 +6,7 @@ import { Logger } from 'winston';
 import * as path from 'path';
 import * as fs from 'fs';
 import { FileUploadService } from '@/modules/file-upload/file-upload.service';
+import { ClaudeUsageService } from '@/modules/master/health/claude-usage.service';
 import { startHeartbeat } from '@/infra/queue/worker-heartbeat';
 import { PdfExtractionJobData, PdfExtractionJobResult } from './types/pdf-extraction.types';
 
@@ -16,9 +17,11 @@ export class PdfExtractionProcessor implements OnModuleInit {
     constructor(
         private readonly configService: ConfigService,
         private readonly fileUploadService: FileUploadService,
+        private readonly claudeUsageService: ClaudeUsageService,
         @Inject(WINSTON_MODULE_PROVIDER)
         private readonly logger: Logger,
     ) {}
+
 
     onModuleInit() {
         const host = this.configService.get<string>('redis.host') || '127.0.0.1';
@@ -80,19 +83,22 @@ export class PdfExtractionProcessor implements OnModuleInit {
         serviceUrl: string,
         timeoutMs: number,
     ): Promise<PdfExtractionJobResult> {
-        const { tenderId, pdfPath, userId } = job.data;
+        const { tenderId, pdfPath, mainTenderPath, atcPaths, boqPath, userId } = job.data;
+        const primaryPdf = mainTenderPath || pdfPath;
 
         this.logger.info(`[PdfExtractionProcessor] Starting extraction for tender ${tenderId}`, {
             jobId: job.id,
             tenderId,
-            pdfPath,
+            primaryPdf,
+            atcCount: atcPaths?.length || 0,
+            hasBoq: Boolean(boqPath),
             userId,
         });
 
         // Resolve absolute path from existing file storage
-        const resolvedPath = this.resolvePdfPath(pdfPath);
+        const resolvedPath = this.resolvePdfPath(primaryPdf);
         if (!fs.existsSync(resolvedPath)) {
-            const errorMsg = `PDF file not found at path: '${pdfPath}' (resolved to '${resolvedPath}')`;
+            const errorMsg = `PDF file not found at path: '${primaryPdf}' (resolved to '${resolvedPath}')`;
             this.logger.error(`[PdfExtractionProcessor] ${errorMsg}`);
             throw new Error(errorMsg);
         }
@@ -109,6 +115,40 @@ export class PdfExtractionProcessor implements OnModuleInit {
 
         const formData = new FormData();
         formData.append('pdf_file', blob, fileName);
+
+        // Attach ATC files if provided
+        if (atcPaths && Array.isArray(atcPaths)) {
+            for (const atcPath of atcPaths) {
+                try {
+                    const resolvedAtc = this.resolvePdfPath(atcPath);
+                    if (fs.existsSync(resolvedAtc)) {
+                        const atcBuffer = await fs.promises.readFile(resolvedAtc);
+                        const atcBlob = new Blob([atcBuffer], { type: 'application/pdf' });
+                        formData.append('atc_files', atcBlob, path.basename(resolvedAtc));
+                    }
+                } catch (atcErr) {
+                    this.logger.warn(`[PdfExtractionProcessor] Could not load ATC file '${atcPath}': ${(atcErr as Error).message}`);
+                }
+            }
+        }
+
+        // Attach BOQ file if provided
+        if (boqPath) {
+            try {
+                const resolvedBoq = this.resolvePdfPath(boqPath);
+                if (fs.existsSync(resolvedBoq)) {
+                    const boqBuffer = await fs.promises.readFile(resolvedBoq);
+                    const boqBlob = new Blob([boqBuffer], { type: 'application/pdf' });
+                    formData.append('boq_file', boqBlob, path.basename(resolvedBoq));
+                }
+            } catch (boqErr) {
+                this.logger.warn(`[PdfExtractionProcessor] Could not load BOQ file '${boqPath}': ${(boqErr as Error).message}`);
+            }
+        }
+
+        if (userId) {
+            formData.append('user_id', String(userId));
+        }
 
         const endpoint = `${serviceUrl.replace(/\/+$/, '')}/extract`;
         this.logger.info(`[PdfExtractionProcessor] Dispatching POST to ${endpoint} with ${timeoutMs}ms timeout...`, {
@@ -161,8 +201,26 @@ export class PdfExtractionProcessor implements OnModuleInit {
             },
         );
 
+        // Record Claude API token usage & per-stage metrics into claude_token_usage & sliding window TPM
+        if (extractionResult.llm_usage) {
+            try {
+                await this.claudeUsageService.recordUsage({
+                    userId,
+                    tenderId,
+                    jobId: job.id,
+                    durationMs: extractionResult.processing_time_ms,
+                    usage: extractionResult.llm_usage,
+                });
+            } catch (usageErr: unknown) {
+                this.logger.warn(
+                    `[PdfExtractionProcessor] Failed to record Claude usage for job ${job.id}: ${(usageErr as Error).message}`,
+                );
+            }
+        }
+
         // Return result directly to BullMQ (stored in Redis returnvalue, non-destructive, no DB writes)
         return extractionResult;
+
     }
 
     /**

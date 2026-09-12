@@ -15,9 +15,11 @@ import {
     Layers,
     Wifi,
     Cpu,
+    Bot,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useSystemHealth } from "@/hooks/api/useHealth";
+import { ClaudeTelemetrySection } from "./components/ClaudeTelemetrySection";
 import type {
     SubHealth,
     WorkerStatusDetail,
@@ -562,7 +564,7 @@ const SystemHealthPage = () => {
                 isRefreshing={isFetching}
             />
 
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
                 <KpiCard
                     icon={Server}
                     label="API"
@@ -602,6 +604,13 @@ const SystemHealthPage = () => {
                     sub={emailData ? `${emailData.failed} failed` : "unavailable"}
                     status={toStatusKind(overview.email.status)}
                 />
+                <KpiCard
+                    icon={Bot}
+                    label="Claude AI"
+                    value={overview.claude?.data?.currentTpm != null ? `${overview.claude.data.currentTpm} TPM` : "0 TPM"}
+                    sub={overview.claude?.status === "ok" ? "sliding window active" : (overview.claude?.error ?? "active")}
+                    status={toStatusKind(overview.claude?.status ?? "ok")}
+                />
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -612,6 +621,9 @@ const SystemHealthPage = () => {
                 <WorkersCard sub={overview.workers} />
                 <QueuesCard sub={overview.queues} />
             </div>
+
+            {/* Claude AI Token Telemetry, Sliding TPM & Leaderboard */}
+            <ClaudeTelemetrySection />
 
             {isFetching && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">

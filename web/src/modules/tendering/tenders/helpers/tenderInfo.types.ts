@@ -52,6 +52,52 @@ export interface TenderInfoWithNames extends TenderInfo {
     enquiryId?: number | null;
 }
 
+export interface StructuredTenderDocuments {
+    schemaVersion: number;
+    mainTender: string | null;
+    atc: string[];
+    boq: string | null;
+    otherDocuments: string[];
+}
+
+export function parseTenderDocuments(raw: string | null | undefined): StructuredTenderDocuments {
+    const empty: StructuredTenderDocuments = {
+        schemaVersion: 1,
+        mainTender: null,
+        atc: [],
+        boq: null,
+        otherDocuments: [],
+    };
+    if (!raw) return empty;
+    try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+            // Legacy flat array: paths[0] is mainTender, rest is otherDocuments
+            const valid = parsed.filter(Boolean);
+            const [main, ...rest] = valid;
+            return {
+                schemaVersion: 1,
+                mainTender: main || null,
+                atc: [],
+                boq: null,
+                otherDocuments: rest,
+            };
+        }
+        if (parsed && typeof parsed === "object") {
+            return {
+                schemaVersion: typeof parsed.schemaVersion === "number" ? parsed.schemaVersion : 1,
+                mainTender: typeof parsed.mainTender === "string" ? parsed.mainTender : null,
+                atc: Array.isArray(parsed.atc) ? parsed.atc.filter(Boolean) : [],
+                boq: typeof parsed.boq === "string" ? parsed.boq : null,
+                otherDocuments: Array.isArray(parsed.otherDocuments) ? parsed.otherDocuments.filter(Boolean) : [],
+            };
+        }
+        return empty;
+    } catch {
+        return empty;
+    }
+}
+
 export interface CreateTenderRequest {
     team: number;
     tenderNo: string;
@@ -68,6 +114,7 @@ export interface CreateTenderRequest {
     location?: number | null;
     website?: number | null;
     courierAddress?: string | null;
+    documents?: string | null;
 }
 
 export interface UpdateTenderRequest {
@@ -86,6 +133,7 @@ export interface UpdateTenderRequest {
     location?: number | null;
     website?: number | null;
     courierAddress?: string | null;
+    documents?: string | null;
     tlRemarks?: string | null;
     rfqTo?: string | null;
     tlStatus?: number;

@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
 from app.services.pdf_parent_ingest import ingest_parent_tender_pdf
 from app.services.tms_field_mapper import map_to_tms_dto
@@ -20,6 +20,7 @@ from app.services.tender_mapper import (
 
 router = APIRouter(tags=["Extract"])
 logger = logging.getLogger(__name__)
+
 
 # Map internal source identifiers to canonical API sources
 SOURCE_MAP: Dict[str, str] = {
@@ -185,7 +186,10 @@ def _format_field_object(
 
 
 @router.post("/extract")
-async def extract_tender(pdf_file: UploadFile = File(...)) -> Dict[str, Any]:
+async def extract_tender(
+    pdf_file: UploadFile = File(...),
+    user_id: Optional[int] = Form(None),
+) -> Dict[str, Any]:
     """
     Extracts structured fields from an uploaded tender PDF and returns
     TMS DTO-shaped fields with merged confidence and source metadata.
@@ -211,7 +215,7 @@ async def extract_tender(pdf_file: UploadFile = File(...)) -> Dict[str, Any]:
 
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     start_time = time.time()
-    logger.info(f"[EXTRACT_API] Starting extraction request for '{filename}' (job_id: {job_id})")
+    logger.info(f"[EXTRACT_API] Starting extraction request for '{filename}' (job_id: {job_id}, user_id: {user_id})")
 
     # Use TemporaryDirectory as context manager so all generated files
     # (temp PDF, page PNGs in pages/{job_id}, and downloaded child PDFs)
@@ -274,7 +278,9 @@ async def extract_tender(pdf_file: UploadFile = File(...)) -> Dict[str, Any]:
                 "fields": fields,
                 "missing_fields": missing_fields,
                 "processing_time_ms": processing_time_ms,
+                "llm_usage": infosheet_data.get("_llm_usage"),
             }
+
 
             logger.info(
                 f"[EXTRACT_API] Extraction complete for '{filename}' "

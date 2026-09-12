@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException } from '@nestjs/common';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { NewTenderInfo } from '@db/schemas/tendering/tenders.schema';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
@@ -140,6 +140,15 @@ export class TenderInfoController {
             throw new NotFoundException(`Tender with ID ${id} not found`);
         }
         return tender;
+    }
+
+    @Post('classify-document')
+    @HttpCode(HttpStatus.OK)
+    async classifyDocument(@Body() body: { filePath: string }) {
+        if (!body || !body.filePath) {
+            throw new BadRequestException('filePath is required for document classification');
+        }
+        return this.tenderInfosService.classifyDocument(body.filePath);
     }
 
     @Post()

@@ -207,12 +207,20 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
         });
 
         beforeEach(() => {
+            const mockClaudeUsageService = {
+                recordUsage: jest.fn().mockResolvedValue(undefined),
+                recordTpmEntry: jest.fn().mockResolvedValue(undefined),
+                getCurrentTpm: jest.fn().mockResolvedValue(0),
+            };
+
             processor = new PdfExtractionProcessor(
                 mockConfigService,
                 mockFileUploadService,
+                mockClaudeUsageService as any,
                 mockLogger,
             );
         });
+
 
         it('should resolve absolute paths directly or through FileUploadService', () => {
             const abs = processor.resolvePdfPath(tempPdfFile);

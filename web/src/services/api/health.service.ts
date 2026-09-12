@@ -32,6 +32,114 @@ export interface SubHealth<T = Record<string, unknown>> {
     error?: string
 }
 
+export interface ClaudeCurrencyMeta {
+    usdToInrRate: number
+    usdToInrRateAsOf: string
+}
+
+export interface ClaudeTelemetrySummary {
+    currentTpm: number
+    peakTpm: number
+    totalTokens: number
+    inputTokens: number
+    outputTokens: number
+    cacheTokens: number
+    estimatedCostUsd: number
+    estimatedCostInr: number
+    totalRequests: number
+    activeUsersCount: number
+    tpmLimit: number
+    tpmUtilizationPct: number
+    models: Record<string, { modelId: string; displayName: string; inputPricePerMillion: number; outputPricePerMillion: number }>
+    currency: ClaudeCurrencyMeta
+}
+
+export interface ClaudeMinuteUsage {
+    minute: string
+    timestamp: number
+    tokens: number
+    inputTokens: number
+    outputTokens: number
+    requests: number
+}
+
+export interface ClaudeUserUsage {
+    userId: number
+    name: string
+    email: string
+    totalTokens: number
+    inputTokens: number
+    outputTokens: number
+    requests: number
+    estimatedCostUsd: number
+    estimatedCostInr: number
+    lastActiveAt: string | null
+}
+
+export interface ClaudeRecentCall {
+    id: number
+    jobId: string | null
+    tenderId: number | null
+    callType: string
+    model: string
+    userName: string
+    inputTokens: number
+    outputTokens: number
+    totalTokens: number
+    estimatedCostUsd: number
+    estimatedCostInr: number
+    durationMs: number | null
+    createdAt: string
+}
+
+export interface AdminReconciliationReport {
+    status: 'matched' | 'drift_detected' | 'unconfigured' | 'error'
+    message: string
+    appTrackedTokens: number
+    appTrackedCostUsd: number
+    anthropicVerifiedTokens: number | null
+    anthropicVerifiedCostUsd: number | null
+    deltaTokens: number | null
+    driftPercent: number | null
+    windowStart: string
+    windowEnd: string
+    cached: boolean
+    lastCheckedAt: string
+}
+
+export interface ClaudeTelemetryResponse {
+    status: string
+    summary: ClaudeTelemetrySummary
+    timeline: ClaudeMinuteUsage[]
+    userBreakdown: ClaudeUserUsage[]
+    recentCalls: ClaudeRecentCall[]
+    reconciliation: AdminReconciliationReport
+}
+
+export interface TenderCallDetail {
+    id: number
+    jobId: string | null
+    callType: string
+    model: string
+    inputTokens: number
+    outputTokens: number
+    totalTokens: number
+    estimatedCostUsd: number
+    estimatedCostInr: number
+    durationMs: number | null
+    createdAt: string
+}
+
+export interface TenderBreakdownItem {
+    tenderId: number
+    totalTokens: number
+    estimatedCostUsd: number
+    estimatedCostInr: number
+    totalCalls: number
+    lastActiveAt: string
+    calls: TenderCallDetail[]
+}
+
 export interface SystemHealth {
     status: 'ok' | 'degraded' | 'down'
     data: {
@@ -41,6 +149,7 @@ export interface SystemHealth {
         queues: SubHealth<Record<string, QueueCounts>>
         workers: SubHealth<Record<string, WorkerStatusDetail>>
         email: SubHealth<EmailHealth>
+        claude?: SubHealth<{ currentTpm?: number; status?: string; models?: string[] }>
     }
 }
 
@@ -52,6 +161,15 @@ class HealthService extends BaseApiService {
     async getSystemHealth(): Promise<SystemHealth> {
         return this.get<SystemHealth>('')
     }
+
+    async getClaudeTelemetry(): Promise<ClaudeTelemetryResponse> {
+        return this.get<ClaudeTelemetryResponse>('/claude')
+    }
+
+    async getClaudeTenders(sortBy: 'cost' | 'tokens' | 'recent' = 'cost'): Promise<TenderBreakdownItem[]> {
+        return this.get<TenderBreakdownItem[]>(`/claude/tenders?sortBy=${sortBy}`)
+    }
 }
 
 export const healthService = new HealthService()
+

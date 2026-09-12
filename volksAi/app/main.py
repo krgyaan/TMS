@@ -3,7 +3,7 @@ import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import health, extract
+from app.routers import health, extract, classify
 
 if hasattr(sys.stdout, "reconfigure"):
     try:
@@ -72,7 +72,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount health and extraction routers
+# Mount health, extraction, and classification routers
 app.include_router(health.router)
 app.include_router(extract.router)
+app.include_router(classify.router)
 
