@@ -11,12 +11,14 @@ import { ClientDirectorySyncService } from "@/modules/shared/client-directory/cl
 import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
 
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
+import { projects } from "@/db/schemas/master/projects.schema";
 import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-items.schema";
 import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
 import { paymentRequests } from "@/db/schemas/operations";
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
 import { woBasicDetails } from "@/db/schemas/operations/work-order.schema";
 import { users } from "@/db/schemas";
+import { materializeApprovalLines } from "@/modules/operations/inventory/inventory.materialize";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -61,11 +63,18 @@ export class VendorWorkOrderService {
 
     async create(body: any, userId: number) {
         if (body.projectId) {
-            const hasWC = await this.insuranceService.hasActiveWCInsurance(body.projectId);
-            if (!hasWC) {
-                throw new BadRequestException(
-                    "Cannot create Vendor Work Order: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
-                );
+            const [project] = await this.db
+                .select({ insuranceRequired: projects.insuranceRequired })
+                .from(projects)
+                .where(eq(projects.id, body.projectId))
+                .limit(1);
+            if (project?.insuranceRequired) {
+                const hasWC = await this.insuranceService.hasActiveWCInsurance(body.projectId);
+                if (!hasWC) {
+                    throw new BadRequestException(
+                        "Cannot create Vendor Work Order: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
+                    );
+                }
             }
         }
 
@@ -374,6 +383,7 @@ export class VendorWorkOrderService {
             .select({
                 id: vendorWorkOrders.id,
                 projectId: vendorWorkOrders.projectId,
+                projectName: vendorWorkOrders.projectName,
                 woNumber: vendorWorkOrders.woNumber,
                 sellerName: vendorWorkOrders.sellerName,
                 sellerEmail: vendorWorkOrders.sellerEmail,
@@ -445,7 +455,7 @@ export class VendorWorkOrderService {
         return { pending, approved, rejected, new: newCount, closed: closedCount, invoicePending: invoicePendingCount };
     }
 
-    async setVwoApproval(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }) {
+    async setVwoApproval(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }, userId?: number) {
         const wo = await this.db
             .select()
             .from(vendorWorkOrders)
@@ -468,18 +478,30 @@ export class VendorWorkOrderService {
             const tdsAmt = (subtotal * tdsPercentage) / 100;
             const amountAfterTds = grandTotal - tdsAmt;
 
-            const [updated] = await this.db
-                .update(vendorWorkOrders)
-                .set({
-                    tdsPercentage: tdsPercentage.toString(),
-                    tdsAmount: tdsAmt.toString(),
-                    amountAfterTds: amountAfterTds.toString(),
-                    woApproved: true,
-                    woApprovalRemark: remark || null,
-                    updatedAt: sql`now()`,
-                })
-                .where(eq(vendorWorkOrders.id, id))
-                .returning();
+            const [updated] = await this.db.transaction(async tx => {
+                const [row] = await tx
+                    .update(vendorWorkOrders)
+                    .set({
+                        tdsPercentage: tdsPercentage.toString(),
+                        tdsAmount: tdsAmt.toString(),
+                        amountAfterTds: amountAfterTds.toString(),
+                        woApproved: true,
+                        woApprovalRemark: remark || null,
+                        updatedAt: sql`now()`,
+                    })
+                    .where(eq(vendorWorkOrders.id, id))
+                    .returning();
+
+                await materializeApprovalLines(tx, {
+                    docType: "vwo",
+                    projectId: row.projectId,
+                    referenceId: row.id,
+                    lines: items,
+                    createdBy: userId ?? wo.woRaisedBy,
+                });
+
+                return [row];
+            });
 
             this.logger.info(`VWO approved #${id}: ${tdsPercentage}%, TDS Amount: ${tdsAmt}, After TDS: ${amountAfterTds}`);
             return updated;
@@ -504,6 +526,7 @@ export class VendorWorkOrderService {
             .select({
                 id: vendorWorkOrders.id,
                 projectId: vendorWorkOrders.projectId,
+                projectName: vendorWorkOrders.projectName,
                 woNumber: vendorWorkOrders.woNumber,
                 woDate: vendorWorkOrders.woDate,
                 sellerName: vendorWorkOrders.sellerName,

@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
@@ -12,12 +13,22 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { NumberInput } from "@/components/form/NumberInput";
 import { SelectField } from "@/components/form/SelectField";
 import { DateTimeInput } from "@/components/form/DateTimeInput";
-import { DateInput } from "@/components/form/DateInput";
 import { FileUploader } from "@/components/file-upload";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { fileUploadService } from "@/services/api/file-upload.service";
+import { parseFileMeta } from "@/components/file-upload/helpers/fileMeta";
+import { cn } from "@/lib/utils";
 import { useCreateTender, useUpdateTender, useGenerateTenderName } from "@/hooks/api/useTenders";
-import type { TenderInfoWithNames } from "../helpers/tenderInfo.types";
+import { type TenderInfoWithNames, type StructuredTenderDocuments, parseTenderDocuments } from "../helpers/tenderInfo.types";
+import {
+    classifyDocumentFilename,
+    classifyDocumentViaApi,
+    CATEGORY_INFO,
+    type DocumentCategory,
+    type ClassifiedDocument,
+} from "../helpers/documentClassifier";
 import { paths } from "@/app/routes/paths";
-import { ArrowLeft, Sparkles, CheckCircle2, ArrowRight, FileSpreadsheet, FileUp } from "lucide-react";
+import { ArrowLeft, Sparkles, CheckCircle2, ArrowRight, FileSpreadsheet, FileUp, FileText, AlertTriangle, X } from "lucide-react";
 import { useTeamOptions, useOrganizationOptions, useUserOptions, useLocationOptions, useWebsiteOptions, useItemOptions } from "@/hooks/useSelectOptions";
 import { useAuth } from "@/contexts/AuthContext";
 import { TenderNameWarningAlert } from "./TenderNameWarningAlert";
@@ -46,16 +57,7 @@ const ManualFormSchema = z.object({
     courierAddress: z.string().optional(),
 });
 
-const AiFormSchema = z.object({
-    team: z.coerce.number().int().positive({ message: "Team is required" }),
-    tenderNo: z.string().min(1, { message: "Tender No is required" }),
-    startDate: z.string().min(1, { message: "Start date is required" }),
-    closingDate: z.string().min(1, { message: "Closing date is required" }),
-    files: z.array(z.string()).default([]),
-});
-
 type ManualFormValues = z.infer<typeof ManualFormSchema>;
-type AiFormValues = z.infer<typeof AiFormSchema>;
 
 interface TenderFormProps {
     tender?: TenderInfoWithNames;
@@ -98,16 +100,11 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
         },
     });
 
-    const aiForm = useForm<AiFormValues>({
-        resolver: zodResolver(AiFormSchema) as any,
-        defaultValues: {
-            team: undefined as any,
-            tenderNo: "",
-            startDate: "",
-            closingDate: "",
-            files: [],
-        },
-    });
+
+
+    // Classification state for uploaded tender documents
+    const [fileClassifications, setFileClassifications] = useState<Record<string, ClassifiedDocument>>({});
+    const [documentError, setDocumentError] = useState<string | null>(null);
 
     // Watch fields for auto-generation
     const organization = useWatch({ control: manualForm.control, name: "organization" });
@@ -116,11 +113,9 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
     const team = useWatch({ control: manualForm.control, name: "team" });
     const watchTenderName = useWatch({ control: manualForm.control, name: "tenderName" });
     const watchTenderNo = useWatch({ control: manualForm.control, name: "tenderNo" });
-    console.log({watchTenderName});
 
-    // Watch documents for display
-    const documents = useWatch({ control: manualForm.control, name: "documents" });
-    const aiFiles = useWatch({ control: aiForm.control, name: "files" });
+    // Watch documents list
+    const documents = useWatch({ control: manualForm.control, name: "documents" }) || [];
 
     const userOptions = useUserOptions(team);
 
@@ -146,13 +141,53 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
             return;
         }
         try {
-            let parsedDocuments: string[] = [];
-            if (tender.documents) {
-                try {
-                    parsedDocuments = JSON.parse(tender.documents);
-                } catch {
-                    parsedDocuments = [];
-                }
+            const parsedDocs = parseTenderDocuments(tender.documents);
+            const initialPaths: string[] = [];
+            const initialClassifications: Record<string, ClassifiedDocument> = {};
+
+            if (parsedDocs.mainTender) {
+                initialPaths.push(parsedDocs.mainTender);
+                initialClassifications[parsedDocs.mainTender] = {
+                    path: parsedDocs.mainTender,
+                    name: parseFileMeta(parsedDocs.mainTender).displayName,
+                    category: "mainTender",
+                    confidence: 100,
+                    needsConfirmation: false,
+                    reason: "persisted",
+                };
+            }
+            for (const p of parsedDocs.atc) {
+                initialPaths.push(p);
+                initialClassifications[p] = {
+                    path: p,
+                    name: parseFileMeta(p).displayName,
+                    category: "atc",
+                    confidence: 100,
+                    needsConfirmation: false,
+                    reason: "persisted",
+                };
+            }
+            if (parsedDocs.boq) {
+                initialPaths.push(parsedDocs.boq);
+                initialClassifications[parsedDocs.boq] = {
+                    path: parsedDocs.boq,
+                    name: parseFileMeta(parsedDocs.boq).displayName,
+                    category: "boq",
+                    confidence: 100,
+                    needsConfirmation: false,
+                    reason: "persisted",
+                };
+            }
+            for (const p of parsedDocs.otherDocuments) {
+                initialPaths.push(p);
+                initialClassifications[p] = {
+                    path: p,
+                    name: parseFileMeta(p).displayName,
+                    category: "otherDocuments",
+                    confidence: 100,
+                    needsConfirmation: false,
+                    reason: "persisted",
+                };
             }
 
             const resetValues = {
@@ -169,10 +204,11 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                 website: tender.website ? Number(tender.website) : undefined,
                 item: Number(tender.item) || (undefined as any),
                 status: Number(tender.status) ?? 1,
-                documents: parsedDocuments,
+                documents: initialPaths,
                 remarks: tender.remarks || "",
             };
             manualForm.reset(resetValues);
+            setFileClassifications(initialClassifications);
             previousValues.current = {
                 organization: resetValues.organization,
                 item: resetValues.item,
@@ -186,6 +222,105 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
             console.error("Error resetting form:", err);
         }
     }, [tender, mode, manualForm]);
+
+    // Handle files upload & classification
+    const handleFilesChange = (paths: string[]) => {
+        setDocumentError(null);
+        manualForm.setValue("documents", paths, { shouldValidate: true });
+
+        setFileClassifications((prev) => {
+            const updated: Record<string, ClassifiedDocument> = {};
+
+            // Keep existing classifications for paths that remain
+            for (const p of paths) {
+                if (prev[p]) {
+                    updated[p] = prev[p];
+                } else {
+                    // Instant optimistic classification from filename
+                    updated[p] = classifyDocumentFilename(p);
+                }
+            }
+
+            // Ensure at least one Main Tender exists if none tagged
+            const hasMain = Object.values(updated).some((c) => c.category === "mainTender");
+            if (!hasMain && paths.length > 0) {
+                const candidate = paths.find((p) => updated[p]?.category !== "boq" && updated[p]?.category !== "atc") || paths[0];
+                if (candidate && updated[candidate]) {
+                    updated[candidate] = {
+                        ...updated[candidate],
+                        category: "mainTender",
+                        needsConfirmation: updated[candidate].confidence < 70,
+                    };
+                }
+            }
+
+            return updated;
+        });
+
+        // Asynchronously sniff PDF content (pages 1-5 via VolksAI) for any PDF files
+        for (const p of paths) {
+            if (p.toLowerCase().endsWith(".pdf")) {
+                classifyDocumentViaApi(p)
+                    .then((apiResult) => {
+                        setFileClassifications((prev) => {
+                            const current = prev[p];
+                            if (!current) return prev;
+                            // Only update if user hasn't manually overridden
+                            if (current.reason === "manual_override") return prev;
+
+                            return {
+                                ...prev,
+                                [p]: {
+                                    ...current,
+                                    category: apiResult.category,
+                                    confidence: apiResult.confidence,
+                                    needsConfirmation: apiResult.needsConfirmation,
+                                    reason: apiResult.reason,
+                                    scores: apiResult.scores,
+                                },
+                            };
+                        });
+                    })
+                    .catch(() => {});
+            }
+        }
+    };
+
+    // Quick reclassify control handler
+    const handleReclassify = (filePath: string, newCategory: DocumentCategory) => {
+        setDocumentError(null);
+        setFileClassifications((prev) => {
+            const updated = { ...prev };
+            const target = updated[filePath];
+            if (!target) return prev;
+
+            // Enforce single Main Tender
+            if (newCategory === "mainTender") {
+                for (const [k, v] of Object.entries(updated)) {
+                    if (k !== filePath && v.category === "mainTender") {
+                        updated[k] = { ...v, category: "otherDocuments" };
+                    }
+                }
+            }
+            // Enforce single BOQ
+            if (newCategory === "boq") {
+                for (const [k, v] of Object.entries(updated)) {
+                    if (k !== filePath && v.category === "boq") {
+                        updated[k] = { ...v, category: "otherDocuments" };
+                    }
+                }
+            }
+
+            updated[filePath] = {
+                ...target,
+                category: newCategory,
+                needsConfirmation: false,
+                reason: "manual_override",
+            };
+
+            return updated;
+        });
+    };
 
     // Auto-generate tender name
     useEffect(() => {
@@ -251,6 +386,56 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
 
     const handleManualSubmit: SubmitHandler<ManualFormValues> = async values => {
         try {
+            setDocumentError(null);
+            const uploadedPaths = values.documents || [];
+
+            let mainTenderPath: string | null = null;
+            const atcPaths: string[] = [];
+            let boqPath: string | null = null;
+            const otherDocumentsPaths: string[] = [];
+
+            for (const p of uploadedPaths) {
+                const category = fileClassifications[p]?.category || classifyDocumentFilename(p).category;
+                if (category === "mainTender") {
+                    if (!mainTenderPath) {
+                        mainTenderPath = p;
+                    } else {
+                        otherDocumentsPaths.push(p);
+                    }
+                } else if (category === "atc") {
+                    atcPaths.push(p);
+                } else if (category === "boq") {
+                    if (!boqPath) {
+                        boqPath = p;
+                    } else {
+                        otherDocumentsPaths.push(p);
+                    }
+                } else {
+                    otherDocumentsPaths.push(p);
+                }
+            }
+
+            // Require at least one mainTender if documents are uploaded
+            if (uploadedPaths.length > 0 && !mainTenderPath) {
+                setDocumentError("Please designate one of the uploaded documents as the Main Tender Document (NIT).");
+                return;
+            }
+
+            const structuredDocuments: StructuredTenderDocuments = {
+                schemaVersion: 1,
+                mainTender: mainTenderPath,
+                atc: atcPaths,
+                boq: boqPath,
+                otherDocuments: otherDocumentsPaths,
+            };
+
+            const hasAnyDocs = Boolean(
+                structuredDocuments.mainTender ||
+                structuredDocuments.atc.length > 0 ||
+                structuredDocuments.boq ||
+                structuredDocuments.otherDocuments.length > 0
+            );
+
             const payload = {
                 team: values.team,
                 tenderNo: values.tenderNo,
@@ -266,7 +451,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                 item: values.item,
                 status: values.status,
                 remarks: values.remarks || undefined,
-                documents: values.documents.length > 0 ? JSON.stringify(values.documents) : null,
+                documents: hasAnyDocs ? JSON.stringify(structuredDocuments) : null,
             };
 
             if (mode === "create") {
@@ -281,11 +466,121 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
         }
     };
 
-    const handleAiSubmit: SubmitHandler<AiFormValues> = async _values => {
-        alert("AI-based tender creation is not yet available. Please use the manual form instead.");
-    };
-
     const saving = createTender.isPending || updateTender.isPending;
+
+    const mainTenderCount = documents.filter(
+        (p) => (fileClassifications[p]?.category || classifyDocumentFilename(p).category) === "mainTender"
+    ).length;
+    const atcCount = documents.filter(
+        (p) => (fileClassifications[p]?.category || classifyDocumentFilename(p).category) === "atc"
+    ).length;
+    const boqCount = documents.filter(
+        (p) => (fileClassifications[p]?.category || classifyDocumentFilename(p).category) === "boq"
+    ).length;
+    const otherCount = documents.filter(
+        (p) => (fileClassifications[p]?.category || classifyDocumentFilename(p).category) === "otherDocuments"
+    ).length;
+
+    const renderFileCard = (filePath: string, onRemove: () => void) => {
+        const meta = parseFileMeta(filePath);
+        const classification = fileClassifications[filePath] || classifyDocumentFilename(filePath);
+        const category = classification.category;
+        const info = CATEGORY_INFO[category];
+        const isPdf = filePath.toLowerCase().endsWith(".pdf");
+        const isSpreadsheet = filePath.toLowerCase().endsWith(".xlsx") || filePath.toLowerCase().endsWith(".xls");
+
+        return (
+            <div
+                key={filePath}
+                className={cn(
+                    "flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border bg-card transition-all",
+                    classification.needsConfirmation && "border-amber-500/40 bg-amber-500/5",
+                    category === "mainTender" && "border-violet-500/30",
+                    category === "atc" && "border-blue-500/30",
+                    category === "boq" && "border-emerald-500/30",
+                    category === "otherDocuments" && "border-border"
+                )}
+            >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div
+                        className={cn(
+                            "p-2 rounded-md shrink-0",
+                            isSpreadsheet
+                                ? "bg-emerald-500/10 text-emerald-600"
+                                : isPdf
+                                  ? "bg-red-500/10 text-red-600"
+                                  : "bg-muted text-muted-foreground"
+                        )}
+                    >
+                        {isSpreadsheet ? (
+                            <FileSpreadsheet className="h-4 w-4" />
+                        ) : (
+                            <FileText className="h-4 w-4" />
+                        )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <a
+                                href={fileUploadService.getFileUrl(filePath)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm font-medium hover:underline truncate max-w-[240px] sm:max-w-md"
+                                title={meta.displayName}
+                            >
+                                {meta.displayName}
+                            </a>
+                            <Badge
+                                variant="outline"
+                                className={cn("text-[11px] font-semibold shrink-0", info.badgeClass)}
+                            >
+                                {info.badgeText}
+                            </Badge>
+                            {classification.needsConfirmation && (
+                                <Badge
+                                    variant="outline"
+                                    className="text-[11px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 shrink-0 flex items-center gap-1"
+                                >
+                                    <AlertTriangle className="h-3 w-3" />
+                                    Needs confirmation
+                                </Badge>
+                            )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {info.label} • {info.description}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                    <Select
+                        value={category}
+                        onValueChange={(val) => handleReclassify(filePath, val as DocumentCategory)}
+                        disabled={saving}
+                    >
+                        <SelectTrigger className="h-8 w-[165px] text-xs">
+                            <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="mainTender">Main Tender (NIT)</SelectItem>
+                            <SelectItem value="atc">Additional Terms (ATC)</SelectItem>
+                            <SelectItem value="boq">Bill of Quantities (BOQ)</SelectItem>
+                            <SelectItem value="otherDocuments">Other / Supporting</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        onClick={onRemove}
+                        disabled={saving}
+                    >
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
+        );
+    };
 
     return (
         <Card>
@@ -516,17 +811,73 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                         options={websiteOptions}
                                         placeholder="Select Website"
                                     />
-                                    <div className="space-y-2">
+                                    {/* Unified Single Upload Box with Automatic VolksAI Classification */}
+                                    <div className="col-span-full space-y-4 rounded-xl border bg-muted/20 p-5 my-2 shadow-2xs">
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b pb-3">
+                                            <div>
+                                                <h4 className="text-sm font-semibold tracking-tight flex items-center gap-2">
+                                                    <FileUp className="h-4 w-4 text-primary" />
+                                                    Tender Documents
+                                                </h4>
+                                                <p className="text-xs text-muted-foreground mt-0.5">
+                                                    Upload all tender documents together. VolksAI automatically detects and tags each file (NIT, ATC, BOQ, or Supporting).
+                                                </p>
+                                            </div>
+                                            <Badge variant="outline" className="text-xs font-mono self-start sm:self-auto bg-background/80 text-muted-foreground">
+                                                Auto-Classified Ingestion
+                                            </Badge>
+                                        </div>
+
+                                        {documentError && (
+                                            <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm font-medium">
+                                                <AlertTriangle className="h-4 w-4 shrink-0" />
+                                                <span>{documentError}</span>
+                                            </div>
+                                        )}
+
+                                        {documents.length > 0 && (
+                                            <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-lg bg-background/80 border text-xs">
+                                                <span className="font-semibold text-foreground/80 mr-1">Detected Structure:</span>
+                                                <Badge
+                                                    variant="outline"
+                                                    className={cn(
+                                                        "text-xs",
+                                                        mainTenderCount === 1
+                                                            ? "bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/30"
+                                                            : "bg-destructive/10 text-destructive border-destructive/30"
+                                                    )}
+                                                >
+                                                    Main Tender: {mainTenderCount === 1 ? "1 file (NIT)" : "0 (Required!)"}
+                                                </Badge>
+                                                <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/30">
+                                                    ATC: {atcCount} {atcCount === 1 ? "file" : "files"}
+                                                </Badge>
+                                                <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">
+                                                    BOQ: {boqCount} {boqCount === 1 ? "file" : "files"}
+                                                </Badge>
+                                                <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30">
+                                                    Other: {otherCount} {otherCount === 1 ? "file" : "files"}
+                                                </Badge>
+                                            </div>
+                                        )}
+
                                         <FileUploader
                                             context="tender-documents"
                                             value={documents}
-                                            onChange={(paths) => manualForm.setValue("documents", paths)}
-                                            label="Upload Documents"
+                                            onChange={handleFilesChange}
+                                            maxFiles={20}
+                                            allowedExtensions={[".pdf", ".xlsx", ".xls", ".doc", ".docx", ".zip", ".jpg", ".png"]}
+                                            hint="Upload tender documents (.pdf, .xlsx, .doc, images, etc.) • Single or multi-file upload"
                                             disabled={saving}
+                                            renderItem={(filePath, onRemove) => renderFileCard(filePath, onRemove)}
                                         />
-                                        <p className="text-xs text-muted-foreground">
-                                            Upload relevant tender documents (optional)
-                                        </p>
+
+                                        <div className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground border border-dashed flex items-center gap-2">
+                                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                                            <span>
+                                                <strong>Strict Security Boundary:</strong> Files categorized as <em>Other / Supporting</em> are stored for team reference only and are strictly excluded from OCR, parsing, and LLM processing.
+                                            </span>
+                                        </div>
                                     </div>
 
                                     {/* Remarks */}

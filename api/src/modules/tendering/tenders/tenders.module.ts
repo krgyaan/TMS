@@ -5,9 +5,10 @@ import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service'
 import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-history/tender-status-history.module';
 import { EmailModule } from '@/modules/email/email.module';
 import { TimersModule } from '@/modules/timers/timers.module';
+import { FileUploadModule } from '@/modules/file-upload/file-upload.module';
 
 @Module({
-    imports: [DatabaseModule, TenderStatusHistoryModule, EmailModule, TimersModule],
+    imports: [DatabaseModule, TenderStatusHistoryModule, EmailModule, TimersModule, FileUploadModule],
     controllers: [TenderInfoController],
     providers: [TenderInfosService],
     exports: [TenderInfosService],

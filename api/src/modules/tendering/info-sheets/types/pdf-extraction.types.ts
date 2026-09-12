@@ -1,6 +1,18 @@
+export interface VolksAiExtractionPayload {
+    tenderId: number;
+    pdfPath: string;
+    mainTenderPath: string;
+    atcPaths: string[];
+    boqPath: string | null;
+    userId: number;
+}
+
 export interface PdfExtractionJobData {
     tenderId: number;
     pdfPath: string;
+    mainTenderPath?: string;
+    atcPaths?: string[];
+    boqPath?: string | null;
     userId: number;
 }
 
@@ -15,7 +27,9 @@ export interface PdfExtractionJobResult {
     fields: Record<string, PdfExtractionFieldValue>;
     missing_fields: string[];
     processing_time_ms: number;
+    llm_usage?: Record<string, any>;
 }
+
 
 export type PdfExtractionJobState =
     | 'waiting'

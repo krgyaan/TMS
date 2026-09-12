@@ -105,6 +105,22 @@ class TenderInfosService extends BaseApiService {
         if (item) params.set('item', String(item));
         return this.get(`/tender-no-check?${params.toString()}`);
     }
+
+    async classifyDocument(filePath: string): Promise<{
+        suggestedType: 'mainTender' | 'atc' | 'boq' | 'other';
+        confidence: number;
+        needsConfirmation: boolean;
+        reason: string;
+        scores?: Record<string, number>;
+    }> {
+        return this.post<{
+            suggestedType: 'mainTender' | 'atc' | 'boq' | 'other';
+            confidence: number;
+            needsConfirmation: boolean;
+            reason: string;
+            scores?: Record<string, number>;
+        }>('/classify-document', { filePath });
+    }
 }
 
 export const tenderInfosService = new TenderInfosService();

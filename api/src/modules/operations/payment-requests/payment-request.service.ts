@@ -56,11 +56,18 @@ export class PaymentRequestService {
 
         // WC insurance gate: block PO/VWO/Others payment requests if no active WC policy
         if (body.projectId && body.paymentAgainst && !["insurance", "imprest"].includes(body.paymentAgainst)) {
-            const hasWC = await this.insurancePolicyService.hasActiveWCInsurance(body.projectId);
-            if (!hasWC) {
-                throw new BadRequestException(
-                    "Cannot create Payment Request: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
-                );
+            const [project] = await this.db
+                .select({ insuranceRequired: projects.insuranceRequired })
+                .from(projects)
+                .where(eq(projects.id, body.projectId))
+                .limit(1);
+            if (project?.insuranceRequired) {
+                const hasWC = await this.insurancePolicyService.hasActiveWCInsurance(body.projectId);
+                if (!hasWC) {
+                    throw new BadRequestException(
+                        "Cannot create Payment Request: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
+                    );
+                }
             }
         }
 
@@ -185,8 +192,10 @@ export class PaymentRequestService {
         this.notifications.notifyNewPaymentRequest({
           requestNo: pr.requestNo ?? '',
           amount: pr.amount ?? 0,
-          partyName: pr.partyName ?? '',
+          partyName: pr.partyName ?? null,
+          portalLink: pr.portalLink ?? null,
           requestedBy: userId,
+          category: pr.paymentAgainst ?? '',
         }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
 
         return pr;
@@ -281,6 +290,39 @@ export class PaymentRequestService {
             }
 
             this.logger.info(`Payment Request #${id} status updated to "${body.status}"`);
+
+            if (body.status === 'payment_done') {
+              this.notifications.notifyPaymentDone({
+                amount: updated.amount ?? 0,
+                partyName: updated.partyName ?? null,
+                portalLink: updated.portalLink ?? null,
+                utrNumber: updated.utrNumber ?? null,
+                requestedBy: existing.requestedBy ?? 0,
+                category: existing.paymentAgainst ?? '',
+              }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+            }
+
+            if (body.status === 'rejected') {
+              this.notifications.notifyRejection({
+                amount: updated.amount ?? 0,
+                partyName: updated.partyName ?? null,
+                portalLink: updated.portalLink ?? null,
+                rejectionReason: body.rejectionReason ?? null,
+                requestedBy: existing.requestedBy ?? 0,
+                category: existing.paymentAgainst ?? '',
+              }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+            }
+
+            if (body.status === 'maker_done') {
+              this.notifications.notifyMakerDone({
+                amount: updated.amount ?? 0,
+                partyName: updated.partyName ?? null,
+                portalLink: updated.portalLink ?? null,
+                requestedBy: existing.requestedBy ?? 0,
+                category: existing.paymentAgainst ?? '',
+              }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+            }
+
             return updated;
         });
     }

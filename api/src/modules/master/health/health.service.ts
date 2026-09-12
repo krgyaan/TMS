@@ -4,6 +4,7 @@ import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
 import type IORedis from "ioredis";
 import { Queue } from "bullmq";
+import { ClaudeUsageService } from "./claude-usage.service";
 
 export interface WorkerHeartbeat {
     pid?: number;
@@ -39,7 +40,8 @@ export class HealthService {
         @Inject("FOLLOWUP_QUEUE") private readonly followupQueue: Queue,
         @Inject("CHECKLIST_QUEUE") private readonly checklistQueue: Queue,
         @Inject("VIDEO_PROCESSING_QUEUE") private readonly videoProcessingQueue: Queue,
-        @Inject("GENERIC_QUEUE") private readonly genericQueue: Queue
+        @Inject("GENERIC_QUEUE") private readonly genericQueue: Queue,
+        private readonly claudeUsageService: ClaudeUsageService,
     ) {}
 
     private queues(): Record<string, Queue> {
@@ -52,22 +54,43 @@ export class HealthService {
     }
 
     async getHealth(): Promise<HealthResult> {
-        const [api, database, redis, queues, workers, email] = await Promise.all([
+        const [api, database, redis, queues, workers, email, claude] = await Promise.all([
             Promise.resolve(this.checkApi()),
             this.checkDatabase(),
             this.checkRedis(),
             this.checkQueues(),
             this.checkWorkers(),
             this.checkEmail(),
+            this.checkClaude(),
         ]);
 
-        const results = { api, database, redis, queues, workers, email };
-        const statuses = [api.status, database.status, redis.status, queues.status, workers.status, email.status];
+        const results = { api, database, redis, queues, workers, email, claude };
+        const statuses = [api.status, database.status, redis.status, queues.status, workers.status, email.status, claude.status];
 
         const status: "ok" | "degraded" | "down" = statuses.includes("down") ? "down" : statuses.includes("degraded") ? "degraded" : "ok";
 
         return { status, data: results };
     }
+
+    private async checkClaude(): Promise<HealthResult> {
+        try {
+            const currentTpm = await this.claudeUsageService.getCurrentTpm();
+            return {
+                status: "ok",
+                data: {
+                    currentTpm,
+                    status: "healthy",
+                    models: ["claude-haiku-4-5-20251001", "claude-sonnet-5"],
+                },
+            };
+        } catch (err: unknown) {
+            return {
+                status: "degraded",
+                data: { error: (err as Error).message },
+            };
+        }
+    }
+
 
     private checkApi(): HealthResult {
         const startedAt = new Date().toISOString();

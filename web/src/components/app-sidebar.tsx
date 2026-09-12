@@ -10,6 +10,8 @@ import { TeamSwitcher } from "@/components/team-switcher";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail } from "@/components/ui/sidebar";
 
 import { useCurrentUser, useLogout } from "@/hooks/api/useAuth";
+import { useFieldMode } from "@/hooks/useFieldMode";
+import { FIELD_DASHBOARD_TILES } from "@/lib/field-mode";
 import { getStoredUser } from "@/lib/auth";
 
 import type { AuthUser } from "@/types/auth.types";
@@ -66,6 +68,7 @@ const navMain: NavGroup[] = [
             { title: "Purchase Orders", url: paths.operations.purchaseOrders, permission: "ops.purchase-orders" },
             { title: "Vendor Work Orders", url: paths.operations.vendorWorkOrders, permission: "ops.vendor-work-orders" },
             { title: "Sale Invoices", url: paths.operations.saleInvoices, permission: "ops.sale-invoices" },
+            { title: "Inventory", url: paths.operations.inventory, permission: "ops.inventory" },
             { title: "Payment Requests", url: paths.operations.paymentRequests, permission: "ops.payment-requests" },
         ],
     },
@@ -112,6 +115,7 @@ const navMain: NavGroup[] = [
             { title: "Vendor Work Orders", url: paths.accounts.vendorWorkOrders, permission: "accounts.vendor-work-orders" },
             { title: "Payment Requests", url: paths.accounts.paymentRequests, permission: "accounts.payment-requests" },
             { title: "Sale Invoices", url: paths.accounts.saleInvoices, permission: "accounts.sale-invoices" },
+            { title: "Inventory", url: paths.accounts.inventory, permission: "accounts.inventory" },
             { title: "Vendor Master", url: paths.accounts.vendorMaster, permission: "accounts.vendor-master" },
         ],
     },
@@ -154,7 +158,6 @@ const navMain: NavGroup[] = [
         items: [
             // { title: "Recruitment", url: "", permission: "hrms.admin" },
             { title: "Onboarding", url: paths.hrms.onboardingDashboard, permission: "hrms.admin" },
-            { title: "Approval Dashboard", url : paths.hrms.approvalDashboard, permission: "hrms.admin"},
             { title: "Induction", url: paths.hrms.inductionDashboard, permission: "hrms.admin" },
             { title: "Assets", url: "/hrms/admin/assets", permission: "hrms.admin" },
             { title: "Training", url: "/hrms/training", permission: "hrms.admin"} // -> naya module hai bhai
@@ -214,9 +217,21 @@ function filterMenu(user: AuthUser | null, menu: NavGroup[]): NavGroup[] {
         .filter(Boolean) as NavGroup[];
 }
 
+function buildFieldMenu(user: AuthUser | null): NavGroup[] {
+    return [
+        ...navMain.filter(group => group.title === "Dashboard"),
+        ...FIELD_DASHBOARD_TILES.filter(tile => canRead(user, tile.permission)).map(tile => ({
+            title: tile.title,
+            url: tile.url,
+            icon: tile.icon,
+        })),
+    ];
+}
+
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     const { data: currentUser } = useCurrentUser();
     const storedUser = getStoredUser();
+    const isFieldMode = useFieldMode();
 
     const displayUser = currentUser ??
         storedUser ?? {
@@ -227,7 +242,10 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
             mobile: null,
         };
 
-    const filteredMenuItems = React.useMemo(() => filterMenu(currentUser, navMain), [currentUser]);
+    const filteredMenuItems = React.useMemo(
+        () => (isFieldMode ? buildFieldMenu(currentUser) : filterMenu(currentUser, navMain)),
+        [currentUser, isFieldMode]
+    );
 
     const logoutMutation = useLogout();
 

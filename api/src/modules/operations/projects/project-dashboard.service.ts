@@ -11,6 +11,7 @@ import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
 import { imprestCategories, tenderInformation, users } from "@/db/schemas";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 
 export interface ProjectListFilters {
     page?: number;
@@ -48,6 +49,8 @@ export class ProjectDashboardService {
             .select({
                 projectName: projects.projectName,
                 tenderId: projects.tenderId,
+                insuranceRequired: projects.insuranceRequired,
+                insuranceRequiredRemark: projects.insuranceRequiredRemark,
             })
             .from(projects)
             .where(eq(projects.id, projectId));
@@ -115,7 +118,11 @@ export class ProjectDashboardService {
         const { expenses_done, po_raised, wo_raised } = rows?.[0] ?? {};
 
         return {
-            project: { projectName: project.projectName },
+            project: {
+                projectName: project.projectName,
+                insuranceRequired: project.insuranceRequired,
+                insuranceRequiredRemark: project.insuranceRequiredRemark,
+            },
             tender: tender ?? undefined,
             woBasicDetail: {
                 ...(basicDetail ?? {}),
@@ -169,24 +176,48 @@ export class ProjectDashboardService {
         return { imprests, imprestSum };
     }
 
-    async getProjectList(filters: ProjectListFilters = {}) {
+    async getProjectList(filters: ProjectListFilters = {}, user?: ValidatedUser) {
         const page = filters.page && filters.page > 0 ? filters.page : 1;
         const limit = filters.limit && filters.limit > 0 ? filters.limit : 100;
         const offset = (page - 1) * limit;
+        const effectiveTeamId = filters.teamId ?? user?.teamId;
 
         const whereConditions: any[] = [];
 
+        if (user?.roleId && user.roleId !== 1 && user.roleId !== 2) {
+            const teamName = effectiveTeamId
+                ? (
+                    await this.db
+                        .select({ name: teams.name })
+                        .from(teams)
+                        .where(eq(teams.id, effectiveTeamId))
+                        .limit(1)
+                )[0]?.name ?? null
+                : null;
+
+            whereConditions.push(
+                or(
+                    teamName ? eq(projects.teamName, teamName) : sql`1 = 0`,
+                    eq(projects.teamName, "IT"),
+                    eq(projects.teamName, "BD")
+                )
+            );
+        }
+
         if (filters.search) {
             const pattern = `%${filters.search}%`;
-            whereConditions.push(or(ilike(projects.projectName, pattern), ilike(projects.projectCode, pattern), ilike(projects.teamName, pattern), ilike(projects.poNo, pattern)));
+            whereConditions.push(
+                or(
+                    ilike(projects.projectName, pattern),
+                    ilike(projects.projectCode, pattern),
+                    ilike(projects.teamName, pattern),
+                    ilike(projects.poNo, pattern)
+                )
+            );
         }
 
         if (filters.teamName) {
             whereConditions.push(ilike(projects.teamName, `%${filters.teamName}%`));
-        }
-
-        if (filters.teamId) {
-            whereConditions.push(eq(teams.id, filters.teamId));
         }
 
         const where = whereConditions.length > 0 ? and(...whereConditions) : undefined;

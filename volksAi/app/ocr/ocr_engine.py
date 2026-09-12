@@ -24,6 +24,20 @@ class OcrEngine:
         self._init_paddle()
 
     @classmethod
+    def is_available(cls) -> bool:
+        """
+        True if either OCR engine (PaddleOCR primary, Tesseract fallback) can
+        actually be used. Attempts PaddleOCR initialization (idempotent, cached)
+        so availability reflects reality rather than just checking for the
+        Tesseract binary on PATH.
+        """
+        cls._init_paddle()
+        if cls._paddle_instance is not None:
+            return True
+        import shutil
+        return shutil.which("tesseract") is not None
+
+    @classmethod
     def _init_paddle(cls):
         import os
         if os.getenv("PADDLE_OCR_ENABLED", "true").lower() == "false":

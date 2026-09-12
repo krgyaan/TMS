@@ -174,11 +174,10 @@ def extract_pdf_text_hybrid(pdf_path: str, pages_dir: Path, max_pages: int = 50)
                 "checkboxes": cb_states
             })
         else:
-            # Check if tesseract is installed on PATH
-            import shutil
-            has_tesseract = shutil.which("tesseract") is not None
-            
-            if not has_tesseract:
+            # Check if an OCR engine (PaddleOCR primary, Tesseract fallback) is usable
+            has_ocr_engine = OcrEngine.is_available()
+
+            if not has_ocr_engine:
                 # Fast fallback directly to native words without image I/O overhead
                 native_words = page.get_text("words")
                 blocks_data = build_text_blocks_from_words(native_words)

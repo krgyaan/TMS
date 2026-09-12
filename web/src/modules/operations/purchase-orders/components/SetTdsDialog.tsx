@@ -24,6 +24,7 @@ const TDS_RATES = [
     { value: "194I_2", label: "194I @2%" },
     { value: "194I_10", label: "194I @10%" },
     { value: "194H_2", label: "194H @2%" },
+    { value: "194Q_0.1", label: "194Q @0.1%" },
 ];
 
 function parsePercentage(rateValue: string): number {

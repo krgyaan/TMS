@@ -17,6 +17,8 @@ dist-pwa/
 dist-ssr/
 build/
 
+dev-dist/
+
 # Vite cache
 .vite/
 

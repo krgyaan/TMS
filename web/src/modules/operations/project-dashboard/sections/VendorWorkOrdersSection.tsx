@@ -22,15 +22,17 @@ import { useNavigate } from "react-router-dom";
 
 interface VendorWorkOrdersSectionProps {
     projectId: number | null;
+    insuranceRequired?: boolean;
 }
 
 export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = ({
     projectId,
+    insuranceRequired = true,
 }) => {
     const navigate = useNavigate();
     const [vwoGridApi, setVwoGridApi] = useState<GridApi | null>(null);
     const { data, isLoading } = useProjectVendorWorkOrders(projectId!);
-    const { hasWC } = useHasWCInsurance(projectId ?? 0);
+    const { hasWC } = useHasWCInsurance(projectId ?? 0, insuranceRequired);
 
     const vendorWorkOrders = data ?? [];
 
@@ -119,27 +121,17 @@ export const VendorWorkOrdersSection: React.FC<VendorWorkOrdersSectionProps> = (
             ),
         },
         {
-            field: "shipToName",
-            headerName: "Shipping",
+            field: "projectName",
+            headerName: "Project Name",
             sortable: true,
             filter: true,
-            cellRenderer: (p: CustomCellRendererProps<VendorWorkOrderRow>) => (
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <span className="truncate block max-w-[200px]">{p.value || "-"}</span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" align="start" className="max-w-xs">
-                            <div className="space-y-1 text-xs">
-                                <p><strong>Address:</strong> {p.data?.shippingAddress || "—"}</p>
-                                <p><strong>GST:</strong> {p.data?.shipToGst || "—"}</p>
-                                <p><strong>PAN:</strong> {p.data?.shipToPan || "—"}</p>
-                            </div>
-                        </TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            ),
+            minWidth: 150,
+            flex: 1,
+            cellRenderer: (p: CustomCellRendererProps<VendorWorkOrderRow>) => {
+                return <span className="capitalize">{p.value || "-"}</span>;
+            },
         },
+        
         {
             field: "grandTotal",
             headerName: "Amount",

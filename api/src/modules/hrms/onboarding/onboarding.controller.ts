@@ -20,9 +20,17 @@ const UpdateProfileSchema = z.object({
   designationId: z.number().optional(),
   departmentId: z.number().optional(),
   reportingTl: z.number().optional(),
+  // Designation / Department synced to users table (only when currently null)
+  designationRoleId: z.number().optional(),
+  departmentTeamId: z.number().optional(),
   // Compensation
   salaryType: z.string().optional(),
   basicSalary: z.coerce.string().optional(),
+  hra: z.coerce.string().optional(),
+  allowances: z.coerce.string().optional(),
+  bonus: z.coerce.string().optional(),
+  pfApplicable: z.boolean().optional(),
+  esicApplicable: z.boolean().optional(),
   // Bank
   bankName: z.string().optional(),
   accountNumber: z.string().optional(),

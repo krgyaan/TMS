@@ -2,6 +2,7 @@ import { AppController } from "@/app.controller";
 import { AppService } from "@/app.service";
 import appConfig, { validateAppEnv } from "@/config/app.config";
 import authConfig, { validateAuthEnv } from "@/config/auth.config";
+import currencyConfig, { validateCurrencyEnv } from "@/config/currency.config";
 import dbConfig, { validateDbEnv } from "@/config/db.config";
 import googleConfig, { validateGoogleEnv } from "@/config/google.config";
 import openwaConfig, { validateOpenwaEnv } from "@/config/openwa.config";
@@ -117,6 +118,7 @@ import { PaymentRequestModule } from "./modules/operations/payment-requests/paym
 import { ProjectDashboardModule } from "./modules/operations/projects/project-dashboard.module";
 import { PurchaseInvoiceModule } from "./modules/operations/purchase-invoices/purchase-invoice.module";
 import { PurchaseOrderModule } from "./modules/operations/purchase-orders/purchase-order.module";
+import { InventoryModule } from "./modules/operations/inventory/inventory.module";
 import { SaleInvoiceModule } from "./modules/operations/sale-invoices/sale-invoice.module";
 import { VendorWorkOrderModule } from "./modules/operations/vendor-work-orders/vendor-work-order.module";
 import { WoAmendmentsModule } from "./modules/operations/wo-amendments/wo-amendments.module";
@@ -151,7 +153,7 @@ import { WebhookController } from "./webhook/webhook.controller";
         ConfigModule.forRoot({
             isGlobal: true,
             expandVariables: true,
-            load: [appConfig, dbConfig, googleConfig, authConfig, redisConfig, openwaConfig, volksAiConfig],
+            load: [appConfig, dbConfig, googleConfig, authConfig, redisConfig, openwaConfig, volksAiConfig, currencyConfig],
             validate: env => ({
                 ...validateAppEnv(env),
                 ...validateDbEnv(env),
@@ -160,6 +162,7 @@ import { WebhookController } from "./webhook/webhook.controller";
                 ...validateRedisEnv(env),
                 ...validateOpenwaEnv(env),
                 ...validateVolksAiEnv(env),
+                ...validateCurrencyEnv(env),
             }),
         }),
         LoggerModule,
@@ -261,6 +264,7 @@ import { WebhookController } from "./webhook/webhook.controller";
         SaleInvoiceModule,
         PurchaseOrderModule,
         PurchaseInvoiceModule,
+        InventoryModule,
         PaymentRequestModule,
         MakerRequestModule,
         EmployeeProfilesModule,

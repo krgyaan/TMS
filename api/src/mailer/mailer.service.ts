@@ -154,7 +154,26 @@ export class MailerService {
                 },
             });
 
-            const resolvedAttachments = payload.attachments ? this.resolveAttachments(payload.attachments) : undefined;
+            let resolvedAttachments: { filename: string; path: string; size?: number }[] | undefined;
+
+            try {
+                resolvedAttachments = payload.attachments ? this.resolveAttachments(payload.attachments) : undefined;
+            } catch (error) {
+                if (error instanceof BadRequestException && String(error.message).includes("Attachment not found")) {
+                    const attachmentMeta = payload.attachments as { files?: string | string[]; baseDir?: string } | undefined;
+
+                    this.logger.warn("Attachment not found. Sending email without attachment.", {
+                        subject: payload.subject,
+                        files: attachmentMeta?.files,
+                        baseDir: attachmentMeta?.baseDir,
+                    });
+
+                    // TODO: remove this attachment bypass once attachment storage path is normalized.
+                    resolvedAttachments = undefined;
+                } else {
+                    throw error;
+                }
+            }
 
             this.logger.info("Sending email via Gmail", {
                 from: connection.providerEmail,

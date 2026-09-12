@@ -1,4 +1,4 @@
-import { pgTable, bigint, integer, varchar, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, bigint, integer, varchar, timestamp, date, boolean } from "drizzle-orm/pg-core";
 
 export const projects = pgTable("projects", {
     id: bigint("id", { mode: "number" }).primaryKey(),
@@ -21,6 +21,8 @@ export const projects = pgTable("projects", {
     sapPoNo: varchar("sap_po_no", { length: 255 }),
     tenderId: integer("tender_id"),
     enquiryId: bigint("enquiry_id", { mode: "number" }),
+    insuranceRequired: boolean("insurance_required").notNull().default(true),
+    insuranceRequiredRemark: varchar("insurance_required_remark", { length: 500 }),
 });
 
 export type Project = typeof projects.$inferSelect;

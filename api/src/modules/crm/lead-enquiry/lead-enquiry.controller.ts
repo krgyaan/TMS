@@ -2,7 +2,10 @@ import { ValidatedBody } from '@/decorators/validated-body.decorator';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import type { SiteVisitContact } from '@db/schemas/crm/site-visit-contacts.schema';
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '@/modules/auth/guards/permission.guard';
+import { CanRead, CanCreate, CanUpdate, CanDelete } from '@/modules/auth/decorators/permissions.decorator';
 import type {
     CreateEnquiryWithLeadDto,
     CreateLeadEnquiryDto,
@@ -23,11 +26,13 @@ import {
 } from './dto/lead-enquiry.dto';
 import { LeadEnquiryService } from './lead-enquiry.service';
 
+@UseGuards(JwtAuthGuard, PermissionGuard)
 @Controller('lead-enquiries')
 export class LeadEnquiryController {
     constructor(private readonly leadEnquiryService: LeadEnquiryService) {}
 
     @Get()
+    @CanRead('crm.enquiries')
     async list(
         @Query('page')      page?:      string,
         @Query('limit')     limit?:     string,
@@ -61,6 +66,7 @@ export class LeadEnquiryController {
     }
 
     @Post('site-visits')
+    @CanUpdate('crm.enquiries')
     @HttpCode(HttpStatus.CREATED)
     async createSiteVisit(
         @ValidatedBody(CreateSiteVisitSchema) body: CreateSiteVisitDto,
@@ -69,26 +75,31 @@ export class LeadEnquiryController {
     }
 
     @Get('site-visits/enquiry/:enquiryId')
+    @CanRead('crm.enquiries')
     async getSiteVisitsByEnquiry(@Param('enquiryId', ParseIntPipe) enquiryId: number) {
         return this.leadEnquiryService.findSiteVisitsByEnquiry(enquiryId);
     }
 
     @Get('site-visits/first/:enquiryId')
+    @CanRead('crm.enquiries')
     async getFirstSiteVisitByEnquiry(@Param('enquiryId', ParseIntPipe) enquiryId: number) {
         return this.leadEnquiryService.findFirstSiteVisitByEnquiry(enquiryId);
     }
 
     @Get('site-visits/by-lead/:leadId')
+    @CanRead('crm.enquiries')
     async getSiteVisitsByLead(@Param('leadId', ParseIntPipe) leadId: number) {
         return this.leadEnquiryService.findSiteVisitsByLead(leadId);
     }
 
     @Get('site-visits/by-happy-calling/:happyCallingId')
+    @CanRead('crm.enquiries')
     async getSiteVisitsByHappyCalling(@Param('happyCallingId', ParseIntPipe) happyCallingId: number) {
         return this.leadEnquiryService.findSiteVisitsByHappyCalling(happyCallingId);
     }
 
     @Patch('site-visits/details/:id')
+    @CanUpdate('crm.enquiries')
     async updateSiteVisitDetails(
         @Param('id', ParseIntPipe) id: number,
         @ValidatedBody(UpdateSiteVisitDetailsSchema) body: UpdateSiteVisitDetailsDto,
@@ -97,6 +108,7 @@ export class LeadEnquiryController {
     }
 
     @Patch('site-visits/:id')
+    @CanUpdate('crm.enquiries')
     async updateSiteVisit(
         @Param('id', ParseIntPipe) id: number,
         @ValidatedBody(UpdateSiteVisitSchema) body: UpdateSiteVisitDto,
@@ -105,11 +117,13 @@ export class LeadEnquiryController {
     }
 
     @Get('site-visits/contacts/:siteVisitId')
+    @CanRead('crm.enquiries')
     async getSiteVisitContacts(@Param('siteVisitId', ParseIntPipe) siteVisitId: number) {
         return this.leadEnquiryService.findSiteVisitContacts(siteVisitId);
     }
 
     @Post('site-visits/contacts/bulk')
+    @CanUpdate('crm.enquiries')
     @HttpCode(HttpStatus.CREATED)
     async createSiteVisitContacts(
         @ValidatedBody(CreateSiteVisitContactArraySchema) body: CreateSiteVisitContactArrayDto,
@@ -126,6 +140,7 @@ export class LeadEnquiryController {
     }
 
     @Post('site-visits/:id/upload-docs')
+    @CanUpdate('crm.enquiries')
     @HttpCode(HttpStatus.OK)
     async uploadSiteVisitDocs(
         @Param('id', ParseIntPipe) id: number,
@@ -137,11 +152,13 @@ export class LeadEnquiryController {
     }
 
     @Get(':id')
+    @CanRead('crm.enquiries')
     async getById(@Param('id', ParseIntPipe) id: number) {
         return this.leadEnquiryService.findById(id);
     }
 
     @Post()
+    @CanCreate('crm.enquiries')
     @HttpCode(HttpStatus.CREATED)
     async create(
         @ValidatedBody(CreateLeadEnquirySchema) body: CreateLeadEnquiryDto,
@@ -151,6 +168,7 @@ export class LeadEnquiryController {
     }
 
     @Post('with-lead')
+    @CanCreate('crm.enquiries')
     @HttpCode(HttpStatus.CREATED)
     async createWithLead(
         @ValidatedBody(CreateEnquiryWithLeadSchema) body: CreateEnquiryWithLeadDto,
@@ -160,6 +178,7 @@ export class LeadEnquiryController {
     }
 
     @Patch(':id')
+    @CanUpdate('crm.enquiries')
     async update(
         @Param('id', ParseIntPipe) id: number,
         @ValidatedBody(UpdateLeadEnquirySchema) body: UpdateLeadEnquiryDto,
@@ -169,6 +188,7 @@ export class LeadEnquiryController {
     }
 
     @Delete(':id')
+    @CanDelete('crm.enquiries')
     @HttpCode(HttpStatus.NO_CONTENT)
     async delete(@Param('id', ParseIntPipe) id: number) {
         await this.leadEnquiryService.delete(id);

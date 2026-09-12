@@ -9,10 +9,12 @@ import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
 import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
 import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
 import { users } from "@/db/schemas";
+import { projects } from "@/db/schemas/master/projects.schema";
 import { paymentRequests, purchaseInvoices, saleInvoiceItems, saleInvoices } from "@/db/schemas/operations";
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
 import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
+import { materializeApprovalLines } from "@/modules/operations/inventory/inventory.materialize";
 import { woBasicDetails } from "@/db/schemas/operations/work-order.schema";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -35,6 +37,7 @@ export class PurchaseOrderService {
                 .select({
                     id: purchaseOrders.id,
                     projectId: purchaseOrders.projectId,
+                    projectName: purchaseOrders.projectName,
                     poNumber: purchaseOrders.poNumber,
                     sellerName: purchaseOrders.sellerName,
                     sellerEmail: purchaseOrders.sellerEmail,
@@ -154,6 +157,7 @@ export class PurchaseOrderService {
                 .select({
                     id: purchaseOrders.id,
                     projectId: purchaseOrders.projectId,
+                    projectName: purchaseOrders.projectName,
                     poNumber: purchaseOrders.poNumber,
                     sellerName: purchaseOrders.sellerName,
                     sellerEmail: purchaseOrders.sellerEmail,
@@ -264,11 +268,18 @@ export class PurchaseOrderService {
 
     async createPurchaseOrder(body: any, userId: number) {
         if (body.projectId) {
-            const hasWC = await this.insuranceService.hasActiveWCInsurance(body.projectId);
-            if (!hasWC) {
-                throw new BadRequestException(
-                    "Cannot create Purchase Order: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
-                );
+            const [project] = await this.db
+                .select({ insuranceRequired: projects.insuranceRequired })
+                .from(projects)
+                .where(eq(projects.id, body.projectId))
+                .limit(1);
+            if (project?.insuranceRequired) {
+                const hasWC = await this.insuranceService.hasActiveWCInsurance(body.projectId);
+                if (!hasWC) {
+                    throw new BadRequestException(
+                        "Cannot create Purchase Order: project does not have an active WC (Workers Compensation) insurance policy. Please add a WC policy first."
+                    );
+                }
             }
         }
 
@@ -515,7 +526,7 @@ export class PurchaseOrderService {
         }
     }
 
-    async setTdsPercentage(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }) {
+    async setTdsPercentage(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }, userId?: number) {
         const po = await this.db
             .select()
             .from(purchaseOrders)
@@ -537,18 +548,31 @@ export class PurchaseOrderService {
             const tdsAmt = (subtotal * tdsPercentage) / 100;
             const amountAfterTds = grandTotal - tdsAmt;
 
-            const [updated] = await this.db
-                .update(purchaseOrders)
-                .set({
-                    tdsPercentage: tdsPercentage.toString(),
-                    tdsAmount: tdsAmt.toString(),
-                    amountAfterTds: amountAfterTds.toString(),
-                    poApproved: true,
-                    poApprovalRemark: remark || null,
-                    updatedAt: new Date(),
-                })
-                .where(eq(purchaseOrders.id, id))
-                .returning();
+            const updated = await this.db.transaction(async tx => {
+                const updatedPo = await tx
+                    .update(purchaseOrders)
+                    .set({
+                        tdsPercentage: tdsPercentage.toString(),
+                        tdsAmount: tdsAmt.toString(),
+                        amountAfterTds: amountAfterTds.toString(),
+                        poApproved: true,
+                        poApprovalRemark: remark || null,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(purchaseOrders.id, id))
+                    .returning()
+                    .then(rows => rows[0]);
+
+                await materializeApprovalLines(tx, {
+                    docType: "po",
+                    projectId: po.projectId,
+                    referenceId: po.id,
+                    lines: products,
+                    createdBy: userId ?? po.poRaisedBy,
+                });
+
+                return updatedPo;
+            });
 
             this.logger.info(`TDS approved for PO #${id}: ${tdsPercentage}%, TDS Amount: ${tdsAmt}, After TDS: ${amountAfterTds}`);
             return updated;

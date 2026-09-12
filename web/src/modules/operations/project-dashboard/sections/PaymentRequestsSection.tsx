@@ -21,15 +21,17 @@ import { PAYMENT_AGAINST_LABELS } from "@/modules/operations/payment-requests/co
 
 interface PaymentRequestsSectionProps {
     projectId: number | null;
+    insuranceRequired?: boolean;
 }
 
 export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
     projectId,
+    insuranceRequired = true,
 }) => {
     const navigate = useNavigate();
     const [prGridApi, setPrGridApi] = useState<GridApi | null>(null);
     const { data, isLoading } = useProjectPaymentRequests(projectId!);
-    const { hasWC } = useHasWCInsurance(projectId ?? 0);
+    const { hasWC } = useHasWCInsurance(projectId ?? 0, insuranceRequired);
 
     const paymentRequests = data ?? [];
 

@@ -947,6 +947,30 @@ class LLMFieldResolver:
         self.total_raw_processing_tokens: int = 0
         self.total_cost_usd: float = 0.0
         self.role1_retries: int = 0
+        self.stages_usage: Dict[str, Dict[str, Any]] = {
+            "missing_field_fallback": {
+                "call_type": "missing_field_fallback",
+                "model": self.role1_model,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_creation_tokens": 0,
+                "cache_read_tokens": 0,
+                "total_tokens": 0,
+                "estimated_cost_usd": 0.0,
+                "calls_count": 0,
+            },
+            "ambiguity_resolution": {
+                "call_type": "ambiguity_resolution",
+                "model": self.role2_model,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cache_creation_tokens": 0,
+                "cache_read_tokens": 0,
+                "total_tokens": 0,
+                "estimated_cost_usd": 0.0,
+                "calls_count": 0,
+            },
+        }
 
     def record_usage(
         self,
@@ -989,11 +1013,13 @@ class LLMFieldResolver:
             out_rate = SONNET_5_OUTPUT_PRICE_PER_M
             cache_write_rate = SONNET_5_CACHE_WRITE_5M_PER_M
             cache_read_rate = SONNET_5_CACHE_READ_PER_M
+            stage_key = "ambiguity_resolution"
         else:
             in_rate = HAIKU_45_INPUT_PRICE_PER_M
             out_rate = HAIKU_45_OUTPUT_PRICE_PER_M
             cache_write_rate = HAIKU_45_CACHE_WRITE_5M_PER_M
             cache_read_rate = HAIKU_45_CACHE_READ_PER_M
+            stage_key = "missing_field_fallback"
 
         call_cost = (
             (in_tok / 1_000_000 * in_rate)
@@ -1002,6 +1028,17 @@ class LLMFieldResolver:
             + (cache_read / 1_000_000 * cache_read_rate)
         )
         self.total_cost_usd += call_cost
+
+        # Update stage-specific breakdown
+        if stage_key in self.stages_usage:
+            st = self.stages_usage[stage_key]
+            st["input_tokens"] += in_tok
+            st["output_tokens"] += out_tok
+            st["cache_creation_tokens"] += cache_create
+            st["cache_read_tokens"] += cache_read
+            st["total_tokens"] += raw_toks
+            st["estimated_cost_usd"] = round(st["estimated_cost_usd"] + call_cost, 6)
+            st["calls_count"] += 1
 
     def get_usage_summary(self) -> Dict[str, Any]:
         """Return cumulative token usage, cache metrics, and estimated cost."""
@@ -1023,6 +1060,7 @@ class LLMFieldResolver:
             "cache_hit_rate_pct": cache_hit_rate,
             "role1_retries": self.role1_retries,
             "estimated_cost_usd": round(self.total_cost_usd, 5),
+            "stages": self.stages_usage,
         }
 
     # ─────────────────────────────────────────────────────────────────────────
