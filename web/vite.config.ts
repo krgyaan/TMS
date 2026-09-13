@@ -49,16 +49,20 @@ export default defineConfig(({ command }) => ({
             workbox: {
                 // Lean precache: only the shell, and only for production
                 // builds. Route chunks are cached at runtime as users visit
-                // them (CacheFirst for hashed assets). Empty in dev — the
-                // dev service worker has nothing to precache.
+                // them. Empty in dev — the dev service worker has nothing to
+                // precache.
                 globPatterns: command === "build" ? ["index.html", "manifest.webmanifest"] : [],
+                cleanupOutdatedCaches: true,
                 navigateFallback: "/index.html",
                 navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//],
                 runtimeCaching: [
-                    // Hashed, immutable bundles — safe to cache-first.
+                    // Hashed, immutable bundles. StaleWhileRevalidate keeps
+                    // serving cached chunks instantly but validates against
+                    // the network in the background, so stale chunk URLs from
+                    // a pre-deploy shell resolve to the freshly deployed files.
                     {
                         urlPattern: ({ url }) => url.pathname.startsWith("/assets/"),
-                        handler: "CacheFirst",
+                        handler: "StaleWhileRevalidate",
                         options: {
                             cacheName: "tms-assets",
                             expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
@@ -85,7 +89,7 @@ export default defineConfig(({ command }) => ({
                 ],
             },
             devOptions: {
-                enabled: true,
+                enabled: false,
             },
         }),
     ],
