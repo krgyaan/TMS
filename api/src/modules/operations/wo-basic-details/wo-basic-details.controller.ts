@@ -1,11 +1,11 @@
-import { Inject, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
-import { WoBasicDetailsService } from './wo-basic-details.service';
-import { CreateWoBasicDetailSchema, UpdateWoBasicDetailSchema, AssignOeSchema, BulkAssignOeSchema, RemoveOeAssignmentSchema,  WoBasicDetailsQuerySchema } from './dto/wo-basic-details.dto';
-import type { CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, BulkAssignOeDto, RemoveOeAssignmentDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Inject, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from "winston";
+import type { AssignOeDto, CreateWoBasicDetailDto, RemoveOeAssignmentDto, ReviseOrderDto, UpdateWoBasicDetailDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
+import { AssignOeSchema, CreateWoBasicDetailSchema, RemoveOeAssignmentSchema, ReviseOrderSchema, UpdateWoBasicDetailSchema, WoBasicDetailsQuerySchema } from './dto/wo-basic-details.dto';
+import { WoBasicDetailsService } from './wo-basic-details.service';
 
 @Controller('wo-basic-details')
 export class WoBasicDetailsController {
@@ -95,6 +95,23 @@ export class WoBasicDetailsController {
     @HttpCode(HttpStatus.NO_CONTENT)
     async delete(@Param('id', ParseIntPipe) id: number) {
         await this.woBasicDetailsService.delete(id);
+    }
+
+    // ORDER REVISION OPERATIONS
+    @Post(':id/revise-order')
+    @HttpCode(HttpStatus.OK)
+    async reviseOrder(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() body: unknown,
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        const parsed = ReviseOrderSchema.parse(body) as ReviseOrderDto;
+        return this.woBasicDetailsService.reviseOrder(id, parsed, user.sub);
+    }
+
+    @Get(':id/revisions')
+    async getOrderRevisions(@Param('id', ParseIntPipe) id: number) {
+        return this.woBasicDetailsService.getOrderRevisions(id);
     }
 
     // OE ASSIGNMENT OPERATIONS

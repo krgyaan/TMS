@@ -23,6 +23,7 @@ export const projects = pgTable("projects", {
     enquiryId: bigint("enquiry_id", { mode: "number" }),
     insuranceRequired: boolean("insurance_required").notNull().default(true),
     insuranceRequiredRemark: varchar("insurance_required_remark", { length: 500 }),
+    woBasicDetailId: bigint("wo_basic_detail_id", { mode: "number" }),
     createdAt: timestamp("created_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }),
   },
@@ -30,5 +31,6 @@ export const projects = pgTable("projects", {
     index("idx_projects_org_id").on(table.organisationId),
     index("idx_projects_item_id").on(table.itemId),
     index("idx_projects_location_id").on(table.locationId),
+    index("idx_projects_wo_basic_detail").on(table.woBasicDetailId),
   ])
 );

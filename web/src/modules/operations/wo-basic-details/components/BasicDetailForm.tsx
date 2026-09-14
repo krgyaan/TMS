@@ -1,31 +1,31 @@
-import { useEffect, useMemo, useState } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { type SubmitHandler, useForm, type Resolver } from "react-hook-form";
-import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Form } from "@/components/ui/form";
+import { paths } from "@/app/routes/paths";
+import { FileUploader } from "@/components/file-upload";
+import { ConditionalSection } from "@/components/form/ConditionalSection";
+import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
-import { Input } from "@/components/ui/input";
-import { DateInput } from "@/components/form/DateInput";
-import { FileUploader } from "@/components/file-upload";
-import { ArrowLeft, Save, Plus, Trash2, Check, HashIcon, TrendingUp, Calculator } from "lucide-react";
-import { paths } from "@/app/routes/paths";
-import { WoBasicDetailFormSchema } from "../helpers/basiDetail.schema";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Form } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ConditionalSection } from "@/components/form/ConditionalSection";
-import { YES_NO_OPTIONS } from "../../wo-details/helpers/constants";
-import { useWoContactsByBasicDetail, useCreateBulkWoContacts, useDeleteAllContactsByBasicDetail } from "@/hooks/api/useWoContacts";
-import type { WoBasicDetailFormValues, WoBasicDetail } from "../helpers/basiDetail.types";
-import { buildDefaultValues, mapResponseToForm, mapFormToCreatePayload, mapFormToUpdatePayload } from "../helpers/basiDetail.mapper";
 import { useCreateWoBasicDetail, useUpdateWoBasicDetail, useWoBasicDetailPrefill } from "@/hooks/api/useWoBasicDetails";
-import { ProjectNameWarningAlert } from "./ProjectNameWarningAlert";
-import { useOrganizationOptions, useItemOptions, useLocationOptions, useTeamOptions } from "@/hooks/useSelectOptions";
+import { useCreateBulkWoContacts, useDeleteAllContactsByBasicDetail, useWoContactsByBasicDetail } from "@/hooks/api/useWoContacts";
+import { useItemOptions, useLocationOptions, useOrganizationOptions, useTeamOptions } from "@/hooks/useSelectOptions";
 import type { CreateWoBasicDetailDto } from "@/modules/operations/types/wo.types";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { ArrowLeft, Calculator, Check, HashIcon, Plus, Save, Trash2, TrendingUp } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { YES_NO_OPTIONS } from "../../wo-details/helpers/constants";
+import { buildDefaultValues, mapFormToCreatePayload, mapFormToUpdatePayload, mapResponseToForm } from "../helpers/basiDetail.mapper";
+import { WoBasicDetailFormSchema } from "../helpers/basiDetail.schema";
+import type { WoBasicDetail, WoBasicDetailFormValues } from "../helpers/basiDetail.types";
+import { ProjectNameWarningAlert } from "./ProjectNameWarningAlert";
 
 interface BasicDetailFormProps {
     mode: "create" | "edit";
@@ -276,6 +276,17 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                     });
                 }
             }
+
+            // For multiple orders, immediately open the form for the next order in the batch
+            if (mode === "create" && values.orderType === "multiple" && !isNonTender && values.tenderId) {
+                navigate(`${paths.operations.woBasicDetailCreatePage}?tenderId=${values.tenderId}`, {
+                    replace: true,
+                    state: { from: returnTo },
+                });
+                toast.info("Order created. Fill the next order for the same tender.");
+                return;
+            }
+
             navigate(returnTo || paths.operations.woBasicDetailListPage);
         } catch (error: any) {
             toast.error(error?.message || "Failed to save basic detail");
@@ -362,11 +373,25 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
 
                         {/* WO Basic Info */}
                         <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
-                            <FieldWrapper control={form.control} name="woNumber" label="WO Number">
-                                {field => <Input {...field} placeholder="WO Number" value={field.value || ""} onChange={e => field.onChange(e.target.value)} />}
-                            </FieldWrapper>
+{/* Order Type: only eligible when linked to a tender */}
+                                {!isNonTender && (
+                                    <SelectField
+                                        control={form.control}
+                                        name="orderType"
+                                        label="Order Type"
+                                        options={[
+                                            { value: "single", label: "Single" },
+                                            { value: "multiple", label: "Multiple (part of a batch)" },
+                                        ]}
+                                        placeholder="Single"
+                                    />
+                                )}
 
-                            <FieldWrapper control={form.control} name="woDate" label="WO Date">
+                                <FieldWrapper control={form.control} name="woNumber" label="WO Number">
+                                    {field => <Input {...field} placeholder="WO Number" value={field.value || ""} onChange={e => field.onChange(e.target.value)} />}
+                                </FieldWrapper>
+
+                                <FieldWrapper control={form.control} name="woDate" label="WO Date">
                                 {field => (
                                     <DateInput
                                         {...field}

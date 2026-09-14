@@ -145,6 +145,25 @@ const BasicDetailListPage = () => {
                     {params.value || '—'}
                 </span>,
             },
+            {
+                field: 'orderType',
+                colId: 'orderType',
+                headerName: 'Order Type',
+                width: 110,
+                sortable: true,
+                filter: true,
+                cellRenderer: (params: { value: string | null; data: WoBasicDetail }) => {
+                    const { orderType, orderSequence } = params.data;
+                    if (orderType === 'multiple') {
+                        return (
+                            <Badge variant="default">
+                                Multiple #{orderSequence ?? ''}
+                            </Badge>
+                        );
+                    }
+                    return <Badge variant="secondary">Single</Badge>;
+                },
+            },
             currencyCol<WoBasicDetail>('woValuePreGst', {
                 field: 'woValuePreGst',
                 colId: 'woValuePreGst',

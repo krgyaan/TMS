@@ -237,6 +237,24 @@ export function BasicDetailView({
                                 {data.projectName || '—'}
                             </TableCell>
                         </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Order Type
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                <Badge variant={data.orderType === "multiple" ? "default" : "secondary"}>
+                                    {data.orderType === "multiple" ? "Multiple" : "Single"}
+                                </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Order Sequence
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.orderType === "multiple" && data.orderSequence
+                                    ? <Badge variant="default">#{data.orderSequence}</Badge>
+                                    : '—'}
+                            </TableCell>
+                        </TableRow>
 
                         {/* Financial Details */}
                         <TableRow className="bg-muted/50">
