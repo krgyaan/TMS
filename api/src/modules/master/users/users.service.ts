@@ -405,7 +405,7 @@ export class UsersService {
         const result = await this.db
             .select()
             .from(users)
-            .where(and(eq(users.email, email), isNull(users.deletedAt)))
+            .where(and(eq(users.email, email.toLowerCase().trim()), isNull(users.deletedAt)))
             .limit(1);
         return result[0] ?? null;
     }
