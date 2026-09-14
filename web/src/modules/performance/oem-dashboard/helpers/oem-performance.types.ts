@@ -10,10 +10,17 @@ export interface OemPerformanceQuery {
 
 // ─── API response ─────────────────────────────────────────────────────────────
 
+export interface TenderRef {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    value: number;
+}
+
 export interface SummaryItem {
     count: number;
     value: number;
-    tenders: string[];
+    tenders: TenderRef[];
 }
 
 export interface OemSummary {
@@ -61,6 +68,7 @@ export interface OemPerformanceResponse {
 /** Flat counts for KPI cards */
 export interface OemKpiSummary {
     totalTendersWithOem: number;
+    totalValueAssigned: number;
     tendersWon: number;
     totalValueWon: number;
     tendersLost: number;

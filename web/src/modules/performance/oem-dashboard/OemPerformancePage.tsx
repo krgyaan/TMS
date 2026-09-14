@@ -14,6 +14,7 @@ import WorkedWithOemTable from "./components/WorkedWithOemTable";
 
 const EMPTY_SUMMARY: OemKpiSummary = {
     totalTendersWithOem: 0,
+    totalValueAssigned: 0,
     tendersWon: 0,
     totalValueWon: 0,
     tendersLost: 0,

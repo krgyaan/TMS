@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+import { paths } from "@/app/routes/paths";
 import type { OemKpiSummary, TendersByKpi } from "../helpers/oem-performance.types";
 import { formatCurrency, usePagination } from "../helpers/oem-performance.mapper";
 import { PaginationControls, TableSearch } from "./table-parts";
@@ -34,7 +35,7 @@ export default function WorkedWithOemTable({ summary, tendersByKpi }: WorkedWith
             {
                 category: "Total",
                 count: summary.totalTendersWithOem,
-                value: 0,
+                value: summary.totalValueAssigned,
                 tenders: tendersByKpi.total || [],
             },
             {
@@ -106,7 +107,13 @@ export default function WorkedWithOemTable({ summary, tendersByKpi }: WorkedWith
                                             <TableCell>
                                                 <div className="flex flex-wrap gap-1 max-w-md">
                                                     {visibleTenders.map(t => (
-                                                        <Badge key={t.id} variant="secondary" className="font-normal truncate max-w-[150px]" title={t.tenderName}>
+                                                        <Badge
+                                                            key={t.id}
+                                                            variant="secondary"
+                                                            className="font-normal truncate max-w-[150px] cursor-pointer hover:bg-muted"
+                                                            title={`${t.tenderNo} — ${formatCurrency(t.value)}`}
+                                                            onClick={() => window.open(paths.tendering.tenderView(t.id), "_blank")}
+                                                        >
                                                             {t.tenderName}
                                                         </Badge>
                                                     ))}

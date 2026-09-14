@@ -28,6 +28,7 @@ export function mapOemPerformance(raw: OemPerformanceResponse): OemComponentData
 
     const flatSummary: OemKpiSummary = {
         totalTendersWithOem,
+        totalValueAssigned: summary.tendersAssigned.value,
         tendersWon,
         totalValueWon: summary.tendersWon.value,
         tendersLost: summary.tendersLost.count,
@@ -53,9 +54,8 @@ export function mapOemPerformance(raw: OemPerformanceResponse): OemComponentData
         total: Math.round((winRateScore + responseEfficiencyScore + complianceScore) / 3),
     };
 
-    // Tender list builders — converts summary.tenders[] (names only) into TenderListItem[]
-    // tendersBid/Won/Lost buckets only have tenderName — the tables only render
-    // tenderName + value in those buckets which we have.
+    // Tender list builders — summary buckets now carry real per-tender refs
+    // (id, tenderNo, value), so no fabrication is needed.
     const wonItems = toListItems(summary.tendersWon, "Won");
     const lostItems = toListItems(summary.tendersLost, "Lost");
     const bidItems = toListItems(summary.tendersBid, "Submitted");
@@ -83,17 +83,14 @@ export function mapOemPerformance(raw: OemPerformanceResponse): OemComponentData
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function toListItems(item: SummaryItem, status: string): TenderListItem[] {
-    // summary buckets only carry tenderName — org/member not available without
-    // a second query, which we intentionally avoid. Tables in these buckets
-    // only render tenderName + value so this is sufficient.
-    return item.tenders.map((name, i) => ({
-        id: i,
-        tenderNo: "—",
-        tenderName: name,
+    return item.tenders.map(t => ({
+        id: t.id,
+        tenderNo: t.tenderNo,
+        tenderName: t.tenderName,
         organizationName: "—",
         teamMember: "—",
         team: "—",
-        value: item.count > 0 ? item.value / item.count : 0,
+        value: t.value,
         status,
     }));
 }

@@ -2,46 +2,56 @@
 
 export interface TenderRow {
     id: number;
-    team: number;
-    teamName: string | null;
     tenderNo: string;
     tenderName: string;
     dueDate: Date;
     gstValues: string;
-    organizationName: string | null;
-    rfqTo: string | null;
-    oemNotAllowed: string[] | null;
-    tlStatus: number;
-    teamMember: number | null;
+    teamName: string | null;
     teamMemberName: string | null;
+    tlStatus: number;
     status: number;
-    rfqId: number | null;
-    rfqCreatedAt: Date | null;
-    rfqResponseReceiptDatetime: Date | null;
+    sentToOem: boolean;
+    notAllowedForOem: boolean;
 }
 
 export interface BidTenderRow {
     tenderId: number;
+    tenderNo: string;
     tenderName: string;
     gstValues: string;
     bidStatus: "Submission Pending" | "Bid Submitted" | "Tender Missed";
     tenderStatus: number;
-    submissionDatetime: Date | null;
 }
 
-// ─── Summary item (mirrors Laravel's addToSummary shape) ─────────────────────
+export interface RfqInfoRow {
+    tenderId: number;
+    rfqSentOn: Date | null;
+    responseOn: Date | null;
+}
+
+// ─── Summary item ─────────────────────────────────────────────────────────────
+
+export interface SummarizableTender {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    gstValues: string;
+}
+
+export interface TenderRef {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    value: number;
+}
 
 export interface SummaryItem {
     count: number;
     value: number;
-    tenders: string[];
+    tenders: TenderRef[];
 }
 
-// ─── API response — mirrors Laravel's compact() output ───────────────────────
-// Only 3 intentional changes from the original:
-//   1. teamName + organizationName resolved server-side (was team bigint)
-//   2. reason field added to NotAllowedTenderRow
-//   3. rfqResponseOn: string | null instead of "Not Yet" string
+// ─── API response ─────────────────────────────────────────────────────────────
 
 export interface OemSummary {
     tendersAssigned: SummaryItem;

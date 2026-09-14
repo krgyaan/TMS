@@ -10,7 +10,7 @@ import { OemPerformanceService } from "./oem-performance.service";
 import { oemPerformanceQuerySchema } from "./zod/oem-performance.dto";
 
 @Controller("performance/oem")
-// @UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class OemPerformanceController {
     constructor(
         private readonly service: OemPerformanceService,
@@ -26,7 +26,7 @@ export class OemPerformanceController {
      */
 
     @Get("health")
-    async getHealth() {
+    getHealth() {
         this.logger.debug("This is the debug statement");
         return {
             status: "ok",
