@@ -1,90 +1,19 @@
-import { useQuery } from "@tanstack/react-query";
-import api from "@/lib/axios";
-import type { OemPerformanceResponse, OemSummary, NotAllowedTenderRow, RfqSentToOemRow } from "./oem-performance.types";
+import React, { useState, useMemo, useCallback } from "react";
 
-export interface OemPerformanceParams {
-    oemId: number;
-    fromDate: string;
-    toDate: string;
-}
-
-// ─── Component-level types (what the dashboard consumes) ──────────────────────
-
-/** Flat counts for KPI cards */
-export interface OemKpiSummary {
-    totalTendersWithOem: number;
-    tendersWon: number;
-    totalValueWon: number;
-    tendersLost: number;
-    totalValueLost: number;
-    tendersSubmitted: number;
-    totalValueSubmitted: number;
-    tendersNotAllowed: number;
-    rfqsSent: number;
-    rfqsResponded: number;
-    winRate: number;
-    rfqResponseRate: number;
-}
-
-/** Scoring out of 100 for the scoring chart */
-export interface OemScoring {
-    winRateScore: number;
-    responseEfficiencyScore: number;
-    complianceScore: number;
-    total: number;
-}
-
-/** Tender row for the general KPI list table */
-export interface TenderListItem {
-    id: number;
-    tenderNo: string;
-    tenderName: string;
-    organizationName: string;
-    teamMember: string;
-    team: string;
-    value: number;
-    status: string;
-}
-
-/** Re-exported backend rows for the two dedicated tables */
-export type { NotAllowedTenderRow as NotAllowedTenderItem, RfqSentToOemRow as RfqSentTenderItem };
-
-export interface TendersByKpi {
-    total: TenderListItem[];
-    tendersWon: TenderListItem[];
-    tendersLost: TenderListItem[];
-    tendersSubmitted: TenderListItem[];
-    tendersNotAllowed: NotAllowedTenderRow[];
-    rfqsSent: RfqSentToOemRow[];
-    rfqsResponded: TenderListItem[];
-    winRate: TenderListItem[]; // alias of tendersWon
-    rfqResponseRate: TenderListItem[]; // alias of rfqsResponded
-}
-
-/** Full shape the component uses — returned by useOemOutcomes */
-export interface OemComponentData {
-    summary: OemKpiSummary;
-    scoring: OemScoring;
-    trends: []; // Not in Laravel module — empty, retained for component compat
-    tendersByKpi: TendersByKpi;
-}
-
-// ─── Fetcher ──────────────────────────────────────────────────────────────────
-
-async function fetchOemPerformance(params: OemPerformanceParams): Promise<OemPerformanceResponse> {
-    const { data } = await api.get<OemPerformanceResponse>("/performance/oem", {
-        params: {
-            oem: params.oemId,
-            fromDate: params.fromDate,
-            toDate: params.toDate,
-        },
-    });
-    return data;
-}
+import type {
+    OemComponentData,
+    OemKpiSummary,
+    OemPerformanceResponse,
+    OemScoring,
+    RfqSentToOemRow,
+    SummaryItem,
+    TenderListItem,
+    TendersByKpi,
+} from "./oem-performance.types";
 
 // ─── Transform backend → component shape ─────────────────────────────────────
 
-function transform(raw: OemPerformanceResponse): OemComponentData {
+export function mapOemPerformance(raw: OemPerformanceResponse): OemComponentData {
     const { summary, notAllowedTenders, rfqsSentToOem } = raw;
 
     // Flat KPI counts — derived from the Laravel summary buckets
@@ -153,7 +82,7 @@ function transform(raw: OemPerformanceResponse): OemComponentData {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function toListItems(item: { tenders: string[]; value: number; count: number }, status: string): TenderListItem[] {
+function toListItems(item: SummaryItem, status: string): TenderListItem[] {
     // summary buckets only carry tenderName — org/member not available without
     // a second query, which we intentionally avoid. Tables in these buckets
     // only render tenderName + value so this is sufficient.
@@ -182,29 +111,115 @@ function rfqRowToListItem(r: RfqSentToOemRow): TenderListItem {
     };
 }
 
-// ─── Hooks ────────────────────────────────────────────────────────────────────
+/* ================================
+    FORMAT / EXPORT UTILITIES
+================================ */
+export const formatCurrency = (amount: string | number) => {
+    const numericAmount = typeof amount === "number" ? amount : parseFloat(amount);
 
-/**
- * Primary hook used by the dashboard.
- * All other hooks are thin selectors over the same query key — no extra requests.
- */
-export function useOemOutcomes(params: OemPerformanceParams | null) {
-    return useQuery({
-        queryKey: ["oem-performance", params],
-        queryFn: () => fetchOemPerformance(params!),
-        enabled: params !== null,
-        staleTime: 1000 * 60 * 5,
-        select: transform,
-    });
+    if (isNaN(numericAmount)) {
+        return "₹0";
+    }
+
+    return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 0,
+    }).format(numericAmount);
+};
+
+export interface CsvHeader {
+    key: string;
+    label: string;
 }
 
-// Kept for component import compat — not in Laravel module, always returns []
-export function useOemTenderList(params: OemPerformanceParams | null) {
-    return useQuery({
-        queryKey: ["oem-performance", params],
-        queryFn: () => fetchOemPerformance(params!),
-        enabled: params !== null,
-        staleTime: 1000 * 60 * 5,
-        select: d => transform(d).tendersByKpi.total,
-    });
+export const exportToCSV = (data: Record<string, unknown>[], filename: string, headers: CsvHeader[]) => {
+    if (data.length === 0) {
+        alert("No data to export");
+        return;
+    }
+
+    const csvHeaders = headers.map(h => h.label).join(",");
+    const csvRows = data
+        .map(row =>
+            headers
+                .map(h => {
+                    const value = row[h.key];
+                    // Escape quotes and wrap in quotes if contains comma
+                    const stringValue = String(value ?? "");
+                    if (stringValue.includes(",") || stringValue.includes('"') || stringValue.includes("\n")) {
+                        return `"${stringValue.replace(/"/g, '""')}"`;
+                    }
+                    return stringValue;
+                })
+                .join(",")
+        )
+        .join("\n");
+
+    const csvContent = `${csvHeaders}\n${csvRows}`;
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${filename}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
+/* ================================
+   PAGINATION HOOK
+================================ */
+export function usePagination<T>(data: T[], itemsPerPage: number = 10) {
+    const [currentPage, setCurrentPage] = useState(1);
+
+    const totalPages = Math.ceil(data.length / itemsPerPage);
+
+    const paginatedData = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return data.slice(startIndex, startIndex + itemsPerPage);
+    }, [data, currentPage, itemsPerPage]);
+
+    const goToPage = useCallback(
+        (page: number) => {
+            setCurrentPage(Math.max(1, Math.min(page, totalPages || 1)));
+        },
+        [totalPages]
+    );
+
+    const nextPage = useCallback(() => {
+        goToPage(currentPage + 1);
+    }, [currentPage, goToPage]);
+
+    const prevPage = useCallback(() => {
+        goToPage(currentPage - 1);
+    }, [currentPage, goToPage]);
+
+    const firstPage = useCallback(() => {
+        goToPage(1);
+    }, [goToPage]);
+
+    const lastPage = useCallback(() => {
+        goToPage(totalPages);
+    }, [goToPage, totalPages]);
+
+    // Reset to page 1 when data changes
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [data.length]);
+
+    return {
+        currentPage,
+        totalPages,
+        paginatedData,
+        goToPage,
+        nextPage,
+        prevPage,
+        firstPage,
+        lastPage,
+        totalItems: data.length,
+        startIndex: (currentPage - 1) * itemsPerPage + 1,
+        endIndex: Math.min(currentPage * itemsPerPage, data.length),
+    };
 }

@@ -1,4 +1,4 @@
-/* ===================== TYPES ===================== */
+/* ===================== API TYPES (mirror backend response) ===================== */
 
 // ─── Query ────────────────────────────────────────────────────────────────────
 
@@ -8,7 +8,7 @@ export interface OemPerformanceQuery {
     toDate: string | null; // yyyy-mm-dd
 }
 
-// ─── API response (mirrors backend shape exactly) ─────────────────────────────
+// ─── API response ─────────────────────────────────────────────────────────────
 
 export interface SummaryItem {
     count: number;
@@ -56,8 +56,9 @@ export interface OemPerformanceResponse {
     rfqsSentToOem: RfqSentToOemRow[];
 }
 
-// ─── Component-level types (derived in hooks, consumed by dashboard) ──────────
+/* ===================== COMPONENT TYPES (produced by the mapper) ===================== */
 
+/** Flat counts for KPI cards */
 export interface OemKpiSummary {
     totalTendersWithOem: number;
     tendersWon: number;
@@ -73,6 +74,7 @@ export interface OemKpiSummary {
     rfqResponseRate: number;
 }
 
+/** Scoring out of 100 for the scoring chart */
 export interface OemScoring {
     winRateScore: number;
     responseEfficiencyScore: number;
@@ -80,7 +82,8 @@ export interface OemScoring {
     total: number;
 }
 
-export interface TenderListRow {
+/** Tender row for the general KPI list table */
+export interface TenderListItem {
     id: number;
     tenderNo: string;
     tenderName: string;
@@ -92,13 +95,28 @@ export interface TenderListRow {
 }
 
 export interface TendersByKpi {
-    total: TenderListRow[];
-    tendersWon: TenderListRow[];
-    tendersLost: TenderListRow[];
-    tendersSubmitted: TenderListRow[];
+    total: TenderListItem[];
+    tendersWon: TenderListItem[];
+    tendersLost: TenderListItem[];
+    tendersSubmitted: TenderListItem[];
     tendersNotAllowed: NotAllowedTenderRow[];
     rfqsSent: RfqSentToOemRow[];
-    rfqsResponded: TenderListRow[];
-    winRate: TenderListRow[];
-    rfqResponseRate: TenderListRow[];
+    rfqsResponded: TenderListItem[];
+    winRate: TenderListItem[]; // alias of tendersWon
+    rfqResponseRate: TenderListItem[]; // alias of rfqsResponded
+}
+
+/** Full shape the components use — returned by useOemPerformance */
+export interface OemComponentData {
+    summary: OemKpiSummary;
+    scoring: OemScoring;
+    trends: []; // Not in Laravel module — empty, retained for component compat
+    tendersByKpi: TendersByKpi;
+}
+
+/** Params accepted by useOemPerformance / the report endpoint */
+export interface OemPerformanceParams {
+    oemId: number;
+    fromDate: string;
+    toDate: string;
 }
