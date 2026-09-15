@@ -10,6 +10,7 @@ export type UserData = {
   lastLoginAt: string;
   createdAt: string;
   team: string;
+  role?: string | null;
 };
 
 export type ProfileData = {
@@ -28,7 +29,10 @@ export type ProfileData = {
   employeeCode: string;
   altEmail: string;
   bloodGroup: string;
-  linkedinProfile: string;
+  linkedinProfile: string;    pfNumber?: string | null;
+  hrStatus?: string;
+  hrRemark?: string | null;
+  profilePhoto?: string | null;
 };
 
 export type EmployeeProfileData = {
@@ -109,10 +113,7 @@ export type EducationData = {
   fieldOfStudy: string | null;
   startDate: string | null;
   endDate: string | null;
-  grade: string | null;
-  status: string;
-  hrStatus : hrStatus;
-};
+  grade: string | null;  status: string;  hrStatus : hrStatus;  hrRemark?: string | null;};
 
 export type ExperienceData = {
   id: number;
@@ -121,10 +122,7 @@ export type ExperienceData = {
   fromDate: string;
   toDate: string | null;
   currentlyWorking: boolean;
-  responsibilities: string | null;
-  status: string;
-  hrStatus : hrStatus;
-};
+  responsibilities: string | null;  status: string;  hrStatus : hrStatus;  hrRemark?: string | null;  remarks?: string | null;};
 
 export type BankDetailData = {
   id: number;
@@ -135,10 +133,7 @@ export type BankDetailData = {
   branchName: string | null;
   branchAddress: string | null;
   upiId: string | null;
-  isPrimary: boolean;
-  status: string;
-  hrStatus : hrStatus;
-};
+  isPrimary: boolean;  status: string;  hrStatus : hrStatus;  hrRemark?: string | null;};
 
 export type ProfileResponse = {
   currentUser: UserData;
@@ -147,18 +142,17 @@ export type ProfileResponse = {
   employeeProfile: EmployeeProfileData | null;
   address: AddressData | null;
   emergencyContact: EmergencyContactData | null;
-  profileStatus: String;
-  documentStatus: String;
-  inductionStatus: String;
-  bankStatus : String;
-  educationStatus: String;
+  profileStatus: string;
+  documentStatus: string;
+  inductionStatus: string;
+  bankStatus : string;
+  educationStatus: string;
   documents: DocumentData[];
   education: EducationData[];
   experience: ExperienceData[];
   bankAccounts: BankDetailData[];
   inductionTasks: InductionTaskData[];
   assets: AssetData[];
-  complaints: ComplaintData[];
   notifications: NotificationData[];
   onboardingStatus: OnboardingStatus | null;
   hrStatus : hrStatus;
@@ -226,13 +220,4 @@ export type NotificationData = {
   time: string;
   read: boolean;
   type: "success" | "error" | "warning" | "info";
-};
-
-export type ComplaintData = {
-  id: number;
-  complaintCode: string;
-  subject: string;
-  status: string;
-  priority: string;
-  createdAt: string;
 };

@@ -1,7 +1,7 @@
 import React, { createContext, useContext } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/axios';
-import type { ProfileResponse } from '../../../../types';
+import type { ProfileResponse } from '../../../types';
 
 interface OnboardingContextType {
   data: ProfileResponse | undefined;
@@ -28,6 +28,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- standard context pattern: provider + hook in one file
 export const useOnboardingContext = () => {
   const context = useContext(OnboardingContext);
   if (context === undefined) {
