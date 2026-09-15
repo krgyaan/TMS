@@ -498,6 +498,14 @@
         "when":  1788600000000,
         "tag":  "0135_add_warehouse_dimension",
         "breakpoints":  true
+    },
+  
+    {
+        "idx":  95,
+        "version":  "7",
+        "when":  1788500000000,
+        "tag":  "0136_add_created_by_to_hrms_complaints",
+        "breakpoints":  true
     }
-  ]
+                ]
 }

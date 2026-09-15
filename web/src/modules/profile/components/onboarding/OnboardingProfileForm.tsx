@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import * as z from "zod";import type { ProfileData, AddressData, EmergencyContactData } from "../../types";
 import {
   User,
   MapPin,
@@ -11,7 +11,6 @@ import {
   Save,
   Loader2,
   AlertCircle,
-  Lock,
   CheckCircle2,
   Info,
   Phone,
@@ -282,7 +281,7 @@ function ErrorSummary({
   errors,
   fields,
 }: {
-  errors: Record<string, any>;
+  errors: Record<string, unknown>;
   fields: string[];
 }) {
   const relevantErrors = fields.filter((f) => errors[f]);
@@ -338,9 +337,9 @@ export function OnboardingProfileForm({
     Set<TabId>
   >(new Set());
 
-  const P = data?.profile || ({} as any);
-  const ADDR = data?.address || ({} as any);
-  const EC = data?.emergencyContact || ({} as any);
+  const P = data?.profile || ({} as ProfileData);
+  const ADDR = data?.address || ({} as AddressData);
+  const EC = data?.emergencyContact || ({} as EmergencyContactData);
 
   const profileHrStatus =
     data?.onboardingStatus?.profileHrStatus || P.hrStatus || "pending";
@@ -398,7 +397,7 @@ export function OnboardingProfileForm({
     trigger,
     watch,
     control,
-    formState: { errors, dirtyFields },
+    formState: { errors },
   } = form;
 
   // Count errors per tab for badge display
@@ -503,10 +502,10 @@ export function OnboardingProfileForm({
         icon: <CheckCircle2 className="h-4 w-4" />,
       });
       onSuccess();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Save profile error:", error);
       const message =
-        error?.response?.data?.message ||
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         "An unexpected error occurred. Please try again.";
       toast.error("Failed to save profile", {
         description: message,
@@ -517,7 +516,7 @@ export function OnboardingProfileForm({
     }
   };
 
-  const onError = (formErrors: any) => {
+  const onError = (formErrors: Record<string, unknown>) => {
     const errorFields = Object.keys(formErrors) as (keyof ProfileFormValues)[];
 
     // Mark all tabs as validation-attempted
@@ -627,30 +626,12 @@ export function OnboardingProfileForm({
         </div>
       )}
 
-      {isLocked && (
-        <div
-          className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/15 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300"
-          role="status"
-        >
-          <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-            <Lock className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <div className="space-y-1">
-            <h5 className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-              Profile Approved & Locked
-            </h5>
-            <p className="text-sm font-medium text-emerald-600/90 dark:text-emerald-400/90">
-              Your profile has been approved by HR. No further edits are allowed.
-            </p>
-          </div>
-        </div>
-      )}
+      
 
       {/* ── Tab Navigation ───────────────────────────────────────────── */}
       <nav aria-label="Form sections" className="relative">
         <div className="flex items-center gap-1 p-1 bg-muted/30 rounded-2xl border border-border/10">
-          {tabs.map((tab, idx) => {
-            const status = getTabStatus(tab.id);
+          {tabs.map((tab) => {            const status = getTabStatus(tab.id);
             const errorCount = getTabErrorCount(tab.id);
 
             return (
@@ -658,7 +639,6 @@ export function OnboardingProfileForm({
                 key={tab.id}
                 type="button"
                 onClick={() => handleTabChange(tab.id)}
-                disabled={isLocked}
                 aria-selected={activeTab === tab.id}
                 aria-controls={`panel-${tab.id}`}
                 role="tab"
@@ -1421,7 +1401,6 @@ export function OnboardingProfileForm({
               type="button"
               variant="outline"
               onClick={handlePrevious}
-              disabled={isLocked}
               className="rounded-xl gap-2 h-11 px-6 flex-1 sm:flex-none border-border/30 hover:bg-muted/50"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -1446,7 +1425,6 @@ export function OnboardingProfileForm({
               key="continue-btn"
               type="button"
               onClick={handleNext}
-              disabled={isLocked}
               className="rounded-xl gap-2 h-11 px-8 flex-1 sm:flex-none shadow-lg shadow-primary/15 hover:shadow-primary/25 transition-shadow"
             >
               <span>Continue</span>

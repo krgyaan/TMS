@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import * as z from "zod";import type { EducationData } from "../../types";
 import {
   GraduationCap,
   Building2,
@@ -14,13 +14,11 @@ import {
   BookOpen,
   Hash,
   Award,
-  Calendar,
   CheckCircle2,
   AlertCircle,
   XCircle,
   Lock,
 } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,12 +63,7 @@ type EducationFormValues = z.infer<typeof educationFormSchema>;
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
-];
 
-const YEARS = Array.from({ length: 50 }, (_, i) => currentYear + 5 - i);
 
 const DEGREE_OPTIONS = [
   "10th / SSLC",
@@ -114,7 +107,7 @@ const SectionHeader = ({
   title,
   description,
 }: {
-  icon: any;
+  icon: React.ElementType;
   title: string;
   description: string;
 }) => (
@@ -156,22 +149,17 @@ const EmptyState = ({ onAdd }: { onAdd: () => void }) => (
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface OnboardingEducationFormProps {
-  onCancel: () => void;
-  onSuccess: () => void;
-}
+interface OnboardingEducationFormProps {  onCancel: () => void;  onSuccess: () => void;  readOnly?: boolean;}
 
 export function OnboardingEducationForm({
   onCancel,
-  onSuccess,
-}: OnboardingEducationFormProps) {
+  onSuccess,  readOnly,}: OnboardingEducationFormProps) {
   const { data, refetch } = useOnboardingContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [collapsedCards, setCollapsedCards] = useState<Set<number>>(new Set());
 
   // Map existing education data from context
-  const existingEducations =
-    data?.education?.map((edu: any) => ({
+  const existingEducations = useMemo(    () =>      data?.education?.map((edu: EducationData) => ({
       id: edu.id,
       degree: edu.degree || "",
       institution: edu.institution || "",
@@ -181,10 +169,9 @@ export function OnboardingEducationForm({
       grade: edu.grade || "",
       hrStatus: edu.hrStatus || "pending",
       hrRemark: edu.hrRemark || "",
-    })) || [];
+    })) ?? [],    [data?.education]  );
 
-  const form = useForm<EducationFormValues>({
-    resolver: zodResolver(educationFormSchema),
+  const form = useForm<EducationFormValues>({    resolver: zodResolver(educationFormSchema),    disabled: readOnly,
     defaultValues: {
       educations: existingEducations.length > 0 ? existingEducations : [],
     },
@@ -201,7 +188,7 @@ export function OnboardingEducationForm({
   useEffect(() => {
     if (existingEducations.length > 0 && !hasInitializedCollapsed) {
       const initialCollapsed = new Set<number>();
-      existingEducations.forEach((edu: any, index: number) => {
+      existingEducations.forEach((edu, index) => {
         if (edu.hrStatus !== "rejected") {
           initialCollapsed.add(index);
         }
@@ -296,7 +283,7 @@ export function OnboardingEducationForm({
   }
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">      <fieldset disabled={readOnly} className="contents">
       <SectionHeader
         icon={GraduationCap}
         title="Education Details"
@@ -433,15 +420,7 @@ export function OnboardingEducationForm({
                 {/* Card Body — collapsible */}
                 {!isCollapsed && (
                   <div className="px-5 py-5 animate-in fade-in slide-in-from-top-2 duration-300">
-                    {watchHrStatus === "approved" && (
-                      <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-start gap-3">
-                        <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5 text-emerald-500" />
-                        <div className="space-y-1">
-                          <h5 className="text-xs font-bold uppercase tracking-wider">Verification Approved</h5>
-                          <p className="text-sm font-medium">This education qualification has been approved by HR and is locked for editing.</p>
-                        </div>
-                      </div>
-                    )}
+                    
 
                     {watchHrStatus === "rejected" && watchHrRemark && (
                       <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 flex items-start gap-3">
@@ -631,7 +610,7 @@ export function OnboardingEducationForm({
             Cancel
           </Button>
 
-          <Button
+          {!readOnly && (<Button
             type="submit"
             disabled={isSubmitting}
             className="rounded-xl gap-2 h-11 px-10 flex-1 sm:flex-none shadow-lg shadow-primary/20"
@@ -642,9 +621,9 @@ export function OnboardingEducationForm({
               <Save className="h-4 w-4" />
             )}
             Save Education
-          </Button>
+          </Button>)}
         </div>
       </div>
-    </form>
+    </fieldset></form>
   );
 }

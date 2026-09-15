@@ -1,5 +1,6 @@
 export { authService } from './auth.service'
 export { usersService } from './users.service'
+export { complaintsService } from './complaints.service'
 export { locationsService } from './location.service'
 export { statusesService } from './status.service'
 export { itemsService } from './items.service'

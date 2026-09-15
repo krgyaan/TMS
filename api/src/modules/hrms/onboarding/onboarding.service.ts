@@ -224,7 +224,7 @@ export class OnboardingService {
   /**
    * Helper to seed default induction tasks for an onboarding request.
    */
-  private async seedInductionTasks(tx: any, onboardingId: number): Promise<void> {
+  async seedInductionTasks(tx: any, onboardingId: number): Promise<void> {
     const defaultTasks = [
       ...['Documents collection form completed', 'DISC form completed', 'Workstation identified', 
         'Email ID created', 'Employee added to systems', 'Visiting card ordered', 'ID card ordered']
@@ -1312,7 +1312,7 @@ export class OnboardingService {
       let newUserId: number | null = null;
       
       if (dto.status === 'approved') {
-        if ((request as any).requestType === 're_onboarding') {
+        if ((request as any).requestType === 're_onboarding' || request.userId) {
           // User already exists — just seed tasks
           await this.seedInductionTasks(tx, id);
           // userId is already set on the request — no need to update it

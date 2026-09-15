@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";import type { BankDetailData } from "../../types";
 import {
   CreditCard,
   Building2,
@@ -27,7 +26,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useOnboardingContext } from "./contexts/OnboardingContext";
 import api from "@/lib/axios";
-import { bankFormSchema, type BankFormValues } from "./onboarding.types";
+import { bankFormSchema, type BankFormValues, type BankFormInput } from "./onboarding.types";
 
 
 const EmptyState = ({ onAdd }: { onAdd: () => void }) => (
@@ -57,22 +56,17 @@ const EmptyState = ({ onAdd }: { onAdd: () => void }) => (
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface OnboardingBankFormProps {
-  onCancel: () => void;
-  onSuccess: () => void;
-}
+interface OnboardingBankFormProps {  onCancel: () => void;  onSuccess: () => void;  readOnly?: boolean;}
 
 export function OnboardingBankForm({
   onCancel,
-  onSuccess,
-}: OnboardingBankFormProps) {
+  onSuccess,  readOnly,}: OnboardingBankFormProps) {
   const { data, refetch } = useOnboardingContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [collapsedCards, setCollapsedCards] = useState<Set<number>>(new Set());
 
   // Map existing bank data from context
-  const existingBanks =
-    data?.bankAccounts?.map((bank: any) => ({
+  const existingBanks = useMemo(    () =>      data?.bankAccounts?.map((bank: BankDetailData) => ({
       id: bank.id,
       bankName: bank.bankName || "",
       accountHolderName: bank.accountHolderName || "",
@@ -84,10 +78,9 @@ export function OnboardingBankForm({
       isPrimary: bank.isPrimary || false,
       hrStatus: bank.hrStatus || "pending",
       hrRemark: bank.hrRemark || "",
-    })) || [];
+    })) ?? [],    [data?.bankAccounts]  );
 
-  const form = useForm<BankFormValues>({
-    resolver: zodResolver(bankFormSchema),
+  const form = useForm<BankFormInput, unknown, BankFormValues>({    resolver: zodResolver(bankFormSchema),    disabled: readOnly,
     defaultValues: {
       bankAccounts: existingBanks.length > 0 ? existingBanks : [],
     },
@@ -104,7 +97,7 @@ export function OnboardingBankForm({
   useEffect(() => {
     if (existingBanks.length > 0 && !hasInitializedCollapsed) {
       const initialCollapsed = new Set<number>();
-      existingBanks.forEach((bank: any, index: number) => {
+      existingBanks.forEach((bank, index) => {
         if (bank.hrStatus !== "rejected") {
           initialCollapsed.add(index);
         }
@@ -191,7 +184,7 @@ export function OnboardingBankForm({
   };
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">      <fieldset disabled={readOnly} className="contents">
 
       {fields.length === 0 ? (
         <EmptyState onAdd={addNewBank} />
@@ -321,15 +314,7 @@ export function OnboardingBankForm({
                 {/* Card Body — collapsible */}
                 {!isCollapsed && (
                   <div className="px-5 py-5 animate-in fade-in slide-in-from-top-2 duration-300">
-                    {watchHrStatus === "approved" && (
-                      <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-start gap-3">
-                        <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5 text-emerald-500" />
-                        <div className="space-y-1">
-                          <h5 className="text-xs font-bold uppercase tracking-wider">Verification Approved</h5>
-                          <p className="text-sm font-medium">This bank account has been approved by HR and is locked for editing.</p>
-                        </div>
-                      </div>
-                    )}
+                    
 
                     {watchHrStatus === "rejected" && watchHrRemark && (
                       <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 flex items-start gap-3">
@@ -514,7 +499,7 @@ export function OnboardingBankForm({
             Cancel
           </Button>
 
-          <Button
+          {!readOnly && (<Button
             type="submit"
             disabled={isSubmitting}
             className="rounded-xl gap-2 h-11 px-10 flex-1 sm:flex-none shadow-lg shadow-primary/20"
@@ -525,9 +510,9 @@ export function OnboardingBankForm({
               <Save className="h-4 w-4" />
             )}
             Save Bank Details
-          </Button>
+          </Button>)}
         </div>
       </div>
-    </form>
+    </fieldset></form>
   );
 }
