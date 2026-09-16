@@ -1,5 +1,5 @@
-import { pgTable, serial, bigint, integer, varchar, jsonb, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
-import { projects } from "./projects.schema";
+import { bigint, integer, jsonb, pgTable, serial, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import { projects } from "../master/projects.schema";
 
 export const projectClosureDocuments = pgTable(
     "project_closure_documents",

@@ -1,5 +1,4 @@
-import { bigserial } from "drizzle-orm/pg-core";
-import { text, integer, index, uniqueIndex, pgTable, bigint, varchar, timestamp, numeric, date, boolean, jsonb } from "drizzle-orm/pg-core";
+import { bigint, bigserial, boolean, date, index, integer, jsonb, numeric, pgTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 
 // WO Basic Details - Initial project info filled by TE within 12 hours of PO receipt
 export const woBasicDetails = pgTable("wo_basic_details", {
@@ -15,6 +14,11 @@ export const woBasicDetails = pgTable("wo_basic_details", {
     woDate: date("wo_date"),
     projectCode: varchar("project_code", { length: 100 }).unique(),
     projectName: varchar("project_name", { length: 255 }),
+
+    // Order type: 'single' (one order per tender) | 'multiple' (several orders per tender)
+    // orderSequence numbers each order within the same tender (1, 2, 3...)
+    orderType: varchar("order_type", { length: 20 }).default('single'),
+    orderSequence: integer("order_sequence").default(1),
 
     // Workflow state: 'basic_details' | 'wo_details' | 'wo_acceptance' | 'wo_upload' | 'completed'
     currentStage: varchar("current_stage", { length: 50 }),
@@ -66,6 +70,29 @@ export const woBasicDetails = pgTable("wo_basic_details", {
     createdBy: bigint("created_by", { mode: "number" }),
     updatedBy: bigint("updated_by", { mode: "number" }),
 });
+
+// WO Order Revisions - History of repeated/revised orders for a single WO Basic Detail
+export const woOrderRevisions = pgTable("wo_order_revisions", {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    woBasicDetailId: bigint("wo_basic_detail_id", { mode: "number" }).notNull()
+        .references(() => woBasicDetails.id, { onDelete: "cascade" }),
+
+    // Snapshot of the order values before the revision
+    woNumber: varchar("wo_number", { length: 255 }),
+    woDate: date("wo_date"),
+    woValuePreGst: numeric("wo_value_pre_gst", { precision: 20, scale: 2 }),
+    woValueGstAmt: numeric("wo_value_gst_amt", { precision: 20, scale: 2 }),
+    woDraft: varchar("wo_draft", { length: 255 }),
+
+    revisionNumber: integer("revision_number").notNull(),
+    revisionDate: timestamp("revision_date", { withTimezone: true }).notNull().defaultNow(),
+    revisedBy: bigint("revised_by", { mode: "number" }),
+    revisionNotes: text("revision_notes"),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+    index("idx_wo_order_revisions_basic_detail").on(table.woBasicDetailId),
+]);
 
 // WO Details - Detailed WO info filled by OE (Pages 1-7)
 export const woDetails = pgTable("wo_details", {
@@ -415,6 +442,9 @@ export const woShippingAddresses = pgTable("wo_shipping_addresses", {
 // Type Exports
 export type WoBasicDetails = typeof woBasicDetails.$inferSelect;
 export type NewWoBasicDetails = typeof woBasicDetails.$inferInsert;
+
+export type WoOrderRevision = typeof woOrderRevisions.$inferSelect;
+export type NewWoOrderRevision = typeof woOrderRevisions.$inferInsert;
 
 export type WoDetail = typeof woDetails.$inferSelect;
 export type NewWoDetail = typeof woDetails.$inferInsert;

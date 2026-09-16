@@ -1,18 +1,17 @@
 import { items, locations, organizations, projects, teams, tenderClients, tenderCostingDetails, tenderCostingSheets, tenderInfos } from '@/db/schemas';
-import { instrumentTransferDetails } from '@/db/schemas/tendering/payment-requests.schema';
 import { AppLogger } from '@/logger/app-logger.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { PaymentRequestService } from '@/modules/operations/payment-requests/payment-request.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { users } from '@db/schemas/auth/users.schema';
-import { woBasicDetails, woContacts, woDetails } from '@db/schemas/operations';
+import { woBasicDetails, woContacts, woDetails, woOrderRevisions } from '@db/schemas/operations';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import type { AssignOeDto, BulkAssignOeDto, CreateWoBasicDetailDto, RemoveOeAssignmentDto, UpdateWoBasicDetailDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
-import { PaymentRequestService } from '@/modules/operations/payment-requests/payment-request.service';
+import type { AssignOeDto, BulkAssignOeDto, CreateWoBasicDetailDto, RemoveOeAssignmentDto, ReviseOrderDto, UpdateWoBasicDetailDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 const oeFirstUser = alias(users, 'oeFirstUser');
 const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
 const oeDocsPrepUser = alias(users, 'oeDocsPrepUser');
@@ -57,6 +56,8 @@ export class WoBasicDetailsService {
             woDraft: data.woDraft ?? null,
             teChecklistConfirmed: data.teChecklistConfirmed ?? false,
             tmsDocuments: data.tmsDocuments ?? null,
+            orderType: data.orderType ?? 'single',
+            orderSequence: data.orderSequence ?? 1,
             isWorkflowPaused: false,
             createdAt: now,
             updatedAt: now,
@@ -87,6 +88,8 @@ export class WoBasicDetailsService {
         if (data.woDraft !== undefined) out.woDraft = data.woDraft;
         if (data.teChecklistConfirmed !== undefined) out.teChecklistConfirmed = data.teChecklistConfirmed;
         if (data.tmsDocuments !== undefined) out.tmsDocuments = data.tmsDocuments;
+        if (data.orderType !== undefined) out.orderType = data.orderType;
+        if (data.orderSequence !== undefined) out.orderSequence = data.orderSequence;
 
         return out as any;
     }
@@ -102,6 +105,8 @@ export class WoBasicDetailsService {
             projectCode: row.projectCode,
             projectName: row.projectName,
             currentStage: row.currentStage,
+            orderType: row.orderType,
+            orderSequence: row.orderSequence,
             woValuePreGst: row.woValuePreGst,
             woValueGstAmt: row.woValueGstAmt,
             receiptPreGst: row.receiptPreGst,
@@ -142,6 +147,8 @@ export class WoBasicDetailsService {
             woDate: row.woBasicDetails.woDate,
             projectName: row.woBasicDetails.projectName ?? row.tenderInfos?.tenderName ?? null,
             currentStage: row.woBasicDetails.currentStage,
+            orderType: row.woBasicDetails.orderType,
+            orderSequence: row.woBasicDetails.orderSequence,
             woValuePreGst: row.woBasicDetails.woValuePreGst,
             woValueGstAmt: row.woBasicDetails.woValueGstAmt,
             grossMargin: row.woBasicDetails.grossMargin,
@@ -161,11 +168,13 @@ export class WoBasicDetailsService {
             woBasicDetails: {
                 id: woBasicDetails.id,
                 tenderId: woBasicDetails.tenderId,
-                projectId: sql<number | null>`(select ${projects.id} from ${projects} where ${projects.tenderId} = ${woBasicDetails.tenderId} limit 1)::int`,
+                projectId: sql<number | null>`(select ${projects.id} from ${projects} where ${projects.woBasicDetailId} = ${woBasicDetails.id} limit 1)::int`,
                 woNumber: woBasicDetails.woNumber,
                 woDate: woBasicDetails.woDate,
                 projectName: woBasicDetails.projectName,
                 currentStage: woBasicDetails.currentStage,
+                orderType: woBasicDetails.orderType,
+                orderSequence: woBasicDetails.orderSequence,
                 woValuePreGst: woBasicDetails.woValuePreGst,
                 woValueGstAmt: woBasicDetails.woValueGstAmt,
                 grossMargin: woBasicDetails.grossMargin,
@@ -409,10 +418,33 @@ export class WoBasicDetailsService {
         }
 
         const insertValues = this.mapCreateToDb(data);
+
+        // For multiple orders, derive the sequence number (count of existing orders for the tender + 1)
+        const orderType = data.orderType ?? 'single';
+        if (orderType === 'multiple' && data.tenderId) {
+            const [{ count }] = await this.db
+                .select({ count: sql<number>`count(*)::int` })
+                .from(woBasicDetails)
+                .where(eq(woBasicDetails.tenderId, data.tenderId));
+            insertValues.orderType = 'multiple';
+            insertValues.orderSequence = (count ?? 0) + 1;
+        } else {
+            insertValues.orderType = insertValues.orderType ?? orderType;
+            insertValues.orderSequence = insertValues.orderSequence ?? 1;
+        }
+
         if (userId) {
             insertValues.createdBy = userId;
             insertValues.updatedBy = userId;
             insertValues.team = teamId;
+        }
+
+        // Auto-append (N) suffix when the same project name already exists
+        if (insertValues.projectName) {
+            const nameCheck = await this.checkProjectNameExists(insertValues.projectName, insertValues.team ?? teamId ?? undefined);
+            if (nameCheck.exists && nameCheck.suggestion) {
+                insertValues.projectName = nameCheck.suggestion;
+            }
         }
 
         // Create WO Basic Detail
@@ -440,12 +472,12 @@ export class WoBasicDetailsService {
         }
 
         // Create Project asynchronously (non-blocking)
-        this.safeCreateProject(data, row?.id, userId);
+        this.safeCreateProject(data, row?.id, userId, insertValues.projectName ?? null);
 
         return this.mapRowToResponse(row!);
     }
 
-    private async safeCreateProject(data: CreateWoBasicDetailDto, woBasicDetailId?: number, currentUserId?: number): Promise<void> {
+    private async safeCreateProject(data: CreateWoBasicDetailDto, woBasicDetailId?: number, currentUserId?: number, actualProjectName?: string | null): Promise<void> {
         if (!woBasicDetailId) return;
 
         setImmediate(async () => {
@@ -512,7 +544,7 @@ export class WoBasicDetailsService {
                     locationId: locationId ?? null,
                     poNo: data.woNumber ?? null,
                     projectCode: data.projectCode ?? null,
-                    projectName: data.projectName ?? null,
+                    projectName: actualProjectName ?? data.projectName ?? null,
                     poUpload: data.woDraft ?? null,
                     poDate: this.parseDate(data.woDate),
                     performanceProof: null,
@@ -523,6 +555,7 @@ export class WoBasicDetailsService {
                     sapPoNo: null,
                     tenderId: data.tenderId ?? null,
                     enquiryId: data.enquiryId ?? null,
+                    woBasicDetailId: woBasicDetailId ?? null,
                     createdAt: now,
                     updatedAt: now,
                 } as typeof projects.$inferInsert).returning();
@@ -584,13 +617,17 @@ export class WoBasicDetailsService {
         currentUserId?: number
     ): Promise<void> {
         try {
+            const gemInvoiceFiles = data.gemChargesInvoice ? JSON.parse(data.gemChargesInvoice) as string[] : [];
+
             const makerRequestBody: any = {
                 projectId,
+                projectName: data.projectName ?? null,
                 amount: data.gemChargesAmount || 0,
                 paymentAgainst: 'gem_charges',
-                paymentMode: 'portal',
+                paymentMode: 'PORTAL',
                 portalLink: data.gemChargesPortalLink || null,
-                uploadedInvoiceFile: data.gemChargesInvoice ? JSON.parse(data.gemChargesInvoice) : [],
+                uploadedInvoiceFile: gemInvoiceFiles[0] ?? null,
+                billFiles: gemInvoiceFiles,
                 remark: `Auto-created from Basic Detail: ${woBasicDetailId}, for ${data.projectName}`,
                 requestedBy: currentUserId,
             };
@@ -607,7 +644,20 @@ export class WoBasicDetailsService {
 
     async update(id: number, data: UpdateWoBasicDetailDto, userId?: number) {
         // Check if record exists
-        await this.findById(id);
+        const existing = await this.findById(id);
+
+        // Guard against converting a 'multiple' order claim to 'single' when several orders exist for the tender
+        if (data.orderType === 'single' && existing.orderType === 'multiple' && existing.tenderId) {
+            const [{ count }] = await this.db
+                .select({ count: sql<number>`count(*)::int` })
+                .from(woBasicDetails)
+                .where(eq(woBasicDetails.tenderId, existing.tenderId));
+            if ((count ?? 1) > 1) {
+                throw new BadRequestException(
+                    `Cannot convert to a single order: ${count} orders are already linked to tender ${existing.tenderId}.`,
+                );
+            }
+        }
 
         // Check project code uniqueness if being updated
         if (data.projectCode) {
@@ -654,6 +704,111 @@ export class WoBasicDetailsService {
         if (!row) {
             throw new NotFoundException(`WO Basic Detail with ID ${id} not found`);
         }
+    }
+
+    // ============================================
+    // ORDER REVISION OPERATIONS (repeated/revised orders)
+    // ============================================
+
+    /**
+     * Revise an existing order: snapshots the current order values into wo_order_revisions,
+     * updates the wo_basic_details row with the new order values, and keeps the linked
+     * project (po_no, po_date, po_upload) in sync. No new project is created.
+     */
+    async reviseOrder(id: number, data: ReviseOrderDto, userId?: number) {
+        const [row] = await this.db
+            .select()
+            .from(woBasicDetails)
+            .where(eq(woBasicDetails.id, id));
+
+        if (!row) {
+            throw new NotFoundException(`WO Basic Detail with ID ${id} not found`);
+        }
+
+        const now = new Date();
+
+        // Compute next revision number for this order
+        const [{ maxRev }] = await this.db
+            .select({ maxRev: sql<number | null>`max(${woOrderRevisions.revisionNumber})::int` })
+            .from(woOrderRevisions)
+            .where(eq(woOrderRevisions.woBasicDetailId, id));
+
+        const revisionNumber = (maxRev ?? 0) + 1;
+
+        // Snapshot current order values
+        const snapshotWoDate = row.woDate ?? null;
+        await this.db.insert(woOrderRevisions).values({
+            woBasicDetailId: id,
+            woNumber: row.woNumber,
+            woDate: snapshotWoDate,
+            woValuePreGst: row.woValuePreGst,
+            woValueGstAmt: row.woValueGstAmt,
+            woDraft: row.woDraft,
+            revisionNumber,
+            revisionDate: now,
+            revisedBy: userId ?? null,
+            revisionNotes: data.revisionNotes ?? null,
+        });
+
+        // Apply new order values
+        const updateValues: Record<string, unknown> = { updatedAt: now };
+        if (data.woNumber !== undefined) updateValues.woNumber = data.woNumber;
+        if (data.woDate !== undefined) updateValues.woDate = data.woDate;
+        if (data.woValuePreGst !== undefined) updateValues.woValuePreGst = data.woValuePreGst;
+        if (data.woValueGstAmt !== undefined) updateValues.woValueGstAmt = data.woValueGstAmt;
+        if (data.woDraft !== undefined) updateValues.woDraft = data.woDraft;
+        if (userId) updateValues.updatedBy = userId;
+
+        const [updated] = await this.db
+            .update(woBasicDetails)
+            .set(updateValues)
+            .where(eq(woBasicDetails.id, id))
+            .returning();
+
+        // Keep the linked project's PO fields in sync (if a project exists via woBasicDetailId)
+        const projectSync: Record<string, unknown> = { updatedAt: now };
+        if (data.woNumber !== undefined) projectSync.poNo = data.woNumber;
+        if (data.woDate !== undefined) projectSync.poDate = this.parseDate(data.woDate);
+        if (data.woDraft !== undefined) projectSync.poUpload = data.woDraft;
+        await this.db
+            .update(projects)
+            .set(projectSync)
+            .where(eq(projects.woBasicDetailId, id));
+
+        const revisions = await this.getOrderRevisions(id);
+
+        return {
+            ...this.mapRowToResponse(updated),
+            revisions,
+        };
+    }
+
+    /**
+     * Returns the revision history for a WO basic detail, newest first.
+     */
+    async getOrderRevisions(woBasicDetailId: number) {
+        const rows = await this.db
+            .select({
+                id: woOrderRevisions.id,
+                woBasicDetailId: woOrderRevisions.woBasicDetailId,
+                woNumber: woOrderRevisions.woNumber,
+                woDate: woOrderRevisions.woDate,
+                woValuePreGst: woOrderRevisions.woValuePreGst,
+                woValueGstAmt: woOrderRevisions.woValueGstAmt,
+                woDraft: woOrderRevisions.woDraft,
+                revisionNumber: woOrderRevisions.revisionNumber,
+                revisionDate: woOrderRevisions.revisionDate,
+                revisedBy: woOrderRevisions.revisedBy,
+                revisionNotes: woOrderRevisions.revisionNotes,
+                revisedByName: users.name,
+                createdAt: woOrderRevisions.createdAt,
+            })
+            .from(woOrderRevisions)
+            .leftJoin(users, eq(users.id, woOrderRevisions.revisedBy))
+            .where(eq(woOrderRevisions.woBasicDetailId, woBasicDetailId))
+            .orderBy(desc(woOrderRevisions.revisionNumber));
+
+        return rows;
     }
 
     // OE ASSIGNMENT OPERATIONS

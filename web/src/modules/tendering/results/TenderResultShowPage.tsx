@@ -23,7 +23,7 @@ export default function TenderResultShowPage() {
     const navigate = useNavigate();
     const tenderIdNum = tenderId ? Number(tenderId) : null;
 
-    const basicDetailsId = useWoBasicDetailsByTender(tenderIdNum ?? 0)?.data?.[0]?.id;
+    const { data: basicDetailsResponse } = useWoBasicDetailsByTender(tenderIdNum ?? 0);
 
     const { steps: tenderSteps, tender } = useTenderStepStatuses(tenderIdNum);
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["result", "basic-details"]));
@@ -52,7 +52,23 @@ export default function TenderResultShowPage() {
             case "bid":            return <BidSubmissionSection tenderId={tenderIdNum} />;
             case "ra-management":  return <RaSection tenderId={tenderIdNum} />;
             case "result":         return <TenderResultSection tenderId={tenderIdNum} />;
-            case "basic-details":  return basicDetailsId ? <BasicDetailsSection woBasicDetailId={basicDetailsId} /> : null;
+            case "basic-details":
+            if (!basicDetailsResponse?.length) return null;
+            return (
+                <div className="space-y-6">
+                    {basicDetailsResponse.map((wo, idx) => (
+                        <div key={wo.id} className="space-y-3">
+                            {basicDetailsResponse.length > 1 && (
+                                <h4 className="text-sm font-semibold text-muted-foreground">
+                                    Order {idx + 1}
+                                    {wo.orderType === "multiple" && wo.orderSequence ? ` · #${wo.orderSequence}` : ""}
+                                </h4>
+                            )}
+                            <BasicDetailsSection woBasicDetailId={wo.id} />
+                        </div>
+                    ))}
+                </div>
+            );
             default: return null;
         }
     };

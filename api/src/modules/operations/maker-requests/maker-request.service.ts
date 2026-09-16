@@ -147,6 +147,7 @@ export class MakerRequestService {
 
         if (body.status === 'payment_done') {
           this.notifications.notifyPaymentDone({
+            requestNo: existing.requestNo ?? undefined,
             amount: updated.amount ?? 0,
             partyName: updated.partyName ?? null,
             portalLink: updated.portalLink ?? null,
@@ -158,6 +159,7 @@ export class MakerRequestService {
 
         if (body.status === 'rejected') {
           this.notifications.notifyRejection({
+            requestNo: existing.requestNo ?? undefined,
             amount: updated.amount ?? 0,
             partyName: updated.partyName ?? null,
             portalLink: updated.portalLink ?? null,
@@ -169,6 +171,7 @@ export class MakerRequestService {
 
         if (body.status === 'maker_done') {
           this.notifications.notifyMakerDone({
+            requestNo: existing.requestNo ?? undefined,
             amount: updated.amount ?? 0,
             partyName: updated.partyName ?? null,
             portalLink: updated.portalLink ?? null,

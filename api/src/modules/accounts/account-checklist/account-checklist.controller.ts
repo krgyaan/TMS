@@ -6,6 +6,7 @@ import { Logger } from "winston";
 import { CurrentUser } from "@/decorators/current-user.decorator";
 import { CanDelete } from "@/modules/auth/decorators";
 import { AccountChecklistService } from "./account-checklist.service";
+import { PermissionService } from "@/modules/auth/services/permission.service";
 
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { z } from "zod";
@@ -69,27 +70,30 @@ export type GetTasksDto = z.infer<typeof GetTasksSchema>;
 
 @Controller("accounts/checklists")
 export class AccountChecklistController {
-    constructor(private readonly service: AccountChecklistService,
-
-    @Inject(WINSTON_MODULE_PROVIDER)
-    private readonly logger: Logger,
+    constructor(
+        private readonly service: AccountChecklistService,
+        private readonly permissionService: PermissionService,
+        @Inject(WINSTON_MODULE_PROVIDER)
+        private readonly logger: Logger,
     ) {}
 
     /**
      * Get all checklists (index view)
      */
     @Get()
-    getIndex(@CurrentUser() user: any) {
+    async getIndex(@CurrentUser() user: any) {
         this.logger.debug(`User object: ${JSON.stringify(user, null, 2)}`);
-        return this.service.getIndexData(user.sub, user.role, user.permissions);
+        const permissions = await this.permissionService.getUserPermissions(user.sub, user.roleId);
+        return this.service.getIndexData(user.sub, user.role, permissions);
     }
 
     /**
      * Get all checklists (simple list)
      */
     @Get("all")
-    getAll(@CurrentUser() user: any) {
-        return this.service.findAll(user.sub, user.role, user.permissions);
+    async getAll(@CurrentUser() user: any) {
+        const permissions = await this.permissionService.getUserPermissions(user.sub, user.roleId);
+        return this.service.findAll(user.sub, user.role, permissions);
     }
 
     /**

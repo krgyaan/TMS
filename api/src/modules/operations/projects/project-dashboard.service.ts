@@ -1,17 +1,17 @@
-import { Inject, Injectable, NotFoundException, Query } from "@nestjs/common";
-import { and, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
+import { imprestCategories, tenderInformation, users } from "@/db/schemas";
+import { projects } from "@/db/schemas/master/projects.schema";
 import { teams } from "@/db/schemas/master/teams.schema";
-import { projects } from "@/db/schemas/operations/projects.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { woBasicDetails, woDetails } from "@/db/schemas/operations/work-order.schema";
 import { employeeImprests } from "@/db/schemas/shared/employee-imprest.schema";
 import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
-import { imprestCategories, tenderInformation, users } from "@/db/schemas";
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
-import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 
 export interface ProjectListFilters {
     page?: number;
@@ -51,6 +51,7 @@ export class ProjectDashboardService {
                 tenderId: projects.tenderId,
                 insuranceRequired: projects.insuranceRequired,
                 insuranceRequiredRemark: projects.insuranceRequiredRemark,
+                woBasicDetailId: projects.woBasicDetailId,
             })
             .from(projects)
             .where(eq(projects.id, projectId));
@@ -60,7 +61,25 @@ export class ProjectDashboardService {
             ? await this.db.select({ id: tenderInfos.id, tenderNumber: tenderInfos.tenderNo }).from(tenderInfos).where(eq(tenderInfos.id, project.tenderId))
             : [];
 
-        const [basicDetail] = tender
+        // Prefer direct woBasicDetailId FK (new multi-order path); fall back to tenderId chain (backward compat)
+        const [basicDetail] = project.woBasicDetailId
+            ? await this.db
+                  .select({
+                      id: woBasicDetails.id,
+                      woValuePreGst: woBasicDetails.woValuePreGst,
+                      woValueGstAmt: woBasicDetails.woValueGstAmt,
+                      budget: woBasicDetails.budgetPreGst,
+                      budgetSupply: woBasicDetails.budgetSupply,
+                      budgetService: woBasicDetails.budgetService,
+                      budgetFreight: woBasicDetails.budgetFreight,
+                      budgetAdmin: woBasicDetails.budgetAdmin,
+                      budgetBuybackSale: woBasicDetails.budgetBuybackSale,
+                      budgetGemCharges: woBasicDetails.budgetGemCharges,
+                  })
+                  .from(woBasicDetails)
+                  .where(eq(woBasicDetails.id, project.woBasicDetailId))
+                  .limit(1)
+            : tender
             ? await this.db
                   .select({
                       id: woBasicDetails.id,

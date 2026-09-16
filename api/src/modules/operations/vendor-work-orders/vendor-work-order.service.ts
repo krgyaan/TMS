@@ -21,6 +21,7 @@ import { users } from "@/db/schemas";
 
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
+import { OperationNotificationService } from "@/modules/operations/operation-notification.service";
 
 @Injectable()
 export class VendorWorkOrderService {
@@ -30,6 +31,7 @@ export class VendorWorkOrderService {
         private readonly pdfGenerator: PdfGeneratorService,
         private readonly clientDirectorySyncService: ClientDirectorySyncService,
         private readonly insuranceService: InsurancePolicyService,
+        private readonly notifications: OperationNotificationService,
     ) {}
 
     async generateWONumber(projectName?: string) {
@@ -153,6 +155,24 @@ export class VendorWorkOrderService {
 
         this.logger.info(`Vendor Work Order created: ${woNumber}`);
 
+        // Compute grandTotal from products for notification
+        const grandTotal = (body.products || []).reduce((sum: number, p: any) => {
+            const qty = Number(p.qty);
+            const rate = Number(p.rate);
+            const gstRate = Number(p.gstRate);
+            const taxable = qty * rate;
+            const gst = (taxable * gstRate) / 100;
+            return sum + taxable + gst;
+        }, 0);
+
+        this.notifications.notifyVwoCreated({
+            woNumber,
+            sellerName: body.sellerName,
+            grandTotal: grandTotal.toFixed(2),
+            projectName: body.projectName,
+            createdBy: userId,
+        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+
         this.generatePdfForWO(wo, body.products).catch((err) => {
             this.logger.error(`Failed to generate VWO PDF: ${err.message}`);
         });
@@ -256,6 +276,12 @@ export class VendorWorkOrderService {
         }
 
         this.logger.info(`Vendor Work Order updated: ${existing.woNumber}`);
+
+        this.notifications.notifyVwoUpdated({
+            woNumber: existing.woNumber ?? `#${id}`,
+            sellerName: body.sellerName,
+            updatedBy: userId,
+        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
 
         this.generatePdfForWO(updated, body.products).catch((err) => {
             this.logger.error(`Failed to regenerate VWO PDF: ${err.message}`);
@@ -455,7 +481,7 @@ export class VendorWorkOrderService {
         return { pending, approved, rejected, new: newCount, closed: closedCount, invoicePending: invoicePendingCount };
     }
 
-    async setVwoApproval(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }) {
+    async setVwoApproval(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }, userId?: number) {
         const wo = await this.db
             .select()
             .from(vendorWorkOrders)
@@ -492,6 +518,43 @@ export class VendorWorkOrderService {
                 .returning();
 
             this.logger.info(`VWO approved #${id}: ${tdsPercentage}%, TDS Amount: ${tdsAmt}, After TDS: ${amountAfterTds}`);
+
+            // Bulk update po_approval_pending → pending and send WA notifications
+            const pendingPrs = await this.db
+                .select({ id: paymentRequests.id, requestNo: paymentRequests.requestNo, amount: paymentRequests.amount, partyName: paymentRequests.partyName, portalLink: paymentRequests.portalLink, paymentAgainst: paymentRequests.paymentAgainst, requestedBy: paymentRequests.requestedBy })
+                .from(paymentRequests)
+                .where(and(eq(paymentRequests.vendorWorkOrderId, id), eq(paymentRequests.status, 'po_approval_pending')));
+
+            if (pendingPrs.length > 0) {
+                await this.db
+                    .update(paymentRequests)
+                    .set({ status: 'pending', updatedAt: new Date() })
+                    .where(and(eq(paymentRequests.vendorWorkOrderId, id), eq(paymentRequests.status, 'po_approval_pending')));
+
+                for (const pr of pendingPrs) {
+                    this.notifications.notifyNewPaymentRequest({
+                        requestNo: pr.requestNo ?? '',
+                        amount: pr.amount ?? 0,
+                        partyName: pr.partyName ?? null,
+                        portalLink: pr.portalLink ?? null,
+                        requestedBy: pr.requestedBy ?? 0,
+                        category: pr.paymentAgainst ?? '',
+                    }).catch((err) => this.logger.warn(`WhatsApp notification failed for PR #${pr.id}: ${err}`));
+                }
+
+                this.logger.info(`Bulk updated ${pendingPrs.length} payment requests from po_approval_pending to pending for VWO #${id}`);
+            }
+
+            // Send VWO approved notification
+            this.notifications.notifyVwoApproved({
+                woNumber: wo.woNumber ?? `#${id}`,
+                sellerName: wo.sellerName,
+                grandTotal: grandTotal.toString(),
+                tdsPercentage: tdsPercentage.toString(),
+                amountAfterTds: amountAfterTds.toString(),
+                approvedBy: userId ?? 0,
+            }).catch((err) => this.logger.warn(`WhatsApp VWO approval notification failed: ${err}`));
+
             return updated;
         } else {
             const [updated] = await this.db
@@ -503,6 +566,32 @@ export class VendorWorkOrderService {
                 })
                 .where(eq(vendorWorkOrders.id, id))
                 .returning();
+
+            // Bulk update po_approval_pending → rejected
+            const rejectedCount = await this.db
+                .update(paymentRequests)
+                .set({ status: 'rejected', rejectionReason: remark || 'VWO Rejected', updatedAt: new Date() })
+                .where(and(eq(paymentRequests.vendorWorkOrderId, id), eq(paymentRequests.status, 'po_approval_pending')))
+                .returning({ id: paymentRequests.id });
+
+            if (rejectedCount.length > 0) {
+                this.logger.info(`Bulk rejected ${rejectedCount.length} payment requests for rejected VWO #${id}`);
+            }
+
+            // Compute grandTotal for notification
+            const rejectItems = await this.db
+                .select()
+                .from(vendorWorkOrderItems)
+                .where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
+            const rejectGrandTotal = rejectItems.reduce((acc, item) => acc + Number(item.totalAmount), 0);
+
+            this.notifications.notifyVwoRejected({
+                woNumber: wo.woNumber ?? `#${id}`,
+                sellerName: wo.sellerName,
+                grandTotal: rejectGrandTotal.toString(),
+                remark: remark || null,
+                rejectedBy: userId ?? 0,
+            }).catch((err) => this.logger.warn(`WhatsApp VWO rejection notification failed: ${err}`));
 
             this.logger.info(`VWO rejected #${id}: ${remark || 'no remark'}`);
             return updated;

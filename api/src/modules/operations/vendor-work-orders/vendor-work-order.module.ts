@@ -5,9 +5,10 @@ import { PdfGeneratorModule } from "@/modules/pdf/pdf-generator.module";
 import { VendorWorkOrderController } from "./vendor-work-order.controller";
 import { VendorWorkOrderService } from "./vendor-work-order.service";
 import { ClientDirectoryModule } from "@/modules/shared/client-directory/client-directory.module";
+import { OpenwaModule } from "@/openwa/openwa.module";
 
 @Module({
-    imports: [DatabaseModule, PdfGeneratorModule, ClientDirectoryModule, InsurancePolicyModule],
+    imports: [DatabaseModule, PdfGeneratorModule, ClientDirectoryModule, InsurancePolicyModule, OpenwaModule],
     controllers: [VendorWorkOrderController],
     providers: [VendorWorkOrderService],
     exports: [VendorWorkOrderService],
