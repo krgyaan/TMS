@@ -1860,7 +1860,7 @@ export class OnboardingService {
       bankName: bank.bankName || '',
       accountHolderName: bank.accountHolderName || '',
       accountNumber: bank.accountNumber || '',
-      ifscCode: bank.ifscCode || '',
+      ifscCode: bank.ifscCode?.trim().toUpperCase() || '',
       branchName: sanitize(bank.branchName),
       branchAddress: sanitize(bank.branchAddress),
       upiId: sanitize(bank.upiId),
