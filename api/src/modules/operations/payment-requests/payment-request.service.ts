@@ -188,9 +188,16 @@ export class PaymentRequestService {
 
         this.logger.info(`Payment Request created: ${requestNo}`);
 
+        // Use the requestNo stored in the DB (not the transient local value)
+        const [storedPr] = await this.db
+            .select({ requestNo: paymentRequests.requestNo })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, pr.id))
+            .limit(1);
+
         // Fire-and-forget WhatsApp notification
         this.notifications.notifyNewPaymentRequest({
-          requestNo: pr.requestNo ?? '',
+          requestNo: storedPr?.requestNo ?? pr.requestNo ?? '',
           amount: pr.amount ?? 0,
           partyName: pr.partyName ?? null,
           portalLink: pr.portalLink ?? null,
@@ -293,6 +300,7 @@ export class PaymentRequestService {
 
             if (body.status === 'payment_done') {
               this.notifications.notifyPaymentDone({
+                requestNo: existing.requestNo ?? undefined,
                 amount: updated.amount ?? 0,
                 partyName: updated.partyName ?? null,
                 portalLink: updated.portalLink ?? null,
@@ -304,6 +312,7 @@ export class PaymentRequestService {
 
             if (body.status === 'rejected') {
               this.notifications.notifyRejection({
+                requestNo: existing.requestNo ?? undefined,
                 amount: updated.amount ?? 0,
                 partyName: updated.partyName ?? null,
                 portalLink: updated.portalLink ?? null,
@@ -315,6 +324,7 @@ export class PaymentRequestService {
 
             if (body.status === 'maker_done') {
               this.notifications.notifyMakerDone({
+                requestNo: existing.requestNo ?? undefined,
                 amount: updated.amount ?? 0,
                 partyName: updated.partyName ?? null,
                 portalLink: updated.portalLink ?? null,

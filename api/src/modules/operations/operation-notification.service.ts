@@ -19,6 +19,7 @@ export interface PaymentRequestNotificationData {
 }
 
 export interface PaymentDoneNotificationData {
+  requestNo?: string;
   amount: string | number;
   partyName: string | null;
   portalLink: string | null;
@@ -28,6 +29,7 @@ export interface PaymentDoneNotificationData {
 }
 
 export interface RejectionNotificationData {
+  requestNo?: string;
   amount: string | number;
   partyName: string | null;
   portalLink: string | null;
@@ -37,6 +39,7 @@ export interface RejectionNotificationData {
 }
 
 export interface MakerDoneNotificationData {
+  requestNo?: string;
   amount: string | number;
   partyName: string | null;
   portalLink: string | null;
@@ -204,6 +207,7 @@ export class OperationNotificationService {
 
       const userName = user?.name ?? 'Unknown';
       const text = await this.buildText('Payment Done', {
+        requestNo: data.requestNo,
         amount: data.amount,
         partyName: data.partyName,
         portalLink: data.portalLink,
@@ -237,6 +241,7 @@ export class OperationNotificationService {
 
       const userName = user?.name ?? 'Unknown';
       const text = await this.buildText('Rejection', {
+        requestNo: data.requestNo,
         amount: data.amount,
         partyName: data.partyName,
         portalLink: data.portalLink,
@@ -270,6 +275,7 @@ export class OperationNotificationService {
 
       const userName = user?.name ?? 'Unknown';
       const text = await this.buildText('Maker Done', {
+        requestNo: data.requestNo,
         amount: data.amount,
         partyName: data.partyName,
         portalLink: data.portalLink,
