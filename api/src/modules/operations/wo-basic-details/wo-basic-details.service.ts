@@ -617,13 +617,17 @@ export class WoBasicDetailsService {
         currentUserId?: number
     ): Promise<void> {
         try {
+            const gemInvoiceFiles = data.gemChargesInvoice ? JSON.parse(data.gemChargesInvoice) as string[] : [];
+
             const makerRequestBody: any = {
                 projectId,
+                projectName: data.projectName ?? null,
                 amount: data.gemChargesAmount || 0,
                 paymentAgainst: 'gem_charges',
-                paymentMode: 'portal',
+                paymentMode: 'PORTAL',
                 portalLink: data.gemChargesPortalLink || null,
-                uploadedInvoiceFile: data.gemChargesInvoice ? JSON.parse(data.gemChargesInvoice) : [],
+                uploadedInvoiceFile: gemInvoiceFiles[0] ?? null,
+                billFiles: gemInvoiceFiles,
                 remark: `Auto-created from Basic Detail: ${woBasicDetailId}, for ${data.projectName}`,
                 requestedBy: currentUserId,
             };
