@@ -377,6 +377,24 @@ export class PurchaseOrderService {
 
         this.logger.info(`Purchase Order created: ${poNumber}`);
 
+        // Compute grandTotal from products for notification
+        const grandTotal = (body.products || []).reduce((sum: number, p: any) => {
+            const qty = Number(p.qty);
+            const rate = Number(p.rate);
+            const gstRate = Number(p.gstRate);
+            const taxable = qty * rate;
+            const gst = (taxable * gstRate) / 100;
+            return sum + taxable + gst;
+        }, 0);
+
+        this.notifications.notifyPoCreated({
+            poNumber,
+            sellerName: body.sellerName,
+            grandTotal: grandTotal.toFixed(2),
+            projectName: body.projectName,
+            createdBy: userId,
+        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+
         this.generatePdfForPO(po, body.products).catch((err) => {
             this.logger.error(`Failed to generate PO PDF: ${err.message}`);
         });
@@ -598,6 +616,8 @@ export class PurchaseOrderService {
             this.notifications.notifyPoApproved({
                 poNumber: po.poNumber ?? `#${id}`,
                 sellerName: po.sellerName,
+                grandTotal: grandTotal.toString(),
+                tdsPercentage: tdsPercentage.toString(),
                 amountAfterTds: amountAfterTds.toString(),
                 approvedBy: userId ?? 0,
             }).catch((err) => this.logger.warn(`WhatsApp PO approval notification failed: ${err}`));
@@ -625,6 +645,21 @@ export class PurchaseOrderService {
             if (rejectedCount.length > 0) {
                 this.logger.info(`Bulk rejected ${rejectedCount.length} payment requests for rejected PO #${id}`);
             }
+
+            // Compute grandTotal for notification
+            const rejectProducts = await this.db
+                .select()
+                .from(purchaseOrderProducts)
+                .where(eq(purchaseOrderProducts.purchaseOrderId, id));
+            const { totalWithGst: rejectGrandTotal } = this.getTotalProductValues(rejectProducts);
+
+            this.notifications.notifyPoRejected({
+                poNumber: po.poNumber ?? `#${id}`,
+                sellerName: po.sellerName,
+                grandTotal: rejectGrandTotal.toString(),
+                remark: remark || null,
+                rejectedBy: userId ?? 0,
+            }).catch((err) => this.logger.warn(`WhatsApp PO rejection notification failed: ${err}`));
 
             this.logger.info(`TDS rejected for PO #${id}: ${remark || 'no remark'}`);
             return updated;
@@ -932,6 +967,13 @@ export class PurchaseOrderService {
         }].filter((c) => c.name));
 
         this.logger.info(`Purchase Order updated: ${updatedPO.poNumber}`);
+
+        this.notifications.notifyPoUpdated({
+            poNumber: updatedPO.poNumber ?? `#${id}`,
+            sellerName: body.sellerName,
+            updatedBy: userId ?? 0,
+        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+
         return updatedPO;
     }
 

@@ -47,18 +47,66 @@ export interface MakerDoneNotificationData {
   category: string;
 }
 
+export interface PoCreatedNotificationData {
+  poNumber: string;
+  sellerName: string | null;
+  grandTotal: string | number;
+  projectName: string | null;
+  createdBy: number;
+}
+
 export interface PoApprovalNotificationData {
   poNumber: string;
   sellerName: string | null;
+  grandTotal: string | number;
+  tdsPercentage: string | null;
   amountAfterTds: string | null;
   approvedBy: number;
+}
+
+export interface PoRejectedNotificationData {
+  poNumber: string;
+  sellerName: string | null;
+  grandTotal: string | number;
+  remark: string | null;
+  rejectedBy: number;
+}
+
+export interface PoUpdatedNotificationData {
+  poNumber: string;
+  sellerName: string | null;
+  updatedBy: number;
+}
+
+export interface VwoCreatedNotificationData {
+  woNumber: string;
+  sellerName: string | null;
+  grandTotal: string | number;
+  projectName: string | null;
+  createdBy: number;
 }
 
 export interface VwoApprovalNotificationData {
   woNumber: string;
   sellerName: string | null;
+  grandTotal: string | number;
+  tdsPercentage: string | null;
   amountAfterTds: string | null;
   approvedBy: number;
+}
+
+export interface VwoRejectedNotificationData {
+  woNumber: string;
+  sellerName: string | null;
+  grandTotal: string | number;
+  remark: string | null;
+  rejectedBy: number;
+}
+
+export interface VwoUpdatedNotificationData {
+  woNumber: string;
+  sellerName: string | null;
+  updatedBy: number;
 }
 
 @Injectable()
@@ -312,9 +360,10 @@ export class OperationNotificationService {
       const userName = user?.name ?? 'Unknown';
       const lines: string[] = [
         `*PO Approved* @${userName}`,
-        `PO Number: ${data.poNumber}`,
+        `PO No: ${data.poNumber}`,
+        `Amount: ₹${data.grandTotal}`,
+        `After TDS (${data.tdsPercentage || '0'}%): ₹${data.amountAfterTds || 'N/A'}`,
         `Party: ${data.sellerName || 'N/A'}`,
-        `Amount: ₹${data.amountAfterTds || 'N/A'}`,
       ];
 
       const text = lines.join('\n');
@@ -334,16 +383,159 @@ export class OperationNotificationService {
 
       const userName = user?.name ?? 'Unknown';
       const lines: string[] = [
-        `*VWO Approved* @${userName}`,
-        `VWO Number: ${data.woNumber}`,
+        `*WO Approved* @${userName}`,
+        `WO No: ${data.woNumber}`,
+        `Amount: ₹${data.grandTotal}`,
+        `After TDS (${data.tdsPercentage || '0'}%): ₹${data.amountAfterTds || 'N/A'}`,
         `Party: ${data.sellerName || 'N/A'}`,
-        `Amount: ₹${data.amountAfterTds || 'N/A'}`,
       ];
 
       const text = lines.join('\n');
       await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
     } catch (err) {
       this.logger.warn(`Failed to send VWO approval notification: ${err}`);
+    }
+  }
+
+  async notifyPoCreated(data: PoCreatedNotificationData): Promise<void> {
+    try {
+      const [user] = await this.db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, data.createdBy))
+        .limit(1);
+
+      const userName = user?.name ?? 'Unknown';
+      const lines: string[] = [
+        `*New PO Raised*`,
+        `PO No: ${data.poNumber}`,
+        `Amount: ₹${data.grandTotal}`,
+        `Party: ${data.sellerName || 'N/A'}`,
+        `Raised by: ${userName}`,
+        `Kindly approve ASAP.`,
+      ];
+
+      const text = lines.join('\n');
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+    } catch (err) {
+      this.logger.warn(`Failed to send PO created notification: ${err}`);
+    }
+  }
+
+  async notifyPoRejected(data: PoRejectedNotificationData): Promise<void> {
+    try {
+      const [user] = await this.db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, data.rejectedBy))
+        .limit(1);
+
+      const userName = user?.name ?? 'Unknown';
+      const lines: string[] = [
+        `*PO Rejected* @${userName}`,
+        `PO No: ${data.poNumber}`,
+        `Amount: ₹${data.grandTotal}`,
+        `Party: ${data.sellerName || 'N/A'}`,
+        `Reason: ${data.remark || 'N/A'}`,
+      ];
+
+      const text = lines.join('\n');
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+    } catch (err) {
+      this.logger.warn(`Failed to send PO rejected notification: ${err}`);
+    }
+  }
+
+  async notifyPoUpdated(data: PoUpdatedNotificationData): Promise<void> {
+    try {
+      const [user] = await this.db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, data.updatedBy))
+        .limit(1);
+
+      const userName = user?.name ?? 'Unknown';
+      const lines: string[] = [
+        `*PO Updated* @${userName}`,
+        `PO No: ${data.poNumber}`,
+        `Party: ${data.sellerName || 'N/A'}`,
+      ];
+
+      const text = lines.join('\n');
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+    } catch (err) {
+      this.logger.warn(`Failed to send PO updated notification: ${err}`);
+    }
+  }
+
+  async notifyVwoCreated(data: VwoCreatedNotificationData): Promise<void> {
+    try {
+      const [user] = await this.db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, data.createdBy))
+        .limit(1);
+
+      const userName = user?.name ?? 'Unknown';
+      const lines: string[] = [
+        `*New WO Raised*`,
+        `WO No: ${data.woNumber}`,
+        `Amount: ₹${data.grandTotal}`,
+        `Party: ${data.sellerName || 'N/A'}`,
+        `Raised by: ${userName}`,
+        `Kindly approve ASAP.`,
+      ];
+
+      const text = lines.join('\n');
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+    } catch (err) {
+      this.logger.warn(`Failed to send VWO created notification: ${err}`);
+    }
+  }
+
+  async notifyVwoRejected(data: VwoRejectedNotificationData): Promise<void> {
+    try {
+      const [user] = await this.db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, data.rejectedBy))
+        .limit(1);
+
+      const userName = user?.name ?? 'Unknown';
+      const lines: string[] = [
+        `*WO Rejected* @${userName}`,
+        `WO No: ${data.woNumber}`,
+        `Amount: ₹${data.grandTotal}`,
+        `Party: ${data.sellerName || 'N/A'}`,
+        `Reason: ${data.remark || 'N/A'}`,
+      ];
+
+      const text = lines.join('\n');
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+    } catch (err) {
+      this.logger.warn(`Failed to send VWO rejected notification: ${err}`);
+    }
+  }
+
+  async notifyVwoUpdated(data: VwoUpdatedNotificationData): Promise<void> {
+    try {
+      const [user] = await this.db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, data.updatedBy))
+        .limit(1);
+
+      const userName = user?.name ?? 'Unknown';
+      const lines: string[] = [
+        `*WO Updated* @${userName}`,
+        `WO No: ${data.woNumber}`,
+        `Party: ${data.sellerName || 'N/A'}`,
+      ];
+
+      const text = lines.join('\n');
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+    } catch (err) {
+      this.logger.warn(`Failed to send VWO updated notification: ${err}`);
     }
   }
 }

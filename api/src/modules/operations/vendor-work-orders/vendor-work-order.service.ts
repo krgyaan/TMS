@@ -155,6 +155,24 @@ export class VendorWorkOrderService {
 
         this.logger.info(`Vendor Work Order created: ${woNumber}`);
 
+        // Compute grandTotal from products for notification
+        const grandTotal = (body.products || []).reduce((sum: number, p: any) => {
+            const qty = Number(p.qty);
+            const rate = Number(p.rate);
+            const gstRate = Number(p.gstRate);
+            const taxable = qty * rate;
+            const gst = (taxable * gstRate) / 100;
+            return sum + taxable + gst;
+        }, 0);
+
+        this.notifications.notifyVwoCreated({
+            woNumber,
+            sellerName: body.sellerName,
+            grandTotal: grandTotal.toFixed(2),
+            projectName: body.projectName,
+            createdBy: userId,
+        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+
         this.generatePdfForWO(wo, body.products).catch((err) => {
             this.logger.error(`Failed to generate VWO PDF: ${err.message}`);
         });
@@ -258,6 +276,12 @@ export class VendorWorkOrderService {
         }
 
         this.logger.info(`Vendor Work Order updated: ${existing.woNumber}`);
+
+        this.notifications.notifyVwoUpdated({
+            woNumber: existing.woNumber ?? `#${id}`,
+            sellerName: body.sellerName,
+            updatedBy: userId,
+        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
 
         this.generatePdfForWO(updated, body.products).catch((err) => {
             this.logger.error(`Failed to regenerate VWO PDF: ${err.message}`);
@@ -457,7 +481,7 @@ export class VendorWorkOrderService {
         return { pending, approved, rejected, new: newCount, closed: closedCount, invoicePending: invoicePendingCount };
     }
 
-    async setVwoApproval(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }) {
+    async setVwoApproval(id: number, { approve, tdsPercentage, remark }: { approve: boolean; tdsPercentage?: number; remark?: string }, userId?: number) {
         const wo = await this.db
             .select()
             .from(vendorWorkOrders)
@@ -525,8 +549,10 @@ export class VendorWorkOrderService {
             this.notifications.notifyVwoApproved({
                 woNumber: wo.woNumber ?? `#${id}`,
                 sellerName: wo.sellerName,
+                grandTotal: grandTotal.toString(),
+                tdsPercentage: tdsPercentage.toString(),
                 amountAfterTds: amountAfterTds.toString(),
-                approvedBy: 0,
+                approvedBy: userId ?? 0,
             }).catch((err) => this.logger.warn(`WhatsApp VWO approval notification failed: ${err}`));
 
             return updated;
@@ -551,6 +577,21 @@ export class VendorWorkOrderService {
             if (rejectedCount.length > 0) {
                 this.logger.info(`Bulk rejected ${rejectedCount.length} payment requests for rejected VWO #${id}`);
             }
+
+            // Compute grandTotal for notification
+            const rejectItems = await this.db
+                .select()
+                .from(vendorWorkOrderItems)
+                .where(eq(vendorWorkOrderItems.vendorWorkOrderId, id));
+            const rejectGrandTotal = rejectItems.reduce((acc, item) => acc + Number(item.totalAmount), 0);
+
+            this.notifications.notifyVwoRejected({
+                woNumber: wo.woNumber ?? `#${id}`,
+                sellerName: wo.sellerName,
+                grandTotal: rejectGrandTotal.toString(),
+                remark: remark || null,
+                rejectedBy: userId ?? 0,
+            }).catch((err) => this.logger.warn(`WhatsApp VWO rejection notification failed: ${err}`));
 
             this.logger.info(`VWO rejected #${id}: ${remark || 'no remark'}`);
             return updated;
