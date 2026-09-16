@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
@@ -51,6 +51,7 @@ interface ProfileSummary {
   hrStatus: "pending" | "approved" | "rejected";
   hrRemark?: string;
   employeeCompleted: boolean;
+  profilePhoto?: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -64,6 +65,7 @@ const mapProfile = (item: ProfileListItem): ProfileSummary => ({
   hrStatus: (item.hrStatus as ProfileSummary["hrStatus"]) || "pending",
   hrRemark: item.hrRemark || undefined,
   employeeCompleted: item.employeeCompleted ?? false,
+  profilePhoto: item.profilePhoto ?? null,
 });
 
 const getInitials = (name: string) => {
@@ -557,6 +559,13 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ profile, onReview }) => {
     >
       {/* Avatar */}
       <Avatar className="h-9 w-9 flex-shrink-0">
+        {profile.profilePhoto && (
+          <AvatarImage
+            src={profile.profilePhoto}
+            alt={profile.name}
+            className="object-cover"
+          />
+        )}
         <AvatarFallback className="text-[11px] font-semibold bg-primary/8 text-primary">
           {getInitials(profile.name)}
         </AvatarFallback>

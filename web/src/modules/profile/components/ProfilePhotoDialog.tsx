@@ -43,7 +43,8 @@ export const ProfilePhotoDialog: React.FC<ProfilePhotoDialogProps> = ({ open, on
       .join(" ")
       .trim() || CURRENT_USER?.name || "Employee";
   const initials = getInitials(fullName);
-  const currentPhoto = data?.profile?.profilePhoto || null;
+  const currentPhoto =
+    data?.profile?.profilePhoto || data?.currentUser?.profilePhoto || null;
 
   // Local preview cleanup
   useEffect(() => {
