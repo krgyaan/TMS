@@ -11,6 +11,7 @@ export type UserData = {
   createdAt: string;
   team: string;
   role?: string | null;
+  profilePhoto?: string | null;
 };
 
 export type ProfileData = {

@@ -825,6 +825,7 @@ export class OnboardingService {
     const rows = await this.db
       .select({
         id: onboardingRequests.id,
+        userId: onboardingRequests.userId,
         name: onboardingRequests.name,
         email: onboardingRequests.email,
         personalEmail: onboardingProfiles.email,
@@ -860,7 +861,34 @@ export class OnboardingService {
       )
       .orderBy(desc(onboardingRequests.approvedAt));
 
-    return rows;
+    const requestIds = rows.map((r) => r.id);
+    const userIds = rows.map((r) => r.userId).filter(Boolean) as number[];
+
+    const [passportPhotos, oauthAvatars] = await Promise.all([
+      requestIds.length > 0
+        ? this.db
+            .select({ onboardingId: onboardingDocuments.onboardingId, fileUrl: onboardingDocuments.fileUrl })
+            .from(onboardingDocuments)
+            .where(and(
+              inArray(onboardingDocuments.onboardingId, requestIds),
+              eq(onboardingDocuments.docType, 'Passport Size Photo'),
+            ))
+        : Promise.resolve([] as { onboardingId: number; fileUrl: string }[]),
+      userIds.length > 0
+        ? this.db
+            .select({ userId: oauthAccounts.userId, avatar: oauthAccounts.avatar })
+            .from(oauthAccounts)
+            .where(inArray(oauthAccounts.userId, userIds))
+        : Promise.resolve([] as { userId: number; avatar: string | null }[]),
+    ]);
+
+    return rows.map((row) => ({
+      ...row,
+      profilePhoto:
+        passportPhotos.find((p) => p.onboardingId === row.id)?.fileUrl ||
+        oauthAvatars.find((o) => o.userId === row.userId)?.avatar ||
+        null,
+    }));
   }
 
   /**
