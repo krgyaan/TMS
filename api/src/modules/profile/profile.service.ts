@@ -37,6 +37,7 @@ import {
   onboardingBankDetails
 } from '@/db/schemas/hrms/onboarding';
 import { teams } from '@/db/schemas/master/teams.schema';
+import { oauthAccounts } from '@/db/schemas';
 import { OnboardingService } from '../hrms/onboarding/onboarding.service';
 
 @Injectable()
@@ -71,6 +72,21 @@ export class ProfileService {
       throw new NotFoundException('User not found');
     }
 
+    // Avatar: uploaded profile photo first, then Google/OAuth photo
+    const [avatarProfile, oauthAvatar] = await Promise.all([
+      this.db
+        .select({ image: userProfiles.image })
+        .from(userProfiles)
+        .where(eq(userProfiles.userId, userId))
+        .limit(1),
+      this.db
+        .select({ avatar: oauthAccounts.avatar })
+        .from(oauthAccounts)
+        .where(eq(oauthAccounts.userId, userId))
+        .limit(1),
+    ]);
+    const profilePhoto = avatarProfile[0]?.image || oauthAvatar[0]?.avatar || null;
+
     const currentUser = {
       id: userRow.id,
       name: userRow.name,
@@ -82,6 +98,7 @@ export class ProfileService {
       createdAt: userRow.createdAt?.toISOString() || null,
       team: userRow.teamName || 'Unassigned',
       role: userRow.roleName || null,
+      profilePhoto,
     };
 
     // CHECK ONBOARDING STATUS

@@ -117,7 +117,35 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
             expect(mockQueue.add).not.toHaveBeenCalled();
         });
 
-        it('should remove old completed job and re-enqueue for fresh extraction', async () => {
+        it('should return existing_completed and preserve cache to prevent token burn when force is not set', async () => {
+            const mockExistingJob = {
+                id: 'extract-tender-101',
+                getState: jest.fn().mockResolvedValue('completed'),
+                remove: jest.fn().mockResolvedValue(undefined),
+                returnvalue: { fields: { tenderValue: { value: 1000 } } },
+            };
+            mockQueue.getJob.mockResolvedValue(mockExistingJob);
+
+            const jobData: PdfExtractionJobData = {
+                tenderId: 101,
+                pdfPath: 'tenders/gem_101.pdf',
+                userId: 42,
+            };
+
+            const result = await producer.enqueueExtraction(jobData);
+
+            expect(result).toEqual({
+                jobId: 'extract-tender-101',
+                status: 'existing_completed',
+                fields: { tenderValue: { value: 1000 } },
+                missing_fields: undefined,
+            });
+
+            expect(mockExistingJob.remove).not.toHaveBeenCalled();
+            expect(mockQueue.add).not.toHaveBeenCalled();
+        });
+
+        it('should remove old completed job and re-enqueue when force: true is specified', async () => {
             const mockExistingJob = {
                 id: 'extract-tender-101',
                 getState: jest.fn().mockResolvedValue('completed'),
@@ -130,6 +158,7 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
                 tenderId: 101,
                 pdfPath: 'tenders/gem_101.pdf',
                 userId: 42,
+                force: true,
             };
 
             const result = await producer.enqueueExtraction(jobData);

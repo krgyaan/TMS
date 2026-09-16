@@ -152,7 +152,7 @@ export class ClaudeUsageService {
         const entryId = crypto.randomUUID();
         const member = `${now}:${tokens}:${entryId}`;
 
-        if (this.redis) {
+        if (this.redis && this.redis.status === 'ready') {
             try {
                 const pipe = this.redis.pipeline();
                 pipe.zadd(TPM_ZSET_KEY, now, member);
@@ -180,7 +180,7 @@ export class ClaudeUsageService {
         const now = Date.now();
         const cutoff = now - TPM_WINDOW_MS;
 
-        if (this.redis) {
+        if (this.redis && this.redis.status === 'ready') {
             try {
                 await this.redis.zremrangebyscore(TPM_ZSET_KEY, 0, cutoff);
                 const entries = await this.redis.zrangebyscore(TPM_ZSET_KEY, cutoff, now);

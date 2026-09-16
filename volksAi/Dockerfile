@@ -23,7 +23,7 @@ WORKDIR /app
 
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --default-timeout=1000 --retries 10 --no-cache-dir -r requirements.txt
 
 # Pre-bake PaddleOCR's detection/recognition/angle-classifier models into the image
 # so there is no live download attempt on first request in production

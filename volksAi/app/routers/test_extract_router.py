@@ -125,3 +125,76 @@ def test_extract_endpoint_response_shape():
     assert "pbgPercentage" not in missing
     assert "avgAnnualTurnoverValue" not in missing
     assert "processingFeeAmount" not in missing
+
+
+def test_extract_endpoint_accepts_and_forwards_atc_and_boq_files():
+    """
+    Regression guard for the accepted-but-silently-dropped bug: /extract
+    previously declared only `pdf_file` + `user_id` as parameters, so the
+    atc_files/boq_file multipart fields the NestJS worker sends were never
+    bound to anything and vanished -- ingest_parent_tender_pdf() always ran
+    with no ATC/BOQ content. This asserts the endpoint actually accepts
+    them (HTTP 200, no silent drop) AND forwards non-empty paths into
+    ingest_parent_tender_pdf() as explicit_atc_paths / explicit_boq_path.
+
+    (The deeper guarantee -- that the forwarded files' CONTENT actually
+    changes the extraction result -- is covered without mocking in
+    app/services/test_pdf_parent_ingest_atc.py; this test only proves the
+    HTTP/API layer no longer drops the files before they get that far.)
+    """
+    captured = {}
+
+    def _fake_ingest(**kwargs):
+        # Snapshot existence + content HERE, while the endpoint's
+        # TemporaryDirectory is still alive -- it's cleaned up as soon as
+        # this call returns, before the HTTP response reaches the test.
+        atc_paths = kwargs.get("explicit_atc_paths") or []
+        boq_path = kwargs.get("explicit_boq_path")
+        captured["atc_count"] = len(atc_paths)
+        captured["atc_exist"] = [p.exists() for p in atc_paths]
+        captured["atc_contents"] = [p.read_bytes() for p in atc_paths]
+        captured["boq_present"] = boq_path is not None
+        captured["boq_exists"] = boq_path.exists() if boq_path else None
+        captured["boq_content"] = boq_path.read_bytes() if boq_path else None
+        return {"missing_fields": []}
+
+    with patch("app.routers.extract.ingest_parent_tender_pdf", side_effect=_fake_ingest):
+        response = client.post(
+            "/extract",
+            files=[
+                ("pdf_file", ("main_tender.pdf", b"%PDF-1.4 mock main content", "application/pdf")),
+                ("atc_files", ("atc_1.pdf", b"%PDF-1.4 mock atc content 1", "application/pdf")),
+                ("atc_files", ("atc_2.pdf", b"%PDF-1.4 mock atc content 2", "application/pdf")),
+                ("boq_file", ("boq.pdf", b"%PDF-1.4 mock boq content", "application/pdf")),
+            ],
+        )
+
+    assert response.status_code == 200
+
+    assert captured["atc_count"] == 2
+    assert all(captured["atc_exist"])
+    assert captured["atc_contents"] == [b"%PDF-1.4 mock atc content 1", b"%PDF-1.4 mock atc content 2"]
+
+    assert captured["boq_present"] is True
+    assert captured["boq_exists"] is True
+    assert captured["boq_content"] == b"%PDF-1.4 mock boq content"
+
+
+def test_extract_endpoint_works_without_atc_or_boq_files():
+    """ATC/BOQ files must remain optional -- a plain main-PDF-only request
+    (no atc_files, no boq_file) still succeeds, with empty/None forwarded."""
+    captured_kwargs = {}
+
+    def _fake_ingest(**kwargs):
+        captured_kwargs.update(kwargs)
+        return {"missing_fields": []}
+
+    with patch("app.routers.extract.ingest_parent_tender_pdf", side_effect=_fake_ingest):
+        response = client.post(
+            "/extract",
+            files={"pdf_file": ("main_tender.pdf", b"%PDF-1.4 mock main content", "application/pdf")},
+        )
+
+    assert response.status_code == 200
+    assert captured_kwargs.get("explicit_atc_paths") == []
+    assert captured_kwargs.get("explicit_boq_path") is None

@@ -1,0 +1,22 @@
+positions:
+  /logs/volksAi.log: "0"
+  ? /var/lib/docker/containers/6a0cc1fc2339d41db3db4acbbdd5a79ba9345a2cf32172b3c12aea38fba8c212/6a0cc1fc2339d41db3db4acbbdd5a79ba9345a2cf32172b3c12aea38fba8c212-json.log
+  : "312433"
+  ? /var/lib/docker/containers/08b63de5cd0d21e5331502e7bfab3ae6e13b46b3948d4c64965108d225d1c29b/08b63de5cd0d21e5331502e7bfab3ae6e13b46b3948d4c64965108d225d1c29b-json.log
+  : "90037"
+  ? /var/lib/docker/containers/8024f713fa85dfd42c307a05bf924f60d4b6cd9c7d299eeb85ed32fd027f547a/8024f713fa85dfd42c307a05bf924f60d4b6cd9c7d299eeb85ed32fd027f547a-json.log
+  : "620044"
+  ? /var/lib/docker/containers/a07d2bb930ab2adc35b0ce5ae29e7394ce312d64488381b7df292578edf6e909/a07d2bb930ab2adc35b0ce5ae29e7394ce312d64488381b7df292578edf6e909-json.log
+  : "13443"
+  ? /var/lib/docker/containers/b60c60122c15ad997224d6239d9b2ee874aef3d0e4abf86468b3b0b83db3d6d5/b60c60122c15ad997224d6239d9b2ee874aef3d0e4abf86468b3b0b83db3d6d5-json.log
+  : "55248"
+  ? /var/lib/docker/containers/c28e7d2946e122c53b3b4a0170d3c605ac2ebfab0ffafd5c16b2d49503a1a01c/c28e7d2946e122c53b3b4a0170d3c605ac2ebfab0ffafd5c16b2d49503a1a01c-json.log
+  : "23130"
+  ? /var/lib/docker/containers/d78cd3ac2db4ddb61e9d3632eaac94feb028e04bda5813966a8929c13448e41e/d78cd3ac2db4ddb61e9d3632eaac94feb028e04bda5813966a8929c13448e41e-json.log
+  : "4126600"
+  ? /var/lib/docker/containers/db797e2aaae6e326e13012a2cd0ba8638aaabd414243af0bd7bdf5232f7917ec/db797e2aaae6e326e13012a2cd0ba8638aaabd414243af0bd7bdf5232f7917ec-json.log
+  : "150215"
+  ? /var/lib/docker/containers/e7c17b6854a3d31c5a743d7b09fea321838d802a2ac987e59e6b3dd383376f21/e7c17b6854a3d31c5a743d7b09fea321838d802a2ac987e59e6b3dd383376f21-json.log
+  : "13156"
+  ? /var/lib/docker/containers/f8b2d4ee9176d6810693fb3d6b39f1b476dcdf6a1738adae4487288d54b38871/f8b2d4ee9176d6810693fb3d6b39f1b476dcdf6a1738adae4487288d54b38871-json.log
+  : "4883435"

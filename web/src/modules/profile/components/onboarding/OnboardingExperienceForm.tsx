@@ -138,9 +138,25 @@ export function OnboardingExperienceForm({
   const { data, refetch } = useOnboardingContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [collapsedCards, setCollapsedCards] = useState<Set<number>>(new Set());
+  const [isFresher, setIsFresher] = useState(false);
+  const fresherInitializedRef = React.useRef(false);
 
-  // Map existing experience data from context
-  const existingExperiences = useMemo(    () =>      data?.experience?.map((exp: ExperienceData) => ({
+  const isFresherMarker = (name?: string | null) =>
+    (name || "").trim().toLowerCase() === "fresher";
+
+  // Marker row (if declared) drives the fresher checkbox; excluded from entries
+  const markerFromApi = useMemo(
+    () =>
+      (data?.experience ?? []).find((exp: ExperienceData) =>
+        isFresherMarker(exp.companyName)
+      ),
+    [data?.experience]
+  );
+
+  // Map existing experience data from context (excluding fresher marker)
+  const existingExperiences = useMemo(    () =>      data?.experience
+        ?.filter((exp: ExperienceData) => !isFresherMarker(exp.companyName))
+        .map((exp: ExperienceData) => ({
       id: exp.id,
       companyName: exp.companyName || "",
       designation: exp.designation || "",
@@ -164,6 +180,14 @@ export function OnboardingExperienceForm({
   });
 
   const [hasInitializedCollapsed, setHasInitializedCollapsed] = useState(false);
+
+  // Pre-tick the fresher checkbox once data loads (one-time)
+  useEffect(() => {
+    if (!fresherInitializedRef.current && data?.experience) {
+      setIsFresher(!!markerFromApi);
+      fresherInitializedRef.current = true;
+    }
+  }, [data?.experience, markerFromApi]);
 
   // Initialize collapsed cards: expand rejected experiences by default, collapse others
   useEffect(() => {
@@ -229,10 +253,19 @@ export function OnboardingExperienceForm({
     });
   };
 
+  const saveExperiences = async (payload: Record<string, unknown>[]) => {
+    await api.put("/hrms/employee-onboarding/me/experiences", {
+      experiences: payload,
+      ...(isFresher ? { isFresher: true } : {}),
+    });
+  };
+
   const onSubmit = async (values: ExperienceFormValues) => {
     setIsSubmitting(true);
     try {
-      const payload = values.experiences.map((exp) => ({
+      const payload = isFresher
+        ? []
+        : values.experiences.map((exp) => ({
         ...(exp.id ? { id: exp.id } : {}),
         companyName: exp.companyName,
         designation: exp.designation,
@@ -244,14 +277,38 @@ export function OnboardingExperienceForm({
         hrRemark: exp.hrRemark || null,
       }));
 
-      await api.put("/hrms/employee-onboarding/me/experiences", { experiences: payload });
+      await saveExperiences(payload);
 
       toast.success("Work experience saved successfully");
       refetch?.();
       onSuccess();
     } catch (error) {
       console.error("Save experience error:", error);
-      toast.error("An error occurred while saving experience details");
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || "An error occurred while saving experience details";
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleFresherSave = async () => {
+    setIsSubmitting(true);
+    try {
+      await api.put("/hrms/employee-onboarding/me/experiences", {
+        experiences: [],
+        isFresher: true,
+      });
+      toast.success("Declared as fresher — ready for HR verification");
+      refetch?.();
+      onSuccess();
+    } catch (error) {
+      console.error("Fresher declaration error:", error);
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || "An error occurred while saving";
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -280,7 +337,44 @@ export function OnboardingExperienceForm({
         description="Add your previous employment details. Most recent first."
       />
 
-      {fields.length === 0 ? (
+      {/* Fresher declaration */}
+      <div
+        className={cn(
+          "flex items-start gap-3 rounded-2xl border px-5 py-4 transition-colors",
+          isFresher
+            ? "border-primary/40 bg-primary/[0.04]"
+            : "border-border/20 bg-background"
+        )}
+      >
+        <Checkbox
+          id="isFresher"
+          checked={isFresher}
+          disabled={readOnly || markerFromApi?.hrStatus === "approved"}
+          onCheckedChange={(checked) => setIsFresher(!!checked)}
+          className="mt-0.5 rounded-md"
+        />
+        <div className="space-y-0.5">
+          <Label
+            htmlFor="isFresher"
+            className="text-sm font-semibold cursor-pointer"
+          >
+            I am a fresher (no work experience)
+          </Label>
+          <p className="text-xs text-muted-foreground/70">
+            {isFresher
+              ? "Your Work Experience will be marked as 'Fresher' for HR verification. Uncheck to add experience entries instead."
+              : "Check this if you have no prior work experience — HR will verify the declaration instead of entries."}
+          </p>
+          {markerFromApi?.hrStatus === "approved" && (
+            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
+              <Lock className="h-3 w-3" />
+              Fresher declaration already verified by HR
+            </p>
+          )}
+        </div>
+      </div>
+
+      {isFresher ? null : fields.length === 0 ? (
         <EmptyState onAdd={addNewExperience} />
       ) : (
         <div className="space-y-4">
@@ -621,7 +715,9 @@ export function OnboardingExperienceForm({
         <div className="flex items-center gap-2 text-xs text-muted-foreground/50">
           <Briefcase className="h-3.5 w-3.5" />
           <span className="font-medium">
-            {fields.length === 0
+            {isFresher
+              ? "Declared as fresher"
+              : fields.length === 0
               ? "No experience entries"
               : `${fields.length} experience${fields.length > 1 ? "s" : ""} added`}
           </span>
@@ -638,7 +734,8 @@ export function OnboardingExperienceForm({
           </Button>
 
           {!readOnly && (<Button
-            type="submit"
+            type={isFresher ? "button" : "submit"}
+            onClick={isFresher ? handleFresherSave : undefined}
             disabled={isSubmitting}
             className="rounded-xl gap-2 h-11 px-10 flex-1 sm:flex-none shadow-lg shadow-primary/20"
           >
@@ -647,7 +744,7 @@ export function OnboardingExperienceForm({
             ) : (
               <Save className="h-4 w-4" />
             )}
-            Save Experience
+            {isFresher ? "Save as Fresher" : "Save Experience"}
           </Button>)}
         </div>
       </div>
