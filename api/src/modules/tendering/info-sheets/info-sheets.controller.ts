@@ -26,12 +26,31 @@ export class TenderInfoSheetsController {
         return this.infoSheetsService.getTenderContacts(tenderId);
     }
 
+    @Get(':tenderId/extraction')
+    async getSavedExtraction(@Param('tenderId', ParseIntPipe) tenderId: number) {
+        return this.infoSheetsService.getSavedExtraction(tenderId);
+    }
+
+    @Post(':tenderId/extraction/save')
+    @HttpCode(HttpStatus.OK)
+    async saveExtraction(
+        @Param('tenderId', ParseIntPipe) tenderId: number,
+        @Body() body: any,
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        return this.infoSheetsService.saveExtractionResult(tenderId, body, user.sub);
+    }
+
     @Post(':tenderId/auto-extract')
     @HttpCode(HttpStatus.OK)
     async autoExtract(
         @Param('tenderId', ParseIntPipe) tenderId: number,
         @CurrentUser() user: ValidatedUser,
+        @Body() body?: { force?: boolean },
     ) {
+        if (body?.force !== undefined) {
+            return this.infoSheetsService.autoExtractFromPdf(tenderId, user.sub, body.force);
+        }
         return this.infoSheetsService.autoExtractFromPdf(tenderId, user.sub);
     }
 

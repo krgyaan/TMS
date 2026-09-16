@@ -18,7 +18,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { ArrowLeft, Plus, Trash2, Save, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, AlertCircle, Sparkles, Loader2, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { paths } from '@/app/routes/paths';
 import { infoSheetsService } from '@/services/api';
@@ -68,6 +68,7 @@ export function TenderInformationForm({
     const financeDocumentOptions = useFinanceDocumentOptions();
 
     const [isExtracting, setIsExtracting] = useState(false);
+    const [isExtractionSaved, setIsExtractionSaved] = useState(false);
     const [fieldIndicators, setFieldIndicators] = useState<Record<string, FieldIndicator>>({});
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -80,7 +81,39 @@ export function TenderInformationForm({
         };
     }, []);
 
-    const handleAutoExtract = async () => {
+    // Hydrate form from saved extraction on mount if in create mode or without existing submission
+    useEffect(() => {
+        let isMounted = true;
+        async function checkSavedExtraction() {
+            if (!tenderId || mode !== 'create' || isTenderLoading) return;
+            try {
+                const saved = await infoSheetsService.getSavedExtraction(tenderId);
+                if (isMounted && saved && saved.fields && Object.keys(saved.fields).length > 0) {
+                    console.log('[AutoExtract] Hydrating form from saved extraction', {
+                        event_type: 'autoextract_save',
+                        action: 'hydration_success',
+                        tender_id: tenderId,
+                    });
+                    const populateResult = populateFormFromExtraction(form, saved.fields as any);
+                    const indicators = extractFieldIndicators(saved.fields as any, saved.missing_fields);
+                    setFieldIndicators(indicators);
+                    setIsExtractionSaved(true);
+                    toast.info(
+                        `Restored saved AI extraction (${populateResult.populatedCount} fields auto-populated).`,
+                        { duration: 4000 }
+                    );
+                }
+            } catch (err) {
+                console.warn('[AutoExtract] Error checking for saved extraction:', err);
+            }
+        }
+        checkSavedExtraction();
+        return () => {
+            isMounted = false;
+        };
+    }, [tenderId, mode, isTenderLoading]);
+
+    const handleAutoExtract = async (force = false) => {
         if (!tenderId) {
             toast.error('Invalid tender reference.');
             return;
@@ -94,10 +127,36 @@ export function TenderInformationForm({
         if (isExtracting) return;
 
         setIsExtracting(true);
-        toast.loading('Initiating AI extraction from tender PDF...', { id: 'auto-extract' });
+        console.log('[AutoExtract] Requesting auto-extract', {
+            event_type: 'autoextract_save',
+            action: 'extraction_started',
+            tender_id: tenderId,
+            force,
+        });
+        toast.loading(force ? 'Re-extracting clauses and values with AI...' : 'Initiating AI extraction from tender PDF...', { id: 'auto-extract' });
 
         try {
-            const res = await infoSheetsService.autoExtract(tenderId);
+            const res = await infoSheetsService.autoExtract(tenderId, { force });
+
+            // If backend already has completed extraction and force was not requested:
+            if (res.status === 'existing_completed' && res.fields) {
+                setIsExtracting(false);
+                const populateResult = populateFormFromExtraction(form, res.fields as any);
+                const indicators = extractFieldIndicators(res.fields as any, res.missing_fields);
+                setFieldIndicators(indicators);
+                setIsExtractionSaved(true);
+                console.log('[AutoExtract] Using existing completed extraction (zero token cost)', {
+                    event_type: 'autoextract_save',
+                    action: 'cached_result_used',
+                    tender_id: tenderId,
+                });
+                toast.success(
+                    `Existing AI extraction loaded! ${populateResult.populatedCount} fields populated without re-extraction.`,
+                    { id: 'auto-extract', duration: 5000 }
+                );
+                return;
+            }
+
             const jobId = res.jobId;
 
             toast.loading('Analyzing PDF with VolksAI... extracting clauses and values', { id: 'auto-extract' });
@@ -114,15 +173,48 @@ export function TenderInformationForm({
                         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                         setIsExtracting(false);
 
+                        console.log('[AutoExtract] Extraction result received from worker', {
+                            event_type: 'autoextract_save',
+                            action: 'extraction_result_received',
+                            tender_id: tenderId,
+                            job_id: jobId,
+                        });
+
                         const populateResult = populateFormFromExtraction(form, statusRes.fields as any);
                         const indicators = extractFieldIndicators(statusRes.fields as any, statusRes.missing_fields);
                         setFieldIndicators(indicators);
+
+                        // Save extraction permanently to backend
+                        try {
+                            console.log('[AutoExtract] Saving extraction result to backend', {
+                                event_type: 'autoextract_save',
+                                action: 'save_request_sent',
+                                tender_id: tenderId,
+                            });
+                            await infoSheetsService.saveExtraction(tenderId, {
+                                fields: statusRes.fields,
+                                missing_fields: statusRes.missing_fields,
+                            });
+                            setIsExtractionSaved(true);
+                            console.log('[AutoExtract] Extraction result saved successfully', {
+                                event_type: 'autoextract_save',
+                                action: 'save_success',
+                                tender_id: tenderId,
+                            });
+                        } catch (saveErr) {
+                            console.error('[AutoExtract] Failed to persist extraction to backend', {
+                                event_type: 'autoextract_save',
+                                action: 'save_failure',
+                                tender_id: tenderId,
+                                error: saveErr,
+                            });
+                        }
 
                         const missingCount = statusRes.missing_fields?.length || 0;
                         const fallbackCount = Object.values(indicators).filter((i) => i.type === 'fallback').length;
 
                         toast.success(
-                            `AI Extraction complete! ${populateResult.populatedCount} fields auto-populated.${
+                            `AI Extraction complete & saved! ${populateResult.populatedCount} fields auto-populated.${
                                 fallbackCount > 0 ? ` (${fallbackCount} fallback values)` : ''
                             }${missingCount > 0 ? ` (${missingCount} missing)` : ''}`,
                             { id: 'auto-extract', duration: 6000 },
@@ -130,6 +222,13 @@ export function TenderInformationForm({
                     } else if (statusRes.status === 'failed') {
                         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                         setIsExtracting(false);
+                        console.error('[AutoExtract] Extraction worker failed', {
+                            event_type: 'autoextract_save',
+                            action: 'extraction_failed',
+                            tender_id: tenderId,
+                            job_id: jobId,
+                            error: statusRes.error,
+                        });
                         toast.error(
                             statusRes.error || 'AI extraction failed for this tender document.',
                             { id: 'auto-extract', duration: 6000 },
@@ -137,6 +236,12 @@ export function TenderInformationForm({
                     } else if (attempts >= maxAttempts) {
                         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                         setIsExtracting(false);
+                        console.warn('[AutoExtract] Extraction timed out', {
+                            event_type: 'autoextract_save',
+                            action: 'extraction_timeout',
+                            tender_id: tenderId,
+                            job_id: jobId,
+                        });
                         toast.error('Extraction timed out. You may check back in a moment or retry.', {
                             id: 'auto-extract',
                             duration: 6000,
@@ -308,18 +413,29 @@ export function TenderInformationForm({
                         </CardDescription>
                     </div>
                     <CardAction className="flex items-center gap-2">
+                        {isExtractionSaved && (
+                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 flex items-center gap-1 py-1 px-2.5">
+                                <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                <span>AI Extracted</span>
+                            </Badge>
+                        )}
                         <Button
                             type="button"
                             variant="default"
                             className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             disabled={isExtracting || isTenderLoading || isInfoSheetLoading || !tender?.documents?.toLowerCase().includes('.pdf')}
                             title={!tender?.documents?.toLowerCase().includes('.pdf') ? 'A PDF document must be uploaded to the tender for AI extraction' : undefined}
-                            onClick={handleAutoExtract}
+                            onClick={() => handleAutoExtract(isExtractionSaved)}
                         >
                             {isExtracting ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                     Extracting from PDF...
+                                </>
+                            ) : isExtractionSaved ? (
+                                <>
+                                    <Sparkles className="mr-2 h-4 w-4" />
+                                    Re-Extract with AI
                                 </>
                             ) : (
                                 <>

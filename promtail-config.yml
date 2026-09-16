@@ -22,20 +22,61 @@ scrape_configs:
             stream: stream
             content: log
             container_name: attrs.container.name
+      - json:
+          expressions:
+            service_name: service_name
+            service: service
+            event_type: event_type
+            action: action
+          source: content
       - labels:
           stream:
           container_name:
+          service_name:
+          service:
+          event_type:
+          action:
       - timestamp:
           source: timestamp
           format: RFC3339Nano
       - output:
           source: content
 
+  - job_name: volksAi
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: volksAi
+          service_name: volksAi
+          __path__: /logs/volksAi*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            message: message
+            timestamp: timestamp
+            service_name: service_name
+            service: service
+            request_id: request_id
+            event_type: event_type
+            action: action
+      - labels:
+          level:
+          service_name:
+          event_type:
+          action:
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      - structured_metadata:
+          {}
+
   - job_name: tms-api
     static_configs:
       - targets: [localhost]
         labels:
           job: tms-api
+          service_name: tms-api
           __path__: /logs/tms-api-*.log
     pipeline_stages:
       - json:
@@ -43,8 +84,14 @@ scrape_configs:
             level: level
             message: message
             timestamp: timestamp
+            event_type: event_type
+            action: action
+            tenderId: tenderId
       - labels:
           level:
+          service_name:
+          event_type:
+          action:
       - timestamp:
           source: timestamp
           format: RFC3339Nano
@@ -56,6 +103,7 @@ scrape_configs:
       - targets: [localhost]
         labels:
           job: tms-worker
+          service_name: tms-worker
           __path__: /logs/tms-worker-*.log
     pipeline_stages:
       - json:
@@ -63,8 +111,14 @@ scrape_configs:
             level: level
             message: message
             timestamp: timestamp
+            event_type: event_type
+            action: action
+            tenderId: tenderId
       - labels:
           level:
+          service_name:
+          event_type:
+          action:
       - timestamp:
           source: timestamp
           format: RFC3339Nano

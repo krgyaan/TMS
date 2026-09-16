@@ -17,6 +17,7 @@ export * from './physical-docs.relations';
 // Tender Info Sheet
 export * from './tender-info-sheet.schema';
 export * from './tender-info-sheet.relations';
+export * from './tender-extractions.schema';
 
 // Tender Costing
 export * from './tender-costing-sheets.schema';
