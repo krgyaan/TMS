@@ -1,5 +1,3 @@
-import React, { useState, useMemo, useCallback } from "react";
-
 import type {
     OemComponentData,
     OemKpiSummary,
@@ -109,22 +107,8 @@ function rfqRowToListItem(r: RfqSentToOemRow): TenderListItem {
 }
 
 /* ================================
-    FORMAT / EXPORT UTILITIES
+    EXPORT UTILITIES
 ================================ */
-export const formatCurrency = (amount: string | number) => {
-    const numericAmount = typeof amount === "number" ? amount : parseFloat(amount);
-
-    if (isNaN(numericAmount)) {
-        return "₹0";
-    }
-
-    return new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-    }).format(numericAmount);
-};
-
 export interface CsvHeader {
     key: string;
     label: string;
@@ -164,59 +148,3 @@ export const exportToCSV = (data: Record<string, unknown>[], filename: string, h
     link.click();
     document.body.removeChild(link);
 };
-
-/* ================================
-   PAGINATION HOOK
-================================ */
-export function usePagination<T>(data: T[], itemsPerPage: number = 10) {
-    const [currentPage, setCurrentPage] = useState(1);
-
-    const totalPages = Math.ceil(data.length / itemsPerPage);
-
-    const paginatedData = useMemo(() => {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        return data.slice(startIndex, startIndex + itemsPerPage);
-    }, [data, currentPage, itemsPerPage]);
-
-    const goToPage = useCallback(
-        (page: number) => {
-            setCurrentPage(Math.max(1, Math.min(page, totalPages || 1)));
-        },
-        [totalPages]
-    );
-
-    const nextPage = useCallback(() => {
-        goToPage(currentPage + 1);
-    }, [currentPage, goToPage]);
-
-    const prevPage = useCallback(() => {
-        goToPage(currentPage - 1);
-    }, [currentPage, goToPage]);
-
-    const firstPage = useCallback(() => {
-        goToPage(1);
-    }, [goToPage]);
-
-    const lastPage = useCallback(() => {
-        goToPage(totalPages);
-    }, [goToPage, totalPages]);
-
-    // Reset to page 1 when data changes
-    React.useEffect(() => {
-        setCurrentPage(1);
-    }, [data.length]);
-
-    return {
-        currentPage,
-        totalPages,
-        paginatedData,
-        goToPage,
-        nextPage,
-        prevPage,
-        firstPage,
-        lastPage,
-        totalItems: data.length,
-        startIndex: (currentPage - 1) * itemsPerPage + 1,
-        endIndex: Math.min(currentPage * itemsPerPage, data.length),
-    };
-}

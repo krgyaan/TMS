@@ -1,134 +1,125 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 /* UI Components */
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import DataTable from "@/components/ui/data-table";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
 
 /* Icons */
-import { Mail, Eye } from "lucide-react";
+import { Eye } from "lucide-react";
 import { paths } from "@/app/routes/paths";
+import { useOemPerformance } from "@/hooks/api/useOemPerformance";
+import { formatINR } from "@/hooks/useINRFormatter";
+import type { OemPerformanceParams, RfqSentToOemRow } from "../helpers/oem-performance.types";
 
-import type { RfqSentToOemRow } from "../helpers/oem-performance.types";
-import { formatCurrency, usePagination } from "../helpers/oem-performance.mapper";
-import { PaginationControls, TableSearch } from "./table-parts";
+import type { ColDef } from "ag-grid-community";
+import type { CustomCellRendererProps } from "ag-grid-react";
 
 interface RfqsSentTableProps {
-    rfqs: RfqSentToOemRow[];
+    params: OemPerformanceParams | null;
 }
 
-export default function RfqsSentTable({ rfqs }: RfqsSentTableProps) {
-    const [search, setSearch] = useState("");
+export default function RfqsSentTable({ params }: RfqsSentTableProps) {
+    const navigate = useNavigate();
+    const { data, isLoading } = useOemPerformance(params);
 
-    const filtered = useMemo(() => {
-        if (!search.trim()) return rfqs;
-        const term = search.toLowerCase();
-        return rfqs.filter(
-            tender =>
-                tender.member?.toLowerCase().includes(term) ||
-                tender.tenderName?.toLowerCase().includes(term) ||
-                tender.tenderNo?.toLowerCase().includes(term) ||
-                tender.team?.toLowerCase().includes(term)
+    const rfqs = useMemo(() => data?.tendersByKpi.rfqsSent ?? [], [data]);
+    const respondedCount = useMemo(() => rfqs.filter(r => r.rfqResponseOn !== null).length, [rfqs]);
+
+    const actions = useMemo<ActionItem<RfqSentToOemRow>[]>(
+        () => [{ label: "View", icon: <Eye className="h-4 w-4" />, onClick: row => navigate(paths.tendering.tenderView(row.id)) }],
+        [navigate]
+    );
+
+    const columnDefs = useMemo<ColDef<RfqSentToOemRow>[]>(
+        () => [
+            { field: "team", headerName: "Team", sortable: true, filter: true, width: 130 },
+            { field: "member", headerName: "Team Member", sortable: true, filter: true, width: 150 },
+            {
+                field: "tenderName",
+                headerName: "Tender",
+                sortable: true,
+                filter: true,
+                flex: 1,
+                minWidth: 220,
+                cellRenderer: (p: CustomCellRendererProps<RfqSentToOemRow>) => (
+                    <div>
+                        <span className="text-sm font-medium">{p.value}</span>
+                        <span className="text-xs text-muted-foreground block">{p.data?.tenderNo}</span>
+                    </div>
+                ),
+            },
+            {
+                field: "gstValues",
+                headerName: "GST Value",
+                sortable: true,
+                filter: false,
+                width: 150,
+                type: ["numericColumn"],
+                valueGetter: params => Number(params.data?.gstValues || 0),
+                cellRenderer: (p: CustomCellRendererProps<RfqSentToOemRow>) => <span className="tabular-nums">{formatINR(Number(p.value))}</span>,
+            },
+            { field: "dueDate", headerName: "Due Date", sortable: true, filter: false, width: 170 },
+            { field: "rfqSentOn", headerName: "RFQ Sent On", sortable: true, filter: false, width: 170 },
+            {
+                field: "rfqResponseOn",
+                headerName: "Response On",
+                sortable: true,
+                filter: true,
+                width: 170,
+                valueFormatter: p => (p.value ? String(p.value) : "Pending"),
+                cellRenderer: (p: CustomCellRendererProps<RfqSentToOemRow>) =>
+                    p.value ? (
+                        <Badge variant="default" className="h-5 px-2 font-normal">
+                            {String(p.value)}
+                        </Badge>
+                    ) : (
+                        <Badge variant="secondary" className="h-5 px-2 font-normal">
+                            Pending
+                        </Badge>
+                    ),
+            },
+            { headerName: "", filter: false, sortable: false, width: 80, pinned: "right", cellRenderer: createActionColumnRenderer(actions) },
+        ],
+        [actions]
+    );
+
+    if (!params) return null;
+
+    if (isLoading) {
+        return (
+            <Card>
+                <CardHeader className="pb-4">
+                    <Skeleton className="h-6 w-52" />
+                    <Skeleton className="h-4 w-80" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-48 w-full rounded-lg" />
+                </CardContent>
+            </Card>
         );
-    }, [rfqs, search]);
-
-    const pagination = usePagination(filtered, 10);
+    }
 
     return (
-        <Card className="shadow-sm border-0 ring-1 ring-border/50">
+        <Card>
             <CardHeader className="pb-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center justify-between gap-2">
                     <div>
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            <Mail className="h-5 w-5 text-purple-600" />
-                            RFQs Sent to This OEM
-                            <Badge variant="secondary">{rfqs.length}</Badge>
-                        </CardTitle>
-                        <CardDescription className="mt-1">Detailed list of RFQs sent to this OEM and their response status.</CardDescription>
+                        <CardTitle className="text-base font-semibold">RFQs Sent to This OEM</CardTitle>
+                        <CardDescription>
+                            {respondedCount} of {rfqs.length} RFQs responded
+                        </CardDescription>
                     </div>
-                    <TableSearch value={search} onChange={setSearch} placeholder="Search RFQs..." />
+                    <Badge variant={respondedCount === rfqs.length && rfqs.length > 0 ? "success" : "secondary"}>
+                        {respondedCount}/{rfqs.length}
+                    </Badge>
                 </div>
             </CardHeader>
-            <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                    <Table>
-                        <TableHeader className="bg-muted/50">
-                            <TableRow>
-                                <TableHead className="font-semibold">Team</TableHead>
-                                <TableHead className="font-semibold">Team Member</TableHead>
-                                <TableHead className="font-semibold">Tender</TableHead>
-                                <TableHead className="text-right font-semibold">GST Value</TableHead>
-                                <TableHead className="font-semibold">Due Date</TableHead>
-                                <TableHead className="font-semibold">RFQ Sent On</TableHead>
-                                <TableHead className="font-semibold">Response On</TableHead>
-                                <TableHead className="text-right font-semibold">Action</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {pagination.paginatedData.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                                        {search ? "No matching RFQs found." : "No RFQs found for this category."}
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                pagination.paginatedData.map(tender => (
-                                    <TableRow key={tender.id} className="hover:bg-muted/30 transition-colors">
-                                        <TableCell>
-                                            <div className="font-medium">{tender.team}</div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="font-medium">{tender.member}</div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="font-medium max-w-[200px] truncate" title={tender.tenderName}>
-                                                {tender.tenderName}
-                                            </div>
-                                            <div className="text-sm text-muted-foreground">{tender.tenderNo}</div>
-                                        </TableCell>
-                                        <TableCell className="text-right font-medium tabular-nums">{formatCurrency(tender.gstValues)}</TableCell>
-                                        <TableCell className="tabular-nums">{tender.dueDate}</TableCell>
-                                        <TableCell className="tabular-nums">{tender.rfqSentOn}</TableCell>
-                                        <TableCell>
-                                            {tender.rfqResponseOn ? (
-                                                <Badge variant="default" className="font-normal">
-                                                    {tender.rfqResponseOn}
-                                                </Badge>
-                                            ) : (
-                                                <Badge variant="secondary" className="font-normal">
-                                                    Pending
-                                                </Badge>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <button
-                                                onClick={ev => {
-                                                    ev.stopPropagation();
-                                                    window.open(paths.tendering.tenderView(tender.id), "_blank");
-                                                }}
-                                                className="h-7 w-7 flex items-center justify-center rounded-md
-                                                text-muted-foreground hover:text-primary hover:bg-muted"
-                                            >
-                                                <Eye className="h-4 w-4" />
-                                            </button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
-                <PaginationControls
-                    currentPage={pagination.currentPage}
-                    totalPages={pagination.totalPages}
-                    totalItems={pagination.totalItems}
-                    startIndex={pagination.startIndex}
-                    endIndex={pagination.endIndex}
-                    onFirstPage={pagination.firstPage}
-                    onPrevPage={pagination.prevPage}
-                    onNextPage={pagination.nextPage}
-                    onLastPage={pagination.lastPage}
-                    onPageChange={pagination.goToPage}
-                />
+            <CardContent className="pt-0">
+                <DataTable data={rfqs} columnDefs={columnDefs} gridOptions={{ domLayout: "autoHeight" }} />
             </CardContent>
         </Card>
     );

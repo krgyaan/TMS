@@ -1,44 +1,17 @@
 import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Download } from "lucide-react";
 
 import { useVendorOrganizations } from "@/hooks/api/useVendorOrganizations";
 import { useOemPerformance } from "@/hooks/api/useOemPerformance";
-import type { OemKpiSummary, OemPerformanceParams, TendersByKpi } from "./helpers/oem-performance.types";
+import type { OemPerformanceParams } from "./helpers/oem-performance.types";
 import { exportToCSV } from "./helpers/oem-performance.mapper";
 
 import OemFilterCard from "./components/OemFilterCard";
 import TendersNotAllowedTable from "./components/TendersNotAllowedTable";
 import RfqsSentTable from "./components/RfqsSentTable";
 import WorkedWithOemTable from "./components/WorkedWithOemTable";
-
-const EMPTY_SUMMARY: OemKpiSummary = {
-    totalTendersWithOem: 0,
-    totalValueAssigned: 0,
-    tendersWon: 0,
-    totalValueWon: 0,
-    tendersLost: 0,
-    totalValueLost: 0,
-    tendersSubmitted: 0,
-    totalValueSubmitted: 0,
-    tendersNotAllowed: 0,
-    rfqsSent: 0,
-    rfqsResponded: 0,
-    winRate: 0,
-    rfqResponseRate: 0,
-};
-
-const EMPTY_TENDERS_BY_KPI: TendersByKpi = {
-    total: [],
-    tendersWon: [],
-    tendersLost: [],
-    tendersSubmitted: [],
-    tendersNotAllowed: [],
-    rfqsSent: [],
-    rfqsResponded: [],
-    winRate: [],
-    rfqResponseRate: [],
-};
 
 export default function OemPerformancePage() {
     const [selectedOemId, setSelectedOemId] = useState<number | null>();
@@ -58,15 +31,12 @@ export default function OemPerformancePage() {
 
     const { data: oems = [] } = useVendorOrganizations();
 
+    // Same query key as the table components — served from cache, no extra request.
     const { data } = useOemPerformance(appliedParams);
 
-    const summary = data?.summary ?? EMPTY_SUMMARY;
-    const tendersByKpi = data?.tendersByKpi ?? EMPTY_TENDERS_BY_KPI;
+    const tendersNotAllowed = useMemo(() => data?.tendersByKpi.tendersNotAllowed ?? [], [data]);
+    const rfqsSent = useMemo(() => data?.tendersByKpi.rfqsSent ?? [], [data]);
 
-    const tendersNotAllowed = useMemo(() => tendersByKpi.tendersNotAllowed ?? [], [tendersByKpi]);
-    const rfqsSent = useMemo(() => tendersByKpi.rfqsSent ?? [], [tendersByKpi]);
-
-    // Export handler
     const handleExportReport = useCallback(() => {
         const selectedOem = oems.find(o => o.id === selectedOemId);
         const oemName = selectedOem?.name || "Unknown OEM";
@@ -124,48 +94,49 @@ export default function OemPerformancePage() {
     }, [tendersNotAllowed, rfqsSent, oems, selectedOemId, fromDate, toDate]);
 
     return (
-        <div className="min-h-screen bg-muted/10 pb-12">
-            <div className="mx-auto max-w-7xl p-6 space-y-8">
-                {/* ===== HEADER & FILTERS ===== */}
-                <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight">OEM Performance Report</h1>
-                        <p className="text-muted-foreground mt-1">Analyze performance metrics and interactions with selected Original Equipment Manufacturers.</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" onClick={handleExportReport} disabled={!appliedParams}>
-                            <Download className="mr-2 h-4 w-4" /> Export Report
+        <div className="space-y-6">
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle>OEM Performance Report</CardTitle>
+                            <CardDescription>Analyze performance metrics and interactions with selected Original Equipment Manufacturers.</CardDescription>
+                        </div>
+                        <Button variant="outline" onClick={handleExportReport} disabled={!appliedParams} className="gap-2">
+                            <Download className="h-4 w-4" />
+                            Export Report
                         </Button>
                     </div>
-                </div>
+                </CardHeader>
+                <CardContent>
+                    {!appliedParams && (
+                        <p className="text-sm text-muted-foreground">
+                            No report selected. Please select an OEM and a date range, then press Submit.
+                        </p>
+                    )}
+                </CardContent>
+            </Card>
 
-                <OemFilterCard
-                    oemOptions={oems.map(oem => ({ id: oem.id.toString(), name: oem.name }))}
-                    selectedOemId={selectedOemId}
-                    onSelectOem={setSelectedOemId}
-                    fromDate={fromDate}
-                    toDate={toDate}
-                    onFromDate={setFromDate}
-                    onToDate={setToDate}
-                    onSubmit={() => {
-                        if (params) setAppliedParams(params);
-                    }}
-                />
+            <OemFilterCard
+                oemOptions={oems.map(oem => ({ id: oem.id.toString(), name: oem.name }))}
+                selectedOemId={selectedOemId}
+                onSelectOem={setSelectedOemId}
+                fromDate={fromDate}
+                toDate={toDate}
+                onFromDate={setFromDate}
+                onToDate={setToDate}
+                onSubmit={() => {
+                    if (params) setAppliedParams(params);
+                }}
+            />
 
-                {!appliedParams ? (
-                    <>
-                        <div className="bg-muted rounded-full p-3 text-center mx-50">
-                            <span className="justify-center">Please Select an OEM and Date</span>
-                        </div>
-                    </>
-                ) : (
-                    <>
-                        <TendersNotAllowedTable tenders={tendersNotAllowed} />
-                        <RfqsSentTable rfqs={rfqsSent} />
-                        <WorkedWithOemTable summary={summary} tendersByKpi={tendersByKpi} />
-                    </>
-                )}
-            </div>
+            {appliedParams && (
+                <>
+                    <TendersNotAllowedTable params={appliedParams} />
+                    <RfqsSentTable params={appliedParams} />
+                    <WorkedWithOemTable params={appliedParams} />
+                </>
+            )}
         </div>
     );
 }
