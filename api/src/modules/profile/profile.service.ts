@@ -18,6 +18,7 @@ const REQUIRED_DOC_TYPES = [
 
 
 import { users } from '@/db/schemas/auth/users.schema';
+import { roles } from '@/db/schemas/auth/roles.schema';
 import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
 import { employeeProfiles } from '@/db/schemas/hrms/employee-profiles.schema';
 import { employeeDocuments } from '@/db/schemas/hrms/employee-documents.schema';
@@ -35,8 +36,8 @@ import {
   onboardingInduction,
   onboardingBankDetails
 } from '@/db/schemas/hrms/onboarding';
-import { complaints } from '@/db/schemas/hrms/complaints.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
+import { oauthAccounts } from '@/db/schemas';
 import { OnboardingService } from '../hrms/onboarding/onboarding.service';
 
 @Injectable()
@@ -59,15 +60,32 @@ export class ProfileService {
         lastLoginAt: users.lastLoginAt,
         createdAt: users.createdAt,
         teamName: teams.name,
+        roleName: roles.name,
       })
       .from(users)
       .leftJoin(teams, eq(users.team, teams.id))
+      .leftJoin(roles, eq(users.roleId, roles.id))
       .where(eq(users.id, userId))
       .limit(1);
 
     if (!userRow) {
       throw new NotFoundException('User not found');
     }
+
+    // Avatar: uploaded profile photo first, then Google/OAuth photo
+    const [avatarProfile, oauthAvatar] = await Promise.all([
+      this.db
+        .select({ image: userProfiles.image })
+        .from(userProfiles)
+        .where(eq(userProfiles.userId, userId))
+        .limit(1),
+      this.db
+        .select({ avatar: oauthAccounts.avatar })
+        .from(oauthAccounts)
+        .where(eq(oauthAccounts.userId, userId))
+        .limit(1),
+    ]);
+    const profilePhoto = avatarProfile[0]?.image || oauthAvatar[0]?.avatar || null;
 
     const currentUser = {
       id: userRow.id,
@@ -79,6 +97,8 @@ export class ProfileService {
       lastLoginAt: userRow.lastLoginAt?.toISOString() || null,
       createdAt: userRow.createdAt?.toISOString() || null,
       team: userRow.teamName || 'Unassigned',
+      role: userRow.roleName || null,
+      profilePhoto,
     };
 
     // CHECK ONBOARDING STATUS
@@ -133,7 +153,6 @@ export class ProfileService {
         inductionTasks: [],
         assets: [],
         bankAccounts: [],
-        complaints: [],
         notifications: [],
       };
     }
@@ -179,6 +198,7 @@ export class ProfileService {
       linkedinProfile: (upr as any).linkedinProfile || null,
       employeeCode: upr.employeeCode || null,
       altEmail: upr.altEmail || null,
+      profilePhoto: upr.image || null,
     } : null;
 
     address = upr ? {
@@ -299,21 +319,6 @@ export class ProfileService {
       assetStatus: a.assetStatus,
     }));
 
-    // 9. Fetch Complaints
-    const complaintsRows = await this.db
-      .select()
-      .from(complaints)
-      .where(eq(complaints.complainantId, userId));
-
-    const mappedComplaints = complaintsRows.map(c => ({
-      id: c.id,
-      complaintCode: c.complaintCode,
-      subject: c.subject,
-      status: c.status,
-      priority: c.priority,
-      createdAt: c.createdAt?.toISOString() || null,
-    }));
-
     return {
       currentUser,
       isOnboarding: false,
@@ -328,7 +333,6 @@ export class ProfileService {
       inductionTasks: [],
       assets,
       bankAccounts,
-      complaints: mappedComplaints,
       notifications: [],
     };
   }
@@ -352,4 +356,5 @@ export class ProfileService {
 
     return { success: true, profile: updated };
   }
+
 }

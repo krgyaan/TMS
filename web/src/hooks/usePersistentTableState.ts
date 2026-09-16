@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useDebouncedSearch } from './useDebouncedSearch';
 
@@ -66,6 +66,8 @@ export function usePersistentTableState<Tab extends string>({
         initialSortBy ? [{ colId: initialSortBy, sort: initialSortOrder || 'asc' }] : []
     );
 
+    const prevResetKey = useRef({ activeTab, debouncedSearch });
+
     const setActiveTab = useCallback((tab: Tab) => {
         setActiveTabState(tab);
     }, []);
@@ -112,6 +114,11 @@ export function usePersistentTableState<Tab extends string>({
     }, [activeTab, search, pagination, sortModel, storageKey]);
 
     useEffect(() => {
+        const last = prevResetKey.current;
+        prevResetKey.current = { activeTab, debouncedSearch };
+        if (activeTab === last.activeTab && debouncedSearch === last.debouncedSearch) {
+            return;
+        }
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [activeTab, debouncedSearch]);
 

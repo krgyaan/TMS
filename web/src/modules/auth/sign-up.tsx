@@ -472,7 +472,7 @@ const SignUp: React.FC = () => {
         phone:         data.phone,
         alternatePhone: data.alternatePhone,
         aadharNumber:   data.aadharNumber,
-        panNumber:      data.panNumber,
+        panNumber:      data.panNumber?.trim().toUpperCase(),
 
         currentAddressLine1: data.currentAddressLine1,
         currentAddressLine2: data.currentAddressLine2,
@@ -857,7 +857,10 @@ const SignUp: React.FC = () => {
                         hint="10-character alphanumeric identifier"
                       >
                         <Input
-                          {...register("panNumber")}
+                          {...register("panNumber", {
+                            setValueAs: (v) =>
+                              typeof v === "string" ? v.toUpperCase() : v,
+                          })}
                           placeholder="ABCDE1234F"
                           maxLength={10}
                           className="font-mono uppercase tracking-wider"

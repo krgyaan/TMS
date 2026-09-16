@@ -78,6 +78,17 @@ export class EmployeeOnboardingController {
   }
 
   /**
+   * POST /hrms/employee-onboarding/me/request
+   * Explicitly starts onboarding for users created directly via master Users —
+   * creates the onboarding request only when the employee clicks to fill.
+   */
+  @Post('me/request')
+
+  async ensureMyOnboardingRequest(@Req() req: any) {
+    return this.employeeOnboardingService.ensureMyOnboardingRequest(req.user.id);
+  }
+
+  /**
    * PATCH /hrms/onboarding/me/profile
    * Updates draft onboarding profile details.
    */

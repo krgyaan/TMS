@@ -1,124 +1,210 @@
-import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  User, 
-  FileText, 
-  Bell, 
-  Laptop, 
-  MessageSquare,
-  Loader2
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Navigate, Route, Routes, useNavigate, useSearchParams } from "react-router-dom";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 import { ProfileProvider, useProfileContext } from "./contexts/ProfileContext";
-
-import { ProfileHeader } from "./components/ProfileHeader";
-import { OverviewTab } from "./components/OverviewTab";
-import { DocumentsSection } from "./components/DocumentsSection";
-import { NotificationsSection } from "./components/NotificationsSection";
-import { AssetsSection } from "./components/AssetsSection";
-import { ComplaintsSection } from "./components/ComplaintsSection";
+import {
+  OnboardingProvider,
+  useOnboardingContext,
+} from "./components/onboarding/contexts/OnboardingContext";
 
 import { OnboardingView } from "./components/onboarding/OnboardingView";
-import { OnboardingProvider } from "./components/onboarding/contexts/OnboardingContext";
-
+import { DocumentsSection } from "./components/DocumentsSection";
+import { AssetsSection } from "./components/AssetsSection";
+import { ComplaintsSection } from "./components/ComplaintsSection";
+import { OnboardingProfileForm } from "./components/onboarding/OnboardingProfileForm";
+import { OnboardingBankForm } from "./components/onboarding/OnboardingBankForm";
+import { OnboardingEducationForm } from "./components/onboarding/OnboardingEducationForm";
+import { OnboardingExperienceForm } from "./components/onboarding/OnboardingExperienceForm";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Standard Profile View
-// Shown when isOnboarding === false (employee has completed onboarding)
+// Small shared pieces
 // ─────────────────────────────────────────────────────────────────────────────
 
-function StandardProfileView() {
-  const { data } = useProfileContext();
-  const [activeTab, setActiveTab] = useState("overview");
+function PageLoader() {
+  return (
+    <div className="rounded-2xl border border-border/50 bg-card p-6 flex items-center gap-3">
+      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+      <p className="text-sm text-muted-foreground">Loading details…</p>
+    </div>
+  );
+}
 
-  const unreadNotifCount = data?.notifications?.filter((n) => !n.read).length || 0;
+function BackToDashboardButton() {
+  const navigate = useNavigate();
+  return (
+    <Button
+      variant="ghost"
+      onClick={() => navigate("/profile")}
+      className="rounded-xl"
+    >
+      Back to Dashboard
+    </Button>
+  );
+}
 
-  const tabs = [
-    { value: "overview",       label: "Overview",  icon: User },
-    { value: "documents",      label: "Documents", icon: FileText },
-    { value: "notifications",  label: "Activity",  icon: Bell, badge: unreadNotifCount },
-    { value: "assets",         label: "Assets",    icon: Laptop },
-    { value: "complaints",     label: "Support",   icon: MessageSquare },
-  ];
+// ─────────────────────────────────────────────────────────────────────────────
+// Onboarding stage editors — /profile/personal | bank | education | experience
+// ─────────────────────────────────────────────────────────────────────────────
+
+const STAGE_EDITOR_META = {
+  profile: {
+    title: "Profile Details",
+    description: "Please provide your personal and professional information",
+  },
+  bank: {
+    title: "Bank Details",
+    description: "Please provide your bank account information for salary processing",
+  },
+  education: {
+    title: "Education Details",
+    description: "Please provide your academic details",
+  },
+  experience: {
+    title: "Work Experience",
+    description: "Please provide your previous employment history",
+  },
+} as const;
+
+type StageEditorKey = keyof typeof STAGE_EDITOR_META;
+
+function ProfileEditorPage({ stage }: { stage: StageEditorKey }) {
+  const navigate = useNavigate();
+  const { data: obData, isLoading: obLoading, refetch } = useOnboardingContext();
+  const [searchParams] = useSearchParams();
+  const viewOnly = searchParams.get("mode") === "view";
+  const meta = STAGE_EDITOR_META[stage];
+
+  if (obLoading) return <PageLoader />;
+  if (!obData) return <Navigate to="/profile" replace />;
 
   return (
     <div className="space-y-6">
-      {/* Header Card */}
-      <ProfileHeader />
-
-      {/* Tabs Navigation */}
-      <div>
-        <Tabs
-          value={activeTab}
-          onValueChange={setActiveTab}
-          className="w-full"
-        >
-          <TabsList className="w-full justify-start h-auto p-1.5 bg-background/60 rounded-2xl overflow-x-auto flex-nowrap backdrop-blur-xl border border-border/40 shadow-lg">
-            {tabs.map((tab) => (
-              <TabsTrigger
-                key={tab.value}
-                value={tab.value}
-                className={cn(
-                  "relative gap-2 rounded-xl text-xs sm:text-sm px-4 sm:px-6 py-2.5 flex-shrink-0 font-semibold transition-all duration-300",
-                  "data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:shadow-black/[0.04]"
-                )}
-              >
-                <tab.icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{tab.label}</span>
-                <span className="sm:hidden">{tab.label.slice(0, 3)}</span>
-                {tab.badge ? (
-                  <span className="ml-0.5 min-w-[20px] h-5 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold px-1.5">
-                    {tab.badge}
-                  </span>
-                ) : null}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          {/* Tab Contents */}
-          <div className="mt-6">
-            {activeTab === "overview" && (
-              <TabsContent value="overview" className="outline-none m-0" forceMount>
-                <OverviewTab setActiveTab={setActiveTab} />
-              </TabsContent>
-            )}
-            {activeTab === "documents" && (
-              <TabsContent value="documents" className="outline-none m-0" forceMount>
-                <DocumentsSection />
-              </TabsContent>
-            )}
-            {activeTab === "notifications" && (
-              <TabsContent value="notifications" className="outline-none m-0" forceMount>
-                <NotificationsSection />
-              </TabsContent>
-            )}
-            {activeTab === "assets" && (
-              <TabsContent value="assets" className="outline-none m-0" forceMount>
-                <AssetsSection />
-              </TabsContent>
-            )}
-            {activeTab === "complaints" && (
-              <TabsContent value="complaints" className="outline-none m-0" forceMount>
-                <ComplaintsSection />
-              </TabsContent>
-            )}
+      <div className="rounded-3xl border border-border/40 bg-background/50 backdrop-blur-xl p-6 sm:p-8 shadow-2xl">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">{meta.title}</h2>
+            <p className="text-muted-foreground mt-1 text-sm">{meta.description}</p>
           </div>
-        </Tabs>
+          <BackToDashboardButton />
+        </div>
+
+        {stage === "profile" && (
+          <OnboardingProfileForm
+            onCancel={() => navigate("/profile")}
+            onSuccess={() => {
+              refetch?.();
+              navigate("/profile");
+            }}
+          />
+        )}
+        {stage === "bank" && (
+          <OnboardingBankForm
+            readOnly={viewOnly}
+            onCancel={() => navigate("/profile")}
+            onSuccess={() => {
+              refetch?.();
+              navigate("/profile");
+            }}
+          />
+        )}
+        {stage === "education" && (
+          <OnboardingEducationForm
+            readOnly={viewOnly}
+            onCancel={() => navigate("/profile")}
+            onSuccess={() => {
+              refetch?.();
+              navigate("/profile");
+            }}
+          />
+        )}
+        {stage === "experience" && (
+          <OnboardingExperienceForm
+            readOnly={viewOnly}
+            onCancel={() => navigate("/profile")}
+            onSuccess={() => {
+              refetch?.();
+              navigate("/profile");
+            }}
+          />
+        )}
       </div>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Profile Page Content
-// Top-level router: decides between onboarding view and standard profile view
+// Documents — /profile/documents (onboarding editor + minimal accounts)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ProfilePageContent() {
-  const { data, isLoading, error } = useProfileContext();
+function DocumentsPage() {
+  const { data: obData, isLoading: obLoading } = useOnboardingContext();
 
-  // ── Loading State ──────────────────────────────────────────────────────────
+  if (obLoading) return <PageLoader />;
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-border/40 bg-background/50 backdrop-blur-xl p-6 sm:p-8 shadow-2xl">
+        {obData ? (
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-2xl font-bold text-foreground">Documents</h2>
+              <p className="text-muted-foreground mt-1 text-sm">
+                Upload required identity and academic documents
+              </p>
+            </div>
+            <BackToDashboardButton />
+          </div>
+        ) : null}
+        <DocumentsSection />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Assets / Support — /profile/assets | support
+// ─────────────────────────────────────────────────────────────────────────────
+
+function AssetsPage() {
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-border/40 bg-background/50 backdrop-blur-xl p-6 sm:p-8 shadow-2xl">
+        <AssetsSection />
+      </div>
+    </div>
+  );
+}
+
+function SupportPage() {
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-border/40 bg-background/50 backdrop-blur-xl p-6 sm:p-8 shadow-2xl">
+        <ComplaintsSection />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dashboard — /profile
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ProfileHome() {
+  const { isLoading: obLoading } = useOnboardingContext();
+
+  if (obLoading) return <PageLoader />;
+
+  return <OnboardingView />;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Layout + Routes
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ProfileLayout() {
+  const { isLoading, error } = useProfileContext();
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -130,14 +216,13 @@ function ProfilePageContent() {
     );
   }
 
-  // ── Error State ────────────────────────────────────────────────────────────
-  if (error || !data) {
+  if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-destructive text-center p-6">
         <div className="max-w-md">
           <h2 className="text-xl font-bold mb-2">Error Loading Profile</h2>
           <p className="text-muted-foreground">
-            {error?.message || "Failed to load profile data"}
+            {error.message || "Failed to load profile data"}
           </p>
         </div>
       </div>
@@ -145,16 +230,21 @@ function ProfilePageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground selection:bg-primary/10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 relative">
-        {/* my very personal router */}
-        {data.isOnboarding ? (
-            <OnboardingProvider>
-              <OnboardingView />
-            </OnboardingProvider>
-          ) : (
-            <StandardProfileView />
-          )}
+    <div className="bg-background text-foreground selection:bg-primary/10">
+      <div className="relative">
+        <OnboardingProvider>
+          <Routes>
+            <Route index element={<ProfileHome />} />
+            <Route path="personal" element={<ProfileEditorPage stage="profile" />} />
+            <Route path="bank" element={<ProfileEditorPage stage="bank" />} />
+            <Route path="education" element={<ProfileEditorPage stage="education" />} />
+            <Route path="experience" element={<ProfileEditorPage stage="experience" />} />
+            <Route path="documents" element={<DocumentsPage />} />
+            <Route path="assets" element={<AssetsPage />} />
+            <Route path="support" element={<SupportPage />} />
+            <Route path="*" element={<Navigate to="/profile" replace />} />
+          </Routes>
+        </OnboardingProvider>
       </div>
     </div>
   );
@@ -164,7 +254,7 @@ function ProfilePageContent() {
 export default function ProfilePage() {
   return (
     <ProfileProvider>
-      <ProfilePageContent />
+      <ProfileLayout />
     </ProfileProvider>
   );
 }

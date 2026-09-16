@@ -7,6 +7,7 @@ export const complaints = pgTable('hrms_complaints', {
   id:                     bigserial('id', { mode: 'number' }).primaryKey(),
   complaintCode:          varchar('complaint_code', { length: 50 }).notNull().unique(),
   complainantId:          bigint('complainant_id', { mode: 'number' }).notNull(),
+  createdBy:              bigint('created_by', { mode: 'number' }),
   complaintType:          varchar('complaint_type', { length: 100 }).notNull(),
   complaintAgainstType:   varchar('complaint_against_type', { length: 50 }),
   complaintAgainstId:     bigint('complaint_against_id', { mode: 'number' }),
