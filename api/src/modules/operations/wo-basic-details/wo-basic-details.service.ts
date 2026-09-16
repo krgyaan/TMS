@@ -439,6 +439,14 @@ export class WoBasicDetailsService {
             insertValues.team = teamId;
         }
 
+        // Auto-append (N) suffix when the same project name already exists
+        if (insertValues.projectName) {
+            const nameCheck = await this.checkProjectNameExists(insertValues.projectName, insertValues.team ?? teamId ?? undefined);
+            if (nameCheck.exists && nameCheck.suggestion) {
+                insertValues.projectName = nameCheck.suggestion;
+            }
+        }
+
         // Create WO Basic Detail
         const [row] = await this.db
             .insert(woBasicDetails)

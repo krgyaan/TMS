@@ -16,7 +16,7 @@ import { useCreateBulkWoContacts, useDeleteAllContactsByBasicDetail, useWoContac
 import { useItemOptions, useLocationOptions, useOrganizationOptions, useTeamOptions } from "@/hooks/useSelectOptions";
 import type { CreateWoBasicDetailDto } from "@/modules/operations/types/wo.types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Calculator, Check, HashIcon, Plus, Save, Trash2, TrendingUp } from "lucide-react";
+import { ArrowLeft, Calculator, Check, Plus, Save, Trash2, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -76,6 +76,12 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     const watchProjectName = form.watch("projectName");
     const [projectNameSuffix, setProjectNameSuffix] = useState<string | null>(null);
     const watchPricesChanged = form.watch("pricesChanged");
+
+    useEffect(() => {
+        if (projectNameSuffix && mode === "create") {
+            form.setValue("projectName", projectNameSuffix);
+        }
+    }, [projectNameSuffix, form, mode]);
     const watchPaymentConsent = form.watch("requestGemCharges");
 
     const tenderId = watchTenderId ? Number(watchTenderId) : null;
@@ -373,25 +379,25 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
 
                         {/* WO Basic Info */}
                         <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 items-start">
-{/* Order Type: only eligible when linked to a tender */}
-                                {!isNonTender && (
-                                    <SelectField
-                                        control={form.control}
-                                        name="orderType"
-                                        label="Order Type"
-                                        options={[
-                                            { value: "single", label: "Single" },
-                                            { value: "multiple", label: "Multiple (part of a batch)" },
-                                        ]}
-                                        placeholder="Single"
-                                    />
-                                )}
+                            {/* Order Type: only eligible when linked to a tender */}
+                            {!isNonTender && (
+                                <SelectField
+                                    control={form.control}
+                                    name="orderType"
+                                    label="Order Type"
+                                    options={[
+                                        { value: "single", label: "Single" },
+                                        { value: "multiple", label: "Multiple (part of a batch)" },
+                                    ]}
+                                    placeholder="Single"
+                                />
+                            )}
 
-                                <FieldWrapper control={form.control} name="woNumber" label="WO Number">
-                                    {field => <Input {...field} placeholder="WO Number" value={field.value || ""} onChange={e => field.onChange(e.target.value)} />}
-                                </FieldWrapper>
+                            <FieldWrapper control={form.control} name="woNumber" label="WO Number">
+                                {field => <Input {...field} placeholder="WO Number" value={field.value || ""} onChange={e => field.onChange(e.target.value)} />}
+                            </FieldWrapper>
 
-                                <FieldWrapper control={form.control} name="woDate" label="WO Date">
+                            <FieldWrapper control={form.control} name="woDate" label="WO Date">
                                 {field => (
                                     <DateInput
                                         {...field}
@@ -451,10 +457,6 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                         <Check className="h-5 w-5 text-orange-500" />
                                         Checklist confirmation from TE
                                     </h3>
-                                    <p className="mb-4 text-sm flex items-center gap-2 text-muted-foreground">
-                                        <HashIcon className="h-4 w-4 text-orange-500" />
-                                        All Documents are complete in the TMS
-                                    </p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg border">
                                         {tmsDocList.map((doc) => (
                                             <div key={doc} className="flex items-center space-x-2">
