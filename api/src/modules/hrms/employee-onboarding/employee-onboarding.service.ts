@@ -200,7 +200,7 @@ export class EmployeeOnboardingService {
         email: dto.personalEmail,
         phone: dto.phone,
         aadharNumber: dto.aadharNumber ?? null,
-        panNumber: dto.panNumber ?? null,
+          panNumber: dto.panNumber?.trim().toUpperCase() ?? null,
         pfNumber: dto.pfNumber ?? null,
 
         // Address (stored as JSONB)
@@ -693,7 +693,7 @@ export class EmployeeOnboardingService {
         maritalStatus: dto.maritalStatus,
         nationality: dto.nationality,
         aadharNumber: dto.aadharNumber,
-        panNumber: dto.panNumber,
+        panNumber: dto.panNumber?.trim().toUpperCase(),
         pfNumber: dto.pfNumber,
         phone: dto.phone,
         email: dto.personalEmail,

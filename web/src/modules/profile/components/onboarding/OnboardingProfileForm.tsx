@@ -930,7 +930,10 @@ export function OnboardingProfileForm({
                 hint="Permanent Account Number"
               >
                 <FormInput
-                  {...register("panNumber")}
+                  {...register("panNumber", {
+                    setValueAs: (v) =>
+                      typeof v === "string" ? v.toUpperCase() : v,
+                  })}
                   placeholder="ABCDE1234F"
                   hasError={!!errors.panNumber}
                   disabled={isLocked}
