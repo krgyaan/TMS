@@ -21,12 +21,14 @@ import {
   onboardingInduction,
 } from '@/db/schemas/hrms/onboarding';
 import { users } from '@/db/schemas/auth/users.schema';
+import { roles } from '@/db/schemas/auth/roles.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
 import { eq, desc, aliasedTable, and } from 'drizzle-orm';
 import * as fs from 'fs';
 import * as path from 'path';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
+import { OnboardingService } from '../onboarding/onboarding.service';
 
 const EMPLOYEE_DOCS_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'hrms', 'employee-documents');
 
@@ -88,6 +90,7 @@ export class EmployeeOnboardingService {
   constructor(
     @Inject(DRIZZLE) private readonly db: DbInstance,
     @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
+    private readonly onboardingService: OnboardingService,
   ) {}
 
   // ── Helpers ──────────────────────────────────────────────────────────────
@@ -246,9 +249,11 @@ export class EmployeeOnboardingService {
         lastLoginAt: users.lastLoginAt,
         createdAt: users.createdAt,
         teamName: teams.name,
+        roleName: roles.name,
       })
       .from(users)
       .leftJoin(teams, eq(users.team, teams.id))
+      .leftJoin(roles, eq(users.roleId, roles.id))
       .where(eq(users.id, userId))
       .limit(1);
 
@@ -266,6 +271,7 @@ export class EmployeeOnboardingService {
       lastLoginAt: userRow.lastLoginAt?.toISOString() || null,
       createdAt: userRow.createdAt?.toISOString() || null,
       team: userRow.teamName || 'Unassigned',
+      role: userRow.roleName || null,
     };
 
     // CHECK ONBOARDING STATUS
@@ -287,9 +293,29 @@ export class EmployeeOnboardingService {
       .orderBy(desc(onboardingRequests.createdAt))
       .limit(1);
     
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed'; 
-    if (!isOnboarding) {
-      throw new BadRequestException('No active onboarding request found for this user.');
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+    // Fully-completed users still get their onboarding data back so the profile
+    // page can prefill the per-stage tabs; `isOnboarding` only tells the client
+    // whether the wizard flow is still in progress. Edit guards further below
+    // still prevent modifying HR-approved entries.
+    //
+    // Users created directly via master Users (no onboarding request) get an
+    // EMPTY draft back — no request is created until they explicitly click to
+    // fill (ensureMyOnboardingRequest).
+    if (activeReqs.length === 0) {
+      return {
+        currentUser,
+        isOnboarding: false,
+        onboardingStatus: null,
+        profile: null,
+        address: null,
+        emergencyContact: null,
+        education: [],
+        experience: [],
+        documents: [],
+        inductionTasks: [],
+        bankAccounts: [],
+      };
     }
 
     const onboardingId = activeReqs[0].id;
@@ -560,7 +586,7 @@ export class EmployeeOnboardingService {
 
     return {
       currentUser,
-      isOnboarding: true,
+      isOnboarding,
       onboardingStatus,
       profile,
       address,
@@ -573,6 +599,57 @@ export class EmployeeOnboardingService {
     };
   }
 
+  /**
+   * Ensure the current user has an onboarding request. Created ONLY when the
+   * employee explicitly starts filling their details (never on page load).
+   * Idempotent — returns the existing draft when a request is already present.
+   */
+  async ensureMyOnboardingRequest(userId: number) {
+    const existing = await this.db
+      .select({ id: onboardingRequests.id })
+      .from(onboardingRequests)
+      .where(eq(onboardingRequests.userId, userId))
+      .orderBy(desc(onboardingRequests.createdAt))
+      .limit(1);
+
+    if (existing.length === 0) {
+      const [userRow] = await this.db
+        .select({
+          name: users.name,
+          email: users.email,
+          mobile: users.mobile,
+        })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+      if (!userRow) {
+        throw new NotFoundException('User not found');
+      }
+
+      // The user account was already created by HR — registration approval is
+      // implicit, so the request starts approved; only section-level review
+      // remains. Induction tasks are seeded here (normally done on approve).
+      const [request] = await this.db
+        .insert(onboardingRequests)
+        .values({
+          userId,
+          name: userRow.name,
+          email: userRow.email as string,
+          phone: userRow.mobile || null,
+          status: 'approved',
+          hrStatus: 'approved',
+          approvedAt: new Date(),
+          requestType: 'new_hire',
+        } as any)
+        .returning({ id: onboardingRequests.id });
+
+      await this.onboardingService.seedInductionTasks(this.db, request.id);
+    }
+
+    return this.getMyOnboardingDraft(userId);
+  }
+
   async updateMyOnboardingProfile(userId: number, dto: any) {
     const activeReqs = await this.db
       .select({ id: onboardingRequests.id, status: onboardingRequests.status })
@@ -581,10 +658,10 @@ export class EmployeeOnboardingService {
       .orderBy(desc(onboardingRequests.createdAt))
       .limit(1);
     
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-
-    if (!isOnboarding) {
-      throw new BadRequestException('No active onboarding request found.');
+    // Stage-level approved guards below are the lock; a fully_completed
+    // request must not block editing a stage that is still pending/rejected.
+    if (activeReqs.length === 0) {
+      throw new BadRequestException('No onboarding request found for this user.');
     }
 
     const onboardingId = activeReqs[0].id;
@@ -1021,7 +1098,7 @@ export class EmployeeOnboardingService {
 
     const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
 
-    if (!isOnboarding) {
+    if (activeReqs.length === 0) {
       throw new BadRequestException('Bank details can only be modified during onboarding.');
     }
 
@@ -1112,9 +1189,7 @@ export class EmployeeOnboardingService {
       .orderBy(desc(onboardingRequests.createdAt))
       .limit(1);
 
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-
-    if (!isOnboarding) {
+    if (activeReqs.length === 0) {
       throw new BadRequestException('Education details can only be modified during onboarding.');
     }
 
@@ -1285,9 +1360,7 @@ export class EmployeeOnboardingService {
       .orderBy(desc(onboardingRequests.createdAt))
       .limit(1);
 
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-
-    if (!isOnboarding) {
+    if (activeReqs.length === 0) {
       throw new BadRequestException('Experience details can only be modified during onboarding.');
     }
 
@@ -1460,9 +1533,9 @@ export class EmployeeOnboardingService {
       .limit(1);
     
     const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-    const onboardingId = isOnboarding ? activeReqs[0].id : null;
+    const onboardingId = activeReqs.length > 0 ? activeReqs[0].id : null;
 
-    if (!isOnboarding) {
+    if (activeReqs.length === 0) {
       throw new BadRequestException('Documents can only be uploaded during onboarding.');
     }
 
@@ -1543,9 +1616,7 @@ export class EmployeeOnboardingService {
       .orderBy(desc(onboardingRequests.createdAt))
       .limit(1);
     
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-
-    if (!isOnboarding) {
+    if (activeReqs.length === 0) {
       throw new BadRequestException('Documents can only be modified during onboarding.');
     }
 
@@ -1631,9 +1702,7 @@ export class EmployeeOnboardingService {
       .orderBy(desc(onboardingRequests.createdAt))
       .limit(1);
     
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-
-    if (!isOnboarding) {
+    if (activeReqs.length === 0) {
       throw new BadRequestException('Documents can only be deleted during onboarding.');
     }
 

@@ -7,7 +7,7 @@ export interface OnboardingRequest {
   name: string;
   email: string;
   phone: string;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "fully_completed";
   hrStatus: "pending" | "approved" | "rejected";
   profileStatus: string;
   documentStatus: string;
