@@ -83,10 +83,6 @@ export class PaymentRequestService {
                 throw new NotFoundException("Purchase Order not found");
             }
 
-            if (po.poApproved !== true) {
-                throw new BadRequestException("Cannot create payment request against an unapproved PO. Only approved POs are eligible.");
-            }
-
             if (po?.amountAfterTds) {
                 const amountAfterTds = Number(po.amountAfterTds);
                 const existingSumResult = await this.db
@@ -123,10 +119,6 @@ export class PaymentRequestService {
                 throw new NotFoundException("Vendor Work Order not found");
             }
 
-            if (wo.woApproved !== true) {
-                throw new BadRequestException("Cannot create payment request against an unapproved WO. Only approved WOs are eligible.");
-            }
-
             if (wo?.amountAfterTds) {
                 const amountAfterTds = Number(wo.amountAfterTds);
                 const existingSumResult = await this.db
@@ -144,6 +136,28 @@ export class PaymentRequestService {
                         `Available: ${amountAfterTds - existingSum}, Already used: ${existingSum}`,
                     );
                 }
+            }
+        }
+
+        // Determine initial status based on PO/VWO approval
+        let initialStatus = 'pending';
+        if (body.purchaseOrderId) {
+            const po = await this.db
+                .select({ poApproved: purchaseOrders.poApproved })
+                .from(purchaseOrders)
+                .where(eq(purchaseOrders.id, body.purchaseOrderId))
+                .then(rows => rows[0]);
+            if (po && po.poApproved !== true) {
+                initialStatus = 'po_approval_pending';
+            }
+        } else if (body.vendorWorkOrderId) {
+            const wo = await this.db
+                .select({ woApproved: vendorWorkOrders.woApproved })
+                .from(vendorWorkOrders)
+                .where(eq(vendorWorkOrders.id, body.vendorWorkOrderId))
+                .then(rows => rows[0]);
+            if (wo && wo.woApproved !== true) {
+                initialStatus = 'po_approval_pending';
             }
         }
 
@@ -171,6 +185,7 @@ export class PaymentRequestService {
                     portalLink: body.portalLink || null,
                     billFiles: body.billFiles || [],
                     remark: body.remark,
+                    status: initialStatus,
                     requestedBy: userId,
                 })
                 .returning();
@@ -195,15 +210,17 @@ export class PaymentRequestService {
             .where(eq(paymentRequests.id, pr.id))
             .limit(1);
 
-        // Fire-and-forget WhatsApp notification
-        this.notifications.notifyNewPaymentRequest({
-          requestNo: storedPr?.requestNo ?? pr.requestNo ?? '',
-          amount: pr.amount ?? 0,
-          partyName: pr.partyName ?? null,
-          portalLink: pr.portalLink ?? null,
-          requestedBy: userId,
-          category: pr.paymentAgainst ?? '',
-        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+        // Fire-and-forget WhatsApp notification (skip for po_approval_pending)
+        if (initialStatus !== 'po_approval_pending') {
+            this.notifications.notifyNewPaymentRequest({
+              requestNo: storedPr?.requestNo ?? pr.requestNo ?? '',
+              amount: pr.amount ?? 0,
+              partyName: pr.partyName ?? null,
+              portalLink: pr.portalLink ?? null,
+              requestedBy: userId,
+              category: pr.paymentAgainst ?? '',
+            }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+        }
 
         return pr;
     }
@@ -269,6 +286,7 @@ export class PaymentRequestService {
 
         const validTransitions: Record<string, string[]> = {
             pending: ["maker_done", "rejected"],
+            po_approval_pending: ["pending", "rejected"],
             maker_done: ["payment_done", "rejected"],
         };
 

@@ -47,6 +47,20 @@ export interface MakerDoneNotificationData {
   category: string;
 }
 
+export interface PoApprovalNotificationData {
+  poNumber: string;
+  sellerName: string | null;
+  amountAfterTds: string | null;
+  approvedBy: number;
+}
+
+export interface VwoApprovalNotificationData {
+  woNumber: string;
+  sellerName: string | null;
+  amountAfterTds: string | null;
+  approvedBy: number;
+}
+
 @Injectable()
 export class OperationNotificationService {
   private readonly logger = new Logger(OperationNotificationService.name);
@@ -284,6 +298,52 @@ export class OperationNotificationService {
       await this.sendToTargets(text, target);
     } catch (err) {
       this.logger.warn(`Failed to send maker done notification: ${err}`);
+    }
+  }
+
+  async notifyPoApproved(data: PoApprovalNotificationData): Promise<void> {
+    try {
+      const [user] = await this.db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, data.approvedBy))
+        .limit(1);
+
+      const userName = user?.name ?? 'Unknown';
+      const lines: string[] = [
+        `*PO Approved* @${userName}`,
+        `PO Number: ${data.poNumber}`,
+        `Party: ${data.sellerName || 'N/A'}`,
+        `Amount: ₹${data.amountAfterTds || 'N/A'}`,
+      ];
+
+      const text = lines.join('\n');
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+    } catch (err) {
+      this.logger.warn(`Failed to send PO approval notification: ${err}`);
+    }
+  }
+
+  async notifyVwoApproved(data: VwoApprovalNotificationData): Promise<void> {
+    try {
+      const [user] = await this.db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, data.approvedBy))
+        .limit(1);
+
+      const userName = user?.name ?? 'Unknown';
+      const lines: string[] = [
+        `*VWO Approved* @${userName}`,
+        `VWO Number: ${data.woNumber}`,
+        `Party: ${data.sellerName || 'N/A'}`,
+        `Amount: ₹${data.amountAfterTds || 'N/A'}`,
+      ];
+
+      const text = lines.join('\n');
+      await this.sendToTargets(text, { type: 'group', group: GROUPS.PAYMENTS });
+    } catch (err) {
+      this.logger.warn(`Failed to send VWO approval notification: ${err}`);
     }
   }
 }

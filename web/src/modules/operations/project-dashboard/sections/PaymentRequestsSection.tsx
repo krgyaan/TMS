@@ -104,6 +104,7 @@ export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
                 const status = p.value || "pending";
                 const colors: Record<string, string> = {
                     pending: "text-yellow-600 bg-yellow-50",
+                    po_approval_pending: "text-orange-600 bg-orange-50",
                     approved: "text-green-600 bg-green-50",
                     rejected: "text-red-600 bg-red-50",
                 };
