@@ -1514,7 +1514,7 @@ export class OnboardingService {
       const [req] = await tx.select({ userId: onboardingRequests.userId }).from(onboardingRequests).where(eq(onboardingRequests.id, id)).limit(1);
 
       if (hrStatus === 'approved') {
-        if (req?.userId) {
+        if (req?.userId && (exp.companyName || '').trim().toLowerCase() !== 'fresher') {
           await this.syncExperienceToEmployee(tx, req.userId, exp);
         }
       }
