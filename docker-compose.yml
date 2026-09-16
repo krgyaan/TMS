@@ -51,9 +51,12 @@ services:
       - "127.0.0.1:8001:8000"
     env_file:
       - ./volksAi/.env
+    volumes:
+      - ./logs:/logs
     environment:
       - PYTHONUNBUFFERED=1
       - OMP_NUM_THREADS=1
+      - LOG_DIR=/logs
     deploy:
       resources:
         limits:

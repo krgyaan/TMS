@@ -17,6 +17,7 @@ import { websites } from '@db/schemas/master/websites.schema';
 import { financeDocuments } from '@db/schemas/shared/finance_docs.schema';
 import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
 import { tenderClients, tenderFinancialDocuments, tenderInformation, tenderTechnicalDocuments, type TenderClient, type TenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { tenderExtractions } from '@db/schemas/tendering/tender-extractions.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -1759,16 +1760,19 @@ export class TenderInfoSheetsService {
     /**
      * Enqueues an asynchronous PDF extraction job for the specified tender.
      */
-    async autoExtractFromPdf(tenderId: number, userId: number) {
+    async autoExtractFromPdf(tenderId: number, userId: number, force?: boolean) {
         const tender = await this.tenderInfosService.validateExists(tenderId);
         const resolvedDocs = this.resolveTenderDocuments(tender.documents);
 
         this.logger.log(`Initiating auto-extraction for tender ${tenderId} from document '${resolvedDocs.mainTenderPath}'`, {
+            event_type: 'autoextract_save',
+            action: 'extraction_started',
             tenderId,
             mainTenderPath: resolvedDocs.mainTenderPath,
             atcCount: resolvedDocs.atcPaths.length,
             hasBoq: Boolean(resolvedDocs.boqPath),
             userId,
+            force: Boolean(force),
         });
 
         // VolksAI extraction payload: otherDocuments is strictly EXCLUDED to maintain security boundary
@@ -1779,6 +1783,7 @@ export class TenderInfoSheetsService {
             atcPaths: resolvedDocs.atcPaths,
             boqPath: resolvedDocs.boqPath,
             userId,
+            ...(force ? { force: true } : {}),
         };
 
         const result = await this.pdfExtractionProducer.enqueueExtraction(volksAiPayload);
@@ -1789,8 +1794,126 @@ export class TenderInfoSheetsService {
             message:
                 result.status === 'existing_active'
                     ? 'Extraction job is already active/processing for this tender'
+                    : result.status === 'existing_completed'
+                    ? 'Extraction results already exist and are available'
                     : 'Extraction job enqueued successfully',
         };
+    }
+
+    /**
+     * Retrieves the durable saved extraction result from PostgreSQL for a tender.
+     */
+    async getSavedExtraction(tenderId: number) {
+        const [row] = await this.db
+            .select()
+            .from(tenderExtractions)
+            .where(eq(tenderExtractions.tenderId, tenderId))
+            .limit(1);
+
+        if (!row) {
+            return null;
+        }
+
+        return {
+            tenderId: row.tenderId,
+            fields: row.fields as Record<string, any>,
+            missing_fields: row.missingFields || [],
+            extraction_version: row.extractionVersion || '1.0.0',
+            processing_time_ms: row.processingTimeMs || 0,
+            updatedAt: row.updatedAt,
+        };
+    }
+
+    /**
+     * Explicitly saves or updates the extracted data for a tender in PostgreSQL,
+     * emitting full structured telemetry for the save lifecycle.
+     */
+    async saveExtractionResult(
+        tenderId: number,
+        data: {
+            fields: Record<string, any>;
+            missing_fields?: string[];
+            extraction_version?: string;
+            processing_time_ms?: number;
+        },
+        userId: number,
+    ) {
+        await this.tenderInfosService.validateExists(tenderId);
+
+        const fieldsCount = Object.keys(data.fields || {}).length;
+
+        this.logger.log(`[AutoExtract] Save request initiated for tender ${tenderId}`, {
+            event_type: 'autoextract_save',
+            action: 'save_request_sent',
+            tenderId,
+            userId,
+            fieldsCount,
+        });
+
+        try {
+            await this.db
+                .insert(tenderExtractions)
+                .values({
+                    tenderId,
+                    fields: data.fields,
+                    missingFields: data.missing_fields || [],
+                    extractionVersion: data.extraction_version || '1.0.0',
+                    processingTimeMs: data.processing_time_ms || null,
+                    userId,
+                    updatedAt: new Date(),
+                })
+                .onConflictDoUpdate({
+                    target: tenderExtractions.tenderId,
+                    set: {
+                        fields: data.fields,
+                        missingFields: data.missing_fields || [],
+                        extractionVersion: data.extraction_version || '1.0.0',
+                        processingTimeMs: data.processing_time_ms || null,
+                        userId,
+                        updatedAt: new Date(),
+                    },
+                });
+
+            this.logger.log(`[AutoExtract] Extraction saved successfully for tender ${tenderId}`, {
+                event_type: 'autoextract_save',
+                action: 'save_success',
+                tenderId,
+                userId,
+                fieldsCount,
+            });
+
+            // Follow-up check: confirm persisted data matches
+            const [saved] = await this.db
+                .select()
+                .from(tenderExtractions)
+                .where(eq(tenderExtractions.tenderId, tenderId))
+                .limit(1);
+
+            const verified = Boolean(saved && Object.keys(saved.fields || {}).length === fieldsCount);
+
+            this.logger.log(`[AutoExtract] Follow-up check: verified=${verified} for tender ${tenderId}`, {
+                event_type: 'autoextract_save',
+                action: 'followup_check',
+                tenderId,
+                verified,
+                persistedFieldsCount: saved ? Object.keys(saved.fields || {}).length : 0,
+            });
+
+            return {
+                success: true,
+                tenderId,
+                fieldsCount,
+                verified,
+            };
+        } catch (error: any) {
+            this.logger.error(`[AutoExtract] Extraction save failed for tender ${tenderId}: ${error?.message}`, {
+                event_type: 'autoextract_save',
+                action: 'save_failure',
+                tenderId,
+                error: error?.message,
+            });
+            throw error;
+        }
     }
 
     /**

@@ -1,10 +1,14 @@
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Job, Worker } from 'bullmq';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
 import * as path from 'path';
 import * as fs from 'fs';
+import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
+import { tenderExtractions } from '@db/schemas/tendering';
+import { eq } from 'drizzle-orm';
 import { FileUploadService } from '@/modules/file-upload/file-upload.service';
 import { ClaudeUsageService } from '@/modules/master/health/claude-usage.service';
 import { startHeartbeat } from '@/infra/queue/worker-heartbeat';
@@ -20,6 +24,9 @@ export class PdfExtractionProcessor implements OnModuleInit {
         private readonly claudeUsageService: ClaudeUsageService,
         @Inject(WINSTON_MODULE_PROVIDER)
         private readonly logger: Logger,
+        @Optional()
+        @Inject(DRIZZLE)
+        private readonly db?: DbInstance,
     ) {}
 
 
@@ -90,7 +97,9 @@ export class PdfExtractionProcessor implements OnModuleInit {
         const { tenderId, pdfPath, mainTenderPath, atcPaths, boqPath, userId } = job.data;
         const primaryPdf = mainTenderPath || pdfPath;
 
-        this.logger.info(`[PdfExtractionProcessor] Starting extraction for tender ${tenderId}`, {
+        this.logger.info(`[AutoExtract] Extraction started for tender ${tenderId}`, {
+            event_type: 'autoextract_save',
+            action: 'extraction_started',
             jobId: job.id,
             tenderId,
             primaryPdf,
@@ -195,11 +204,13 @@ export class PdfExtractionProcessor implements OnModuleInit {
         const missingCount = (extractionResult.missing_fields || []).length;
 
         this.logger.info(
-            `[PdfExtractionProcessor] Extraction successful for tender ${tenderId}: ${fieldCount} fields resolved, ${missingCount} missing, ${extractionResult.processing_time_ms}ms server time`,
+            `[AutoExtract] Extraction result received for tender ${tenderId}: ${fieldCount} fields resolved, ${missingCount} missing, ${extractionResult.processing_time_ms}ms server time`,
             {
+                event_type: 'autoextract_save',
+                action: 'extraction_result_received',
                 tenderId,
                 jobId: job.id,
-                fieldCount,
+                fieldsCount: fieldCount,
                 missingCount,
                 processingTimeMs: extractionResult.processing_time_ms,
             },
@@ -222,7 +233,74 @@ export class PdfExtractionProcessor implements OnModuleInit {
             }
         }
 
-        // Return result directly to BullMQ (stored in Redis returnvalue, non-destructive, no DB writes)
+        // Durable Database Persistence: Save extraction result to tender_extractions table (if db is provided)
+        if (this.db) {
+            try {
+                this.logger.info(`[AutoExtract] Sending save request to persist extraction for tender ${tenderId}`, {
+                    event_type: 'autoextract_save',
+                    action: 'save_request_sent',
+                    tenderId,
+                    fieldsCount: fieldCount,
+                });
+
+                await this.db
+                    .insert(tenderExtractions)
+                    .values({
+                        tenderId,
+                        fields: extractionResult.fields,
+                        missingFields: extractionResult.missing_fields,
+                        extractionVersion: extractionResult.extraction_version || '1.0.0',
+                        processingTimeMs: extractionResult.processing_time_ms,
+                        userId: userId || null,
+                        updatedAt: new Date(),
+                    })
+                    .onConflictDoUpdate({
+                        target: tenderExtractions.tenderId,
+                        set: {
+                            fields: extractionResult.fields,
+                            missingFields: extractionResult.missing_fields,
+                            extractionVersion: extractionResult.extraction_version || '1.0.0',
+                            processingTimeMs: extractionResult.processing_time_ms,
+                            userId: userId || null,
+                            updatedAt: new Date(),
+                        },
+                    });
+
+                this.logger.info(`[AutoExtract] Extraction result saved successfully for tender ${tenderId}`, {
+                    event_type: 'autoextract_save',
+                    action: 'save_success',
+                    tenderId,
+                    fieldsCount: fieldCount,
+                });
+
+                // Follow-up check: confirm persisted data matches
+                const [persistedRow] = await this.db
+                    .select()
+                    .from(tenderExtractions)
+                    .where(eq(tenderExtractions.tenderId, tenderId))
+                    .limit(1);
+
+                const persistedFieldsCount = persistedRow ? Object.keys(persistedRow.fields || {}).length : 0;
+                const matches = Boolean(persistedRow && persistedFieldsCount === fieldCount);
+
+                this.logger.info(`[AutoExtract] Follow-up check for tender ${tenderId}: verified=${matches}`, {
+                    event_type: 'autoextract_save',
+                    action: 'followup_check',
+                    tenderId,
+                    verified: matches,
+                    persistedFieldsCount,
+                });
+            } catch (dbErr: any) {
+                this.logger.error(`[AutoExtract] Failed to persist extraction for tender ${tenderId}: ${dbErr?.message}`, {
+                    event_type: 'autoextract_save',
+                    action: 'save_failure',
+                    tenderId,
+                    error: dbErr?.message,
+                    stack: dbErr?.stack,
+                });
+            }
+        }
+
         return extractionResult;
 
     }

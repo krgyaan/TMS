@@ -3,6 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
+import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
+import { tenderExtractions } from '@db/schemas/tendering';
+import { eq } from 'drizzle-orm';
 import {
     PdfExtractionJobData,
     PdfExtractionJobResult,
@@ -13,7 +17,9 @@ import { PdfExtractionProcessor } from './pdf-extraction.processor';
 
 export interface EnqueueExtractionResult {
     jobId: string;
-    status: 'enqueued' | 'existing_active';
+    status: 'enqueued' | 'existing_active' | 'existing_completed';
+    fields?: Record<string, any>;
+    missing_fields?: string[];
 }
 
 interface InMemoryJobRecord {
@@ -39,6 +45,9 @@ export class PdfExtractionProducer {
         private readonly processor?: PdfExtractionProcessor,
         @Optional()
         private readonly configService?: ConfigService,
+        @Optional()
+        @Inject(DRIZZLE)
+        private readonly db?: DbInstance,
     ) {}
 
     private isRedisReady(): boolean {
@@ -58,6 +67,32 @@ export class PdfExtractionProducer {
     async enqueueExtraction(data: PdfExtractionJobData): Promise<EnqueueExtractionResult> {
         const jobId = `extract-tender-${data.tenderId}`;
 
+        // 1. Check PostgreSQL durable storage first (unless force re-extraction is requested)
+        if (!data.force && this.db) {
+            try {
+                const [saved] = await this.db
+                    .select()
+                    .from(tenderExtractions)
+                    .where(eq(tenderExtractions.tenderId, data.tenderId))
+                    .limit(1);
+
+                if (saved && saved.fields && Object.keys(saved.fields).length > 0) {
+                    this.logger.info(
+                        `[PdfExtractionProducer] Durable extraction already exists in database for tender ${data.tenderId}. Returning existing completed extraction without re-running (saving Claude tokens).`,
+                        { tenderId: data.tenderId, jobId },
+                    );
+                    return {
+                        jobId,
+                        status: 'existing_completed',
+                        fields: saved.fields as Record<string, any>,
+                        missing_fields: saved.missingFields || [],
+                    };
+                }
+            } catch (dbErr: any) {
+                this.logger.warn(`[PdfExtractionProducer] Could not check existing extraction in DB: ${dbErr?.message}`);
+            }
+        }
+
         if (!this.isRedisReady()) {
             const existing = this.inMemoryJobs.get(jobId);
             if (existing && (existing.state === 'active' || existing.state === 'waiting')) {
@@ -66,6 +101,19 @@ export class PdfExtractionProducer {
                     { tenderId: data.tenderId, jobId, state: existing.state },
                 );
                 return { jobId, status: 'existing_active' };
+            }
+
+            if (existing && existing.state === 'completed' && !data.force) {
+                this.logger.info(
+                    `[PdfExtractionProducer] In-memory job ${jobId} already completed. Returning existing extraction without re-queueing.`,
+                    { tenderId: data.tenderId, jobId },
+                );
+                return {
+                    jobId,
+                    status: 'existing_completed',
+                    fields: existing.result?.fields,
+                    missing_fields: existing.result?.missing_fields,
+                };
             }
 
             this.inMemoryJobs.set(jobId, {
@@ -143,6 +191,19 @@ export class PdfExtractionProducer {
                 return { jobId, status: 'existing_active' };
             }
 
+            if (state === 'completed' && !data.force) {
+                this.logger.info(
+                    `[PdfExtractionProducer] Job ${jobId} previously finished with state '${state}'. Returning existing extraction without re-queueing (saving tokens).`,
+                    { tenderId: data.tenderId, jobId, state },
+                );
+                return {
+                    jobId,
+                    status: 'existing_completed',
+                    fields: existingJob.returnvalue?.fields,
+                    missing_fields: existingJob.returnvalue?.missing_fields,
+                };
+            }
+
             this.logger.info(
                 `[PdfExtractionProducer] Job ${jobId} previously finished with state '${state}'. Removing old job for fresh run.`,
                 { tenderId: data.tenderId, jobId, state },
@@ -191,24 +252,51 @@ export class PdfExtractionProducer {
             };
         }
 
-        if (!this.isRedisReady()) {
-            return null;
+        if (this.isRedisReady()) {
+            const job = await this.queue.getJob(jobId);
+            if (job) {
+                const state = (await job.getState()) as PdfExtractionJobState;
+                return {
+                    jobId: (job.id as string) || jobId,
+                    state,
+                    progress: job.progress,
+                    data: job.data,
+                    result: state === 'completed' ? (job.returnvalue as PdfExtractionJobResult) : null,
+                    failedReason: state === 'failed' ? job.failedReason : null,
+                };
+            }
         }
 
-        const job = await this.queue.getJob(jobId);
-        if (!job) {
-            return null;
+        // Fallback: check PostgreSQL durable storage if job is not in Redis or Redis is offline
+        if (this.db) {
+            const numericTenderId = Number(jobId.replace(/^extract-tender-/, ''));
+            if (!Number.isNaN(numericTenderId) && numericTenderId > 0) {
+                try {
+                    const [saved] = await this.db
+                        .select()
+                        .from(tenderExtractions)
+                        .where(eq(tenderExtractions.tenderId, numericTenderId))
+                        .limit(1);
+
+                    if (saved && saved.fields) {
+                        return {
+                            jobId,
+                            state: 'completed',
+                            data: { tenderId: numericTenderId, pdfPath: '', userId: saved.userId || 0 },
+                            result: {
+                                extraction_version: saved.extractionVersion || '1.0.0',
+                                fields: saved.fields as any,
+                                missing_fields: saved.missingFields || [],
+                                processing_time_ms: saved.processingTimeMs || 0,
+                            },
+                        };
+                    }
+                } catch (dbErr: any) {
+                    this.logger.warn(`[PdfExtractionProducer] Error querying DB in getJobStatus: ${dbErr?.message}`);
+                }
+            }
         }
 
-        const state = (await job.getState()) as PdfExtractionJobState;
-
-        return {
-            jobId: (job.id as string) || jobId,
-            state,
-            progress: job.progress,
-            data: job.data,
-            result: state === 'completed' ? (job.returnvalue as PdfExtractionJobResult) : null,
-            failedReason: state === 'failed' ? job.failedReason : null,
-        };
+        return null;
     }
 }

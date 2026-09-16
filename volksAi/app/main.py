@@ -3,6 +3,7 @@ import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.logging import setup_logging, get_logger
 from app.routers import health, extract, classify
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -12,12 +13,8 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
-# Standard logging configuration to stdout for Docker log visibility
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
+# Initialize structured JSON logging for Promtail / Loki with service_name="volksAi"
+setup_logging(service_name="volksAi")
 
 import os
 from contextlib import asynccontextmanager
