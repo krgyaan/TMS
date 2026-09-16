@@ -44,7 +44,6 @@ services:
     build:
       context: ./volksAi
       dockerfile: Dockerfile
-    image: volksai:staging
     container_name: volksai
     restart: unless-stopped
     ports:
