@@ -200,7 +200,7 @@ export class EmployeeOnboardingService {
         email: dto.personalEmail,
         phone: dto.phone,
         aadharNumber: dto.aadharNumber ?? null,
-        panNumber: dto.panNumber ?? null,
+          panNumber: dto.panNumber?.trim().toUpperCase() ?? null,
         pfNumber: dto.pfNumber ?? null,
 
         // Address (stored as JSONB)
@@ -693,7 +693,7 @@ export class EmployeeOnboardingService {
         maritalStatus: dto.maritalStatus,
         nationality: dto.nationality,
         aadharNumber: dto.aadharNumber,
-        panNumber: dto.panNumber,
+        panNumber: dto.panNumber?.trim().toUpperCase(),
         pfNumber: dto.pfNumber,
         phone: dto.phone,
         email: dto.personalEmail,
@@ -788,7 +788,7 @@ export class EmployeeOnboardingService {
           bankName: b.bankName,
           accountHolderName: b.accountHolderName,
           accountNumber: b.accountNumber,
-          ifscCode: b.ifscCode,
+          ifscCode: b.ifscCode?.trim().toUpperCase(),
           branchName: b.branchName || null,
           branchAddress: b.branchAddress || null,
           upiId: b.upiId || null,
@@ -1134,7 +1134,7 @@ export class EmployeeOnboardingService {
         bankName: b.bankName,
         accountHolderName: b.accountHolderName,
         accountNumber: b.accountNumber,
-        ifscCode: b.ifscCode,
+        ifscCode: b.ifscCode?.trim().toUpperCase(),
         branchName: b.branchName || null,
         branchAddress: b.branchAddress || null,
         upiId: b.upiId || null,
@@ -1364,15 +1364,77 @@ export class EmployeeOnboardingService {
       throw new BadRequestException('Experience details can only be modified during onboarding.');
     }
 
-    const { experiences } = body;
-    if (!experiences || !Array.isArray(experiences)) {
+    const { experiences, isFresher } = body;
+    if (!Array.isArray(experiences)) {
       throw new BadRequestException('Experiences array is required');
     }
+
+    const onboardingId = activeReqs[0].id;
 
     const existing = await this.db
       .select()
       .from(onboardingExperience)
-      .where(eq(onboardingExperience.onboardingId, activeReqs[0].id));
+      .where(eq(onboardingExperience.onboardingId, onboardingId));
+
+    const isFresherMarker = (e: { companyName?: string | null }) =>
+      (e.companyName || '').trim().toLowerCase() === 'fresher';
+
+    if (isFresher) {
+      if (existing.some((e) => e.hrStatus === 'approved' && !isFresherMarker(e))) {
+        throw new BadRequestException(
+          'Approved experience records exist — cannot declare fresher.',
+        );
+      }
+
+      const toDelete = existing.filter(
+        (e) => !isFresherMarker(e) && e.hrStatus !== 'approved',
+      );
+      for (const record of toDelete) {
+        await this.db.delete(onboardingExperience).where(eq(onboardingExperience.id, record.id));
+      }
+
+      const marker = existing.find(isFresherMarker);
+      if (marker) {
+        if (marker.hrStatus === 'rejected') {
+          await this.db
+            .update(onboardingExperience)
+            .set({ status: 'resubmitted', hrStatus: 'pending', hrRemark: null, updatedAt: new Date() })
+            .where(eq(onboardingExperience.id, marker.id));
+        }
+      } else {
+        await this.db.insert(onboardingExperience).values({
+          onboardingId,
+          companyName: 'Fresher',
+          designation: 'Fresher',
+          fromDate: null,
+          toDate: null,
+          currentlyWorking: false,
+          responsibilities: 'Declared no prior work experience',
+          status: 'submitted',
+          hrStatus: 'pending',
+          hrRemark: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as any);
+      }
+
+      await this.recalculateSubmissionStatuses(this.db, onboardingId);
+
+      await this.db.insert(onboardingActivityLogs).values({
+        onboardingId,
+        action: 'EXPERIENCE_FRESHER_DECLARED',
+        performedBy: userId,
+        metadata: { action: 'fresher_declared' },
+      });
+
+      if (activeReqs[0].status === 'rejected') {
+        await this.db.update(onboardingRequests)
+          .set({ status: 'pending' })
+          .where(eq(onboardingRequests.id, onboardingId));
+      }
+
+      return { success: true };
+    }
 
     const inputIds = experiences.map((e: any) => e.id).filter(Boolean) as number[];
     const toDelete = existing.filter((e) => !inputIds.includes(e.id));
@@ -1441,7 +1503,7 @@ export class EmployeeOnboardingService {
         bankName: dto.bankName,
         accountHolderName: dto.accountHolderName,
         accountNumber: dto.accountNumber,
-        ifscCode: dto.ifscCode,
+        ifscCode: dto.ifscCode?.trim().toUpperCase(),
         branchName: dto.branchName || null,
         branchAddress: dto.branchAddress || null,
         upiId: dto.upiId || null,
@@ -1482,7 +1544,7 @@ export class EmployeeOnboardingService {
         bankName: dto.bankName,
         accountHolderName: dto.accountHolderName,
         accountNumber: dto.accountNumber,
-        ifscCode: dto.ifscCode,
+        ifscCode: dto.ifscCode?.trim().toUpperCase(),
         branchName: dto.branchName || null,
         branchAddress: dto.branchAddress || null,
         upiId: dto.upiId || null,
