@@ -22,8 +22,35 @@ class InfoSheetsService extends BaseApiService {
         return this.patch<TenderInfoSheetResponse, SaveTenderInfoSheetDto>(`/${tenderId}`, data)
     }
 
-    async autoExtract(tenderId: number): Promise<{ jobId: string; status: string; message: string }> {
-        return this.post<{ jobId: string; status: string; message: string }>(`/${tenderId}/auto-extract`)
+    async autoExtract(tenderId: number, force?: boolean): Promise<{ jobId: string; status: string; message: string }> {
+        return this.post<{ jobId: string; status: string; message: string }>(`/${tenderId}/auto-extract`, { force })
+    }
+
+    async getSavedExtraction(tenderId: number): Promise<{
+        tenderId: number;
+        fields: Record<string, { value: unknown; confidence: string; source: string | null }>;
+        missing_fields: string[];
+        extraction_version: string;
+        processing_time_ms: number;
+        updatedAt: string;
+    } | null> {
+        try {
+            return await this.get(`/${tenderId}/extraction`)
+        } catch {
+            return null
+        }
+    }
+
+    async saveExtraction(
+        tenderId: number,
+        data: {
+            fields: Record<string, unknown>;
+            missing_fields?: string[];
+            extraction_version?: string;
+            processing_time_ms?: number;
+        },
+    ): Promise<{ success: boolean; tenderId: number; fieldsCount: number; verified: boolean }> {
+        return this.post(`/${tenderId}/extraction/save`, data)
     }
 
     async getAutoExtractStatus(jobId: string): Promise<{

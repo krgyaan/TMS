@@ -5,6 +5,7 @@ export interface VolksAiExtractionPayload {
     atcPaths: string[];
     boqPath: string | null;
     userId: number;
+    force?: boolean;
 }
 
 export interface PdfExtractionJobData {
@@ -14,6 +15,7 @@ export interface PdfExtractionJobData {
     atcPaths?: string[];
     boqPath?: string | null;
     userId: number;
+    force?: boolean;
 }
 
 export interface PdfExtractionFieldValue<T = unknown> {
