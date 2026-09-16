@@ -26,7 +26,6 @@ export const PAYMENT_AGAINST_LABELS: Record<string, string> = {
     AU_5242: 'AU Current Account (AU_5242)',
     AU_5180: 'AU Inflow Account (AU_5180)',
     AU_5190: 'AU Expenses Account (AU_5190)',
-    AU_8316: 'AU Outflow Account (AU_8316)',
     AU_9589: 'AU EMD Account (AU_9589)',
     AU_9284: 'AU Cash Reserve Account (AU_9284)',
     amex_cc: 'Amex Company Credit Card',
@@ -37,7 +36,17 @@ export const PAYMENT_AGAINST_LABELS: Record<string, string> = {
     insurance: 'Insurance',
     YES_BANK_2011: 'Yes Bank Inflow Account (2011)',
     YES_BANK_0771: "Yes Bank (0771)",
-    gem_charges: 'GeM Charges'
+    inventory_purchase: 'Inventory Purchase',
+    gem_charges: 'GeM Charges',
+    registration_charges: 'Registration Charges',
+    pop_charges: 'POP Charges',
+    bank_charges: 'Bank Charges',
+    cc_ac_interest: 'CC A/C Interest',
+    esi: 'ESI',
+    pf: 'PF',
+    gst: 'GST',
+    tds: 'TDS',
+    income_tax: 'Income Tax',
 };
 
 export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {

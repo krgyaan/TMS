@@ -55,7 +55,7 @@ export class PaymentRequestService {
         const requestNo = body.requestNo || await this.generateNumber(body.projectName);
 
         // WC insurance gate: block PO/VWO/Others payment requests if no active WC policy
-        if (body.projectId && body.paymentAgainst && !["insurance", "imprest"].includes(body.paymentAgainst)) {
+        if (body.projectId && body.paymentAgainst && !["insurance", "imprest", "gem_charges"].includes(body.paymentAgainst)) {
             const [project] = await this.db
                 .select({ insuranceRequired: projects.insuranceRequired })
                 .from(projects)

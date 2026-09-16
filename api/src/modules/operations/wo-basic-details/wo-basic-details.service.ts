@@ -472,12 +472,12 @@ export class WoBasicDetailsService {
         }
 
         // Create Project asynchronously (non-blocking)
-        this.safeCreateProject(data, row?.id, userId);
+        this.safeCreateProject(data, row?.id, userId, insertValues.projectName ?? null);
 
         return this.mapRowToResponse(row!);
     }
 
-    private async safeCreateProject(data: CreateWoBasicDetailDto, woBasicDetailId?: number, currentUserId?: number): Promise<void> {
+    private async safeCreateProject(data: CreateWoBasicDetailDto, woBasicDetailId?: number, currentUserId?: number, actualProjectName?: string | null): Promise<void> {
         if (!woBasicDetailId) return;
 
         setImmediate(async () => {
@@ -544,7 +544,7 @@ export class WoBasicDetailsService {
                     locationId: locationId ?? null,
                     poNo: data.woNumber ?? null,
                     projectCode: data.projectCode ?? null,
-                    projectName: data.projectName ?? null,
+                    projectName: actualProjectName ?? data.projectName ?? null,
                     poUpload: data.woDraft ?? null,
                     poDate: this.parseDate(data.woDate),
                     performanceProof: null,

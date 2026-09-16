@@ -154,8 +154,8 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
 
     useEffect(() => {
         if (derivedCode) form.setValue("projectCode", derivedCode);
-        if (derivedName) form.setValue("projectName", derivedName);
-    }, [derivedCode, derivedName, form]);
+        if (derivedName && !projectNameSuffix) form.setValue("projectName", derivedName);
+    }, [derivedCode, derivedName, form, projectNameSuffix]);
 
     // Auto-calculate Margin if manually edited
     useEffect(() => {
