@@ -21,6 +21,7 @@ export interface BidTenderRow {
     gstValues: string;
     bidStatus: "Submission Pending" | "Bid Submitted" | "Tender Missed";
     tenderStatus: number;
+    submissionDatetime: Date | null;
 }
 
 export interface RfqInfoRow {
@@ -91,6 +92,18 @@ export interface OemPerformanceResponse {
     summary: OemSummary;
     notAllowedTenders: NotAllowedTenderRow[];
     rfqsSentToOem: RfqSentToOemRow[];
+    monthlyTrend: MonthlyTrendPoint[];
+}
+
+// ─── Monthly trend (Won / Missed / Lost per calendar month) ───────────────────
+
+export interface MonthlyTrendPoint {
+    month: string; // "2024-01" — sortable key
+    label: string; // "Jan '24" — display label
+    won: number;
+    missed: number;
+    lost: number;
+    total: number; // won + missed + lost
 }
 
 // ─── Reason map (Laravel's TenderInfo::REASON) ────────────────────────────────

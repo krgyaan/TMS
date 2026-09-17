@@ -61,6 +61,16 @@ export interface OemPerformanceResponse {
     summary: OemSummary;
     notAllowedTenders: NotAllowedTenderRow[];
     rfqsSentToOem: RfqSentToOemRow[];
+    monthlyTrend: MonthlyTrendPoint[];
+}
+
+export interface MonthlyTrendPoint {
+    month: string; // "2024-01" — sortable key
+    label: string; // "Jan '24" — display label
+    won: number;
+    missed: number;
+    lost: number;
+    total: number; // won + missed + lost
 }
 
 /* ===================== COMPONENT TYPES (produced by the mapper) ===================== */
@@ -123,6 +133,7 @@ export interface OemComponentData {
     scoring: OemScoring;
     trends: []; // Not in Laravel module — empty, retained for component compat
     tendersByKpi: TendersByKpi;
+    monthlyTrend: MonthlyTrendPoint[];
 }
 
 /** Params accepted by useOemPerformance / the report endpoint */

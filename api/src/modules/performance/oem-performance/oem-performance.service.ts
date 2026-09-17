@@ -17,6 +17,7 @@ import type { OemPerformanceQuery } from "./zod/oem-performance.dto";
 import {
     TENDER_REASON_MAP,
     type BidTenderRow,
+    type MonthlyTrendPoint,
     type NotAllowedTenderRow,
     type OemPerformanceResponse,
     type OemSummary,
@@ -75,10 +76,11 @@ export class OemPerformanceService {
             const notAllowedTenders = this.buildNotAllowedTenders(tenderRows);
             const rfqsSentToOem = this.buildRfqsSentToOem(tenderRows, rfqInfoByTender);
             const summary = this.buildSummary(tenderRows, bidRows);
+            const monthlyTrend = this.buildMonthlyTrend(bidRows);
 
             this.logger.info("OEM performance computed", { oem });
 
-            return { summary, notAllowedTenders, rfqsSentToOem };
+            return { summary, notAllowedTenders, rfqsSentToOem, monthlyTrend };
         } catch (error) {
             const e = error as Error;
             this.logger.error("Failed to fetch OEM performance", {
@@ -130,6 +132,7 @@ export class OemPerformanceService {
                 gstValues: tenderInfos.gstValues,
                 bidStatus: bidSubmissions.status,
                 tenderStatus: tenderInfos.status,
+                submissionDatetime: bidSubmissions.submissionDatetime,
             })
             .from(bidSubmissions)
             .innerJoin(tenderInfos, eq(tenderInfos.id, bidSubmissions.tenderId))
@@ -225,6 +228,40 @@ export class OemPerformanceService {
         }
 
         return summary;
+    }
+
+    // ─── Monthly trend: Won / Missed / Lost counts per calendar month ────────
+
+    private buildMonthlyTrend(bids: BidTenderRow[]): MonthlyTrendPoint[] {
+        const byMonth = new Map<string, MonthlyTrendPoint>();
+
+        for (const row of bids) {
+            if (!row.submissionDatetime) continue;
+
+            const s = Number(row.tenderStatus);
+            const bucket = (STATUS.WON as readonly number[]).includes(s)
+                ? "won"
+                : (STATUS.MISSED as readonly number[]).includes(s)
+                  ? "missed"
+                  : (STATUS.LOST as readonly number[]).includes(s)
+                    ? "lost"
+                    : null;
+
+            if (!bucket) continue;
+
+            const month = format(row.submissionDatetime, "yyyy-MM");
+            let point = byMonth.get(month);
+
+            if (!point) {
+                point = { month, label: format(row.submissionDatetime, "MMM ''yy"), won: 0, missed: 0, lost: 0, total: 0 };
+                byMonth.set(month, point);
+            }
+
+            point[bucket] += 1;
+            point.total += 1;
+        }
+
+        return [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month));
     }
 
     // ─── Utilities ────────────────────────────────────────────────────────────

@@ -12,6 +12,7 @@ import OemFilterCard from "./components/OemFilterCard";
 import TendersNotAllowedTable from "./components/TendersNotAllowedTable";
 import RfqsSentTable from "./components/RfqsSentTable";
 import KpiTenderTable from "./components/KpiTenderTable";
+import MonthlyTrendChart from "./components/MonthlyTrendChart";
 
 export default function OemPerformancePage() {
     const [selectedOemId, setSelectedOemId] = useState<number | null>();
@@ -167,6 +168,7 @@ export default function OemPerformancePage() {
                     <KpiTenderTable title="Tenders Won" description="Tenders that were won." tenders={tendersWon} />
                     <KpiTenderTable title="Tenders Lost" description="Tenders that were lost." tenders={tendersLost} />
                     <RfqsSentTable params={appliedParams} />
+                    <MonthlyTrendChart params={appliedParams} />
                 </>
             )}
         </div>

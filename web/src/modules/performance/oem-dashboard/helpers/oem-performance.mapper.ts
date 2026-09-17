@@ -78,7 +78,7 @@ export function mapOemPerformance(raw: OemPerformanceResponse): OemComponentData
         tenderResultsAwaited: toListItems(summary.tenderResultsAwaited, "Results Awaited"),
     };
 
-    return { summary: flatSummary, scoring, trends: [], tendersByKpi };
+    return { summary: flatSummary, scoring, trends: [], tendersByKpi, monthlyTrend: raw.monthlyTrend ?? [] };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
