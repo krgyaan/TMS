@@ -22,6 +22,7 @@ export interface PaymentRequestRow {
     uploadInvoiceAfterPayment: string[];
     remark?: string;
     status: string;
+    tdsPercentage?: number | string;
     requestedBy: string;
     requestedByName?: string;
     utrNumber?: string;

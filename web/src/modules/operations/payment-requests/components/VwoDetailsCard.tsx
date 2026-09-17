@@ -11,7 +11,7 @@ interface VwoDetailsCardProps {
 }
 
 export const VwoDetailsCard: React.FC<VwoDetailsCardProps> = ({ vwo, requestAmount }) => {
-    const cap = vwo.amountAfterTds ? Number(vwo.amountAfterTds) : Number(vwo.grandTotal || 0);
+    const cap = Number(vwo.grandTotal || 0);
     const remaining = cap - Number(vwo.totalPaymentRequested || 0);
     const isExhausted = remaining <= 0;
     const exceedsRemaining = requestAmount != null && requestAmount > 0 && requestAmount > remaining;
@@ -43,19 +43,6 @@ export const VwoDetailsCard: React.FC<VwoDetailsCardProps> = ({ vwo, requestAmou
                     <span>Grand Total:</span>
                     <span>{formatINR(vwo.grandTotal || 0)}</span>
                 </div>
-                {vwo.tdsPercentage && Number(vwo.tdsPercentage) > 0 && (
-                    <>
-                        <div className="border-t my-1.5" />
-                        <div className="flex justify-between text-destructive">
-                            <span>TDS @ {Number(vwo.tdsPercentage)}%:</span>
-                            <span>-{formatINR(vwo.tdsAmount || 0)}</span>
-                        </div>
-                        <div className="flex justify-between font-semibold">
-                            <span>Amount After TDS:</span>
-                            <span>{formatINR(vwo.amountAfterTds || 0)}</span>
-                        </div>
-                    </>
-                )}
                 <div className="border-t my-1.5" />
                 <div className="flex justify-between">
                     <span className="text-muted-foreground">Payment Requested:</span>

@@ -9,6 +9,7 @@ import { fileUploadService } from "@/services/api/file-upload.service";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
+import { calculateTds } from "@/modules/operations/payment-requests/helpers/tds-calculator";
 import { PAYMENT_AGAINST_LABELS, STATUS_CONFIG } from "../constants";
 
 interface PaymentRequestDetailFieldsProps {
@@ -40,6 +41,18 @@ export const PaymentRequestDetailFields: React.FC<PaymentRequestDetailFieldsProp
             <Label className="text-muted-foreground text-xs">Amount</Label>
             <p className="font-medium">{formatINR(detail.amount)}</p>
         </div>
+        {Number(detail.tdsPercentage) > 0 && (() => {
+            const { tdsAmount, netPayable } = calculateTds(Number(detail.amount), Number(detail.tdsPercentage));
+            return (
+                <div className="col-span-2 mt-2">
+                    <Label className="text-muted-foreground text-xs">Net Payable</Label>
+                    <p className="font-medium text-green-500">{formatINR(netPayable)}</p>
+                    <Label className="text-muted-foreground text-xs font-mono">
+                        TDS @ {Number(detail.tdsPercentage)}% (-{formatINR(tdsAmount)}) = Net Payable {formatINR(netPayable)}
+                    </Label>
+                </div>
+            );
+        })()}
         <div>
             <Label className="text-muted-foreground text-xs">Account Number</Label>
             <p className="font-mono">{detail.accountNumber}</p>
