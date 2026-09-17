@@ -1,5 +1,6 @@
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import { FileUploader } from "@/components/file-upload";
+import { Combobox, type SelectOption } from "@/components/form/SelectField";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -119,6 +120,11 @@ const CombinedPaymentRequestListPage: React.FC = () => {
         rejected: visibleRows.filter((r) => r.status === "rejected").length,
     }), [visibleRows]);
 
+    const revertStatusOptions: SelectOption[] = useMemo(
+        () => Object.entries(STATUS_CONFIG).map(([key, config]) => ({ id: key, name: config.label })),
+        [],
+    );
+
     const onGridReady = useCallback((event: GridReadyEvent<PaymentRequestRow>) => {
         setGridApi(event.api);
     }, []);
@@ -197,7 +203,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
         try {
             await revertMutation.mutateAsync({
                 id: revertRow.id,
-                data: { status: revertStatus, remark: revertRemark.trim() },
+                data: { status: revertStatus, remark: `Status Reverted - ${revertRemark.trim()}` },
             });
             toast.success("Payment request reverted successfully");
             setRevertRow(null);
@@ -716,17 +722,12 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="revert-status">New Status <span className="text-destructive">*</span></Label>
-                                <select
-                                    id="revert-status"
+                                <Combobox
                                     value={revertStatus}
-                                    onChange={(e) => setRevertStatus(e.target.value)}
-                                    className="w-full border rounded-md px-3 py-2 text-sm"
-                                >
-                                    <option value="">Select status...</option>
-                                    {Object.entries(STATUS_CONFIG).map(([key, config]) => (
-                                        <option key={key} value={key}>{config.label}</option>
-                                    ))}
-                                </select>
+                                    onChange={setRevertStatus}
+                                    options={revertStatusOptions}
+                                    placeholder="Select status..."
+                                />
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="revert-remark">Remark <span className="text-destructive">*</span></Label>
