@@ -418,6 +418,47 @@ export class PaymentRequestService {
         return ben.userId;
     }
 
+    async revertStatus(id: number, body: { status: string; remark: string }) {
+        const existing = await this.db
+            .select()
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, id))
+            .then(rows => rows[0]);
+        if (!existing) throw new NotFoundException("Payment Request not found");
+
+        const allowedSourceStatuses = ["rejected", "payment_done", "maker_done"];
+        if (!allowedSourceStatuses.includes(existing.status)) {
+            throw new BadRequestException(
+                `Cannot revert from "${existing.status}". Only rejected, payment_done, or maker_done can be reverted.`
+            );
+        }
+
+        const allStatuses = ["pending", "po_approval_pending", "maker_done", "payment_done", "rejected"];
+        if (!allStatuses.includes(body.status)) {
+            throw new BadRequestException(`Invalid target status "${body.status}"`);
+        }
+
+        return await this.db.transaction(async tx => {
+            const updated = (
+                await tx
+                    .update(paymentRequests)
+                    .set({
+                        status: body.status,
+                        remark: body.remark,
+                        utrNumber: existing.status === "payment_done" ? null : existing.utrNumber,
+                        rejectionReason: existing.status === "rejected" ? null : existing.rejectionReason,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(paymentRequests.id, id))
+                    .returning()
+            )[0];
+
+            this.logger.info(`Payment Request #${id} reverted from "${existing.status}" to "${body.status}"`);
+
+            return updated;
+        });
+    }
+
     async uploadInvoiceAfterPayment(id: number, files: string[]) {
         const existing = await this.db
             .select({ id: paymentRequests.id })

@@ -13,7 +13,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
-import { useAllPaymentRequests, usePaymentRequestDetails, useUpdatePaymentRequestStatus, useUploadPaymentInvoiceAfterPayment } from "@/hooks/api/useProjectPaymentRequests";
+import { useAllPaymentRequests, usePaymentRequestDetails, useUpdatePaymentRequestStatus, useUploadPaymentInvoiceAfterPayment, useRevertPaymentRequestStatus } from "@/hooks/api/useProjectPaymentRequests";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
@@ -26,7 +26,7 @@ import { purchaseOrderApi } from "@/services/api/purchase-order.api";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { Ban, Banknote, CheckCircle2, Copy, Eye, Search, Upload } from "lucide-react";
+import { Ban, Banknote, CheckCircle2, Copy, Eye, RotateCcw, Search, Upload } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
@@ -58,6 +58,11 @@ const CombinedPaymentRequestListPage: React.FC = () => {
     const [uploadInvoiceFiles, setUploadInvoiceFiles] = useState<string[]>([]);
     const [uploadInvoiceError, setUploadInvoiceError] = useState("");
     const uploadInvoiceMutation = useUploadPaymentInvoiceAfterPayment();
+
+    const [revertRow, setRevertRow] = useState<PaymentRequestRow | null>(null);
+    const [revertStatus, setRevertStatus] = useState("");
+    const [revertRemark, setRevertRemark] = useState("");
+    const revertMutation = useRevertPaymentRequestStatus();
 
     const rows = useMemo(() => (data ?? []) as PaymentRequestRow[], [data]);
 
@@ -133,6 +138,12 @@ const CombinedPaymentRequestListPage: React.FC = () => {
         setUploadInvoiceError("");
     }, []);
 
+    const handleRevert = useCallback((row: PaymentRequestRow) => {
+        setRevertRow(row);
+        setRevertStatus("");
+        setRevertRemark("");
+    }, []);
+
     const CATEGORIES_NEED_INVOICE_AFTER_PAYMENT = useMemo(() => new Set([
         'rent', 'software', 'printing_stationary', 'office_maintenance', 'portal_renewal_charges', 'professional_charges',
         'gem_charges',
@@ -181,6 +192,22 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             setRejectRow(null); setRejectionReason(""); } catch {}
     }, [rejectRow, rejectionReason, updateStatusMutation]);
 
+    const confirmRevert = useCallback(async () => {
+        if (!revertRow || !revertStatus || !revertRemark.trim()) return;
+        try {
+            await revertMutation.mutateAsync({
+                id: revertRow.id,
+                data: { status: revertStatus, remark: revertRemark.trim() },
+            });
+            toast.success("Payment request reverted successfully");
+            setRevertRow(null);
+            setRevertStatus("");
+            setRevertRemark("");
+        } catch {
+            toast.error("Failed to revert payment request");
+        }
+    }, [revertRow, revertStatus, revertRemark, revertMutation]);
+
     const actions: ActionItem<PaymentRequestRow>[] = useMemo(() => [
         { label: "View Details", icon: <Eye className="h-4 w-4" />, onClick: handleView },
         { label: "Maker Done", icon: <CheckCircle2 className="h-4 w-4" />, onClick: handleMakerDone, visible: (row) => row.status === "pending" },
@@ -192,7 +219,13 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             visible: (row) => row.status !== "rejected" && row.status !== "po_approval_pending" && CATEGORIES_NEED_INVOICE_AFTER_PAYMENT.has(row.paymentAgainst),
         },
         { label: "Reject", icon: <Ban className="h-4 w-4" />, onClick: handleReject, className: "text-red-600", visible: (row) => row.status === "pending" || row.status === "maker_done" },
-    ], [handleView, handleMakerDone, handlePaymentDone, handleUploadInvoice, handleReject, CATEGORIES_NEED_INVOICE_AFTER_PAYMENT]);
+        {
+            label: "Revert",
+            icon: <RotateCcw className="h-4 w-4" />,
+            onClick: handleRevert,
+            visible: (row) => !isOperationsSection && ["rejected", "payment_done", "maker_done"].includes(row.status),
+        },
+    ], [handleView, handleMakerDone, handlePaymentDone, handleUploadInvoice, handleReject, handleRevert, CATEGORIES_NEED_INVOICE_AFTER_PAYMENT, isOperationsSection]);
 
     const columns = useMemo<ColDef<PaymentRequestRow>[]>(() => [
         {
@@ -661,6 +694,50 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                         <Button variant="outline" onClick={() => { setUploadInvoiceRow(null); setUploadInvoiceFiles([]); setUploadInvoiceError(""); }}>Cancel</Button>
                         <Button onClick={confirmUploadInvoice} disabled={uploadInvoiceMutation.isPending}>
                             {uploadInvoiceMutation.isPending ? "Uploading..." : "Submit"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Revert Status Dialog */}
+            <Dialog open={revertRow !== null} onOpenChange={(open) => { if (!open) { setRevertRow(null); setRevertStatus(""); setRevertRemark(""); } }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Revert Payment Request</DialogTitle>
+                        <DialogDescription>Change the status of this payment request</DialogDescription>
+                    </DialogHeader>
+                    {revertRow &&
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-1">
+                                <p className="text-sm"><strong>Request No:</strong> {revertRow.requestNo}</p>
+                                <p className="text-sm"><strong>Party:</strong> {revertRow.partyName}</p>
+                                <p className="text-sm"><strong>Amount:</strong> {formatINR(revertRow.amount)}</p>
+                                <p className="text-sm"><strong>Current Status:</strong> <Badge variant="outline" className={STATUS_CONFIG[revertRow.status]?.color || ""}>{STATUS_CONFIG[revertRow.status]?.label || revertRow.status}</Badge></p>
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="revert-status">New Status <span className="text-destructive">*</span></Label>
+                                <select
+                                    id="revert-status"
+                                    value={revertStatus}
+                                    onChange={(e) => setRevertStatus(e.target.value)}
+                                    className="w-full border rounded-md px-3 py-2 text-sm"
+                                >
+                                    <option value="">Select status...</option>
+                                    {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                                        <option key={key} value={key}>{config.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="revert-remark">Remark <span className="text-destructive">*</span></Label>
+                                <Textarea id="revert-remark" value={revertRemark} onChange={(e) => setRevertRemark(e.target.value)} placeholder="Explain why this request is being reverted..." rows={3} />
+                            </div>
+                        </div>
+                    }
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => { setRevertRow(null); setRevertStatus(""); setRevertRemark(""); }}>Cancel</Button>
+                        <Button onClick={confirmRevert} disabled={!revertStatus || !revertRemark.trim() || revertMutation.isPending}>
+                            {revertMutation.isPending ? "Reverting..." : "Revert"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
