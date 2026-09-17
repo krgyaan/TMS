@@ -100,7 +100,7 @@ export default function TendersNotAllowedTable({ params }: TendersNotAllowedTabl
             <CardHeader className="pb-4">
                 <div className="flex items-center justify-between gap-2">
                     <div>
-                        <CardTitle className="text-base font-semibold">Tenders Not Allowed by This OEM</CardTitle>
+                        <CardTitle className="text-base font-semibold">Tenders Not Allowed to Bid</CardTitle>
                         <CardDescription>List of tenders that could not proceed due to OEM specific restrictions or policies.</CardDescription>
                     </div>
                     <Badge variant="secondary">{tenders.length}</Badge>

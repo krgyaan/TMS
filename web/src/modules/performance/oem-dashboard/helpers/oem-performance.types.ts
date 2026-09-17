@@ -107,6 +107,9 @@ export interface TendersByKpi {
     tendersWon: TenderListItem[];
     tendersLost: TenderListItem[];
     tendersSubmitted: TenderListItem[];
+    tendersMissed: TenderListItem[];
+    tendersDisqualified: TenderListItem[];
+    tenderResultsAwaited: TenderListItem[];
     tendersNotAllowed: NotAllowedTenderRow[];
     rfqsSent: RfqSentToOemRow[];
     rfqsResponded: TenderListItem[];

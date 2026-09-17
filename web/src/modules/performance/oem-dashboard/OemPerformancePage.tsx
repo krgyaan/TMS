@@ -5,13 +5,13 @@ import { Download } from "lucide-react";
 
 import { useVendorOrganizations } from "@/hooks/api/useVendorOrganizations";
 import { useOemPerformance } from "@/hooks/api/useOemPerformance";
-import type { OemPerformanceParams } from "./helpers/oem-performance.types";
+import type { OemPerformanceParams, TenderListItem } from "./helpers/oem-performance.types";
 import { exportToCSV } from "./helpers/oem-performance.mapper";
 
 import OemFilterCard from "./components/OemFilterCard";
 import TendersNotAllowedTable from "./components/TendersNotAllowedTable";
 import RfqsSentTable from "./components/RfqsSentTable";
-import WorkedWithOemTable from "./components/WorkedWithOemTable";
+import KpiTenderTable from "./components/KpiTenderTable";
 
 export default function OemPerformancePage() {
     const [selectedOemId, setSelectedOemId] = useState<number | null>();
@@ -36,6 +36,12 @@ export default function OemPerformancePage() {
 
     const tendersNotAllowed = useMemo(() => data?.tendersByKpi.tendersNotAllowed ?? [], [data]);
     const rfqsSent = useMemo(() => data?.tendersByKpi.rfqsSent ?? [], [data]);
+    const tendersMissed = useMemo(() => data?.tendersByKpi.tendersMissed ?? [], [data]);
+    const tendersDisqualified = useMemo(() => data?.tendersByKpi.tendersDisqualified ?? [], [data]);
+    const tenderResultsAwaited = useMemo(() => data?.tendersByKpi.tenderResultsAwaited ?? [], [data]);
+    const tendersBid = useMemo(() => data?.tendersByKpi.tendersSubmitted ?? [], [data]);
+    const tendersWon = useMemo(() => data?.tendersByKpi.tendersWon ?? [], [data]);
+    const tendersLost = useMemo(() => data?.tendersByKpi.tendersLost ?? [], [data]);
 
     const handleExportReport = useCallback(() => {
         const selectedOem = oems.find(o => o.id === selectedOemId);
@@ -76,6 +82,33 @@ export default function OemPerformancePage() {
             });
         });
 
+        // Add lifecycle buckets
+        const lifecycleSections: { section: string; rows: TenderListItem[] }[] = [
+            { section: "Tenders Missed", rows: tendersMissed },
+            { section: "Tenders Bid", rows: tendersBid },
+            { section: "Tender Results Awaited", rows: tenderResultsAwaited },
+            { section: "Tenders Disqualified", rows: tendersDisqualified },
+            { section: "Tenders Won", rows: tendersWon },
+            { section: "Tenders Lost", rows: tendersLost },
+        ];
+
+        for (const { section, rows } of lifecycleSections) {
+            for (const t of rows) {
+                allData.push({
+                    section,
+                    member: t.teamMember,
+                    team: t.team,
+                    tenderName: t.tenderName,
+                    tenderNo: t.tenderNo,
+                    gstValue: String(t.value),
+                    dueDate: "",
+                    reason: "",
+                    rfqSentOn: "",
+                    rfqResponseOn: "",
+                });
+            }
+        }
+
         const headers = [
             { key: "section", label: "Section" },
             { key: "member", label: "Team Member" },
@@ -91,7 +124,7 @@ export default function OemPerformancePage() {
 
         const filename = `OEM_Performance_Report_${oemName}_${fromDate}_to_${toDate}`;
         exportToCSV(allData, filename, headers);
-    }, [tendersNotAllowed, rfqsSent, oems, selectedOemId, fromDate, toDate]);
+    }, [tendersNotAllowed, rfqsSent, tendersMissed, tendersBid, tenderResultsAwaited, tendersDisqualified, tendersWon, tendersLost, oems, selectedOemId, fromDate, toDate]);
 
     return (
         <div className="space-y-6">
@@ -108,13 +141,7 @@ export default function OemPerformancePage() {
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent>
-                    {!appliedParams && (
-                        <p className="text-sm text-muted-foreground">
-                            No report selected. Please select an OEM and a date range, then press Submit.
-                        </p>
-                    )}
-                </CardContent>
+                <CardContent />
             </Card>
 
             <OemFilterCard
@@ -133,8 +160,13 @@ export default function OemPerformancePage() {
             {appliedParams && (
                 <>
                     <TendersNotAllowedTable params={appliedParams} />
+                    <KpiTenderTable title="Tenders Missed" description="Tenders that were missed for submission." tenders={tendersMissed} />
+                    <KpiTenderTable title="Tenders Bid" description="Tenders where a bid has been submitted." tenders={tendersBid} />
+                    <KpiTenderTable title="Tender Results Awaited" description="Tenders awaiting final results." tenders={tenderResultsAwaited} />
+                    <KpiTenderTable title="Tenders Disqualified" description="Tenders that were disqualified." tenders={tendersDisqualified} />
+                    <KpiTenderTable title="Tenders Won" description="Tenders that were won." tenders={tendersWon} />
+                    <KpiTenderTable title="Tenders Lost" description="Tenders that were lost." tenders={tendersLost} />
                     <RfqsSentTable params={appliedParams} />
-                    <WorkedWithOemTable params={appliedParams} />
                 </>
             )}
         </div>

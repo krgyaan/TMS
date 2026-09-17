@@ -73,6 +73,9 @@ export function mapOemPerformance(raw: OemPerformanceResponse): OemComponentData
         rfqsResponded: respondedItems,
         winRate: wonItems, // same bucket
         rfqResponseRate: respondedItems, // same bucket
+        tendersMissed: toListItems(summary.tendersMissed, "Missed"),
+        tendersDisqualified: toListItems(summary.tendersDisqualified, "Disqualified"),
+        tenderResultsAwaited: toListItems(summary.tenderResultsAwaited, "Results Awaited"),
     };
 
     return { summary: flatSummary, scoring, trends: [], tendersByKpi };
