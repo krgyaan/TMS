@@ -595,7 +595,7 @@ export class PurchaseOrderService {
             if (pendingPrs.length > 0) {
                 await this.db
                     .update(paymentRequests)
-                    .set({ status: 'pending', updatedAt: new Date() })
+                    .set({ status: 'pending', tdsPercentage: tdsPercentage.toString(), updatedAt: new Date() })
                     .where(and(eq(paymentRequests.purchaseOrderId, id), eq(paymentRequests.status, 'po_approval_pending')));
 
                 for (const pr of pendingPrs) {

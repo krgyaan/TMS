@@ -7,7 +7,9 @@ import { paymentRequests, type PaymentRequest as OperationPaymentRequest } from 
 import { employeeImprestTransactions } from "@/db/schemas/shared/employee-imprest-transaction.schema";
 import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
+import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
+import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-items.schema";
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, desc, eq, like, ne, sql } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
@@ -71,7 +73,7 @@ export class PaymentRequestService {
             }
         }
 
-        // Validate against PO TDS cap
+        // Validate against PO grand total
         if (body.purchaseOrderId) {
             const po = await this.db
                 .select()
@@ -83,31 +85,35 @@ export class PaymentRequestService {
                 throw new NotFoundException("Purchase Order not found");
             }
 
-            if (po?.amountAfterTds) {
-                const amountAfterTds = Number(po.amountAfterTds);
-                const existingSumResult = await this.db
-                    .select({
-                        total: sql<number>`COALESCE(SUM(amount::numeric), 0)`,
-                    })
-                    .from(paymentRequests)
-                    .where(
-                        and(
-                            eq(paymentRequests.purchaseOrderId, body.purchaseOrderId),
-                            ne(paymentRequests.status, 'rejected'),
-                        )
-                    );
-                const existingSum = Number(existingSumResult[0]?.total ?? 0);
-                const requestedAmount = Number(body.amount ?? 0);
+            const poGrandTotalResult = await this.db
+                .select({ total: sql<number>`COALESCE(SUM(total_amount::numeric), 0)` })
+                .from(purchaseOrderProducts)
+                .where(eq(purchaseOrderProducts.purchaseOrderId, body.purchaseOrderId));
+            const poGrandTotal = Number(poGrandTotalResult[0]?.total ?? 0);
 
-                if (existingSum + requestedAmount > amountAfterTds) {
-                    throw new BadRequestException(
-                        `Payment request amount (${requestedAmount}) exceeds remaining PO limit. ` +
-                        `Available: ${amountAfterTds - existingSum}, Already used: ${existingSum}`
-                    );
-                }
+            const existingSumResult = await this.db
+                .select({
+                    total: sql<number>`COALESCE(SUM(amount::numeric), 0)`,
+                })
+                .from(paymentRequests)
+                .where(
+                    and(
+                        eq(paymentRequests.purchaseOrderId, body.purchaseOrderId),
+                        ne(paymentRequests.status, 'rejected'),
+                    )
+                );
+            const existingSum = Number(existingSumResult[0]?.total ?? 0);
+            const requestedAmount = Number(body.amount ?? 0);
+
+            if (existingSum + requestedAmount > poGrandTotal) {
+                throw new BadRequestException(
+                    `Payment request amount (${requestedAmount}) exceeds remaining PO limit. ` +
+                    `Available: ${poGrandTotal - existingSum}, Already used: ${existingSum}`
+                );
             }
         }
 
+        // Validate against VWO grand total
         if (body.vendorWorkOrderId) {
             const wo = await this.db
                 .select()
@@ -119,46 +125,52 @@ export class PaymentRequestService {
                 throw new NotFoundException("Vendor Work Order not found");
             }
 
-            if (wo?.amountAfterTds) {
-                const amountAfterTds = Number(wo.amountAfterTds);
-                const existingSumResult = await this.db
-                    .select({
-                        total: sql<number>`COALESCE(SUM(amount::numeric), 0)`,
-                    })
-                    .from(paymentRequests)
-                    .where(and(eq(paymentRequests.vendorWorkOrderId, body.vendorWorkOrderId), ne(paymentRequests.status, "rejected")));
-                const existingSum = Number(existingSumResult[0]?.total ?? 0);
-                const requestedAmount = Number(body.amount ?? 0);
+            const woGrandTotalResult = await this.db
+                .select({ total: sql<number>`COALESCE(SUM(total_amount::numeric), 0)` })
+                .from(vendorWorkOrderItems)
+                .where(eq(vendorWorkOrderItems.vendorWorkOrderId, body.vendorWorkOrderId));
+            const woGrandTotal = Number(woGrandTotalResult[0]?.total ?? 0);
 
-                if (existingSum + requestedAmount > amountAfterTds) {
-                    throw new BadRequestException(
-                        `Payment request amount (${requestedAmount}) exceeds remaining WO limit. ` +
-                        `Available: ${amountAfterTds - existingSum}, Already used: ${existingSum}`,
-                    );
-                }
+            const existingSumResult = await this.db
+                .select({
+                    total: sql<number>`COALESCE(SUM(amount::numeric), 0)`,
+                })
+                .from(paymentRequests)
+                .where(and(eq(paymentRequests.vendorWorkOrderId, body.vendorWorkOrderId), ne(paymentRequests.status, "rejected")));
+            const existingSum = Number(existingSumResult[0]?.total ?? 0);
+            const requestedAmount = Number(body.amount ?? 0);
+
+            if (existingSum + requestedAmount > woGrandTotal) {
+                throw new BadRequestException(
+                    `Payment request amount (${requestedAmount}) exceeds remaining WO limit. ` +
+                    `Available: ${woGrandTotal - existingSum}, Already used: ${existingSum}`,
+                );
             }
         }
 
         // Determine initial status based on PO/VWO approval
         let initialStatus = 'pending';
+        let tdsPercentage: number | null = null;
         if (body.purchaseOrderId) {
             const po = await this.db
-                .select({ poApproved: purchaseOrders.poApproved })
+                .select({ poApproved: purchaseOrders.poApproved, tdsPercentage: purchaseOrders.tdsPercentage })
                 .from(purchaseOrders)
                 .where(eq(purchaseOrders.id, body.purchaseOrderId))
                 .then(rows => rows[0]);
             if (po && po.poApproved !== true) {
                 initialStatus = 'po_approval_pending';
             }
+            if (po?.tdsPercentage) tdsPercentage = Number(po.tdsPercentage);
         } else if (body.vendorWorkOrderId) {
             const wo = await this.db
-                .select({ woApproved: vendorWorkOrders.woApproved })
+                .select({ woApproved: vendorWorkOrders.woApproved, tdsPercentage: vendorWorkOrders.tdsPercentage })
                 .from(vendorWorkOrders)
                 .where(eq(vendorWorkOrders.id, body.vendorWorkOrderId))
                 .then(rows => rows[0]);
             if (wo && wo.woApproved !== true) {
                 initialStatus = 'po_approval_pending';
             }
+            if (wo?.tdsPercentage) tdsPercentage = Number(wo.tdsPercentage);
         }
 
         const insurance = this.parseInsurancePayload(body.insurance);
@@ -186,6 +198,7 @@ export class PaymentRequestService {
                     billFiles: body.billFiles || [],
                     remark: body.remark,
                     status: initialStatus,
+                    tdsPercentage: tdsPercentage?.toString() ?? null,
                     requestedBy: userId,
                 })
                 .returning();
@@ -508,6 +521,7 @@ export class PaymentRequestService {
         utrNumber: paymentRequests.utrNumber,
         rejectionReason: paymentRequests.rejectionReason,
         status: paymentRequests.status,
+        tdsPercentage: paymentRequests.tdsPercentage,
         requestedBy: paymentRequests.requestedBy,
         createdAt: paymentRequests.createdAt,
         updatedAt: paymentRequests.updatedAt,
