@@ -71,7 +71,7 @@ export class OemPerformanceService {
                 this.fetchRfqInfo(oem, from, to),
             ]);
 
-            const rfqInfoByTender = new Map(rfqInfoRows.map(r => [r.tenderId, r]));
+            const rfqInfoByTender = new Map(rfqInfoRows.map(r => [Number(r.tenderId), r]));
 
             const notAllowedTenders = this.buildNotAllowedTenders(tenderRows);
             const rfqsSentToOem = this.buildRfqsSentToOem(tenderRows, rfqInfoByTender);
@@ -147,19 +147,20 @@ export class OemPerformanceService {
 
     private async fetchRfqInfo(oem: number, from: Date, to: Date): Promise<RfqInfoRow[]> {
         const { rows } = await this.db.execute(sql`
-            SELECT r.tender_id              AS "tenderId",
+            SELECT t.id                     AS "tenderId",
                    MIN(r.created_at)        AS "rfqSentOn",
                    MAX(rr.receipt_datetime) AS "responseOn"
-            FROM rfqs r
-            JOIN tender_infos t ON t.id = r.tender_id
+            FROM tender_infos t
+            LEFT JOIN rfqs r ON r.tender_id = t.id
             LEFT JOIN rfq_responses rr
                    ON rr.rfq_id = r.id
                   AND (   rr.vendor_id IN (SELECT v.id FROM vendors v WHERE v.org_id = ${oem})
-                       OR (COALESCE(rr.vendor_id, 0) = 0 AND ${oem}::text = btrim(t.rfq_to)) )
+                       OR (COALESCE(rr.vendor_id, 0) = 0 AND ${oem}::text = btrim(coalesce(t.rfq_to::text, ''))) )
             WHERE t.due_date BETWEEN ${from} AND ${to}
               AND t.delete_status = 0
-              AND ${oem}::text = ANY(regexp_split_to_array(btrim(t.rfq_to), '\\s*,\\s*'))
-            GROUP BY r.tender_id
+              AND ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(t.rfq_to::text, '')), '\\s*,\\s*'))
+            GROUP BY t.id
+            HAVING COUNT(r.id) > 0
         `);
         return rows as unknown as RfqInfoRow[];
     }
@@ -196,6 +197,7 @@ export class OemPerformanceService {
                     team: t.teamName ?? "—",
                     rfqSentOn: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
                     rfqResponseOn: info?.responseOn ? format(info.responseOn, DATE_FORMAT) : null,
+                    createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
                 };
             });
     }

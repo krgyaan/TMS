@@ -55,6 +55,7 @@ export interface RfqSentToOemRow {
     team: string;
     rfqSentOn: string;
     rfqResponseOn: string | null; // null = not yet responded
+    createdAt: string;
 }
 
 export interface OemPerformanceResponse {

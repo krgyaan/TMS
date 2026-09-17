@@ -58,7 +58,7 @@ export default function RfqsSentTable({ params }: RfqsSentTableProps) {
                 cellRenderer: (p: CustomCellRendererProps<RfqSentToOemRow>) => <span className="tabular-nums">{formatINR(Number(p.value))}</span>,
             },
             { field: "dueDate", headerName: "Due Date", sortable: true, filter: false, width: 170 },
-            { field: "rfqSentOn", headerName: "RFQ Sent On", sortable: true, filter: false, width: 170 },
+            { field: "createdAt", headerName: "Created At", sortable: true, filter: false, width: 170 },
             {
                 field: "rfqResponseOn",
                 headerName: "Response On",
