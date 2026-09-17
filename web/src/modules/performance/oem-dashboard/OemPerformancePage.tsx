@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Download } from "lucide-react";
@@ -16,10 +17,26 @@ import TenderCountBarChart from "./components/TenderCountBarChart";
 import DonutChartPerformance from "./components/DonutChartPerformance";
 
 export default function OemPerformancePage() {
-    const [selectedOemId, setSelectedOemId] = useState<number | null>();
-    const [fromDate, setFromDate] = useState<string | null>();
-    const [toDate, setToDate] = useState<string | null>();
-    const [appliedParams, setAppliedParams] = useState<OemPerformanceParams | null>(null);
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    // Restore filters from the URL so a reload (or shared link) keeps the selection.
+    const [selectedOemId, setSelectedOemId] = useState<number | null>(() => {
+        const raw = new URLSearchParams(location.search).get("oemId");
+        const parsed = raw !== null ? Number(raw) : NaN;
+        return Number.isFinite(parsed) ? parsed : null;
+    });
+    const [fromDate, setFromDate] = useState<string | null>(() => new URLSearchParams(location.search).get("fromDate"));
+    const [toDate, setToDate] = useState<string | null>(() => new URLSearchParams(location.search).get("toDate"));
+    const [appliedParams, setAppliedParams] = useState<OemPerformanceParams | null>(() => {
+        const search = new URLSearchParams(location.search);
+        const rawOemId = search.get("oemId");
+        const oemId = rawOemId !== null ? Number(rawOemId) : NaN;
+        const from = search.get("fromDate");
+        const to = search.get("toDate");
+        if (!Number.isFinite(oemId) || !from || !to) return null;
+        return { oemId, fromDate: from, toDate: to };
+    });
 
     const params = useMemo(() => {
         if (!selectedOemId || !fromDate || !toDate) return null;
@@ -155,7 +172,14 @@ export default function OemPerformancePage() {
                 onFromDate={setFromDate}
                 onToDate={setToDate}
                 onSubmit={() => {
-                    if (params) setAppliedParams(params);
+                    if (!params) return;
+                    setAppliedParams(params);
+                    const search = new URLSearchParams({
+                        oemId: String(params.oemId),
+                        fromDate: params.fromDate,
+                        toDate: params.toDate,
+                    });
+                    navigate({ search: `?${search.toString()}` }, { replace: true });
                 }}
             />
 
