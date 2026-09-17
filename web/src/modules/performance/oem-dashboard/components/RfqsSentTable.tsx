@@ -17,6 +17,7 @@ import type { OemPerformanceParams, RfqSentToOemRow } from "../helpers/oem-perfo
 
 import type { ColDef } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
+import { TenderNameCell } from "@/components/data-grid/renderers/TenderNameCell";
 
 interface RfqsSentTableProps {
     params: OemPerformanceParams | null;
@@ -36,21 +37,15 @@ export default function RfqsSentTable({ params }: RfqsSentTableProps) {
 
     const columnDefs = useMemo<ColDef<RfqSentToOemRow>[]>(
         () => [
-            { field: "team", headerName: "Team", sortable: true, filter: true, width: 130 },
             { field: "member", headerName: "Team Member", sortable: true, filter: true, width: 150 },
             {
-                field: "tenderName",
+                field: "tenderNo",
                 headerName: "Tender",
                 sortable: true,
                 filter: true,
                 flex: 1,
                 minWidth: 220,
-                cellRenderer: (p: CustomCellRendererProps<RfqSentToOemRow>) => (
-                    <div>
-                        <span className="text-sm font-medium">{p.value}</span>
-                        <span className="text-xs text-muted-foreground block">{p.data?.tenderNo}</span>
-                    </div>
-                ),
+                cellRenderer: TenderNameCell,
             },
             {
                 field: "gstValues",

@@ -17,6 +17,7 @@ import type { NotAllowedTenderRow, OemPerformanceParams } from "../helpers/oem-p
 
 import type { ColDef } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
+import { TenderNameCell } from "@/components/data-grid/renderers/TenderNameCell";
 
 interface TendersNotAllowedTableProps {
     params: OemPerformanceParams | null;
@@ -35,21 +36,15 @@ export default function TendersNotAllowedTable({ params }: TendersNotAllowedTabl
 
     const columnDefs = useMemo<ColDef<NotAllowedTenderRow>[]>(
         () => [
-            { field: "team", headerName: "Team", sortable: true, filter: true, width: 130 },
             { field: "member", headerName: "Team Member", sortable: true, filter: true, width: 150 },
             {
-                field: "tenderName",
+                field: "tenderNo",
                 headerName: "Tender",
                 sortable: true,
                 filter: true,
                 flex: 1,
                 minWidth: 220,
-                cellRenderer: (p: CustomCellRendererProps<NotAllowedTenderRow>) => (
-                    <div>
-                        <span className="text-sm font-medium">{p.value}</span>
-                        <span className="text-xs text-muted-foreground block">{p.data?.tenderNo}</span>
-                    </div>
-                ),
+                cellRenderer: TenderNameCell,
             },
             {
                 field: "gstValues",

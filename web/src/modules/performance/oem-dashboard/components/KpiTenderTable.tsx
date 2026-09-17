@@ -15,6 +15,7 @@ import type { TenderListItem } from "../helpers/oem-performance.types";
 
 import type { ColDef } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
+import { TenderNameCell } from "@/components/data-grid/renderers/TenderNameCell";
 
 interface KpiTenderTableProps {
     title: string;
@@ -33,18 +34,13 @@ export default function KpiTenderTable({ title, description, tenders }: KpiTende
     const columnDefs = useMemo<ColDef<TenderListItem>[]>(
         () => [
             {
-                field: "tenderName",
+                field: "tenderNo",
                 headerName: "Tender",
                 sortable: true,
                 filter: true,
                 flex: 1,
                 minWidth: 200,
-                cellRenderer: (p: CustomCellRendererProps<TenderListItem>) => (
-                    <div>
-                        <span className="text-sm font-medium">{p.value}</span>
-                        <span className="text-xs text-muted-foreground block">{p.data?.tenderNo}</span>
-                    </div>
-                ),
+                cellRenderer: TenderNameCell,
             },
             {
                 field: "value",
