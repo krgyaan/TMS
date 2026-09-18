@@ -89,7 +89,7 @@ export interface RfqSentToOemRow {
     createdAt: string;
 }
 
-export interface MissedTenderRow {
+export interface LifecycleTenderRow {
     id: number;
     tenderNo: string;
     tenderName: string;
@@ -105,7 +105,12 @@ export interface OemPerformanceResponse {
     summary: OemSummary;
     notAllowedTenders: NotAllowedTenderRow[];
     rfqsSentToOem: RfqSentToOemRow[];
-    missedTenders: MissedTenderRow[];
+    missedTenders: LifecycleTenderRow[];
+    wonTenders: LifecycleTenderRow[];
+    lostTenders: LifecycleTenderRow[];
+    disqualifiedTenders: LifecycleTenderRow[];
+    resultsAwaitedTenders: LifecycleTenderRow[];
+    bidTenders: LifecycleTenderRow[];
     monthlyTrend: MonthlyTrendPoint[];
 }
 

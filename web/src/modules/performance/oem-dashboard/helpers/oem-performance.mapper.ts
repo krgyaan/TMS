@@ -12,7 +12,7 @@ import type {
 // ─── Transform backend → component shape ─────────────────────────────────────
 
 export function mapOemPerformance(raw: OemPerformanceResponse): OemComponentData {
-    const { summary, notAllowedTenders, rfqsSentToOem, missedTenders } = raw;
+    const { summary, notAllowedTenders, rfqsSentToOem, missedTenders, wonTenders, lostTenders, disqualifiedTenders, resultsAwaitedTenders, bidTenders } = raw;
 
     // Flat KPI counts — derived from the Laravel summary buckets
     const totalTendersWithOem = summary.tendersAssigned.count;
@@ -54,10 +54,8 @@ export function mapOemPerformance(raw: OemPerformanceResponse): OemComponentData
 
     // Tender list builders — summary buckets now carry real per-tender refs
     // (id, tenderNo, value), so no fabrication is needed.
-    const wonItems = toListItems(summary.tendersWon, "Won");
-    const lostItems = toListItems(summary.tendersLost, "Lost");
-    const bidItems = toListItems(summary.tendersBid, "Submitted");
     const totalItems = toListItems(summary.tendersAssigned, "Assigned");
+    const wonItems = toListItems(summary.tendersWon, "Won"); // alias for winRate
 
     // rfqsSent uses the full row shape (has dueDate, rfqSentOn, rfqResponseOn)
     // notAllowed uses the full row shape (has reason, dueDate)
@@ -65,17 +63,17 @@ export function mapOemPerformance(raw: OemPerformanceResponse): OemComponentData
 
     const tendersByKpi: TendersByKpi = {
         total: totalItems,
-        tendersWon: wonItems,
-        tendersLost: lostItems,
-        tendersSubmitted: bidItems,
+        tendersWon: wonTenders ?? [],
+        tendersLost: lostTenders ?? [],
+        tendersSubmitted: bidTenders ?? [],
         tendersNotAllowed: notAllowedTenders,
         rfqsSent: rfqsSentToOem,
         rfqsResponded: respondedItems,
         winRate: wonItems, // same bucket
         rfqResponseRate: respondedItems, // same bucket
-        tendersMissed: missedTenders,
-        tendersDisqualified: toListItems(summary.tendersDisqualified, "Disqualified"),
-        tenderResultsAwaited: toListItems(summary.tenderResultsAwaited, "Results Awaited"),
+        tendersMissed: missedTenders ?? [],
+        tendersDisqualified: disqualifiedTenders ?? [],
+        tenderResultsAwaited: resultsAwaitedTenders ?? [],
     };
 
     return { summary: flatSummary, scoring, trends: [], tendersByKpi, monthlyTrend: raw.monthlyTrend ?? [] };

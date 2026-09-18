@@ -13,28 +13,28 @@ import { Eye } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { useOemPerformance } from "@/hooks/api/useOemPerformance";
 import { formatINR } from "@/hooks/useINRFormatter";
-import type { MissedTenderRow, OemPerformanceParams } from "../helpers/oem-performance.types";
+import type { LifecycleTenderRow, OemPerformanceParams } from "../helpers/oem-performance.types";
 
 import type { ColDef } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { TenderNameCell } from "@/components/data-grid/renderers/TenderNameCell";
 
-interface TendersMissedTableProps {
+interface BidTenderTableProps {
     params: OemPerformanceParams | null;
 }
 
-export default function TendersMissedTable({ params }: TendersMissedTableProps) {
+export default function BidTenderTable({ params }: BidTenderTableProps) {
     const navigate = useNavigate();
     const { data, isLoading } = useOemPerformance(params);
 
-    const tenders = useMemo(() => data?.tendersByKpi.tendersMissed ?? [], [data]);
+    const tenders = useMemo(() => data?.tendersByKpi.tendersSubmitted ?? [], [data]);
 
-    const actions = useMemo<ActionItem<MissedTenderRow>[]>(
+    const actions = useMemo<ActionItem<LifecycleTenderRow>[]>(
         () => [{ label: "View", icon: <Eye className="h-4 w-4" />, onClick: row => navigate(paths.tendering.tenderView(row.id)) }],
         [navigate]
     );
 
-    const columnDefs = useMemo<ColDef<MissedTenderRow>[]>(
+    const columnDefs = useMemo<ColDef<LifecycleTenderRow>[]>(
         () => [
             { field: "member", headerName: "Team Member", sortable: true, filter: true, width: 150 },
             {
@@ -54,7 +54,7 @@ export default function TendersMissedTable({ params }: TendersMissedTableProps) 
                 width: 150,
                 type: ["numericColumn"],
                 valueGetter: params => Number(params.data?.gstValues || 0),
-                cellRenderer: (p: CustomCellRendererProps<MissedTenderRow>) => <span className="tabular-nums">{formatINR(Number(p.value))}</span>,
+                cellRenderer: (p: CustomCellRendererProps<LifecycleTenderRow>) => <span className="tabular-nums">{formatINR(Number(p.value))}</span>,
             },
             { field: "dueDate", headerName: "Due Date", sortable: true, filter: false, width: 170 },
             { field: "createdAt", headerName: "Rfq Sent On", sortable: true, filter: false, width: 170 },
@@ -64,7 +64,7 @@ export default function TendersMissedTable({ params }: TendersMissedTableProps) 
                 sortable: true,
                 filter: true,
                 width: 150,
-                cellRenderer: (p: CustomCellRendererProps<MissedTenderRow>) => (
+                cellRenderer: (p: CustomCellRendererProps<LifecycleTenderRow>) => (
                     <Badge variant="secondary" className="h-5 px-2 font-normal">
                         {p.value}
                     </Badge>
@@ -96,8 +96,8 @@ export default function TendersMissedTable({ params }: TendersMissedTableProps) 
             <CardHeader className="pb-4">
                 <div className="flex items-center justify-between gap-2">
                     <div>
-                        <CardTitle className="text-base font-semibold">Tenders Missed</CardTitle>
-                        <CardDescription>Tenders that were missed for submission.</CardDescription>
+                        <CardTitle className="text-base font-semibold">Tenders Bid</CardTitle>
+                        <CardDescription>Tenders where a bid has been submitted.</CardDescription>
                     </div>
                     <Badge variant="secondary">{tenders.length}</Badge>
                 </div>

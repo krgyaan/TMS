@@ -6,14 +6,18 @@ import { Download } from "lucide-react";
 
 import { useVendorOrganizations } from "@/hooks/api/useVendorOrganizations";
 import { useOemPerformance } from "@/hooks/api/useOemPerformance";
-import type { OemPerformanceParams, TenderListItem } from "./helpers/oem-performance.types";
+import type { LifecycleTenderRow, OemPerformanceParams } from "./helpers/oem-performance.types";
 import { exportToCSV } from "./helpers/oem-performance.mapper";
 
 import OemFilterCard from "./components/OemFilterCard";
 import TendersNotAllowedTable from "./components/TendersNotAllowedTable";
-import TendersMissedTable from "./components/TendersMissedTable";
+import MissedTenderTable from "./components/MissedTenderTable";
+import BidTenderTable from "./components/BidTenderTable";
+import ResultsAwaitedTenderTable from "./components/ResultsAwaitedTenderTable";
+import DisqualifiedTenderTable from "./components/DisqualifiedTenderTable";
+import WonTenderTable from "./components/WonTenderTable";
+import LostTenderTable from "./components/LostTenderTable";
 import RfqsSentTable from "./components/RfqsSentTable";
-import KpiTenderTable from "./components/KpiTenderTable";
 import TenderCountBarChart from "./components/TenderCountBarChart";
 import DonutChartPerformance from "./components/DonutChartPerformance";
 
@@ -119,7 +123,7 @@ export default function OemPerformancePage() {
         });
 
         // Add lifecycle buckets
-        const lifecycleSections: { section: string; rows: TenderListItem[] }[] = [
+        const lifecycleSections: { section: string; rows: LifecycleTenderRow[] }[] = [
             { section: "Tenders Bid", rows: tendersBid },
             { section: "Tender Results Awaited", rows: tenderResultsAwaited },
             { section: "Tenders Disqualified", rows: tendersDisqualified },
@@ -131,14 +135,14 @@ export default function OemPerformancePage() {
             for (const t of rows) {
                 allData.push({
                     section,
-                    member: t.teamMember,
+                    member: t.member,
                     team: t.team,
                     tenderName: t.tenderName,
                     tenderNo: t.tenderNo,
-                    gstValue: String(t.value),
-                    dueDate: "",
+                    gstValue: t.gstValues,
+                    dueDate: t.dueDate,
                     reason: "",
-                    rfqSentOn: "",
+                    rfqSentOn: t.createdAt,
                     rfqResponseOn: "",
                 });
             }
@@ -202,12 +206,12 @@ export default function OemPerformancePage() {
             {appliedParams && (
                 <>
                     <TendersNotAllowedTable params={appliedParams} />
-                    <TendersMissedTable params={appliedParams} />
-                    <KpiTenderTable title="Tenders Bid" description="Tenders where a bid has been submitted." tenders={tendersBid} />
-                    <KpiTenderTable title="Tender Results Awaited" description="Tenders awaiting final results." tenders={tenderResultsAwaited} />
-                    <KpiTenderTable title="Tenders Disqualified" description="Tenders that were disqualified." tenders={tendersDisqualified} />
-                    <KpiTenderTable title="Tenders Won" description="Tenders that were won." tenders={tendersWon} />
-                    <KpiTenderTable title="Tenders Lost" description="Tenders that were lost." tenders={tendersLost} />
+                    <MissedTenderTable params={appliedParams} />
+                    <BidTenderTable params={appliedParams} />
+                    <ResultsAwaitedTenderTable params={appliedParams} />
+                    <DisqualifiedTenderTable params={appliedParams} />
+                    <WonTenderTable params={appliedParams} />
+                    <LostTenderTable params={appliedParams} />
                     <RfqsSentTable params={appliedParams} />
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                         <TenderCountBarChart params={appliedParams} />

@@ -16,7 +16,7 @@ import type { OemPerformanceQuery } from "./zod/oem-performance.dto";
 import {
     TENDER_REASON_MAP,
     type BidTenderRow,
-    type MissedTenderRow,
+    type LifecycleTenderRow,
     type MonthlyTrendPoint,
     type NotAllowedTenderRow,
     type OemPerformanceResponse,
@@ -37,7 +37,6 @@ const STATUS = {
 } as const;
 
 const DATE_FORMAT = "dd-MM-yyyy hh:mm a";
-
 
 const containsOem = (column: PgColumn, oem: number) => sql<boolean>`${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(${column}::text, '')), '\\s*,\\s*'))`;
 
@@ -72,13 +71,18 @@ export class OemPerformanceService {
 
             const notAllowedTenders = this.buildNotAllowedTenders(tenderRows);
             const rfqsSentToOem = this.buildRfqsSentToOem(tenderRows, rfqInfoByTender);
-            const missedTenders = this.buildMissedTenders(tenderRows, rfqInfoByTender);
+            const missedTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.MISSED, "Missed");
+            const wonTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.WON, "Won");
+            const lostTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.LOST, "Lost");
+            const disqualifiedTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.DISQUALIFIED, "Disqualified");
+            const resultsAwaitedTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.RESULTS_AWAITED, "Results Awaited");
+            const bidTenders = this.buildBidTenders(tenderRows, bidRows, rfqInfoByTender);
             const summary = this.buildSummary(tenderRows, bidRows);
             const monthlyTrend = this.buildMonthlyTrend(bidRows);
 
             this.logger.info("OEM performance computed", { oem });
 
-            return { summary, notAllowedTenders, rfqsSentToOem, missedTenders, monthlyTrend };
+            return { summary, notAllowedTenders, rfqsSentToOem, missedTenders, wonTenders, lostTenders, disqualifiedTenders, resultsAwaitedTenders, bidTenders, monthlyTrend };
         } catch (error) {
             const e = error as Error;
             this.logger.error("Failed to fetch OEM performance", {
@@ -89,7 +93,6 @@ export class OemPerformanceService {
         }
     }
 
-   
     private async fetchOemTenders(oem: number, from: Date, to: Date): Promise<TenderRow[]> {
         return this.db
             .select({
@@ -114,7 +117,6 @@ export class OemPerformanceService {
             .orderBy(tenderInfos.dueDate);
     }
 
-    
     private async fetchBidTenders(oem: number, from: Date, to: Date): Promise<BidTenderRow[]> {
         const { rows } = await this.db.execute(sql`
             SELECT bs.tender_id           AS "tenderId",
@@ -150,7 +152,6 @@ export class OemPerformanceService {
         return rows as unknown as BidTenderRow[];
     }
 
-   
     private async fetchRfqInfo(oem: number, from: Date, to: Date): Promise<RfqInfoRow[]> {
         const { rows } = await this.db.execute(sql`
             SELECT t.id                     AS "tenderId",
@@ -215,9 +216,9 @@ export class OemPerformanceService {
             });
     }
 
-    private buildMissedTenders(tenders: TenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>): MissedTenderRow[] {
+    private buildLifecycleTenders(tenders: TenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>, statuses: readonly number[], statusLabel: string): LifecycleTenderRow[] {
         return tenders
-            .filter(t => t.sentToOem && (STATUS.MISSED as readonly number[]).includes(Number(t.status)))
+            .filter(t => t.sentToOem && statuses.includes(Number(t.status)))
             .map(t => {
                 const info = rfqInfoByTender.get(t.id);
                 return {
@@ -229,7 +230,31 @@ export class OemPerformanceService {
                     member: t.teamMemberName ?? "—",
                     team: t.teamName ?? "—",
                     createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
-                    status: "Missed",
+                    status: statusLabel,
+                };
+            });
+    }
+
+    private buildBidTenders(tenders: TenderRow[], bids: BidTenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>): LifecycleTenderRow[] {
+        const bidTenderIds = new Set<number>();
+        for (const row of bids) {
+            if (row.bidStatus === "Bid Submitted") bidTenderIds.add(Number(row.tenderId));
+        }
+
+        return tenders
+            .filter(t => t.sentToOem && bidTenderIds.has(t.id))
+            .map(t => {
+                const info = rfqInfoByTender.get(t.id);
+                return {
+                    id: t.id,
+                    tenderNo: t.tenderNo,
+                    tenderName: t.tenderName,
+                    dueDate: format(t.dueDate, DATE_FORMAT),
+                    gstValues: t.gstValues,
+                    member: t.teamMemberName ?? "—",
+                    team: t.teamName ?? "—",
+                    createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                    status: "Bid Submitted",
                 };
             });
     }
