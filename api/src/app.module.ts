@@ -138,6 +138,7 @@ import { RequestExtensionsModule } from "./modules/tendering/request_extensions/
 import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-queries.module";
 import { OpenwaModule } from "./openwa/openwa.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
+import { CashFlowModule } from "./modules/operations/cash-flows/cash-flow.module";
 import { WebhookController } from "./webhook/webhook.controller";
 
 @Module({
