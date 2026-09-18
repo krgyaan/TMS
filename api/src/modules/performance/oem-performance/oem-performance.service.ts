@@ -132,11 +132,11 @@ export class OemPerformanceService {
                    t.gst_values           AS "gstValues",
                    bs.status              AS "bidStatus",
                    t.status               AS "tenderStatus",
-                   bs.submission_datetime AS "submissionDatetime"
+                   COALESCE(bs.submission_datetime, bs.created_at) AS "submissionDatetime"
             FROM bid_submissions bs
             INNER JOIN tender_infos t ON t.id = bs.tender_id
             WHERE t.delete_status = 0
-              AND bs.submission_datetime BETWEEN ${from} AND ${to}
+              AND COALESCE(bs.submission_datetime, bs.created_at) BETWEEN ${from} AND ${to}
               AND (
                     EXISTS (
                         SELECT 1
