@@ -12,7 +12,7 @@ import type {
 // ─── Transform backend → component shape ─────────────────────────────────────
 
 export function mapOemPerformance(raw: OemPerformanceResponse): OemComponentData {
-    const { summary, notAllowedTenders, rfqsSentToOem, missedTenders, wonTenders, lostTenders, disqualifiedTenders, resultsAwaitedTenders, bidTenders } = raw;
+    const { summary, notAllowedTenders, rfqsSentToOem, missedTenders, wonTenders, lostTenders, disqualifiedTenders, resultsAwaitedTenders, bidTenders, quotationReceivedTenders } = raw;
 
     // Flat KPI counts — derived from the Laravel summary buckets
     const totalTendersWithOem = summary.tendersAssigned.count;
@@ -66,6 +66,7 @@ export function mapOemPerformance(raw: OemPerformanceResponse): OemComponentData
         tendersWon: wonTenders ?? [],
         tendersLost: lostTenders ?? [],
         tendersSubmitted: bidTenders ?? [],
+        quotationReceived: quotationReceivedTenders ?? [],
         tendersNotAllowed: notAllowedTenders,
         rfqsSent: rfqsSentToOem,
         rfqsResponded: respondedItems,

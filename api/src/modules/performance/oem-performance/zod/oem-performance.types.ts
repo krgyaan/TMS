@@ -111,6 +111,7 @@ export interface OemPerformanceResponse {
     disqualifiedTenders: LifecycleTenderRow[];
     resultsAwaitedTenders: LifecycleTenderRow[];
     bidTenders: LifecycleTenderRow[];
+    quotationReceivedTenders: LifecycleTenderRow[];
     monthlyTrend: MonthlyTrendPoint[];
 }
 

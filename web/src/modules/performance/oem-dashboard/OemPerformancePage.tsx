@@ -17,6 +17,7 @@ import ResultsAwaitedTenderTable from "./components/ResultsAwaitedTenderTable";
 import DisqualifiedTenderTable from "./components/DisqualifiedTenderTable";
 import WonTenderTable from "./components/WonTenderTable";
 import LostTenderTable from "./components/LostTenderTable";
+import QuotationReceivedTable from "./components/QuotationReceivedTable";
 import RfqsSentTable from "./components/RfqsSentTable";
 import TenderCountBarChart from "./components/TenderCountBarChart";
 import DonutChartPerformance from "./components/DonutChartPerformance";
@@ -212,6 +213,7 @@ export default function OemPerformancePage() {
                     <DisqualifiedTenderTable params={appliedParams} />
                     <WonTenderTable params={appliedParams} />
                     <LostTenderTable params={appliedParams} />
+                    <QuotationReceivedTable params={appliedParams} />
                     <RfqsSentTable params={appliedParams} />
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                         <TenderCountBarChart params={appliedParams} />

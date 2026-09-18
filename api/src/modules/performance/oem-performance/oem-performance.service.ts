@@ -61,10 +61,11 @@ export class OemPerformanceService {
         this.logger.info("Fetching OEM performance", { oem, fromDate, toDate });
 
         try {
-            const [tenderRows, bidRows, rfqInfoRows] = await Promise.all([
+            const [tenderRows, bidRows, rfqInfoRows, quotationTenderIds] = await Promise.all([
                 this.fetchOemTenders(oem, from, to),
                 this.fetchBidTenders(oem, from, to),
                 this.fetchRfqInfo(oem, from, to),
+                this.fetchQuotationReceivedIds(oem, from, to),
             ]);
 
             const rfqInfoByTender = new Map(rfqInfoRows.map(r => [Number(r.tenderId), r]));
@@ -77,12 +78,25 @@ export class OemPerformanceService {
             const disqualifiedTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.DISQUALIFIED, "Disqualified");
             const resultsAwaitedTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.RESULTS_AWAITED, "Results Awaited");
             const bidTenders = this.buildBidTenders(tenderRows, bidRows, rfqInfoByTender);
+            const quotationReceivedTenders = this.buildQuotationReceivedTenders(tenderRows, quotationTenderIds, rfqInfoByTender);
             const summary = this.buildSummary(tenderRows, bidRows);
             const monthlyTrend = this.buildMonthlyTrend(bidRows);
 
             this.logger.info("OEM performance computed", { oem });
 
-            return { summary, notAllowedTenders, rfqsSentToOem, missedTenders, wonTenders, lostTenders, disqualifiedTenders, resultsAwaitedTenders, bidTenders, monthlyTrend };
+            return {
+                summary,
+                notAllowedTenders,
+                rfqsSentToOem,
+                missedTenders,
+                wonTenders,
+                lostTenders,
+                disqualifiedTenders,
+                resultsAwaitedTenders,
+                bidTenders,
+                quotationReceivedTenders,
+                monthlyTrend,
+            };
         } catch (error) {
             const e = error as Error;
             this.logger.error("Failed to fetch OEM performance", {
@@ -115,6 +129,23 @@ export class OemPerformanceService {
                 and(between(tenderInfos.dueDate, from, to), eq(tenderInfos.deleteStatus, 0), or(containsOem(tenderInfos.rfqTo, oem), containsOem(tenderInfos.oemNotAllowed, oem)))
             )
             .orderBy(tenderInfos.dueDate);
+    }
+
+    private async fetchQuotationReceivedIds(oem: number, from: Date, to: Date): Promise<Set<number>> {
+        const { rows } = await this.db.execute(sql`
+            SELECT DISTINCT t.id AS "tenderId"
+            FROM tender_infos t
+            INNER JOIN rfqs r ON r.tender_id = t.id
+            INNER JOIN rfq_responses rr
+                   ON rr.rfq_id = r.id
+                  AND rr.response_status = 1
+                  AND (   rr.vendor_id IN (SELECT v.id FROM vendors v WHERE v.org_id = ${oem})
+                       OR (COALESCE(rr.vendor_id, 0) = 0 AND ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(r.requested_organization::text, '')), '\\s*,\\s*'))) )
+            WHERE t.due_date BETWEEN ${from} AND ${to}
+              AND t.delete_status = 0
+              AND ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(r.requested_organization::text, '')), '\\s*,\\s*'))
+        `);
+        return new Set((rows as unknown as Array<{ tenderId: number }>).map(r => Number(r.tenderId)));
     }
 
     private async fetchBidTenders(oem: number, from: Date, to: Date): Promise<BidTenderRow[]> {
@@ -231,6 +262,25 @@ export class OemPerformanceService {
                     team: t.teamName ?? "—",
                     createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
                     status: statusLabel,
+                };
+            });
+    }
+
+    private buildQuotationReceivedTenders(tenders: TenderRow[], quotationTenderIds: Set<number>, rfqInfoByTender: Map<number, RfqInfoRow>): LifecycleTenderRow[] {
+        return tenders
+            .filter(t => t.sentToOem && quotationTenderIds.has(t.id))
+            .map(t => {
+                const info = rfqInfoByTender.get(t.id);
+                return {
+                    id: t.id,
+                    tenderNo: t.tenderNo,
+                    tenderName: t.tenderName,
+                    dueDate: format(t.dueDate, DATE_FORMAT),
+                    gstValues: t.gstValues,
+                    member: t.teamMemberName ?? "—",
+                    team: t.teamName ?? "—",
+                    createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                    status: "Quotation Received",
                 };
             });
     }

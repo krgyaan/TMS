@@ -80,6 +80,7 @@ export interface OemPerformanceResponse {
     disqualifiedTenders: LifecycleTenderRow[];
     resultsAwaitedTenders: LifecycleTenderRow[];
     bidTenders: LifecycleTenderRow[];
+    quotationReceivedTenders: LifecycleTenderRow[];
     monthlyTrend: MonthlyTrendPoint[];
 }
 
@@ -139,6 +140,7 @@ export interface TendersByKpi {
     tendersMissed: LifecycleTenderRow[];
     tendersDisqualified: LifecycleTenderRow[];
     tenderResultsAwaited: LifecycleTenderRow[];
+    quotationReceived: LifecycleTenderRow[];
     tendersNotAllowed: NotAllowedTenderRow[];
     rfqsSent: RfqSentToOemRow[];
     rfqsResponded: TenderListItem[];
