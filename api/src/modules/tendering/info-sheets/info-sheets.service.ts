@@ -717,7 +717,11 @@ export class TenderInfoSheetsService {
                 );
             }
 
-            await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
+            try {
+                await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
+            } catch (emailError) {
+                this.logger.error(`[InfoSheet] Non-fatal email sending failure for tender ${tenderId}:`, emailError);
+            }
 
             return result;
         } catch (error: any) {
@@ -1192,7 +1196,11 @@ export class TenderInfoSheetsService {
                 }
             }
 
-            await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
+            try {
+                await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
+            } catch (emailError) {
+                this.logger.error(`[InfoSheet] Non-fatal email sending failure for tender ${tenderId}:`, emailError);
+            }
 
             return result;
         } catch (error: any) {
@@ -1952,3 +1960,5 @@ export class TenderInfoSheetsService {
         };
     }
 }
+
+export { TenderInfoSheetsService as InfoSheetsService };
