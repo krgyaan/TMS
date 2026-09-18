@@ -11,6 +11,7 @@ import { exportToCSV } from "./helpers/oem-performance.mapper";
 
 import OemFilterCard from "./components/OemFilterCard";
 import TendersNotAllowedTable from "./components/TendersNotAllowedTable";
+import TendersMissedTable from "./components/TendersMissedTable";
 import RfqsSentTable from "./components/RfqsSentTable";
 import KpiTenderTable from "./components/KpiTenderTable";
 import TenderCountBarChart from "./components/TenderCountBarChart";
@@ -101,9 +102,24 @@ export default function OemPerformancePage() {
             });
         });
 
+        // Add missed tenders (rich row shape)
+        tendersMissed.forEach(t => {
+            allData.push({
+                section: "Tenders Missed",
+                member: t.member,
+                team: t.team,
+                tenderName: t.tenderName,
+                tenderNo: t.tenderNo,
+                gstValue: t.gstValues,
+                dueDate: t.dueDate,
+                reason: "",
+                rfqSentOn: t.createdAt,
+                rfqResponseOn: "",
+            });
+        });
+
         // Add lifecycle buckets
         const lifecycleSections: { section: string; rows: TenderListItem[] }[] = [
-            { section: "Tenders Missed", rows: tendersMissed },
             { section: "Tenders Bid", rows: tendersBid },
             { section: "Tender Results Awaited", rows: tenderResultsAwaited },
             { section: "Tenders Disqualified", rows: tendersDisqualified },
@@ -186,7 +202,7 @@ export default function OemPerformancePage() {
             {appliedParams && (
                 <>
                     <TendersNotAllowedTable params={appliedParams} />
-                    <KpiTenderTable title="Tenders Missed" description="Tenders that were missed for submission." tenders={tendersMissed} />
+                    <TendersMissedTable params={appliedParams} />
                     <KpiTenderTable title="Tenders Bid" description="Tenders where a bid has been submitted." tenders={tendersBid} />
                     <KpiTenderTable title="Tender Results Awaited" description="Tenders awaiting final results." tenders={tenderResultsAwaited} />
                     <KpiTenderTable title="Tenders Disqualified" description="Tenders that were disqualified." tenders={tendersDisqualified} />

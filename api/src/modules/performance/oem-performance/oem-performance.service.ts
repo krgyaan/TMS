@@ -16,6 +16,7 @@ import type { OemPerformanceQuery } from "./zod/oem-performance.dto";
 import {
     TENDER_REASON_MAP,
     type BidTenderRow,
+    type MissedTenderRow,
     type MonthlyTrendPoint,
     type NotAllowedTenderRow,
     type OemPerformanceResponse,
@@ -74,12 +75,13 @@ export class OemPerformanceService {
 
             const notAllowedTenders = this.buildNotAllowedTenders(tenderRows);
             const rfqsSentToOem = this.buildRfqsSentToOem(tenderRows, rfqInfoByTender);
+            const missedTenders = this.buildMissedTenders(tenderRows, rfqInfoByTender);
             const summary = this.buildSummary(tenderRows, bidRows);
             const monthlyTrend = this.buildMonthlyTrend(bidRows);
 
             this.logger.info("OEM performance computed", { oem });
 
-            return { summary, notAllowedTenders, rfqsSentToOem, monthlyTrend };
+            return { summary, notAllowedTenders, rfqsSentToOem, missedTenders, monthlyTrend };
         } catch (error) {
             const e = error as Error;
             this.logger.error("Failed to fetch OEM performance", {
@@ -218,6 +220,25 @@ export class OemPerformanceService {
                     rfqSentOn: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
                     rfqResponseOn: info?.responseOn ? format(info.responseOn, DATE_FORMAT) : null,
                     createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                };
+            });
+    }
+
+    private buildMissedTenders(tenders: TenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>): MissedTenderRow[] {
+        return tenders
+            .filter(t => t.sentToOem && (STATUS.MISSED as readonly number[]).includes(Number(t.status)))
+            .map(t => {
+                const info = rfqInfoByTender.get(t.id);
+                return {
+                    id: t.id,
+                    tenderNo: t.tenderNo,
+                    tenderName: t.tenderName,
+                    dueDate: format(t.dueDate, DATE_FORMAT),
+                    gstValues: t.gstValues,
+                    member: t.teamMemberName ?? "—",
+                    team: t.teamName ?? "—",
+                    createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                    status: "Missed",
                 };
             });
     }
