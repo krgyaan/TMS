@@ -9,7 +9,6 @@ import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 
 import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
-import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
 import { users } from "@/db/schemas/auth/users.schema";
 import { teams } from "@/db/schemas";
 
@@ -119,24 +118,45 @@ export class OemPerformanceService {
             .orderBy(tenderInfos.dueDate);
     }
 
-    // ─── Query 2: bid submissions for tenders assigned to this OEM ───────────
-    // Kept on submission_datetime basis (Laravel parity), while tenders
-    // (assigned / RFQ / not-allowed) use due_date.
+    // ─── Query 2: bid submissions attributable to this OEM ────────────────────
+    // A bid belongs to an OEM only when costing was approved including that OEM
+    // (tender_costing_sheets.oem_vendor_ids) — not merely because the tender's
+    // rfq_to listed it. Legacy tenders without any costing selection fall back
+    // to rfq_to attribution. Kept on submission_datetime basis (Laravel parity).
 
     private async fetchBidTenders(oem: number, from: Date, to: Date): Promise<BidTenderRow[]> {
-        return this.db
-            .select({
-                tenderId: bidSubmissions.tenderId,
-                tenderNo: tenderInfos.tenderNo,
-                tenderName: tenderInfos.tenderName,
-                gstValues: tenderInfos.gstValues,
-                bidStatus: bidSubmissions.status,
-                tenderStatus: tenderInfos.status,
-                submissionDatetime: bidSubmissions.submissionDatetime,
-            })
-            .from(bidSubmissions)
-            .innerJoin(tenderInfos, eq(tenderInfos.id, bidSubmissions.tenderId))
-            .where(and(containsOem(tenderInfos.rfqTo, oem), between(bidSubmissions.submissionDatetime, from, to), eq(tenderInfos.deleteStatus, 0)));
+        const { rows } = await this.db.execute(sql`
+            SELECT bs.tender_id           AS "tenderId",
+                   t.tender_no            AS "tenderNo",
+                   t.tender_name          AS "tenderName",
+                   t.gst_values           AS "gstValues",
+                   bs.status              AS "bidStatus",
+                   t.status               AS "tenderStatus",
+                   bs.submission_datetime AS "submissionDatetime"
+            FROM bid_submissions bs
+            INNER JOIN tender_infos t ON t.id = bs.tender_id
+            WHERE t.delete_status = 0
+              AND bs.submission_datetime BETWEEN ${from} AND ${to}
+              AND (
+                    EXISTS (
+                        SELECT 1
+                        FROM tender_costing_sheets cs
+                        WHERE cs.tender_id = t.id
+                          AND cs.oem_vendor_ids @> to_jsonb(${oem}::int)
+                    )
+                 OR (
+                        NOT EXISTS (
+                            SELECT 1
+                            FROM tender_costing_sheets cs
+                            WHERE cs.tender_id = t.id
+                              AND cs.oem_vendor_ids IS NOT NULL
+                              AND jsonb_array_length(cs.oem_vendor_ids) > 0
+                        )
+                        AND ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(t.rfq_to::text, '')), '\\s*,\\s*'))
+                 )
+              )
+        `);
+        return rows as unknown as BidTenderRow[];
     }
 
     // ─── Query 3: earliest RFQ + latest OEM-attributable response per tender ─
