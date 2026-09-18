@@ -38,10 +38,7 @@ const STATUS = {
 
 const DATE_FORMAT = "dd-MM-yyyy hh:mm a";
 
-/**
- * rfq_to / oem_not_allowed are comma-separated OEM org ids stored as plain
- * text (e.g. "44,13", possible whitespace). Compare per-segment after trim.
- */
+
 const containsOem = (column: PgColumn, oem: number) => sql<boolean>`${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(${column}::text, '')), '\\s*,\\s*'))`;
 
 @Injectable()
@@ -92,10 +89,7 @@ export class OemPerformanceService {
         }
     }
 
-    // ─── Query 1: tenders referencing this OEM (assigned or not-allowed) ─────
-    // OEM filtering happens in SQL — no per-tender rfq joins, so no row
-    // multiplication.
-
+   
     private async fetchOemTenders(oem: number, from: Date, to: Date): Promise<TenderRow[]> {
         return this.db
             .select({
@@ -120,12 +114,7 @@ export class OemPerformanceService {
             .orderBy(tenderInfos.dueDate);
     }
 
-    // ─── Query 2: bid submissions attributable to this OEM ────────────────────
-    // A bid belongs to an OEM only when costing was approved including that OEM
-    // (tender_costing_sheets.oem_vendor_ids) — not merely because the tender's
-    // rfq_to listed it. Legacy tenders without any costing selection fall back
-    // to rfq_to attribution. Kept on submission_datetime basis (Laravel parity).
-
+    
     private async fetchBidTenders(oem: number, from: Date, to: Date): Promise<BidTenderRow[]> {
         const { rows } = await this.db.execute(sql`
             SELECT bs.tender_id           AS "tenderId",
@@ -161,12 +150,7 @@ export class OemPerformanceService {
         return rows as unknown as BidTenderRow[];
     }
 
-    // ─── Query 3: earliest RFQ + latest OEM-attributable response per tender ─
-    // Aggregated in SQL: one row per tender (no duplication). A response is
-    // attributed to this OEM when it came from one of the OEM's vendor
-    // contacts, OR it is a legacy unattributed response (vendor_id = 0) on a
-    // tender whose rfq_to contains ONLY this OEM.
-
+   
     private async fetchRfqInfo(oem: number, from: Date, to: Date): Promise<RfqInfoRow[]> {
         const { rows } = await this.db.execute(sql`
             SELECT t.id                     AS "tenderId",
@@ -177,10 +161,17 @@ export class OemPerformanceService {
             LEFT JOIN rfq_responses rr
                    ON rr.rfq_id = r.id
                   AND (   rr.vendor_id IN (SELECT v.id FROM vendors v WHERE v.org_id = ${oem})
-                       OR (COALESCE(rr.vendor_id, 0) = 0 AND ${oem}::text = btrim(coalesce(t.rfq_to::text, ''))) )
+                       OR (COALESCE(rr.vendor_id, 0) = 0 AND ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(r.requested_organization::text, '')), '\\s*,\\s*'))) )
             WHERE t.due_date BETWEEN ${from} AND ${to}
               AND t.delete_status = 0
-              AND ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(t.rfq_to::text, '')), '\\s*,\\s*'))
+              AND (   ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(r.requested_organization::text, '')), '\\s*,\\s*'))
+                   OR EXISTS (
+                           SELECT 1
+                           FROM vendors v
+                           WHERE v.org_id = ${oem}
+                             AND v.id::text = ANY(regexp_split_to_array(btrim(coalesce(r.requested_vendor::text, '')), '\\s*,\\s*'))
+                       )
+                  )
             GROUP BY t.id
             HAVING COUNT(r.id) > 0
         `);
@@ -206,9 +197,9 @@ export class OemPerformanceService {
 
     private buildRfqsSentToOem(tenders: TenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>): RfqSentToOemRow[] {
         return tenders
-            .filter(t => t.sentToOem)
+            .filter(t => t.sentToOem && rfqInfoByTender.has(t.id))
             .map(t => {
-                const info = rfqInfoByTender.get(t.id);
+                const info = rfqInfoByTender.get(t.id)!;
                 return {
                     id: t.id,
                     tenderNo: t.tenderNo,
@@ -217,9 +208,9 @@ export class OemPerformanceService {
                     gstValues: t.gstValues,
                     member: t.teamMemberName ?? "—",
                     team: t.teamName ?? "—",
-                    rfqSentOn: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
-                    rfqResponseOn: info?.responseOn ? format(info.responseOn, DATE_FORMAT) : null,
-                    createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                    rfqSentOn: info.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                    rfqResponseOn: info.responseOn ? format(info.responseOn, DATE_FORMAT) : null,
+                    createdAt: info.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
                 };
             });
     }
