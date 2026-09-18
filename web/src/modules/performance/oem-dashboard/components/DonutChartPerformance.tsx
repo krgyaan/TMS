@@ -57,17 +57,23 @@ export default function DonutChartPerformance({ params }: DonutChartPerformanceP
     const { data, isLoading } = useOemPerformance(params);
 
     const summary = data?.summary;
-    const total = summary?.totalTendersWithOem ?? 0;
+    const tenderBuckets = data?.tendersByKpi;
 
     const slices = useMemo<DonutSlice[]>(() => {
         if (!summary) return [];
         return [
             { name: "Won", value: summary.tendersWon, color: "#16a34a" },
             { name: "Bid", value: summary.tendersSubmitted, color: "#2563eb" },
-            { name: "Lost", value: summary.tendersLost, color: "#dc2626" },
+            { name: "Quotation Received", value: tenderBuckets?.quotationReceived.length ?? 0, color: "#0ea5e9" },
+            { name: "Results Awaited", value: tenderBuckets?.tenderResultsAwaited.length ?? 0, color: "#8b5cf6" },
+            { name: "Missed", value: tenderBuckets?.tendersMissed.length ?? 0, color: "#f59e0b" },
+            { name: "Disqualified", value: tenderBuckets?.tendersDisqualified.length ?? 0, color: "#f97316" },
             { name: "Not Allowed", value: summary.tendersNotAllowed, color: "#64748b" },
+            { name: "Lost", value: summary.tendersLost, color: "#dc2626" },
         ];
-    }, [summary]);
+    }, [summary, tenderBuckets]);
+
+    const total = slices.reduce((sum, slice) => sum + slice.value, 0);
 
     const hasData = slices.some(slice => slice.value > 0);
 
@@ -91,7 +97,7 @@ export default function DonutChartPerformance({ params }: DonutChartPerformanceP
         <Card>
             <CardHeader className="pb-4">
                 <CardTitle className="text-base font-semibold">Tender Outcome Split</CardTitle>
-                <CardDescription>Share of tenders by win, bid, lost and not-allowed status.</CardDescription>
+                <CardDescription>Share of tenders across all outcome statuses.</CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
                 {!hasData ? (
