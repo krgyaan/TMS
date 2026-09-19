@@ -6,6 +6,14 @@ const decimalString = z
   .or(z.number().transform(val => val.toString()));
 
 const eventTypeSchema = z.enum([
+  'po_created',
+  'vwo_created',
+  'po_approved',
+  'vwo_approved',
+  'payment_requested',
+  'payment_approved',
+  'payment_paid',
+  'invoice_uploaded',
   'purchase_invoice_booked',
   'payment_request_created',
   'payment_processed',
@@ -24,7 +32,7 @@ export const createCashFlowSchema = z.object({
   projectId: z.number().int().positive('Project ID is required'),
   eventType: eventTypeSchema,
   amount: decimalString,
-  direction: z.enum(['inflow', 'outflow']).default('outflow'),
+  direction: z.enum(['inflow', 'outflow', 'adjustment']).default('outflow'),
   referenceType: z.string().max(50).optional(),
   referenceId: z.number().int().positive().optional(),
   referenceNo: z.string().max(255).optional(),

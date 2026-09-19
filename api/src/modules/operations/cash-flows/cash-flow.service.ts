@@ -12,7 +12,11 @@ export class CashFlowService {
   ) {}
 
   async create(entry: CreateCashFlowDto) {
-    const result = await this.db
+    return this.createInTransaction(this.db, entry);
+  }
+
+  async createInTransaction(tx: DbInstance, entry: CreateCashFlowDto) {
+    const result = await tx
       .insert(projectCashFlows)
       .values({
         projectId: entry.projectId,

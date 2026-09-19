@@ -15,6 +15,7 @@ import { and, desc, eq, like, ne, sql } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
+import { CashFlowService } from "@/modules/operations/cash-flows/cash-flow.service";
 import { insurancePayloadSchema, insurancePolicySchema, type InsurancePayload } from "@/modules/insurance/zod/insurance-policy.schema";
 import { OperationNotificationService } from "@/modules/operations/operation-notification.service";
 
@@ -25,6 +26,7 @@ export class PaymentRequestService {
         @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
         private readonly insurancePolicyService: InsurancePolicyService,
         private readonly notifications: OperationNotificationService,
+        private readonly cashFlowService: CashFlowService,
     ) {}
 
     async generateNumber(projectName?: string) {
@@ -216,6 +218,24 @@ export class PaymentRequestService {
 
         this.logger.info(`Payment Request created: ${requestNo}`);
 
+        if (pr.projectId) {
+            const prAmount = Number(pr.amount);
+            const tdsAmt = tdsPercentage ? (prAmount * tdsPercentage / 100) : undefined;
+            await this.cashFlowService.create({
+                projectId: pr.projectId,
+                eventType: 'payment_requested',
+                amount: prAmount.toString(),
+                direction: 'outflow',
+                referenceType: 'payment_request',
+                referenceId: pr.id,
+                referenceNo: requestNo ?? `PR #${pr.id}`,
+                tdsPercentage: tdsPercentage?.toString(),
+                tdsAmount: tdsAmt?.toString(),
+                remark: `Payment requested against ${pr.paymentAgainst}`,
+                createdBy: userId,
+            }).catch((err) => this.logger.warn(`Cash flow creation failed for PR #${pr.id}: ${err}`));
+        }
+
         // Use the requestNo stored in the DB (not the transient local value)
         const [storedPr] = await this.db
             .select({ requestNo: paymentRequests.requestNo })
@@ -339,6 +359,24 @@ export class PaymentRequestService {
                 requestedBy: existing.requestedBy ?? 0,
                 category: existing.paymentAgainst ?? '',
               }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+
+              if (existing.projectId) {
+                  const tdsPct = existing.tdsPercentage ? Number(existing.tdsPercentage).toString() : undefined;
+                  const tdsAmt = existing.tdsPercentage ? (Number(existing.amount) * Number(existing.tdsPercentage) / 100) : 0;
+                  await this.cashFlowService.createInTransaction(tx, {
+                      projectId: existing.projectId,
+                      eventType: 'payment_paid',
+                      amount: Number(updated.amount).toString(),
+                      direction: 'outflow',
+                      referenceType: 'payment_request',
+                      referenceId: existing.id,
+                      referenceNo: existing.requestNo ?? `PR #${existing.id}`,
+                      tdsPercentage: tdsPct,
+                      tdsAmount: tdsAmt.toString(),
+                      remark: `Payment done. UTR: ${updated.utrNumber ?? 'N/A'}`,
+                      createdBy: existing.requestedBy ?? 0,
+                  }).catch((err) => this.logger.warn(`Cash flow creation failed for payment_paid PR #${existing.id}: ${err}`));
+              }
             }
 
             if (body.status === 'rejected') {
@@ -362,6 +400,24 @@ export class PaymentRequestService {
                 requestedBy: existing.requestedBy ?? 0,
                 category: existing.paymentAgainst ?? '',
               }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+
+              if (existing.projectId) {
+                  const tdsPct = existing.tdsPercentage ? Number(existing.tdsPercentage).toString() : undefined;
+                  const tdsAmt = existing.tdsPercentage ? (Number(existing.amount) * Number(existing.tdsPercentage) / 100) : 0;
+                  await this.cashFlowService.createInTransaction(tx, {
+                      projectId: existing.projectId,
+                      eventType: 'payment_approved',
+                      amount: Number(updated.amount).toString(),
+                      direction: 'outflow',
+                      referenceType: 'payment_request',
+                      referenceId: existing.id,
+                      referenceNo: existing.requestNo ?? `PR #${existing.id}`,
+                      tdsPercentage: tdsPct,
+                      tdsAmount: tdsAmt.toString(),
+                      remark: `Payment approved by maker for ${existing.paymentAgainst}`,
+                      createdBy: existing.requestedBy ?? 0,
+                  }).catch((err) => this.logger.warn(`Cash flow creation failed for payment_approved PR #${existing.id}: ${err}`));
+              }
             }
 
             return updated;

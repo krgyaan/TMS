@@ -9,6 +9,7 @@ import type { DbInstance } from "@/db";
 import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
 import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
 import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
+import { CashFlowService } from "@/modules/operations/cash-flows/cash-flow.service";
 
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
 import { projects } from "@/db/schemas/master/projects.schema";
@@ -32,6 +33,7 @@ export class VendorWorkOrderService {
         private readonly clientDirectorySyncService: ClientDirectorySyncService,
         private readonly insuranceService: InsurancePolicyService,
         private readonly notifications: OperationNotificationService,
+        private readonly cashFlowService: CashFlowService,
     ) {}
 
     async generateWONumber(projectName?: string) {
@@ -176,6 +178,20 @@ export class VendorWorkOrderService {
         this.generatePdfForWO(wo, body.products).catch((err) => {
             this.logger.error(`Failed to generate VWO PDF: ${err.message}`);
         });
+
+        if (wo.projectId) {
+            await this.cashFlowService.create({
+                projectId: wo.projectId,
+                eventType: 'vwo_created',
+                amount: grandTotal.toString(),
+                direction: 'outflow',
+                referenceType: 'vendor_work_order',
+                referenceId: wo.id,
+                referenceNo: woNumber ?? `VWO #${wo.id}`,
+                remark: `VWO created: ${woNumber}`,
+                createdBy: userId,
+            }).catch((err) => this.logger.warn(`Cash flow creation failed for VWO #${wo.id}: ${err}`));
+        }
 
         return this.getById(wo.id);
     }
@@ -554,6 +570,22 @@ export class VendorWorkOrderService {
                 amountAfterTds: amountAfterTds.toString(),
                 approvedBy: userId ?? 0,
             }).catch((err) => this.logger.warn(`WhatsApp VWO approval notification failed: ${err}`));
+
+            if (wo.projectId) {
+                await this.cashFlowService.create({
+                    projectId: wo.projectId,
+                    eventType: 'vwo_approved',
+                    amount: amountAfterTds.toString(),
+                    direction: 'outflow',
+                    referenceType: 'vendor_work_order',
+                    referenceId: wo.id,
+                    referenceNo: wo.woNumber ?? `VWO #${wo.id}`,
+                    tdsPercentage: tdsPercentage.toString(),
+                    tdsAmount: tdsAmt.toString(),
+                    remark: `VWO approved with TDS @ ${tdsPercentage}%`,
+                    createdBy: userId ?? 0,
+                }).catch((err) => this.logger.warn(`Cash flow creation failed for VWO approval #${wo.id}: ${err}`));
+            }
 
             return updated;
         } else {

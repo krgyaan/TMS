@@ -8,6 +8,7 @@ import { DRIZZLE } from "@/db/database.module";
 import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
 import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
 import { InsurancePolicyService } from "@/modules/insurance/insurance-policy.service";
+import { CashFlowService } from "@/modules/operations/cash-flows/cash-flow.service";
 import { users } from "@/db/schemas";
 import { projects } from "@/db/schemas/master/projects.schema";
 import { paymentRequests, purchaseInvoices, saleInvoiceItems, saleInvoices } from "@/db/schemas/operations";
@@ -32,6 +33,7 @@ export class PurchaseOrderService {
         private readonly clientDirectorySyncService: ClientDirectorySyncService,
         private readonly insuranceService: InsurancePolicyService,
         private readonly notifications: OperationNotificationService,
+        private readonly cashFlowService: CashFlowService,
     ) {}
 
     async getPurchaseOrders(projectId: number) {
@@ -399,6 +401,20 @@ export class PurchaseOrderService {
             this.logger.error(`Failed to generate PO PDF: ${err.message}`);
         });
 
+        if (po.projectId) {
+            await this.cashFlowService.create({
+                projectId: po.projectId,
+                eventType: 'po_created',
+                amount: grandTotal.toString(),
+                direction: 'outflow',
+                referenceType: 'purchase_order',
+                referenceId: po.id,
+                referenceNo: poNumber ?? `PO #${po.id}`,
+                remark: `PO created: ${poNumber}`,
+                createdBy: userId,
+            }).catch((err) => this.logger.warn(`Cash flow creation failed for PO #${po.id}: ${err}`));
+        }
+
         return this.getPurchaseOrder(po.id);
     }
 
@@ -623,6 +639,23 @@ export class PurchaseOrderService {
             }).catch((err) => this.logger.warn(`WhatsApp PO approval notification failed: ${err}`));
 
             this.logger.info(`TDS approved for PO #${id}: ${tdsPercentage}%, TDS Amount: ${tdsAmt}, After TDS: ${amountAfterTds}`);
+
+            if (po.projectId) {
+                await this.cashFlowService.create({
+                    projectId: po.projectId,
+                    eventType: 'po_approved',
+                    amount: amountAfterTds.toString(),
+                    direction: 'outflow',
+                    referenceType: 'purchase_order',
+                    referenceId: po.id,
+                    referenceNo: po.poNumber ?? `PO #${po.id}`,
+                    tdsPercentage: tdsPercentage.toString(),
+                    tdsAmount: tdsAmt.toString(),
+                    remark: `PO approved with TDS @ ${tdsPercentage}%`,
+                    createdBy: userId ?? 0,
+                }).catch((err) => this.logger.warn(`Cash flow creation failed for PO approval #${po.id}: ${err}`));
+            }
+
             return updated;
         } else {
             const [updated] = await this.db
