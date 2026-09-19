@@ -91,13 +91,13 @@ export class CashFlowService {
       .select({
         totalOutflow: sql<number>`COALESCE(SUM(CASE WHEN direction = 'outflow' THEN amount ELSE 0 END), 0)`,
         totalInflow: sql<number>`COALESCE(SUM(CASE WHEN direction = 'inflow' THEN amount ELSE 0 END), 0)`,
-        totalTds: sql<number>`COALESCE(SUM(CASE WHEN event_type = 'tds_deducted' THEN tdsAmount ELSE 0 END), 0)`,
-        totalGst: sql<number>`COALESCE(SUM(CASE WHEN event_type = 'gst_booked' THEN gstAmount ELSE 0 END), 0)`,
+        totalTds: sql<number>`COALESCE(SUM(CASE WHEN event_type = 'tds_deducted' THEN tds_amount ELSE 0 END), 0)`,
+        totalGst: sql<number>`COALESCE(SUM(CASE WHEN event_type = 'gst_booked' THEN gst_amount ELSE 0 END), 0)`,
         netCashFlow: sql<number>`
           COALESCE(
             SUM(CASE WHEN direction = 'outflow' THEN amount ELSE 0 END) -
-            SUM(CASE WHEN event_type = 'tds_deducted' THEN tdsAmount ELSE 0 END) -
-            SUM(CASE WHEN event_type = 'gst_booked' THEN gstAmount ELSE 0 END),
+            SUM(CASE WHEN event_type = 'tds_deducted' THEN tds_amount ELSE 0 END) -
+            SUM(CASE WHEN event_type = 'gst_booked' THEN gst_amount ELSE 0 END),
             0
           )
         `,

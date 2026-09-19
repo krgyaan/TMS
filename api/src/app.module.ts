@@ -194,6 +194,7 @@ import { WebhookController } from "./webhook/webhook.controller";
         VendorAccountsModule,
         VendorFilesModule,
         GoogleIntegrationModule,
+        CashFlowModule,
         AuthModule,
         WebsitesModule,
         StatesModule,
