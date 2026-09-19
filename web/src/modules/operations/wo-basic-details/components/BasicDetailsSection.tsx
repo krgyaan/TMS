@@ -4,6 +4,7 @@ import { useWoBasicDetailById } from "@/hooks/api/useWoBasicDetails";
 import { useWoContactsByBasicDetail } from "@/hooks/api/useWoContacts";
 import { AlertCircle } from "lucide-react";
 import BasicDetailView from "./BasicDetailView";
+import { OrderRevisionsSection } from "./OrderRevisionsSection";
 
 interface BasicDetailsSectionProps {
     woBasicDetailId: number;
@@ -35,5 +36,10 @@ export function BasicDetailsSection({ woBasicDetailId }: BasicDetailsSectionProp
         return <p className="text-sm text-muted-foreground italic">No basic details found.</p>;
     }
 
-    return <BasicDetailView data={data} contacts={contactsData} />;
+    return (
+        <div className="space-y-4">
+            <BasicDetailView data={data} contacts={contactsData} />
+            <OrderRevisionsSection woBasicDetailId={woBasicDetailId} />
+        </div>
+    );
 }

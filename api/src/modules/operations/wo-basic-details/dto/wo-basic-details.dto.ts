@@ -25,6 +25,11 @@ export const CreateWoBasicDetailSchema = z.object({
   projectCode: z.string().max(100).optional(), // Auto-generated, optional on create
   projectName: z.string().max(255).optional(),
 
+  // Order type: 'single' (default) | 'multiple' — several POs for the same won tender
+  // orderSequence is derived by the backend (count of existing orders for the tender + 1)
+  orderType: z.enum(["single", "multiple"]).default("single").optional(),
+  orderSequence: z.number().int().positive().optional(),
+
   // Workflow state tracking
   currentStage: z.enum(["basic_details", "wo_details", "wo_acceptance", "wo_upload", "completed"]).optional(),
 
@@ -217,6 +222,8 @@ export const WoBasicDetailsResponseSchema = z.object({
   projectCode: z.string(),
   projectName: z.string().nullable(),
   currentStage: z.string(),
+  orderType: z.string().nullable(),
+  orderSequence: z.number().nullable(),
   woValuePreGst: z.string().nullable(),
   woValueGstAmt: z.string().nullable(),
   receiptPreGst: z.string().nullable(),
@@ -308,3 +315,22 @@ export const CheckProjectCodeSchema = z.object({
 });
 
 export type CheckProjectCodeDto = z.infer<typeof CheckProjectCodeSchema>;
+
+// ============================================
+// ORDER REVISION SCHEMAS
+// ============================================
+
+/**
+ * Schema for revising an existing order (repeated/revision order).
+ * Only the order-level values change; the linked project and wo_details wizard are preserved.
+ */
+export const ReviseOrderSchema = z.object({
+  woNumber: z.string().max(255).optional(),
+  woDate: z.string().date().optional(),
+  woValuePreGst: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
+  woValueGstAmt: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
+  woDraft: z.string().max(255).optional(),
+  revisionNotes: z.string().optional(),
+});
+
+export type ReviseOrderDto = z.infer<typeof ReviseOrderSchema>;

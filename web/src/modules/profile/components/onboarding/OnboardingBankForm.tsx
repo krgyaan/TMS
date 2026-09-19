@@ -398,7 +398,10 @@ export function OnboardingBankForm({
                         <div className="relative">
                           <Hash className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/50" />
                           <Input
-                            {...form.register(`bankAccounts.${index}.ifscCode`)}
+                            {...form.register(`bankAccounts.${index}.ifscCode`, {
+                              setValueAs: (v) =>
+                                typeof v === "string" ? v.toUpperCase() : v,
+                            })}
                             className="rounded-xl h-11 pl-10 font-mono uppercase"
                             placeholder="HDFC0001234"
                             disabled={watchHrStatus === "approved"}

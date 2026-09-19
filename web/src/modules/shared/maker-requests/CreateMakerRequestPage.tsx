@@ -55,6 +55,7 @@ const headings = [
     {label: 'loan_return', value: 'Loan Repayment/Return'},
     {label: 'own_bank', value: 'Own Bank'},
     {label: 'capital_asset_purchase', value: 'Capital/Asset Purchase'},
+    {label: 'taxes', value: 'Taxes'},
 ];
 
 const fixedCategory = [
@@ -71,14 +72,18 @@ const fixedCategory = [
     {label: 'office_maintenance', value: 'Office Maintenance'},
     {label: 'portal_renewal_charges', value: 'Portal Renewal Charges'},
     {label: 'professional_charges', value: 'Professional Charges'},
-    {label: 'od_ac_interest', value: 'OD A/C Interest'},
     {label: 'insurance', value: 'Insurance'},
+    {label: 'registration_charges', value: 'Registration Charges'},
+    {label: 'pop_charges', value: 'POP Charges'},
+    {label: 'bank_charges', value: 'Bank Charges'},
 ];
 
 const loanReturnCategory = [
     {label: 'related_party', value: 'Related Party'},
     {label: 'nbfc_oc_acc', value: 'NBFC OC Account'},
     {label: 'loan_principal_return', value: 'Loan Principal Return'},
+    {label: 'od_ac_interest', value: 'OD A/C Interest'},
+    {label: 'cc_ac_interest', value: 'CC A/C Interest'},
 ];
 
 const ownBankCategory = [
@@ -96,6 +101,15 @@ const ownBankCategory = [
 const capitalAssetPurchaseCategory = [
     {label: 'investment', value: 'Investment'},
     {label: 'asset_purchase', value: 'Asset Purchase'},
+    {label: 'inventory_purchase', value: 'Inventory Purchase'},
+];
+
+const taxesCategory = [
+    {label: 'esi', value: 'ESI'},
+    {label: 'pf', value: 'PF'},
+    {label: 'gst', value: 'GST'},
+    {label: 'tds', value: 'TDS'},
+    {label: 'income_tax', value: 'Income Tax'},
 ];
 
 const CATEGORY_UPLOAD_CONFIG: Record<string, { allowedUserIds?: number[]; uploadInvoice: boolean; uploadPI: boolean; uploadInvoiceAfterPayment: boolean }> = {
@@ -107,6 +121,8 @@ const CATEGORY_UPLOAD_CONFIG: Record<string, { allowedUserIds?: number[]; upload
     emi: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
     salary: { allowedUserIds: [13, 7, 21, 42, 26], uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
     software: { uploadInvoice: true, uploadPI: true, uploadInvoiceAfterPayment: true },
+    asset_purchase: { uploadInvoice: false, uploadPI: true, uploadInvoiceAfterPayment: true },
+    inventory_purchase: { uploadInvoice: false, uploadPI: true, uploadInvoiceAfterPayment: true },
     office_expenses: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
     printing_stationary: { uploadInvoice: true, uploadPI: true, uploadInvoiceAfterPayment: true },
     office_maintenance: { uploadInvoice: true, uploadPI: true, uploadInvoiceAfterPayment: true },
@@ -124,7 +140,6 @@ const CATEGORY_UPLOAD_CONFIG: Record<string, { allowedUserIds?: number[]; upload
     AU_9284: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
     amex_cc: { uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
     investment: { allowedUserIds: [13, 7, 21, 26], uploadInvoice: false, uploadPI: false, uploadInvoiceAfterPayment: false },
-    asset_purchase: { uploadInvoice: false, uploadPI: true, uploadInvoiceAfterPayment: false },
 };
 
 export default function CreateMakerRequestPage() {
@@ -157,6 +172,7 @@ export default function CreateMakerRequestPage() {
             loan_return: loanReturnCategory,
             own_bank: ownBankCategory,
             capital_asset_purchase: capitalAssetPurchaseCategory,
+            taxes: taxesCategory,
         };
         const cats = map[selectedHeading] || [];
         return cats.filter(c => {

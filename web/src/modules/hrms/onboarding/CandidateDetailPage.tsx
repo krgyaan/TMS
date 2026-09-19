@@ -640,7 +640,29 @@ export default function CandidateDetailPage() {
                       </div>
                       {(profile?.experience?.length ?? 0) > 0 ? (
                         <div className="space-y-3">
-                          {profile?.experience?.map((exp: ProfileExperienceItem) => (
+                          {profile?.experience?.map((exp: ProfileExperienceItem) =>
+                            (exp.companyName || "").trim().toLowerCase() ===
+                            "fresher" ? (
+                              <div
+                                key={exp.id}
+                                className="p-4 rounded-xl border bg-card flex items-center justify-between gap-3"
+                              >
+                                <div className="flex items-center gap-2.5">
+                                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-semibold">
+                                      Fresher
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Declared no prior work experience
+                                    </p>
+                                  </div>
+                                </div>
+                                <StatusBadge status={exp.hrStatus || "pending"} />
+                              </div>
+                            ) : (
                             <div key={exp.id} className="p-4 rounded-xl border bg-card">
                               <div className="flex justify-between items-start mb-2">
                                 <div className="flex items-center gap-2.5">

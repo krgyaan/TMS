@@ -55,7 +55,7 @@ export class PaymentRequestService {
         const requestNo = body.requestNo || await this.generateNumber(body.projectName);
 
         // WC insurance gate: block PO/VWO/Others payment requests if no active WC policy
-        if (body.projectId && body.paymentAgainst && !["insurance", "imprest"].includes(body.paymentAgainst)) {
+        if (body.projectId && body.paymentAgainst && !["insurance", "imprest", "gem_charges"].includes(body.paymentAgainst)) {
             const [project] = await this.db
                 .select({ insuranceRequired: projects.insuranceRequired })
                 .from(projects)
@@ -81,10 +81,6 @@ export class PaymentRequestService {
 
             if (!po) {
                 throw new NotFoundException("Purchase Order not found");
-            }
-
-            if (po.poApproved !== true) {
-                throw new BadRequestException("Cannot create payment request against an unapproved PO. Only approved POs are eligible.");
             }
 
             if (po?.amountAfterTds) {
@@ -123,10 +119,6 @@ export class PaymentRequestService {
                 throw new NotFoundException("Vendor Work Order not found");
             }
 
-            if (wo.woApproved !== true) {
-                throw new BadRequestException("Cannot create payment request against an unapproved WO. Only approved WOs are eligible.");
-            }
-
             if (wo?.amountAfterTds) {
                 const amountAfterTds = Number(wo.amountAfterTds);
                 const existingSumResult = await this.db
@@ -144,6 +136,28 @@ export class PaymentRequestService {
                         `Available: ${amountAfterTds - existingSum}, Already used: ${existingSum}`,
                     );
                 }
+            }
+        }
+
+        // Determine initial status based on PO/VWO approval
+        let initialStatus = 'pending';
+        if (body.purchaseOrderId) {
+            const po = await this.db
+                .select({ poApproved: purchaseOrders.poApproved })
+                .from(purchaseOrders)
+                .where(eq(purchaseOrders.id, body.purchaseOrderId))
+                .then(rows => rows[0]);
+            if (po && po.poApproved !== true) {
+                initialStatus = 'po_approval_pending';
+            }
+        } else if (body.vendorWorkOrderId) {
+            const wo = await this.db
+                .select({ woApproved: vendorWorkOrders.woApproved })
+                .from(vendorWorkOrders)
+                .where(eq(vendorWorkOrders.id, body.vendorWorkOrderId))
+                .then(rows => rows[0]);
+            if (wo && wo.woApproved !== true) {
+                initialStatus = 'po_approval_pending';
             }
         }
 
@@ -171,6 +185,7 @@ export class PaymentRequestService {
                     portalLink: body.portalLink || null,
                     billFiles: body.billFiles || [],
                     remark: body.remark,
+                    status: initialStatus,
                     requestedBy: userId,
                 })
                 .returning();
@@ -188,15 +203,24 @@ export class PaymentRequestService {
 
         this.logger.info(`Payment Request created: ${requestNo}`);
 
-        // Fire-and-forget WhatsApp notification
-        this.notifications.notifyNewPaymentRequest({
-          requestNo: pr.requestNo ?? '',
-          amount: pr.amount ?? 0,
-          partyName: pr.partyName ?? null,
-          portalLink: pr.portalLink ?? null,
-          requestedBy: userId,
-          category: pr.paymentAgainst ?? '',
-        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+        // Use the requestNo stored in the DB (not the transient local value)
+        const [storedPr] = await this.db
+            .select({ requestNo: paymentRequests.requestNo })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, pr.id))
+            .limit(1);
+
+        // Fire-and-forget WhatsApp notification (skip for po_approval_pending)
+        if (initialStatus !== 'po_approval_pending') {
+            this.notifications.notifyNewPaymentRequest({
+              requestNo: storedPr?.requestNo ?? pr.requestNo ?? '',
+              amount: pr.amount ?? 0,
+              partyName: pr.partyName ?? null,
+              portalLink: pr.portalLink ?? null,
+              requestedBy: userId,
+              category: pr.paymentAgainst ?? '',
+            }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+        }
 
         return pr;
     }
@@ -262,6 +286,7 @@ export class PaymentRequestService {
 
         const validTransitions: Record<string, string[]> = {
             pending: ["maker_done", "rejected"],
+            po_approval_pending: ["pending", "rejected"],
             maker_done: ["payment_done", "rejected"],
         };
 
@@ -293,6 +318,7 @@ export class PaymentRequestService {
 
             if (body.status === 'payment_done') {
               this.notifications.notifyPaymentDone({
+                requestNo: existing.requestNo ?? undefined,
                 amount: updated.amount ?? 0,
                 partyName: updated.partyName ?? null,
                 portalLink: updated.portalLink ?? null,
@@ -304,6 +330,7 @@ export class PaymentRequestService {
 
             if (body.status === 'rejected') {
               this.notifications.notifyRejection({
+                requestNo: existing.requestNo ?? undefined,
                 amount: updated.amount ?? 0,
                 partyName: updated.partyName ?? null,
                 portalLink: updated.portalLink ?? null,
@@ -315,6 +342,7 @@ export class PaymentRequestService {
 
             if (body.status === 'maker_done') {
               this.notifications.notifyMakerDone({
+                requestNo: existing.requestNo ?? undefined,
                 amount: updated.amount ?? 0,
                 partyName: updated.partyName ?? null,
                 portalLink: updated.portalLink ?? null,

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const WoBasicDetailFormSchema = z.object({
   tenderId: z.number().nullable().optional(),
+  orderType: z.enum(["single", "multiple"]).default("single").optional(),
 
   teamId: z.coerce.number().int().positive({ message: "Team is required" }).nullable().optional(),
   organizationId: z.coerce.number().nullable().optional(),
@@ -9,7 +10,7 @@ export const WoBasicDetailFormSchema = z.object({
   locationId: z.coerce.number().nullable().optional(),
 
   woNumber: z.string().min(1, "WO Number is Required"),
-  woDate: z.date().min(1, "WO Date is Required."),
+  woDate: z.coerce.date().nullable().refine(d => d !== null, { message: "WO Date is Required." }),
 
   woValuePreGst: z.coerce.number().nonnegative().min(1, "WO Value (pre GST) is Required."),
   woValueGstAmt: z.coerce.number().nonnegative().min(1, "WO Value (GST) is Required."),

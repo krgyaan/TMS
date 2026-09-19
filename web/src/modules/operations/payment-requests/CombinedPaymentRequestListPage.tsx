@@ -78,6 +78,10 @@ const CombinedPaymentRequestListPage: React.FC = () => {
         };
 
         return rows.filter((row) => {
+            // Hide po_approval_pending from accounts side
+            if (!isOperationsSection && row.status === "po_approval_pending") {
+                return false;
+            }
             const category = row.paymentAgainst;
             if (team5Categories.has(category)) {
                 return currentTeamId === 5 || currentUserId === 7 || currentUserId === 21 || currentUserId === 13;
@@ -88,7 +92,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             }
             return true;
         });
-    }, [rows, user?.team?.id, user?.id]);
+    }, [rows, user?.team?.id, user?.id, isOperationsSection]);
 
     const { activeTab: activeSubTab, setActiveTab: setActiveSubTab } = usePersistentTableState<SubTab>({
         storageKey: "payment-requests-combined-subtab",
@@ -100,12 +104,12 @@ const CombinedPaymentRequestListPage: React.FC = () => {
         if (activeSubTab === "all") return visibleRows;
         if (activeSubTab === "payment_done") return visibleRows.filter((r) => r.status === "payment_done");
         if (activeSubTab === "rejected") return visibleRows.filter((r) => r.status === "rejected");
-        return visibleRows.filter((r) => r.status === "pending" || r.status === "maker_done");
+        return visibleRows.filter((r) => r.status === "pending" || r.status === "maker_done" || r.status === "po_approval_pending");
     }, [visibleRows, activeSubTab]);
 
     const subtabCounts = useMemo(() => ({
         all: visibleRows.length,
-        pending: visibleRows.filter((r) => r.status === "pending" || r.status === "maker_done").length,
+        pending: visibleRows.filter((r) => r.status === "pending" || r.status === "maker_done" || r.status === "po_approval_pending").length,
         payment_done: visibleRows.filter((r) => r.status === "payment_done").length,
         rejected: visibleRows.filter((r) => r.status === "rejected").length,
     }), [visibleRows]);
@@ -185,7 +189,7 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             label: "Upload Invoice",
             icon: <Upload className="h-4 w-4" />,
             onClick: handleUploadInvoice,
-            visible: (row) => row.status !== "rejected" && CATEGORIES_NEED_INVOICE_AFTER_PAYMENT.has(row.paymentAgainst),
+            visible: (row) => row.status !== "rejected" && row.status !== "po_approval_pending" && CATEGORIES_NEED_INVOICE_AFTER_PAYMENT.has(row.paymentAgainst),
         },
         { label: "Reject", icon: <Ban className="h-4 w-4" />, onClick: handleReject, className: "text-red-600", visible: (row) => row.status === "pending" || row.status === "maker_done" },
     ], [handleView, handleMakerDone, handlePaymentDone, handleUploadInvoice, handleReject, CATEGORIES_NEED_INVOICE_AFTER_PAYMENT]);

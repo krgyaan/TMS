@@ -4,6 +4,7 @@ import type { WoBasicDetail, CreateWoBasicDetailDto, UpdateWoBasicDetailDto } fr
 
 export const buildDefaultValues = (): WoBasicDetailFormValues => ({
   tenderId: null,
+  orderType: "single",
   teamId: null,
   organizationId: null,
   itemId: null,
@@ -49,6 +50,7 @@ export const buildDefaultValues = (): WoBasicDetailFormValues => ({
 export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues => {
   return {
     tenderId: data.tenderId,
+    orderType: data.orderType === "multiple" ? "multiple" : "single",
     teamId: data.team,
     woNumber: String(data.woNumber || ""),
     woDate: data.woDate ? new Date(data.woDate) : null,
@@ -99,6 +101,7 @@ export const mapFormToCreatePayload = (values: WoBasicDetailFormValues): CreateW
   };
 
   if (values.tenderId) payload.tenderId = values.tenderId;
+  if (values.orderType) payload.orderType = values.orderType;
   if (values.woValuePreGst !== undefined) payload.woValuePreGst = String(values.woValuePreGst);
   if (values.woValueGstAmt !== undefined) payload.woValueGstAmt = String(values.woValueGstAmt);
   if (values.budgetPreGst !== undefined) payload.budgetPreGst = String(values.budgetPreGst);
@@ -127,6 +130,8 @@ export const mapFormToUpdatePayload = (values: WoBasicDetailFormValues): UpdateW
     projectName: values.projectName || "",
     tmsDocuments: values.tmsDocuments,
   };
+
+  if (values.orderType) payload.orderType = values.orderType;
 
   if (values.woValuePreGst !== undefined) payload.woValuePreGst = String(values.woValuePreGst);
   if (values.woValueGstAmt !== undefined) payload.woValueGstAmt = String(values.woValueGstAmt);

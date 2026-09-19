@@ -94,7 +94,11 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = () => {
                     <div className="absolute -inset-1 rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 blur-xl" />
                     <Avatar className="relative h-28 w-28 sm:h-32 sm:w-32 rounded-3xl border-4 border-background shadow-xl">
                       <AvatarImage
-                        src={PROFILE.profilePhoto || undefined}
+                        src={
+                          PROFILE.profilePhoto ||
+                          CURRENT_USER.profilePhoto ||
+                          undefined
+                        }
                         alt={fullName}
                         className="object-cover"
                       />

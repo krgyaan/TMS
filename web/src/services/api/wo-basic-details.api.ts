@@ -1,8 +1,18 @@
-import { BaseApiService } from './base.service';
-import type { 
-  WoBasicDetail, WoBasicDetailWithRelations, CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, 
-  WoBasicDetailsFilters, OeAssignments, WoBasicDetailsDashboardSummary, PaginatedResult, WoBasicDetailPrefillData 
+import type {
+  AssignOeDto,
+  CreateWoBasicDetailDto,
+  OeAssignments,
+  PaginatedResult,
+  ReviseOrderDto,
+  UpdateWoBasicDetailDto,
+  WoBasicDetail,
+  WoBasicDetailPrefillData,
+  WoBasicDetailsDashboardSummary,
+  WoBasicDetailsFilters,
+  WoBasicDetailWithRelations,
+  WoOrderRevision
 } from '@/modules/operations/types/wo.types';
+import { BaseApiService } from './base.service';
 
 class WoBasicDetailsService extends BaseApiService {
   constructor() {
@@ -67,6 +77,15 @@ class WoBasicDetailsService extends BaseApiService {
 
   async getOeAssignments(id: number): Promise<OeAssignments> {
     return this.get<OeAssignments>(`/${id}/oe-assignments`);
+  }
+
+  // Order Revision Operations
+  async reviseOrder(id: number, data: ReviseOrderDto): Promise<WoBasicDetail & { revisions: WoOrderRevision[] }> {
+    return this.post<WoBasicDetail & { revisions: WoOrderRevision[] }>(`/${id}/revise-order`, data);
+  }
+
+  async getOrderRevisions(id: number): Promise<WoOrderRevision[]> {
+    return this.get<WoOrderRevision[]>(`/${id}/revisions`);
   }
 
   // Utility Operations

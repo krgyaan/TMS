@@ -51,7 +51,7 @@ export class AuthService {
     ) {}
 
     async loginWithPassword(email: string, password: string): Promise<SessionWithToken> {
-        const user = await this.usersService.findByEmail(email);
+        const user = await this.usersService.findByEmail(email.toLowerCase().trim());
         if (!user) {
             throw new UnauthorizedException("Invalid credentials");
         }
@@ -199,7 +199,7 @@ export class AuthService {
             teamId: authInfo?.primaryTeamId ?? null,
             dataScope: authInfo?.dataScope ?? DataScope.SELF,
             canSwitchTeams: authInfo?.canSwitchTeams ?? false,
-            permissions: permissions,
+            permissions: [],
         };
 
         const accessToken = await this.jwtService.signAsync(payload);
