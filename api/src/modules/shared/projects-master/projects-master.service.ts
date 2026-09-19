@@ -11,6 +11,8 @@ import { locations } from "@/db/schemas/master/locations.schema";
 import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
 import { tenderInformation } from "@/db/schemas/tendering/tender-info-sheet.schema";
 import { users } from "@/db/schemas/auth/users.schema";
+import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
+import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
 import { CashFlowService } from "@/modules/operations/cash-flows/cash-flow.service";
 
 import type {
@@ -220,6 +222,21 @@ export class ProjectsMasterService {
                     tenderName: tenderInfos.tenderName,
                     tenderNo: tenderInfos.tenderNo,
                     teamMemberName: users.name,
+                    totalPaymentDone: sql<number>`
+                        COALESCE((
+                            SELECT SUM(amount::numeric)
+                            FROM project_payment_requests
+                            WHERE project_id = ${projects.id}
+                            AND status = 'payment_done'
+                        ), 0)
+                    `,
+                    totalInvoicesReceived: sql<number>`
+                        COALESCE((
+                            SELECT SUM((value_pre_gst + gst_amount)::numeric)
+                            FROM project_purchase_invoices
+                            WHERE project_id = ${projects.id}
+                        ), 0)
+                    `,
                 })
                 .from(projects)
                 .leftJoin(organizations, eq(organizations.id, projects.organisationId as any))
@@ -273,6 +290,8 @@ export class ProjectsMasterService {
             tenderName: row.tenderName,
             tenderNo: row.tenderNo,
             teamMemberName: row.teamMemberName,
+            totalPaymentDone: Number(row.totalPaymentDone ?? 0),
+            totalInvoicesReceived: Number(row.totalInvoicesReceived ?? 0),
         }));
 
         return {

@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectCashFlows, useProjectCashFlowSummary } from "@/hooks/api/useCashFlows";
+import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { ColDef, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
@@ -50,11 +51,11 @@ export const CashFlowSection: React.FC<CashFlowSectionProps> = ({
     const loading = flowsLoading || summaryLoading;
 
     const summaryCards = useMemo(() => [
-        { title: "Total Inflow", value: summary?.totalInflow ?? 0, icon: "↗" },
-        { title: "Total Outflow", value: summary?.totalOutflow ?? 0, icon: "↘" },
-        { title: "Total TDS", value: summary?.totalTds ?? 0, icon: "₹" },
-        { title: "Total GST", value: summary?.totalGst ?? 0, icon: "📊" },
-        { title: "Net Cash Flow", value: summary?.netCashFlow ?? 0, icon: "💰" },
+        { title: "Total Inflow", value: summary?.totalInflow ?? 0},
+        { title: "Total Outflow", value: summary?.totalOutflow ?? 0},
+        { title: "Total TDS", value: summary?.totalTds ?? 0},
+        { title: "Total GST", value: summary?.totalGst ?? 0},
+        { title: "Net Cash Flow", value: summary?.netCashFlow ?? 0},
     ], [summary]);
 
     const columns = useMemo<ColDef[]>(() => [
@@ -83,7 +84,6 @@ export const CashFlowSection: React.FC<CashFlowSectionProps> = ({
             sortable: true,
             width: 140,
             valueFormatter: (p: ValueFormatterParams) => formatINR(p.value),
-            cellClass: "font-mono text-right",
         },
         {
             field: "direction",
@@ -107,6 +107,9 @@ export const CashFlowSection: React.FC<CashFlowSectionProps> = ({
             sortable: true,
             filter: true,
             width: 140,
+            cellRenderer: (p: CustomCellRendererProps) => (
+                <span className="capitalize">{p.value || "-"}</span>
+            ),
         },
         {
             field: "referenceNo",
@@ -126,11 +129,7 @@ export const CashFlowSection: React.FC<CashFlowSectionProps> = ({
             valueFormatter: (p: ValueFormatterParams) => {
                 if (!p.value) return "-";
                 const date = new Date(p.value);
-                return date.toLocaleDateString("en-IN", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                });
+                return formatDate(date);
             },
         },
     ], []);
@@ -181,7 +180,6 @@ export const CashFlowSection: React.FC<CashFlowSectionProps> = ({
                     {summaryCards.map((card, idx) => (
                         <Card key={idx} className="h-20">
                             <CardContent className="flex flex-col justify-center items-start p-4 h-full">
-                                <div className="text-2xl mb-1">{card.icon}</div>
                                 <p className="text-xs text-muted-foreground">{card.title}</p>
                                 <p className="text-lg font-semibold font-mono">{formatINR(card.value)}</p>
                             </CardContent>
