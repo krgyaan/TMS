@@ -67,13 +67,13 @@ export default function ProjectShowPage() {
 
     return (
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "operation" | "tendering" | "cash-flow")}>
-            <TabsList className="mb-4">
+            <TabsList className="m-auto">
                 <TabsTrigger value="operation">Operation Details</TabsTrigger>
                 <TabsTrigger value="tendering">Tendering Details</TabsTrigger>
                 <TabsTrigger value="cash-flow">Cash Flow</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="operation">
+            <TabsContent value="operation" className="mt-6">
                 {woBasicDetailId ? (
                     <ShowPageLayout
                         steps={steps}
@@ -94,7 +94,7 @@ export default function ProjectShowPage() {
                 )}
             </TabsContent>
 
-            <TabsContent value="tendering">
+            <TabsContent value="tendering" className="mt-6">
                 {activeTab === "tendering" && tenderId ? (
                     <TenderViewPage
                         tenderId={tenderId}
@@ -110,7 +110,7 @@ export default function ProjectShowPage() {
                 )}
             </TabsContent>
 
-            <TabsContent value="cash-flow">
+            <TabsContent value="cash-flow" className="mt-6">
                 <CashFlowSection projectId={projectId} />
             </TabsContent>
         </Tabs>
