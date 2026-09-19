@@ -198,3 +198,163 @@ def test_extract_endpoint_works_without_atc_or_boq_files():
     assert response.status_code == 200
     assert captured_kwargs.get("explicit_atc_paths") == []
     assert captured_kwargs.get("explicit_boq_path") is None
+
+
+def test_extract_endpoint_returns_dual_sources_with_conflict():
+    """
+    Validates that /extract returns the additive 'sources' object per field:
+    - contains 'main_tender' with value, page, and snippet
+    - contains 'atc' with value, page, and snippet
+    - accurately computes 'has_conflict': True when values disagree
+    - preserves existing resolved value, confidence, and source intact.
+    """
+    mock_infosheet_data = {
+        "emd_amount_display": "50000.0",
+        "tender_value_display": "1000000.0",
+        "_info_sheet_statuses": {
+            "emd_amount_display": "OK",
+            "tender_value_display": "OK",
+        },
+        "_info_sheet_sources": {
+            "emd_amount_display": "atc",
+            "tender_value_display": "main_tender",
+        },
+        "_dual_sources": {
+            "emdAmount": {
+                "self_classified_atc": False,
+                "has_conflict": True,
+                "main_tender": {
+                    "value": 100000.0,
+                    "raw_value": "Rs. 1,00,000",
+                    "page": 3,
+                    "snippet": "EMD Amount: Rs. 1,00,000",
+                },
+                "atc": {
+                    "value": 50000.0,
+                    "raw_value": "Rs. 50,000",
+                    "page": 1,
+                    "snippet": "Revised EMD: Rs. 50,000",
+                },
+            },
+            "tenderValue": {
+                "self_classified_atc": False,
+                "has_conflict": False,
+                "main_tender": {
+                    "value": 1000000.0,
+                    "raw_value": "Rs. 10,00,000",
+                    "page": 2,
+                    "snippet": "Estimated Tender Value: Rs. 10,00,000",
+                },
+                "atc": None,
+            },
+        },
+        "_self_classified_atc": False,
+        "_has_atc": True,
+        "_ambiguous_field_conflicts": {
+            "emdAmount": {
+                "main_tender": 100000.0,
+                "atc": 50000.0,
+                "main_tender_page": 3,
+                "atc_page": 1,
+                "main_tender_snippet": "EMD Amount: Rs. 1,00,000",
+                "atc_snippet": "Revised EMD: Rs. 50,000",
+            }
+        },
+        "missing_fields": [],
+    }
+
+    with patch("app.routers.extract.ingest_parent_tender_pdf", return_value=mock_infosheet_data):
+        response = client.post(
+            "/extract",
+            files={"pdf_file": ("test_tender.pdf", b"%PDF-1.4 mock content", "application/pdf")},
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    # Top-level flags
+    assert data["self_classified_atc"] is False
+    assert data["has_atc"] is True
+    assert "ambiguous_field_conflicts" in data
+    assert "emdAmount" in data["ambiguous_field_conflicts"]
+
+    fields = data["fields"]
+
+    # 1. Existing contract remains untouched
+    assert fields["emdAmount"]["value"] == 50000.0
+    assert fields["emdAmount"]["confidence"] == "high"
+    assert fields["emdAmount"]["source"] == "atc"
+
+    # 2. Additive dual-source block
+    emd_sources = fields["emdAmount"]["sources"]
+    assert emd_sources["self_classified_atc"] is False
+    assert emd_sources["has_conflict"] is True
+    assert emd_sources["main_tender"]["value"] == 100000.0
+    assert emd_sources["main_tender"]["page"] == 3
+    assert "1,00,000" in emd_sources["main_tender"]["snippet"]
+    assert emd_sources["atc"]["value"] == 50000.0
+    assert emd_sources["atc"]["page"] == 1
+    assert "50,000" in emd_sources["atc"]["snippet"]
+
+    # 3. Main-only field has atc: None and has_conflict: False
+    tv_sources = fields["tenderValue"]["sources"]
+    assert tv_sources["self_classified_atc"] is False
+    assert tv_sources["has_conflict"] is False
+    assert tv_sources["main_tender"]["value"] == 1000000.0
+    assert tv_sources["main_tender"]["page"] == 2
+    assert tv_sources["atc"] is None
+
+
+def test_extract_endpoint_handles_self_classified_atc():
+    """
+    When a single PDF is self-classified as ATC:
+    - top-level self_classified_atc is True
+    - field sources.self_classified_atc is True
+    - main_tender is None (no fabricated duplicate data)
+    - atc contains the extracted value
+    - has_conflict is False
+    """
+    mock_infosheet_data = {
+        "emd_amount_display": "75000.0",
+        "_info_sheet_statuses": {
+            "emd_amount_display": "OK",
+        },
+        "_info_sheet_sources": {
+            "emd_amount_display": "atc",
+        },
+        "_dual_sources": {
+            "emdAmount": {
+                "self_classified_atc": True,
+                "has_conflict": False,
+                "main_tender": None,
+                "atc": {
+                    "value": 75000.0,
+                    "raw_value": "Rs. 75,000",
+                    "page": 1,
+                    "snippet": "EMD: Rs. 75,000",
+                },
+            },
+        },
+        "_self_classified_atc": True,
+        "_has_atc": True,
+        "_ambiguous_field_conflicts": {},
+        "missing_fields": [],
+    }
+
+    with patch("app.routers.extract.ingest_parent_tender_pdf", return_value=mock_infosheet_data):
+        response = client.post(
+            "/extract",
+            files={"pdf_file": ("Buyer_ATC_Document.pdf", b"%PDF-1.4 mock content", "application/pdf")},
+        )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["self_classified_atc"] is True
+
+    emd_sources = data["fields"]["emdAmount"]["sources"]
+    assert emd_sources["self_classified_atc"] is True
+    assert emd_sources["main_tender"] is None
+    assert emd_sources["atc"]["value"] == 75000.0
+    assert emd_sources["atc"]["page"] == 1
+    assert emd_sources["has_conflict"] is False

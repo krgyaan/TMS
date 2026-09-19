@@ -941,7 +941,15 @@ def generate_bidder_readiness_summary(
     return summary
 
 
-def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[List[Dict[str, Any]]] = None, job_id: str = "Unknown", atc_full_text: Optional[str] = None) -> Dict[str, str]:
+def build_infosheet_data(
+    sections: List[Dict[str, Any]],
+    page_texts: Optional[List[Dict[str, Any]]] = None,
+    job_id: str = "Unknown",
+    atc_full_text: Optional[str] = None,
+    dual_sources: Optional[Dict[str, Any]] = None,
+    is_self_classified_atc: bool = False,
+    has_atc: bool = False,
+) -> Dict[str, Any]:
     """
     Flattens the extracted sections and runs regex match fallbacks on the raw page texts
     to resolve all Visual Layout variables defined in INFOSHEET_DATA_KEYS.
@@ -3185,6 +3193,24 @@ def build_infosheet_data(sections: List[Dict[str, Any]], page_texts: Optional[Li
         if key not in info_sheet_sources and st != FIELD_STATUS_MISSING:
             info_sheet_sources[key] = "main_tender"
 
+    if dual_sources:
+        for k, d in dual_sources.items():
+            if isinstance(d, dict) and d.get("has_conflict"):
+                m = d.get("main_tender") or {}
+                a = d.get("atc") or {}
+                if k not in ambiguous_field_conflicts:
+                    ambiguous_field_conflicts[k] = {
+                        "main_tender": m.get("value"),
+                        "atc": a.get("value"),
+                        "main_tender_page": m.get("page"),
+                        "atc_page": a.get("page"),
+                        "main_tender_snippet": m.get("snippet"),
+                        "atc_snippet": a.get("snippet"),
+                    }
+
+    res_dict["_dual_sources"] = dual_sources or {}
+    res_dict["_self_classified_atc"] = is_self_classified_atc
+    res_dict["_has_atc"] = has_atc
     res_dict["_info_sheet_statuses"] = field_statuses
     res_dict["status_summary"] = status_summary
     res_dict["missing_fields"] = missing_fields

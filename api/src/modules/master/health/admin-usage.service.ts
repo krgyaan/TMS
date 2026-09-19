@@ -6,6 +6,7 @@ import { DRIZZLE } from '@/db/database.module';
 export interface AdminReconciliationReport {
     status: 'matched' | 'drift_detected' | 'unconfigured' | 'error';
     message: string;
+    windowLabel?: string;
     appTrackedTokens: number;
     appTrackedCostUsd: number;
     anthropicVerifiedTokens: number | null;
@@ -59,7 +60,8 @@ export class AdminUsageService {
         if (!adminKey || adminKey.toLowerCase().includes('placeholder') || adminKey.toLowerCase().includes('your_')) {
             const unconfiguredReport: AdminReconciliationReport = {
                 status: 'unconfigured',
-                message: 'ANTHROPIC_ADMIN_API_KEY not configured. Set organization admin key to enable verified reconciliation.',
+                message: 'ANTHROPIC_ADMIN_API_KEY not configured. Set organization admin key to enable daily verified reconciliation.',
+                windowLabel: 'Today (UTC)',
                 appTrackedTokens: appTracked.tokens,
                 appTrackedCostUsd: appTracked.costUsd,
                 anthropicVerifiedTokens: null,
@@ -124,8 +126,9 @@ export class AdminUsageService {
                 status,
                 message:
                     status === 'matched'
-                        ? `Usage reconciled with Anthropic Organization API (drift: ${driftPercent}%)`
-                        : `Drift detected between internal telemetry and Anthropic API (${driftPercent}% variance)`,
+                        ? `Today's usage reconciled with Anthropic Organization API (drift: ${driftPercent}%)`
+                        : `Drift detected between internal telemetry and Anthropic API for today's window (${driftPercent}% variance)`,
+                windowLabel: 'Today (UTC)',
                 appTrackedTokens: appTracked.tokens,
                 appTrackedCostUsd: appTracked.costUsd,
                 anthropicVerifiedTokens: anthropicTokens,
@@ -145,7 +148,8 @@ export class AdminUsageService {
 
             const errorReport: AdminReconciliationReport = {
                 status: 'error',
-                message: `Failed to contact Anthropic Usage API: ${(err as Error).message}`,
+                message: `Failed to contact Anthropic Usage API for today's window: ${(err as Error).message}`,
+                windowLabel: 'Today (UTC)',
                 appTrackedTokens: appTracked.tokens,
                 appTrackedCostUsd: appTracked.costUsd,
                 anthropicVerifiedTokens: null,
@@ -178,7 +182,11 @@ export class AdminUsageService {
                 tokens: Number(row.tokens || 0),
                 costUsd: Number(parseFloat(String(row.cost_usd || 0)).toFixed(4)),
             };
-        } catch {
+        } catch (err: unknown) {
+            this.logger.error(
+                `Failed to query app-tracked usage: ${(err as Error).message}`,
+                (err as Error).stack,
+            );
             return { tokens: 0, costUsd: 0 };
         }
     }

@@ -299,4 +299,24 @@ describe('ClaudeUsageService & Health Controller RBAC Security', () => {
             expect(report.message).toContain('ANTHROPIC_ADMIN_API_KEY not configured');
         });
     });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 5. QUERY ERROR LOGGING & VISIBILITY
+    // ─────────────────────────────────────────────────────────────────────────
+    describe('Query Error Logging & Visibility', () => {
+        it('should log query errors and safely return fallback defaults when db.execute throws', async () => {
+            const loggerSpy = jest.spyOn((claudeUsageService as any).logger, 'error').mockImplementation();
+            mockDb.execute.mockRejectedValueOnce(new Error('Simulated database connection error'));
+
+            const telemetry = await claudeUsageService.getClaudeTelemetry();
+
+            expect(loggerSpy).toHaveBeenCalledWith(
+                expect.stringContaining('Failed to query aggregate Claude stats: Simulated database connection error'),
+                expect.any(String),
+            );
+            expect(telemetry.status).toBe('ok');
+            expect(telemetry.summary.totalTokens).toBe(0);
+            loggerSpy.mockRestore();
+        });
+    });
 });

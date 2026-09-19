@@ -103,18 +103,156 @@ TMS_TO_SOURCE_KEY_MAP: Dict[str, str] = {
 }
 
 
+def _normalize_extracted_value_for_key(tms_key: str, raw_val: Any) -> Any:
+    """Normalizes raw string extraction to typed value matching TMS DTO schema."""
+    if raw_val is None or str(raw_val).strip() in ("", "None", "NA", "N/A", "Not Found", "⚠️ MISSING"):
+        return None
+    if isinstance(raw_val, (int, float, bool)):
+        return raw_val
+    s = str(raw_val).strip()
+
+    float_keys = {
+        "emdAmount", "tenderValue", "processingFeeAmount", "tenderFeeAmount",
+        "orderValue1", "orderValue2", "orderValue3", "avgAnnualTurnoverValue",
+        "workingCapitalValue", "netWorthValue", "solvencyCertificateValue",
+        "pbgPercentage", "sdPercentage", "ldPercentagePerWeek", "maxLdPercentage",
+        "paymentTermsSupply", "paymentTermsInstallation"
+    }
+    if tms_key in float_keys:
+        from app.services.tms_field_mapper import _parse_float
+        parsed = _parse_float(s)
+        return parsed if parsed is not None else s
+
+    int_keys = {
+        "bidValidityDays", "deliveryTimeSupply", "deliveryTimeInstallationDays",
+        "pbgDurationMonths", "sdDurationMonths", "techEligibilityAge"
+    }
+    if tms_key in int_keys:
+        from app.services.tms_field_mapper import _parse_int
+        parsed = _parse_int(s)
+        return parsed if parsed is not None else s
+
+    bool_keys = {
+        "reverseAuctionApplicable", "deliveryTimeInstallationInclusive", "physicalDocsRequired"
+    }
+    if tms_key in bool_keys:
+        s_lower = s.lower()
+        if "yes" in s_lower or "true" in s_lower or "applicable" in s_lower:
+            return True
+        if "no" in s_lower or "false" in s_lower or "not" in s_lower:
+            return False
+
+    return s
+
+
+def _resolve_dual_source_for_tms_key(
+    tms_key: str,
+    source_field_name: Optional[str],
+    dual_sources: Dict[str, Any],
+    is_self_classified_atc: bool,
+    has_atc: bool,
+    clean_value: Any,
+    source: Optional[str],
+) -> Dict[str, Any]:
+    candidates = [tms_key, tms_key.lower()]
+    if source_field_name:
+        candidates.extend([
+            source_field_name,
+            source_field_name.lower(),
+            source_field_name.replace("_display", ""),
+            source_field_name.replace("_display", "").lower(),
+            source_field_name.replace("_display", "").replace("_", " ").title(),
+        ])
+
+    dual_entry = None
+    for cand in candidates:
+        if cand in dual_sources:
+            dual_entry = dual_sources[cand]
+            break
+
+    if is_self_classified_atc:
+        atc_item = None
+        if dual_entry and dual_entry.get("atc"):
+            atc_item = dict(dual_entry["atc"])
+        elif clean_value is not None:
+            atc_item = {"value": clean_value, "raw_value": str(clean_value), "page": 1, "snippet": ""}
+        if atc_item:
+            norm = _normalize_extracted_value_for_key(tms_key, atc_item.get("value"))
+            if norm is not None:
+                atc_item["raw_value"] = str(atc_item.get("value", ""))
+                atc_item["value"] = norm
+        return {
+            "self_classified_atc": True,
+            "has_conflict": False,
+            "main_tender": None,
+            "atc": atc_item,
+        }
+
+    main_item = None
+    atc_item = None
+    if dual_entry:
+        if dual_entry.get("main_tender"):
+            main_item = dict(dual_entry["main_tender"])
+        if dual_entry.get("atc"):
+            atc_item = dict(dual_entry["atc"])
+
+    # Fallback attribution if dual_entry had no record but clean_value exists
+    if not main_item and not atc_item and clean_value is not None:
+        if source == "atc" and has_atc:
+            atc_item = {"value": clean_value, "raw_value": str(clean_value), "page": 1, "snippet": ""}
+        elif source == "regex" or not has_atc:
+            main_item = {"value": clean_value, "raw_value": str(clean_value), "page": 1, "snippet": ""}
+
+    if main_item and main_item.get("value") is not None:
+        norm = _normalize_extracted_value_for_key(tms_key, main_item.get("value"))
+        if norm is not None:
+            main_item["raw_value"] = str(main_item.get("value", ""))
+            main_item["value"] = norm
+
+    if atc_item and atc_item.get("value") is not None:
+        norm = _normalize_extracted_value_for_key(tms_key, atc_item.get("value"))
+        if norm is not None:
+            atc_item["raw_value"] = str(atc_item.get("value", ""))
+            atc_item["value"] = norm
+
+    has_conflict = False
+    if (
+        main_item is not None
+        and atc_item is not None
+        and main_item.get("value") is not None
+        and atc_item.get("value") is not None
+    ):
+        mv = main_item.get("value")
+        av = atc_item.get("value")
+        if isinstance(mv, (int, float)) and isinstance(av, (int, float)):
+            has_conflict = bool(abs(mv - av) > 1e-4)
+        else:
+            has_conflict = bool(str(mv).strip().lower() != str(av).strip().lower())
+
+    return {
+        "self_classified_atc": False,
+        "has_conflict": has_conflict,
+        "main_tender": main_item,
+        "atc": atc_item,
+    }
+
+
 def _format_field_object(
     tms_key: str,
     dto_value: Any,
     source_field_name: Optional[str],
     field_statuses: Dict[str, str],
     field_sources: Dict[str, str],
+    dual_sources: Optional[Dict[str, Any]] = None,
+    is_self_classified_atc: bool = False,
+    has_atc: bool = False,
 ) -> Dict[str, Any]:
     """
     Transforms an extracted TMS DTO field into a structured object containing:
     - value: Any (None for missing fields, or DTO-converted value)
     - confidence: "high" | "fallback" | "missing" | "not_applicable"
     - source: "regex" | "atc" | "llm" | None
+    - sources: { self_classified_atc: bool, has_conflict: bool, main_tender: dict | None, atc: dict | None }
     """
     status_val = field_statuses.get(source_field_name) if source_field_name else None
     raw_source = field_sources.get(source_field_name) if source_field_name else None
@@ -178,10 +316,21 @@ def _format_field_object(
                 else:
                     source = None
 
+    sources_obj = _resolve_dual_source_for_tms_key(
+        tms_key=tms_key,
+        source_field_name=source_field_name,
+        dual_sources=dual_sources or {},
+        is_self_classified_atc=is_self_classified_atc,
+        has_atc=has_atc,
+        clean_value=clean_value,
+        source=source,
+    )
+
     return {
         "value": clean_value,
         "confidence": confidence,
         "source": source,
+        "sources": sources_obj,
     }
 
 
@@ -278,6 +427,10 @@ async def extract_tender(
 
             field_statuses: Dict[str, str] = infosheet_data.get("_info_sheet_statuses", {})
             field_sources: Dict[str, str] = infosheet_data.get("_info_sheet_sources", {})
+            dual_sources: Dict[str, Any] = infosheet_data.get("_dual_sources", {})
+            is_self_classified_atc: bool = bool(infosheet_data.get("_self_classified_atc", False))
+            has_atc: bool = bool(infosheet_data.get("_has_atc", bool(atc_paths)))
+            ambiguous_field_conflicts: Dict[str, Any] = infosheet_data.get("_ambiguous_field_conflicts", {})
 
             # 1. Transform raw extraction dictionary into TMS DTO shape
             tms_dto: Dict[str, Any] = map_to_tms_dto(infosheet_data)
@@ -297,6 +450,9 @@ async def extract_tender(
                     source_field_name=source_key,
                     field_statuses=field_statuses,
                     field_sources=field_sources,
+                    dual_sources=dual_sources,
+                    is_self_classified_atc=is_self_classified_atc,
+                    has_atc=has_atc,
                 )
                 fields[tms_key] = field_obj
 
@@ -316,6 +472,9 @@ async def extract_tender(
                 "missing_fields": missing_fields,
                 "processing_time_ms": processing_time_ms,
                 "llm_usage": infosheet_data.get("_llm_usage"),
+                "self_classified_atc": is_self_classified_atc,
+                "has_atc": has_atc,
+                "ambiguous_field_conflicts": ambiguous_field_conflicts,
             }
 
 

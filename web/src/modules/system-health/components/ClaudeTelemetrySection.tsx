@@ -209,6 +209,9 @@ export function ClaudeTelemetrySection() {
                             <div>
                                 <div className="flex items-center gap-2 text-sm font-medium">
                                     <span>Anthropic Admin API Cross-Check</span>
+                                    <Badge variant="secondary" className="text-[10px]">
+                                        {reconciliation.windowLabel || 'Today (UTC)'}
+                                    </Badge>
                                     {reconciliation.status === 'matched' && (
                                         <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 text-[10px]">
                                             <CheckCircle2 className="mr-1 h-3 w-3" /> Matched
@@ -224,6 +227,11 @@ export function ClaudeTelemetrySection() {
                                             Unverified (Admin Key Not Set)
                                         </Badge>
                                     )}
+                                    {reconciliation.status === 'error' && (
+                                        <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive text-[10px]">
+                                            <AlertTriangle className="mr-1 h-3 w-3" /> Error / API Unavailable
+                                        </Badge>
+                                    )}
                                 </div>
                                 <p className="text-xs text-muted-foreground">{reconciliation.message}</p>
                             </div>
@@ -232,13 +240,13 @@ export function ClaudeTelemetrySection() {
                         {reconciliation.anthropicVerifiedTokens != null && (
                             <div className="flex items-center gap-6 text-xs">
                                 <div>
-                                    <span className="text-muted-foreground">App-Tracked: </span>
+                                    <span className="text-muted-foreground">Today's App-Tracked: </span>
                                     <span className="font-semibold text-foreground">
                                         {reconciliation.appTrackedTokens.toLocaleString()} tok
                                     </span>
                                 </div>
                                 <div>
-                                    <span className="text-muted-foreground">Anthropic-Verified: </span>
+                                    <span className="text-muted-foreground">Today's Anthropic-Verified: </span>
                                     <span className="font-semibold text-foreground">
                                         {reconciliation.anthropicVerifiedTokens.toLocaleString()} tok
                                     </span>
@@ -294,6 +302,9 @@ export function ClaudeTelemetrySection() {
                             <Sparkles className="h-4 w-4 text-indigo-500" />
                             Total Tokens Consumed
                         </div>
+                        <Badge variant="secondary" className="text-[10px]">
+                            All-time
+                        </Badge>
                     </div>
                     <div>
                         <div className="text-2xl font-bold tracking-tight">
@@ -316,6 +327,9 @@ export function ClaudeTelemetrySection() {
                             <Users className="h-4 w-4 text-blue-500" />
                             Active Users
                         </div>
+                        <Badge variant="secondary" className="text-[10px]">
+                            All-time
+                        </Badge>
                     </div>
                     <div>
                         <div className="text-2xl font-bold tracking-tight">
@@ -335,6 +349,9 @@ export function ClaudeTelemetrySection() {
                             <Coins className="h-4 w-4 text-amber-500" />
                             Estimated Total Cost
                         </div>
+                        <Badge variant="secondary" className="text-[10px]">
+                            All-time
+                        </Badge>
                     </div>
                     <div>
                         <div className="text-2xl font-bold tracking-tight text-emerald-600">
@@ -428,6 +445,9 @@ export function ClaudeTelemetrySection() {
                         <div className="flex items-center gap-2">
                             <Users className="h-4 w-4 text-muted-foreground" />
                             <CardTitle className="text-sm font-semibold">User Token Consumption Leaderboard</CardTitle>
+                            <Badge variant="secondary" className="text-[10px]">
+                                All-time
+                            </Badge>
                         </div>
                         <div className="relative w-64">
                             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
@@ -512,7 +532,12 @@ export function ClaudeTelemetrySection() {
                 <CardHeader className="px-5 py-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                            <CardTitle className="text-sm font-semibold">Tender Token & Cost Breakdown</CardTitle>
+                            <div className="flex items-center gap-2">
+                                <CardTitle className="text-sm font-semibold">Tender Token & Cost Breakdown</CardTitle>
+                                <Badge variant="secondary" className="text-[10px]">
+                                    All-time
+                                </Badge>
+                            </div>
                             <p className="mt-0.5 text-xs text-muted-foreground">
                                 Detailed token usage and dollar cost grouped by tender, expandable by pipeline stage
                             </p>

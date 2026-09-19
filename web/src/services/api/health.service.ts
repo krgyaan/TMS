@@ -95,6 +95,7 @@ export interface ClaudeRecentCall {
 export interface AdminReconciliationReport {
     status: 'matched' | 'drift_detected' | 'unconfigured' | 'error'
     message: string
+    windowLabel?: string
     appTrackedTokens: number
     appTrackedCostUsd: number
     anthropicVerifiedTokens: number | null
