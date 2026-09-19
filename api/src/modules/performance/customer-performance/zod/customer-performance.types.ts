@@ -14,6 +14,18 @@ export interface TenderRow {
     itemHeadingName: string | null;
 }
 
+export interface CustomerTenderRow {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: Date;
+    gstValues: string;
+    member: string | null;
+    team: string | null;
+    status: number;
+    rfqSentOn: Date | null;
+}
+
 // ─── API response (mirrors Laravel compact() output) ─────────────────────────
 
 export interface SummaryItem {
@@ -45,7 +57,20 @@ export interface CustomerMetrics {
     // by_region / by_state intentionally omitted — locations not joined in this module
 }
 
+export interface TenderListItem {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: string;
+    gstValues: string;
+    member: string;
+    team: string;
+    createdAt: string;
+    status: string;
+}
+
 export interface CustomerPerformanceResponse {
     summary: CustomerSummary;
     metrics: CustomerMetrics;
+    tenderList: TenderListItem[];
 }

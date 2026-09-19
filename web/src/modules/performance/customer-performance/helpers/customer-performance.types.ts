@@ -2,12 +2,26 @@
 
 // ─── Query ────────────────────────────────────────────────────────────────────
 
+export type TeamCategory = "AC" | "DC";
+
+export type YearType = "bidding" | "financial" | "calendar";
+
 export interface CustomerPerformanceQuery {
     org: number | null;
-    teamId: number | null;
+    teamCategory: TeamCategory | null;
     itemHeading: number | null;
     fromDate: string | null; // yyyy-mm-dd
     toDate: string | null; // yyyy-mm-dd
+}
+
+// ─── Params ───────────────────────────────────────────────────────────────────
+
+export interface CustomerPerformanceParams {
+    org?: number;
+    teamCategory?: TeamCategory;
+    itemHeading?: number;
+    fromDate?: string;
+    toDate?: string;
 }
 
 // ─── API response (mirrors backend shape exactly) ─────────────────────────────
@@ -40,7 +54,20 @@ export interface CustomerMetrics {
     by_item: Record<string, MetricEntry>;
 }
 
+export interface TenderListItem {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: string;
+    gstValues: string;
+    member: string;
+    team: string;
+    createdAt: string;
+    status: string;
+}
+
 export interface CustomerPerformanceResponse {
     summary: CustomerSummary;
     metrics: CustomerMetrics;
+    tenderList: TenderListItem[];
 }
