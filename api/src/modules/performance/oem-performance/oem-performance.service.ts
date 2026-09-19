@@ -1,5 +1,6 @@
 import { Injectable, Inject } from "@nestjs/common";
-import { and, between, eq, sql } from "drizzle-orm";
+import { and, between, eq, or, sql } from "drizzle-orm";
+import type { PgColumn } from "drizzle-orm/pg-core";
 import { format } from "date-fns";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -8,20 +9,21 @@ import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 
 import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
-import { rfqs, rfqResponses } from "@/db/schemas/tendering/rfqs.schema";
-import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
 import { users } from "@/db/schemas/auth/users.schema";
 import { teams } from "@/db/schemas";
-import { organizations } from "@/db/schemas/master/organizations.schema"; // ⚠️ verify path
 
 import type { OemPerformanceQuery } from "./zod/oem-performance.dto";
 import {
     TENDER_REASON_MAP,
     type BidTenderRow,
+    type LifecycleTenderRow,
+    type MonthlyTrendPoint,
     type NotAllowedTenderRow,
     type OemPerformanceResponse,
     type OemSummary,
+    type RfqInfoRow,
     type RfqSentToOemRow,
+    type SummarizableTender,
     type SummaryItem,
     type TenderRow,
 } from "./zod/oem-performance.types";
@@ -33,6 +35,11 @@ const STATUS = {
     LOST: [24],
     WON: [25, 26, 27, 28],
 } as const;
+
+const DATE_FORMAT = "dd-MM-yyyy hh:mm a";
+
+const containsOem = (column: PgColumn, oem: number) =>
+    sql<boolean>`${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(${column}::text, '')), '\\s*,\\s*'))`;
 
 @Injectable()
 export class OemPerformanceService {
@@ -47,123 +54,315 @@ export class OemPerformanceService {
     async getOemPerformance(query: OemPerformanceQuery): Promise<OemPerformanceResponse> {
         const { oem, fromDate, toDate } = query;
 
-        const from = new Date(fromDate);
-        const to = new Date(toDate);
-        to.setHours(23, 59, 59, 999);
+        const from = new Date(`${fromDate}T00:00:00+05:30`);
+        const to = new Date(`${toDate}T23:59:59.999+05:30`);
 
         this.logger.info("Fetching OEM performance", { oem, fromDate, toDate });
 
         try {
-            const [tenderRows, bidRows] = await Promise.all([this.fetchTendersWithRfqs(from, to), this.fetchBidTenders(oem, from, to)]);
+            const [tenderRows, bidRows, rfqInfoRows, quotationTenders] = await Promise.all([
+                this.fetchOemTenders(oem, from, to),
+                this.fetchBidTenders(oem, from, to),
+                this.fetchRfqInfo(oem, from, to),
+                this.fetchQuotationReceivedTenders(oem, from, to),
+            ]);
 
-            const notAllowedTenders = this.buildNotAllowedTenders(tenderRows, oem);
-            const rfqsSentToOem = this.buildRfqsSentToOem(tenderRows, oem);
-            const summary = this.buildSummary(tenderRows, bidRows, oem);
+            const rfqInfoByTender = new Map(rfqInfoRows.map(r => [Number(r.tenderId), r]));
+
+            const notAllowedTenders = this.buildNotAllowedTenders(tenderRows);
+            const rfqsSentToOem = this.buildRfqsSentToOem(tenderRows, rfqInfoByTender);
+            const missedTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.MISSED, "Missed");
+            const wonTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.WON, "Won");
+            const lostTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.LOST, "Lost");
+            const disqualifiedTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.DISQUALIFIED, "Disqualified");
+            const resultsAwaitedTenders = this.buildLifecycleTenders(tenderRows, rfqInfoByTender, STATUS.RESULTS_AWAITED, "Results Awaited");
+            const bidTenders = this.buildBidTenders(tenderRows, bidRows, rfqInfoByTender);
+            const quotationReceivedTenders = this.buildQuotationReceivedTenders(quotationTenders, rfqInfoByTender);
+            const summary = this.buildSummary(tenderRows, bidRows);
+            const monthlyTrend = this.buildMonthlyTrend(bidRows);
 
             this.logger.info("OEM performance computed", { oem });
 
-            return { summary, notAllowedTenders, rfqsSentToOem };
-        } catch (error: any) {
+            return {
+                summary,
+                notAllowedTenders,
+                rfqsSentToOem,
+                missedTenders,
+                wonTenders,
+                lostTenders,
+                disqualifiedTenders,
+                resultsAwaitedTenders,
+                bidTenders,
+                quotationReceivedTenders,
+                monthlyTrend,
+            };
+        } catch (error) {
+            const e = error as Error;
             this.logger.error("Failed to fetch OEM performance", {
-                message: error?.message,
-                stack: error?.stack,
+                message: e?.message,
+                stack: e?.stack,
             });
             throw error;
         }
     }
 
-    // ─── Query 1: tenders in date range ──────────────────────────────────────
-    // Added: teams + organizations LEFT JOINs to resolve name strings.
-    // rfq_responses joined without vendor filter — mirrors old hasOne behaviour.
+    // ─── Fetchers ─────────────────────────────────────────────────────────────
 
-    private async fetchTendersWithRfqs(from: Date, to: Date): Promise<TenderRow[]> {
+    private async fetchOemTenders(oem: number, from: Date, to: Date): Promise<TenderRow[]> {
         return this.db
             .select({
                 id: tenderInfos.id,
-                team: tenderInfos.team,
-                teamName: teams.name,
                 tenderNo: tenderInfos.tenderNo,
                 tenderName: tenderInfos.tenderName,
                 dueDate: tenderInfos.dueDate,
                 gstValues: tenderInfos.gstValues,
-                organizationName: organizations.name,
-                rfqTo: tenderInfos.rfqTo,
-                oemNotAllowed: tenderInfos.oemNotAllowed,
-                tlStatus: tenderInfos.tlStatus,
-                teamMember: tenderInfos.teamMember,
+                teamName: teams.name,
                 teamMemberName: users.name,
+                tlStatus: tenderInfos.tlStatus,
                 status: tenderInfos.status,
-                rfqId: rfqs.id,
-                rfqCreatedAt: rfqs.createdAt,
-                rfqResponseReceiptDatetime: rfqResponses.receiptDatetime,
+                sentToOem: containsOem(tenderInfos.rfqTo, oem),
+                notAllowedForOem: containsOem(tenderInfos.oemNotAllowed, oem),
             })
             .from(tenderInfos)
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(teams, eq(teams.id, tenderInfos.team))
-            .leftJoin(organizations, eq(organizations.id, tenderInfos.organization))
-            .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
-            .leftJoin(rfqResponses, eq(rfqResponses.rfqId, rfqs.id))
-            .where(and(between(tenderInfos.dueDate, from, to), eq(tenderInfos.deleteStatus, 0))) as unknown as TenderRow[];
+            .where(
+                and(
+                    between(tenderInfos.dueDate, from, to),
+                    eq(tenderInfos.deleteStatus, 0),
+                    or(
+                        containsOem(tenderInfos.rfqTo, oem),
+                        containsOem(tenderInfos.oemNotAllowed, oem)
+                    )
+                )
+            )
+            .orderBy(tenderInfos.dueDate);
     }
 
-    // ─── Query 2: bid submissions for this OEM ────────────────────────────────
-    // FIND_IN_SET(oem, rfq_to) → oem::text = ANY(string_to_array(rfq_to, ','))
-    // ⚠️  rfqTo is varchar(15) — flag for migration to text.
+    private async fetchQuotationReceivedTenders(oem: number, from: Date, to: Date): Promise<TenderRow[]> {
+        const { rows } = await this.db.execute(sql`
+            SELECT DISTINCT t.id            AS "id",
+                t.tender_no              AS "tenderNo",
+                t.tender_name            AS "tenderName",
+                t.due_date               AS "dueDate",
+                t.gst_values             AS "gstValues",
+                t.tl_status              AS "tlStatus",
+                t.status                 AS "status",
+                u.name                   AS "teamMemberName",
+                tm.name                  AS "teamName",
+                ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(t.rfq_to::text, '')), '\\s*,\\s*')) AS "sentToOem",
+                ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(t.oem_not_allowed::text, '')), '\\s*,\\s*')) AS "notAllowedForOem"
+            FROM tender_infos t
+            LEFT JOIN users u ON u.id = t.team_member
+            LEFT JOIN teams tm ON tm.id = t.team
+            INNER JOIN rfqs r ON r.tender_id = t.id
+            INNER JOIN rfq_responses rr
+                ON rr.rfq_id = r.id
+                AND (rr.response_status = 1 OR rr.response_status IS NULL)
+                AND (
+                        rr.vendor_id IN (SELECT v.id FROM vendors v WHERE v.org_id = ${oem})
+                        OR (
+                            COALESCE(rr.vendor_id, 0) = 0
+                            AND ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(r.requested_organization::text, '')), '\\s*,\\s*'))
+                        )
+                    )
+            WHERE t.due_date BETWEEN ${from} AND ${to}
+            AND t.delete_status = 0
+            AND ${oem}::text = ANY(
+                    regexp_split_to_array(
+                    btrim(coalesce(r.requested_organization::text, '')),
+                    '\\s*,\\s*'
+                    )
+                )
+            AND EXISTS (
+                    SELECT 1
+                    FROM rfq_response_documents rrd
+                    WHERE rrd.rfq_response_id = rr.id
+                    AND rrd.doc_type = 'QUOTATION'
+                )
+        `);
+        return rows as unknown as TenderRow[];
+    }
 
     private async fetchBidTenders(oem: number, from: Date, to: Date): Promise<BidTenderRow[]> {
-        return this.db
-            .select({
-                tenderId: bidSubmissions.tenderId,
-                tenderName: tenderInfos.tenderName,
-                gstValues: tenderInfos.gstValues,
-                bidStatus: bidSubmissions.status,
-                tenderStatus: tenderInfos.status,
-                submissionDatetime: bidSubmissions.submissionDatetime,
-            })
-            .from(bidSubmissions)
-            .innerJoin(tenderInfos, eq(tenderInfos.id, bidSubmissions.tenderId))
-            .where(
-                and(sql`${oem.toString()} = ANY(string_to_array(${tenderInfos.rfqTo}, ','))`, between(bidSubmissions.submissionDatetime, from, to), eq(tenderInfos.deleteStatus, 0))
-            ) as unknown as BidTenderRow[];
+        const { rows } = await this.db.execute(sql`
+            SELECT bs.tender_id           AS "tenderId",
+                   t.tender_no            AS "tenderNo",
+                   t.tender_name          AS "tenderName",
+                   t.gst_values           AS "gstValues",
+                   bs.status              AS "bidStatus",
+                   t.status               AS "tenderStatus",
+                   COALESCE(bs.submission_datetime, bs.created_at) AS "submissionDatetime"
+            FROM bid_submissions bs
+            INNER JOIN tender_infos t ON t.id = bs.tender_id
+            WHERE t.delete_status = 0
+              AND COALESCE(bs.submission_datetime, bs.created_at) BETWEEN ${from} AND ${to}
+              AND (
+                    EXISTS (
+                        SELECT 1
+                        FROM tender_costing_sheets cs
+                        WHERE cs.tender_id = t.id
+                          AND cs.oem_vendor_ids @> to_jsonb(${oem}::int)
+                    )
+                 OR (
+                        NOT EXISTS (
+                            SELECT 1
+                            FROM tender_costing_sheets cs
+                            WHERE cs.tender_id = t.id
+                              AND cs.oem_vendor_ids IS NOT NULL
+                              AND jsonb_array_length(cs.oem_vendor_ids) > 0
+                        )
+                        AND ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(t.rfq_to::text, '')), '\\s*,\\s*'))
+                 )
+              )
+        `);
+        return rows as unknown as BidTenderRow[];
+    }
+
+    private async fetchRfqInfo(oem: number, from: Date, to: Date): Promise<RfqInfoRow[]> {
+        const { rows } = await this.db.execute(sql`
+            SELECT t.id                     AS "tenderId",
+                   MIN(r.created_at)        AS "rfqSentOn",
+                   MAX(rr.receipt_datetime) AS "responseOn"
+            FROM tender_infos t
+            LEFT JOIN rfqs r ON r.tender_id = t.id
+            LEFT JOIN rfq_responses rr
+                   ON rr.rfq_id = r.id
+                  AND (
+                        rr.vendor_id IN (SELECT v.id FROM vendors v WHERE v.org_id = ${oem})
+                        OR (
+                            COALESCE(rr.vendor_id, 0) = 0
+                            AND ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(r.requested_organization::text, '')), '\\s*,\\s*'))
+                        )
+                      )
+            WHERE t.due_date BETWEEN ${from} AND ${to}
+              AND t.delete_status = 0
+              AND (
+                    ${oem}::text = ANY(regexp_split_to_array(btrim(coalesce(r.requested_organization::text, '')), '\\s*,\\s*'))
+                    OR EXISTS (
+                           SELECT 1
+                           FROM vendors v
+                           WHERE v.org_id = ${oem}
+                             AND v.id::text = ANY(regexp_split_to_array(btrim(coalesce(r.requested_vendor::text, '')), '\\s*,\\s*'))
+                       )
+                  )
+            GROUP BY t.id
+            HAVING COUNT(r.id) > 0
+        `);
+        return rows as unknown as RfqInfoRow[];
     }
 
     // ─── Builders ─────────────────────────────────────────────────────────────
 
-    private buildNotAllowedTenders(tenders: TenderRow[], oem: number): NotAllowedTenderRow[] {
+    private buildNotAllowedTenders(tenders: TenderRow[]): NotAllowedTenderRow[] {
         return tenders
-            .filter(t => this.fieldContainsOem(t.oemNotAllowed, oem))
+            .filter(t => t.notAllowedForOem)
             .map(t => ({
                 id: t.id,
                 tenderNo: t.tenderNo,
                 tenderName: t.tenderName,
-                dueDate: format(t.dueDate, "dd-MM-yyyy hh:mm a"),
+                dueDate: format(t.dueDate, DATE_FORMAT),
                 gstValues: t.gstValues,
                 member: t.teamMemberName ?? "—",
                 team: t.teamName ?? "—",
-                // ← new: derived from status code, no extra query
                 reason: TENDER_REASON_MAP[Number(t.status)] ?? "Not allowed by OEM",
             }));
     }
 
-    private buildRfqsSentToOem(tenders: TenderRow[], oem: number): RfqSentToOemRow[] {
+    private buildRfqsSentToOem(tenders: TenderRow[], rfqInfoByTender: Map<number, RfqInfoRow>): RfqSentToOemRow[] {
         return tenders
-            .filter(t => this.fieldContainsOem(t.rfqTo, oem))
-            .map(t => ({
+            .filter(t => t.sentToOem && rfqInfoByTender.has(t.id))
+            .map(t => {
+                const info = rfqInfoByTender.get(t.id)!;
+                return {
+                    id: t.id,
+                    tenderNo: t.tenderNo,
+                    tenderName: t.tenderName,
+                    dueDate: format(t.dueDate, DATE_FORMAT),
+                    gstValues: t.gstValues,
+                    member: t.teamMemberName ?? "—",
+                    team: t.teamName ?? "—",
+                    rfqSentOn: info.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                    rfqResponseOn: info.responseOn ? format(info.responseOn, DATE_FORMAT) : null,
+                    createdAt: info.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                };
+            });
+    }
+
+    private buildLifecycleTenders(
+        tenders: TenderRow[],
+        rfqInfoByTender: Map<number, RfqInfoRow>,
+        statuses: readonly number[],
+        statusLabel: string
+    ): LifecycleTenderRow[] {
+        return tenders
+            .filter(t => t.sentToOem && statuses.includes(Number(t.status)))
+            .map(t => {
+                const info = rfqInfoByTender.get(t.id);
+                return {
+                    id: t.id,
+                    tenderNo: t.tenderNo,
+                    tenderName: t.tenderName,
+                    dueDate: format(t.dueDate, DATE_FORMAT),
+                    gstValues: t.gstValues,
+                    member: t.teamMemberName ?? "—",
+                    team: t.teamName ?? "—",
+                    createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                    status: statusLabel,
+                };
+            });
+    }
+
+    private buildQuotationReceivedTenders(
+        quotationTenders: TenderRow[],
+        rfqInfoByTender: Map<number, RfqInfoRow>
+    ): LifecycleTenderRow[] {
+        return quotationTenders.map(t => {
+            const info = rfqInfoByTender.get(t.id);
+            return {
                 id: t.id,
                 tenderNo: t.tenderNo,
                 tenderName: t.tenderName,
-                dueDate: format(t.dueDate, "dd-MM-yyyy hh:mm a"),
+                dueDate: format(t.dueDate, DATE_FORMAT),
                 gstValues: t.gstValues,
                 member: t.teamMemberName ?? "—",
                 team: t.teamName ?? "—",
-                rfqSentOn: t.rfqCreatedAt ? format(t.rfqCreatedAt, "dd-MM-yyyy hh:mm a") : "—",
-                // ← changed: null instead of "Not Yet" — frontend decides how to render
-                rfqResponseOn: t.rfqResponseReceiptDatetime ? format(t.rfqResponseReceiptDatetime, "dd-MM-yyyy hh:mm a") : null,
-            }));
+                createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                status: "Quotation Received",
+            };
+        });
     }
 
-    private buildSummary(tenders: TenderRow[], bidRows: BidTenderRow[], oem: number): OemSummary {
-        const assigned = tenders.filter(t => this.fieldContainsOem(t.rfqTo, oem));
+    private buildBidTenders(
+        tenders: TenderRow[],
+        bids: BidTenderRow[],
+        rfqInfoByTender: Map<number, RfqInfoRow>
+    ): LifecycleTenderRow[] {
+        const bidTenderIds = new Set<number>();
+        for (const row of bids) {
+            if (row.bidStatus === "Bid Submitted") bidTenderIds.add(Number(row.tenderId));
+        }
+
+        return tenders
+            .filter(t => t.sentToOem && bidTenderIds.has(t.id))
+            .map(t => {
+                const info = rfqInfoByTender.get(t.id);
+                return {
+                    id: t.id,
+                    tenderNo: t.tenderNo,
+                    tenderName: t.tenderName,
+                    dueDate: format(t.dueDate, DATE_FORMAT),
+                    gstValues: t.gstValues,
+                    member: t.teamMemberName ?? "—",
+                    team: t.teamName ?? "—",
+                    createdAt: info?.rfqSentOn ? format(info.rfqSentOn, DATE_FORMAT) : "—",
+                    status: "Bid Submitted",
+                };
+            });
+    }
+
+    private buildSummary(tenders: TenderRow[], bids: BidTenderRow[]): OemSummary {
+        const assigned = tenders.filter(t => t.sentToOem);
         const approved = assigned.filter(t => t.tlStatus === 1);
 
         const summary: OemSummary = {
@@ -177,48 +376,91 @@ export class OemPerformanceService {
             tendersLost: this.emptySummaryItem(),
         };
 
-        for (const row of bidRows) {
+        for (const row of bids) {
             const s = Number(row.tenderStatus);
 
-            if ((STATUS.MISSED as readonly number[]).includes(s)) this.add(summary.tendersMissed, row);
-            else if ((STATUS.DISQUALIFIED as readonly number[]).includes(s)) this.add(summary.tendersDisqualified, row);
-            else if ((STATUS.RESULTS_AWAITED as readonly number[]).includes(s)) this.add(summary.tenderResultsAwaited, row);
-            else if ((STATUS.LOST as readonly number[]).includes(s)) this.add(summary.tendersLost, row);
-            else if ((STATUS.WON as readonly number[]).includes(s)) this.add(summary.tendersWon, row);
+            if ((STATUS.MISSED as readonly number[]).includes(s)) this.add(summary.tendersMissed, this.toSummaryRow(row));
+            else if ((STATUS.DISQUALIFIED as readonly number[]).includes(s)) this.add(summary.tendersDisqualified, this.toSummaryRow(row));
+            else if ((STATUS.RESULTS_AWAITED as readonly number[]).includes(s)) this.add(summary.tenderResultsAwaited, this.toSummaryRow(row));
+            else if ((STATUS.LOST as readonly number[]).includes(s)) this.add(summary.tendersLost, this.toSummaryRow(row));
+            else if ((STATUS.WON as readonly number[]).includes(s)) this.add(summary.tendersWon, this.toSummaryRow(row));
 
-            if (row.bidStatus === "Bid Submitted") this.add(summary.tendersBid, row);
+            if (row.bidStatus === "Bid Submitted") this.add(summary.tendersBid, this.toSummaryRow(row));
         }
 
         return summary;
     }
 
-    // ─── Utilities ────────────────────────────────────────────────────────────
+    private buildMonthlyTrend(bids: BidTenderRow[]): MonthlyTrendPoint[] {
+        const byMonth = new Map<string, MonthlyTrendPoint>();
 
-    private fieldContainsOem(field: string | string[] | null, oem: number): boolean {
-        if (!field) return false;
-        if (Array.isArray(field)) {
-            return field.some(v => v.trim() === oem.toString());
+        for (const row of bids) {
+            if (!row.submissionDatetime) continue;
+
+            const s = Number(row.tenderStatus);
+            const bucket = (STATUS.WON as readonly number[]).includes(s)
+                ? "won"
+                : (STATUS.MISSED as readonly number[]).includes(s)
+                  ? "missed"
+                  : (STATUS.LOST as readonly number[]).includes(s)
+                    ? "lost"
+                    : null;
+
+            if (!bucket) continue;
+
+            const month = format(row.submissionDatetime, "yyyy-MM");
+            let point = byMonth.get(month);
+
+            if (!point) {
+                point = {
+                    month,
+                    label: format(row.submissionDatetime, "MMM ''yy"),
+                    won: 0,
+                    missed: 0,
+                    lost: 0,
+                    total: 0,
+                };
+                byMonth.set(month, point);
+            }
+
+            point[bucket] += 1;
+            point.total += 1;
         }
-        return field
-            .split(",")
-            .some(v => v.trim() === oem.toString());
+
+        return [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month));
     }
 
-    private makeSummaryItem(rows: Array<{ tenderName: string; gstValues: string }>): SummaryItem {
+    // ─── Utilities ────────────────────────────────────────────────────────────
+
+    private toSummaryRow(row: BidTenderRow): SummarizableTender {
         return {
-            count: rows.length,
-            value: rows.reduce((acc, r) => acc + parseFloat(r.gstValues || "0"), 0),
-            tenders: rows.map(r => r.tenderName),
+            id: row.tenderId,
+            tenderNo: row.tenderNo,
+            tenderName: row.tenderName,
+            gstValues: row.gstValues,
         };
+    }
+
+    private makeSummaryItem(rows: SummarizableTender[]): SummaryItem {
+        return rows.reduce<SummaryItem>(
+            (acc, r) => this.add(acc, r),
+            { count: 0, value: 0, tenders: [] }
+        );
     }
 
     private emptySummaryItem(): SummaryItem {
         return { count: 0, value: 0, tenders: [] };
     }
 
-    private add(item: SummaryItem, row: Pick<BidTenderRow, "tenderName" | "gstValues">): void {
+    private add(item: SummaryItem, row: SummarizableTender): SummaryItem {
         item.count++;
         item.value += parseFloat(row.gstValues || "0");
-        item.tenders.push(row.tenderName);
+        item.tenders.push({
+            id: row.id,
+            tenderNo: row.tenderNo,
+            tenderName: row.tenderName,
+            value: parseFloat(row.gstValues || "0"),
+        });
+        return item;
     }
 }

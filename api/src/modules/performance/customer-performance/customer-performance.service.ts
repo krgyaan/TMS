@@ -1,5 +1,6 @@
 import { Injectable, Inject } from "@nestjs/common";
-import { and, between, eq } from "drizzle-orm";
+import { and, between, eq, sql } from "drizzle-orm";
+import { format } from "date-fns";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -8,12 +9,24 @@ import type { DbInstance } from "@/db";
 
 import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
 import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
+import { rfqs } from "@/db/schemas/tendering/rfqs.schema";
 import { organizations } from "@/db/schemas/master/organizations.schema";
 import { items } from "@/db/schemas/master/items.schema";
 import { itemHeadings } from "@/db/schemas/master/item-headings.schema";
+import { teams } from "@/db/schemas/master/teams.schema";
+import { users } from "@/db/schemas/auth/users.schema";
 
 import type { CustomerPerformanceQuery } from "./zod/customer-performance.dto";
-import type { CustomerMetrics, CustomerPerformanceResponse, CustomerSummary, MetricEntry, SummaryItem, TenderRow } from "./zod/customer-performance.types";
+import type {
+    CustomerMetrics,
+    CustomerPerformanceResponse,
+    CustomerSummary,
+    CustomerTenderRow,
+    MetricEntry,
+    SummaryItem,
+    TenderListItem,
+    TenderRow,
+} from "./zod/customer-performance.types";
 
 // ─── Status buckets ───────────────────────────────────────────────────────────
 const STATUS = {
@@ -25,6 +38,21 @@ const STATUS = {
     // tenders_approved in this module = reached a result stage
     APPROVED: [17, 24, 25, 26, 27, 28],
 } as const;
+
+const DATE_FORMAT = "dd-MM-yyyy hh:mm a";
+
+const STATUS_LABEL = (s: number): string =>
+    (STATUS.WON as readonly number[]).includes(s)
+        ? "Won"
+        : (STATUS.MISSED as readonly number[]).includes(s)
+          ? "Missed"
+          : (STATUS.LOST as readonly number[]).includes(s)
+            ? "Lost"
+            : (STATUS.DISQUALIFIED as readonly number[]).includes(s)
+              ? "Disqualified"
+              : (STATUS.RESULTS_AWAITED as readonly number[]).includes(s)
+                ? "Results Awaited"
+                : "Assigned";
 
 @Injectable()
 export class CustomerPerformanceService {
@@ -40,19 +68,21 @@ export class CustomerPerformanceService {
         this.logger.info("Fetching customer performance", { query });
 
         try {
-            const tenderRows = await this.getTenders(query);
+            const [tenderRows, tenderList] = await Promise.all([this.getTenders(query), this.getTenderList(query)]);
             const summary = this.calculateSummary(tenderRows);
             const metrics = this.getMetrics(tenderRows);
 
             this.logger.info("Customer performance computed", {
                 rowCount: tenderRows.length,
+                tenderListCount: tenderList.length,
             });
 
-            return { summary, metrics };
-        } catch (error: any) {
+            return { summary, metrics, tenderList };
+        } catch (error) {
+            const e = error as Error;
             this.logger.error("Failed to fetch customer performance", {
-                message: error?.message,
-                stack: error?.stack,
+                message: e?.message,
+                stack: e?.stack,
             });
             throw error;
         }
@@ -66,8 +96,8 @@ export class CustomerPerformanceService {
         if (filters.org) {
             conditions.push(eq(tenderInfos.organization, filters.org));
         }
-        if (filters.teamId) {
-            conditions.push(eq(tenderInfos.team, filters.teamId));
+        if (filters.teamCategory) {
+            conditions.push(eq(teams.category, filters.teamCategory));
         }
         if (filters.itemHeading) {
             conditions.push(eq(itemHeadings.id, filters.itemHeading));
@@ -98,7 +128,64 @@ export class CustomerPerformanceService {
             .leftJoin(organizations, eq(organizations.id, tenderInfos.organization))
             .innerJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
-            .where(and(...conditions)) as unknown as TenderRow[];
+            .leftJoin(teams, eq(teams.id, tenderInfos.team))
+            .where(and(...conditions));
+    }
+
+    private async getTenderList(filters: CustomerPerformanceQuery): Promise<TenderListItem[]> {
+        const conditions = [eq(tenderInfos.deleteStatus, 0)];
+
+        if (filters.org) {
+            conditions.push(eq(tenderInfos.organization, filters.org));
+        }
+        if (filters.teamCategory) {
+            conditions.push(eq(teams.category, filters.teamCategory));
+        }
+        if (filters.itemHeading) {
+            conditions.push(eq(itemHeadings.id, filters.itemHeading));
+        }
+        if (filters.fromDate && filters.toDate) {
+            const from = new Date(filters.fromDate);
+            const to = new Date(filters.toDate);
+            to.setHours(23, 59, 59, 999);
+            conditions.push(between(tenderInfos.dueDate, from, to));
+        }
+
+        const rows = await this.db
+            .select({
+                id: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                dueDate: tenderInfos.dueDate,
+                gstValues: tenderInfos.gstValues,
+                member: users.name,
+                team: teams.name,
+                status: tenderInfos.status,
+                rfqSentOn: sql<Date | null>`MIN(${rfqs.createdAt})`,
+            })
+            .from(tenderInfos)
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(teams, eq(teams.id, tenderInfos.team))
+            .leftJoin(organizations, eq(organizations.id, tenderInfos.organization))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
+            .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
+            .where(and(...conditions))
+            .groupBy(tenderInfos.id, users.name, teams.name)
+            .orderBy(tenderInfos.dueDate)
+            .execute();
+
+        return (rows as unknown as CustomerTenderRow[]).map(row => ({
+            id: row.id,
+            tenderNo: row.tenderNo,
+            tenderName: row.tenderName,
+            dueDate: format(row.dueDate, DATE_FORMAT),
+            gstValues: row.gstValues,
+            member: row.member ?? "—",
+            team: row.team ?? "—",
+            createdAt: row.rfqSentOn ? format(new Date(row.rfqSentOn), DATE_FORMAT) : "—",
+            status: STATUS_LABEL(Number(row.status)),
+        }));
     }
 
     // ─── Summary ──────────────────────────────────────────────────────────────

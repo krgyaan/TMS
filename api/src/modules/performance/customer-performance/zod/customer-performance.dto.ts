@@ -3,7 +3,7 @@ import { z } from "zod";
 export const customerPerformanceQuerySchema = z
     .object({
         org: z.coerce.number().int().positive().optional(),
-        teamId: z.coerce.number().int().positive().optional(),
+        teamCategory: z.enum(["AC", "DC"]).optional(),
         itemHeading: z.coerce.number().int().positive().optional(),
         fromDate: z.string().date("Invalid from date").optional(),
         toDate: z.string().date("Invalid to date").optional(),
