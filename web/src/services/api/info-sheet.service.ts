@@ -22,17 +22,30 @@ class InfoSheetsService extends BaseApiService {
         return this.patch<TenderInfoSheetResponse, SaveTenderInfoSheetDto>(`/${tenderId}`, data)
     }
 
-    async autoExtract(tenderId: number, force?: boolean): Promise<{ jobId: string; status: string; message: string }> {
-        return this.post<{ jobId: string; status: string; message: string }>(`/${tenderId}/auto-extract`, { force })
+    async autoExtract(tenderId: number, force?: boolean): Promise<{
+        jobId: string;
+        status: string;
+        message?: string;
+        fields?: Record<string, import('@/modules/tendering/info-sheet/helpers/tenderInfoSheet.autoExtract').ExtractedField>;
+        missing_fields?: string[];
+        self_classified_atc?: boolean;
+        has_atc?: boolean;
+        ambiguous_field_conflicts?: Record<string, any>;
+        processing_time_ms?: number;
+    }> {
+        return this.post(`/${tenderId}/auto-extract`, { force })
     }
 
     async getSavedExtraction(tenderId: number): Promise<{
         tenderId: number;
-        fields: Record<string, { value: unknown; confidence: string; source: string | null }>;
+        fields: Record<string, import('@/modules/tendering/info-sheet/helpers/tenderInfoSheet.autoExtract').ExtractedField>;
         missing_fields: string[];
         extraction_version: string;
         processing_time_ms: number;
         updatedAt: string;
+        self_classified_atc?: boolean;
+        has_atc?: boolean;
+        ambiguous_field_conflicts?: Record<string, any>;
     } | null> {
         try {
             return await this.get(`/${tenderId}/extraction`)
@@ -48,6 +61,9 @@ class InfoSheetsService extends BaseApiService {
             missing_fields?: string[];
             extraction_version?: string;
             processing_time_ms?: number;
+            self_classified_atc?: boolean;
+            has_atc?: boolean;
+            ambiguous_field_conflicts?: Record<string, any>;
         },
     ): Promise<{ success: boolean; tenderId: number; fieldsCount: number; verified: boolean }> {
         return this.post(`/${tenderId}/extraction/save`, data)
@@ -58,10 +74,13 @@ class InfoSheetsService extends BaseApiService {
         status: 'processing' | 'completed' | 'failed';
         state?: string;
         progress?: unknown;
-        fields?: Record<string, { value: unknown; confidence: string; source: string | null }>;
+        fields?: Record<string, import('@/modules/tendering/info-sheet/helpers/tenderInfoSheet.autoExtract').ExtractedField>;
         missing_fields?: string[];
         extraction_version?: string;
         processing_time_ms?: number;
+        self_classified_atc?: boolean;
+        has_atc?: boolean;
+        ambiguous_field_conflicts?: Record<string, any>;
         error?: string;
     }> {
         return this.get(`/auto-extract/${jobId}`)

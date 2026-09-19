@@ -20,6 +20,10 @@ export interface EnqueueExtractionResult {
     status: 'enqueued' | 'existing_active' | 'existing_completed';
     fields?: Record<string, any>;
     missing_fields?: string[];
+    self_classified_atc?: boolean;
+    has_atc?: boolean;
+    ambiguous_field_conflicts?: Record<string, any>;
+    processing_time_ms?: number;
 }
 
 interface InMemoryJobRecord {
@@ -81,11 +85,25 @@ export class PdfExtractionProducer {
                         `[PdfExtractionProducer] Durable extraction already exists in database for tender ${data.tenderId}. Returning existing completed extraction without re-running (saving Claude tokens).`,
                         { tenderId: data.tenderId, jobId },
                     );
+                    let selfClassifiedAtc = false;
+                    let hasAtc = false;
+                    if (saved.fields && typeof saved.fields === 'object') {
+                        for (const val of Object.values(saved.fields) as any[]) {
+                            if (val?.sources?.self_classified_atc) {
+                                selfClassifiedAtc = true;
+                            }
+                            if (val?.sources?.atc) {
+                                hasAtc = true;
+                            }
+                        }
+                    }
                     return {
                         jobId,
                         status: 'existing_completed',
                         fields: saved.fields as Record<string, any>,
                         missing_fields: saved.missingFields || [],
+                        self_classified_atc: selfClassifiedAtc,
+                        has_atc: hasAtc,
                     };
                 }
             } catch (dbErr: any) {
@@ -113,6 +131,9 @@ export class PdfExtractionProducer {
                     status: 'existing_completed',
                     fields: existing.result?.fields,
                     missing_fields: existing.result?.missing_fields,
+                    self_classified_atc: existing.result?.self_classified_atc,
+                    has_atc: existing.result?.has_atc,
+                    ambiguous_field_conflicts: existing.result?.ambiguous_field_conflicts,
                 };
             }
 
@@ -201,6 +222,9 @@ export class PdfExtractionProducer {
                     status: 'existing_completed',
                     fields: existingJob.returnvalue?.fields,
                     missing_fields: existingJob.returnvalue?.missing_fields,
+                    self_classified_atc: existingJob.returnvalue?.self_classified_atc,
+                    has_atc: existingJob.returnvalue?.has_atc,
+                    ambiguous_field_conflicts: existingJob.returnvalue?.ambiguous_field_conflicts,
                 };
             }
 

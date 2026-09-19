@@ -156,12 +156,18 @@ def _resolve_dual_source_for_tms_key(
 ) -> Dict[str, Any]:
     candidates = [tms_key, tms_key.lower()]
     if source_field_name:
+        base_name = source_field_name.replace("_display", "")
+        with_spaces = base_name.replace("_", " ")
         candidates.extend([
             source_field_name,
             source_field_name.lower(),
-            source_field_name.replace("_display", ""),
-            source_field_name.replace("_display", "").lower(),
-            source_field_name.replace("_display", "").replace("_", " ").title(),
+            base_name,
+            base_name.lower(),
+            with_spaces,
+            with_spaces.lower(),
+            with_spaces.title(),
+            base_name.replace("_percent", ""),
+            base_name.replace("_percent", "").replace("_", " ").lower(),
         ])
 
     dual_entry = None
@@ -169,6 +175,12 @@ def _resolve_dual_source_for_tms_key(
         if cand in dual_sources:
             dual_entry = dual_sources[cand]
             break
+    if not dual_entry:
+        lower_dual = {k.lower(): v for k, v in dual_sources.items()}
+        for cand in candidates:
+            if cand.lower() in lower_dual:
+                dual_entry = lower_dual[cand.lower()]
+                break
 
     if is_self_classified_atc:
         atc_item = None

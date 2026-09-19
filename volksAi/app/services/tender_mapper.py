@@ -1245,7 +1245,54 @@ def build_infosheet_data(
                 emd_total = total_gem_emd
                 emd_required_display = "Yes"
                 emd_amount_display = format_currency(emd_total)
-                logger.info(f"[ATC_ANCHOR] Resolved field 'emd_amount' via GeM EMD schedule sum ({emd_total})")
+                logger.info(f"[MAIN_TENDER_SCHEDULE_SUM] Resolved field 'emd_amount' via GeM EMD schedule sum ({emd_total})")
+
+                # Locate page number and schedule context lines from page_texts
+                emd_page = 1
+                schedule_lines = []
+                if page_texts:
+                    for idx, p in enumerate(page_texts):
+                        p_num = p.get("page", p.get("page_number", idx + 1)) if isinstance(p, dict) else (idx + 1)
+                        p_txt = p.get("text", "") if isinstance(p, dict) else str(p)
+                        if re.search(r"EMD\s+Amount[^\n]*\n\s*[\d,]+", p_txt, re.IGNORECASE):
+                            emd_page = p_num
+                            lines_p = [l.strip() for l in p_txt.split("\n") if l.strip()]
+                            for l_idx, line_val in enumerate(lines_p):
+                                if "emd amount" in line_val.lower() and l_idx + 1 < len(lines_p):
+                                    nxt_val = lines_p[l_idx + 1]
+                                    if re.match(r"^[\d,]+(?:\.\d+)?$", nxt_val.strip()) and parse_money(nxt_val) is not None:
+                                        part_label = " ".join(lines_p[max(0, l_idx - 2):l_idx])
+                                        part_prefix = ""
+                                        if "part a" in part_label.lower():
+                                            part_prefix = "Part A: "
+                                        elif "part b" in part_label.lower():
+                                            part_prefix = "Part B: "
+                                        schedule_lines.append(f"{part_prefix}EMD Amount {nxt_val}")
+
+                if schedule_lines:
+                    emd_snip = "GeM Schedule Sum: " + ", ".join(schedule_lines)
+                else:
+                    emd_snip = f"GeM Schedule Sum: total {emd_total} (line-item breakdown unavailable)"
+
+                if dual_sources is not None:
+                    main_entry = {
+                        "value": total_gem_emd,
+                        "raw_value": str(total_gem_emd),
+                        "page": emd_page,
+                        "snippet": emd_snip,
+                        "confidence": 0.95,
+                        "status": "extracted",
+                    }
+                    for emd_k in ("emdAmount", "emdamount", "EMD Amount", "emd_amount", "emd_amount_display"):
+                        if emd_k in dual_sources:
+                            dual_sources[emd_k]["main_tender"] = main_entry
+                        else:
+                            dual_sources[emd_k] = {
+                                "self_classified_atc": False,
+                                "has_conflict": False,
+                                "main_tender": main_entry,
+                                "atc": None,
+                            }
 
     if emd_amount_display == "NA":
         if _is_missing(emd_amount_raw):
