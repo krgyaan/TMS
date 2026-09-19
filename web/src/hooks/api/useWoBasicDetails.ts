@@ -3,6 +3,7 @@ import { handleQueryError } from '@/lib/react-query';
 import type {
   AssignOeDto,
   CreateWoBasicDetailDto,
+  ReviseOrderDto,
   UpdateWoBasicDetailDto,
   WoBasicDetailsFilters
 } from '@/modules/operations/types/wo.types';
@@ -81,6 +82,14 @@ export const useOeAssignments = (id: number) => {
   return useQuery({
     queryKey: woBasicDetailsKeys.oeAssignments(id),
     queryFn: () => woBasicDetailsService.getOeAssignments(id),
+    enabled: !!id,
+  });
+};
+
+export const useOrderRevisions = (id: number) => {
+  return useQuery({
+    queryKey: [...woBasicDetailsKeys.all, 'revisions', id] as const,
+    queryFn: () => woBasicDetailsService.getOrderRevisions(id),
     enabled: !!id,
   });
 };
@@ -182,6 +191,25 @@ export const useAssignOe = () => {
       queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.oeAssignments(id) });
       queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.pendingAssignments() });
       toast.success('OE assigned successfully');
+    },
+    onError: (error: any) => {
+      toast.error(handleQueryError(error));
+    },
+  });
+};
+
+// Order Revision Mutations
+export const useReviseOrder = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: ReviseOrderDto }) =>
+      woBasicDetailsService.reviseOrder(id, data),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.all });
+      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: [...woBasicDetailsKeys.all, 'revisions', id] });
+      toast.success('Order revised successfully');
     },
     onError: (error: any) => {
       toast.error(handleQueryError(error));

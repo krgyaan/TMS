@@ -60,7 +60,6 @@ export function EnquiryTenderFlow({
     const { steps, leadId, happyCallingId } = useEnquiryTenderSteps({ tenderId, enquiryId, sourceType });
     const { data: happyCalling } = useHappyCalling(happyCallingId);
     const { data: basicDetailsResponse } = useWoBasicDetailsByTender(tenderId ?? 0);
-    const basicDetailsId = basicDetailsResponse?.[0]?.id;
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set([defaultExpanded]));
 
@@ -113,12 +112,27 @@ export function EnquiryTenderFlow({
                 case "result":
                     return <TenderResultSection tenderId={tenderId} />;
                 case "basic-details":
-                    return basicDetailsId ? <BasicDetailsSection woBasicDetailId={basicDetailsId} /> : null;
+                    if (!basicDetailsResponse?.length) return null;
+                    return (
+                        <div className="space-y-6">
+                            {basicDetailsResponse.map((wo, idx) => (
+                                <div key={wo.id} className="space-y-3">
+                                    {basicDetailsResponse.length > 1 && (
+                                        <h4 className="text-sm font-semibold text-muted-foreground">
+                                            Order {idx + 1}
+                                            {wo.orderType === "multiple" && wo.orderSequence ? ` · #${wo.orderSequence}` : ""}
+                                        </h4>
+                                    )}
+                                    <BasicDetailsSection woBasicDetailId={wo.id} />
+                                </div>
+                            ))}
+                        </div>
+                    );
                 default:
                     return null;
             }
         },
-        [tenderId, enquiryId, leadId, happyCallingId, happyCalling, sourceType, basicDetailsId]
+        [tenderId, enquiryId, leadId, happyCallingId, happyCalling, sourceType, basicDetailsResponse]
     );
 
     return (

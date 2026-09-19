@@ -93,6 +93,8 @@ export interface WoBasicDetail {
   projectCode: string | null;
   projectName: string | null;
   currentStage: WorkflowStage | null;
+  orderType: string | null;       // 'single' | 'multiple'
+  orderSequence: number | null;   // 1, 2, 3... within the same tender
   woValuePreGst: string | null;
   woValueGstAmt: string | null;
   receiptPreGst: string | null;
@@ -140,6 +142,8 @@ export interface WoBasicDetailWithRelations extends WoBasicDetail {
 export interface CreateWoBasicDetailDto {
   tenderId?: number;
   enquiryId?: number;
+  orderType?: 'single' | 'multiple';
+  orderSequence?: number;
   woNumber?: string;
   woDate?: string;
   projectCode?: string;
@@ -178,6 +182,31 @@ export interface AssignOeDto {
   oeDocsPrep: number | null;
   oeDocsPrepAssignedAt: Date | null;
   oeDocsPrepAssignedBy: number | null;
+}
+
+export interface WoOrderRevision {
+  id: number;
+  woBasicDetailId: number;
+  woNumber: string | null;
+  woDate: string | null;
+  woValuePreGst: string | null;
+  woValueGstAmt: string | null;
+  woDraft: string | null;
+  revisionNumber: number;
+  revisionDate: string | null;
+  revisedBy: number | null;
+  revisedByName: string | null;
+  revisionNotes: string | null;
+  createdAt: string | null;
+}
+
+export interface ReviseOrderDto {
+  woNumber?: string;
+  woDate?: string;
+  woValuePreGst?: string;
+  woValueGstAmt?: string;
+  woDraft?: string;
+  revisionNotes?: string;
 }
 
 export interface WoBasicDetailsFilters {

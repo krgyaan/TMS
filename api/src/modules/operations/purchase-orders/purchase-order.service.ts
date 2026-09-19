@@ -18,6 +18,7 @@ import { tryMaterializePoInventory, poHasPurchaseInvoice } from "@/modules/opera
 import { woBasicDetails } from "@/db/schemas/operations/work-order.schema";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
+import { OperationNotificationService } from "@/modules/operations/operation-notification.service";
 
 @Injectable()
 export class PurchaseOrderService {
@@ -30,6 +31,7 @@ export class PurchaseOrderService {
         private readonly pdfGenerator: PdfGeneratorService,
         private readonly clientDirectorySyncService: ClientDirectorySyncService,
         private readonly insuranceService: InsurancePolicyService,
+        private readonly notifications: OperationNotificationService,
     ) {}
 
     async getPurchaseOrders(projectId: number) {
@@ -375,6 +377,24 @@ export class PurchaseOrderService {
 
         this.logger.info(`Purchase Order created: ${poNumber}`);
 
+        // Compute grandTotal from products for notification
+        const grandTotal = (body.products || []).reduce((sum: number, p: any) => {
+            const qty = Number(p.qty);
+            const rate = Number(p.rate);
+            const gstRate = Number(p.gstRate);
+            const taxable = qty * rate;
+            const gst = (taxable * gstRate) / 100;
+            return sum + taxable + gst;
+        }, 0);
+
+        this.notifications.notifyPoCreated({
+            poNumber,
+            sellerName: body.sellerName,
+            grandTotal: grandTotal.toFixed(2),
+            projectName: body.projectName,
+            createdBy: userId,
+        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+
         this.generatePdfForPO(po, body.products).catch((err) => {
             this.logger.error(`Failed to generate PO PDF: ${err.message}`);
         });
@@ -566,6 +586,42 @@ export class PurchaseOrderService {
                 await this.db.transaction(tx => tryMaterializePoInventory(tx, id, userId ?? po.poRaisedBy));
             }
 
+            // Bulk update po_approval_pending → pending and send WA notifications
+            const pendingPrs = await this.db
+                .select({ id: paymentRequests.id, requestNo: paymentRequests.requestNo, amount: paymentRequests.amount, partyName: paymentRequests.partyName, portalLink: paymentRequests.portalLink, paymentAgainst: paymentRequests.paymentAgainst, requestedBy: paymentRequests.requestedBy })
+                .from(paymentRequests)
+                .where(and(eq(paymentRequests.purchaseOrderId, id), eq(paymentRequests.status, 'po_approval_pending')));
+
+            if (pendingPrs.length > 0) {
+                await this.db
+                    .update(paymentRequests)
+                    .set({ status: 'pending', updatedAt: new Date() })
+                    .where(and(eq(paymentRequests.purchaseOrderId, id), eq(paymentRequests.status, 'po_approval_pending')));
+
+                for (const pr of pendingPrs) {
+                    this.notifications.notifyNewPaymentRequest({
+                        requestNo: pr.requestNo ?? '',
+                        amount: pr.amount ?? 0,
+                        partyName: pr.partyName ?? null,
+                        portalLink: pr.portalLink ?? null,
+                        requestedBy: pr.requestedBy ?? 0,
+                        category: pr.paymentAgainst ?? '',
+                    }).catch((err) => this.logger.warn(`WhatsApp notification failed for PR #${pr.id}: ${err}`));
+                }
+
+                this.logger.info(`Bulk updated ${pendingPrs.length} payment requests from po_approval_pending to pending for PO #${id}`);
+            }
+
+            // Send PO approved notification
+            this.notifications.notifyPoApproved({
+                poNumber: po.poNumber ?? `#${id}`,
+                sellerName: po.sellerName,
+                grandTotal: grandTotal.toString(),
+                tdsPercentage: tdsPercentage.toString(),
+                amountAfterTds: amountAfterTds.toString(),
+                approvedBy: userId ?? 0,
+            }).catch((err) => this.logger.warn(`WhatsApp PO approval notification failed: ${err}`));
+
             this.logger.info(`TDS approved for PO #${id}: ${tdsPercentage}%, TDS Amount: ${tdsAmt}, After TDS: ${amountAfterTds}`);
             return updated;
         } else {
@@ -578,6 +634,32 @@ export class PurchaseOrderService {
                 })
                 .where(eq(purchaseOrders.id, id))
                 .returning();
+
+            // Bulk update po_approval_pending → rejected
+            const rejectedCount = await this.db
+                .update(paymentRequests)
+                .set({ status: 'rejected', rejectionReason: remark || 'PO Rejected', updatedAt: new Date() })
+                .where(and(eq(paymentRequests.purchaseOrderId, id), eq(paymentRequests.status, 'po_approval_pending')))
+                .returning({ id: paymentRequests.id });
+
+            if (rejectedCount.length > 0) {
+                this.logger.info(`Bulk rejected ${rejectedCount.length} payment requests for rejected PO #${id}`);
+            }
+
+            // Compute grandTotal for notification
+            const rejectProducts = await this.db
+                .select()
+                .from(purchaseOrderProducts)
+                .where(eq(purchaseOrderProducts.purchaseOrderId, id));
+            const { totalWithGst: rejectGrandTotal } = this.getTotalProductValues(rejectProducts);
+
+            this.notifications.notifyPoRejected({
+                poNumber: po.poNumber ?? `#${id}`,
+                sellerName: po.sellerName,
+                grandTotal: rejectGrandTotal.toString(),
+                remark: remark || null,
+                rejectedBy: userId ?? 0,
+            }).catch((err) => this.logger.warn(`WhatsApp PO rejection notification failed: ${err}`));
 
             this.logger.info(`TDS rejected for PO #${id}: ${remark || 'no remark'}`);
             return updated;
@@ -885,6 +967,13 @@ export class PurchaseOrderService {
         }].filter((c) => c.name));
 
         this.logger.info(`Purchase Order updated: ${updatedPO.poNumber}`);
+
+        this.notifications.notifyPoUpdated({
+            poNumber: updatedPO.poNumber ?? `#${id}`,
+            sellerName: body.sellerName,
+            updatedBy: userId ?? 0,
+        }).catch((err) => this.logger.warn(`WhatsApp notification failed: ${err}`));
+
         return updatedPO;
     }
 

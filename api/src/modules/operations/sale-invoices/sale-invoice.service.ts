@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 
-import { projects } from "@/db/schemas/operations/projects.schema";
+import { projects } from "@/db/schemas/master/projects.schema";
 import { users } from "@/db/schemas/auth/users.schema";
 import { woBasicDetails, woDetails, woBillingBoq, woBuybackBoq, woBillingAddresses, woShippingAddresses } from "@/db/schemas/operations/work-order.schema";
 import { saleInvoices, saleInvoiceItems } from "@/db/schemas/operations/sale-invoices.schema";

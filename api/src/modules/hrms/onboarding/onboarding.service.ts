@@ -1376,7 +1376,7 @@ export class OnboardingService {
               .values({
                 name: fullName,
                 username: username,
-                email: onProf.email as string,
+                email: (onProf.email as string).toLowerCase().trim(),
                 mobile: onProf.phone,
                 password: hashedPassword,
                 isActive: true, // Login enabled immediately per requirements

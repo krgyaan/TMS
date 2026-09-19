@@ -1,8 +1,8 @@
-import { Injectable, Inject } from "@nestjs/common";
-import { eq } from "drizzle-orm";
-import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
-import { projects } from "@/db/schemas/operations/projects.schema";
+import { DRIZZLE } from "@/db/database.module";
+import { projects } from "@/db/schemas/master/projects.schema";
+import { Inject, Injectable } from "@nestjs/common";
+import { eq } from "drizzle-orm";
 
 @Injectable()
 export class ProjectsMasterService {

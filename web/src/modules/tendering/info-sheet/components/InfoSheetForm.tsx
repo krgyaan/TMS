@@ -18,11 +18,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { ArrowLeft, Plus, Trash2, Save, AlertCircle, Sparkles, Loader2, Check } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, AlertCircle, Sparkles, Loader2, Check, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { paths } from '@/app/routes/paths';
 import { infoSheetsService } from '@/services/api';
-import { populateFormFromExtraction, extractFieldIndicators } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.autoExtract';
+import { populateFormFromExtraction, extractFieldIndicators, type ExtractedField } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.autoExtract';
+import { ExtractionPreviewPanel } from './ExtractionPreviewPanel';
 import { AiIndicatorsContext, type FieldIndicator } from '@/components/form/AiIndicatorsContext';
 import { useCreateInfoSheet, useUpdateInfoSheet } from '@/hooks/api/useInfoSheets';
 import { handleInfoSheetFormErrors } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.errors';
@@ -70,7 +71,20 @@ export function TenderInformationForm({
     const [isExtracting, setIsExtracting] = useState(false);
     const [isExtractionSaved, setIsExtractionSaved] = useState(false);
     const [fieldIndicators, setFieldIndicators] = useState<Record<string, FieldIndicator>>({});
+    const [showPreview, setShowPreview] = useState(false);
+    const [extractionData, setExtractionData] = useState<{
+        fields?: Record<string, ExtractedField>;
+        self_classified_atc?: boolean;
+        has_atc?: boolean;
+        missing_fields?: string[];
+        processing_time_ms?: number;
+    } | null>(null);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    const discrepancyCount = useMemo(() => {
+        if (!extractionData?.fields) return 0;
+        return Object.values(extractionData.fields).filter((f) => f?.sources?.has_conflict).length;
+    }, [extractionData]);
 
     // Clean up polling interval when component unmounts
     useEffect(() => {
@@ -81,27 +95,30 @@ export function TenderInformationForm({
         };
     }, []);
 
-    // Hydrate form from saved extraction on mount if in create mode or without existing submission
+    // Hydrate form and extraction preview from saved extraction on mount
     useEffect(() => {
         let isMounted = true;
         async function checkSavedExtraction() {
-            if (!tenderId || mode !== 'create' || isTenderLoading) return;
+            if (!tenderId || isTenderLoading) return;
             try {
                 const saved = await infoSheetsService.getSavedExtraction(tenderId);
                 if (isMounted && saved && saved.fields && Object.keys(saved.fields).length > 0) {
-                    console.log('[AutoExtract] Hydrating form from saved extraction', {
-                        event_type: 'autoextract_save',
-                        action: 'hydration_success',
-                        tender_id: tenderId,
-                    });
-                    const populateResult = populateFormFromExtraction(form, saved.fields as any);
-                    const indicators = extractFieldIndicators(saved.fields as any, saved.missing_fields);
-                    setFieldIndicators(indicators);
+                    setExtractionData(saved);
                     setIsExtractionSaved(true);
-                    toast.info(
-                        `Restored saved AI extraction (${populateResult.populatedCount} fields auto-populated).`,
-                        { duration: 4000 }
-                    );
+                    if (mode === 'create') {
+                        console.log('[AutoExtract] Hydrating form from saved extraction', {
+                            event_type: 'autoextract_save',
+                            action: 'hydration_success',
+                            tender_id: tenderId,
+                        });
+                        const populateResult = populateFormFromExtraction(form, saved.fields as any);
+                        const indicators = extractFieldIndicators(saved.fields as any, saved.missing_fields);
+                        setFieldIndicators(indicators);
+                        toast.info(
+                            `Restored saved AI extraction (${populateResult.populatedCount} fields auto-populated).`,
+                            { duration: 4000 }
+                        );
+                    }
                 }
             } catch (err) {
                 console.warn('[AutoExtract] Error checking for saved extraction:', err);
@@ -141,6 +158,13 @@ export function TenderInformationForm({
             // If backend already has completed extraction and force was not requested:
             if (res.status === 'existing_completed' && res.fields) {
                 setIsExtracting(false);
+                setExtractionData({
+                    fields: res.fields,
+                    self_classified_atc: res.self_classified_atc,
+                    has_atc: res.has_atc,
+                    missing_fields: res.missing_fields,
+                    processing_time_ms: res.processing_time_ms,
+                });
                 const populateResult = populateFormFromExtraction(form, res.fields as any);
                 const indicators = extractFieldIndicators(res.fields as any, res.missing_fields);
                 setFieldIndicators(indicators);
@@ -180,6 +204,14 @@ export function TenderInformationForm({
                             job_id: jobId,
                         });
 
+                        setExtractionData({
+                            fields: statusRes.fields,
+                            self_classified_atc: statusRes.self_classified_atc,
+                            has_atc: statusRes.has_atc,
+                            missing_fields: statusRes.missing_fields,
+                            processing_time_ms: statusRes.processing_time_ms,
+                        });
+
                         const populateResult = populateFormFromExtraction(form, statusRes.fields as any);
                         const indicators = extractFieldIndicators(statusRes.fields as any, statusRes.missing_fields);
                         setFieldIndicators(indicators);
@@ -194,6 +226,10 @@ export function TenderInformationForm({
                             await infoSheetsService.saveExtraction(tenderId, {
                                 fields: statusRes.fields,
                                 missing_fields: statusRes.missing_fields,
+                                self_classified_atc: statusRes.self_classified_atc,
+                                has_atc: statusRes.has_atc,
+                                ambiguous_field_conflicts: statusRes.ambiguous_field_conflicts,
+                                processing_time_ms: statusRes.processing_time_ms,
                             });
                             setIsExtractionSaved(true);
                             console.log('[AutoExtract] Extraction result saved successfully', {
@@ -419,6 +455,23 @@ export function TenderInformationForm({
                                 <span>AI Extracted</span>
                             </Badge>
                         )}
+                        {extractionData?.fields && Object.keys(extractionData.fields).length > 0 && (
+                            <Button
+                                type="button"
+                                variant={showPreview ? 'secondary' : 'outline'}
+                                onClick={() => setShowPreview((prev) => !prev)}
+                                className="flex items-center gap-1.5 cursor-pointer border-slate-700 hover:bg-slate-800"
+                                title="Toggle side-by-side document extraction and citation preview"
+                            >
+                                <Eye className="h-4 w-4" />
+                                <span>{showPreview ? 'Hide Preview' : 'Document Preview'}</span>
+                                {discrepancyCount > 0 && (
+                                    <Badge variant="outline" className="border-amber-500/50 bg-amber-500/20 text-amber-300 text-[10px] px-1.5 py-0 ml-0.5">
+                                        {discrepancyCount} discrepanc{discrepancyCount > 1 ? 'ies' : 'y'}
+                                    </Badge>
+                                )}
+                            </Button>
+                        )}
                         <Button
                             type="button"
                             variant="default"
@@ -452,6 +505,17 @@ export function TenderInformationForm({
             </CardHeader>
 
             <CardContent>
+                {showPreview && extractionData && (
+                    <ExtractionPreviewPanel
+                        fields={extractionData.fields}
+                        selfClassifiedAtc={extractionData.self_classified_atc}
+                        hasAtc={extractionData.has_atc}
+                        missingFields={extractionData.missing_fields}
+                        processingTimeMs={extractionData.processing_time_ms}
+                        tenderDocuments={tender?.documents}
+                        onClose={() => setShowPreview(false)}
+                    />
+                )}
                 <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="tender-details">
                         <AccordionTrigger className="text-lg font-semibold bg-accent p-4 rounded-md cursor-pointer">
