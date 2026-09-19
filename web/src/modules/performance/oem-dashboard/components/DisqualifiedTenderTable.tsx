@@ -1,15 +1,16 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 /* UI Components */
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import DataTable from "@/components/ui/data-table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 
 /* Icons */
-import { Eye } from "lucide-react";
+import { ChevronDown, Eye } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { useOemPerformance } from "@/hooks/api/useOemPerformance";
 import { formatINR } from "@/hooks/useINRFormatter";
@@ -26,6 +27,7 @@ interface DisqualifiedTenderTableProps {
 export default function DisqualifiedTenderTable({ params }: DisqualifiedTenderTableProps) {
     const navigate = useNavigate();
     const { data, isLoading } = useOemPerformance(params);
+    const [isOpen, setIsOpen] = useState(true);
 
     const tenders = useMemo(() => data?.tendersByKpi.tendersDisqualified ?? [], [data]);
 
@@ -92,19 +94,28 @@ export default function DisqualifiedTenderTable({ params }: DisqualifiedTenderTa
     }
 
     return (
-        <Card>
-            <CardHeader className="pb-4">
-                <div className="flex items-center justify-between gap-2">
-                    <div>
-                        <CardTitle className="text-base font-semibold">Tenders Disqualified</CardTitle>
-                        <CardDescription>Tenders that were disqualified.</CardDescription>
-                    </div>
-                    <Badge variant="secondary">{tenders.length}</Badge>
-                </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-                <DataTable data={tenders} columnDefs={columnDefs} gridOptions={{ domLayout: "autoHeight" }} />
-            </CardContent>
-        </Card>
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+            <Card>
+                <CardHeader className="pb-4">
+                    <CollapsibleTrigger asChild>
+                        <div className="flex cursor-pointer items-center justify-between gap-2 transition-opacity hover:opacity-80">
+                            <div>
+                                <CardTitle className="text-base font-semibold">Tenders Disqualified</CardTitle>
+                                <CardDescription>Tenders that were disqualified.</CardDescription>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Badge variant="secondary">{tenders.length}</Badge>
+                                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+                            </div>
+                        </div>
+                    </CollapsibleTrigger>
+                </CardHeader>
+                <CollapsibleContent>
+                    <CardContent className="pt-0">
+                        <DataTable data={tenders} columnDefs={columnDefs} gridOptions={{ domLayout: "autoHeight" }} />
+                    </CardContent>
+                </CollapsibleContent>
+            </Card>
+        </Collapsible>
     );
 }
