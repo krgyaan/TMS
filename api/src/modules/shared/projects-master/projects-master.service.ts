@@ -9,7 +9,9 @@ import { organizations } from "@/db/schemas/master/organizations.schema";
 import { items } from "@/db/schemas/master/items.schema";
 import { locations } from "@/db/schemas/master/locations.schema";
 import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
+import { tenderInformation } from "@/db/schemas/tendering/tender-info-sheet.schema";
 import { users } from "@/db/schemas/auth/users.schema";
+import { CashFlowService } from "@/modules/operations/cash-flows/cash-flow.service";
 
 import type {
     CreateProjectDto,
@@ -30,7 +32,10 @@ type ProjectListRow = ProjectRow & {
 
 @Injectable()
 export class ProjectsMasterService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly cashFlowService: CashFlowService,
+    ) { }
 
     private async generateProjectCodeAndName(input: {
         teamName: string;
@@ -322,11 +327,52 @@ export class ProjectsMasterService {
             } as typeof projects.$inferInsert)
             .returning();
 
+        // Create EMD cash flow if tenderId is present and has valid EMD
+        if (rows[0].tenderId && input.tenderId) {
+            try {
+                const [tender] = await this.db
+                    .select({
+                        emd: tenderInfos.emd,
+                        teamMember: tenderInfos.teamMember,
+                        tenderNo: tenderInfos.tenderNo,
+                    })
+                    .from(tenderInfos)
+                    .where(eq(tenderInfos.id, input.tenderId))
+                    .limit(1);
+
+                if (tender && tender.emd && Number(tender.emd) > 0) {
+                    // Check if EMD is exempt
+                    const [ti] = await this.db
+                        .select({ emdRequired: tenderInformation.emdRequired })
+                        .from(tenderInformation)
+                        .where(eq(tenderInformation.tenderId, input.tenderId))
+                        .limit(1);
+
+                    const isExempt = ti?.emdRequired === 'EXEMPT';
+                    if (!isExempt && tender.teamMember) {
+                        await this.cashFlowService.createEmdCashFlow(
+                            rows[0].id,
+                            input.tenderId,
+                            Number(tender.emd),
+                            tender.teamMember,
+                            tender.tenderNo
+                        );
+                    }
+                }
+            } catch (error) {
+                // Log error but don't fail project creation
+                console.warn(`Failed to create EMD cash flow for project ${rows[0].id}: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
+
         return rows[0];
     }
 
     async update(id: number, input: UpdateProjectDto): Promise<ProjectRow> {
         const existing = await this.findById(id);
+
+        const oldTenderId = existing.tenderId;
+        const newTenderId = input.tenderId !== undefined ? input.tenderId : existing.tenderId;
 
         const rows = await this.db
             .update(projects)
@@ -357,6 +403,52 @@ export class ProjectsMasterService {
 
         if (!rows[0]) {
             throw new NotFoundException("Project not found");
+        }
+
+        // Handle EMD cash flow if tenderId changed
+        if (oldTenderId !== newTenderId) {
+            try {
+                // Zero out old EMD if it existed
+                if (oldTenderId) {
+                    await this.cashFlowService.updateEmdCashFlowAmount(oldTenderId, 0);
+                }
+
+                // Create new EMD if new tender has valid EMD
+                if (newTenderId) {
+                    const [tender] = await this.db
+                        .select({
+                            emd: tenderInfos.emd,
+                            teamMember: tenderInfos.teamMember,
+                            tenderNo: tenderInfos.tenderNo,
+                        })
+                        .from(tenderInfos)
+                        .where(eq(tenderInfos.id, newTenderId))
+                        .limit(1);
+
+                    if (tender && tender.emd && Number(tender.emd) > 0) {
+                        // Check if EMD is exempt
+                        const [ti] = await this.db
+                            .select({ emdRequired: tenderInformation.emdRequired })
+                            .from(tenderInformation)
+                            .where(eq(tenderInformation.tenderId, newTenderId))
+                            .limit(1);
+
+                        const isExempt = ti?.emdRequired === 'EXEMPT';
+                        if (!isExempt && tender.teamMember) {
+                            await this.cashFlowService.createEmdCashFlow(
+                                id,
+                                newTenderId,
+                                Number(tender.emd),
+                                tender.teamMember,
+                                tender.tenderNo
+                            );
+                        }
+                    }
+                }
+            } catch (error) {
+                // Log error but don't fail project update
+                console.warn(`Failed to handle EMD cash flow for project ${id}: ${error instanceof Error ? error.message : String(error)}`);
+            }
         }
 
         return rows[0];

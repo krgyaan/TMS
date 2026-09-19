@@ -26,6 +26,7 @@ const eventTypeSchema = z.enum([
   'refund_received',
   'write_off',
   'adjustment',
+  'emd_outflow',
 ]);
 
 export const createCashFlowSchema = z.object({

@@ -11,7 +11,7 @@ interface CashFlowSectionProps {
     projectId: number | null;
 }
 
-const EVENT_TYPE_LABELS: Record<string, { label: string; className: string }> = {
+const EVENT_TYPE_LABELS: Record<string, { label: string | ((row: any) => string); className: string | ((row: any) => string) }> = {
     po_created: { label: "PO Created", className: "bg-blue-100 text-blue-800" },
     vwo_created: { label: "VWO Created", className: "bg-blue-100 text-blue-800" },
     po_approved: { label: "PO Approved", className: "bg-green-100 text-green-800" },
@@ -29,6 +29,10 @@ const EVENT_TYPE_LABELS: Record<string, { label: string; className: string }> = 
     refund_received: { label: "Refund Received", className: "bg-pink-100 text-pink-800" },
     write_off: { label: "Write Off", className: "bg-red-100 text-red-800" },
     adjustment: { label: "Adjustment", className: "bg-gray-100 text-gray-800" },
+    emd_outflow: { 
+        label: (row) => Number(row.amount) === 0 ? "EMD Voided" : "EMD Outflow", 
+        className: (row) => Number(row.amount) === 0 ? "bg-gray-100 text-gray-600" : "bg-amber-100 text-amber-800" 
+    },
 };
 
 const DIRECTION_CLASSES: Record<string, string> = {
@@ -62,10 +66,13 @@ export const CashFlowSection: React.FC<CashFlowSectionProps> = ({
             width: 180,
             cellRenderer: (p: CustomCellRendererProps) => {
                 const event = p.value || "";
+                const rowData = p.data || {};
                 const config = EVENT_TYPE_LABELS[event] || { label: event, className: "bg-gray-100 text-gray-800" };
+                const label = typeof config.label === "function" ? config.label(rowData) : config.label;
+                const className = typeof config.className === "function" ? config.className(rowData) : config.className;
                 return (
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${config.className}`}>
-                        {config.label}
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${className}`}>
+                        {label}
                     </span>
                 );
             },

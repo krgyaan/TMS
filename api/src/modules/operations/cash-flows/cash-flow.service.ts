@@ -107,4 +107,62 @@ export class CashFlowService {
 
     return rows[0];
   }
+
+  async createEmdCashFlow(
+    projectId: number,
+    tenderId: number,
+    emdAmount: number,
+    createdBy: number,
+    tenderNo: string
+  ) {
+    return this.create({
+      projectId,
+      eventType: 'emd_outflow',
+      amount: emdAmount.toString(),
+      direction: 'outflow',
+      referenceType: 'tender',
+      referenceId: tenderId,
+      referenceNo: tenderNo,
+      remark: `EMD outflow for tender ${tenderNo}`,
+      createdBy,
+    });
+  }
+
+  async updateEmdCashFlowAmount(tenderId: number, newAmount: number) {
+    const result = await this.db
+      .update(projectCashFlows)
+      .set({
+        amount: newAmount.toString(),
+        remark:
+          newAmount === 0
+            ? 'EMD voided - tender removed/changed from project'
+            : 'EMD amount updated',
+      })
+      .where(
+        and(
+          eq(projectCashFlows.referenceType, 'tender'),
+          eq(projectCashFlows.referenceId, tenderId),
+          eq(projectCashFlows.eventType, 'emd_outflow')
+        )
+      )
+      .returning();
+
+    return result[0];
+  }
+
+  async getEmdByTenderId(tenderId: number) {
+    const rows = await this.db
+      .select()
+      .from(projectCashFlows)
+      .where(
+        and(
+          eq(projectCashFlows.referenceType, 'tender'),
+          eq(projectCashFlows.referenceId, tenderId),
+          eq(projectCashFlows.eventType, 'emd_outflow')
+        )
+      )
+      .limit(1);
+
+    return rows[0];
+  }
 }
