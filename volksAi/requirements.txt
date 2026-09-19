@@ -17,3 +17,4 @@ paddleocr>=2.8.0
 pyyaml
 rapidfuzz
 python-dotenv
+pypdf

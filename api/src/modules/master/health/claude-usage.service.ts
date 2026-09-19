@@ -370,7 +370,11 @@ export class ClaudeUsageService {
                 totalRequests: Number(row.total_requests || 0),
                 peakTpm: 0,
             };
-        } catch {
+        } catch (err: unknown) {
+            this.logger.error(
+                `Failed to query aggregate Claude stats: ${(err as Error).message}`,
+                (err as Error).stack,
+            );
             return {
                 totalTokens: 0,
                 inputTokens: 0,
@@ -427,7 +431,11 @@ export class ClaudeUsageService {
                     requests: entry.requests,
                 });
             }
-        } catch {
+        } catch (err: unknown) {
+            this.logger.error(
+                `Failed to query minute timeline for Claude usage: ${(err as Error).message}`,
+                (err as Error).stack,
+            );
             for (let i = minutes - 1; i >= 0; i--) {
                 const d = new Date(now.getTime() - i * 60 * 1000);
                 timeline.push({
@@ -478,7 +486,11 @@ export class ClaudeUsageService {
                     lastActiveAt: row.last_active_at ? new Date(String(row.last_active_at)).toISOString() : null,
                 };
             });
-        } catch {
+        } catch (err: unknown) {
+            this.logger.error(
+                `Failed to query Claude user breakdown: ${(err as Error).message}`,
+                (err as Error).stack,
+            );
             return [];
         }
     }
@@ -524,7 +536,11 @@ export class ClaudeUsageService {
                     createdAt: new Date(String(row.created_at)).toISOString(),
                 };
             });
-        } catch {
+        } catch (err: unknown) {
+            this.logger.error(
+                `Failed to query recent Claude calls: ${(err as Error).message}`,
+                (err as Error).stack,
+            );
             return [];
         }
     }

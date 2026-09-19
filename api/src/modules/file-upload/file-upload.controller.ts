@@ -65,6 +65,7 @@ export class FileUploadController {
      * Serve/Download file
      * GET /files/serve/:context/:fileName
      */
+    @Public()
     @Get('serve/:context/:fileName')
     async serve(
         @Param('context') context: string,

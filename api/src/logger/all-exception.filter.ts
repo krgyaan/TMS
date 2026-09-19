@@ -7,6 +7,7 @@ import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 import { SentryExceptionCaptured } from "@sentry/nestjs";
 import * as Sentry from "@sentry/nestjs";
+import { ZodError } from "zod";
 
 const PG_ERROR_MAP: Record<string, { status: number; message: string }> = {
   '23505': { status: HttpStatus.CONFLICT, message: 'A record with this value already exists' },
@@ -61,6 +62,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
       if (Array.isArray(errorResponse.errors) && !errorResponse.issues) {
         errorResponse.issues = errorResponse.errors;
       }
+    } else if (exception instanceof ZodError) {
+      status = HttpStatus.BAD_REQUEST;
+      errorResponse = {
+        statusCode: status,
+        message: "Validation failed",
+        errors: exception.issues,
+        issues: exception.issues,
+      };
     } else {
       const pgCode = extractPgCode(exception);
       const pgMapping = pgCode ? PG_ERROR_MAP[pgCode] : undefined;

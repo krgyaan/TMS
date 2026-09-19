@@ -717,7 +717,11 @@ export class TenderInfoSheetsService {
                 );
             }
 
-            await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
+            try {
+                await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
+            } catch (emailError) {
+                this.logger.error(`[InfoSheet] Non-fatal email sending failure for tender ${tenderId}:`, emailError);
+            }
 
             return result;
         } catch (error: any) {
@@ -1192,7 +1196,11 @@ export class TenderInfoSheetsService {
                 }
             }
 
-            await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
+            try {
+                await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
+            } catch (emailError) {
+                this.logger.error(`[InfoSheet] Non-fatal email sending failure for tender ${tenderId}:`, emailError);
+            }
 
             return result;
         } catch (error: any) {
@@ -1814,6 +1822,23 @@ export class TenderInfoSheetsService {
             return null;
         }
 
+        let selfClassifiedAtc = false;
+        let hasAtc = false;
+        const conflicts: Record<string, any> = {};
+        if (row.fields && typeof row.fields === 'object') {
+            for (const [key, val] of Object.entries(row.fields) as [string, any][]) {
+                if (val?.sources?.self_classified_atc) {
+                    selfClassifiedAtc = true;
+                }
+                if (val?.sources?.atc) {
+                    hasAtc = true;
+                }
+                if (val?.sources?.has_conflict) {
+                    conflicts[key] = val.sources;
+                }
+            }
+        }
+
         return {
             tenderId: row.tenderId,
             fields: row.fields as Record<string, any>,
@@ -1821,6 +1846,9 @@ export class TenderInfoSheetsService {
             extraction_version: row.extractionVersion || '1.0.0',
             processing_time_ms: row.processingTimeMs || 0,
             updatedAt: row.updatedAt,
+            self_classified_atc: selfClassifiedAtc,
+            has_atc: hasAtc,
+            ambiguous_field_conflicts: conflicts,
         };
     }
 
@@ -1933,6 +1961,9 @@ export class TenderInfoSheetsService {
                 missing_fields: jobStatus.result?.missing_fields ?? [],
                 extraction_version: jobStatus.result?.extraction_version ?? '1.0.0',
                 processing_time_ms: jobStatus.result?.processing_time_ms ?? 0,
+                self_classified_atc: jobStatus.result?.self_classified_atc,
+                has_atc: jobStatus.result?.has_atc,
+                ambiguous_field_conflicts: jobStatus.result?.ambiguous_field_conflicts,
             };
         }
 
@@ -1952,3 +1983,5 @@ export class TenderInfoSheetsService {
         };
     }
 }
+
+export { TenderInfoSheetsService as InfoSheetsService };

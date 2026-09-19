@@ -1,10 +1,27 @@
 import type { UseFormReturn } from 'react-hook-form';
 import type { TenderInfoSheetFormValues } from './tenderInfoSheet.types';
 
+export interface FieldSourceCitation {
+    value: unknown;
+    raw_value: string;
+    page: number;
+    snippet: string;
+    confidence?: number;
+    status?: string;
+}
+
+export interface FieldSources {
+    self_classified_atc: boolean;
+    has_conflict: boolean;
+    main_tender: FieldSourceCitation | null;
+    atc: FieldSourceCitation | null;
+}
+
 export interface ExtractedField<T = unknown> {
     value: T;
     confidence: 'high' | 'medium' | 'low' | 'not_applicable' | string;
     source?: string | null;
+    sources?: FieldSources;
 }
 
 export interface PopulateResult {
@@ -88,6 +105,8 @@ export function extractFieldIndicators(
                     confidenceValue: 'High',
                     suggestedValue: field.value,
                     source: field.source,
+                    sources: field.sources,
+                    rawKey: key,
                 };
             } else if (confidence === 'fallback') {
                 indicators[formKey] = {
@@ -97,6 +116,8 @@ export function extractFieldIndicators(
                     confidenceValue: 'Fallback',
                     suggestedValue: field.value,
                     source: field.source,
+                    sources: field.sources,
+                    rawKey: key,
                 };
             } else if (confidence === 'low') {
                 indicators[formKey] = {
@@ -106,6 +127,8 @@ export function extractFieldIndicators(
                     confidenceValue: 'Low',
                     suggestedValue: field.value,
                     source: field.source,
+                    sources: field.sources,
+                    rawKey: key,
                 };
             }
         }
@@ -119,6 +142,7 @@ export function extractFieldIndicators(
                     type: 'missing',
                     label: 'Missing in PDF',
                     message: 'Clause was not found in the tender PDF. Please review and fill manually.',
+                    rawKey: missingKey,
                 };
             }
         }

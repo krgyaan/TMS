@@ -2,7 +2,7 @@ import time
 import re
 import os
 from pathlib import Path
-from typing import Dict, Any, List, Optional, cast
+from typing import Dict, Any, List, Optional, cast, Tuple
 from app.services.pdf_text_extractor import extract_pdf_text_hybrid
 from app.services.pdf_link_extractor import extract_links_and_mentions
 from app.services.field_extractor import extract_tender_fields
@@ -48,6 +48,90 @@ AMBIGUOUS_LABELS = {
     "Installation Inclusive", "Custom Eligibility Criteria", "Custom Rules",
     "delivery_time_installation_inclusive", "custom_eligibility_criteria", "custom_rules"
 }
+
+
+def _find_atc_anchor_citation(key: str, atc_page_texts: List[Dict[str, Any]]) -> Tuple[int, str]:
+    """Finds the page number and a contextual text snippet for an ATC anchor field."""
+    if not atc_page_texts:
+        return 1, ""
+    patterns = {
+        "maf_required": [r"oem\s+authorization", r"manufacturer\s+authorization", r"authorization\s+certificate", r"\bmaf\b"],
+        "payment_terms_supply_percent": [r"terms\s+of\s+payment", r"payment\s+terms", r"payment.*supply", r"payment"],
+        "payment_terms_installation_percent": [r"installation.*commissioning", r"balance.*installation", r"installation", r"commissioning"],
+        "ld_percentage_per_week": [r"liquidated\s+damages", r"price\s+reduction\s+schedule", r"\bprs\b", r"\bld\b"],
+        "max_ld_percentage": [r"maximum.*(?:ld|penalty|prs)", r"liquidated\s+damages", r"price\s+reduction\s+schedule", r"\bprs\b"],
+        "sd_required": [r"security\s+deposit", r"\bsd\b"],
+        "sd_mode": [r"security\s+deposit", r"\bsd\b"],
+        "sd_percentage": [r"security\s+deposit", r"\bsd\b"],
+        "sd_duration": [r"security\s+deposit", r"within\s+\d+\s+days"],
+        "pbg_mode": [r"performance\s+bank\s+guarantee", r"performance\s+security", r"\bpbg\b"],
+        "commercial_evaluation": [r"commercial\s+evaluation", r"evaluation\s+method"],
+        "reverse_auction": [r"reverse\s+auction"],
+        "delivery_time_supply": [r"delivery\s+time", r"contract\s+period", r"delivery\s+period", r"delivery"],
+        "client_contacts": [r"contact\s+person", r"nodal\s+officer", r"email", r"telephone", r"phone"],
+        "courier_address": [r"courier\s+address", r"postal\s+address", r"consignee\s+address", r"address"],
+    }
+    key_patterns = patterns.get(key, [re.escape(key.replace("_", " "))])
+    for page in atc_page_texts:
+        text = page.get("text", "")
+        for pat in key_patterns:
+            m = re.search(pat, text, re.IGNORECASE)
+            if m:
+                p_num = page.get("page", page.get("page_number", 1))
+                start = max(0, m.start() - 30)
+                end = min(len(text), m.end() + 70)
+                snip = text[start:end].replace("\n", " ").strip()
+                if start > 0:
+                    snip = "..." + snip
+                if end < len(text):
+                    snip = snip + "..."
+                return p_num, snip
+    first_p = atc_page_texts[0].get("page", atc_page_texts[0].get("page_number", 1)) if atc_page_texts else 1
+    return first_p, ""
+
+
+def _collect_field_snapshots(sections_list: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """
+    Builds a lookup map from field labels, field_names, and IDs to
+    {value, raw_value, page, snippet, confidence, status}.
+    """
+    snapshot: Dict[str, Dict[str, Any]] = {}
+    for sec in sections_list:
+        if not isinstance(sec, dict):
+            continue
+        for f in sec.get("fields", []):
+            if not isinstance(f, dict):
+                continue
+            lbl = f.get("label", "").strip()
+            fn = f.get("field_name", "").strip()
+            fid = f.get("id", "").strip()
+            val = f.get("value")
+            st = f.get("status")
+            page = f.get("sourcePage", 1)
+            snip = f.get("sourceSnippet") or ""
+            conf = f.get("confidence", 85.0)
+
+            if val in (None, "", "None", "Not Found", "Out of Scope (Stage 1)"):
+                continue
+
+            entry = {
+                "value": val,
+                "raw_value": str(val),
+                "page": page,
+                "snippet": snip,
+                "confidence": conf,
+                "status": st,
+            }
+            if lbl:
+                snapshot[lbl] = entry
+                snapshot[lbl.lower()] = entry
+            if fn:
+                snapshot[fn] = entry
+                snapshot[fn.lower()] = entry
+            if fid:
+                snapshot[fid] = entry
+                snapshot[fid.lower()] = entry
+    return snapshot
 
 
 def _resolve_top_level_fields(sections: List[Dict[str, Any]]) -> Dict[str, str]:
@@ -148,6 +232,7 @@ def ingest_parent_tender_pdf(
     
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 3: Running Layer 1 spatial field extraction (doc_type='{doc_type}')...")
     sections = extract_tender_fields(page_texts, title_raw, document_type=doc_type)
+    main_tender_snapshot = _collect_field_snapshots(sections)
 
     # 3a. Bridge resolved ATC link URL to sections atc_document_link_present field
     matched_atc_link = None
@@ -252,6 +337,8 @@ def ingest_parent_tender_pdf(
         atc_path = pdf_path
         logger.info(f"[ATC_RESOLVER] Selected primary PDF itself as ATC document: '{atc_path}'")
 
+    is_self_classified_atc = bool(not explicit_atc_paths and is_direct_atc and str(atc_path) == str(pdf_path))
+
     # --- ATC PRECONDITION GUARD ---
     # If the main tender PDF contained an ATC hyperlink but the downloaded file is
     # unavailable (None path or non-existent file), surface a structured warning so
@@ -288,6 +375,7 @@ def ingest_parent_tender_pdf(
 
     atc_full_text = ""  # Outer-scope ATC text — used by LLM fallback post-pass
     merged_atc_field_count = 0
+    atc_snapshot: Dict[str, Dict[str, Any]] = {}
     if atc_path:
         try:
             logger.info(f"[ATC_RESOLVER] Ingest pipeline parsing downloaded ATC child PDF: '{atc_path}'...")
@@ -361,6 +449,7 @@ def ingest_parent_tender_pdf(
                     if val is None:
                         continue
                     lbl = schema_label_map.get(key, key.replace("_", " ").title())
+                    anc_page, anc_snip = _find_atc_anchor_citation(key, atc_page_texts)
                     sec_to_update.setdefault("fields", []).append({
                         "id": f"f-{key}",
                         "label": lbl,
@@ -368,8 +457,12 @@ def ingest_parent_tender_pdf(
                         "value": val,
                         "status": "extracted",
                         "confidence": 85.0,
-                        "source": "atc"
+                        "source": "atc",
+                        "sourcePage": anc_page,
+                        "sourceSnippet": anc_snip,
                     })
+
+            atc_snapshot = _collect_field_snapshots(atc_sections)
             
             # BUG 4 FIX: Build label -> (section_index, field_index) map to preserve section layout
             label_to_loc = {}
@@ -470,6 +563,41 @@ def ingest_parent_tender_pdf(
         except Exception as atc_err:
             logger.warning(f"[ATC_RESOLVER] ATC_PARSE_FAILED: Error processing ATC PDF '{atc_path}': {atc_err}. Continuing with main tender parsing only.")
 
+    # 3a3. Build dual source extraction records
+    has_atc = bool(atc_path is not None)
+    dual_sources: Dict[str, Dict[str, Any]] = {}
+    all_keys = set(main_tender_snapshot.keys()) | set(atc_snapshot.keys())
+    for k in all_keys:
+        if is_self_classified_atc:
+            dual_sources[k] = {
+                "self_classified_atc": True,
+                "has_conflict": False,
+                "main_tender": None,
+                "atc": atc_snapshot.get(k) or main_tender_snapshot.get(k),
+            }
+        elif has_atc:
+            m = main_tender_snapshot.get(k)
+            a = atc_snapshot.get(k)
+            has_conflict = False
+            if m and a and m.get("value") is not None and a.get("value") is not None:
+                m_v = str(m["value"]).strip().lower()
+                a_v = str(a["value"]).strip().lower()
+                if m_v and a_v and m_v != a_v:
+                    has_conflict = True
+            dual_sources[k] = {
+                "self_classified_atc": False,
+                "has_conflict": has_conflict,
+                "main_tender": m,
+                "atc": a,
+            }
+        else:
+            dual_sources[k] = {
+                "self_classified_atc": False,
+                "has_conflict": False,
+                "main_tender": main_tender_snapshot.get(k),
+                "atc": None,
+            }
+
     # 3a2. Explicit BOQ upload: merge its text into the extraction context so it
     # actually participates in extraction instead of being accepted by the API
     # and then silently dropped. Runs independently of ATC (a tender can have a
@@ -512,7 +640,15 @@ def ingest_parent_tender_pdf(
     infosheet_data = {}
     try:
         from app.services.tender_mapper import build_infosheet_data
-        infosheet_data = build_infosheet_data(sections, all_pages, job_id=job_id, atc_full_text=atc_full_text)
+        infosheet_data = build_infosheet_data(
+            sections,
+            all_pages,
+            job_id=job_id,
+            atc_full_text=atc_full_text,
+            dual_sources=dual_sources,
+            is_self_classified_atc=is_self_classified_atc,
+            has_atc=has_atc,
+        )
 
         # 4a. LLM Fallback Post-Pass — resolve remaining NA fields via LLM (Gemini / OpenAI-compatible)
         import os
@@ -957,6 +1093,9 @@ def ingest_parent_tender_pdf(
     # Drop consignee_address_display per specification (no TMS destination field)
     if isinstance(infosheet_data, dict):
         infosheet_data.pop("consignee_address_display", None)
+        infosheet_data["_dual_sources"] = dual_sources
+        infosheet_data["_self_classified_atc"] = is_self_classified_atc
+        infosheet_data["_has_atc"] = has_atc
 
     # Return built infosheet dict directly with zero side effects
     return infosheet_data

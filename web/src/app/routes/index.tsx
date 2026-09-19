@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import { lazy } from "react";
+import React, { lazy } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PublicOnlyRoute from "@/components/PublicOnlyRoute";
 import DashboardLayout from "@/app/layout/DashboardLayout";
@@ -16,6 +16,9 @@ const Auth_GoogleCallback = lazy(() => import("@/modules/auth/google-callback"))
 
 // Public customer feedback form (no login / no app layout)
 const Public_CustomerFeedbackForm = lazy(() => import("@/modules/services/service-feedback/ServiceFeedbackFormPage"));
+
+// Verification demo page
+const ExtractionPreviewDemoPage = lazy(() => import("@/modules/tendering/info-sheet/components/ExtractionPreviewDemoPage"));
 
 // Section Routes
 const MasterRoutes = lazy(() => import("./sections/master.routes"));
@@ -61,6 +64,16 @@ export default function AppRoutes() {
                 element={
                     <RouteWrapper>
                         <Public_CustomerFeedbackForm />
+                    </RouteWrapper>
+                }
+            />
+
+            {/* Public route for verifying clickable citation badges & extraction preview */}
+            <Route
+                path="/extraction-preview-demo"
+                element={
+                    <RouteWrapper>
+                        <ExtractionPreviewDemoPage />
                     </RouteWrapper>
                 }
             />
