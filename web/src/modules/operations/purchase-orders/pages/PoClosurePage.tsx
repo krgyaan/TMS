@@ -12,7 +12,7 @@ import { FileUploader } from "@/components/file-upload";
 import { AlertCircle, CheckCircle2, Loader2, Plus, Save, Trash2, Edit } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { CanUpdate, AdminOnly } from "@/components/PermissionGuard";
+import { CanUpdate } from "@/components/PermissionGuard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { AdminOnly } from "@/components/RoleGuard";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "default" | "outline" | "success" | "destructive" }> = {
     pending: { label: "Pending", variant: "outline" },

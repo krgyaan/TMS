@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { AlertCircle, CheckCircle2, Loader2, Plus, Save, Trash2, Edit, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Plus, Save, Trash2, Edit } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,8 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { FileUploader } from "@/components/file-upload";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
-import { CanUpdate, AdminOnly } from "@/components/PermissionGuard";
+import { CanUpdate } from "@/components/PermissionGuard";
+import { AdminOnly } from "@/components/RoleGuard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -688,64 +689,63 @@ const VwoClosurePage = () => {
       </Card>
 
       <CardFooter className="flex gap-3">
-{canClose && (
-            <Button
-              className="bg-green-600 hover:bg-green-700"
-              onClick={async () => {
-                try {
-                  setSaveMsg(null);
-                  await vendorWorkOrderApi.close(woId);
-                  setSaveMsg({ type: "success", text: "Vendor Work Order closed successfully." });
-                  await fetchData();
-                } catch (err) {
-                  console.error(err);
-                  setSaveMsg({ type: "error", text: "Failed to close Vendor Work Order." });
-                }
-              }}
-            >
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Close VWO
-            </Button>
-          )}
-        </CardFooter>
+        {canClose && (
+          <Button
+            className="bg-green-600 hover:bg-green-700"
+            onClick={async () => {
+              try {
+                setSaveMsg(null);
+                await vendorWorkOrderApi.close(woId);
+                setSaveMsg({ type: "success", text: "Vendor Work Order closed successfully." });
+                await fetchData();
+              } catch (err) {
+                console.error(err);
+                setSaveMsg({ type: "error", text: "Failed to close Vendor Work Order." });
+              }
+            }}
+          >
+            <CheckCircle2 className="h-4 w-4 mr-2" />
+            Close VWO
+          </Button>
+        )}
+      </CardFooter>
 
-        {/* Delete Payment Request Confirmation Dialog */}
-        <AlertDialog open={!!deletePaymentRequest} onOpenChange={(open) => !open && setDeletePaymentRequest(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Payment Request</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete payment request <strong>{deletePaymentRequest?.requestNo}</strong>? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setDeletePaymentRequest(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeletePaymentRequest} className="bg-destructive hover:bg-destructive/90">
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+      {/* Delete Payment Request Confirmation Dialog */}
+      <AlertDialog open={!!deletePaymentRequest} onOpenChange={(open) => !open && setDeletePaymentRequest(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Payment Request</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete payment request <strong>{deletePaymentRequest?.requestNo}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletePaymentRequest(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeletePaymentRequest} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-        {/* Delete Purchase Invoice Confirmation Dialog */}
-        <AlertDialog open={!!deletePurchaseInvoice} onOpenChange={(open) => !open && setDeletePurchaseInvoice(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Purchase Invoice</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete purchase invoice <strong>{deletePurchaseInvoice?.invoiceNo}</strong>? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setDeletePurchaseInvoice(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeletePurchaseInvoice} className="bg-destructive hover:bg-destructive/90">
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </Card>
-    );
-  };
-}
+      {/* Delete Purchase Invoice Confirmation Dialog */}
+      <AlertDialog open={!!deletePurchaseInvoice} onOpenChange={(open) => !open && setDeletePurchaseInvoice(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Purchase Invoice</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete purchase invoice <strong>{deletePurchaseInvoice?.invoiceNo}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletePurchaseInvoice(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeletePurchaseInvoice} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
+};
 export default VwoClosurePage;
