@@ -9,175 +9,162 @@ import { PurchaseOrderService } from "./purchase-order.service";
 
 @Controller("purchase-orders")
 export class PurchaseOrderController {
-  constructor(private readonly service: PurchaseOrderService) {}
+    constructor(private readonly service: PurchaseOrderService) {}
 
-  @Get("project/:projectId")
-  getProjectPurchaseOrders(@Param("projectId", ParseIntPipe) projectId: number) {
-    return this.service.getPurchaseOrders(projectId);
-  }
-
-  @Get("project/:projectId/inventory")
-  getProjectInventory(@Param("projectId", ParseIntPipe) projectId: number) {
-    return this.service.getProjectInventory(projectId);
-  }
-
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  createPurchaseOrder(@Body() body: any, @CurrentUser() user: ValidatedUser) {
-    return this.service.createPurchaseOrder(body, user.id);
-  }
-
-  @Post("parties")
-  @HttpCode(HttpStatus.CREATED)
-  createParty(@Body() body: any) {
-    return this.service.createParty(body);
-  }
-
-  @Get("parties")
-  listParties(@Query("type") type?: string) {
-    return this.service.listParties(type);
-  }
-
-  @Get("next-number")
-  getNextPONumber(@Query("projectName") projectName: string) {
-    return this.service.generatePONumber(projectName);
-  }
-
-  @Get()
-  getAllPurchaseOrders(
-    @Query("status") status?: string,
-    @Query("section") section?: string,
-    @CurrentUser() user?: ValidatedUser,
-  ) {
-    return this.service.getAllPurchaseOrders(
-      status,
-      section,
-      user,
-    );
-  }
-
-  @Get("approval-counts")
-  getApprovalCounts(
-    @Query("section") section?: string,
-    @CurrentUser() user?: ValidatedUser,
-  ) {
-    return this.service.getApprovalCounts(
-      section,
-      user,
-    );
-  }
-
-  @Get(":id/pdf/versions")
-  getPurchaseOrderPdfVersions(@Param("id", ParseIntPipe) id: number) {
-    return this.service.getPurchaseOrderPdfVersions(id);
-  }
-
-  @Delete(":id/pdf/versions/:version")
-  @HttpCode(HttpStatus.OK)
-  deletePdfVersion(
-    @Param("id", ParseIntPipe) id: number,
-    @Param("version") version: string,
-  ) {
-    return this.service.deletePdfVersion(id, version);
-  }
-
-  @Get(":id/pdf")
-  async getPurchaseOrderPdf(
-    @Param("id", ParseIntPipe) id: number,
-    @Query("version") version: string | undefined,
-    @Res() res: Response,
-  ) {
-    const { path: relPath, filename } = await this.service.getPurchaseOrderPdf(id, version);
-    const absolutePath = join(process.cwd(), "uploads", relPath);
-
-    if (!existsSync(absolutePath)) {
-      throw new NotFoundException("PDF file not found on disk");
+    @Get("project/:projectId")
+    getProjectPurchaseOrders(@Param("projectId", ParseIntPipe) projectId: number) {
+        return this.service.getPurchaseOrders(projectId);
     }
 
-    const fileStream = createReadStream(absolutePath);
-    fileStream.on("error", (err) => {
-      if (!res.headersSent) {
-        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Error streaming PDF");
-      }
-    });
+    @Get("project/:projectId/inventory")
+    getProjectInventory(@Param("projectId", ParseIntPipe) projectId: number) {
+        return this.service.getProjectInventory(projectId);
+    }
 
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${filename}"`,
-    });
-    fileStream.pipe(res);
-  }
+    @Post()
+    @HttpCode(HttpStatus.CREATED)
+    createPurchaseOrder(@Body() body: any, @CurrentUser() user: ValidatedUser) {
+        return this.service.createPurchaseOrder(body, user.id);
+    }
 
-  @Patch("parties/:id")
-  @HttpCode(HttpStatus.OK)
-  updateParty(@Param("id", ParseIntPipe) id: number, @Body() body: any) {
-    return this.service.updateParty(id, body);
-  }
+    @Post("parties")
+    @HttpCode(HttpStatus.CREATED)
+    createParty(@Body() body: any) {
+        return this.service.createParty(body);
+    }
 
-  @Patch("parties/:id/activate")
-  @HttpCode(HttpStatus.OK)
-  activateParty(@Param("id", ParseIntPipe) id: number) {
-    return this.service.activateParty(id);
-  }
+    @Get("parties")
+    listParties(@Query("type") type?: string) {
+        return this.service.listParties(type);
+    }
 
-  @Patch("parties/:id/deactivate")
-  @HttpCode(HttpStatus.OK)
-  deactivateParty(@Param("id", ParseIntPipe) id: number) {
-    return this.service.deactivateParty(id);
-  }
+    @Get("next-number")
+    getNextPONumber(@Query("projectName") projectName: string) {
+        return this.service.generatePONumber(projectName);
+    }
 
-  @Get(":id")
-  getPurchaseOrder(@Param("id", ParseIntPipe) id: number) {
-    return this.service.getPurchaseOrder(id);
-  }
+    @Get()
+    getAllPurchaseOrders(@Query("status") status?: string, @Query("section") section?: string, @CurrentUser() user?: ValidatedUser) {
+        return this.service.getAllPurchaseOrders(status, section, user);
+    }
 
-  @Get(":id/closure-status")
-  getClosureStatus(@Param("id", ParseIntPipe) id: number) {
-    return this.service.checkClosure(id);
-  }
+    @Get("approval-counts")
+    getApprovalCounts(@Query("section") section?: string, @CurrentUser() user?: ValidatedUser) {
+        return this.service.getApprovalCounts(section, user);
+    }
 
-  @Get(":id/closure")
-  getClosure(@Param("id", ParseIntPipe) id: number) {
-    return this.service.getPurchaseOrderClosure(id);
-  }
+    @Get(":id/pdf/versions")
+    getPurchaseOrderPdfVersions(@Param("id", ParseIntPipe) id: number) {
+        return this.service.getPurchaseOrderPdfVersions(id);
+    }
 
-  @Post(":id/bulk-payment-requests")
-  @HttpCode(HttpStatus.CREATED)
-  bulkCreatePaymentRequests(
-    @Param("id", ParseIntPipe) id: number,
-    @Body() body: { items: any[] },
-    @CurrentUser() user: ValidatedUser,
-  ) {
-    return this.service.bulkCreatePaymentRequests(id, body?.items ?? [], user.id);
-  }
+    @Delete(":id/pdf/versions/:version")
+    @HttpCode(HttpStatus.OK)
+    deletePdfVersion(@Param("id", ParseIntPipe) id: number, @Param("version") version: string) {
+        return this.service.deletePdfVersion(id, version);
+    }
 
-  @Post(":id/bulk-purchase-invoices")
-  @HttpCode(HttpStatus.CREATED)
-  bulkCreatePurchaseInvoices(
-    @Param("id", ParseIntPipe) id: number,
-    @Body() body: { items: any[] },
-    @CurrentUser() user: ValidatedUser,
-  ) {
-    return this.service.bulkCreatePurchaseInvoices(id, body?.items ?? [], user.id);
-  }
+    @Get(":id/pdf")
+    async getPurchaseOrderPdf(@Param("id", ParseIntPipe) id: number, @Query("version") version: string | undefined, @Res() res: Response) {
+        const { path: relPath, filename } = await this.service.getPurchaseOrderPdf(id, version);
+        const absolutePath = join(process.cwd(), "uploads", relPath);
 
-  @Put(":id/tds")
-  @HttpCode(HttpStatus.OK)
-  setTdsPercentage(
-      @Param("id", ParseIntPipe) id: number,
-      @Body() body: { approve: boolean; tdsPercentage?: number; remark?: string },
-      @CurrentUser() user: ValidatedUser,
-  ) {
-      return this.service.setTdsPercentage(id, body, user?.id);
-  }
+        if (!existsSync(absolutePath)) {
+            throw new NotFoundException("PDF file not found on disk");
+        }
 
-  @Put(":id")
-  @HttpCode(HttpStatus.OK)
-  updatePurchaseOrder(
-      @Param("id", ParseIntPipe) id: number,
-      @Body() body: any,
-      @CurrentUser() user: ValidatedUser,
-  ) {
-      return this.service.updatePurchaseOrder(id, body, user.id);
-  }
+        const fileStream = createReadStream(absolutePath);
+        fileStream.on("error", err => {
+            if (!res.headersSent) {
+                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Error streaming PDF");
+            }
+        });
+
+        res.set({
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `inline; filename="${filename}"`,
+        });
+        fileStream.pipe(res);
+    }
+
+    @Patch("parties/:id")
+    @HttpCode(HttpStatus.OK)
+    updateParty(@Param("id", ParseIntPipe) id: number, @Body() body: any) {
+        return this.service.updateParty(id, body);
+    }
+
+    @Patch("parties/:id/activate")
+    @HttpCode(HttpStatus.OK)
+    activateParty(@Param("id", ParseIntPipe) id: number) {
+        return this.service.activateParty(id);
+    }
+
+    @Patch("parties/:id/deactivate")
+    @HttpCode(HttpStatus.OK)
+    deactivateParty(@Param("id", ParseIntPipe) id: number) {
+        return this.service.deactivateParty(id);
+    }
+
+    @Get(":id")
+    getPurchaseOrder(@Param("id", ParseIntPipe) id: number) {
+        return this.service.getPurchaseOrder(id);
+    }
+
+    @Get(":id/closure-status")
+    getClosureStatus(@Param("id", ParseIntPipe) id: number) {
+        return this.service.checkClosure(id);
+    }
+
+    @Get(":id/closure")
+    getClosure(@Param("id", ParseIntPipe) id: number) {
+        return this.service.getPurchaseOrderClosure(id);
+    }
+
+    @Post(":id/bulk-payment-requests")
+    @HttpCode(HttpStatus.CREATED)
+    bulkCreatePaymentRequests(@Param("id", ParseIntPipe) id: number, @Body() body: { items: any[] }, @CurrentUser() user: ValidatedUser) {
+        return this.service.bulkCreatePaymentRequests(id, body?.items ?? [], user.id);
+    }
+
+    @Post(":id/bulk-purchase-invoices")
+    @HttpCode(HttpStatus.CREATED)
+    bulkCreatePurchaseInvoices(@Param("id", ParseIntPipe) id: number, @Body() body: { items: any[] }, @CurrentUser() user: ValidatedUser) {
+        return this.service.bulkCreatePurchaseInvoices(id, body?.items ?? [], user.id);
+    }
+
+    @Put(":id/payment-requests/:prId")
+    @HttpCode(HttpStatus.OK)
+    updatePaymentRequest(@Param("id", ParseIntPipe) id: number, @Param("prId", ParseIntPipe) prId: number, @Body() body: any, @CurrentUser() user: ValidatedUser) {
+        return this.service.updatePaymentRequest(id, prId, body, user.id);
+    }
+
+    @Delete(":id/payment-requests/:prId")
+    @HttpCode(HttpStatus.OK)
+    deletePaymentRequest(@Param("id", ParseIntPipe) id: number, @Param("prId", ParseIntPipe) prId: number, @CurrentUser() user: ValidatedUser) {
+        return this.service.deletePaymentRequest(id, prId, user.id);
+    }
+
+    @Put(":id/purchase-invoices/:piId")
+    @HttpCode(HttpStatus.OK)
+    updatePurchaseInvoice(@Param("id", ParseIntPipe) id: number, @Param("piId", ParseIntPipe) piId: number, @Body() body: any, @CurrentUser() user: ValidatedUser) {
+        return this.service.updatePurchaseInvoice(id, piId, body, user.id);
+    }
+
+    @Delete(":id/purchase-invoices/:piId")
+    @HttpCode(HttpStatus.OK)
+    deletePurchaseInvoice(@Param("id", ParseIntPipe) id: number, @Param("piId", ParseIntPipe) piId: number, @CurrentUser() user: ValidatedUser) {
+        return this.service.deletePurchaseInvoice(id, piId, user.id);
+    }
+
+    @Put(":id/tds")
+    @HttpCode(HttpStatus.OK)
+    setTdsPercentage(@Param("id", ParseIntPipe) id: number, @Body() body: { approve: boolean; tdsPercentage?: number; remark?: string }, @CurrentUser() user: ValidatedUser) {
+        return this.service.setTdsPercentage(id, body, user?.id);
+    }
+
+    @Put(":id")
+    @HttpCode(HttpStatus.OK)
+    updatePurchaseOrder(@Param("id", ParseIntPipe) id: number, @Body() body: any, @CurrentUser() user: ValidatedUser) {
+        return this.service.updatePurchaseOrder(id, body, user.id);
+    }
 }

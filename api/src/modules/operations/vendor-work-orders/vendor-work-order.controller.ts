@@ -9,169 +9,163 @@ import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 
 @Controller("vendor-work-orders")
 export class VendorWorkOrderController {
-  constructor(private readonly service: VendorWorkOrderService) {}
+    constructor(private readonly service: VendorWorkOrderService) {}
 
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  create(@Body() body: any, @CurrentUser() user: ValidatedUser) {
-    return this.service.create(body, user.id);
-  }
-
-  @Put(":id")
-  @HttpCode(HttpStatus.OK)
-  update(
-    @Param("id", ParseIntPipe) id: number,
-    @Body() body: any,
-    @CurrentUser() user: ValidatedUser,
-  ) {
-    return this.service.update(id, body, user.id);
-  }
-
-  @Post("parties")
-  @HttpCode(HttpStatus.CREATED)
-  createParty(@Body() body: any) {
-    return this.service.createParty(body);
-  }
-
-  @Patch("parties/:id")
-  @HttpCode(HttpStatus.OK)
-  updateParty(@Param("id", ParseIntPipe) id: number, @Body() body: any) {
-    return this.service.updateParty(id, body);
-  }
-
-  @Patch("parties/:id/activate")
-  @HttpCode(HttpStatus.OK)
-  activateParty(@Param("id", ParseIntPipe) id: number) {
-    return this.service.activateParty(id);
-  }
-
-  @Patch("parties/:id/deactivate")
-  @HttpCode(HttpStatus.OK)
-  deactivateParty(@Param("id", ParseIntPipe) id: number) {
-    return this.service.deactivateParty(id);
-  }
-
-  @Get("parties")
-  listParties(@Query("type") type?: string) {
-    return this.service.listParties(type);
-  }
-
-  @Get("next-number")
-  getNextWONumber(@Query("projectName") projectName: string) {
-    return this.service.generateWONumber(projectName);
-  }
-
-  @Get("approval-counts")
-  getApprovalCounts(
-    @Query("section") section?: string,
-    @CurrentUser() user?: ValidatedUser,
-  ) {
-    return this.service.getApprovalCounts(section, user);
-  }
-
-  @Get()
-  getAll(
-    @Query("status") status?: string,
-    @Query("section") section?: string,
-    @CurrentUser() user?: ValidatedUser,
-  ) {
-    return this.service.getAll(status, section, user);
-  }
-
-  @Put(":id/approval")
-  @HttpCode(HttpStatus.OK)
-  setApproval(
-    @Param("id", ParseIntPipe) id: number,
-    @Body() body: { approve: boolean; tdsPercentage?: number; remark?: string },
-    @CurrentUser() user: ValidatedUser,
-  ) {
-    return this.service.setVwoApproval(id, body, user?.id);
-  }
-
-  @Get(":id")
-  getById(@Param("id", ParseIntPipe) id: number) {
-    return this.service.getById(id);
-  }
-
-  @Get(":id/closure-status")
-  getClosureStatus(@Param("id", ParseIntPipe) id: number) {
-    return this.service.checkClosure(id);
-  }
-
-  @Get(":id/closure")
-  getClosure(@Param("id", ParseIntPipe) id: number) {
-    return this.service.getVendorWorkOrderClosure(id);
-  }
-
-  @Post(":id/close")
-  @HttpCode(HttpStatus.OK)
-  closeVendorWorkOrder(@Param("id", ParseIntPipe) id: number) {
-    return this.service.closeVendorWorkOrder(id);
-  }
-
-  @Post(":id/bulk-payment-requests")
-  @HttpCode(HttpStatus.CREATED)
-  bulkCreatePaymentRequests(
-    @Param("id", ParseIntPipe) id: number,
-    @Body() body: { items: any[] },
-    @CurrentUser() user: ValidatedUser,
-  ) {
-    return this.service.bulkCreatePaymentRequests(id, body?.items ?? [], user.id);
-  }
-
-  @Post(":id/bulk-purchase-invoices")
-  @HttpCode(HttpStatus.CREATED)
-  bulkCreatePurchaseInvoices(
-    @Param("id", ParseIntPipe) id: number,
-    @Body() body: { items: any[] },
-    @CurrentUser() user: ValidatedUser,
-  ) {
-    return this.service.bulkCreatePurchaseInvoices(id, body?.items ?? [], user.id);
-  }
-
-  @Get("project/:projectId")
-  getByProject(@Param("projectId", ParseIntPipe) projectId: number) {
-    return this.service.getByProject(projectId);
-  }
-
-  @Get(":id/pdf")
-  async getPdf(
-    @Param("id", ParseIntPipe) id: number,
-    @Query("version") version: string | undefined,
-    @Res() res: Response,
-  ) {
-    const { path: relPath, filename } = await this.service.getPdf(id, version);
-    const absolutePath = join(process.cwd(), "uploads", relPath);
-
-    if (!existsSync(absolutePath)) {
-      throw new NotFoundException("PDF file not found on disk");
+    @Post()
+    @HttpCode(HttpStatus.CREATED)
+    create(@Body() body: any, @CurrentUser() user: ValidatedUser) {
+        return this.service.create(body, user.id);
     }
 
-    const fileStream = createReadStream(absolutePath);
-    fileStream.on("error", (err) => {
-      if (!res.headersSent) {
-        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Error streaming PDF");
-      }
-    });
+    @Put(":id")
+    @HttpCode(HttpStatus.OK)
+    update(@Param("id", ParseIntPipe) id: number, @Body() body: any, @CurrentUser() user: ValidatedUser) {
+        return this.service.update(id, body, user.id);
+    }
 
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${filename}"`,
-    });
-    fileStream.pipe(res);
-  }
+    @Post("parties")
+    @HttpCode(HttpStatus.CREATED)
+    createParty(@Body() body: any) {
+        return this.service.createParty(body);
+    }
 
-  @Get(":id/pdf/versions")
-  getPdfVersions(@Param("id", ParseIntPipe) id: number) {
-    return this.service.getPdfVersions(id);
-  }
+    @Patch("parties/:id")
+    @HttpCode(HttpStatus.OK)
+    updateParty(@Param("id", ParseIntPipe) id: number, @Body() body: any) {
+        return this.service.updateParty(id, body);
+    }
 
-  @Delete(":id/pdf/versions/:version")
-  @HttpCode(HttpStatus.OK)
-  deletePdfVersion(
-    @Param("id", ParseIntPipe) id: number,
-    @Param("version") version: string,
-  ) {
-    return this.service.deletePdfVersion(id, version);
-  }
+    @Patch("parties/:id/activate")
+    @HttpCode(HttpStatus.OK)
+    activateParty(@Param("id", ParseIntPipe) id: number) {
+        return this.service.activateParty(id);
+    }
+
+    @Patch("parties/:id/deactivate")
+    @HttpCode(HttpStatus.OK)
+    deactivateParty(@Param("id", ParseIntPipe) id: number) {
+        return this.service.deactivateParty(id);
+    }
+
+    @Get("parties")
+    listParties(@Query("type") type?: string) {
+        return this.service.listParties(type);
+    }
+
+    @Get("next-number")
+    getNextWONumber(@Query("projectName") projectName: string) {
+        return this.service.generateWONumber(projectName);
+    }
+
+    @Get("approval-counts")
+    getApprovalCounts(@Query("section") section?: string, @CurrentUser() user?: ValidatedUser) {
+        return this.service.getApprovalCounts(section, user);
+    }
+
+    @Get()
+    getAll(@Query("status") status?: string, @Query("section") section?: string, @CurrentUser() user?: ValidatedUser) {
+        return this.service.getAll(status, section, user);
+    }
+
+    @Put(":id/approval")
+    @HttpCode(HttpStatus.OK)
+    setApproval(@Param("id", ParseIntPipe) id: number, @Body() body: { approve: boolean; tdsPercentage?: number; remark?: string }, @CurrentUser() user: ValidatedUser) {
+        return this.service.setVwoApproval(id, body, user?.id);
+    }
+
+    @Get(":id")
+    getById(@Param("id", ParseIntPipe) id: number) {
+        return this.service.getById(id);
+    }
+
+    @Get(":id/closure-status")
+    getClosureStatus(@Param("id", ParseIntPipe) id: number) {
+        return this.service.checkClosure(id);
+    }
+
+    @Get(":id/closure")
+    getClosure(@Param("id", ParseIntPipe) id: number) {
+        return this.service.getVendorWorkOrderClosure(id);
+    }
+
+    @Post(":id/close")
+    @HttpCode(HttpStatus.OK)
+    closeVendorWorkOrder(@Param("id", ParseIntPipe) id: number) {
+        return this.service.closeVendorWorkOrder(id);
+    }
+
+    @Post(":id/bulk-payment-requests")
+    @HttpCode(HttpStatus.CREATED)
+    bulkCreatePaymentRequests(@Param("id", ParseIntPipe) id: number, @Body() body: { items: any[] }, @CurrentUser() user: ValidatedUser) {
+        return this.service.bulkCreatePaymentRequests(id, body?.items ?? [], user.id);
+    }
+
+    @Post(":id/bulk-purchase-invoices")
+    @HttpCode(HttpStatus.CREATED)
+    bulkCreatePurchaseInvoices(@Param("id", ParseIntPipe) id: number, @Body() body: { items: any[] }, @CurrentUser() user: ValidatedUser) {
+        return this.service.bulkCreatePurchaseInvoices(id, body?.items ?? [], user.id);
+    }
+
+    @Put(":id/payment-requests/:prId")
+    @HttpCode(HttpStatus.OK)
+    updatePaymentRequest(@Param("id", ParseIntPipe) id: number, @Param("prId", ParseIntPipe) prId: number, @Body() body: any, @CurrentUser() user: ValidatedUser) {
+        return this.service.updatePaymentRequest(id, prId, body, user.id);
+    }
+
+    @Delete(":id/payment-requests/:prId")
+    @HttpCode(HttpStatus.OK)
+    deletePaymentRequest(@Param("id", ParseIntPipe) id: number, @Param("prId", ParseIntPipe) prId: number, @CurrentUser() user: ValidatedUser) {
+        return this.service.deletePaymentRequest(id, prId, user.id);
+    }
+
+    @Put(":id/purchase-invoices/:piId")
+    @HttpCode(HttpStatus.OK)
+    updatePurchaseInvoice(@Param("id", ParseIntPipe) id: number, @Param("piId", ParseIntPipe) piId: number, @Body() body: any, @CurrentUser() user: ValidatedUser) {
+        return this.service.updatePurchaseInvoice(id, piId, body, user.id);
+    }
+
+    @Delete(":id/purchase-invoices/:piId")
+    @HttpCode(HttpStatus.OK)
+    deletePurchaseInvoice(@Param("id", ParseIntPipe) id: number, @Param("piId", ParseIntPipe) piId: number, @CurrentUser() user: ValidatedUser) {
+        return this.service.deletePurchaseInvoice(id, piId, user.id);
+    }
+
+    @Get("project/:projectId")
+    getByProject(@Param("projectId", ParseIntPipe) projectId: number) {
+        return this.service.getByProject(projectId);
+    }
+
+    @Get(":id/pdf")
+    async getPdf(@Param("id", ParseIntPipe) id: number, @Query("version") version: string | undefined, @Res() res: Response) {
+        const { path: relPath, filename } = await this.service.getPdf(id, version);
+        const absolutePath = join(process.cwd(), "uploads", relPath);
+
+        if (!existsSync(absolutePath)) {
+            throw new NotFoundException("PDF file not found on disk");
+        }
+
+        const fileStream = createReadStream(absolutePath);
+        fileStream.on("error", err => {
+            if (!res.headersSent) {
+                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Error streaming PDF");
+            }
+        });
+
+        res.set({
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `inline; filename="${filename}"`,
+        });
+        fileStream.pipe(res);
+    }
+
+    @Get(":id/pdf/versions")
+    getPdfVersions(@Param("id", ParseIntPipe) id: number) {
+        return this.service.getPdfVersions(id);
+    }
+
+    @Delete(":id/pdf/versions/:version")
+    @HttpCode(HttpStatus.OK)
+    deletePdfVersion(@Param("id", ParseIntPipe) id: number, @Param("version") version: string) {
+        return this.service.deletePdfVersion(id, version);
+    }
 }

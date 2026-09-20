@@ -1229,6 +1229,92 @@ export class PurchaseOrderService {
         return created;
     }
 
+    async updatePaymentRequest(poId: number, prId: number, data: Partial<{
+        partyName: string;
+        accountNumber: string;
+        ifsc: string;
+        amount: string | number;
+        paymentMode: string;
+        utrNumber: string;
+        status: string;
+        paymentAgainst: string;
+    }>, userId: number) {
+        const pr = await this.db
+            .select()
+            .from(paymentRequests)
+            .where(and(eq(paymentRequests.id, prId), eq(paymentRequests.purchaseOrderId, poId)))
+            .then(rows => rows[0]);
+        if (!pr) throw new NotFoundException("Payment request not found");
+
+        const [updated] = await this.db
+            .update(paymentRequests)
+            .set({
+                ...data,
+                amount: data.amount?.toString(),
+                updatedAt: new Date(),
+            })
+            .where(eq(paymentRequests.id, prId))
+            .returning();
+        this.logger.info(`Payment request updated: ${prId} for PO #${poId}`);
+        return updated;
+    }
+
+    async deletePaymentRequest(poId: number, prId: number, userId: number) {
+        const pr = await this.db
+            .select()
+            .from(paymentRequests)
+            .where(and(eq(paymentRequests.id, prId), eq(paymentRequests.purchaseOrderId, poId)))
+            .then(rows => rows[0]);
+        if (!pr) throw new NotFoundException("Payment request not found");
+
+        await this.db.delete(paymentRequests).where(eq(paymentRequests.id, prId));
+        this.logger.info(`Payment request deleted: ${prId} for PO #${poId}`);
+        return { success: true };
+    }
+
+    async updatePurchaseInvoice(poId: number, piId: number, data: Partial<{
+        category: string;
+        partyName: string;
+        valuePreGst: string | number;
+        gstAmount: string | number;
+        invoiceDate: string;
+        invoiceFile: string;
+    }>, userId: number) {
+        const pi = await this.db
+            .select()
+            .from(purchaseInvoices)
+            .where(and(eq(purchaseInvoices.id, piId), eq(purchaseInvoices.purchaseOrderId, poId)))
+            .then(rows => rows[0]);
+        if (!pi) throw new NotFoundException("Purchase invoice not found");
+
+        const [updated] = await this.db
+            .update(purchaseInvoices)
+            .set({
+                ...data,
+                valuePreGst: data.valuePreGst?.toString(),
+                gstAmount: data.gstAmount?.toString(),
+                invoiceFile: data.invoiceFile ?? pi.invoiceFile,
+                updatedAt: new Date(),
+            })
+            .where(eq(purchaseInvoices.id, piId))
+            .returning();
+        this.logger.info(`Purchase invoice updated: ${piId} for PO #${poId}`);
+        return updated;
+    }
+
+    async deletePurchaseInvoice(poId: number, piId: number, userId: number) {
+        const pi = await this.db
+            .select()
+            .from(purchaseInvoices)
+            .where(and(eq(purchaseInvoices.id, piId), eq(purchaseInvoices.purchaseOrderId, poId)))
+            .then(rows => rows[0]);
+        if (!pi) throw new NotFoundException("Purchase invoice not found");
+
+        await this.db.delete(purchaseInvoices).where(eq(purchaseInvoices.id, piId));
+        this.logger.info(`Purchase invoice deleted: ${piId} for PO #${poId}`);
+        return { success: true };
+    }
+
     private async generatePaymentRequestNumber(projectName?: string) {
         const now = new Date();
         const year = now.getFullYear();
