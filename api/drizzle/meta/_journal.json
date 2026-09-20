@@ -525,7 +525,7 @@
         "when": 1789500000000,
         "tag": "0136_create_tender_extractions",
         "breakpoints": true
-  
+    },
     {
         "idx":  97,
         "version":  "7",

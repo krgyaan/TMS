@@ -54,7 +54,9 @@ function DialogContent({
                 )}
                 {...props}
             >
-                {children}
+                <div className="-mx-4 no-scrollbar max-h-[50vh] overflow-y-auto px-4">
+                    {children}
+                </div>
                 {showCloseButton && (
                     <DialogPrimitive.Close
                         data-slot="dialog-close"

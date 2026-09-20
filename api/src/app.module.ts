@@ -80,7 +80,7 @@ import { SchedulerModule } from "@/modules/scheduler/scheduler.module";
 import { ClientDirectoryModule } from "@/modules/shared/client-directory/client-directory.module";
 import { FinanceDocumentsModule } from "@/modules/shared/finance-documents/finance-documents.module";
 import { PqrModule } from "@/modules/shared/pqr/pqr.module";
-import { ProjectsMasterrModule } from "@/modules/shared/projects-master/projects-master.module";
+import { ProjectsMasterModule as SharedProjectsMasterModule } from "@/modules/shared/projects-master/projects-master.module";
 import { BidSubmissionsModule } from "@/modules/tendering/bid-submissions/bid-submissions.module";
 import { DocumentChecklistsModule } from "@/modules/tendering/checklists/document-checklists.module";
 import { CostingApprovalsModule } from "@/modules/tendering/costing-approvals/costing-approvals.module";
@@ -138,6 +138,7 @@ import { RequestExtensionsModule } from "./modules/tendering/request_extensions/
 import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-queries.module";
 import { OpenwaModule } from "./openwa/openwa.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
+import { CashFlowModule } from "./modules/operations/cash-flows/cash-flow.module";
 import { WebhookController } from "./webhook/webhook.controller";
 
 @Module({
@@ -193,6 +194,7 @@ import { WebhookController } from "./webhook/webhook.controller";
         VendorAccountsModule,
         VendorFilesModule,
         GoogleIntegrationModule,
+        CashFlowModule,
         AuthModule,
         WebsitesModule,
         StatesModule,
@@ -252,8 +254,8 @@ import { WebhookController } from "./webhook/webhook.controller";
         LeadFollowupSchedulerModule,
         PqrModule,
         FinanceDocumentsModule,
+        SharedProjectsMasterModule,
         ProjectsMasterModule,
-        ProjectsMasterrModule,
         BusinessPerformanceModule,
         RequestExtensionsModule,
         SubmitQueriesModule,

@@ -53,6 +53,10 @@ class PaymentRequestApiService extends BaseApiService {
         return this.patch<any>(`/${id}/status`, data);
     }
 
+    async revertStatus(id: number, data: { status: string; remark: string }) {
+        return this.patch<any>(`/${id}/revert`, data);
+    }
+
     async uploadInvoiceAfterPayment(id: number, files: string[]) {
         return this.patch<any>(`/${id}/upload-invoice-after-payment`, { files });
     }

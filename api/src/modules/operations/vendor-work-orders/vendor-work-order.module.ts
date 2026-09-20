@@ -6,9 +6,10 @@ import { VendorWorkOrderController } from "./vendor-work-order.controller";
 import { VendorWorkOrderService } from "./vendor-work-order.service";
 import { ClientDirectoryModule } from "@/modules/shared/client-directory/client-directory.module";
 import { OpenwaModule } from "@/openwa/openwa.module";
+import { CashFlowModule } from "@/modules/operations/cash-flows/cash-flow.module";
 
 @Module({
-    imports: [DatabaseModule, PdfGeneratorModule, ClientDirectoryModule, InsurancePolicyModule, OpenwaModule],
+    imports: [DatabaseModule, PdfGeneratorModule, ClientDirectoryModule, InsurancePolicyModule, OpenwaModule, CashFlowModule],
     controllers: [VendorWorkOrderController],
     providers: [VendorWorkOrderService],
     exports: [VendorWorkOrderService],

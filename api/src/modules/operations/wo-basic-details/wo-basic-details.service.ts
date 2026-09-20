@@ -1,6 +1,7 @@
-import { items, locations, organizations, projects, teams, tenderClients, tenderCostingDetails, tenderCostingSheets, tenderInfos } from '@/db/schemas';
+import { items, locations, organizations, projects, teams, tenderClients, tenderCostingDetails, tenderCostingSheets, tenderInfos, tenderInformation } from '@/db/schemas';
 import { AppLogger } from '@/logger/app-logger.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { CashFlowService } from '@/modules/operations/cash-flows/cash-flow.service';
 import { PaymentRequestService } from '@/modules/operations/payment-requests/payment-request.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
@@ -27,6 +28,7 @@ export class WoBasicDetailsService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly paymentRequestService: PaymentRequestService,
+        private readonly cashFlowService: CashFlowService,
     ) {
         this.logger = this.appLogger.withContext(WoBasicDetailsService.name);
     }
@@ -561,6 +563,44 @@ export class WoBasicDetailsService {
                 } as typeof projects.$inferInsert).returning();
 
                 this.logger.log(`Project created for WO Basic Detail: ${woBasicDetailId}`);
+
+                // Create EMD cash flow if tenderId is present and has valid EMD
+                if (project.tenderId && data.tenderId) {
+                    try {
+                        const [tender] = await this.db
+                            .select({
+                                emd: tenderInfos.emd,
+                                teamMember: tenderInfos.teamMember,
+                                tenderNo: tenderInfos.tenderNo,
+                            })
+                            .from(tenderInfos)
+                            .where(eq(tenderInfos.id, data.tenderId))
+                            .limit(1);
+
+                        if (tender && tender.emd && Number(tender.emd) > 0) {
+                            // Check if EMD is exempt
+                            const [ti] = await this.db
+                                .select({ emdRequired: tenderInformation.emdRequired })
+                                .from(tenderInformation)
+                                .where(eq(tenderInformation.tenderId, data.tenderId))
+                                .limit(1);
+
+                            const isExempt = ti?.emdRequired === 'EXEMPT';
+                            if (!isExempt && tender.teamMember) {
+                                await this.cashFlowService.createEmdCashFlow(
+                                    project.id,
+                                    data.tenderId,
+                                    Number(tender.emd),
+                                    tender.teamMember,
+                                    tender.tenderNo
+                                );
+                                this.logger.log(`EMD cash flow created for project ${project.id}, tender ${data.tenderId}`);
+                            }
+                        }
+                    } catch (error) {
+                        this.logger.warn(`Failed to create EMD cash flow for project ${project.id}: ${error instanceof Error ? error.message : String(error)}`);
+                    }
+                }
 
                 // Create project payment request payload and call existing service
                 await this.createProjectPaymentRequest(project.id, data, woBasicDetailId, currentUserId);
