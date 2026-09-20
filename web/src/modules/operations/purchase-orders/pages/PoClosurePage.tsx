@@ -14,14 +14,14 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CanUpdate } from "@/components/PermissionGuard";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AdminOnly } from "@/components/RoleGuard";
 
@@ -32,7 +32,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "def
     rejected: { label: "Rejected", variant: "destructive" },
 };
 
-const BUDGET_CATEGORIES = ["Supply", "Admin/Misc.", "Buyback/Sale", "GEM Charges","Warranty"];
+const BUDGET_CATEGORIES = ["Supply", "Admin/Misc.", "Buyback/Sale", "GEM Charges", "Warranty"];
 
 interface PoClosureData {
     id: number;
