@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { AlertCircle, CheckCircle2, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Plus, Save, Trash2, Edit, X } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,17 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { FileUploader } from "@/components/file-upload";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
+import { CanUpdate, AdminOnly } from "@/components/PermissionGuard";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const BUDGET_CATEGORIES = ["Service", "Freight", "Warranty"];
 
@@ -103,6 +114,38 @@ const VwoClosurePage = () => {
   const [savingPayments, setSavingPayments] = useState(false);
   const [savingInvoices, setSavingInvoices] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Delete confirmation state
+  const [deletePaymentRequest, setDeletePaymentRequest] = useState<{ id: number; requestNo: string } | null>(null);
+  const [deletePurchaseInvoice, setDeletePurchaseInvoice] = useState<{ id: number; invoiceNo: string } | null>(null);
+
+  const handleDeletePaymentRequest = async () => {
+    if (!deletePaymentRequest || !wo) return;
+    try {
+      await vendorWorkOrderApi.deletePaymentRequest(woId, deletePaymentRequest.id);
+      setSaveMsg({ type: "success", text: `Payment request ${deletePaymentRequest.requestNo} deleted.` });
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      setSaveMsg({ type: "error", text: "Failed to delete payment request." });
+    } finally {
+      setDeletePaymentRequest(null);
+    }
+  };
+
+  const handleDeletePurchaseInvoice = async () => {
+    if (!deletePurchaseInvoice || !wo) return;
+    try {
+      await vendorWorkOrderApi.deletePurchaseInvoice(woId, deletePurchaseInvoice.id);
+      setSaveMsg({ type: "success", text: `Purchase invoice ${deletePurchaseInvoice.invoiceNo} deleted.` });
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      setSaveMsg({ type: "error", text: "Failed to delete purchase invoice." });
+    } finally {
+      setDeletePurchaseInvoice(null);
+    }
+  };
 
   const fetchData = async () => {
     const res = await vendorWorkOrderApi.getClosureData(woId);
@@ -519,6 +562,7 @@ const VwoClosurePage = () => {
                     <TableHead className="text-xs uppercase">Status</TableHead>
                     <TableHead className="text-xs uppercase">Mode</TableHead>
                     <TableHead className="text-xs uppercase">UTR</TableHead>
+                    <TableHead className="text-xs uppercase">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -533,6 +577,34 @@ const VwoClosurePage = () => {
                         <TableCell><Badge variant={cfg.variant}>{cfg.label}</Badge></TableCell>
                         <TableCell className="text-sm">{pr.paymentMode || "—"}</TableCell>
                         <TableCell className="text-sm font-mono">{pr.utrNumber || "—"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <CanUpdate module="accounts.payment-requests">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                onClick={() => navigate(paths.operations.editProjectPaymentRequestPage(pr.id, wo.projectId))}
+                                title="Edit Payment Request"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </CanUpdate>
+                            <AdminOnly>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-destructive"
+                                onClick={() => setDeletePaymentRequest({ id: pr.id, requestNo: pr.requestNo || `#${pr.id}` })}
+                                title="Delete Payment Request"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AdminOnly>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -562,6 +634,7 @@ const VwoClosurePage = () => {
                     <TableHead className="text-xs uppercase text-right">Pre-GST</TableHead>
                     <TableHead className="text-xs uppercase text-right">GST</TableHead>
                     <TableHead className="text-xs uppercase text-right">Total</TableHead>
+                    <TableHead className="text-xs uppercase">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -576,6 +649,34 @@ const VwoClosurePage = () => {
                         <TableCell className="text-sm text-right">{formatINR(Number(inv.valuePreGst || 0))}</TableCell>
                         <TableCell className="text-sm text-right">{formatINR(Number(inv.gstAmount || 0))}</TableCell>
                         <TableCell className="text-sm text-right font-medium">{formatINR(piTotal)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <CanUpdate module="accounts.purchase-invoices">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                onClick={() => navigate(paths.operations.editProjectPurchaseInvoicePage(inv.id, wo.projectId))}
+                                title="Edit Purchase Invoice"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </CanUpdate>
+                            <AdminOnly>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-destructive"
+                                onClick={() => setDeletePurchaseInvoice({ id: inv.id, invoiceNo: inv.invoiceNo || `#${inv.id}` })}
+                                title="Delete Purchase Invoice"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AdminOnly>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -587,28 +688,64 @@ const VwoClosurePage = () => {
       </Card>
 
       <CardFooter className="flex gap-3">
-        {canClose && (
-          <Button
-            className="bg-green-600 hover:bg-green-700"
-            onClick={async () => {
-              try {
-                setSaveMsg(null);
-                await vendorWorkOrderApi.close(woId);
-                setSaveMsg({ type: "success", text: "Vendor Work Order closed successfully." });
-                await fetchData();
-              } catch (err) {
-                console.error(err);
-                setSaveMsg({ type: "error", text: "Failed to close Vendor Work Order." });
-              }
-            }}
-          >
-            <CheckCircle2 className="h-4 w-4 mr-2" />
-            Close VWO
-          </Button>
-        )}
-      </CardFooter>
-    </Card>
-  );
-};
+{canClose && (
+            <Button
+              className="bg-green-600 hover:bg-green-700"
+              onClick={async () => {
+                try {
+                  setSaveMsg(null);
+                  await vendorWorkOrderApi.close(woId);
+                  setSaveMsg({ type: "success", text: "Vendor Work Order closed successfully." });
+                  await fetchData();
+                } catch (err) {
+                  console.error(err);
+                  setSaveMsg({ type: "error", text: "Failed to close Vendor Work Order." });
+                }
+              }}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Close VWO
+            </Button>
+          )}
+        </CardFooter>
 
+        {/* Delete Payment Request Confirmation Dialog */}
+        <AlertDialog open={!!deletePaymentRequest} onOpenChange={(open) => !open && setDeletePaymentRequest(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Payment Request</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete payment request <strong>{deletePaymentRequest?.requestNo}</strong>? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDeletePaymentRequest(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeletePaymentRequest} className="bg-destructive hover:bg-destructive/90">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Delete Purchase Invoice Confirmation Dialog */}
+        <AlertDialog open={!!deletePurchaseInvoice} onOpenChange={(open) => !open && setDeletePurchaseInvoice(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Purchase Invoice</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete purchase invoice <strong>{deletePurchaseInvoice?.invoiceNo}</strong>? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDeletePurchaseInvoice(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeletePurchaseInvoice} className="bg-destructive hover:bg-destructive/90">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </Card>
+    );
+  };
+}
 export default VwoClosurePage;
