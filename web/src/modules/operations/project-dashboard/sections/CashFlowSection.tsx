@@ -7,6 +7,7 @@ import { formatINR } from "@/hooks/useINRFormatter";
 import type { ColDef, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import React, { useMemo } from "react";
+import { CashFlowStepChart } from "./CashFlowStepChart";
 
 interface CashFlowSectionProps {
     projectId: number | null;
@@ -186,16 +187,21 @@ export const CashFlowSection: React.FC<CashFlowSectionProps> = ({
                         </Card>
                     ))}
                 </div>
-                <DataTable
-                    data={cashFlows}
-                    columnDefs={columns}
-                    gridOptions={{
-                        pagination: true,
-                        paginationPageSize: 15,
-                        domLayout: "autoHeight",
-                        rowData: cashFlows,
-                    }}
-                />
+
+                <CashFlowStepChart cashFlows={cashFlows} />
+
+                <div className="mt-6">
+                    <DataTable
+                        data={cashFlows}
+                        columnDefs={columns}
+                        gridOptions={{
+                            pagination: true,
+                            paginationPageSize: 15,
+                            domLayout: "autoHeight",
+                            rowData: cashFlows,
+                        }}
+                    />
+                </div>
             </CardContent>
         </Card>
     );
