@@ -185,7 +185,7 @@ export default function ProjectListPage() {
                 sortable: true,
                 filter: true,
                 width: 160,
-                valueFormatter: (p) => formatINR(p.value),
+                valueFormatter: (p) => formatINR(Number(p.data?.totalPaymentDone)),
             },
             {
                 field: "totalInvoicesReceived",
@@ -193,7 +193,7 @@ export default function ProjectListPage() {
                 sortable: true,
                 filter: true,
                 width: 180,
-                valueFormatter: (p) => formatINR(p.value),
+                valueFormatter: (p) => formatINR(Number(p.data?.totalInvoicesReceived)),
             },
             {
                 headerName: "",
