@@ -14,7 +14,7 @@ import { useItemHeadings } from "@/modules/performance/business-performance/busi
 import { useCustomerPerformance } from "@/hooks/api/useCustomerPerformance";
 import { useOrganizationsTrue } from "@/hooks/api/useOrganizations";
 
-import type { CustomerPerformanceParams, YearType } from "./helpers/customer-performance.types";
+import type { CustomerPerformanceParams } from "./helpers/customer-performance.types";
 
 /* ================================
    HELPERS
@@ -44,37 +44,16 @@ function buildFinancialYearOptions(): { id: string; name: string }[] {
 }
 
 /**
- * Build the list of selectable Calendar / Bidding Years: "2026" style (Jan–Dec), current year + previous years.
+ * Convert a Financial Year selection like "2024-25" into fromDate/toDate strings (2024-04-01 .. 2025-03-31).
  */
-function buildSimpleYearOptions(): { id: string; name: string }[] {
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const options: { id: string; name: string }[] = [];
-    for (let y = currentYear; y >= currentYear - 8; y--) {
-        options.push({ id: String(y), name: String(y) });
-    }
-    return options;
-}
+function yearToDateRange(year: string | null): { fromDate: string; toDate: string } | null {
+    if (!year) return null;
 
-/**
- * Convert a year selection into fromDate/toDate strings.
- *  - Financial Year "2024-25" -> 2024-04-01 .. 2025-03-31
- *  - Calendar / Bidding Year "2024" -> 2024-01-01 .. 2024-12-31
- */
-function yearToDateRange(type: YearType | null, year: string | null): { fromDate: string; toDate: string } | null {
-    if (!type || !year) return null;
-
-    if (type === "financial") {
-        const match = /^(\d{4})-(\d{2})$/.exec(year);
-        if (!match) return null;
-        const startYear = Number(match[1]);
-        const endYear = 2000 + Number(match[2]);
-        return { fromDate: `${startYear}-04-01`, toDate: `${endYear}-03-31` };
-    }
-
-    const y = Number(year);
-    if (!Number.isFinite(y)) return null;
-    return { fromDate: `${y}-01-01`, toDate: `${y}-12-31` };
+    const match = /^(\d{4})-(\d{2})$/.exec(year);
+    if (!match) return null;
+    const startYear = Number(match[1]);
+    const endYear = 2000 + Number(match[2]);
+    return { fromDate: `${startYear}-04-01`, toDate: `${endYear}-03-31` };
 }
 
 /* ================================
@@ -128,8 +107,6 @@ export default function CustomerPerformanceDashboard() {
     const [selectedOrganization, setSelectedOrganization] = useState<number | null>(null);
     const [selectedTeamCategory, setSelectedTeamCategory] = useState<string>("combined");
     const [selectedFinancialYear, setSelectedFinancialYear] = useState<string>("");
-    const [selectedBiddingYear, setSelectedBiddingYear] = useState<string>("");
-    const [selectedCalendarYear, setSelectedCalendarYear] = useState<string>("");
     const [appliedParams, setAppliedParams] = useState<CustomerPerformanceParams | null>(null);
 
     // Fetch headings for dropdown
@@ -139,38 +116,18 @@ export default function CustomerPerformanceDashboard() {
     // Fetch customer performance data
     const { data, isLoading: dataLoading } = useCustomerPerformance(appliedParams);
 
-    // Year dropdown options per year type
+    // Financial Year dropdown options
     const financialYearOptions = useMemo(() => buildFinancialYearOptions(), []);
-    const biddingYearOptions = useMemo(() => buildSimpleYearOptions(), []);
-    const calendarYearOptions = useMemo(() => buildSimpleYearOptions(), []);
 
-    // The active year type comes from whichever year field has a value (mutually exclusive)
-    const activeYearType: YearType | null = selectedFinancialYear ? "financial" : selectedBiddingYear ? "bidding" : selectedCalendarYear ? "calendar" : null;
+    const activeYear = selectedFinancialYear;
 
-    const activeYear = selectedFinancialYear || selectedBiddingYear || selectedCalendarYear;
-
-    // Mutually exclusive handlers: selecting one year clears the other two
     const handleFinancialYearChange = (v: string) => {
         setSelectedFinancialYear(v);
-        setSelectedBiddingYear("");
-        setSelectedCalendarYear("");
-    };
-
-    const handleBiddingYearChange = (v: string) => {
-        setSelectedBiddingYear(v);
-        setSelectedFinancialYear("");
-        setSelectedCalendarYear("");
-    };
-
-    const handleCalendarYearChange = (v: string) => {
-        setSelectedCalendarYear(v);
-        setSelectedFinancialYear("");
-        setSelectedBiddingYear("");
     };
 
     // Build params for submission
     const params = useMemo<CustomerPerformanceParams | null>(() => {
-        const range = yearToDateRange(activeYearType, activeYear);
+        const range = yearToDateRange(activeYear);
         if (!range) return null;
         return {
             org: selectedOrganization ?? undefined,
@@ -179,7 +136,7 @@ export default function CustomerPerformanceDashboard() {
             fromDate: range.fromDate,
             toDate: range.toDate,
         };
-    }, [selectedOrganization, selectedTeamCategory, selectedHeadingId, activeYearType, activeYear]);
+    }, [selectedOrganization, selectedTeamCategory, selectedHeadingId, activeYear]);
 
     // Handle form submission
     const handleSubmit = () => {
@@ -224,9 +181,9 @@ export default function CustomerPerformanceDashboard() {
             { key: "tenders", label: "Tenders" },
         ];
 
-        const filename = `Customer_Performance_${activeYearType ?? "all"}_${activeYear || "all"}`;
+        const filename = `Customer_Performance_${activeYear || "all"}`;
         exportToCSV(allData, filename, headers);
-    }, [data, activeYearType, activeYear]);
+    }, [data, activeYear]);
 
     return (
         <div className="min-h-screen bg-muted/10 pb-12">
@@ -247,9 +204,9 @@ export default function CustomerPerformanceDashboard() {
                 {/* ===== FILTER CARD ===== */}
                 <Card className="shadow-sm">
                     <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-3 w-full gap-1">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 w-full gap-4 items-center">
                             {/* Organization Select */}
-                            <div>
+                            <div className="space-y-2">
                                 <label className="text-sm font-medium">Select Organization</label>
                                 <Combobox
                                     value={selectedOrganization ? selectedOrganization.toString() : ""}
@@ -260,7 +217,7 @@ export default function CustomerPerformanceDashboard() {
                             </div>
 
                             {/* AC / DC / Combined */}
-                            <div>
+                            <div className="space-y-2">
                                 <label className="text-sm font-medium">Select AC/DC/Combined</label>
                                 <Combobox
                                     value={selectedTeamCategory}
@@ -271,7 +228,7 @@ export default function CustomerPerformanceDashboard() {
                             </div>
 
                             {/* Item Heading Select */}
-                            <div className="w-full">
+                            <div className="space-y-2">
                                 <label className="text-sm font-medium">Select Item Heading</label>
                                 <Combobox
                                     value={selectedHeadingId ? selectedHeadingId.toString() : ""}
@@ -280,25 +237,11 @@ export default function CustomerPerformanceDashboard() {
                                     placeholder="Select Item Heading"
                                 />
                             </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full justify-center items-center">
                             {/* Financial Year */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Financial Year</label>
                                 <Combobox value={selectedFinancialYear} onChange={handleFinancialYearChange} options={financialYearOptions} placeholder="Select Financial Year" />
-                            </div>
-
-                            {/* Bidding Year */}
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Bidding Year</label>
-                                <Combobox value={selectedBiddingYear} onChange={handleBiddingYearChange} options={biddingYearOptions} placeholder="Select Bidding Year" />
-                            </div>
-
-                            {/* Calendar Year */}
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Calendar Year</label>
-                                <Combobox value={selectedCalendarYear} onChange={handleCalendarYearChange} options={calendarYearOptions} placeholder="Select Calendar Year" />
                             </div>
                         </div>
 

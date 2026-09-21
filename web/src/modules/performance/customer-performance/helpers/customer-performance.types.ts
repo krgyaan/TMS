@@ -4,8 +4,6 @@
 
 export type TeamCategory = "AC" | "DC";
 
-export type YearType = "bidding" | "financial" | "calendar";
-
 export interface CustomerPerformanceQuery {
     org: number | null;
     teamCategory: TeamCategory | null;
