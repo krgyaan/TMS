@@ -199,6 +199,7 @@ export class CustomerPerformanceService {
                 gstValues: tenderInfos.gstValues,
                 member: users.name,
                 team: teams.name,
+                itemName: items.name,
                 status: tenderInfos.status,
                 rfqSentOn: sql<Date | null>`MIN(${rfqs.createdAt})`,
                 bidStatus: bidSubmissions.status,
@@ -216,7 +217,7 @@ export class CustomerPerformanceService {
             .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .where(and(...conditions))
-            .groupBy(tenderInfos.id, users.name, teams.name, bidSubmissions.status)
+            .groupBy(tenderInfos.id, users.name, teams.name, items.name, bidSubmissions.status)
             .orderBy(tenderInfos.dueDate)
             .execute();
 
@@ -248,6 +249,7 @@ export class CustomerPerformanceService {
                 gstValues: row.gstValues,
                 member: row.member ?? "—",
                 team: row.team ?? "—",
+                item: row.itemName ?? "—",
                 createdAt: row.rfqSentOn ? format(new Date(row.rfqSentOn), DATE_FORMAT) : "—",
                 status: STATUS_LABEL(s),
                 bidStatus: row.bidStatus ?? "—",

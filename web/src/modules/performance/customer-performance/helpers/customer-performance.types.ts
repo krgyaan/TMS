@@ -60,6 +60,7 @@ export interface TenderListItem {
     gstValues: string;
     member: string;
     team: string;
+    item: string;
     createdAt: string;
     status: string;
     bidStatus: string;

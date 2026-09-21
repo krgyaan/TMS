@@ -41,7 +41,9 @@ export default function CustomerCategoryTable({ params, categoryKey, title, desc
 
     const columnDefs = useMemo<ColDef<TenderListItem>[]>(
         () => [
+            { field: "team", headerName: "Team", sortable: true, filter: true, width: 120 },
             { field: "member", headerName: "Team Member", sortable: true, filter: true, width: 150 },
+            { field: "item", headerName: "Item", sortable: true, filter: true, width: 130 },
             {
                 field: "tenderNo",
                 headerName: "Tender",
@@ -62,7 +64,6 @@ export default function CustomerCategoryTable({ params, categoryKey, title, desc
                 cellRenderer: (p: CustomCellRendererProps<TenderListItem>) => <span className="tabular-nums">{formatINR(Number(p.value))}</span>,
             },
             { field: "dueDate", headerName: "Due Date", sortable: true, filter: false, width: 170 },
-            { field: "createdAt", headerName: "Rfq Sent On", sortable: true, filter: false, width: 170 },
             {
                 field: "status",
                 headerName: "Status",

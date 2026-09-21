@@ -22,6 +22,7 @@ export interface CustomerTenderRow {
     gstValues: string;
     member: string | null;
     team: string | null;
+    itemName: string;
     status: number;
     rfqSentOn: Date | null;
     bidStatus: string | null;
@@ -70,6 +71,7 @@ export interface TenderListItem {
     gstValues: string;
     member: string;
     team: string;
+    item: string;
     createdAt: string;
     status: string;
     bidStatus: string;
