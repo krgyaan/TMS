@@ -50,7 +50,7 @@ export default function WonTenderTable({ params }: WonTenderTableProps) {
             },
             {
                 field: "gstValues",
-                headerName: "GST Value",
+                headerName: "Tender Value",
                 sortable: true,
                 filter: false,
                 width: 150,

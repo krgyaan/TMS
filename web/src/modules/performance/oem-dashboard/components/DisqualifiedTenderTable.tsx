@@ -50,7 +50,7 @@ export default function DisqualifiedTenderTable({ params }: DisqualifiedTenderTa
             },
             {
                 field: "gstValues",
-                headerName: "GST Value",
+                headerName: "Tender Value",
                 sortable: true,
                 filter: false,
                 width: 150,

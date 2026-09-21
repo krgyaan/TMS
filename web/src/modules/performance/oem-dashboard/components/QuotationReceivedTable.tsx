@@ -50,7 +50,7 @@ export default function QuotationReceivedTable({ params }: QuotationReceivedTabl
             },
             {
                 field: "gstValues",
-                headerName: "GST Value",
+                headerName: "Tender Value",
                 sortable: true,
                 filter: false,
                 width: 150,

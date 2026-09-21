@@ -4,8 +4,6 @@
 
 export type TeamCategory = "AC" | "DC";
 
-export type YearType = "bidding" | "financial" | "calendar";
-
 export interface CustomerPerformanceQuery {
     org: number | null;
     teamCategory: TeamCategory | null;
@@ -62,12 +60,18 @@ export interface TenderListItem {
     gstValues: string;
     member: string;
     team: string;
+    item: string;
     createdAt: string;
     status: string;
+    bidStatus: string;
+    category: string[];
+    emd: string;
+    emdMode: string | null;
 }
 
 export interface CustomerPerformanceResponse {
     summary: CustomerSummary;
     metrics: CustomerMetrics;
     tenderList: TenderListItem[];
+    avgGrossMargin: number | null;
 }
