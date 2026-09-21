@@ -372,6 +372,80 @@ describe('PDF Extraction Queue Integration (Phase 8)', () => {
                 global.fetch = originalFetch;
             }
         });
+
+        it('should log structured fallback recovery and throw EXTRACTION_SAVE_FAILED when DB persistence fails', async () => {
+            const mockExtractionResult: PdfExtractionJobResult = {
+                extraction_version: '1.0.0',
+                fields: {
+                    tenderValue: { value: 5000000, confidence: 'high', source: 'regex' },
+                    emdAmount: { value: 100000, confidence: 'high', source: 'regex' },
+                },
+                missing_fields: ['processingFeeAmount'],
+                processing_time_ms: 1200,
+            };
+
+            const originalFetch = global.fetch;
+            global.fetch = jest.fn().mockResolvedValue({
+                ok: true,
+                status: 200,
+                json: async () => mockExtractionResult,
+            } as any);
+
+            const mockDb: any = {
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockReturnValue({
+                        onConflictDoUpdate: jest.fn().mockRejectedValue(new Error('relation "tender_extractions" does not exist')),
+                    }),
+                }),
+                select: jest.fn(),
+            };
+
+            const processorWithFailingDb = new PdfExtractionProcessor(
+                mockConfigService,
+                mockFileUploadService,
+                { recordUsage: jest.fn(), recordTpmEntry: jest.fn(), getCurrentTpm: jest.fn() } as any,
+                mockLogger,
+                mockDb,
+            );
+
+            try {
+                const mockJob: any = {
+                    id: 'extract-tender-3665',
+                    data: {
+                        tenderId: 3665,
+                        pdfPath: tempPdfFile,
+                        userId: 42,
+                    },
+                };
+
+                await expect(
+                    processorWithFailingDb.processJob(mockJob, 'http://localhost:8001', 120000),
+                ).rejects.toThrow(/EXTRACTION_SAVE_FAILED: Failed to persist extraction result for tender 3665/);
+
+                // Verify error was logged with [EXTRACTION_FALLBACK_RECOVERY] containing raw extraction
+                expect(mockLogger.error).toHaveBeenCalledWith(
+                    expect.stringContaining('[EXTRACTION_FALLBACK_RECOVERY]'),
+                    expect.objectContaining({
+                        action: 'save_failure_fallback_logged',
+                        tenderId: 3665,
+                        jobId: 'extract-tender-3665',
+                        fallbackRecoveryPayload: expect.objectContaining({
+                            tag: 'EXTRACTION_FALLBACK_RECOVERY',
+                            tenderId: 3665,
+                            jobId: 'extract-tender-3665',
+                            userId: 42,
+                            error: 'relation "tender_extractions" does not exist',
+                            rawExtraction: expect.objectContaining({
+                                fields: mockExtractionResult.fields,
+                                missing_fields: ['processingFeeAmount'],
+                            }),
+                        }),
+                    }),
+                );
+            } finally {
+                global.fetch = originalFetch;
+            }
+        });
     });
 });
 

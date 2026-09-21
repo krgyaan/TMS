@@ -1934,12 +1934,33 @@ export class TenderInfoSheetsService {
                 verified,
             };
         } catch (error: any) {
-            this.logger.error(`[AutoExtract] Extraction save failed for tender ${tenderId}: ${error?.message}`, {
-                event_type: 'autoextract_save',
-                action: 'save_failure',
+            const fallbackRecoveryPayload = {
+                tag: 'EXTRACTION_FALLBACK_RECOVERY',
                 tenderId,
-                error: error?.message,
-            });
+                jobId: null,
+                userId,
+                failureTimestamp: new Date().toISOString(),
+                error: error instanceof Error ? error.message : String(error),
+                rawExtraction: {
+                    fields: data.fields,
+                    missing_fields: data.missing_fields || [],
+                    extraction_version: data.extraction_version || '1.0.0',
+                    processing_time_ms: data.processing_time_ms || null,
+                },
+            };
+
+            this.logger.error(
+                `[EXTRACTION_FALLBACK_RECOVERY] Failed to persist extraction to database: ${JSON.stringify(fallbackRecoveryPayload)}`,
+                {
+                    event_type: 'autoextract_save',
+                    action: 'save_failure_fallback_logged',
+                    tenderId,
+                    userId,
+                    error: error?.message,
+                    stack: error?.stack,
+                    fallbackRecoveryPayload,
+                },
+            );
             throw error;
         }
     }
