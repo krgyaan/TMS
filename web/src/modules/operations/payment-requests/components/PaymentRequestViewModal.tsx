@@ -85,6 +85,18 @@ export const PaymentRequestViewModal: React.FC<PaymentRequestViewModalProps> = (
                         {detail.paymentMode?.replaceAll("_", " ").toLowerCase() || "—"}
                     </p>
                 </div>
+                <div>
+                    <Label className="text-muted-foreground text-xs">Account Number</Label>
+                    <p className="font-mono">
+                        {detail.accountNumber || "—"}
+                    </p>
+                </div>
+                <div>
+                    <Label className="text-muted-foreground text-xs">IFSC</Label>
+                    <p className="font-mono">
+                        {detail.ifsc || "—"}
+                    </p>
+                </div>
                 {detail.portalLink && (
                     <div>
                         <Label className="text-muted-foreground text-xs">Portal Link</Label>
