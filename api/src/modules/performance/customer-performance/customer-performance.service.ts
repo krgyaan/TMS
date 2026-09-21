@@ -193,6 +193,7 @@ export class CustomerPerformanceService {
             else if ((STATUS.WON as readonly number[]).includes(s)) categories.push("won");
 
             if (row.bidStatus === "Bid Submitted") categories.push("bid");
+            if (row.bidStatus !== "Bid Submitted") categories.push("did_not_bid");
             if ((STATUS.APPROVED as readonly number[]).includes(s)) categories.push("approved");
 
             return {

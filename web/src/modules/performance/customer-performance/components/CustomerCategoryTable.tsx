@@ -1,15 +1,16 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 /* UI Components */
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import DataTable from "@/components/ui/data-table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 
 /* Icons */
-import { Eye } from "lucide-react";
+import { ChevronDown, Eye } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { useCustomerPerformance } from "@/hooks/api/useCustomerPerformance";
 import { formatINR } from "@/hooks/useINRFormatter";
@@ -19,15 +20,19 @@ import type { ColDef } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { TenderNameCell } from "@/components/data-grid/renderers/TenderNameCell";
 
-interface TendersAssignedTableProps {
+interface CustomerCategoryTableProps {
     params: CustomerPerformanceParams | null;
+    categoryKey: string;
+    title: string;
+    description: string;
 }
 
-export default function TendersAssignedTable({ params }: TendersAssignedTableProps) {
+export default function CustomerCategoryTable({ params, categoryKey, title, description }: CustomerCategoryTableProps) {
     const navigate = useNavigate();
     const { data, isLoading } = useCustomerPerformance(params);
+    const [isOpen, setIsOpen] = useState(true);
 
-    const tenders = useMemo(() => data?.tenderList ?? [], [data]);
+    const tenders = useMemo(() => (data?.tenderList ?? []).filter(t => t.category.includes(categoryKey)), [data, categoryKey]);
 
     const actions = useMemo<ActionItem<TenderListItem>[]>(
         () => [{ label: "View", icon: <Eye className="h-4 w-4" />, onClick: row => navigate(paths.tendering.tenderView(row.id)) }],
@@ -48,7 +53,7 @@ export default function TendersAssignedTable({ params }: TendersAssignedTablePro
             },
             {
                 field: "gstValues",
-                headerName: "GST Value",
+                headerName: "Tender Value",
                 sortable: true,
                 filter: false,
                 width: 150,
@@ -92,19 +97,28 @@ export default function TendersAssignedTable({ params }: TendersAssignedTablePro
     }
 
     return (
-        <Card>
-            <CardHeader className="pb-4">
-                <div className="flex items-center justify-between gap-2">
-                    <div>
-                        <CardTitle className="text-base font-semibold">Tenders Assigned</CardTitle>
-                        <CardDescription>Tenders assigned to this customer.</CardDescription>
-                    </div>
-                    <Badge variant="secondary">{tenders.length}</Badge>
-                </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-                <DataTable data={tenders} columnDefs={columnDefs} gridOptions={{ domLayout: "autoHeight" }} />
-            </CardContent>
-        </Card>
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+            <Card>
+                <CardHeader className="pb-4">
+                    <CollapsibleTrigger asChild>
+                        <div className="flex cursor-pointer items-center justify-between gap-2 transition-opacity hover:opacity-80">
+                            <div>
+                                <CardTitle className="text-base font-semibold">{title}</CardTitle>
+                                <CardDescription>{description}</CardDescription>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Badge variant="secondary">{tenders.length}</Badge>
+                                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+                            </div>
+                        </div>
+                    </CollapsibleTrigger>
+                </CardHeader>
+                <CollapsibleContent>
+                    <CardContent className="pt-0">
+                        <DataTable data={tenders} columnDefs={columnDefs} gridOptions={{ domLayout: "autoHeight" }} />
+                    </CardContent>
+                </CollapsibleContent>
+            </Card>
+        </Collapsible>
     );
 }

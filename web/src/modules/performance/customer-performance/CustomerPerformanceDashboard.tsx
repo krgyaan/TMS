@@ -1,10 +1,10 @@
 import { useState, useMemo, useCallback } from "react";
 
 /* UI Components */
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Combobox } from "@/components/form/SelectField";
+import CustomerCategoryTable from "./components/CustomerCategoryTable";
 
 /* Icons */
 import { Filter, Download } from "lucide-react";
@@ -13,28 +13,12 @@ import { Filter, Download } from "lucide-react";
 import { useItemHeadings } from "@/modules/performance/business-performance/business-performance.hooks";
 import { useCustomerPerformance } from "@/hooks/api/useCustomerPerformance";
 import { useOrganizationsTrue } from "@/hooks/api/useOrganizations";
-import { Combobox } from "@/components/form/SelectField";
-import TendersAssignedTable from "./components/TendersAssignedTable";
 
 import type { CustomerPerformanceParams, YearType } from "./helpers/customer-performance.types";
 
 /* ================================
    HELPERS
 =============================== */
-const formatCurrency = (amount: number | string): string => {
-    const numericAmount = typeof amount === "string" ? parseFloat(amount) : amount;
-
-    if (isNaN(numericAmount)) {
-        return "₹0";
-    }
-
-    return new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-    }).format(numericAmount);
-};
-
 const titleCase = (str: string): string => {
     return str.replace(/_/g, " ").replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 };
@@ -244,9 +228,6 @@ export default function CustomerPerformanceDashboard() {
         exportToCSV(allData, filename, headers);
     }, [data, activeYearType, activeYear]);
 
-    // Extract summary entries for rendering
-    const summaryEntries = data?.summary ? Object.entries(data.summary) : [];
-
     return (
         <div className="min-h-screen bg-muted/10 pb-12">
             <div className="mx-auto max-w-7xl p-6 space-y-8">
@@ -341,74 +322,16 @@ export default function CustomerPerformanceDashboard() {
                     </div>
                 ) : (
                     <>
-                        {/* ===== SUMMARY CARDS ===== */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {summaryEntries.map(([name, value]) => (
-                                <Card key={name} className="shadow-sm hover:shadow-md transition-shadow">
-                                    <CardContent className="p-3">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <span className="font-semibold text-lg">{titleCase(name)}</span>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-sm text-muted-foreground">
-                                                Count: <span className="font-medium text-foreground">{value.count}</span>
-                                            </p>
-                                            <p className="text-xl font-bold text-orange-400">{formatCurrency(value.value)}</p>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </div>
-
-                        {/* ===== TENDER SUMMARY TABLE ===== */}
-                        <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                            <CardHeader className="pb-4">
-                                <CardTitle className="text-lg">Tender Summary Details</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="overflow-x-auto">
-                                    <Table>
-                                        <TableHeader className="bg-muted/50">
-                                            <TableRow>
-                                                <TableHead className="font-semibold">Category</TableHead>
-                                                <TableHead className="font-semibold">Count</TableHead>
-                                                <TableHead className="font-semibold">Value</TableHead>
-                                                <TableHead className="font-semibold">Tenders</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {summaryEntries.length === 0 ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                                        No summary data available.
-                                                    </TableCell>
-                                                </TableRow>
-                                            ) : (
-                                                summaryEntries.map(([name, value]) => (
-                                                    <TableRow key={name} className="hover:bg-muted/30 transition-colors">
-                                                        <TableCell className="font-medium">{titleCase(name)}</TableCell>
-                                                        <TableCell className="tabular-nums">{value.count}</TableCell>
-                                                        <TableCell className="tabular-nums">{formatCurrency(value.value)}</TableCell>
-                                                        <TableCell>
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {value.tender.map((tender: string, idx: number) => (
-                                                                    <Badge key={idx} variant="secondary" className="font-normal border border-gray-200">
-                                                                        {tender}
-                                                                    </Badge>
-                                                                ))}
-                                                            </div>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* ===== TENDERS ASSIGNED TABLE ===== */}
-                        <TendersAssignedTable params={appliedParams} />
+                        {/* ===== CATEGORY TABLES ===== */}
+                        <CustomerCategoryTable params={appliedParams} categoryKey="assigned" title="Tenders Assigned" description="All tenders assigned to this customer." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="approved" title="Tenders Approved" description="Tenders that reached a result stage." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="missed" title="Tenders Missed" description="Tenders that were missed for submission." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="did_not_bid" title="Did Not Bid" description="Tenders that were not bid for submission." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="bid" title="Tenders Bid" description="Tenders where a bid has been submitted." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="results_awaited" title="Tender Results Awaited" description="Tenders awaiting final results." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="disqualified" title="Tenders Disqualified" description="Tenders that were disqualified." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="won" title="Tenders Won" description="Tenders that were won." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="lost" title="Tenders Lost" description="Tenders that were lost." />
                     </>
                 )}
             </div>
