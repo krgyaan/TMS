@@ -98,7 +98,7 @@ export class CustomerPerformanceService {
             conditions.push(eq(tenderInfos.organization, filters.org));
         }
         if (filters.teamCategory) {
-            conditions.push(eq(teams.category, filters.teamCategory));
+            conditions.push(eq(teams.name, filters.teamCategory));
         }
         if (filters.itemHeading) {
             conditions.push(eq(itemHeadings.id, filters.itemHeading));
@@ -140,7 +140,7 @@ export class CustomerPerformanceService {
             conditions.push(eq(tenderInfos.organization, filters.org));
         }
         if (filters.teamCategory) {
-            conditions.push(eq(teams.category, filters.teamCategory));
+            conditions.push(eq(teams.name, filters.teamCategory));
         }
         if (filters.itemHeading) {
             conditions.push(eq(itemHeadings.id, filters.itemHeading));
@@ -154,23 +154,27 @@ export class CustomerPerformanceService {
 
         const emdPaidFilter = and(
             eq(paymentRequests.tenderId, tenderInfos.id),
-            eq(paymentRequests.purpose, 'EMD'),
+            eq(paymentRequests.purpose, "EMD"),
             sql`CAST(${paymentRequests.amountRequired} AS DECIMAL) > 0`,
             eq(paymentInstruments.isActive, true),
             or(
-                and(eq(paymentInstruments.action, 1), eq(paymentInstruments.status, 'ACCOUNTS_FORM_ACCEPTED')),
-                and(eq(paymentInstruments.action, 2), eq(paymentInstruments.status, 'FOLLOWUP_INITIATED'), inArray(paymentInstruments.instrumentType, ['DD', 'FDR', 'Cheque', 'Bank Transfer', 'Portal Payment'])),
-                and(eq(paymentInstruments.action, 4), eq(paymentInstruments.status, 'FOLLOWUP_INITIATED'), eq(paymentInstruments.instrumentType, 'BG'))
+                and(eq(paymentInstruments.action, 1), eq(paymentInstruments.status, "ACCOUNTS_FORM_ACCEPTED")),
+                and(
+                    eq(paymentInstruments.action, 2),
+                    eq(paymentInstruments.status, "FOLLOWUP_INITIATED"),
+                    inArray(paymentInstruments.instrumentType, ["DD", "FDR", "Cheque", "Bank Transfer", "Portal Payment"])
+                ),
+                and(eq(paymentInstruments.action, 4), eq(paymentInstruments.status, "FOLLOWUP_INITIATED"), eq(paymentInstruments.instrumentType, "BG"))
             )
         );
 
         const emdReturnedFilter = and(
             eq(paymentRequests.tenderId, tenderInfos.id),
-            eq(paymentRequests.purpose, 'EMD'),
+            eq(paymentRequests.purpose, "EMD"),
             eq(paymentInstruments.isActive, true),
             or(
-                and(inArray(paymentInstruments.instrumentType, ['Bank Transfer', 'Portal Payment', 'DD', 'FDR']), inArray(paymentInstruments.action, [3, 4])),
-                and(eq(paymentInstruments.instrumentType, 'BG'), eq(paymentInstruments.action, 6))
+                and(inArray(paymentInstruments.instrumentType, ["Bank Transfer", "Portal Payment", "DD", "FDR"]), inArray(paymentInstruments.action, [3, 4])),
+                and(eq(paymentInstruments.instrumentType, "BG"), eq(paymentInstruments.action, 6))
             )
         );
 
