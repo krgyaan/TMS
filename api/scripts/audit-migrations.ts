@@ -10,7 +10,7 @@ async function audit() {
         console.error('DATABASE_URL is not set.');
         process.exit(1);
     }
-    //testtfgvyghrbhsbfhsbfhba
+    //testtfgvyghrbhsbfhsbfhbahdvdvfs
     const client = new Client({ connectionString: dbUrl });
     await client.connect();
 
