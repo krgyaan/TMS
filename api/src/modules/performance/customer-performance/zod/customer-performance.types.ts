@@ -27,6 +27,8 @@ export interface CustomerTenderRow {
     bidStatus: string | null;
     emd: string;
     emdMode: string | null;
+    hasEmdPaid: boolean | null;
+    hasEmdReturned: boolean | null;
 }
 
 // ─── API response (mirrors Laravel compact() output) ─────────────────────────

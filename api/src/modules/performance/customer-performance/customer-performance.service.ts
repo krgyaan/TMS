@@ -1,5 +1,5 @@
 import { Injectable, Inject } from "@nestjs/common";
-import { and, between, eq, sql } from "drizzle-orm";
+import { and, between, eq, exists, inArray, or, sql } from "drizzle-orm";
 import { format } from "date-fns";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -15,6 +15,7 @@ import { items } from "@/db/schemas/master/items.schema";
 import { itemHeadings } from "@/db/schemas/master/item-headings.schema";
 import { teams } from "@/db/schemas/master/teams.schema";
 import { users } from "@/db/schemas/auth/users.schema";
+import { paymentInstruments, paymentRequests } from "@/db/schemas/tendering/payment-requests.schema";
 
 import type { CustomerPerformanceQuery } from "./zod/customer-performance.dto";
 import type {
@@ -151,6 +152,44 @@ export class CustomerPerformanceService {
             conditions.push(between(tenderInfos.dueDate, from, to));
         }
 
+        const emdPaidFilter = and(
+            eq(paymentRequests.tenderId, tenderInfos.id),
+            eq(paymentRequests.purpose, 'EMD'),
+            sql`CAST(${paymentRequests.amountRequired} AS DECIMAL) > 0`,
+            eq(paymentInstruments.isActive, true),
+            or(
+                and(eq(paymentInstruments.action, 1), eq(paymentInstruments.status, 'ACCOUNTS_FORM_ACCEPTED')),
+                and(eq(paymentInstruments.action, 2), eq(paymentInstruments.status, 'FOLLOWUP_INITIATED'), inArray(paymentInstruments.instrumentType, ['DD', 'FDR', 'Cheque', 'Bank Transfer', 'Portal Payment'])),
+                and(eq(paymentInstruments.action, 4), eq(paymentInstruments.status, 'FOLLOWUP_INITIATED'), eq(paymentInstruments.instrumentType, 'BG'))
+            )
+        );
+
+        const emdReturnedFilter = and(
+            eq(paymentRequests.tenderId, tenderInfos.id),
+            eq(paymentRequests.purpose, 'EMD'),
+            eq(paymentInstruments.isActive, true),
+            or(
+                and(inArray(paymentInstruments.instrumentType, ['Bank Transfer', 'Portal Payment', 'DD', 'FDR']), inArray(paymentInstruments.action, [3, 4])),
+                and(eq(paymentInstruments.instrumentType, 'BG'), eq(paymentInstruments.action, 6))
+            )
+        );
+
+        const hasEmdPaid = exists(
+            this.db
+                .select({ one: sql`1` })
+                .from(paymentRequests)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
+                .where(emdPaidFilter)
+        );
+
+        const hasEmdReturned = exists(
+            this.db
+                .select({ one: sql`1` })
+                .from(paymentRequests)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
+                .where(emdReturnedFilter)
+        );
+
         const rows = await this.db
             .select({
                 id: tenderInfos.id,
@@ -165,6 +204,8 @@ export class CustomerPerformanceService {
                 bidStatus: bidSubmissions.status,
                 emd: tenderInfos.emd,
                 emdMode: tenderInfos.emdMode,
+                hasEmdPaid,
+                hasEmdReturned,
             })
             .from(tenderInfos)
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
@@ -195,6 +236,9 @@ export class CustomerPerformanceService {
             if (row.bidStatus === "Bid Submitted") categories.push("bid");
             if (row.bidStatus !== "Bid Submitted") categories.push("did_not_bid");
             if ((STATUS.APPROVED as readonly number[]).includes(s)) categories.push("approved");
+
+            if (row.hasEmdPaid) categories.push("emd_paid");
+            if (row.hasEmdReturned) categories.push("emd_returned");
 
             return {
                 id: row.id,
