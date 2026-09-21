@@ -25,9 +25,9 @@ const titleCase = (str: string): string => {
 };
 
 const AC_DC_OPTIONS: { id: string; name: string }[] = [
+    { id: "combined", name: "All" },
     { id: "AC", name: "AC" },
     { id: "DC", name: "DC" },
-    { id: "combined", name: "Combined" },
 ];
 
 /**
@@ -243,7 +243,7 @@ export default function CustomerPerformanceDashboard() {
                 {/* ===== FILTER CARD ===== */}
                 <Card className="shadow-sm">
                     <CardContent>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 w-full gap-4 items-center">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 w-full gap-4 items-end">
                             {/* Organization Select */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Select Organization</label>
@@ -255,9 +255,9 @@ export default function CustomerPerformanceDashboard() {
                                 />
                             </div>
 
-                            {/* AC / DC / Combined */}
+                            {/* AC / DC / All */}
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Select AC/DC/Combined</label>
+                                <label className="text-sm font-medium">Select Team</label>
                                 <Combobox
                                     value={selectedTeamCategory}
                                     onChange={v => setSelectedTeamCategory(v || "combined")}
@@ -272,7 +272,7 @@ export default function CustomerPerformanceDashboard() {
                                 <Combobox
                                     value={selectedHeadingId ? selectedHeadingId.toString() : ""}
                                     onChange={v => setSelectedHeadingId(v ? Number(v) : null)}
-                                    options={[{ id: "", name: "Combined" }, ...headings.map(heading => ({ id: heading.id.toString(), name: `${heading.name} (${heading.team})` }))]}
+                                    options={[{ id: "", name: "All" }, ...headings.map(heading => ({ id: heading.id.toString(), name: `${heading.name} (${heading.team})` }))]}
                                     placeholder="Select Item Heading"
                                 />
                             </div>
@@ -282,11 +282,9 @@ export default function CustomerPerformanceDashboard() {
                                 <label className="text-sm font-medium">Financial Year</label>
                                 <Combobox value={selectedFinancialYear} onChange={handleFinancialYearChange} options={financialYearOptions} placeholder="Select Financial Year" />
                             </div>
-                        </div>
 
-                        <div className="flex justify-center items-center w-full p-3">
                             {/* Submit Button */}
-                            <Button onClick={handleSubmit} disabled={!params}>
+                            <Button onClick={handleSubmit} disabled={!params} className="justify-self-center">
                                 <Filter className="mr-2 h-4 w-4" /> Submit
                             </Button>
                         </div>
@@ -308,7 +306,7 @@ export default function CustomerPerformanceDashboard() {
                         <CustomerCategoryTable params={appliedParams} categoryKey="assigned" title="Tenders Assigned" description="All tenders assigned to this customer." />
                         <CustomerCategoryTable params={appliedParams} categoryKey="approved" title="Tenders Approved" description="Tenders that reached a result stage." />
                         <CustomerCategoryTable params={appliedParams} categoryKey="missed" title="Tenders Missed" description="Tenders that were missed for submission." />
-                        <CustomerCategoryTable params={appliedParams} categoryKey="did_not_bid" title="Did Not Bid" description="Tenders that were not bid for submission." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="did_not_bid" title="Tender Did Not Bid" description="Tenders that were not bid for submission." />
                         <CustomerCategoryTable params={appliedParams} categoryKey="bid" title="Tenders Bid" description="Tenders where a bid has been submitted." />
                         <CustomerCategoryTable params={appliedParams} categoryKey="results_awaited" title="Tender Results Awaited" description="Tenders awaiting final results." />
                         <CustomerCategoryTable params={appliedParams} categoryKey="disqualified" title="Tenders Disqualified" description="Tenders that were disqualified." />
