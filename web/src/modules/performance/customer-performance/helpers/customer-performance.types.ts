@@ -73,4 +73,5 @@ export interface CustomerPerformanceResponse {
     summary: CustomerSummary;
     metrics: CustomerMetrics;
     tenderList: TenderListItem[];
+    avgGrossMargin: number | null;
 }

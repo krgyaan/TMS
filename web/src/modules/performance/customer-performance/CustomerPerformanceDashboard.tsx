@@ -24,6 +24,14 @@ const titleCase = (str: string): string => {
     return str.replace(/_/g, " ").replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 };
 
+const getGpColor = (gp: number | null | undefined): string => {
+    if (gp === null || gp === undefined) return "text-muted-foreground";
+    if (gp >= 20) return "text-green-600";
+    if (gp >= 10) return "text-blue-600";
+    if (gp >= 0) return "text-yellow-600";
+    return "text-red-600";
+};
+
 const AC_DC_OPTIONS: { id: string; name: string }[] = [
     { id: "combined", name: "All" },
     { id: "AC", name: "AC" },
@@ -306,7 +314,12 @@ export default function CustomerPerformanceDashboard() {
                         <CustomerCategoryTable params={appliedParams} categoryKey="assigned" title="Tenders Assigned" description="All tenders assigned to this customer." />
                         <CustomerCategoryTable params={appliedParams} categoryKey="approved" title="Tenders Approved" description="Tenders that reached a result stage." />
                         <CustomerCategoryTable params={appliedParams} categoryKey="missed" title="Tenders Missed" description="Tenders that were missed for submission." />
-                        <CustomerCategoryTable params={appliedParams} categoryKey="did_not_bid" title="Tender Did Not Bid" description="Tenders that were not bid for submission." />
+                        <CustomerCategoryTable
+                            params={appliedParams}
+                            categoryKey="did_not_bid"
+                            title="Tender Did Not Bid"
+                            description="Tenders that were not bid for submission."
+                        />
                         <CustomerCategoryTable params={appliedParams} categoryKey="bid" title="Tenders Bid" description="Tenders where a bid has been submitted." />
                         <CustomerCategoryTable params={appliedParams} categoryKey="results_awaited" title="Tender Results Awaited" description="Tenders awaiting final results." />
                         <CustomerCategoryTable params={appliedParams} categoryKey="disqualified" title="Tenders Disqualified" description="Tenders that were disqualified." />
@@ -314,6 +327,19 @@ export default function CustomerPerformanceDashboard() {
                         <CustomerCategoryTable params={appliedParams} categoryKey="lost" title="Tenders Lost" description="Tenders that were lost." />
                         <CustomerCategoryTable params={appliedParams} categoryKey="emd_paid" title="EMD Paid" description="Tenders where the EMD has been paid." />
                         <CustomerCategoryTable params={appliedParams} categoryKey="emd_returned" title="EMD Returned" description="Tenders where the EMD has been returned." />
+
+                        {/* ===== AVERAGE GP ===== */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <Card className="shadow-sm">
+                                <CardContent className="p-5">
+                                    <p className="text-sm text-muted-foreground">Average GP</p>
+                                    <p className={`mt-1 text-3xl font-bold ${getGpColor(data?.avgGrossMargin)}`}>
+                                        {data?.avgGrossMargin !== null && data?.avgGrossMargin !== undefined ? `${data.avgGrossMargin.toFixed(2)}%` : "—"}
+                                    </p>
+                                    <p className="mt-1 text-xs text-muted-foreground">Average approved gross margin across tenders.</p>
+                                </CardContent>
+                            </Card>
+                        </div>
                     </>
                 )}
             </div>

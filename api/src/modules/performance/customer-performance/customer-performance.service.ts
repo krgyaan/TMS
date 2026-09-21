@@ -10,6 +10,8 @@ import type { DbInstance } from "@/db";
 import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
 import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
 import { rfqs } from "@/db/schemas/tendering/rfqs.schema";
+import { tenderCostingSheets } from "@/db/schemas/tendering/tender-costing-sheets.schema";
+import { tenderCostingDetails } from "@/db/schemas/tendering/tender-costing-details.schema";
 import { organizations } from "@/db/schemas/master/organizations.schema";
 import { items } from "@/db/schemas/master/items.schema";
 import { itemHeadings } from "@/db/schemas/master/item-headings.schema";
@@ -69,16 +71,16 @@ export class CustomerPerformanceService {
         this.logger.info("Fetching customer performance", { query });
 
         try {
-            const [tenderRows, tenderList] = await Promise.all([this.getTenders(query), this.getTenderList(query)]);
+            const [tenderRows, tenderListResult] = await Promise.all([this.getTenders(query), this.getTenderList(query)]);
             const summary = this.calculateSummary(tenderRows);
             const metrics = this.getMetrics(tenderRows);
 
             this.logger.info("Customer performance computed", {
                 rowCount: tenderRows.length,
-                tenderListCount: tenderList.length,
+                tenderListCount: tenderListResult.tenderList.length,
             });
 
-            return { summary, metrics, tenderList };
+            return { summary, metrics, tenderList: tenderListResult.tenderList, avgGrossMargin: tenderListResult.avgGrossMargin };
         } catch (error) {
             const e = error as Error;
             this.logger.error("Failed to fetch customer performance", {
@@ -123,6 +125,7 @@ export class CustomerPerformanceService {
                 orgId: organizations.id,
                 orgName: organizations.name,
                 itemHeadingName: itemHeadings.name,
+                avgGrossMargin: this.avgGrossMarginSubquery(),
             })
             .from(bidSubmissions)
             .innerJoin(tenderInfos, eq(tenderInfos.id, bidSubmissions.tenderId))
@@ -133,7 +136,7 @@ export class CustomerPerformanceService {
             .where(and(...conditions));
     }
 
-    private async getTenderList(filters: CustomerPerformanceQuery): Promise<TenderListItem[]> {
+    private async getTenderList(filters: CustomerPerformanceQuery): Promise<{ tenderList: TenderListItem[]; avgGrossMargin: number | null }> {
         const conditions = [eq(tenderInfos.deleteStatus, 0)];
 
         if (filters.org) {
@@ -211,6 +214,7 @@ export class CustomerPerformanceService {
                 emdMode: tenderInfos.emdMode,
                 hasEmdPaid,
                 hasEmdReturned,
+                avgGrossMargin: this.avgGrossMarginSubquery(),
             })
             .from(tenderInfos)
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
@@ -225,7 +229,12 @@ export class CustomerPerformanceService {
             .orderBy(tenderInfos.dueDate)
             .execute();
 
-        return (rows as unknown as CustomerTenderRow[]).map(row => {
+        const rawRows = rows as unknown as CustomerTenderRow[];
+
+        const margins = rawRows.map(row => Number(row.avgGrossMargin)).filter(v => Number.isFinite(v));
+        const avgGrossMargin = margins.length > 0 ? margins.reduce((acc, v) => acc + v, 0) / margins.length : null;
+
+        const tenderList = rawRows.map(row => {
             const s = Number(row.status);
 
             // Mirror calculateSummary() bucket logic — status buckets are mutually exclusive,
@@ -262,6 +271,8 @@ export class CustomerPerformanceService {
                 emdMode: row.emdMode,
             };
         });
+
+        return { tenderList, avgGrossMargin };
     }
 
     // ─── Summary ──────────────────────────────────────────────────────────────
@@ -329,6 +340,17 @@ export class CustomerPerformanceService {
     }
 
     // ─── Utilities ────────────────────────────────────────────────────────────
+
+    
+    private avgGrossMarginSubquery() {
+        return sql<number | null>`
+            (SELECT AVG(${tenderCostingDetails.grossMargin})::float8
+             FROM ${tenderCostingSheets}
+             INNER JOIN ${tenderCostingDetails} ON ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+             WHERE ${tenderCostingSheets.tenderId} = ${tenderInfos.id}
+               AND ${tenderCostingDetails.grossMargin} IS NOT NULL)
+        `;
+    }
 
     private empty(): SummaryItem {
         return { count: 0, value: 0, tender: [] };
