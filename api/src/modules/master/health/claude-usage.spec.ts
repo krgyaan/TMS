@@ -319,4 +319,67 @@ describe('ClaudeUsageService & Health Controller RBAC Security', () => {
             loggerSpy.mockRestore();
         });
     });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // 6. FALLBACK LOGGING ON INSERT FAILURE (RESILIENCE)
+    // ─────────────────────────────────────────────────────────────────────────
+    describe('Fallback Logging on Insert Failure (Resilience)', () => {
+        it('should emit [CLAUDE_USAGE_FALLBACK_RECOVERY] structured log at error level when db.insert throws', async () => {
+            const loggerSpy = jest.spyOn((claudeUsageService as any).logger, 'error').mockImplementation();
+            mockDb.insert.mockReturnValueOnce({
+                values: jest.fn().mockRejectedValueOnce(new Error('relation "claude_token_usage" does not exist')),
+            });
+
+            const usageData = {
+                stages: {
+                    missing_field_fallback: {
+                        total_tokens: 2500,
+                        input_tokens: 2000,
+                        output_tokens: 500,
+                        cache_creation_tokens: 0,
+                        cache_read_tokens: 0,
+                        model: 'claude-haiku-4-5-20251001',
+                        estimated_cost_usd: 0.0035,
+                        calls_count: 1,
+                    },
+                },
+            };
+
+            await claudeUsageService.recordUsage({
+                userId: 42,
+                tenderId: 3665,
+                jobId: 'job_extract_3665',
+                durationMs: 3200,
+                usage: usageData as any,
+            });
+
+            expect(loggerSpy).toHaveBeenCalledWith(
+                expect.stringContaining('[CLAUDE_USAGE_FALLBACK_RECOVERY]'),
+                expect.objectContaining({
+                    action: 'save_failure_fallback_logged',
+                    tenderId: 3665,
+                    jobId: 'job_extract_3665',
+                    userId: 42,
+                    fallbackUsagePayload: expect.objectContaining({
+                        tag: 'CLAUDE_USAGE_FALLBACK_RECOVERY',
+                        tenderId: 3665,
+                        jobId: 'job_extract_3665',
+                        userId: 42,
+                        error: 'relation "claude_token_usage" does not exist',
+                        records: expect.arrayContaining([
+                            expect.objectContaining({
+                                tenderId: 3665,
+                                model: 'claude-haiku-4-5-20251001',
+                                totalTokens: 2500,
+                                estimatedCostUsd: '0.003500',
+                            }),
+                        ]),
+                    }),
+                }),
+            );
+
+            loggerSpy.mockRestore();
+        });
+    });
 });
+

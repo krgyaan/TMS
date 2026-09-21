@@ -381,4 +381,61 @@ describe('TenderInfoSheetsService Auto-Extract & Path Resolution', () => {
             expect(result.status).toBe('processing');
         });
     });
+
+    describe('saveExtractionResult resilience', () => {
+        it('should emit [EXTRACTION_FALLBACK_RECOVERY] structured log when db insert fails', async () => {
+            const failingDb: any = {
+                insert: jest.fn().mockReturnValue({
+                    values: jest.fn().mockReturnValue({
+                        onConflictDoUpdate: jest.fn().mockRejectedValue(new Error('relation "tender_extractions" does not exist')),
+                    }),
+                }),
+            };
+            const mockAppLogger = {
+                withContext: jest.fn().mockReturnValue(mockLogger),
+            };
+            const testService = new TenderInfoSheetsService(
+                mockAppLogger as any,
+                failingDb,
+                {} as any,
+                mockTenderInfosService,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                {} as any,
+                mockProducer,
+            );
+
+            mockTenderInfosService.validateExists.mockResolvedValue({ id: 3665 });
+
+            const payload = {
+                fields: { emdAmount: { value: 50000, confidence: 'high' } },
+                missing_fields: ['processingFee'],
+                extraction_version: '1.0.0',
+                processing_time_ms: 500,
+            };
+
+            await expect(testService.saveExtractionResult(3665, payload, 10)).rejects.toThrow(
+                'relation "tender_extractions" does not exist',
+            );
+
+            expect(mockLogger.error).toHaveBeenCalledWith(
+                expect.stringContaining('[EXTRACTION_FALLBACK_RECOVERY]'),
+                expect.objectContaining({
+                    action: 'save_failure_fallback_logged',
+                    tenderId: 3665,
+                    fallbackRecoveryPayload: expect.objectContaining({
+                        tag: 'EXTRACTION_FALLBACK_RECOVERY',
+                        tenderId: 3665,
+                        userId: 10,
+                        rawExtraction: expect.objectContaining({
+                            fields: payload.fields,
+                            missing_fields: ['processingFee'],
+                        }),
+                    }),
+                }),
+            );
+        });
+    });
 });
