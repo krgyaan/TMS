@@ -24,6 +24,9 @@ export interface CustomerTenderRow {
     team: string | null;
     status: number;
     rfqSentOn: Date | null;
+    bidStatus: string | null;
+    emd: string;
+    emdMode: string | null;
 }
 
 // ─── API response (mirrors Laravel compact() output) ─────────────────────────
@@ -67,6 +70,10 @@ export interface TenderListItem {
     team: string;
     createdAt: string;
     status: string;
+    bidStatus: string;
+    category: string[];
+    emd: string;
+    emdMode: string | null;
 }
 
 export interface CustomerPerformanceResponse {

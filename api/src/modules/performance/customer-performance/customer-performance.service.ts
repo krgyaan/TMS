@@ -162,6 +162,9 @@ export class CustomerPerformanceService {
                 team: teams.name,
                 status: tenderInfos.status,
                 rfqSentOn: sql<Date | null>`MIN(${rfqs.createdAt})`,
+                bidStatus: bidSubmissions.status,
+                emd: tenderInfos.emd,
+                emdMode: tenderInfos.emdMode,
             })
             .from(tenderInfos)
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
@@ -170,22 +173,44 @@ export class CustomerPerformanceService {
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
             .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .where(and(...conditions))
-            .groupBy(tenderInfos.id, users.name, teams.name)
+            .groupBy(tenderInfos.id, users.name, teams.name, bidSubmissions.status)
             .orderBy(tenderInfos.dueDate)
             .execute();
 
-        return (rows as unknown as CustomerTenderRow[]).map(row => ({
-            id: row.id,
-            tenderNo: row.tenderNo,
-            tenderName: row.tenderName,
-            dueDate: format(row.dueDate, DATE_FORMAT),
-            gstValues: row.gstValues,
-            member: row.member ?? "—",
-            team: row.team ?? "—",
-            createdAt: row.rfqSentOn ? format(new Date(row.rfqSentOn), DATE_FORMAT) : "—",
-            status: STATUS_LABEL(Number(row.status)),
-        }));
+        return (rows as unknown as CustomerTenderRow[]).map(row => {
+            const s = Number(row.status);
+
+            // Mirror calculateSummary() bucket logic — status buckets are mutually exclusive,
+            // then the additive buckets (bid, approved) plus the base assigned bucket apply.
+            const categories: string[] = ["assigned"];
+
+            if ((STATUS.MISSED as readonly number[]).includes(s)) categories.push("missed");
+            else if ((STATUS.DISQUALIFIED as readonly number[]).includes(s)) categories.push("disqualified");
+            else if ((STATUS.RESULTS_AWAITED as readonly number[]).includes(s)) categories.push("results_awaited");
+            else if ((STATUS.LOST as readonly number[]).includes(s)) categories.push("lost");
+            else if ((STATUS.WON as readonly number[]).includes(s)) categories.push("won");
+
+            if (row.bidStatus === "Bid Submitted") categories.push("bid");
+            if ((STATUS.APPROVED as readonly number[]).includes(s)) categories.push("approved");
+
+            return {
+                id: row.id,
+                tenderNo: row.tenderNo,
+                tenderName: row.tenderName,
+                dueDate: format(row.dueDate, DATE_FORMAT),
+                gstValues: row.gstValues,
+                member: row.member ?? "—",
+                team: row.team ?? "—",
+                createdAt: row.rfqSentOn ? format(new Date(row.rfqSentOn), DATE_FORMAT) : "—",
+                status: STATUS_LABEL(s),
+                bidStatus: row.bidStatus ?? "—",
+                category: categories,
+                emd: row.emd,
+                emdMode: row.emdMode,
+            };
+        });
     }
 
     // ─── Summary ──────────────────────────────────────────────────────────────

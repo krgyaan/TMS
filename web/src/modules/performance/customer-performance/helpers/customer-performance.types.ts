@@ -64,6 +64,10 @@ export interface TenderListItem {
     team: string;
     createdAt: string;
     status: string;
+    bidStatus: string;
+    category: string[];
+    emd: string;
+    emdMode: string | null;
 }
 
 export interface CustomerPerformanceResponse {
