@@ -6,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/form/SelectField";
 import CustomerCategoryTable from "./components/CustomerCategoryTable";
+import CustomerBarChart from "./components/CustomerBarChart";
+import CustomerDonutChart from "./components/CustomerDonutChart";
 
 /* Icons */
 import { Filter, Download } from "lucide-react";
@@ -328,17 +330,28 @@ export default function CustomerPerformanceDashboard() {
                         <CustomerCategoryTable params={appliedParams} categoryKey="emd_paid" title="EMD Paid" description="Tenders where the EMD has been paid." />
                         <CustomerCategoryTable params={appliedParams} categoryKey="emd_returned" title="EMD Returned" description="Tenders where the EMD has been returned." />
 
-                        {/* ===== AVERAGE GP ===== */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <Card className="shadow-sm">
-                                <CardContent className="p-5">
-                                    <p className="text-sm text-muted-foreground">Average GP</p>
-                                    <p className={`mt-1 text-3xl font-bold ${getGpColor(data?.avgGrossMargin)}`}>
-                                        {data?.avgGrossMargin !== null && data?.avgGrossMargin !== undefined ? `${data.avgGrossMargin.toFixed(2)}%` : "—"}
-                                    </p>
-                                    <p className="mt-1 text-xs text-muted-foreground">Average approved gross margin across tenders.</p>
-                                </CardContent>
-                            </Card>
+                        {/* ===== AVERAGE GP + CHARTS ===== */}
+                        <div className="space-y-4">
+                            {/* Average GP Card - Full Width Row */}
+                            <div className="grid grid-cols-1">
+                                <Card className="shadow-sm">
+                                    <CardContent className="p-5">
+                                        <div className="flex flex-wrap items-center gap-6">
+                                            <p className="text-sm text-muted-foreground">Average GP</p>
+                                            <p className={`text-3xl font-bold ${getGpColor(data?.avgGrossMargin)}`}>
+                                                {data?.avgGrossMargin !== null && data?.avgGrossMargin !== undefined ? `${data.avgGrossMargin.toFixed(2)}%` : "—"}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">Average approved gross margin across tenders.</p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            {/* Bar Chart + Donut Chart - Side by Side */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <CustomerBarChart params={appliedParams} />
+                                <CustomerDonutChart params={appliedParams} />
+                            </div>
                         </div>
                     </>
                 )}
