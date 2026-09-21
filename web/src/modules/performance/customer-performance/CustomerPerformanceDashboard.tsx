@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 /* UI Components */
 import { Card, CardContent } from "@/components/ui/card";
@@ -102,12 +103,45 @@ const exportToCSV = (data: Record<string, unknown>[], filename: string, headers:
    MAIN COMPONENT
 =============================== */
 export default function CustomerPerformanceDashboard() {
-    // Filter States
-    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(null);
-    const [selectedOrganization, setSelectedOrganization] = useState<number | null>(null);
-    const [selectedTeamCategory, setSelectedTeamCategory] = useState<string>("combined");
-    const [selectedFinancialYear, setSelectedFinancialYear] = useState<string>("");
-    const [appliedParams, setAppliedParams] = useState<CustomerPerformanceParams | null>(null);
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    // Restore filters from the URL so a reload (or shared link) keeps the selection.
+    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(() => {
+        const raw = new URLSearchParams(location.search).get("item");
+        const parsed = raw !== null ? Number(raw) : NaN;
+        return Number.isFinite(parsed) ? parsed : null;
+    });
+    const [selectedOrganization, setSelectedOrganization] = useState<number | null>(() => {
+        const raw = new URLSearchParams(location.search).get("orgId");
+        const parsed = raw !== null ? Number(raw) : NaN;
+        return Number.isFinite(parsed) ? parsed : null;
+    });
+    const [selectedTeamCategory, setSelectedTeamCategory] = useState<string>(() => {
+        const raw = new URLSearchParams(location.search).get("team");
+        return raw === "AC" || raw === "DC" ? raw : "combined";
+    });
+    const [selectedFinancialYear, setSelectedFinancialYear] = useState<string>(() => {
+        return new URLSearchParams(location.search).get("year") ?? "";
+    });
+    const [appliedParams, setAppliedParams] = useState<CustomerPerformanceParams | null>(() => {
+        const search = new URLSearchParams(location.search);
+        const rawOrg = search.get("orgId");
+        const orgId = rawOrg !== null ? Number(rawOrg) : NaN;
+        const rawHeading = search.get("item");
+        const headingId = rawHeading !== null ? Number(rawHeading) : NaN;
+        const teamCategory = search.get("team");
+        const year = search.get("year");
+        const range = yearToDateRange(year);
+        if (!range) return null;
+        return {
+            org: Number.isFinite(orgId) ? orgId : undefined,
+            teamCategory: teamCategory === "AC" || teamCategory === "DC" ? teamCategory : undefined,
+            itemHeading: Number.isFinite(headingId) ? headingId : undefined,
+            fromDate: range.fromDate,
+            toDate: range.toDate,
+        };
+    });
 
     // Fetch headings for dropdown
     const { data: headings = [] } = useItemHeadings();
@@ -140,9 +174,14 @@ export default function CustomerPerformanceDashboard() {
 
     // Handle form submission
     const handleSubmit = () => {
-        if (params) {
-            setAppliedParams(params);
-        }
+        if (!params) return;
+        setAppliedParams(params);
+        const search = new URLSearchParams();
+        if (params.org !== undefined) search.set("orgId", String(params.org));
+        if (params.teamCategory !== undefined) search.set("team", params.teamCategory);
+        if (params.itemHeading !== undefined) search.set("item", String(params.itemHeading));
+        if (activeYear) search.set("year", activeYear);
+        navigate({ search: `?${search.toString()}` }, { replace: true });
     };
 
     // Export handler
