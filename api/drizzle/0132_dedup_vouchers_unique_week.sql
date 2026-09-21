@@ -16,7 +16,7 @@ WITH ranked AS (
         v.id ASC
     ) AS rn
   FROM employee_imprest_vouchers v
-)
+) 
 DELETE FROM employee_imprest_vouchers v
 USING ranked r
 WHERE v.id = r.id

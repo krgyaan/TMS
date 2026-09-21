@@ -1812,44 +1812,52 @@ export class TenderInfoSheetsService {
      * Retrieves the durable saved extraction result from PostgreSQL for a tender.
      */
     async getSavedExtraction(tenderId: number) {
-        const [row] = await this.db
-            .select()
-            .from(tenderExtractions)
-            .where(eq(tenderExtractions.tenderId, tenderId))
-            .limit(1);
+        try {
+            const [row] = await this.db
+                .select()
+                .from(tenderExtractions)
+                .where(eq(tenderExtractions.tenderId, tenderId))
+                .limit(1);
 
-        if (!row) {
-            return null;
-        }
+            if (!row) {
+                return null;
+            }
 
-        let selfClassifiedAtc = false;
-        let hasAtc = false;
-        const conflicts: Record<string, any> = {};
-        if (row.fields && typeof row.fields === 'object') {
-            for (const [key, val] of Object.entries(row.fields) as [string, any][]) {
-                if (val?.sources?.self_classified_atc) {
-                    selfClassifiedAtc = true;
-                }
-                if (val?.sources?.atc) {
-                    hasAtc = true;
-                }
-                if (val?.sources?.has_conflict) {
-                    conflicts[key] = val.sources;
+            let selfClassifiedAtc = false;
+            let hasAtc = false;
+            const conflicts: Record<string, any> = {};
+            if (row.fields && typeof row.fields === 'object') {
+                for (const [key, val] of Object.entries(row.fields) as [string, any][]) {
+                    if (val?.sources?.self_classified_atc) {
+                        selfClassifiedAtc = true;
+                    }
+                    if (val?.sources?.atc) {
+                        hasAtc = true;
+                    }
+                    if (val?.sources?.has_conflict) {
+                        conflicts[key] = val.sources;
+                    }
                 }
             }
-        }
 
-        return {
-            tenderId: row.tenderId,
-            fields: row.fields as Record<string, any>,
-            missing_fields: row.missingFields || [],
-            extraction_version: row.extractionVersion || '1.0.0',
-            processing_time_ms: row.processingTimeMs || 0,
-            updatedAt: row.updatedAt,
-            self_classified_atc: selfClassifiedAtc,
-            has_atc: hasAtc,
-            ambiguous_field_conflicts: conflicts,
-        };
+            return {
+                tenderId: row.tenderId,
+                fields: row.fields as Record<string, any>,
+                missing_fields: row.missingFields || [],
+                extraction_version: row.extractionVersion || '1.0.0',
+                processing_time_ms: row.processingTimeMs || 0,
+                updatedAt: row.updatedAt,
+                self_classified_atc: selfClassifiedAtc,
+                has_atc: hasAtc,
+                ambiguous_field_conflicts: conflicts,
+            };
+        } catch (error: any) {
+            const underlyingError = error?.cause?.message || error?.message || String(error);
+            this.logger.warn(
+                `[AutoExtract] Could not fetch saved extraction for tender ${tenderId}: ${underlyingError}`,
+            );
+            return null;
+        }
     }
 
     /**
@@ -1934,13 +1942,14 @@ export class TenderInfoSheetsService {
                 verified,
             };
         } catch (error: any) {
+            const underlyingError = error?.cause?.message || error?.message || String(error);
             const fallbackRecoveryPayload = {
                 tag: 'EXTRACTION_FALLBACK_RECOVERY',
                 tenderId,
                 jobId: null,
                 userId,
                 failureTimestamp: new Date().toISOString(),
-                error: error instanceof Error ? error.message : String(error),
+                error: underlyingError,
                 rawExtraction: {
                     fields: data.fields,
                     missing_fields: data.missing_fields || [],
@@ -1956,7 +1965,7 @@ export class TenderInfoSheetsService {
                     action: 'save_failure_fallback_logged',
                     tenderId,
                     userId,
-                    error: error?.message,
+                    error: underlyingError,
                     stack: error?.stack,
                     fallbackRecoveryPayload,
                 },

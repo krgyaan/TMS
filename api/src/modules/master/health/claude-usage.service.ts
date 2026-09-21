@@ -291,13 +291,14 @@ export class ClaudeUsageService {
                 `Recorded ${insertedRows.length} Claude token usage row(s) for tender ${tenderId}, user ${userId}`,
             );
         } catch (dbErr: unknown) {
+            const underlyingError = (dbErr as any)?.cause?.message || (dbErr as Error).message || String(dbErr);
             const fallbackUsagePayload = {
                 tag: 'CLAUDE_USAGE_FALLBACK_RECOVERY',
                 tenderId: tenderId ?? null,
                 jobId: jobId ?? null,
                 userId: userId ?? null,
                 failureTimestamp: new Date().toISOString(),
-                error: (dbErr as Error).message,
+                error: underlyingError,
                 records: insertedRows.map((row) => ({
                     tenderId: row.tenderId,
                     userId: row.userId,
@@ -322,7 +323,7 @@ export class ClaudeUsageService {
                     tenderId,
                     jobId,
                     userId,
-                    error: (dbErr as Error).message,
+                    error: underlyingError,
                     stack: (dbErr as Error).stack,
                     fallbackUsagePayload,
                 },
