@@ -197,7 +197,7 @@ export function isFieldEmpty(
     if (typeof current === 'number') {
         if (isNaN(current)) return true;
         // If user actively typed/modified this field, NEVER overwrite (even if 0)
-        const isDirty = Boolean(form.formState.dirtyFields?.[key as any]);
+        const isDirty = Boolean((form.formState.dirtyFields as Record<string, unknown>)?.[key]);
         if (isDirty) {
             return false;
         }
@@ -219,7 +219,7 @@ export function isFieldEmpty(
     }
 
     if (typeof current === 'boolean') {
-        const isDirty = Boolean(form.formState.dirtyFields?.[key as any]);
+        const isDirty = Boolean((form.formState.dirtyFields as Record<string, unknown>)?.[key]);
         return !isDirty;
     }
 

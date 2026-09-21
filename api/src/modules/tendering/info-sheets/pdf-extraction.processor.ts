@@ -309,13 +309,14 @@ export class PdfExtractionProcessor implements OnModuleInit {
                     persistedFieldsCount,
                 });
             } catch (dbErr: any) {
+                const underlyingError = dbErr?.cause?.message || dbErr?.message || String(dbErr);
                 const fallbackRecoveryPayload = {
                     tag: 'EXTRACTION_FALLBACK_RECOVERY',
                     tenderId,
                     jobId: job.id,
                     userId: userId || null,
                     failureTimestamp: new Date().toISOString(),
-                    error: dbErr instanceof Error ? dbErr.message : String(dbErr),
+                    error: underlyingError,
                     rawExtraction: {
                         fields: extractionResult.fields,
                         missing_fields: extractionResult.missing_fields,
@@ -331,13 +332,13 @@ export class PdfExtractionProcessor implements OnModuleInit {
                         action: 'save_failure_fallback_logged',
                         tenderId,
                         jobId: job.id,
-                        error: dbErr?.message,
+                        error: underlyingError,
                         stack: dbErr?.stack,
                         fallbackRecoveryPayload,
                     },
                 );
 
-                const saveErrorMsg = `EXTRACTION_SAVE_FAILED: Failed to persist extraction result for tender ${tenderId} to database: ${dbErr?.message || String(dbErr)}`;
+                const saveErrorMsg = `EXTRACTION_SAVE_FAILED: Failed to persist extraction result for tender ${tenderId} to database: ${underlyingError}`;
                 throw new Error(saveErrorMsg);
             }
         }

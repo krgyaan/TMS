@@ -153,7 +153,7 @@ export function TenderInformationForm({
         toast.loading(force ? 'Re-extracting clauses and values with AI...' : 'Initiating AI extraction from tender PDF...', { id: 'auto-extract' });
 
         try {
-            const res = await infoSheetsService.autoExtract(tenderId, { force });
+            const res = await infoSheetsService.autoExtract(tenderId, force);
 
             // If backend already has completed extraction and force was not requested:
             if (res.status === 'existing_completed' && res.fields) {
@@ -223,15 +223,17 @@ export function TenderInformationForm({
                                 action: 'save_request_sent',
                                 tender_id: tenderId,
                             });
-                            await infoSheetsService.saveExtraction(tenderId, {
-                                fields: statusRes.fields,
-                                missing_fields: statusRes.missing_fields,
-                                self_classified_atc: statusRes.self_classified_atc,
-                                has_atc: statusRes.has_atc,
-                                ambiguous_field_conflicts: statusRes.ambiguous_field_conflicts,
-                                processing_time_ms: statusRes.processing_time_ms,
-                            });
-                            setIsExtractionSaved(true);
+                            if (statusRes.fields) {
+                                await infoSheetsService.saveExtraction(tenderId, {
+                                    fields: statusRes.fields as unknown as Record<string, unknown>,
+                                    missing_fields: statusRes.missing_fields,
+                                    self_classified_atc: statusRes.self_classified_atc,
+                                    has_atc: statusRes.has_atc,
+                                    ambiguous_field_conflicts: statusRes.ambiguous_field_conflicts,
+                                    processing_time_ms: statusRes.processing_time_ms,
+                                });
+                                setIsExtractionSaved(true);
+                            }
                             console.log('[AutoExtract] Extraction result saved successfully', {
                                 event_type: 'autoextract_save',
                                 action: 'save_success',
