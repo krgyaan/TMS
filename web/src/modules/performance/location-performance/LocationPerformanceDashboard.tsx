@@ -5,15 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 /* Icons */
 import { Filter, Download, Calendar as CalendarIcon, MapPin, Building2, Package } from "lucide-react";
 
 /* Custom Hooks */
-import { useLocationPerformance, type LocationPerformanceParams } from "./location-performance.hooks"; // not created yet
-import { useItemHeadings } from "../business-performance/business-performance.hooks";
+import { useLocationPerformance, useItemHeadings, type LocationPerformanceParams } from "@/hooks/api/useLocationPerformance";
 import { useLocationsTrue } from "@/hooks/api/useLocations";
 import { useTeams } from "@/hooks/api/useTeams";
 import { Combobox } from "@/components/form/SelectField";
@@ -43,7 +41,7 @@ const region: Array<string> = ["North", "South", "East", "West", "Central", "Nor
 /* ================================
    EXPORT UTILITIES
 ================================ */
-const exportToCSV = (data: any[], filename: string, headers: { key: string; label: string }[]) => {
+const exportToCSV = (data: Record<string, unknown>[], filename: string, headers: { key: string; label: string }[]) => {
     if (data.length === 0) {
         alert("No data to export");
         return;
@@ -93,13 +91,11 @@ export default function LocationPerformanceDashboard() {
 
     // Fetch headings for dropdown
     const { data: headings = [] } = useItemHeadings();
-    console.log({ message: "Headings data" }, headings);
 
     // Fetch location performance data
     const { data, isLoading: dataLoading } = useLocationPerformance(appliedParams);
 
     const { data: locations = [] } = useLocationsTrue();
-    console.log({ message: "locations data" }, locations);
 
     const { data: teams = [] } = useTeams();
 
@@ -107,9 +103,9 @@ export default function LocationPerformanceDashboard() {
     const params = useMemo(() => {
         if (!selectedHeadingId || !fromDate || !toDate || !(selectedArea || selectedLocation)) return null;
         return {
-            team: selectedTeam,
-            area: selectedArea,
-            location: selectedLocation,
+            team: selectedTeam || undefined,
+            area: selectedArea || undefined,
+            location: selectedLocation || undefined,
             headingId: selectedHeadingId,
             fromDate,
             toDate,
@@ -130,7 +126,7 @@ export default function LocationPerformanceDashboard() {
         const selectedHeading = headings.find(h => h.id === selectedHeadingId);
         const headingName = selectedHeading?.name || "Unknown";
 
-        const allData: any[] = [];
+        const allData: Record<string, unknown>[] = [];
 
         // Add summary data
         Object.entries(data.summary).forEach(([category, summaryData]) => {
@@ -361,7 +357,7 @@ export default function LocationPerformanceDashboard() {
                                                         <TableCell className="tabular-nums">{formatCurrency(value.value)}</TableCell>
                                                         <TableCell>
                                                             <div className="flex flex-wrap gap-1">
-                                                                {value.tender.map((tender: string, idx: string) => (
+                                                                {value.tender.map((tender: string, idx: number) => (
                                                                     <Badge key={idx} variant="secondary" className="font-normal border border-gray-200">
                                                                         {tender}
                                                                     </Badge>

@@ -11,6 +11,15 @@ export interface LocationPerformanceQuery {
     toDate: string | null; // yyyy-mm-dd
 }
 
+export interface LocationPerformanceParams {
+    headingId?: number;
+    location?: number;
+    area?: string;
+    team?: number;
+    fromDate: string;
+    toDate: string;
+}
+
 // ─── API response (mirrors backend shape exactly) ─────────────────────────────
 
 export interface SummaryItem {
