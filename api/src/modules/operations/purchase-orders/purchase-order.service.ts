@@ -1369,12 +1369,16 @@ export class PurchaseOrderService {
     }
 
     async listParties(type?: string) {
-        let query = this.db.select().from(projectParties);
+        const conditions = [eq(projectParties.isActive, true)];
         if (type) {
-            query = query.where(eq(projectParties.type, type)) as any;
+            conditions.push(eq(projectParties.type, type));
         }
-        const res = await query.orderBy(desc(projectParties.createdAt));
-        return res;
+
+        return this.db
+            .select()
+            .from(projectParties)
+            .where(and(...conditions))
+            .orderBy(desc(projectParties.createdAt));
     }
 
     async activateParty(id: number) {
