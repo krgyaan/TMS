@@ -4,11 +4,10 @@ import { useState, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 /* Icons */
-import { Filter, Download, Calendar as CalendarIcon, MapPin, Building2, Package } from "lucide-react";
+import { Filter, Download, MapPin, Building2, Package } from "lucide-react";
 
 /* Custom Hooks */
 import { useItemHeadings, useBusinessPerformance } from "@/hooks/api/useBusinessPerformance";
@@ -43,6 +42,33 @@ const formatCurrency = (amount: number | string): string => {
 const titleCase = (str: string): string => {
     return str.replace(/_/g, " ").replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 };
+
+/**
+ * Build the list of selectable Financial Years: "2025-26" style (Apr–Mar), current FY + previous years.
+ */
+function buildFinancialYearOptions(): { id: string; name: string }[] {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const fiscalStartYear = today.getMonth() >= 3 ? currentYear : currentYear - 1;
+    const options: { id: string; name: string }[] = [];
+    for (let y = fiscalStartYear; y >= fiscalStartYear - 8; y--) {
+        options.push({ id: `${y}-${String((y + 1) % 100).padStart(2, "0")}`, name: `${y}-${(y + 1) % 100}` });
+    }
+    return options;
+}
+
+/**
+ * Convert a Financial Year selection like "2024-25" into fromDate/toDate strings (2024-04-01 .. 2025-03-31).
+ */
+function yearToDateRange(year: string | null): { fromDate: string; toDate: string } | null {
+    if (!year) return null;
+
+    const match = /^(\d{4})-(\d{2})$/.exec(year);
+    if (!match) return null;
+    const startYear = Number(match[1]);
+    const endYear = 2000 + Number(match[2]);
+    return { fromDate: `${startYear}-04-01`, toDate: `${endYear}-03-31` };
+}
 
 /* ================================
    EXPORT UTILITIES
@@ -87,8 +113,7 @@ const exportToCSV = (data: Record<string, unknown>[], filename: string, headers:
 export default function BusinessPerformanceDashboard() {
     // Filter States
     const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(null);
-    const [fromDate, setFromDate] = useState<string>("");
-    const [toDate, setToDate] = useState<string>("");
+    const [selectedFinancialYear, setSelectedFinancialYear] = useState<string>("");
     const [appliedParams, setAppliedParams] = useState<BusinessPerformanceParams | null>(null);
 
     // Fetch headings for dropdown
@@ -97,15 +122,19 @@ export default function BusinessPerformanceDashboard() {
     // Fetch business performance data
     const { data, isLoading: dataLoading } = useBusinessPerformance(appliedParams);
 
+    // Financial Year dropdown options
+    const financialYearOptions = useMemo(() => buildFinancialYearOptions(), []);
+
     // Build params for submission
-    const params = useMemo(() => {
-        if (!selectedHeadingId || !fromDate || !toDate) return null;
+    const params = useMemo<BusinessPerformanceParams | null>(() => {
+        const range = yearToDateRange(selectedFinancialYear);
+        if (!range || !selectedHeadingId) return null;
         return {
             headingId: selectedHeadingId,
-            fromDate,
-            toDate,
+            fromDate: range.fromDate,
+            toDate: range.toDate,
         };
-    }, [selectedHeadingId, fromDate, toDate]);
+    }, [selectedHeadingId, selectedFinancialYear]);
 
     // Handle form submission
     const handleSubmit = () => {
@@ -175,9 +204,9 @@ export default function BusinessPerformanceDashboard() {
             { key: "tenders", label: "Tenders" },
         ];
 
-        const filename = `Business_Performance_${headingName}_${fromDate}_to_${toDate}`;
+        const filename = `Business_Performance_${headingName}_${selectedFinancialYear || "all"}`;
         exportToCSV(allData, filename, headers);
-    }, [data, headings, selectedHeadingId, fromDate, toDate]);
+    }, [data, headings, selectedHeadingId, selectedFinancialYear]);
 
     // Extract summary entries for rendering
     const summaryEntries = data ? Object.entries(data.summary) : [];
@@ -200,39 +229,32 @@ export default function BusinessPerformanceDashboard() {
 
                 {/* ===== FILTER CARD ===== */}
                 <Card className="shadow-sm">
-                    <CardContent className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 w-full gap-4 items-end">
                             {/* Item Heading Select */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Item Heading</label>
                                 <Combobox
                                     value={selectedHeadingId ? selectedHeadingId.toString() : ""}
                                     onChange={v => setSelectedHeadingId(v ? Number(v) : null)}
-                                    options={headings.map(heading => ({ id: heading.id.toString(), name: `${heading.name} (${heading.team})` }))}
+                                    options={headings.map(heading => ({ id: heading.id.toString(), name: `${heading.name}` }))}
                                     placeholder="Select Item Heading"
                                 />
                             </div>
 
-                            {/* From Date */}
+                            {/* Financial Year */}
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">From Date</label>
-                                <div className="relative">
-                                    <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input type="date" className="pl-9" value={fromDate} onChange={e => setFromDate(e.target.value)} />
-                                </div>
-                            </div>
-
-                            {/* To Date */}
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">To Date</label>
-                                <div className="relative">
-                                    <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input type="date" className="pl-9" value={toDate} onChange={e => setToDate(e.target.value)} />
-                                </div>
+                                <label className="text-sm font-medium">Financial Year</label>
+                                <Combobox
+                                    value={selectedFinancialYear}
+                                    onChange={v => setSelectedFinancialYear(v)}
+                                    options={financialYearOptions}
+                                    placeholder="Select Financial Year"
+                                />
                             </div>
 
                             {/* Submit Button */}
-                            <Button onClick={handleSubmit} disabled={!params}>
+                            <Button onClick={handleSubmit} disabled={!params} className="justify-self-center">
                                 <Filter className="mr-2 h-4 w-4" /> Submit
                             </Button>
                         </div>
@@ -242,7 +264,7 @@ export default function BusinessPerformanceDashboard() {
                 {/* ===== CONDITIONAL CONTENT ===== */}
                 {!appliedParams ? (
                     <div className="bg-muted rounded-lg p-6 text-center">
-                        <span className="text-muted-foreground">Please select an Item Heading and Date Range to view the report.</span>
+                        <span className="text-muted-foreground">Please select an Item Heading and Financial Year to view the report.</span>
                     </div>
                 ) : dataLoading ? (
                     <div className="bg-muted rounded-lg p-6 text-center">
