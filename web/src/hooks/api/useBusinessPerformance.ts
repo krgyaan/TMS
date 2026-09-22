@@ -43,7 +43,7 @@ export function useItemHeadings() {
 /**
  * Fetches the full business performance report.
  * Pass null as params to keep the query disabled until the user submits the form.
- * Response shape mirrors Laravel: { items, summary, metrics }
+ * Response shape mirrors Laravel: { items, summary, tenderList }
  */
 export function useBusinessPerformance(params: BusinessPerformanceParams | null) {
     return useQuery({

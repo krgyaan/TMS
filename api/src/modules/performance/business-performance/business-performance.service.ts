@@ -1,5 +1,6 @@
 import { Injectable, Inject } from "@nestjs/common";
 import { and, between, eq, exists, inArray, or, sql } from "drizzle-orm";
+import { format } from "date-fns";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -13,18 +14,19 @@ import { locations } from "@/db/schemas/master/locations.schema";
 import { items } from "@/db/schemas/master/items.schema";
 import { itemHeadings } from "@/db/schemas/master/item-headings.schema";
 import { teams } from "@/db/schemas/master/teams.schema";
+import { users } from "@/db/schemas/auth/users.schema";
 
 import type { BusinessPerformanceQuery } from "./zod/business-performance.dto";
 import type {
     AssignedTenderRow,
-    BusinessMetrics,
     BusinessPerformanceResponse,
     BusinessSummary,
+    BusinessTenderListItem,
+    BusinessTenderRow,
     EmdTenderRow,
     ItemHeadingRow,
     ItemHeadingsResponse,
     ItemRow,
-    MetricEntry,
     SummaryItem,
     TenderRow,
 } from "./zod/business-performance.types";
@@ -36,6 +38,21 @@ const STATUS = {
     LOST: [24],
     WON: [25, 26, 27, 28],
 } as const;
+
+const DATE_FORMAT = "dd-MM-yyyy hh:mm a";
+
+const STATUS_LABEL = (s: number): string =>
+    (STATUS.WON as readonly number[]).includes(s)
+        ? "Won"
+        : (STATUS.MISSED as readonly number[]).includes(s)
+          ? "Missed"
+          : (STATUS.LOST as readonly number[]).includes(s)
+            ? "Lost"
+            : (STATUS.DISQUALIFIED as readonly number[]).includes(s)
+              ? "Disqualified"
+              : (STATUS.RESULTS_AWAITED as readonly number[]).includes(s)
+                ? "Results Awaited"
+                : "Assigned";
 
 @Injectable()
 export class BusinessPerformanceService {
@@ -77,17 +94,17 @@ export class BusinessPerformanceService {
         this.logger.info("Fetching business performance", { heading, fromDate, toDate });
 
         try {
-            const [tenderRows, assignedRows, itemRows, emdRows] = await Promise.all([
+            const [tenderRows, assignedRows, itemRows, emdRows, tenderListRows] = await Promise.all([
                 this.getTenders(heading, from, to),
                 this.getAssignedTenders(heading, from, to),
                 this.getItemsUnderHeading(heading),
                 this.getEmdTenders(heading, from, to),
+                this.getTenderList(heading, from, to),
             ]);
 
             const assignedApproved = this.buildAssignedApprovedSummary(assignedRows);
             const bidSummary = this.calculateSummary(tenderRows);
             const emdSummary = this.buildEmdSummary(emdRows);
-            const metrics = this.getMetrics(tenderRows);
 
             // Tenders assigned but never bid on (no bid submission row exists)
             const bidTenderIds = new Set(tenderRows.map(t => t.tenderId));
@@ -100,9 +117,11 @@ export class BusinessPerformanceService {
                 tenders_not_bid,
             };
 
+            const tenderList = this.buildTenderList(tenderListRows);
+
             this.logger.info("Business performance computed", { heading });
 
-            return { items: itemRows, summary, metrics };
+            return { items: itemRows, summary, tenderList };
         } catch (error: any) {
             this.logger.error("Failed to fetch business performance", {
                 message: error?.message,
@@ -118,22 +137,14 @@ export class BusinessPerformanceService {
     private async getTenders(heading: number, from: Date, to: Date): Promise<TenderRow[]> {
         return this.db
             .select({
-                id: bidSubmissions.id,
                 tenderId: bidSubmissions.tenderId,
-                team: tenderInfos.team,
-                location: tenderInfos.location,
-                item: tenderInfos.item,
                 tenderName: tenderInfos.tenderName,
                 gstValues: tenderInfos.gstValues,
                 bidStatus: bidSubmissions.status,
                 tenderStatus: tenderInfos.status,
-                state: locations.state,
-                region: locations.region,
-                itemName: items.name,
             })
             .from(bidSubmissions)
             .innerJoin(tenderInfos, eq(tenderInfos.id, bidSubmissions.tenderId))
-            .innerJoin(locations, eq(locations.id, tenderInfos.location))
             .innerJoin(items, eq(items.id, tenderInfos.item))
             .innerJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
             .where(and(eq(itemHeadings.id, heading), between(bidSubmissions.submissionDatetime, from, to))) as unknown as TenderRow[];
@@ -145,17 +156,11 @@ export class BusinessPerformanceService {
         return this.db
             .select({
                 id: tenderInfos.id,
-                team: tenderInfos.team,
                 tenderName: tenderInfos.tenderName,
                 gstValues: tenderInfos.gstValues,
                 tlStatus: tenderInfos.tlStatus,
-                tenderStatus: tenderInfos.status,
-                state: locations.state,
-                region: locations.region,
-                itemName: items.name,
             })
             .from(tenderInfos)
-            .innerJoin(locations, eq(locations.id, tenderInfos.location))
             .innerJoin(items, eq(items.id, tenderInfos.item))
             .innerJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
             .where(and(eq(tenderInfos.deleteStatus, 0), eq(itemHeadings.id, heading), between(tenderInfos.dueDate, from, to))) as unknown as AssignedTenderRow[];
@@ -165,56 +170,60 @@ export class BusinessPerformanceService {
     // Uses correlated EXISTS against payment_requests (purpose = 'EMD') +
     // payment_instruments (action/status stages) — same logic as the customer dashboard.
 
+    private emdPaidSubquery() {
+        return exists(
+            this.db
+                .select({ one: sql`1` })
+                .from(paymentRequests)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
+                .where(
+                    and(
+                        eq(paymentRequests.tenderId, tenderInfos.id),
+                        eq(paymentRequests.purpose, "EMD"),
+                        sql`CAST(${paymentRequests.amountRequired} AS DECIMAL) > 0`,
+                        eq(paymentInstruments.isActive, true),
+                        or(
+                            and(eq(paymentInstruments.action, 1), eq(paymentInstruments.status, "ACCOUNTS_FORM_ACCEPTED")),
+                            and(
+                                eq(paymentInstruments.action, 2),
+                                eq(paymentInstruments.status, "FOLLOWUP_INITIATED"),
+                                inArray(paymentInstruments.instrumentType, ["DD", "FDR", "Cheque", "Bank Transfer", "Portal Payment"])
+                            ),
+                            and(eq(paymentInstruments.action, 4), eq(paymentInstruments.status, "FOLLOWUP_INITIATED"), eq(paymentInstruments.instrumentType, "BG"))
+                        )
+                    )
+                )
+        );
+    }
+
+    private emdReturnedSubquery() {
+        return exists(
+            this.db
+                .select({ one: sql`1` })
+                .from(paymentRequests)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
+                .where(
+                    and(
+                        eq(paymentRequests.tenderId, tenderInfos.id),
+                        eq(paymentRequests.purpose, "EMD"),
+                        eq(paymentInstruments.isActive, true),
+                        or(
+                            and(inArray(paymentInstruments.instrumentType, ["Bank Transfer", "Portal Payment", "DD", "FDR"]), inArray(paymentInstruments.action, [3, 4])),
+                            and(eq(paymentInstruments.instrumentType, "BG"), eq(paymentInstruments.action, 6))
+                        )
+                    )
+                )
+        );
+    }
+
     private async getEmdTenders(heading: number, from: Date, to: Date): Promise<EmdTenderRow[]> {
-        const emdPaidFilter = and(
-            eq(paymentRequests.tenderId, tenderInfos.id),
-            eq(paymentRequests.purpose, "EMD"),
-            sql`CAST(${paymentRequests.amountRequired} AS DECIMAL) > 0`,
-            eq(paymentInstruments.isActive, true),
-            or(
-                and(eq(paymentInstruments.action, 1), eq(paymentInstruments.status, "ACCOUNTS_FORM_ACCEPTED")),
-                and(
-                    eq(paymentInstruments.action, 2),
-                    eq(paymentInstruments.status, "FOLLOWUP_INITIATED"),
-                    inArray(paymentInstruments.instrumentType, ["DD", "FDR", "Cheque", "Bank Transfer", "Portal Payment"])
-                ),
-                and(eq(paymentInstruments.action, 4), eq(paymentInstruments.status, "FOLLOWUP_INITIATED"), eq(paymentInstruments.instrumentType, "BG"))
-            )
-        );
-
-        const emdReturnedFilter = and(
-            eq(paymentRequests.tenderId, tenderInfos.id),
-            eq(paymentRequests.purpose, "EMD"),
-            eq(paymentInstruments.isActive, true),
-            or(
-                and(inArray(paymentInstruments.instrumentType, ["Bank Transfer", "Portal Payment", "DD", "FDR"]), inArray(paymentInstruments.action, [3, 4])),
-                and(eq(paymentInstruments.instrumentType, "BG"), eq(paymentInstruments.action, 6))
-            )
-        );
-
-        const hasEmdPaid = exists(
-            this.db
-                .select({ one: sql`1` })
-                .from(paymentRequests)
-                .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
-                .where(emdPaidFilter)
-        );
-
-        const hasEmdReturned = exists(
-            this.db
-                .select({ one: sql`1` })
-                .from(paymentRequests)
-                .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
-                .where(emdReturnedFilter)
-        );
-
         return this.db
             .select({
                 id: tenderInfos.id,
                 tenderName: tenderInfos.tenderName,
                 gstValues: tenderInfos.gstValues,
-                hasEmdPaid,
-                hasEmdReturned,
+                hasEmdPaid: this.emdPaidSubquery(),
+                hasEmdReturned: this.emdReturnedSubquery(),
             })
             .from(tenderInfos)
             .innerJoin(locations, eq(locations.id, tenderInfos.location))
@@ -223,7 +232,75 @@ export class BusinessPerformanceService {
             .where(and(eq(tenderInfos.deleteStatus, 0), eq(itemHeadings.id, heading), between(tenderInfos.dueDate, from, to))) as unknown as EmdTenderRow[];
     }
 
-    // ─── Query 4: items under heading ─────────────────────────────────────────
+    // ─── Query 4: flat tender list (for category tables) ─────────────────────
+    // Seeds from tender_infos (by due date), joins team/member/item details and
+    // tags each row with every category it belongs to — mirrors the customer dashboard.
+
+    private async getTenderList(heading: number, from: Date, to: Date): Promise<BusinessTenderRow[]> {
+        return (await this.db
+            .select({
+                id: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                dueDate: tenderInfos.dueDate,
+                gstValues: tenderInfos.gstValues,
+                member: users.name,
+                team: teams.name,
+                itemName: items.name,
+                status: tenderInfos.status,
+                tlStatus: tenderInfos.tlStatus,
+                bidStatus: bidSubmissions.status,
+                hasEmdPaid: this.emdPaidSubquery(),
+                hasEmdReturned: this.emdReturnedSubquery(),
+            })
+            .from(tenderInfos)
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(teams, eq(teams.id, tenderInfos.team))
+            .innerJoin(items, eq(items.id, tenderInfos.item))
+            .innerJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+            .where(and(eq(tenderInfos.deleteStatus, 0), eq(itemHeadings.id, heading), between(tenderInfos.dueDate, from, to)))
+            .groupBy(tenderInfos.id, users.name, teams.name, items.name, bidSubmissions.status)
+            .orderBy(tenderInfos.dueDate)
+            .execute()) as unknown as BusinessTenderRow[];
+    }
+
+    private buildTenderList(rows: BusinessTenderRow[]): BusinessTenderListItem[] {
+        return rows.map(row => {
+            const s = Number(row.status);
+            const categories: string[] = ["tenders_assigned"];
+
+            if ((STATUS.MISSED as readonly number[]).includes(s)) categories.push("tenders_missed");
+            else if ((STATUS.DISQUALIFIED as readonly number[]).includes(s)) categories.push("tenders_disqualified");
+            else if ((STATUS.RESULTS_AWAITED as readonly number[]).includes(s)) categories.push("tender_results_awaited");
+            else if ((STATUS.LOST as readonly number[]).includes(s)) categories.push("tenders_lost");
+            else if ((STATUS.WON as readonly number[]).includes(s)) categories.push("tenders_won");
+
+            if (row.bidStatus === "Bid Submitted") categories.push("tenders_bid");
+            else categories.push("tenders_not_bid");
+
+            if (row.tlStatus === 1) categories.push("tenders_approved");
+
+            if (row.hasEmdPaid) categories.push("emd_paid");
+            if (row.hasEmdReturned) categories.push("emd_returned");
+
+            return {
+                id: row.id,
+                tenderNo: row.tenderNo,
+                tenderName: row.tenderName,
+                dueDate: format(row.dueDate, DATE_FORMAT),
+                gstValues: row.gstValues,
+                member: row.member ?? "—",
+                team: row.team ?? "—",
+                item: row.itemName ?? "—",
+                status: STATUS_LABEL(s),
+                bidStatus: row.bidStatus ?? "—",
+                category: categories,
+            };
+        });
+    }
+
+    // ─── Query 5: items under heading ─────────────────────────────────────────
 
     async getItemsUnderHeading(headingId: number): Promise<ItemRow[]> {
         return this.db
@@ -308,32 +385,6 @@ export class BusinessPerformanceService {
         }
 
         return summary;
-    }
-
-    private getMetrics(tenders: TenderRow[]): BusinessMetrics {
-        const by_region: Record<string, MetricEntry> = {};
-        const by_state: Record<string, MetricEntry> = {};
-        const by_item: Record<string, MetricEntry> = {};
-        let total_count = 0;
-        let total_value = 0;
-
-        for (const tender of tenders) {
-            const value = parseFloat(tender.gstValues || "0");
-
-            const region = tender.region ?? "Unknown";
-            by_region[region] = { count: (by_region[region]?.count ?? 0) + 1, value: (by_region[region]?.value ?? 0) + value };
-
-            const state = tender.state ?? "Unknown";
-            by_state[state] = { count: (by_state[state]?.count ?? 0) + 1, value: (by_state[state]?.value ?? 0) + value };
-
-            const item = tender.itemName ?? "Unknown";
-            by_item[item] = { count: (by_item[item]?.count ?? 0) + 1, value: (by_item[item]?.value ?? 0) + value };
-
-            total_count++;
-            total_value += value;
-        }
-
-        return { by_region, by_state, by_item, total_count, total_value };
     }
 
     // ─── Utilities ────────────────────────────────────────────────────────────

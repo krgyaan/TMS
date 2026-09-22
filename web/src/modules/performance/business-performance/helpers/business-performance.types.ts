@@ -31,19 +31,15 @@ export interface BusinessSummary {
     tender_results_awaited: SummaryItem;
     tenders_won: SummaryItem;
     tenders_lost: SummaryItem;
+    emd_paid: SummaryItem;
+    emd_returned: SummaryItem;
+    tenders_not_bid: SummaryItem;
 }
 
-export interface MetricEntry {
-    count: number;
-    value: number;
-}
-
-export interface BusinessMetrics {
-    by_region: Record<string, MetricEntry>;
-    by_state: Record<string, MetricEntry>;
-    by_item: Record<string, MetricEntry>;
-    total_count: number;
-    total_value: number;
+export interface BusinessPerformanceResponse {
+    items: ItemRow[];
+    summary: BusinessSummary;
+    tenderList: BusinessTenderListItem[];
 }
 
 export interface ItemRow {
@@ -57,10 +53,18 @@ export interface ItemHeadingRow {
     team: string;
 }
 
-export interface BusinessPerformanceResponse {
-    items: ItemRow[];
-    summary: BusinessSummary;
-    metrics: BusinessMetrics;
+export interface BusinessTenderListItem {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: string;
+    gstValues: string;
+    member: string;
+    team: string;
+    item: string;
+    status: string;
+    bidStatus: string;
+    category: string[];
 }
 
 export interface ItemHeadingsResponse {

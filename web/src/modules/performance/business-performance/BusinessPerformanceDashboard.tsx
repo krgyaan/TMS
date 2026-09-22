@@ -1,43 +1,21 @@
 import { useState, useMemo, useCallback } from "react";
 
 /* UI Components */
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 /* Icons */
-import { Filter, Download, MapPin, Building2, Package } from "lucide-react";
+import { Filter, Download } from "lucide-react";
 
 /* Custom Hooks */
 import { useItemHeadings, useBusinessPerformance } from "@/hooks/api/useBusinessPerformance";
 import { Combobox } from "@/components/form/SelectField";
 
-/* ================================
-   TYPES
-=============================== */
-interface BusinessPerformanceParams {
-    headingId: number;
-    fromDate: string;
-    toDate: string;
-}
+/* Types */
+import type { BusinessPerformanceParams } from "./helpers/business-performance.types";
 
-/* ================================
-   HELPERS
-=============================== */
-const formatCurrency = (amount: number | string): string => {
-    const numericAmount = typeof amount === "string" ? parseFloat(amount) : amount;
-
-    if (isNaN(numericAmount)) {
-        return "₹0";
-    }
-
-    return new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-    }).format(numericAmount);
-};
+/* Components */
+import BusinessCategoryTable from "./components/BusinessCategoryTable";
 
 const titleCase = (str: string): string => {
     return str.replace(/_/g, " ").replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
@@ -163,39 +141,6 @@ export default function BusinessPerformanceDashboard() {
             });
         });
 
-        // Add region data
-        Object.entries(data.metrics.by_region).forEach(([region, metricData]) => {
-            allData.push({
-                section: "Region Analysis",
-                category: region,
-                count: metricData.count,
-                value: metricData.value,
-                tenders: "",
-            });
-        });
-
-        // Add state data
-        Object.entries(data.metrics.by_state).forEach(([state, metricData]) => {
-            allData.push({
-                section: "State Analysis",
-                category: state,
-                count: metricData.count,
-                value: metricData.value,
-                tenders: "",
-            });
-        });
-
-        // Add item data
-        Object.entries(data.metrics.by_item).forEach(([item, metricData]) => {
-            allData.push({
-                section: "Item Analysis",
-                category: item,
-                count: metricData.count,
-                value: metricData.value,
-                tenders: "",
-            });
-        });
-
         const headers = [
             { key: "section", label: "Section" },
             { key: "category", label: "Category" },
@@ -207,9 +152,6 @@ export default function BusinessPerformanceDashboard() {
         const filename = `Business_Performance_${headingName}_${selectedFinancialYear || "all"}`;
         exportToCSV(allData, filename, headers);
     }, [data, headings, selectedHeadingId, selectedFinancialYear]);
-
-    // Extract summary entries for rendering
-    const summaryEntries = data ? Object.entries(data.summary) : [];
 
     return (
         <div className="min-h-screen bg-muted/10 pb-12">
@@ -272,210 +214,28 @@ export default function BusinessPerformanceDashboard() {
                     </div>
                 ) : (
                     <>
-                        {/* ===== ITEMS INFO ===== */}
-                        {data?.items && (
-                            <Card className="shadow-sm">
-                                <CardContent className="p-4">
-                                    {data.items.length > 0 ? (
-                                        <p className="text-sm">
-                                            The following items belong to the selected heading: <strong>{data.items.map(item => item.name).join(", ")}</strong>
-                                        </p>
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">No items found under the selected heading.</p>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* ===== SUMMARY CARDS ===== */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {summaryEntries.map(([name, value]) => (
-                                <Card key={name} className="shadow-sm hover:shadow-md transition-shadow">
-                                    <CardContent className="p-3">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            {/* <TrendingUp className="h-5 w-5 text-primary" /> */}
-                                            <span className="font-semibold text-lg">{titleCase(name)}</span>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-sm text-muted-foreground">
-                                                Count: <span className="font-medium text-foreground">{value.count}</span>
-                                            </p>
-                                            <p className="text-xl font-bold text-orange-400">{formatCurrency(value.value)}</p>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </div>
-
-                        {/* ===== TENDER SUMMARY TABLE ===== */}
-                        <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                            <CardHeader className="pb-4">
-                                <CardTitle className="text-lg">Tender Summary Details</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="overflow-x-auto">
-                                    <Table>
-                                        <TableHeader className="bg-muted/50">
-                                            <TableRow>
-                                                <TableHead className="font-semibold">Category</TableHead>
-                                                <TableHead className="font-semibold">Count</TableHead>
-                                                <TableHead className="font-semibold">Value</TableHead>
-                                                <TableHead className="font-semibold">Tenders</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {summaryEntries.length === 0 ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                                        No summary data available.
-                                                    </TableCell>
-                                                </TableRow>
-                                            ) : (
-                                                summaryEntries.map(([name, value]) => (
-                                                    <TableRow key={name} className="hover:bg-muted/30 transition-colors">
-                                                        <TableCell className="font-medium">{titleCase(name)}</TableCell>
-                                                        <TableCell className="tabular-nums">{value.count}</TableCell>
-                                                        <TableCell className="tabular-nums">{formatCurrency(value.value)}</TableCell>
-                                                        <TableCell>
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {(value.tender as string[]).map((tender: string, idx: number) => (
-                                                                    <Badge key={idx} variant="secondary" className="font-normal border border-gray-200">
-                                                                        {tender}
-                                                                    </Badge>
-                                                                ))}
-                                                            </div>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* ===== METRICS TABLES (3 columns) ===== */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {/* Region-wise Analysis */}
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                                <CardHeader className="pb-4">
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <MapPin className="h-5 w-5 text-blue-600" />
-                                        Region-wise Analysis
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="overflow-x-auto">
-                                        <Table>
-                                            <TableHeader className="bg-muted/50">
-                                                <TableRow>
-                                                    <TableHead className="font-semibold">Region</TableHead>
-                                                    <TableHead className="font-semibold">Count</TableHead>
-                                                    <TableHead className="font-semibold">Value</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {data?.metrics?.by_region && Object.entries(data.metrics.by_region).length > 0 ? (
-                                                    Object.entries(data.metrics.by_region).map(([region, metricData]) => (
-                                                        <TableRow key={region} className="hover:bg-muted/30 transition-colors">
-                                                            <TableCell className="font-medium">{region}</TableCell>
-                                                            <TableCell className="tabular-nums">{metricData.count}</TableCell>
-                                                            <TableCell className="tabular-nums">{formatCurrency(metricData.value)}</TableCell>
-                                                        </TableRow>
-                                                    ))
-                                                ) : (
-                                                    <TableRow>
-                                                        <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                                                            No region data available.
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* State-wise Analysis */}
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                                <CardHeader className="pb-4">
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <Building2 className="h-5 w-5 text-green-600" />
-                                        State-wise Analysis
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="overflow-x-auto">
-                                        <Table>
-                                            <TableHeader className="bg-muted/50">
-                                                <TableRow>
-                                                    <TableHead className="font-semibold">State</TableHead>
-                                                    <TableHead className="font-semibold">Count</TableHead>
-                                                    <TableHead className="font-semibold">Value</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {data?.metrics?.by_state && Object.entries(data.metrics.by_state).length > 0 ? (
-                                                    Object.entries(data.metrics.by_state).map(([state, metricData]) => (
-                                                        <TableRow key={state} className="hover:bg-muted/30 transition-colors">
-                                                            <TableCell className="font-medium">{state}</TableCell>
-                                                            <TableCell className="tabular-nums">{metricData.count}</TableCell>
-                                                            <TableCell className="tabular-nums">{formatCurrency(metricData.value)}</TableCell>
-                                                        </TableRow>
-                                                    ))
-                                                ) : (
-                                                    <TableRow>
-                                                        <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                                                            No state data available.
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Item-wise Analysis */}
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                                <CardHeader className="pb-4">
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <Package className="h-5 w-5 text-purple-600" />
-                                        Item-wise Analysis
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="overflow-x-auto">
-                                        <Table>
-                                            <TableHeader className="bg-muted/50">
-                                                <TableRow>
-                                                    <TableHead className="font-semibold">Item</TableHead>
-                                                    <TableHead className="font-semibold">Count</TableHead>
-                                                    <TableHead className="font-semibold">Value</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {data?.metrics?.by_item && Object.entries(data.metrics.by_item).length > 0 ? (
-                                                    Object.entries(data.metrics.by_item).map(([item, metricData]) => (
-                                                        <TableRow key={item} className="hover:bg-muted/30 transition-colors">
-                                                            <TableCell className="font-medium">{item}</TableCell>
-                                                            <TableCell className="tabular-nums">{metricData.count}</TableCell>
-                                                            <TableCell className="tabular-nums">{formatCurrency(metricData.value)}</TableCell>
-                                                        </TableRow>
-                                                    ))
-                                                ) : (
-                                                    <TableRow>
-                                                        <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                                                            No item data available.
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                        {/* ===== CATEGORY TABLES ===== */}
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_assigned" title="Tenders Assigned" description="All tenders assigned in this period." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_approved" title="Tenders Approved" description="Tenders approved by the team lead." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_missed" title="Tenders Missed" description="Tenders that were missed for submission." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_not_bid" title="Tenders Did Not Bid" description="Tenders assigned but not bid on." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_bid" title="Tenders Bid" description="Tenders where a bid has been submitted." />
+                        <BusinessCategoryTable
+                            params={appliedParams}
+                            categoryKey="tender_results_awaited"
+                            title="Tender Results Awaited"
+                            description="Tenders awaiting final results."
+                        />
+                        <BusinessCategoryTable
+                            params={appliedParams}
+                            categoryKey="tenders_disqualified"
+                            title="Tenders Disqualified"
+                            description="Tenders that were disqualified."
+                        />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_won" title="Tenders Won" description="Tenders that were won." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_lost" title="Tenders Lost" description="Tenders that were lost." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="emd_paid" title="EMD Paid" description="Tenders where the EMD has been paid." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="emd_returned" title="EMD Returned" description="Tenders where the EMD has been returned." />
                     </>
                 )}
             </div>
