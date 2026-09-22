@@ -215,7 +215,7 @@ export default function BusinessPerformanceDashboard() {
                                 <Combobox
                                     value={selectedHeadingId ? selectedHeadingId.toString() : ""}
                                     onChange={v => setSelectedHeadingId(v ? Number(v) : null)}
-                                    options={headings.map(heading => ({ id: heading.id.toString(), name: `${heading.name}` }))}
+                                    options={[...headings].sort((a, b) => a.name.localeCompare(b.name)).map(heading => ({ id: heading.id.toString(), name: `${heading.name}` }))}
                                     placeholder="Select Item Heading"
                                 />
                             </div>

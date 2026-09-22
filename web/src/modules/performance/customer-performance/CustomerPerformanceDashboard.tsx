@@ -294,7 +294,10 @@ export default function CustomerPerformanceDashboard() {
                                 <Combobox
                                     value={selectedHeadingId ? selectedHeadingId.toString() : ""}
                                     onChange={v => setSelectedHeadingId(v ? Number(v) : null)}
-                                    options={[{ id: "", name: "All" }, ...headingsWithTeams.map(heading => ({ id: heading.id.toString(), name: heading.name }))]}
+                                    options={[
+                                        { id: "", name: "All" },
+                                        ...[...headingsWithTeams].sort((a, b) => a.name.localeCompare(b.name)).map(heading => ({ id: heading.id.toString(), name: heading.name })),
+                                    ]}
                                     placeholder="Select Item Heading"
                                 />
                             </div>
