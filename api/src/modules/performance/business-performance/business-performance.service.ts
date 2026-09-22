@@ -1,5 +1,5 @@
 import { Injectable, Inject } from "@nestjs/common";
-import { and, between, eq } from "drizzle-orm";
+import { and, between, eq, exists, inArray, or, sql } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -8,6 +8,7 @@ import type { DbInstance } from "@/db";
 
 import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
 import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
+import { paymentInstruments, paymentRequests } from "@/db/schemas/tendering/payment-requests.schema";
 import { locations } from "@/db/schemas/master/locations.schema";
 import { items } from "@/db/schemas/master/items.schema";
 import { itemHeadings } from "@/db/schemas/master/item-headings.schema";
@@ -19,6 +20,7 @@ import type {
     BusinessMetrics,
     BusinessPerformanceResponse,
     BusinessSummary,
+    EmdTenderRow,
     ItemHeadingRow,
     ItemHeadingsResponse,
     ItemRow,
@@ -75,16 +77,28 @@ export class BusinessPerformanceService {
         this.logger.info("Fetching business performance", { heading, fromDate, toDate });
 
         try {
-            const [tenderRows, assignedRows, itemRows] = await Promise.all([
+            const [tenderRows, assignedRows, itemRows, emdRows] = await Promise.all([
                 this.getTenders(heading, from, to),
                 this.getAssignedTenders(heading, from, to),
                 this.getItemsUnderHeading(heading),
+                this.getEmdTenders(heading, from, to),
             ]);
 
             const assignedApproved = this.buildAssignedApprovedSummary(assignedRows);
             const bidSummary = this.calculateSummary(tenderRows);
-            const summary = { ...assignedApproved, ...bidSummary };
+            const emdSummary = this.buildEmdSummary(emdRows);
             const metrics = this.getMetrics(tenderRows);
+
+            // Tenders assigned but never bid on (no bid submission row exists)
+            const bidTenderIds = new Set(tenderRows.map(t => t.tenderId));
+            const tenders_not_bid = this.buildNotBidSummary(assignedRows, bidTenderIds);
+
+            const summary: BusinessSummary = {
+                ...assignedApproved,
+                ...bidSummary,
+                ...emdSummary,
+                tenders_not_bid,
+            };
 
             this.logger.info("Business performance computed", { heading });
 
@@ -147,7 +161,69 @@ export class BusinessPerformanceService {
             .where(and(eq(tenderInfos.deleteStatus, 0), eq(itemHeadings.id, heading), between(tenderInfos.dueDate, from, to))) as unknown as AssignedTenderRow[];
     }
 
-    // ─── Query 3: items under heading ─────────────────────────────────────────
+    // ─── Query 3: EMD paid / returned ────────────────────────────────────────
+    // Uses correlated EXISTS against payment_requests (purpose = 'EMD') +
+    // payment_instruments (action/status stages) — same logic as the customer dashboard.
+
+    private async getEmdTenders(heading: number, from: Date, to: Date): Promise<EmdTenderRow[]> {
+        const emdPaidFilter = and(
+            eq(paymentRequests.tenderId, tenderInfos.id),
+            eq(paymentRequests.purpose, "EMD"),
+            sql`CAST(${paymentRequests.amountRequired} AS DECIMAL) > 0`,
+            eq(paymentInstruments.isActive, true),
+            or(
+                and(eq(paymentInstruments.action, 1), eq(paymentInstruments.status, "ACCOUNTS_FORM_ACCEPTED")),
+                and(
+                    eq(paymentInstruments.action, 2),
+                    eq(paymentInstruments.status, "FOLLOWUP_INITIATED"),
+                    inArray(paymentInstruments.instrumentType, ["DD", "FDR", "Cheque", "Bank Transfer", "Portal Payment"])
+                ),
+                and(eq(paymentInstruments.action, 4), eq(paymentInstruments.status, "FOLLOWUP_INITIATED"), eq(paymentInstruments.instrumentType, "BG"))
+            )
+        );
+
+        const emdReturnedFilter = and(
+            eq(paymentRequests.tenderId, tenderInfos.id),
+            eq(paymentRequests.purpose, "EMD"),
+            eq(paymentInstruments.isActive, true),
+            or(
+                and(inArray(paymentInstruments.instrumentType, ["Bank Transfer", "Portal Payment", "DD", "FDR"]), inArray(paymentInstruments.action, [3, 4])),
+                and(eq(paymentInstruments.instrumentType, "BG"), eq(paymentInstruments.action, 6))
+            )
+        );
+
+        const hasEmdPaid = exists(
+            this.db
+                .select({ one: sql`1` })
+                .from(paymentRequests)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
+                .where(emdPaidFilter)
+        );
+
+        const hasEmdReturned = exists(
+            this.db
+                .select({ one: sql`1` })
+                .from(paymentRequests)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
+                .where(emdReturnedFilter)
+        );
+
+        return this.db
+            .select({
+                id: tenderInfos.id,
+                tenderName: tenderInfos.tenderName,
+                gstValues: tenderInfos.gstValues,
+                hasEmdPaid,
+                hasEmdReturned,
+            })
+            .from(tenderInfos)
+            .innerJoin(locations, eq(locations.id, tenderInfos.location))
+            .innerJoin(items, eq(items.id, tenderInfos.item))
+            .innerJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
+            .where(and(eq(tenderInfos.deleteStatus, 0), eq(itemHeadings.id, heading), between(tenderInfos.dueDate, from, to))) as unknown as EmdTenderRow[];
+    }
+
+    // ─── Query 4: items under heading ─────────────────────────────────────────
 
     async getItemsUnderHeading(headingId: number): Promise<ItemRow[]> {
         return this.db
@@ -178,7 +254,38 @@ export class BusinessPerformanceService {
         };
     }
 
-    private calculateSummary(tenders: TenderRow[]): Omit<BusinessSummary, "tenders_assigned" | "tenders_approved"> {
+    // ─── Builders (EMD paid / returned) ───────────────────────────────────────
+
+    private buildEmdSummary(rows: EmdTenderRow[]): Pick<BusinessSummary, "emd_paid" | "emd_returned"> {
+        const emd_paid = this.emptySummaryItem();
+        const emd_returned = this.emptySummaryItem();
+
+        for (const row of rows) {
+            if (row.hasEmdPaid) this.add(emd_paid, row);
+            if (row.hasEmdReturned) this.add(emd_returned, row);
+        }
+
+        return { emd_paid, emd_returned };
+    }
+
+    // ─── Builders (did not bid) ───────────────────────────────────────────────
+    // Assigned tenders (by due date) that have no bid submission row.
+
+    private buildNotBidSummary(assignedRows: AssignedTenderRow[], bidTenderIds: Set<number>): SummaryItem {
+        const notBid = this.emptySummaryItem();
+
+        for (const row of assignedRows) {
+            if (!bidTenderIds.has(row.id)) {
+                this.add(notBid, row);
+            }
+        }
+
+        return notBid;
+    }
+
+    private calculateSummary(
+        tenders: TenderRow[]
+    ): Pick<BusinessSummary, "tenders_bid" | "tenders_missed" | "tenders_disqualified" | "tender_results_awaited" | "tenders_won" | "tenders_lost"> {
         const summary = {
             tenders_bid: this.emptySummaryItem(),
             tenders_missed: this.emptySummaryItem(),

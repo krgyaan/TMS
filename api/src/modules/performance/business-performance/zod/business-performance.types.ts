@@ -30,6 +30,14 @@ export interface AssignedTenderRow {
     itemName: string | null;
 }
 
+export interface EmdTenderRow {
+    id: number;
+    tenderName: string;
+    gstValues: string;
+    hasEmdPaid: boolean | null;
+    hasEmdReturned: boolean | null;
+}
+
 export interface ItemRow {
     id: number;
     name: string;
@@ -58,6 +66,9 @@ export interface BusinessSummary {
     tender_results_awaited: SummaryItem;
     tenders_won: SummaryItem;
     tenders_lost: SummaryItem;
+    emd_paid: SummaryItem;
+    emd_returned: SummaryItem;
+    tenders_not_bid: SummaryItem;
 }
 
 export interface MetricEntry {
