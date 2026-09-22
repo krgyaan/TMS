@@ -14,7 +14,6 @@ export interface LocationPerformanceQuery {
 export interface LocationPerformanceParams {
     headingId?: number;
     location?: number;
-    area?: string;
     team?: number;
     fromDate: string;
     toDate: string;

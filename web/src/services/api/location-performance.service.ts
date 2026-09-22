@@ -11,7 +11,6 @@ class LocationPerformanceApiService extends BaseApiService {
             params: {
                 heading: params.headingId,
                 location: params.location,
-                area: params.area,
                 team: params.team,
                 fromDate: params.fromDate,
                 toDate: params.toDate,
