@@ -50,7 +50,7 @@ export default function TendersNotAllowedTable({ params }: TendersNotAllowedTabl
             },
             {
                 field: "gstValues",
-                headerName: "Value",
+                headerName: "Tender Value",
                 sortable: true,
                 filter: false,
                 width: 150,

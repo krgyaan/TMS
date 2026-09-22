@@ -12,6 +12,7 @@ export interface TenderRow {
     orgId: number | null;
     orgName: string | null;
     itemHeadingName: string | null;
+    avgGrossMargin: number | null;
 }
 
 export interface CustomerTenderRow {
@@ -22,8 +23,15 @@ export interface CustomerTenderRow {
     gstValues: string;
     member: string | null;
     team: string | null;
+    itemName: string;
     status: number;
     rfqSentOn: Date | null;
+    bidStatus: string | null;
+    emd: string;
+    emdMode: string | null;
+    hasEmdPaid: boolean | null;
+    hasEmdReturned: boolean | null;
+    avgGrossMargin: number | null;
 }
 
 // ─── API response (mirrors Laravel compact() output) ─────────────────────────
@@ -65,12 +73,18 @@ export interface TenderListItem {
     gstValues: string;
     member: string;
     team: string;
+    item: string;
     createdAt: string;
     status: string;
+    bidStatus: string;
+    category: string[];
+    emd: string;
+    emdMode: string | null;
 }
 
 export interface CustomerPerformanceResponse {
     summary: CustomerSummary;
     metrics: CustomerMetrics;
     tenderList: TenderListItem[];
+    avgGrossMargin: number | null;
 }

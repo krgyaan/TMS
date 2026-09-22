@@ -1,5 +1,5 @@
 import { Injectable, Inject } from "@nestjs/common";
-import { and, between, eq, sql } from "drizzle-orm";
+import { and, between, eq, exists, inArray, or, sql } from "drizzle-orm";
 import { format } from "date-fns";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -10,11 +10,14 @@ import type { DbInstance } from "@/db";
 import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
 import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
 import { rfqs } from "@/db/schemas/tendering/rfqs.schema";
+import { tenderCostingSheets } from "@/db/schemas/tendering/tender-costing-sheets.schema";
+import { tenderCostingDetails } from "@/db/schemas/tendering/tender-costing-details.schema";
 import { organizations } from "@/db/schemas/master/organizations.schema";
 import { items } from "@/db/schemas/master/items.schema";
 import { itemHeadings } from "@/db/schemas/master/item-headings.schema";
 import { teams } from "@/db/schemas/master/teams.schema";
 import { users } from "@/db/schemas/auth/users.schema";
+import { paymentInstruments, paymentRequests } from "@/db/schemas/tendering/payment-requests.schema";
 
 import type { CustomerPerformanceQuery } from "./zod/customer-performance.dto";
 import type {
@@ -68,16 +71,16 @@ export class CustomerPerformanceService {
         this.logger.info("Fetching customer performance", { query });
 
         try {
-            const [tenderRows, tenderList] = await Promise.all([this.getTenders(query), this.getTenderList(query)]);
+            const [tenderRows, tenderListResult] = await Promise.all([this.getTenders(query), this.getTenderList(query)]);
             const summary = this.calculateSummary(tenderRows);
             const metrics = this.getMetrics(tenderRows);
 
             this.logger.info("Customer performance computed", {
                 rowCount: tenderRows.length,
-                tenderListCount: tenderList.length,
+                tenderListCount: tenderListResult.tenderList.length,
             });
 
-            return { summary, metrics, tenderList };
+            return { summary, metrics, tenderList: tenderListResult.tenderList, avgGrossMargin: tenderListResult.avgGrossMargin };
         } catch (error) {
             const e = error as Error;
             this.logger.error("Failed to fetch customer performance", {
@@ -97,7 +100,7 @@ export class CustomerPerformanceService {
             conditions.push(eq(tenderInfos.organization, filters.org));
         }
         if (filters.teamCategory) {
-            conditions.push(eq(teams.category, filters.teamCategory));
+            conditions.push(eq(teams.name, filters.teamCategory));
         }
         if (filters.itemHeading) {
             conditions.push(eq(itemHeadings.id, filters.itemHeading));
@@ -122,6 +125,7 @@ export class CustomerPerformanceService {
                 orgId: organizations.id,
                 orgName: organizations.name,
                 itemHeadingName: itemHeadings.name,
+                avgGrossMargin: this.avgGrossMarginSubquery(),
             })
             .from(bidSubmissions)
             .innerJoin(tenderInfos, eq(tenderInfos.id, bidSubmissions.tenderId))
@@ -132,14 +136,14 @@ export class CustomerPerformanceService {
             .where(and(...conditions));
     }
 
-    private async getTenderList(filters: CustomerPerformanceQuery): Promise<TenderListItem[]> {
+    private async getTenderList(filters: CustomerPerformanceQuery): Promise<{ tenderList: TenderListItem[]; avgGrossMargin: number | null }> {
         const conditions = [eq(tenderInfos.deleteStatus, 0)];
 
         if (filters.org) {
             conditions.push(eq(tenderInfos.organization, filters.org));
         }
         if (filters.teamCategory) {
-            conditions.push(eq(teams.category, filters.teamCategory));
+            conditions.push(eq(teams.name, filters.teamCategory));
         }
         if (filters.itemHeading) {
             conditions.push(eq(itemHeadings.id, filters.itemHeading));
@@ -151,6 +155,48 @@ export class CustomerPerformanceService {
             conditions.push(between(tenderInfos.dueDate, from, to));
         }
 
+        const emdPaidFilter = and(
+            eq(paymentRequests.tenderId, tenderInfos.id),
+            eq(paymentRequests.purpose, "EMD"),
+            sql`CAST(${paymentRequests.amountRequired} AS DECIMAL) > 0`,
+            eq(paymentInstruments.isActive, true),
+            or(
+                and(eq(paymentInstruments.action, 1), eq(paymentInstruments.status, "ACCOUNTS_FORM_ACCEPTED")),
+                and(
+                    eq(paymentInstruments.action, 2),
+                    eq(paymentInstruments.status, "FOLLOWUP_INITIATED"),
+                    inArray(paymentInstruments.instrumentType, ["DD", "FDR", "Cheque", "Bank Transfer", "Portal Payment"])
+                ),
+                and(eq(paymentInstruments.action, 4), eq(paymentInstruments.status, "FOLLOWUP_INITIATED"), eq(paymentInstruments.instrumentType, "BG"))
+            )
+        );
+
+        const emdReturnedFilter = and(
+            eq(paymentRequests.tenderId, tenderInfos.id),
+            eq(paymentRequests.purpose, "EMD"),
+            eq(paymentInstruments.isActive, true),
+            or(
+                and(inArray(paymentInstruments.instrumentType, ["Bank Transfer", "Portal Payment", "DD", "FDR"]), inArray(paymentInstruments.action, [3, 4])),
+                and(eq(paymentInstruments.instrumentType, "BG"), eq(paymentInstruments.action, 6))
+            )
+        );
+
+        const hasEmdPaid = exists(
+            this.db
+                .select({ one: sql`1` })
+                .from(paymentRequests)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
+                .where(emdPaidFilter)
+        );
+
+        const hasEmdReturned = exists(
+            this.db
+                .select({ one: sql`1` })
+                .from(paymentRequests)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
+                .where(emdReturnedFilter)
+        );
+
         const rows = await this.db
             .select({
                 id: tenderInfos.id,
@@ -160,8 +206,15 @@ export class CustomerPerformanceService {
                 gstValues: tenderInfos.gstValues,
                 member: users.name,
                 team: teams.name,
+                itemName: items.name,
                 status: tenderInfos.status,
                 rfqSentOn: sql<Date | null>`MIN(${rfqs.createdAt})`,
+                bidStatus: bidSubmissions.status,
+                emd: tenderInfos.emd,
+                emdMode: tenderInfos.emdMode,
+                hasEmdPaid,
+                hasEmdReturned,
+                avgGrossMargin: this.avgGrossMarginSubquery(),
             })
             .from(tenderInfos)
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
@@ -170,22 +223,56 @@ export class CustomerPerformanceService {
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
             .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .where(and(...conditions))
-            .groupBy(tenderInfos.id, users.name, teams.name)
+            .groupBy(tenderInfos.id, users.name, teams.name, items.name, bidSubmissions.status)
             .orderBy(tenderInfos.dueDate)
             .execute();
 
-        return (rows as unknown as CustomerTenderRow[]).map(row => ({
-            id: row.id,
-            tenderNo: row.tenderNo,
-            tenderName: row.tenderName,
-            dueDate: format(row.dueDate, DATE_FORMAT),
-            gstValues: row.gstValues,
-            member: row.member ?? "—",
-            team: row.team ?? "—",
-            createdAt: row.rfqSentOn ? format(new Date(row.rfqSentOn), DATE_FORMAT) : "—",
-            status: STATUS_LABEL(Number(row.status)),
-        }));
+        const rawRows = rows as unknown as CustomerTenderRow[];
+
+        const margins = rawRows.map(row => Number(row.avgGrossMargin)).filter(v => Number.isFinite(v));
+        const avgGrossMargin = margins.length > 0 ? margins.reduce((acc, v) => acc + v, 0) / margins.length : null;
+
+        const tenderList = rawRows.map(row => {
+            const s = Number(row.status);
+
+            // Mirror calculateSummary() bucket logic — status buckets are mutually exclusive,
+            // then the additive buckets (bid, approved) plus the base assigned bucket apply.
+            const categories: string[] = ["assigned"];
+
+            if ((STATUS.MISSED as readonly number[]).includes(s)) categories.push("missed");
+            else if ((STATUS.DISQUALIFIED as readonly number[]).includes(s)) categories.push("disqualified");
+            else if ((STATUS.RESULTS_AWAITED as readonly number[]).includes(s)) categories.push("results_awaited");
+            else if ((STATUS.LOST as readonly number[]).includes(s)) categories.push("lost");
+            else if ((STATUS.WON as readonly number[]).includes(s)) categories.push("won");
+
+            if (row.bidStatus === "Bid Submitted") categories.push("bid");
+            if (row.bidStatus !== "Bid Submitted") categories.push("did_not_bid");
+            if ((STATUS.APPROVED as readonly number[]).includes(s)) categories.push("approved");
+
+            if (row.hasEmdPaid) categories.push("emd_paid");
+            if (row.hasEmdReturned) categories.push("emd_returned");
+
+            return {
+                id: row.id,
+                tenderNo: row.tenderNo,
+                tenderName: row.tenderName,
+                dueDate: format(row.dueDate, DATE_FORMAT),
+                gstValues: row.gstValues,
+                member: row.member ?? "—",
+                team: row.team ?? "—",
+                item: row.itemName ?? "—",
+                createdAt: row.rfqSentOn ? format(new Date(row.rfqSentOn), DATE_FORMAT) : "—",
+                status: STATUS_LABEL(s),
+                bidStatus: row.bidStatus ?? "—",
+                category: categories,
+                emd: row.emd,
+                emdMode: row.emdMode,
+            };
+        });
+
+        return { tenderList, avgGrossMargin };
     }
 
     // ─── Summary ──────────────────────────────────────────────────────────────
@@ -253,6 +340,17 @@ export class CustomerPerformanceService {
     }
 
     // ─── Utilities ────────────────────────────────────────────────────────────
+
+    
+    private avgGrossMarginSubquery() {
+        return sql<number | null>`
+            (SELECT AVG(${tenderCostingDetails.grossMargin})::float8
+             FROM ${tenderCostingSheets}
+             INNER JOIN ${tenderCostingDetails} ON ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+             WHERE ${tenderCostingSheets.tenderId} = ${tenderInfos.id}
+               AND ${tenderCostingDetails.grossMargin} IS NOT NULL)
+        `;
+    }
 
     private empty(): SummaryItem {
         return { count: 0, value: 0, tender: [] };
