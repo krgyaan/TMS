@@ -17,6 +17,16 @@ import type { BusinessPerformanceParams } from "./helpers/business-performance.t
 
 /* Components */
 import BusinessCategoryTable from "./components/BusinessCategoryTable";
+import BusinessBarChart from "./components/BusinessBarChart";
+import BusinessDonutChart from "./components/BusinessDonutChart";
+
+const getGpColor = (gp: number | null | undefined): string => {
+    if (gp === null || gp === undefined) return "text-muted-foreground";
+    if (gp >= 20) return "text-green-600";
+    if (gp >= 10) return "text-blue-600";
+    if (gp >= 0) return "text-yellow-600";
+    return "text-red-600";
+};
 
 const titleCase = (str: string): string => {
     return str.replace(/_/g, " ").replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
@@ -262,6 +272,30 @@ export default function BusinessPerformanceDashboard() {
                         <BusinessCategoryTable params={appliedParams} categoryKey="tenders_lost" title="Tenders Lost" description="Tenders that were lost." />
                         <BusinessCategoryTable params={appliedParams} categoryKey="emd_paid" title="EMD Paid" description="Tenders where the EMD has been paid." />
                         <BusinessCategoryTable params={appliedParams} categoryKey="emd_returned" title="EMD Returned" description="Tenders where the EMD has been returned." />
+
+                        {/* ===== AVERAGE GP + CHARTS (bottom) ===== */}
+                        <div className="space-y-4">
+                            {/* Average GP Card - Full Width Row */}
+                            <div className="grid grid-cols-1">
+                                <Card className="shadow-sm">
+                                    <CardContent className="p-5">
+                                        <div className="flex flex-wrap items-center gap-6">
+                                            <p className="text-sm text-muted-foreground">Average GP</p>
+                                            <p className={`text-3xl font-bold ${getGpColor(data?.avgGrossMargin)}`}>
+                                                {data?.avgGrossMargin !== null && data?.avgGrossMargin !== undefined ? `${data.avgGrossMargin.toFixed(2)}%` : "—"}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">Average approved gross margin across tenders.</p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            {/* Bar Chart + Donut Chart - Side by Side */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <BusinessBarChart params={appliedParams} />
+                                <BusinessDonutChart params={appliedParams} />
+                            </div>
+                        </div>
                     </>
                 )}
             </div>

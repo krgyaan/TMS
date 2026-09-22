@@ -40,6 +40,7 @@ export interface BusinessPerformanceResponse {
     items: ItemRow[];
     summary: BusinessSummary;
     tenderList: BusinessTenderListItem[];
+    avgGrossMargin: number | null;
 }
 
 export interface ItemRow {
@@ -64,6 +65,7 @@ export interface BusinessTenderListItem {
     item: string;
     status: string;
     bidStatus: string;
+    avgGrossMargin: string | null;
     category: string[];
 }
 

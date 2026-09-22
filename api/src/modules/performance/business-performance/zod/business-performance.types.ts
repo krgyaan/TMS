@@ -37,6 +37,7 @@ export interface BusinessTenderRow {
     bidStatus: "Submission Pending" | "Bid Submitted" | "Tender Missed" | null;
     hasEmdPaid: boolean | null;
     hasEmdReturned: boolean | null;
+    avgGrossMargin: number | null;
 }
 
 export interface ItemRow {
@@ -76,6 +77,7 @@ export interface BusinessPerformanceResponse {
     items: ItemRow[];
     summary: BusinessSummary;
     tenderList: BusinessTenderListItem[];
+    avgGrossMargin: number | null;
 }
 
 export interface BusinessTenderListItem {
@@ -89,6 +91,7 @@ export interface BusinessTenderListItem {
     item: string;
     status: string;
     bidStatus: string;
+    avgGrossMargin: string | null;
     category: string[];
 }
 

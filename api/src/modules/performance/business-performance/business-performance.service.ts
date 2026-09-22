@@ -10,6 +10,8 @@ import type { DbInstance } from "@/db";
 import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
 import { bidSubmissions } from "@/db/schemas/tendering/bid-submissions.schema";
 import { paymentInstruments, paymentRequests } from "@/db/schemas/tendering/payment-requests.schema";
+import { tenderCostingSheets } from "@/db/schemas/tendering/tender-costing-sheets.schema";
+import { tenderCostingDetails } from "@/db/schemas/tendering/tender-costing-details.schema";
 import { locations } from "@/db/schemas/master/locations.schema";
 import { items } from "@/db/schemas/master/items.schema";
 import { itemHeadings } from "@/db/schemas/master/item-headings.schema";
@@ -119,9 +121,12 @@ export class BusinessPerformanceService {
 
             const tenderList = this.buildTenderList(tenderListRows);
 
+            const margins = tenderListRows.map(row => Number(row.avgGrossMargin)).filter(v => Number.isFinite(v));
+            const avgGrossMargin = margins.length > 0 ? margins.reduce((acc, v) => acc + v, 0) / margins.length : null;
+
             this.logger.info("Business performance computed", { heading });
 
-            return { items: itemRows, summary, tenderList };
+            return { items: itemRows, summary, tenderList, avgGrossMargin };
         } catch (error: any) {
             this.logger.error("Failed to fetch business performance", {
                 message: error?.message,
@@ -216,6 +221,18 @@ export class BusinessPerformanceService {
         );
     }
 
+    // Average approved gross margin across all costing detail rows for a tender.
+    // Same correlated subquery pattern as the customer dashboard.
+    private avgGrossMarginSubquery() {
+        return sql<number | null>`
+            (SELECT AVG(${tenderCostingDetails.grossMargin})::float8
+             FROM ${tenderCostingSheets}
+             INNER JOIN ${tenderCostingDetails} ON ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+             WHERE ${tenderCostingSheets.tenderId} = ${tenderInfos.id}
+               AND ${tenderCostingDetails.grossMargin} IS NOT NULL)
+        `;
+    }
+
     private async getEmdTenders(heading: number, from: Date, to: Date): Promise<EmdTenderRow[]> {
         return this.db
             .select({
@@ -252,6 +269,7 @@ export class BusinessPerformanceService {
                 bidStatus: bidSubmissions.status,
                 hasEmdPaid: this.emdPaidSubquery(),
                 hasEmdReturned: this.emdReturnedSubquery(),
+                avgGrossMargin: this.avgGrossMarginSubquery(),
             })
             .from(tenderInfos)
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
@@ -295,6 +313,7 @@ export class BusinessPerformanceService {
                 item: row.itemName ?? "—",
                 status: STATUS_LABEL(s),
                 bidStatus: row.bidStatus ?? "—",
+                avgGrossMargin: row.avgGrossMargin !== null && row.avgGrossMargin !== undefined ? row.avgGrossMargin.toFixed(2) : null,
                 category: categories,
             };
         });
