@@ -1,11 +1,17 @@
 /* ===================== TYPES ===================== */
 
-// ─── Query ────────────────────────────────────────────────────────────────────
+// ─── Query ────────────────────────────────────────────────────────────────
 
 export interface BusinessPerformanceQuery {
     headingId: number | null;
     fromDate: string | null; // yyyy-mm-dd
     toDate: string | null; // yyyy-mm-dd
+}
+
+export interface BusinessPerformanceParams {
+    headingId: number;
+    fromDate: string;
+    toDate: string;
 }
 
 // ─── API response (mirrors backend shape exactly) ─────────────────────────────
@@ -48,7 +54,7 @@ export interface ItemRow {
 export interface ItemHeadingRow {
     id: number;
     name: string;
-    team: number;
+    team: string;
 }
 
 export interface BusinessPerformanceResponse {

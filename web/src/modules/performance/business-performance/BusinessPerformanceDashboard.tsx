@@ -1,59 +1,31 @@
-import React, { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 
 /* UI Components */
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 /* Icons */
-import { Filter, Download, Calendar as CalendarIcon, TrendingUp, MapPin, Building2, Package } from "lucide-react";
+import { Filter, Download, Calendar as CalendarIcon, MapPin, Building2, Package } from "lucide-react";
 
 /* Custom Hooks */
-import { useItemHeadings, useBusinessPerformance } from "./business-performance.hooks"; // not created yet
+import { useItemHeadings, useBusinessPerformance } from "@/hooks/api/useBusinessPerformance";
 import { Combobox } from "@/components/form/SelectField";
 
 /* ================================
    TYPES
-================================ */
+=============================== */
 interface BusinessPerformanceParams {
     headingId: number;
     fromDate: string;
     toDate: string;
 }
 
-interface Heading {
-    id: number;
-    name: string;
-    team: string;
-}
-
-interface SummaryItem {
-    count: number;
-    value: number;
-    tender: string[];
-}
-
-interface MetricData {
-    count: number;
-    value: number;
-}
-
-interface BusinessPerformanceData {
-    items: { name: string }[];
-    summary: Record<string, SummaryItem>;
-    metrics: {
-        by_region: Record<string, MetricData>;
-        by_state: Record<string, MetricData>;
-        by_item: Record<string, MetricData>;
-    };
-}
-
 /* ================================
    HELPERS
-================================ */
+=============================== */
 const formatCurrency = (amount: number | string): string => {
     const numericAmount = typeof amount === "string" ? parseFloat(amount) : amount;
 
@@ -74,8 +46,8 @@ const titleCase = (str: string): string => {
 
 /* ================================
    EXPORT UTILITIES
-================================ */
-const exportToCSV = (data: any[], filename: string, headers: { key: string; label: string }[]) => {
+=============================== */
+const exportToCSV = (data: Record<string, unknown>[], filename: string, headers: { key: string; label: string }[]) => {
     if (data.length === 0) {
         alert("No data to export");
         return;
@@ -111,7 +83,7 @@ const exportToCSV = (data: any[], filename: string, headers: { key: string; labe
 
 /* ================================
    MAIN COMPONENT
-================================ */
+=============================== */
 export default function BusinessPerformanceDashboard() {
     // Filter States
     const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(null);
@@ -120,8 +92,7 @@ export default function BusinessPerformanceDashboard() {
     const [appliedParams, setAppliedParams] = useState<BusinessPerformanceParams | null>(null);
 
     // Fetch headings for dropdown
-    const { data: headings = [], isLoading: headingsLoading } = useItemHeadings();
-    console.log({ message: "Headings data" }, headings);
+    const { data: headings = [] } = useItemHeadings();
 
     // Fetch business performance data
     const { data, isLoading: dataLoading } = useBusinessPerformance(appliedParams);
@@ -150,7 +121,7 @@ export default function BusinessPerformanceDashboard() {
         const selectedHeading = headings.find(h => h.id === selectedHeadingId);
         const headingName = selectedHeading?.name || "Unknown";
 
-        const allData: any[] = [];
+        const allData: Record<string, unknown>[] = [];
 
         // Add summary data
         Object.entries(data.summary).forEach(([category, summaryData]) => {
@@ -345,7 +316,7 @@ export default function BusinessPerformanceDashboard() {
                                                         <TableCell className="tabular-nums">{formatCurrency(value.value)}</TableCell>
                                                         <TableCell>
                                                             <div className="flex flex-wrap gap-1">
-                                                                {value.tender.map((tender, idx) => (
+                                                                {(value.tender as string[]).map((tender: string, idx: number) => (
                                                                     <Badge key={idx} variant="secondary" className="font-normal border border-gray-200">
                                                                         {tender}
                                                                     </Badge>

@@ -1,15 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/axios";
 
-import type { BusinessPerformanceResponse, ItemHeadingRow, ItemHeadingsResponse } from "./business-performance.types";
-
-// ─── Params ───────────────────────────────────────────────────────────────────
-
-export interface BusinessPerformanceParams {
-    headingId: number;
-    fromDate: string;
-    toDate: string;
-}
+import type {
+    BusinessPerformanceParams,
+    BusinessPerformanceResponse,
+    ItemHeadingRow,
+    ItemHeadingsResponse,
+} from "@/modules/performance/business-performance/helpers/business-performance.types";
 
 // ─── Fetchers ─────────────────────────────────────────────────────────────────
 
