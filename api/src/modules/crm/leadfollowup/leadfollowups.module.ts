@@ -1,15 +1,12 @@
 import { Module } from "@nestjs/common";
-import { DatabaseModule } from "@db/database.module";
 import { AuthModule } from "@/modules/auth/auth.module";
-import { EmailModule } from "@/modules/email/email.module";
 import { FollowupsController, EnquiryFollowupsController } from "./leadfollowups.controller";
 import { HappyCallingFollowupsController } from "./happy-calling.leadfollowups.controller";
-import { LeadFollowupsService } from "./leadfollowups.service";
+import { LeadFollowupsServiceModule } from "./leadfollowups-service.module";
 
 @Module({
-    imports: [DatabaseModule, EmailModule, AuthModule],
+    imports: [LeadFollowupsServiceModule, AuthModule],
     controllers: [FollowupsController, HappyCallingFollowupsController, EnquiryFollowupsController],
-    providers: [LeadFollowupsService],
-    exports: [LeadFollowupsService],
+    exports: [LeadFollowupsServiceModule],
 })
 export class LeadFollowupsModule {}

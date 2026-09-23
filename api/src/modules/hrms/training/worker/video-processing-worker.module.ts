@@ -6,7 +6,6 @@ import dbConfig, { validateDbEnv } from "@/config/db.config";
 import googleConfig, { validateGoogleEnv } from "@/config/google.config";
 import redisConfig, { validateRedisEnv } from "@/config/redis.config";
 import { DatabaseModule } from "@/db/database.module";
-import { TrainingModule } from "../training.module";
 import { VideoProcessingWorker } from "./video-processing.worker";
 import { LoggerModule } from "@/logger/logger.module";
 
@@ -26,7 +25,6 @@ import { LoggerModule } from "@/logger/logger.module";
         }),
         DatabaseModule,
         LoggerModule,
-        TrainingModule,
     ],
     providers: [VideoProcessingWorker],
 })

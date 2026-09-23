@@ -5,7 +5,7 @@ import authConfig, { validateAuthEnv } from "@/config/auth.config";
 import dbConfig, { validateDbEnv } from "@/config/db.config";
 import googleConfig, { validateGoogleEnv } from "@/config/google.config";
 import redisConfig, { validateRedisEnv } from "@/config/redis.config";
-import { LeadFollowupsModule } from "./leadfollowups.module";
+import { LeadFollowupsServiceModule } from "./leadfollowups-service.module";
 import { LeadFollowupWorker } from "./lead-followup.worker";
 import { LoggerModule } from "@/logger/logger.module";
 
@@ -23,7 +23,7 @@ import { LoggerModule } from "@/logger/logger.module";
                 ...validateRedisEnv(env),
             }),
         }),
-        LeadFollowupsModule,
+        LeadFollowupsServiceModule,
         LoggerModule,
     ],
     providers: [LeadFollowupWorker],

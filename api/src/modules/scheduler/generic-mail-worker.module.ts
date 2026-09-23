@@ -7,7 +7,7 @@ import googleConfig, { validateGoogleEnv } from "@/config/google.config";
 import redisConfig, { validateRedisEnv } from "@/config/redis.config";
 import { GenericMailWorker } from "./generic-mail.worker";
 import { LoggerModule } from "@/logger/logger.module";
-import { PaymentRequestsModule } from "@/modules/tendering/payment-requests/payment-requests.module";
+import { PaymentRequestsNotificationServiceModule } from "@/modules/tendering/payment-requests/payment-requests-notification-service.module";
 
 @Module({
     imports: [
@@ -24,7 +24,7 @@ import { PaymentRequestsModule } from "@/modules/tendering/payment-requests/paym
             }),
         }),
         LoggerModule,
-        PaymentRequestsModule,
+        PaymentRequestsNotificationServiceModule,
     ],
     providers: [GenericMailWorker],
 })
