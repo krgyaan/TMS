@@ -1,81 +1,68 @@
-import React, { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 /* UI Components */
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 /* Icons */
-import { Filter, Download, Calendar as CalendarIcon, TrendingUp, MapPin, Building2, Package } from "lucide-react";
+import { Filter, Download } from "lucide-react";
 
 /* Custom Hooks */
-import { useItemHeadings, useBusinessPerformance } from "./business-performance.hooks"; // not created yet
+import { useItemHeadings, useBusinessPerformance } from "@/hooks/api/useBusinessPerformance";
 import { Combobox } from "@/components/form/SelectField";
 
-/* ================================
-   TYPES
-================================ */
-interface BusinessPerformanceParams {
-    headingId: number;
-    fromDate: string;
-    toDate: string;
-}
+/* Types */
+import type { BusinessPerformanceParams } from "./helpers/business-performance.types";
 
-interface Heading {
-    id: number;
-    name: string;
-    team: string;
-}
+/* Components */
+import BusinessCategoryTable from "./components/BusinessCategoryTable";
+import BusinessBarChart from "./components/BusinessBarChart";
+import BusinessDonutChart from "./components/BusinessDonutChart";
 
-interface SummaryItem {
-    count: number;
-    value: number;
-    tender: string[];
-}
-
-interface MetricData {
-    count: number;
-    value: number;
-}
-
-interface BusinessPerformanceData {
-    items: { name: string }[];
-    summary: Record<string, SummaryItem>;
-    metrics: {
-        by_region: Record<string, MetricData>;
-        by_state: Record<string, MetricData>;
-        by_item: Record<string, MetricData>;
-    };
-}
-
-/* ================================
-   HELPERS
-================================ */
-const formatCurrency = (amount: number | string): string => {
-    const numericAmount = typeof amount === "string" ? parseFloat(amount) : amount;
-
-    if (isNaN(numericAmount)) {
-        return "₹0";
-    }
-
-    return new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-    }).format(numericAmount);
+const getGpColor = (gp: number | null | undefined): string => {
+    if (gp === null || gp === undefined) return "text-muted-foreground";
+    if (gp >= 20) return "text-green-600";
+    if (gp >= 10) return "text-blue-600";
+    if (gp >= 0) return "text-yellow-600";
+    return "text-red-600";
 };
 
 const titleCase = (str: string): string => {
     return str.replace(/_/g, " ").replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 };
 
+/**
+ * Build the list of selectable Financial Years: "2025-26" style (Apr–Mar), current FY + previous years.
+ */
+function buildFinancialYearOptions(): { id: string; name: string }[] {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const fiscalStartYear = today.getMonth() >= 3 ? currentYear : currentYear - 1;
+    const options: { id: string; name: string }[] = [];
+    for (let y = fiscalStartYear; y >= fiscalStartYear - 8; y--) {
+        options.push({ id: `${y}-${String((y + 1) % 100).padStart(2, "0")}`, name: `${y}-${(y + 1) % 100}` });
+    }
+    return options;
+}
+
+/**
+ * Convert a Financial Year selection like "2024-25" into fromDate/toDate strings (2024-04-01 .. 2025-03-31).
+ */
+function yearToDateRange(year: string | null): { fromDate: string; toDate: string } | null {
+    if (!year) return null;
+
+    const match = /^(\d{4})-(\d{2})$/.exec(year);
+    if (!match) return null;
+    const startYear = Number(match[1]);
+    const endYear = 2000 + Number(match[2]);
+    return { fromDate: `${startYear}-04-01`, toDate: `${endYear}-03-31` };
+}
+
 /* ================================
    EXPORT UTILITIES
-================================ */
-const exportToCSV = (data: any[], filename: string, headers: { key: string; label: string }[]) => {
+=============================== */
+const exportToCSV = (data: Record<string, unknown>[], filename: string, headers: { key: string; label: string }[]) => {
     if (data.length === 0) {
         alert("No data to export");
         return;
@@ -111,36 +98,63 @@ const exportToCSV = (data: any[], filename: string, headers: { key: string; labe
 
 /* ================================
    MAIN COMPONENT
-================================ */
+=============================== */
 export default function BusinessPerformanceDashboard() {
-    // Filter States
-    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(null);
-    const [fromDate, setFromDate] = useState<string>("");
-    const [toDate, setToDate] = useState<string>("");
-    const [appliedParams, setAppliedParams] = useState<BusinessPerformanceParams | null>(null);
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    // Filter States (initialised from URL params so the page can be shared/bookmarked)
+    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(() => {
+        const raw = new URLSearchParams(location.search).get("item");
+        const parsed = raw !== null ? Number(raw) : NaN;
+        return Number.isFinite(parsed) ? parsed : null;
+    });
+    const [selectedFinancialYear, setSelectedFinancialYear] = useState<string>(() => {
+        return new URLSearchParams(location.search).get("year") ?? "";
+    });
+    const [appliedParams, setAppliedParams] = useState<BusinessPerformanceParams | null>(() => {
+        const search = new URLSearchParams(location.search);
+        const rawHeading = search.get("item");
+        const headingId = rawHeading !== null ? Number(rawHeading) : NaN;
+        const year = search.get("year");
+        const range = yearToDateRange(year);
+        if (!range || !Number.isFinite(headingId)) return null;
+        return {
+            headingId,
+            fromDate: range.fromDate,
+            toDate: range.toDate,
+        };
+    });
 
     // Fetch headings for dropdown
-    const { data: headings = [], isLoading: headingsLoading } = useItemHeadings();
-    console.log({ message: "Headings data" }, headings);
+    const { data: headings = [] } = useItemHeadings();
 
     // Fetch business performance data
     const { data, isLoading: dataLoading } = useBusinessPerformance(appliedParams);
 
+    // Financial Year dropdown options
+    const financialYearOptions = useMemo(() => buildFinancialYearOptions(), []);
+
     // Build params for submission
-    const params = useMemo(() => {
-        if (!selectedHeadingId || !fromDate || !toDate) return null;
+    const params = useMemo<BusinessPerformanceParams | null>(() => {
+        const range = yearToDateRange(selectedFinancialYear);
+        if (!range || !selectedHeadingId) return null;
         return {
             headingId: selectedHeadingId,
-            fromDate,
-            toDate,
+            fromDate: range.fromDate,
+            toDate: range.toDate,
         };
-    }, [selectedHeadingId, fromDate, toDate]);
+    }, [selectedHeadingId, selectedFinancialYear]);
 
     // Handle form submission
     const handleSubmit = () => {
-        if (params) {
-            setAppliedParams(params);
-        }
+        if (!params) return;
+        setAppliedParams(params);
+
+        const search = new URLSearchParams();
+        search.set("item", String(params.headingId));
+        if (selectedFinancialYear) search.set("year", selectedFinancialYear);
+        navigate({ search: `?${search.toString()}` }, { replace: true });
     };
 
     // Export handler
@@ -150,7 +164,7 @@ export default function BusinessPerformanceDashboard() {
         const selectedHeading = headings.find(h => h.id === selectedHeadingId);
         const headingName = selectedHeading?.name || "Unknown";
 
-        const allData: any[] = [];
+        const allData: Record<string, unknown>[] = [];
 
         // Add summary data
         Object.entries(data.summary).forEach(([category, summaryData]) => {
@@ -163,39 +177,6 @@ export default function BusinessPerformanceDashboard() {
             });
         });
 
-        // Add region data
-        Object.entries(data.metrics.by_region).forEach(([region, metricData]) => {
-            allData.push({
-                section: "Region Analysis",
-                category: region,
-                count: metricData.count,
-                value: metricData.value,
-                tenders: "",
-            });
-        });
-
-        // Add state data
-        Object.entries(data.metrics.by_state).forEach(([state, metricData]) => {
-            allData.push({
-                section: "State Analysis",
-                category: state,
-                count: metricData.count,
-                value: metricData.value,
-                tenders: "",
-            });
-        });
-
-        // Add item data
-        Object.entries(data.metrics.by_item).forEach(([item, metricData]) => {
-            allData.push({
-                section: "Item Analysis",
-                category: item,
-                count: metricData.count,
-                value: metricData.value,
-                tenders: "",
-            });
-        });
-
         const headers = [
             { key: "section", label: "Section" },
             { key: "category", label: "Category" },
@@ -204,12 +185,9 @@ export default function BusinessPerformanceDashboard() {
             { key: "tenders", label: "Tenders" },
         ];
 
-        const filename = `Business_Performance_${headingName}_${fromDate}_to_${toDate}`;
+        const filename = `Business_Performance_${headingName}_${selectedFinancialYear || "all"}`;
         exportToCSV(allData, filename, headers);
-    }, [data, headings, selectedHeadingId, fromDate, toDate]);
-
-    // Extract summary entries for rendering
-    const summaryEntries = data ? Object.entries(data.summary) : [];
+    }, [data, headings, selectedHeadingId, selectedFinancialYear]);
 
     return (
         <div className="min-h-screen bg-muted/10 pb-12">
@@ -229,39 +207,32 @@ export default function BusinessPerformanceDashboard() {
 
                 {/* ===== FILTER CARD ===== */}
                 <Card className="shadow-sm">
-                    <CardContent className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 w-full gap-4 items-end">
                             {/* Item Heading Select */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Item Heading</label>
                                 <Combobox
                                     value={selectedHeadingId ? selectedHeadingId.toString() : ""}
                                     onChange={v => setSelectedHeadingId(v ? Number(v) : null)}
-                                    options={headings.map(heading => ({ id: heading.id.toString(), name: `${heading.name} (${heading.team})` }))}
+                                    options={[...headings].sort((a, b) => a.name.localeCompare(b.name)).map(heading => ({ id: heading.id.toString(), name: `${heading.name}` }))}
                                     placeholder="Select Item Heading"
                                 />
                             </div>
 
-                            {/* From Date */}
+                            {/* Financial Year */}
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">From Date</label>
-                                <div className="relative">
-                                    <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input type="date" className="pl-9" value={fromDate} onChange={e => setFromDate(e.target.value)} />
-                                </div>
-                            </div>
-
-                            {/* To Date */}
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">To Date</label>
-                                <div className="relative">
-                                    <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input type="date" className="pl-9" value={toDate} onChange={e => setToDate(e.target.value)} />
-                                </div>
+                                <label className="text-sm font-medium">Financial Year</label>
+                                <Combobox
+                                    value={selectedFinancialYear}
+                                    onChange={v => setSelectedFinancialYear(v)}
+                                    options={financialYearOptions}
+                                    placeholder="Select Financial Year"
+                                />
                             </div>
 
                             {/* Submit Button */}
-                            <Button onClick={handleSubmit} disabled={!params}>
+                            <Button onClick={handleSubmit} disabled={!params} className="justify-self-center">
                                 <Filter className="mr-2 h-4 w-4" /> Submit
                             </Button>
                         </div>
@@ -271,7 +242,7 @@ export default function BusinessPerformanceDashboard() {
                 {/* ===== CONDITIONAL CONTENT ===== */}
                 {!appliedParams ? (
                     <div className="bg-muted rounded-lg p-6 text-center">
-                        <span className="text-muted-foreground">Please select an Item Heading and Date Range to view the report.</span>
+                        <span className="text-muted-foreground">Please select an Item Heading and Financial Year to view the report.</span>
                     </div>
                 ) : dataLoading ? (
                     <div className="bg-muted rounded-lg p-6 text-center">
@@ -279,209 +250,51 @@ export default function BusinessPerformanceDashboard() {
                     </div>
                 ) : (
                     <>
-                        {/* ===== ITEMS INFO ===== */}
-                        {data?.items && (
-                            <Card className="shadow-sm">
-                                <CardContent className="p-4">
-                                    {data.items.length > 0 ? (
-                                        <p className="text-sm">
-                                            The following items belong to the selected heading: <strong>{data.items.map(item => item.name).join(", ")}</strong>
-                                        </p>
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">No items found under the selected heading.</p>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )}
+                        {/* ===== CATEGORY TABLES ===== */}
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_assigned" title="Tenders Assigned" description="All tenders assigned in this period." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_approved" title="Tenders Approved" description="Tenders approved by the team lead." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_missed" title="Tenders Missed" description="Tenders that were missed for submission." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_not_bid" title="Tenders Did Not Bid" description="Tenders assigned but not bid on." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_bid" title="Tenders Bid" description="Tenders where a bid has been submitted." />
+                        <BusinessCategoryTable
+                            params={appliedParams}
+                            categoryKey="tender_results_awaited"
+                            title="Tender Results Awaited"
+                            description="Tenders awaiting final results."
+                        />
+                        <BusinessCategoryTable
+                            params={appliedParams}
+                            categoryKey="tenders_disqualified"
+                            title="Tenders Disqualified"
+                            description="Tenders that were disqualified."
+                        />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_won" title="Tenders Won" description="Tenders that were won." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_lost" title="Tenders Lost" description="Tenders that were lost." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="emd_paid" title="EMD Paid" description="Tenders where the EMD has been paid." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="emd_returned" title="EMD Returned" description="Tenders where the EMD has been returned." />
 
-                        {/* ===== SUMMARY CARDS ===== */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {summaryEntries.map(([name, value]) => (
-                                <Card key={name} className="shadow-sm hover:shadow-md transition-shadow">
-                                    <CardContent className="p-3">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            {/* <TrendingUp className="h-5 w-5 text-primary" /> */}
-                                            <span className="font-semibold text-lg">{titleCase(name)}</span>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-sm text-muted-foreground">
-                                                Count: <span className="font-medium text-foreground">{value.count}</span>
+                        {/* ===== AVERAGE GP + CHARTS (bottom) ===== */}
+                        <div className="space-y-4">
+                            {/* Average GP Card - Full Width Row */}
+                            <div className="grid grid-cols-1">
+                                <Card className="shadow-sm">
+                                    <CardContent className="p-5">
+                                        <div className="flex flex-wrap items-center gap-6">
+                                            <p className="text-sm text-muted-foreground">Average GP</p>
+                                            <p className={`text-3xl font-bold ${getGpColor(data?.avgGrossMargin)}`}>
+                                                {data?.avgGrossMargin !== null && data?.avgGrossMargin !== undefined ? `${data.avgGrossMargin.toFixed(2)}%` : "—"}
                                             </p>
-                                            <p className="text-xl font-bold text-orange-400">{formatCurrency(value.value)}</p>
+                                            <p className="text-xs text-muted-foreground">Average approved gross margin across tenders.</p>
                                         </div>
                                     </CardContent>
                                 </Card>
-                            ))}
-                        </div>
+                            </div>
 
-                        {/* ===== TENDER SUMMARY TABLE ===== */}
-                        <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                            <CardHeader className="pb-4">
-                                <CardTitle className="text-lg">Tender Summary Details</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="overflow-x-auto">
-                                    <Table>
-                                        <TableHeader className="bg-muted/50">
-                                            <TableRow>
-                                                <TableHead className="font-semibold">Category</TableHead>
-                                                <TableHead className="font-semibold">Count</TableHead>
-                                                <TableHead className="font-semibold">Value</TableHead>
-                                                <TableHead className="font-semibold">Tenders</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {summaryEntries.length === 0 ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                                        No summary data available.
-                                                    </TableCell>
-                                                </TableRow>
-                                            ) : (
-                                                summaryEntries.map(([name, value]) => (
-                                                    <TableRow key={name} className="hover:bg-muted/30 transition-colors">
-                                                        <TableCell className="font-medium">{titleCase(name)}</TableCell>
-                                                        <TableCell className="tabular-nums">{value.count}</TableCell>
-                                                        <TableCell className="tabular-nums">{formatCurrency(value.value)}</TableCell>
-                                                        <TableCell>
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {value.tender.map((tender, idx) => (
-                                                                    <Badge key={idx} variant="secondary" className="font-normal border border-gray-200">
-                                                                        {tender}
-                                                                    </Badge>
-                                                                ))}
-                                                            </div>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* ===== METRICS TABLES (3 columns) ===== */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {/* Region-wise Analysis */}
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                                <CardHeader className="pb-4">
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <MapPin className="h-5 w-5 text-blue-600" />
-                                        Region-wise Analysis
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="overflow-x-auto">
-                                        <Table>
-                                            <TableHeader className="bg-muted/50">
-                                                <TableRow>
-                                                    <TableHead className="font-semibold">Region</TableHead>
-                                                    <TableHead className="font-semibold">Count</TableHead>
-                                                    <TableHead className="font-semibold">Value</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {data?.metrics?.by_region && Object.entries(data.metrics.by_region).length > 0 ? (
-                                                    Object.entries(data.metrics.by_region).map(([region, metricData]) => (
-                                                        <TableRow key={region} className="hover:bg-muted/30 transition-colors">
-                                                            <TableCell className="font-medium">{region}</TableCell>
-                                                            <TableCell className="tabular-nums">{metricData.count}</TableCell>
-                                                            <TableCell className="tabular-nums">{formatCurrency(metricData.value)}</TableCell>
-                                                        </TableRow>
-                                                    ))
-                                                ) : (
-                                                    <TableRow>
-                                                        <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                                                            No region data available.
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* State-wise Analysis */}
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                                <CardHeader className="pb-4">
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <Building2 className="h-5 w-5 text-green-600" />
-                                        State-wise Analysis
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="overflow-x-auto">
-                                        <Table>
-                                            <TableHeader className="bg-muted/50">
-                                                <TableRow>
-                                                    <TableHead className="font-semibold">State</TableHead>
-                                                    <TableHead className="font-semibold">Count</TableHead>
-                                                    <TableHead className="font-semibold">Value</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {data?.metrics?.by_state && Object.entries(data.metrics.by_state).length > 0 ? (
-                                                    Object.entries(data.metrics.by_state).map(([state, metricData]) => (
-                                                        <TableRow key={state} className="hover:bg-muted/30 transition-colors">
-                                                            <TableCell className="font-medium">{state}</TableCell>
-                                                            <TableCell className="tabular-nums">{metricData.count}</TableCell>
-                                                            <TableCell className="tabular-nums">{formatCurrency(metricData.value)}</TableCell>
-                                                        </TableRow>
-                                                    ))
-                                                ) : (
-                                                    <TableRow>
-                                                        <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                                                            No state data available.
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Item-wise Analysis */}
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                                <CardHeader className="pb-4">
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <Package className="h-5 w-5 text-purple-600" />
-                                        Item-wise Analysis
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="overflow-x-auto">
-                                        <Table>
-                                            <TableHeader className="bg-muted/50">
-                                                <TableRow>
-                                                    <TableHead className="font-semibold">Item</TableHead>
-                                                    <TableHead className="font-semibold">Count</TableHead>
-                                                    <TableHead className="font-semibold">Value</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {data?.metrics?.by_item && Object.entries(data.metrics.by_item).length > 0 ? (
-                                                    Object.entries(data.metrics.by_item).map(([item, metricData]) => (
-                                                        <TableRow key={item} className="hover:bg-muted/30 transition-colors">
-                                                            <TableCell className="font-medium">{item}</TableCell>
-                                                            <TableCell className="tabular-nums">{metricData.count}</TableCell>
-                                                            <TableCell className="tabular-nums">{formatCurrency(metricData.value)}</TableCell>
-                                                        </TableRow>
-                                                    ))
-                                                ) : (
-                                                    <TableRow>
-                                                        <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                                                            No item data available.
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                            {/* Bar Chart + Donut Chart - Side by Side */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <BusinessBarChart params={appliedParams} />
+                                <BusinessDonutChart params={appliedParams} />
+                            </div>
                         </div>
                     </>
                 )}

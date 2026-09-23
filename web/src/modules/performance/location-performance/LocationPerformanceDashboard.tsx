@@ -1,49 +1,43 @@
 import { useState, useMemo, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 /* UI Components */
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 /* Icons */
-import { Filter, Download, Calendar as CalendarIcon, MapPin, Building2, Package } from "lucide-react";
+import { Filter, Download } from "lucide-react";
 
 /* Custom Hooks */
-import { useLocationPerformance, type LocationPerformanceParams } from "./location-performance.hooks"; // not created yet
-import { useItemHeadings } from "../business-performance/business-performance.hooks";
+import { useLocationPerformance, useItemHeadings, buildFinancialYearOptions, yearToDateRange, type LocationPerformanceParams } from "@/hooks/api/useLocationPerformance";
 import { useLocationsTrue } from "@/hooks/api/useLocations";
 import { useTeams } from "@/hooks/api/useTeams";
 import { Combobox } from "@/components/form/SelectField";
 
+/* Components */
+import LocationCategoryTable from "./components/LocationCategoryTable";
+import LocationBarChart from "./components/LocationBarChart";
+import LocationDonutChart from "./components/LocationDonutChart";
+
 /* ================================
    HELPERS
-================================ */
-const formatCurrency = (amount: number | string): string => {
-    const numericAmount = typeof amount === "string" ? parseFloat(amount) : amount;
-
-    if (isNaN(numericAmount)) {
-        return "₹0";
-    }
-
-    return new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-    }).format(numericAmount);
+=============================== */
+const getGpColor = (gp: number | null | undefined): string => {
+    if (gp === null || gp === undefined) return "text-muted-foreground";
+    if (gp >= 20) return "text-green-600";
+    if (gp >= 10) return "text-blue-600";
+    if (gp >= 0) return "text-yellow-600";
+    return "text-red-600";
 };
 
 const titleCase = (str: string): string => {
     return str.replace(/_/g, " ").replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 };
 
-const region: Array<string> = ["North", "South", "East", "West", "Central", "North East"];
 /* ================================
    EXPORT UTILITIES
-================================ */
-const exportToCSV = (data: any[], filename: string, headers: { key: string; label: string }[]) => {
+=============================== */
+const exportToCSV = (data: Record<string, unknown>[], filename: string, headers: { key: string; label: string }[]) => {
     if (data.length === 0) {
         alert("No data to export");
         return;
@@ -79,48 +73,86 @@ const exportToCSV = (data: any[], filename: string, headers: { key: string; labe
 
 /* ================================
    MAIN COMPONENT
-================================ */
+=============================== */
 export default function LocationPerformanceDashboard() {
-    // Filter States
-    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(null);
-    const [selectedArea, setSelectedArea] = useState<string | null>(null);
-    const [selectedTeam, setSelectedTeam] = useState<number | null>(null);
-    const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
+    const location = useLocation();
+    const navigate = useNavigate();
 
-    const [fromDate, setFromDate] = useState<string>("");
-    const [toDate, setToDate] = useState<string>("");
-    const [appliedParams, setAppliedParams] = useState<LocationPerformanceParams | null>(null);
+    // Filter States (initialized from URL params for shareable/bookmarkable links)
+    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(() => {
+        const raw = new URLSearchParams(location.search).get("item");
+        const parsed = raw !== null ? Number(raw) : NaN;
+        return Number.isFinite(parsed) ? parsed : null;
+    });
+    const [selectedLocation, setSelectedLocation] = useState<number | null>(() => {
+        const raw = new URLSearchParams(location.search).get("location");
+        const parsed = raw !== null ? Number(raw) : NaN;
+        return Number.isFinite(parsed) ? parsed : null;
+    });
+    const [selectedTeam, setSelectedTeam] = useState<number | null>(() => {
+        const raw = new URLSearchParams(location.search).get("team");
+        const parsed = raw !== null ? Number(raw) : NaN;
+        return Number.isFinite(parsed) ? parsed : null;
+    });
+    const [selectedFinancialYear, setSelectedFinancialYear] = useState<string>(() => {
+        return new URLSearchParams(location.search).get("year") ?? "";
+    });
+    const [appliedParams, setAppliedParams] = useState<LocationPerformanceParams | null>(() => {
+        const search = new URLSearchParams(location.search);
+        const rawHeading = search.get("item");
+        const headingId = rawHeading !== null ? Number(rawHeading) : NaN;
+        const rawLocation = search.get("location");
+        const loc = rawLocation !== null ? Number(rawLocation) : NaN;
+        const rawTeam = search.get("team");
+        const team = rawTeam !== null ? Number(rawTeam) : NaN;
+        const year = search.get("year");
+        const range = yearToDateRange(year);
+        if (!range || !Number.isFinite(headingId) || !Number.isFinite(loc)) return null;
+        return {
+            headingId,
+            location: loc,
+            team: Number.isFinite(team) ? team : undefined,
+            year: year ?? undefined,
+        };
+    });
 
     // Fetch headings for dropdown
     const { data: headings = [] } = useItemHeadings();
-    console.log({ message: "Headings data" }, headings);
 
     // Fetch location performance data
     const { data, isLoading: dataLoading } = useLocationPerformance(appliedParams);
 
     const { data: locations = [] } = useLocationsTrue();
-    console.log({ message: "locations data" }, locations);
 
     const { data: teams = [] } = useTeams();
 
+    // Financial Year dropdown options
+    const financialYearOptions = useMemo(() => buildFinancialYearOptions(), []);
+
     // Build params for submission
     const params = useMemo(() => {
-        if (!selectedHeadingId || !fromDate || !toDate || !(selectedArea || selectedLocation)) return null;
+        if (!selectedHeadingId || !selectedLocation) return null;
+        const range = yearToDateRange(selectedFinancialYear);
+        if (!range) return null;
         return {
-            team: selectedTeam,
-            area: selectedArea,
-            location: selectedLocation,
             headingId: selectedHeadingId,
-            fromDate,
-            toDate,
+            location: selectedLocation,
+            team: selectedTeam || undefined,
+            year: selectedFinancialYear,
         };
-    }, [selectedHeadingId, selectedArea, selectedLocation, selectedTeam, fromDate, toDate]);
+    }, [selectedHeadingId, selectedLocation, selectedTeam, selectedFinancialYear]);
 
     // Handle form submission
     const handleSubmit = () => {
-        if (params) {
-            setAppliedParams(params);
-        }
+        if (!params) return;
+        setAppliedParams(params);
+
+        const search = new URLSearchParams();
+        search.set("item", String(params.headingId));
+        search.set("location", String(params.location));
+        if (params.team) search.set("team", String(params.team));
+        if (selectedFinancialYear) search.set("year", selectedFinancialYear);
+        navigate({ search: `?${search.toString()}` }, { replace: true });
     };
 
     // Export handler
@@ -130,7 +162,7 @@ export default function LocationPerformanceDashboard() {
         const selectedHeading = headings.find(h => h.id === selectedHeadingId);
         const headingName = selectedHeading?.name || "Unknown";
 
-        const allData: any[] = [];
+        const allData: Record<string, unknown>[] = [];
 
         // Add summary data
         Object.entries(data.summary).forEach(([category, summaryData]) => {
@@ -143,36 +175,14 @@ export default function LocationPerformanceDashboard() {
             });
         });
 
-        // Add region data
-        Object.entries(data.metrics.by_region).forEach(([region, metricData]) => {
+        // Add tender list data
+        data.tenderList?.forEach(tender => {
             allData.push({
-                section: "Region Analysis",
-                category: region,
-                count: metricData.count,
-                value: metricData.value,
-                tenders: "",
-            });
-        });
-
-        // Add state data
-        Object.entries(data.metrics.by_state).forEach(([state, metricData]) => {
-            allData.push({
-                section: "State Analysis",
-                category: state,
-                count: metricData.count,
-                value: metricData.value,
-                tenders: "",
-            });
-        });
-
-        // Add item data
-        Object.entries(data.metrics.by_item).forEach(([item, metricData]) => {
-            allData.push({
-                section: "Item Analysis",
-                category: item,
-                count: metricData.count,
-                value: metricData.value,
-                tenders: "",
+                section: "Tender List",
+                category: tender.status,
+                count: 1,
+                value: tender.gstValues,
+                tenders: tender.tenderName,
             });
         });
 
@@ -184,12 +194,9 @@ export default function LocationPerformanceDashboard() {
             { key: "tenders", label: "Tenders" },
         ];
 
-        const filename = `Location_Performance_${headingName}_${fromDate}_to_${toDate}`;
+        const filename = `Location_Performance_${headingName}_${selectedFinancialYear}`;
         exportToCSV(allData, filename, headers);
-    }, [data, headings, selectedHeadingId, fromDate, toDate]);
-
-    // Extract summary entries for rendering
-    const summaryEntries = data ? Object.entries(data.summary) : [];
+    }, [data, headings, selectedHeadingId, selectedFinancialYear]);
 
     return (
         <div className="min-h-screen bg-muted/10 pb-12">
@@ -198,7 +205,7 @@ export default function LocationPerformanceDashboard() {
                 <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight">Location Performance</h1>
-                        <p className="text-muted-foreground mt-1">Analyze location performance metrics by item heading, state, area and date range.</p>
+                        <p className="text-muted-foreground mt-1">Analyze location performance metrics by item heading, state, team and financial year.</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" onClick={handleExportReport} disabled={!appliedParams || !data}>
@@ -210,20 +217,10 @@ export default function LocationPerformanceDashboard() {
                 {/* ===== FILTER CARD ===== */}
                 <Card className="shadow-sm">
                     <CardContent className="p-6">
-                        <div className="flex md:flex-row flex-col gap-3 justify-center items-center w-full">
-                            {/* Item Heading Select */}
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Item Heading</label>
-                                <Combobox
-                                    value={selectedHeadingId ? selectedHeadingId.toString() : ""}
-                                    onChange={v => setSelectedHeadingId(v ? Number(v) : null)}
-                                    options={headings.map(heading => ({ id: heading.id.toString(), name: `${heading.name} (${heading.team})` }))}
-                                    placeholder="Select Item Heading"
-                                />
-                            </div>
-
+                        <div className="flex flex-wrap gap-3 justify-center items-center w-full">
+                            {/* State */}
                             <div>
-                                <label>State</label>
+                                <label className="text-sm font-medium">State</label>
                                 <Combobox
                                     value={selectedLocation !== null ? String(selectedLocation) : ""}
                                     onChange={v => setSelectedLocation(v ? Number(v) : null)}
@@ -235,47 +232,36 @@ export default function LocationPerformanceDashboard() {
                                 />
                             </div>
 
+                            {/* Team */}
                             <div>
-                                <label>Team</label>
+                                <label className="text-sm font-medium">Team</label>
                                 <Combobox
                                     value={selectedTeam !== null ? String(selectedTeam) : ""}
                                     onChange={v => setSelectedTeam(v ? Number(v) : null)}
-                                    options={teams.slice(0, 2).map(team => ({ id: String(team.id), name: team.name }))}
+                                    options={teams.map(team => ({ id: String(team.id), name: team.name }))}
                                     placeholder="Please Select Team"
                                 />
                             </div>
 
+                            {/* Item Heading */}
                             <div>
-                                <label>Area</label>
+                                <label className="text-sm font-medium">Item Heading</label>
                                 <Combobox
-                                    value={selectedArea !== null ? selectedArea : ""}
-                                    onChange={v => setSelectedArea(v || null)}
-                                    options={region.map(r => ({ id: r, name: r }))}
-                                    placeholder="Select Area"
+                                    value={selectedHeadingId ? selectedHeadingId.toString() : ""}
+                                    onChange={v => setSelectedHeadingId(v ? Number(v) : null)}
+                                    options={headings.map(heading => ({ id: heading.id.toString(), name: heading.name }))}
+                                    placeholder="Select Item Heading"
                                 />
                             </div>
-                        </div>
-                        <div className="flex flex-col md:flex-row md:justify-center md:items-center gap-3 p-3">
-                            {/* From Date */}
-                            <div>
-                                <label className="text-sm font-medium">From Date</label>
-                                <div className="relative">
-                                    <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input type="date" className="pl-9" value={fromDate} onChange={e => setFromDate(e.target.value)} />
-                                </div>
-                            </div>
 
-                            {/* To Date */}
-                            <div>
-                                <label className="text-sm font-medium">To Date</label>
-                                <div className="relative">
-                                    <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input type="date" className="pl-9" value={toDate} onChange={e => setToDate(e.target.value)} />
-                                </div>
-                            </div>
-
-                            {/* Submit Button */}
-                            <div className="mt-5">
+                            {/* Financial Year + Submit */}
+                            <div className="flex items-end gap-2">
+                                <Combobox
+                                    value={selectedFinancialYear}
+                                    onChange={v => setSelectedFinancialYear(v)}
+                                    options={financialYearOptions}
+                                    placeholder="Select Financial Year"
+                                />
                                 <Button onClick={handleSubmit} disabled={!params}>
                                     <Filter className="mr-2 h-4 w-4" /> Submit
                                 </Button>
@@ -287,7 +273,7 @@ export default function LocationPerformanceDashboard() {
                 {/* ===== CONDITIONAL CONTENT ===== */}
                 {!appliedParams ? (
                     <div className="bg-muted rounded-lg p-6 text-center">
-                        <span className="text-muted-foreground">Please select an Item Heading and Date Range to view the report.</span>
+                        <span className="text-muted-foreground">Please select a State, Team, Item Heading and Financial Year to view the report.</span>
                     </div>
                 ) : dataLoading ? (
                     <div className="bg-muted rounded-lg p-6 text-center">
@@ -295,210 +281,52 @@ export default function LocationPerformanceDashboard() {
                     </div>
                 ) : (
                     <>
-                        {/* ===== ITEMS INFO ===== */}
-                        {data?.items && (
-                            <Card className="shadow-sm">
-                                <CardContent className="p-4">
-                                    {data.items.length > 0 ? (
-                                        <p className="text-sm">
-                                            The following items belong to the selected heading: <strong>{data.items.map(item => item.name).join(", ")}</strong>
-                                        </p>
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">No items found under the selected heading.</p>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* ===== SUMMARY CARDS ===== */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {summaryEntries.map(([name, value]) => (
-                                <Card key={name} className="shadow-sm hover:shadow-md transition-shadow">
-                                    <CardContent className="p-3">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            {/* <TrendingUp className="h-5 w-5 text-primary" /> */}
-                                            <span className="font-semibold text-lg">{titleCase(name)}</span>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-sm text-muted-foreground">
-                                                Count: <span className="font-medium text-foreground">{value.count}</span>
+                        {/* ===== AVERAGE GP + CHARTS ===== */}
+                        <div className="space-y-4">
+                            {/* Average GP Card - Full Width Row */}
+                            <div className="grid grid-cols-1">
+                                <Card className="shadow-sm">
+                                    <CardContent className="p-5">
+                                        <div className="flex flex-wrap items-center gap-6">
+                                            <p className="text-sm text-muted-foreground">Average GP</p>
+                                            <p className={`text-3xl font-bold ${getGpColor(data?.avgGrossMargin)}`}>
+                                                {data?.avgGrossMargin !== null && data?.avgGrossMargin !== undefined ? `${data.avgGrossMargin.toFixed(2)}%` : "—"}
                                             </p>
-                                            <p className="text-xl font-bold text-orange-400">{formatCurrency(value.value)}</p>
+                                            <p className="text-xs text-muted-foreground">Average approved gross margin across tenders.</p>
                                         </div>
                                     </CardContent>
                                 </Card>
-                            ))}
+                            </div>
+
+                            {/* Bar Chart + Donut Chart - Side by Side */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <LocationBarChart params={appliedParams} />
+                                <LocationDonutChart params={appliedParams} />
+                            </div>
                         </div>
 
-                        {/* ===== TENDER SUMMARY TABLE ===== */}
-                        <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                            <CardHeader className="pb-4">
-                                <CardTitle className="text-lg">Tender Summary Details</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="overflow-x-auto">
-                                    <Table>
-                                        <TableHeader className="bg-muted/50">
-                                            <TableRow>
-                                                <TableHead className="font-semibold">Category</TableHead>
-                                                <TableHead className="font-semibold">Count</TableHead>
-                                                <TableHead className="font-semibold">Value</TableHead>
-                                                <TableHead className="font-semibold">Tenders</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {summaryEntries.length === 0 ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                                        No summary data available.
-                                                    </TableCell>
-                                                </TableRow>
-                                            ) : (
-                                                summaryEntries.map(([name, value]) => (
-                                                    <TableRow key={name} className="hover:bg-muted/30 transition-colors">
-                                                        <TableCell className="font-medium">{titleCase(name)}</TableCell>
-                                                        <TableCell className="tabular-nums">{value.count}</TableCell>
-                                                        <TableCell className="tabular-nums">{formatCurrency(value.value)}</TableCell>
-                                                        <TableCell>
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {value.tender.map((tender: string, idx: string) => (
-                                                                    <Badge key={idx} variant="secondary" className="font-normal border border-gray-200">
-                                                                        {tender}
-                                                                    </Badge>
-                                                                ))}
-                                                            </div>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* ===== METRICS TABLES (3 columns) ===== */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {/* Region-wise Analysis */}
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                                <CardHeader className="pb-4">
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <MapPin className="h-5 w-5 text-blue-600" />
-                                        Region-wise Analysis
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="overflow-x-auto">
-                                        <Table>
-                                            <TableHeader className="bg-muted/50">
-                                                <TableRow>
-                                                    <TableHead className="font-semibold">Region</TableHead>
-                                                    <TableHead className="font-semibold">Count</TableHead>
-                                                    <TableHead className="font-semibold">Value</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {data?.metrics?.by_region && Object.entries(data.metrics.by_region).length > 0 ? (
-                                                    Object.entries(data.metrics.by_region).map(([region, metricData]) => (
-                                                        <TableRow key={region} className="hover:bg-muted/30 transition-colors">
-                                                            <TableCell className="font-medium">{region}</TableCell>
-                                                            <TableCell className="tabular-nums">{metricData.count}</TableCell>
-                                                            <TableCell className="tabular-nums">{formatCurrency(metricData.value)}</TableCell>
-                                                        </TableRow>
-                                                    ))
-                                                ) : (
-                                                    <TableRow>
-                                                        <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                                                            No region data available.
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* State-wise Analysis */}
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                                <CardHeader className="pb-4">
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <Building2 className="h-5 w-5 text-green-600" />
-                                        State-wise Analysis
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="overflow-x-auto">
-                                        <Table>
-                                            <TableHeader className="bg-muted/50">
-                                                <TableRow>
-                                                    <TableHead className="font-semibold">State</TableHead>
-                                                    <TableHead className="font-semibold">Count</TableHead>
-                                                    <TableHead className="font-semibold">Value</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {data?.metrics?.by_state && Object.entries(data.metrics.by_state).length > 0 ? (
-                                                    Object.entries(data.metrics.by_state).map(([state, metricData]) => (
-                                                        <TableRow key={state} className="hover:bg-muted/30 transition-colors">
-                                                            <TableCell className="font-medium">{state}</TableCell>
-                                                            <TableCell className="tabular-nums">{metricData.count}</TableCell>
-                                                            <TableCell className="tabular-nums">{formatCurrency(metricData.value)}</TableCell>
-                                                        </TableRow>
-                                                    ))
-                                                ) : (
-                                                    <TableRow>
-                                                        <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                                                            No state data available.
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Item-wise Analysis */}
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                                <CardHeader className="pb-4">
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <Package className="h-5 w-5 text-purple-600" />
-                                        Item-wise Analysis
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="overflow-x-auto">
-                                        <Table>
-                                            <TableHeader className="bg-muted/50">
-                                                <TableRow>
-                                                    <TableHead className="font-semibold">Item</TableHead>
-                                                    <TableHead className="font-semibold">Count</TableHead>
-                                                    <TableHead className="font-semibold">Value</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {data?.metrics?.by_item && Object.entries(data.metrics.by_item).length > 0 ? (
-                                                    Object.entries(data.metrics.by_item).map(([item, metricData]) => (
-                                                        <TableRow key={item} className="hover:bg-muted/30 transition-colors">
-                                                            <TableCell className="font-medium">{item}</TableCell>
-                                                            <TableCell className="tabular-nums">{metricData.count}</TableCell>
-                                                            <TableCell className="tabular-nums">{formatCurrency(metricData.value)}</TableCell>
-                                                        </TableRow>
-                                                    ))
-                                                ) : (
-                                                    <TableRow>
-                                                        <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                                                            No item data available.
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                        {/* ===== CATEGORY TABLES ===== */}
+                        <LocationCategoryTable params={appliedParams} categoryKey="tenders_assigned" title="Tenders Assigned" description="All tenders assigned in this period." />
+                        <LocationCategoryTable params={appliedParams} categoryKey="tenders_approved" title="Tenders Approved" description="Tenders approved by the team lead." />
+                        <LocationCategoryTable params={appliedParams} categoryKey="tenders_missed" title="Tenders Missed" description="Tenders that were missed for submission." />
+                        <LocationCategoryTable params={appliedParams} categoryKey="tenders_not_bid" title="Tenders Did Not Bid" description="Tenders assigned but not bid on." />
+                        <LocationCategoryTable params={appliedParams} categoryKey="tenders_bid" title="Tenders Bid" description="Tenders where a bid has been submitted." />
+                        <LocationCategoryTable
+                            params={appliedParams}
+                            categoryKey="tender_results_awaited"
+                            title="Tender Results Awaited"
+                            description="Tenders awaiting final results."
+                        />
+                        <LocationCategoryTable
+                            params={appliedParams}
+                            categoryKey="tenders_disqualified"
+                            title="Tenders Disqualified"
+                            description="Tenders that were disqualified."
+                        />
+                        <LocationCategoryTable params={appliedParams} categoryKey="tenders_won" title="Tenders Won" description="Tenders that were won." />
+                        <LocationCategoryTable params={appliedParams} categoryKey="tenders_lost" title="Tenders Lost" description="Tenders that were lost." />
+                        <LocationCategoryTable params={appliedParams} categoryKey="emd_paid" title="EMD Paid" description="Tenders where the EMD has been paid." />
+                        <LocationCategoryTable params={appliedParams} categoryKey="emd_returned" title="EMD Returned" description="Tenders where the EMD has been returned." />
                     </>
                 )}
             </div>

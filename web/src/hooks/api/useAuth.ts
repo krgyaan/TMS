@@ -4,6 +4,7 @@ import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";
 import { useLocation, useNavigate } from "react-router-dom";
 import { setStoredUser, clearAuthSession, getStoredUser } from "@/lib/auth";
+import { flushSync } from "react-dom";
 import type { AuthUser } from "@/types/auth.types";
 
 export const authKeys = {
@@ -107,15 +108,17 @@ export const useLogout = () => {
         },
         onSuccess: () => {
             clearAuthSession();
+            queryClient.cancelQueries();
+            flushSync(() => navigate("/login", { replace: true }));
             queryClient.clear();
             toast.success("Logged out successfully");
-            navigate("/login", { replace: true });
         },
         onError: error => {
             console.error("❌ Logout failed:", error);
             clearAuthSession();
+            queryClient.cancelQueries();
+            flushSync(() => navigate("/login", { replace: true }));
             queryClient.clear();
-            navigate("/login", { replace: true });
         },
     });
 };

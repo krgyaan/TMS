@@ -13,9 +13,10 @@ import CustomerDonutChart from "./components/CustomerDonutChart";
 import { Filter, Download } from "lucide-react";
 
 /* Custom Hooks */
-import { useItemHeadings } from "@/modules/performance/business-performance/business-performance.hooks";
+import { useItemHeadings } from "@/hooks/api/useItemHeadings";
 import { useCustomerPerformance } from "@/hooks/api/useCustomerPerformance";
 import { useOrganizationsTrue } from "@/hooks/api/useOrganizations";
+import { useTeams } from "@/hooks/api/useTeams";
 
 import type { CustomerPerformanceParams } from "./helpers/customer-performance.types";
 
@@ -155,7 +156,18 @@ export default function CustomerPerformanceDashboard() {
 
     // Fetch headings for dropdown
     const { data: headings = [] } = useItemHeadings();
+    const { data: teams = [] } = useTeams();
     const { data: organizations = [] } = useOrganizationsTrue();
+
+    // Client-side join: attach team name to each heading
+    const headingsWithTeams = useMemo(
+        () =>
+            headings.map(h => ({
+                ...h,
+                team: teams.find(t => t.id === (h as { team_id?: number }).team_id)?.name || "",
+            })),
+        [headings, teams]
+    );
 
     // Fetch customer performance data
     const { data, isLoading: dataLoading } = useCustomerPerformance(appliedParams);
@@ -282,7 +294,10 @@ export default function CustomerPerformanceDashboard() {
                                 <Combobox
                                     value={selectedHeadingId ? selectedHeadingId.toString() : ""}
                                     onChange={v => setSelectedHeadingId(v ? Number(v) : null)}
-                                    options={[{ id: "", name: "All" }, ...headings.map(heading => ({ id: heading.id.toString(), name: `${heading.name} (${heading.team})` }))]}
+                                    options={[
+                                        { id: "", name: "All" },
+                                        ...[...headingsWithTeams].sort((a, b) => a.name.localeCompare(b.name)).map(heading => ({ id: heading.id.toString(), name: heading.name })),
+                                    ]}
                                     placeholder="Select Item Heading"
                                 />
                             </div>

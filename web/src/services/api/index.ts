@@ -55,3 +55,5 @@ export { serviceFeedbackService } from "./service-feedback.service";
 export { healthService } from "./health.service";
 export { inventoryApi } from "./inventory.api";
 export { customerPerformanceService } from "./customer-performance.service";
+export { businessPerformanceService } from "./business-performance.service";
+export { locationPerformanceService } from "./location-performance.service";

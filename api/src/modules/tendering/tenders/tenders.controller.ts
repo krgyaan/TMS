@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus, NotFoundException, UseGuards } from '@nestjs/common';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { NewTenderInfo } from '@db/schemas/tendering/tenders.schema';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
@@ -7,7 +7,11 @@ import { CreateTenderSchema, UpdateTenderSchema, UpdateStatusSchema, GenerateTen
 import { TimersService } from '@/modules/timers/timers.service';
 import { getFrontendTimersBatch, getFrontendTimer } from '@/modules/timers/timer-helper';
 import { ValidatedBody } from '@/decorators/validated-body.decorator';
+import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
+import { PermissionGuard } from '@/modules/auth/guards/permission.guard';
+import { CanRead, CanCreate, CanUpdate, CanDelete } from '@/modules/auth/decorators/permissions.decorator';
 
+@UseGuards(JwtAuthGuard, PermissionGuard)
 @Controller('tenders')
 export class TenderInfoController {
     constructor(
@@ -16,6 +20,7 @@ export class TenderInfoController {
     ) { }
 
     @Get('dashboard/counts')
+    @CanRead('tenders')
     async getDashboardCounts(
         @CurrentUser() user: ValidatedUser,
         @Query('teamId') teamId?: string,
@@ -29,6 +34,7 @@ export class TenderInfoController {
     }
 
     @Get()
+    @CanRead('tenders')
     async list(
         @CurrentUser() user: ValidatedUser,
         @Query('statusIds') statusIds?: string,
@@ -98,6 +104,7 @@ export class TenderInfoController {
     }
 
     @Get('tender-name-check')
+    @CanRead('tenders')
     async checkTenderName(
         @Query('tenderName') tenderName: string,
         @Query('organization') organization?: string,
@@ -111,6 +118,7 @@ export class TenderInfoController {
     }
 
     @Get('tender-no-check')
+    @CanRead('tenders')
     async checkTenderNo(
         @Query('tenderNo') tenderNo: string,
         @Query('organization') organization?: string,
@@ -124,16 +132,19 @@ export class TenderInfoController {
     }
 
     @Get(':id/mailing-logs')
+    @CanRead('tenders')
     async getMailingLogs(@Param('id', ParseIntPipe) id: number) {
         return this.tenderInfosService.getMailingLogs(id);
     }
 
     @Get(':id/payment-details')
+    @CanRead('tenders')
     async getPaymentDetails(@Param('id', ParseIntPipe) id: number) {
         return this.tenderInfosService.findPaymentDetails(id);
     }
 
     @Get(':id')
+    @CanRead('tenders')
     async getById(@Param('id', ParseIntPipe) id: number) {
         const tender = await this.tenderInfosService.findById(id);
         if (!tender) {
@@ -144,6 +155,7 @@ export class TenderInfoController {
 
     @Post('classify-document')
     @HttpCode(HttpStatus.OK)
+    @CanRead('tenders')
     async classifyDocument(@Body() body: { filePath: string }) {
         if (!body || !body.filePath) {
             throw new BadRequestException('filePath is required for document classification');
@@ -153,6 +165,7 @@ export class TenderInfoController {
 
     @Post()
     @HttpCode(HttpStatus.CREATED)
+    @CanCreate('tenders')
     async create(
         @ValidatedBody(CreateTenderSchema) body: CreateTenderDto,
         @CurrentUser() user: ValidatedUser
@@ -161,6 +174,7 @@ export class TenderInfoController {
     }
 
     @Patch(':id')
+    @CanUpdate('tenders')
     async update(
         @Param('id', ParseIntPipe) id: number,
         @Body() body: unknown,
@@ -172,11 +186,13 @@ export class TenderInfoController {
 
     @Delete(':id')
     @HttpCode(HttpStatus.NO_CONTENT)
+    @CanDelete('tenders')
     async delete(@Param('id', ParseIntPipe) id: number) {
         await this.tenderInfosService.delete(id);
     }
 
     @Patch(':id/status')
+    @CanUpdate('tenders')
     async updateStatus(
         @Param('id', ParseIntPipe) id: number,
         @Body() body: unknown,
@@ -192,6 +208,7 @@ export class TenderInfoController {
     }
 
     @Post('generate-name')
+    @CanCreate('tenders')
     async generateName(@Body() body: unknown) {
         const parsed = GenerateTenderNameSchema.parse(body);
         return this.tenderInfosService.generateTenderName(
@@ -202,6 +219,7 @@ export class TenderInfoController {
     }
 
     @Get('timers')
+    @CanRead('tenders')
     async getMultipleTenderTimers(@Query('ids') ids: string) {
         const idArray = ids.split(',').map(id => id.trim());
 
