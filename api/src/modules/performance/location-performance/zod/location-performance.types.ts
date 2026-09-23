@@ -12,7 +12,7 @@ export interface TenderRow {
     tenderStatus: number;
     state: string | null;
     region: string | null;
-    itemName: string | null; // selected as items.name — keep this
+    itemName: string | null;
 }
 
 export interface AssignedTenderRow {
@@ -42,7 +42,41 @@ export interface ItemHeadingsResponse {
     headings: ItemHeadingRow[];
 }
 
-// ─── API response (mirrors Laravel compact() output) ─────────────────────────
+// ─── Tender list (for category tables) ─────────────────────────────────────────
+
+export interface BusinessTenderRow {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: Date;
+    gstValues: string;
+    member: string | null;
+    team: string | null;
+    itemName: string | null;
+    status: number;
+    tlStatus: number;
+    bidStatus: "Submission Pending" | "Bid Submitted" | "Tender Missed" | null;
+    hasEmdPaid: boolean | null;
+    hasEmdReturned: boolean | null;
+    avgGrossMargin: number | null;
+}
+
+export interface BusinessTenderListItem {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: string;
+    gstValues: string;
+    member: string;
+    team: string;
+    item: string;
+    status: string;
+    bidStatus: string;
+    avgGrossMargin: string | null;
+    category: string[];
+}
+
+// ─── API response (mirrors Laravel compact() output exactly) ────────────────────
 
 export interface SummaryItem {
     count: number;
@@ -66,15 +100,18 @@ export interface MetricEntry {
     value: number;
 }
 
-// total_count / total_value removed — service does not return them
 export interface LocationMetrics {
     by_region: Record<string, MetricEntry>;
     by_state: Record<string, MetricEntry>;
     by_item: Record<string, MetricEntry>;
+    total_count: number;
+    total_value: number;
 }
 
 export interface LocationPerformanceResponse {
     items: ItemRow[];
     summary: LocationSummary;
     metrics: LocationMetrics;
+    tenderList: BusinessTenderListItem[];
+    avgGrossMargin: number | null;
 }

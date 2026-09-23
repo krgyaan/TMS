@@ -8,9 +8,6 @@ import type {
     LocationPerformanceResponse,
 } from "@/modules/performance/location-performance/helpers/location-performance.types";
 
-// Re-export types for consumers
-export type { LocationPerformanceParams };
-
 // ─── Query key factory ────────────────────────────────────────────────────────
 
 export const locationPerformanceKeys = {
@@ -56,6 +53,9 @@ async function fetchItemHeadings(): Promise<ItemHeadingRow[]> {
 }
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
+
+// Re-export types for consumers
+export type { LocationPerformanceParams };
 
 export function useItemHeadings() {
     return useQuery({
