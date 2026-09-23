@@ -259,10 +259,14 @@ export class LocationPerformanceService {
     // ─── Query 4: flat tender list (for category tables) ─────────────
 
     private async getTenderList(filters: LocationFilters): Promise<BusinessTenderRow[]> {
-        const heading = filters.heading!;
         const from = new Date(filters.fromDate);
         const to = new Date(filters.toDate);
         to.setHours(23, 59, 59, 999);
+
+        const conditions = [eq(tenderInfos.deleteStatus, 0), between(tenderInfos.dueDate, from, to)];
+        if (filters.heading) conditions.push(eq(itemHeadings.id, filters.heading));
+        if (filters.location) conditions.push(eq(locations.id, filters.location));
+        if (filters.team) conditions.push(eq(tenderInfos.team, filters.team));
 
         return (await this.db
             .select({
@@ -274,6 +278,7 @@ export class LocationPerformanceService {
                 member: users.name,
                 team: teams.name,
                 itemName: items.name,
+                state: locations.name,
                 status: tenderInfos.status,
                 tlStatus: tenderInfos.tlStatus,
                 bidStatus: bidSubmissions.status,
@@ -292,9 +297,10 @@ export class LocationPerformanceService {
             .leftJoin(teams, eq(teams.id, tenderInfos.team))
             .innerJoin(items, eq(items.id, tenderInfos.item))
             .innerJoin(itemHeadings, eq(itemHeadings.id, items.headingId))
+            .leftJoin(locations, eq(locations.id, tenderInfos.location))
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-            .where(and(eq(tenderInfos.deleteStatus, 0), eq(itemHeadings.id, heading), between(tenderInfos.dueDate, from, to)))
-            .groupBy(tenderInfos.id, users.name, teams.name, items.name, bidSubmissions.status)
+            .where(and(...conditions))
+            .groupBy(tenderInfos.id, users.name, teams.name, items.name, locations.name, bidSubmissions.status)
             .orderBy(tenderInfos.dueDate)
             .execute()) as unknown as BusinessTenderRow[];
     }
@@ -327,6 +333,7 @@ export class LocationPerformanceService {
                 member: row.member ?? "—",
                 team: row.team ?? "—",
                 item: row.itemName ?? "—",
+                state: row.state ?? "—",
                 status: STATUS_LABEL(s),
                 bidStatus: row.bidStatus ?? "—",
                 avgGrossMargin: row.avgGrossMargin !== null && row.avgGrossMargin !== undefined ? row.avgGrossMargin.toFixed(2) : null,
