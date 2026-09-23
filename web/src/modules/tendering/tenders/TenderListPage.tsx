@@ -37,7 +37,7 @@ const TenderListPage = () => {
         defaultTab: 'under-preparation' as TenderDashboardTab,
     });
 
-    const { isAdmin, isSuperUser, roleId, teamId, canDelete} = useAuth();
+    const { isAdmin, isSuperUser, roleId, teamId, canDelete, canCreate, canUpdate } = useAuth();
 
     const isTeamLead = (teamId == 1 || teamId == 2) && roleId == 3;
 
@@ -185,6 +185,7 @@ const TenderListPage = () => {
             label: "Edit",
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderEdit(row.id)),
             icon: <Pencil className="h-4 w-4" />,
+            visible: () => canUpdate('tenders'),
         },
         {
             label: "Archive",
@@ -199,7 +200,7 @@ const TenderListPage = () => {
                 }
             },
             icon: <Archive className="h-4 w-4 text-red-600" />,
-            visible: () => canDelete("tender"),
+            visible: () => canDelete("tenders"),
         },
     ];
 
@@ -327,12 +328,14 @@ const TenderListPage = () => {
                         <CardDescription>Manage all tenders</CardDescription>
                     </div>
                     <CardAction>
-                        <Button variant="default" asChild>
-                            <NavLink to={paths.tendering.tenderCreate}>
-                                <Plus className="h-4 w-4 mr-2" />
-                                Add New Tender
-                            </NavLink>
-                        </Button>
+                        {canCreate('tenders') && (
+                            <Button variant="default" asChild>
+                                <NavLink to={paths.tendering.tenderCreate}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add New Tender
+                                </NavLink>
+                            </Button>
+                        )}
                     </CardAction>
                 </div>
             </CardHeader>

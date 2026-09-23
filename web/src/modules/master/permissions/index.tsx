@@ -16,10 +16,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { AlertCircle, ChevronDown, Info, KeyRound, Plus, Search, Shield, Trash2, X } from "lucide-react";
+import { AlertCircle, ChevronDown, Info, KeyRound, Plus, Save, Search, Shield, Trash2, X } from "lucide-react";
 
 import { useBulkCreatePermission, useDeletePermission, usePermissions } from "@/hooks/api/usePermissions";
-import { useRole } from "@/hooks/api/useRoles";
+import { useRolePermissions, useRoles, useAssignRolePermissions } from "@/hooks/api/useRoles";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { Permission } from "@/types/api.types";
 
@@ -46,7 +47,9 @@ const PermissionsPage = () => {
     const bulkCreatePermission = useBulkCreatePermission();
 
     const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
-    const { data: selectedRolePermissions = [] } = useRole(selectedRoleId);
+    const { data: roles = [] } = useRoles();
+    const { data: selectedRolePermissions = [] } = useRolePermissions(selectedRoleId);
+    const assignPermissions = useAssignRolePermissions();
 
     const [selectedPermissionMap, setSelectedPermissionMap] = useState<Map<number, true>>(new Map());
     const [isDirty, setIsDirty] = useState(false);
@@ -198,6 +201,15 @@ const PermissionsPage = () => {
         setIsDirty(true);
     };
 
+    const handleSaveRolePermissions = async () => {
+        if (!selectedRoleId) return;
+        await assignPermissions.mutateAsync({
+            roleId: selectedRoleId,
+            permissionIds: Array.from(selectedPermissionMap.keys()),
+        });
+        setIsDirty(false);
+    };
+
     if (isLoading) {
         return (
             <div className="space-y-4 p-4">
@@ -269,7 +281,7 @@ const PermissionsPage = () => {
                             </div>
 
                             {/* Role Selection & Save */}
-                            {/* <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2">
                                 <Select value={selectedRoleId?.toString() ?? ""} onValueChange={v => setSelectedRoleId(v ? Number(v) : null)}>
                                     <SelectTrigger className="h-8 w-[180px] text-sm">
                                         <SelectValue placeholder="Select role..." />
@@ -293,13 +305,18 @@ const PermissionsPage = () => {
                                     <Save className="h-3.5 w-3.5" />
                                     {assignPermissions.isPending ? "..." : "Save"}
                                 </Button>
-                            </div> */}
+                            </div>
                         </div>
 
-                        {!selectedRoleId && (
+                        {!selectedRoleId ? (
                             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                                 <Info className="h-3 w-3" />
-                                Select a role to manage permission assignments
+                                Select a role to edit its permissions
+                            </p>
+                        ) : (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                <Info className="h-3 w-3" />
+                                Applies to all modules except Tendering (Tender access is granted per user).
                             </p>
                         )}
                     </div>
