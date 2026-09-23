@@ -70,6 +70,7 @@ export interface BusinessTenderRow {
     member: string | null;
     team: string | null;
     itemName: string | null;
+    state: string | null;
     status: number;
     tlStatus: number;
     bidStatus: "Submission Pending" | "Bid Submitted" | "Tender Missed" | null;
@@ -87,6 +88,7 @@ export interface BusinessTenderListItem {
     member: string;
     team: string;
     item: string;
+    state: string;
     status: string;
     bidStatus: string;
     avgGrossMargin: string | null;

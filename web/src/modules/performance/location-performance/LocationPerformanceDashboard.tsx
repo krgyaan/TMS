@@ -16,8 +16,6 @@ import { Combobox } from "@/components/form/SelectField";
 
 /* Components */
 import LocationCategoryTable from "./components/LocationCategoryTable";
-import LocationBarChart from "./components/LocationBarChart";
-import LocationDonutChart from "./components/LocationDonutChart";
 
 /* ================================
    HELPERS
@@ -217,9 +215,9 @@ export default function LocationPerformanceDashboard() {
                 {/* ===== FILTER CARD ===== */}
                 <Card className="shadow-sm">
                     <CardContent className="p-6">
-                        <div className="flex flex-wrap gap-3 justify-center items-center w-full">
+                        <div className="grid grid-cols-1 md:grid-cols-5 w-full gap-4 items-end">
                             {/* State */}
-                            <div>
+                            <div className="space-y-2">
                                 <label className="text-sm font-medium">State</label>
                                 <Combobox
                                     value={selectedLocation !== null ? String(selectedLocation) : ""}
@@ -233,7 +231,7 @@ export default function LocationPerformanceDashboard() {
                             </div>
 
                             {/* Team */}
-                            <div>
+                            <div className="space-y-2">
                                 <label className="text-sm font-medium">Team</label>
                                 <Combobox
                                     value={selectedTeam !== null ? String(selectedTeam) : ""}
@@ -244,7 +242,7 @@ export default function LocationPerformanceDashboard() {
                             </div>
 
                             {/* Item Heading */}
-                            <div>
+                            <div className="space-y-2">
                                 <label className="text-sm font-medium">Item Heading</label>
                                 <Combobox
                                     value={selectedHeadingId ? selectedHeadingId.toString() : ""}
@@ -254,18 +252,21 @@ export default function LocationPerformanceDashboard() {
                                 />
                             </div>
 
-                            {/* Financial Year + Submit */}
-                            <div className="flex items-end gap-2">
+                            {/* Financial Year */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Financial Year</label>
                                 <Combobox
                                     value={selectedFinancialYear}
                                     onChange={v => setSelectedFinancialYear(v)}
                                     options={financialYearOptions}
                                     placeholder="Select Financial Year"
                                 />
-                                <Button onClick={handleSubmit} disabled={!params}>
-                                    <Filter className="mr-2 h-4 w-4" /> Submit
-                                </Button>
                             </div>
+
+                            {/* Submit Button */}
+                            <Button onClick={handleSubmit} disabled={!params} className="justify-self-start md:justify-self-center">
+                                <Filter className="mr-2 h-4 w-4" /> Submit
+                            </Button>
                         </div>
                     </CardContent>
                 </Card>
@@ -281,29 +282,18 @@ export default function LocationPerformanceDashboard() {
                     </div>
                 ) : (
                     <>
-                        {/* ===== AVERAGE GP + CHARTS ===== */}
-                        <div className="space-y-4">
-                            {/* Average GP Card - Full Width Row */}
-                            <div className="grid grid-cols-1">
-                                <Card className="shadow-sm">
-                                    <CardContent className="p-5">
-                                        <div className="flex flex-wrap items-center gap-6">
-                                            <p className="text-sm text-muted-foreground">Average GP</p>
-                                            <p className={`text-3xl font-bold ${getGpColor(data?.avgGrossMargin)}`}>
-                                                {data?.avgGrossMargin !== null && data?.avgGrossMargin !== undefined ? `${data.avgGrossMargin.toFixed(2)}%` : "—"}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">Average approved gross margin across tenders.</p>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </div>
-
-                            {/* Bar Chart + Donut Chart - Side by Side */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                <LocationBarChart params={appliedParams} />
-                                <LocationDonutChart params={appliedParams} />
-                            </div>
-                        </div>
+                        {/* ===== AVERAGE GP CARD ===== */}
+                        <Card className="shadow-sm">
+                            <CardContent className="p-5">
+                                <div className="flex flex-wrap items-center gap-6">
+                                    <p className="text-sm text-muted-foreground">Average GP</p>
+                                    <p className={`text-3xl font-bold ${getGpColor(data?.avgGrossMargin)}`}>
+                                        {data?.avgGrossMargin !== null && data?.avgGrossMargin !== undefined ? `${data.avgGrossMargin.toFixed(2)}%` : "—"}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">Average approved gross margin across tenders.</p>
+                                </div>
+                            </CardContent>
+                        </Card>
 
                         {/* ===== CATEGORY TABLES ===== */}
                         <LocationCategoryTable params={appliedParams} categoryKey="tenders_assigned" title="Tenders Assigned" description="All tenders assigned in this period." />
