@@ -41,7 +41,6 @@ export default function LocationCategoryTable({ params, categoryKey, title, desc
 
     const columnDefs = useMemo<ColDef<BusinessTenderListItem>[]>(
         () => [
-            { field: "state", headerName: "State", sortable: true, filter: true, width: 130 },
             { field: "team", headerName: "Team", sortable: true, filter: true, width: 120 },
             { field: "member", headerName: "Team Member", sortable: true, filter: true, width: 150 },
             { field: "item", headerName: "Item", sortable: true, filter: true, width: 130 },

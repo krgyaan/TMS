@@ -259,12 +259,12 @@ export class LocationPerformanceService {
     // ─── Query 4: flat tender list (for category tables) ─────────────
 
     private async getTenderList(filters: LocationFilters): Promise<BusinessTenderRow[]> {
-        const heading = filters.heading!;
         const from = new Date(filters.fromDate);
         const to = new Date(filters.toDate);
         to.setHours(23, 59, 59, 999);
 
-        const conditions = [eq(tenderInfos.deleteStatus, 0), eq(itemHeadings.id, heading), between(tenderInfos.dueDate, from, to)];
+        const conditions = [eq(tenderInfos.deleteStatus, 0), between(tenderInfos.dueDate, from, to)];
+        if (filters.heading) conditions.push(eq(itemHeadings.id, filters.heading));
         if (filters.location) conditions.push(eq(locations.id, filters.location));
         if (filters.team) conditions.push(eq(tenderInfos.team, filters.team));
 

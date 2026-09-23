@@ -16,6 +16,8 @@ import { Combobox } from "@/components/form/SelectField";
 
 /* Components */
 import LocationCategoryTable from "./components/LocationCategoryTable";
+import LocationBarChart from "./components/LocationBarChart";
+import LocationDonutChart from "./components/LocationDonutChart";
 
 /* ================================
    HELPERS
@@ -77,20 +79,20 @@ export default function LocationPerformanceDashboard() {
     const navigate = useNavigate();
 
     // Filter States (initialized from URL params for shareable/bookmarkable links)
-    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(() => {
+    const [selectedHeadingId, setSelectedHeadingId] = useState<number>(() => {
         const raw = new URLSearchParams(location.search).get("item");
         const parsed = raw !== null ? Number(raw) : NaN;
-        return Number.isFinite(parsed) ? parsed : null;
+        return Number.isFinite(parsed) ? parsed : 0;
     });
     const [selectedLocation, setSelectedLocation] = useState<number | null>(() => {
         const raw = new URLSearchParams(location.search).get("location");
         const parsed = raw !== null ? Number(raw) : NaN;
         return Number.isFinite(parsed) ? parsed : null;
     });
-    const [selectedTeam, setSelectedTeam] = useState<number | null>(() => {
+    const [selectedTeam, setSelectedTeam] = useState<number>(() => {
         const raw = new URLSearchParams(location.search).get("team");
         const parsed = raw !== null ? Number(raw) : NaN;
-        return Number.isFinite(parsed) ? parsed : null;
+        return Number.isFinite(parsed) ? parsed : 0;
     });
     const [selectedFinancialYear, setSelectedFinancialYear] = useState<string>(() => {
         return new URLSearchParams(location.search).get("year") ?? "";
@@ -105,11 +107,11 @@ export default function LocationPerformanceDashboard() {
         const team = rawTeam !== null ? Number(rawTeam) : NaN;
         const year = search.get("year");
         const range = yearToDateRange(year);
-        if (!range || !Number.isFinite(headingId) || !Number.isFinite(loc)) return null;
+        if (!range || !Number.isFinite(loc)) return null;
         return {
-            headingId,
+            headingId: Number.isFinite(headingId) && headingId > 0 ? headingId : undefined,
             location: loc,
-            team: Number.isFinite(team) ? team : undefined,
+            team: Number.isFinite(team) && team > 0 ? team : undefined,
             year: year ?? undefined,
         };
     });
@@ -129,13 +131,13 @@ export default function LocationPerformanceDashboard() {
 
     // Build params for submission
     const params = useMemo(() => {
-        if (!selectedHeadingId || !selectedLocation) return null;
+        if (!selectedLocation) return null;
         const range = yearToDateRange(selectedFinancialYear);
         if (!range) return null;
         return {
-            headingId: selectedHeadingId,
+            headingId: selectedHeadingId > 0 ? selectedHeadingId : undefined,
             location: selectedLocation,
-            team: selectedTeam || undefined,
+            team: selectedTeam > 0 ? selectedTeam : undefined,
             year: selectedFinancialYear,
         };
     }, [selectedHeadingId, selectedLocation, selectedTeam, selectedFinancialYear]);
@@ -146,7 +148,7 @@ export default function LocationPerformanceDashboard() {
         setAppliedParams(params);
 
         const search = new URLSearchParams();
-        search.set("item", String(params.headingId));
+        if (params.headingId) search.set("item", String(params.headingId));
         search.set("location", String(params.location));
         if (params.team) search.set("team", String(params.team));
         if (selectedFinancialYear) search.set("year", selectedFinancialYear);
@@ -158,7 +160,7 @@ export default function LocationPerformanceDashboard() {
         if (!data) return;
 
         const selectedHeading = headings.find(h => h.id === selectedHeadingId);
-        const headingName = selectedHeading?.name || "Unknown";
+        const headingName = selectedHeading?.name ?? (selectedHeadingId > 0 ? "Unknown" : "All");
 
         const allData: Record<string, unknown>[] = [];
 
@@ -234,10 +236,16 @@ export default function LocationPerformanceDashboard() {
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Team</label>
                                 <Combobox
-                                    value={selectedTeam !== null ? String(selectedTeam) : ""}
-                                    onChange={v => setSelectedTeam(v ? Number(v) : null)}
-                                    options={teams.map(team => ({ id: String(team.id), name: team.name }))}
-                                    placeholder="Please Select Team"
+                                    value={String(selectedTeam)}
+                                    onChange={v => setSelectedTeam(v ? Number(v) : 0)}
+                                    options={[
+                                        { id: "0", name: "All" },
+                                        ...teams
+                                            .filter(team => team.id === 1 || team.id === 2)
+                                            .sort((a, b) => a.id - b.id)
+                                            .map(team => ({ id: String(team.id), name: team.name })),
+                                    ]}
+                                    placeholder="Select Team"
                                 />
                             </div>
 
@@ -245,9 +253,12 @@ export default function LocationPerformanceDashboard() {
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Item Heading</label>
                                 <Combobox
-                                    value={selectedHeadingId ? selectedHeadingId.toString() : ""}
-                                    onChange={v => setSelectedHeadingId(v ? Number(v) : null)}
-                                    options={headings.map(heading => ({ id: heading.id.toString(), name: heading.name }))}
+                                    value={String(selectedHeadingId)}
+                                    onChange={v => setSelectedHeadingId(v ? Number(v) : 0)}
+                                    options={[
+                                        { id: "0", name: "All" },
+                                        ...[...headings].sort((a, b) => a.name.localeCompare(b.name)).map(heading => ({ id: String(heading.id), name: heading.name })),
+                                    ]}
                                     placeholder="Select Item Heading"
                                 />
                             </div>
@@ -274,7 +285,7 @@ export default function LocationPerformanceDashboard() {
                 {/* ===== CONDITIONAL CONTENT ===== */}
                 {!appliedParams ? (
                     <div className="bg-muted rounded-lg p-6 text-center">
-                        <span className="text-muted-foreground">Please select a State, Team, Item Heading and Financial Year to view the report.</span>
+                        <span className="text-muted-foreground">Please select a State and Financial Year to view the report.</span>
                     </div>
                 ) : dataLoading ? (
                     <div className="bg-muted rounded-lg p-6 text-center">
@@ -282,19 +293,6 @@ export default function LocationPerformanceDashboard() {
                     </div>
                 ) : (
                     <>
-                        {/* ===== AVERAGE GP CARD ===== */}
-                        <Card className="shadow-sm">
-                            <CardContent className="p-5">
-                                <div className="flex flex-wrap items-center gap-6">
-                                    <p className="text-sm text-muted-foreground">Average GP</p>
-                                    <p className={`text-3xl font-bold ${getGpColor(data?.avgGrossMargin)}`}>
-                                        {data?.avgGrossMargin !== null && data?.avgGrossMargin !== undefined ? `${data.avgGrossMargin.toFixed(2)}%` : "—"}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">Average approved gross margin across tenders.</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-
                         {/* ===== CATEGORY TABLES ===== */}
                         <LocationCategoryTable params={appliedParams} categoryKey="tenders_assigned" title="Tenders Assigned" description="All tenders assigned in this period." />
                         <LocationCategoryTable params={appliedParams} categoryKey="tenders_approved" title="Tenders Approved" description="Tenders approved by the team lead." />
@@ -317,6 +315,25 @@ export default function LocationPerformanceDashboard() {
                         <LocationCategoryTable params={appliedParams} categoryKey="tenders_lost" title="Tenders Lost" description="Tenders that were lost." />
                         <LocationCategoryTable params={appliedParams} categoryKey="emd_paid" title="EMD Paid" description="Tenders where the EMD has been paid." />
                         <LocationCategoryTable params={appliedParams} categoryKey="emd_returned" title="EMD Returned" description="Tenders where the EMD has been returned." />
+
+                        {/* ===== AVERAGE GP CARD ===== */}
+                        <Card className="shadow-sm">
+                            <CardContent className="p-5">
+                                <div className="flex flex-wrap items-center gap-6">
+                                    <p className="text-sm text-muted-foreground">Average GP</p>
+                                    <p className={`text-3xl font-bold ${getGpColor(data?.avgGrossMargin)}`}>
+                                        {data?.avgGrossMargin !== null && data?.avgGrossMargin !== undefined ? `${data.avgGrossMargin.toFixed(2)}%` : "—"}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">Average approved gross margin across tenders.</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* ===== CHARTS ===== */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <LocationBarChart params={appliedParams} />
+                            <LocationDonutChart params={appliedParams} />
+                        </div>
                     </>
                 )}
             </div>
