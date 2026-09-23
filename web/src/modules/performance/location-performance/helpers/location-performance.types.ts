@@ -11,7 +11,14 @@ export interface LocationPerformanceQuery {
     toDate: string | null; // yyyy-mm-dd
 }
 
-// ─── API response (mirrors backend shape exactly) ─────────────────────────────
+export interface LocationPerformanceParams {
+    headingId?: number;
+    location?: number;
+    team?: number;
+    year?: string;
+}
+
+// ─── API response (mirrors backend shape exactly) ──────────────────────────────
 
 export interface SummaryItem {
     count: number;
@@ -39,8 +46,8 @@ export interface LocationMetrics {
     by_region: Record<string, MetricEntry>;
     by_state: Record<string, MetricEntry>;
     by_item: Record<string, MetricEntry>;
-    // total_count: number;
-    // total_value: number;
+    total_count: number;
+    total_value: number;
 }
 
 export interface ItemRow {
@@ -54,10 +61,44 @@ export interface ItemHeadingRow {
     team: string;
 }
 
+export interface BusinessTenderRow {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: Date;
+    gstValues: string;
+    member: string | null;
+    team: string | null;
+    itemName: string | null;
+    status: number;
+    tlStatus: number;
+    bidStatus: "Submission Pending" | "Bid Submitted" | "Tender Missed" | null;
+    hasEmdPaid: boolean | null;
+    hasEmdReturned: boolean | null;
+    avgGrossMargin: number | null;
+}
+
+export interface BusinessTenderListItem {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: string;
+    gstValues: string;
+    member: string;
+    team: string;
+    item: string;
+    status: string;
+    bidStatus: string;
+    avgGrossMargin: string | null;
+    category: string[];
+}
+
 export interface LocationPerformanceResponse {
     items: ItemRow[];
     summary: LocationSummary;
     metrics: LocationMetrics;
+    tenderList: BusinessTenderListItem[];
+    avgGrossMargin: number | null;
 }
 
 export interface ItemHeadingsResponse {
