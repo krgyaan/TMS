@@ -83,8 +83,8 @@ export default function TenderingRoutes() {
             <Route path="tenders/create" element={<RouteWrapper permission={{ module: "tenders", action: "create" }}><Tender_Create /></RouteWrapper>} />
             <Route path="tenders/:id/edit" element={<RouteWrapper permission={{ module: "tenders", action: "update" }}><Tender_Edit /></RouteWrapper>} />
             <Route path="tenders/:id" element={<RouteWrapper permission={{ module: "tenders", action: "read" }}><Tender_View /></RouteWrapper>} />
-            <Route path="info-sheet/create/:tenderId" element={<RouteWrapper permission={{ module: "tenders", action: "create" }}><InfoSheet_Create /></RouteWrapper>} />
-            <Route path="info-sheet/edit/:tenderId" element={<RouteWrapper permission={{ module: "tenders", action: "update" }}><InfoSheet_Edit /></RouteWrapper>} />
+            <Route path="info-sheet/create/:tenderId" element={<RouteWrapper><InfoSheet_Create /></RouteWrapper>} />
+            <Route path="info-sheet/edit/:tenderId" element={<RouteWrapper><InfoSheet_Edit /></RouteWrapper>} />
             <Route path="tender-approval" element={<RouteWrapper><Tendering_TenderApproval /></RouteWrapper>} />
             <Route path="tender-approval/create/:tenderId" element={<RouteWrapper><Tendering_TenderApproval_Create /></RouteWrapper>} />
             <Route path="tender-approval/:tenderId" element={<RouteWrapper><Tendering_TenderApproval_Show /></RouteWrapper>} />
