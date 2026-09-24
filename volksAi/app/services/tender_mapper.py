@@ -1960,12 +1960,26 @@ def build_infosheet_data(
     # 32. Physical Docs Submission Required
     physical_docs_required_display = resolve_field("Physical Docs Required", r"Physical Docs Required[:\-\s]+([^\n]+)")
     if _is_missing(physical_docs_required_display) or physical_docs_required_display == "NA":
-        if re.search(r"(?:submitted\s+in\s+Original\s+in\s+physical\s+form|physical\s+form\s+within\s+(\d+|\w+)\s*\(?\w*\)?\s*days|submission\s+of\s+physical\s+document)", full_text, re.IGNORECASE):
+        _clean_text_for_phys = re.sub(
+            r"Mandating\s+submission\s+of\s+documents\s+in\s+physical\s+form[^\n\.]*",
+            "", full_text, flags=re.IGNORECASE
+        )
+        _has_phys_mandate = bool(
+            re.search(r"(?:submitted\s+in\s+Original\s*\(?(?:in\s+)?physical\s+form\)?|physical\s+form\s+within\s+(\d+|\w+)\s*\(?\w*\)?\s*days|submission\s+of\s+physical\s+document(?:s)?\s+(?:is\s+)?mandatory|(?:submit|submission\s+of)[^\n\.]+?original\s+(?:physical\s+)?(?:EMD|DD|BG|document)|original\s+(?:physical\s+)?(?:EMD|DD|BG|document)[^\n\.]+?(?:must|shall|to)\s+be\s+submitted|hard\s+cop(?:y|ies)\s+(?:of\s+[^\n\.]+?\s+)?(?:must|shall|to)\s+be\s+submitted)", _clean_text_for_phys, re.IGNORECASE)
+        )
+        _has_phys_exemption = bool(
+            re.search(r"(?:no\s+physical\s+(?:documents?|submission|copies?)|physical\s+(?:submission|documents?|copies?)[^\n\.]*?(?:not\s+required|exempt|dispensed\s+with|nil)|hard\s+cop(?:y|ies)[^\n\.]*?(?:not\s+required|exempt|dispensed\s+with)|(?:online\s+(?:bidding|tender|submission)\s+only[^\n\.]*?(?:no\s+physical|no\s+hard)))", full_text, re.IGNORECASE)
+        )
+        if _has_phys_mandate:
             physical_docs_required_display = "Yes"
-            logger.info("[ATC_ANCHOR] Resolved field 'physical_docs_required' via ITB Clause 4.0 (Yes)")
-        else:
+            logger.info("[ATC_ANCHOR] Resolved field 'physical_docs_required' via explicit physical submission clause (Yes)")
+        elif _has_phys_exemption:
             physical_docs_required_display = "No"
-            physical_docs_deadline_display = "N/A"
+            physical_docs_deadline_display = "Not Applicable"
+            logger.info("[ATC_ANCHOR] Resolved field 'physical_docs_required' via explicit exemption / online only clause (No)")
+        else:
+            physical_docs_required_display = "NA"
+            physical_docs_deadline_display = "NA"
 
     # 33. Physical Docs Submission Deadline
     physical_docs_deadline_display = resolve_field(["Physical Docs Deadline", "physical_docs_deadline", "Physical Document Submission Deadline"], r"Physical Docs Deadline[:\-\s]+([^\n]+)")
@@ -1977,17 +1991,24 @@ def build_infosheet_data(
         )
         if phys_dl_m:
             raw_dl_str = phys_dl_m.group(0).strip()
-            num_m = re.search(r"\b(\d+|seven|ten|five)\b", raw_dl_str, re.IGNORECASE)
-            num_val = num_m.group(1).lower() if num_m else "7"
-            w_map = {"seven": 7, "ten": 10, "five": 5}
-            days_count = w_map.get(num_val, num_val)
-            physical_docs_deadline_display = f"Within {days_count} days of Bid Due Date"
-            logger.info(f"[ATC_ANCHOR] Resolved field 'physical_docs_deadline' via ITB clause ({physical_docs_deadline_display})")
-        elif physical_docs_required_display == "Yes":
-            physical_docs_deadline_display = "Within 7 days of Bid Due Date"
-            logger.info("[ATC_ANCHOR] Resolved field 'physical_docs_deadline' via Standard ITB Clause 4.0 default (Within 7 days of Bid Due Date)")
-        elif physical_docs_required_display == "No":
-            physical_docs_deadline_display = "N/A"
+            num_m = re.search(r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|1|2|3|4|5|6|7|8|9|10|14|15|21|30)\b", raw_dl_str, re.IGNORECASE)
+            if num_m:
+                raw_n = num_m.group(1).lower()
+                w_map = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+                days_count = w_map.get(raw_n, raw_n)
+                physical_docs_deadline_display = f"Within {days_count} days of Bid Due Date"
+                logger.info(f"[ATC_ANCHOR] Resolved field 'physical_docs_deadline' via ITB clause ({physical_docs_deadline_display})")
+            else:
+                physical_docs_deadline_display = "NA"
+        elif str(physical_docs_required_display).lower() in ("no", "not applicable"):
+            physical_docs_deadline_display = "Not Applicable"
+        else:
+            physical_docs_deadline_display = "NA"
+
+    # If deadline was found, derive physical_docs_required as Yes
+    if physical_docs_required_display in ("NA", None, "", "Not Found"):
+        if not _is_missing(physical_docs_deadline_display) and physical_docs_deadline_display not in ("NA", "Not Found", "Not Applicable", "N/A"):
+            physical_docs_required_display = "Yes"
 
     # 34. Age (in yrs) / Experience Years (BEC Sl. 1)
     word_to_num = {
@@ -3218,11 +3239,18 @@ def build_infosheet_data(
 
     # 6. Physical docs tracking: NA when offline submission not required
     phys_req = str(res_dict.get("physical_docs_required_display", "")).lower()
-    if phys_req in ("no", "na", "n/a", "not required"):
+    if phys_req in ("no", "not required", "not applicable"):
         explicit_na_keys.update([
             "physical_docs_deadline_display", "docket_slip_upload_display",
             "physical_docs_uploaded_display", "courier_provider_display",
             "courier_docket_no_display", "courier_delivery_time_display"
+        ])
+    else:
+        # Operational tracking fields are always NA until a physical courier is uploaded
+        explicit_na_keys.update([
+            "docket_slip_upload_display", "physical_docs_uploaded_display",
+            "courier_provider_display", "courier_docket_no_display",
+            "courier_delivery_time_display"
         ])
 
     # 7. Secondary/Tertiary Client contacts & Schedules: NA when tender only has 1 client/schedule
