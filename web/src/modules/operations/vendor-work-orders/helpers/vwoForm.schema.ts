@@ -20,6 +20,7 @@ export const vendorWorkOrderFormSchema = z.object({
     category: z.string().default(""),
 
     sellerId: z.string().default(""),
+    sellerSource: z.enum(["", "vendor_org", "party"]).default(""),
     sellerName: z.string().min(1, "Vendor name is required"),
     sellerEmail: z.string().default(""),
     sellerAddress: z.string().default(""),

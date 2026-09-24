@@ -27,6 +27,7 @@ export interface VendorMasterRow {
     name: string;
     alias?: string;
     email?: string;
+    mobile?: string;
     address?: string;
     gstNo?: string;
     pan?: string;
@@ -34,6 +35,7 @@ export interface VendorMasterRow {
     contactPerson?: string;
     mobileNumber?: string;
     type: string;
+    source?: "vendor_org" | "party";
     isActive: boolean;
     createdAt: string;
     updatedAt: string;
@@ -71,7 +73,7 @@ const PartyViewDialog: React.FC<PartyViewDialogProps> = ({ party, open, onClose 
                         </div>
                         <div>
                             <span className="text-sm text-muted-foreground">Mobile</span>
-                            <p className="font-medium">{party.mobileNumber || "-"}</p>
+                            <p className="font-medium">{party.mobileNumber || party.mobile || "-"}</p>
                         </div>
                         <div>
                             <span className="text-sm text-muted-foreground">Contact Person</span>
@@ -149,11 +151,12 @@ const VendorMasterListPage: React.FC = () => {
 
     const handleToggleActive = async (party: VendorMasterRow) => {
         try {
+            const payload = { id: party.id, source: party.source };
             if (party.isActive) {
-                await deactivateMutation.mutateAsync(party.id);
+                await deactivateMutation.mutateAsync(payload);
                 toast.success(`Party "${party.name}" has been deactivated.`);
             } else {
-                await activateMutation.mutateAsync(party.id);
+                await activateMutation.mutateAsync(payload);
                 toast.success(`Party "${party.name}" has been activated.`);
             }
             refetchParties();
@@ -176,6 +179,7 @@ const VendorMasterListPage: React.FC = () => {
                 type: editParty.type,
                 contact_person: partyData.contact_person || undefined,
                 mobile_number: partyData.mobile_number || undefined,
+                source: editParty.source,
             };
             await updateMutation.mutateAsync({ id: editParty.id, data: dto });
             toast.success(`Party "${partyData.name}" has been updated successfully.`);
@@ -265,7 +269,8 @@ const VendorMasterListPage: React.FC = () => {
             headerName: "Mobile",
             sortable: true,
             filter: true,
-            width: 150
+            width: 150,
+            valueGetter: (p: { data?: VendorMasterRow }) => p.data?.mobileNumber || p.data?.mobile || "",
         },
         {
             field: "gstNo",

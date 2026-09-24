@@ -17,7 +17,7 @@ import { DialogDescription } from "@radix-ui/react-dialog";
 type GstForm = {
     id?: number;
     gstState: string;
-    gstNum: string;
+    gstNo: string;
     status: boolean;
 };
 
@@ -42,7 +42,7 @@ export const GstSection = ({ orgId }: Props) => {
 
     const emptyGst: GstForm = {
         gstState: "",
-        gstNum: "",
+        gstNo: "",
         status: true,
     };
 
@@ -123,7 +123,7 @@ export const GstSection = ({ orgId }: Props) => {
                     <Card key={gst.id} className="p-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <div className="font-medium">{gst.gstNum || "GST Number"}</div>
+                                <div className="font-medium">{gst.gstNo || "GST Number"}</div>
 
                                 <div className="text-sm text-muted-foreground">State: {gst.gstState}</div>
                             </div>
@@ -159,7 +159,7 @@ export const GstSection = ({ orgId }: Props) => {
 
                         <div>
                             <label className="text-sm font-medium">GST Number</label>
-                            <Input value={formState.gstNum} onChange={e => setFormState({ ...formState, gstNum: e.target.value })} />
+                            <Input value={formState.gstNo} onChange={e => setFormState({ ...formState, gstNo: e.target.value })} />
                         </div>
 
                         <div className="flex items-center gap-2">

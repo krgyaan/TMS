@@ -20,6 +20,9 @@ import { AlertCircle, Plus } from 'lucide-react';
 const VendorFormSchema = z.object({
     organization: z.object({
         name: z.string().min(1, 'Organization name is required').max(255),
+        alias: z.string().max(255).optional(),
+        msme: z.string().max(50).optional(),
+        pan: z.string().max(100).optional(),
         address: z.string().max(500).optional(),
         status: z.boolean().default(true),
     }),
@@ -27,7 +30,7 @@ const VendorFormSchema = z.object({
         .array(
             z.object({
                 gstState: z.string().min(1, 'GST state is required'),
-                gstNum: z.string().min(1, 'GST number is required'),
+                gstNo: z.string().min(1, 'GST number is required'),
                 status: z.boolean().default(true),
             }),
         )
@@ -90,6 +93,9 @@ const CreateVendorPage = () => {
         defaultValues: {
             organization: {
                 name: '',
+                alias: '',
+                msme: '',
+                pan: '',
                 address: '',
                 status: true,
             },
@@ -167,6 +173,47 @@ const CreateVendorPage = () => {
                                     </FormItem>
                                 )}
                             />
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <FormField
+                                    control={form.control}
+                                    name="organization.alias"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Alias</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="e.g. Factory, HO" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="organization.msme"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>MSME</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="UDYAM-XX-00-0000000" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value.toUpperCase())} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="organization.pan"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>PAN</FormLabel>
+                                            <FormControl>
+                                                <Input placeholder="ABCDE1234F" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value.toUpperCase())} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
                             <FormField
                                 control={form.control}
                                 name="organization.address"

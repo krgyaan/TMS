@@ -112,7 +112,7 @@ export const useCreatePoParty = () => {
 export const useActivateParty = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (id: number) => purchaseOrderApi.activateParty(id),
+        mutationFn: ({ id, source }: { id: number; source?: string }) => purchaseOrderApi.activateParty(id, source),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.poParties() });
         },
@@ -122,7 +122,7 @@ export const useActivateParty = () => {
 export const useDeactivateParty = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: (id: number) => purchaseOrderApi.deactivateParty(id),
+        mutationFn: ({ id, source }: { id: number; source?: string }) => purchaseOrderApi.deactivateParty(id, source),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.poParties() });
         },
@@ -132,7 +132,7 @@ export const useDeactivateParty = () => {
 export const useUpdateParty = () => {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: Partial<CreatePartyDTO> }) =>
+        mutationFn: ({ id, data }: { id: number; data: Partial<CreatePartyDTO> & { source?: string } }) =>
             purchaseOrderApi.updateParty(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.poParties() });

@@ -37,15 +37,17 @@ class PurchaseOrderApiService extends BaseApiService {
         return this.post('/parties', data);
     }
 
-    async activateParty(id: number): Promise<any> {
-        return this.patch(`/parties/${id}/activate`);
+    async activateParty(id: number, source?: string): Promise<any> {
+        const qs = source ? `?source=${encodeURIComponent(source)}` : "";
+        return this.patch(`/parties/${id}/activate${qs}`);
     }
 
-    async deactivateParty(id: number): Promise<any> {
-        return this.patch(`/parties/${id}/deactivate`);
+    async deactivateParty(id: number, source?: string): Promise<any> {
+        const qs = source ? `?source=${encodeURIComponent(source)}` : "";
+        return this.patch(`/parties/${id}/deactivate${qs}`);
     }
 
-    async updateParty(id: number, data: Partial<CreatePartyDTO>): Promise<any> {
+    async updateParty(id: number, data: Partial<CreatePartyDTO> & { source?: string }): Promise<any> {
         return this.patch(`/parties/${id}`, data);
     }
 

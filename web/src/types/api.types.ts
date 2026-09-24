@@ -178,6 +178,9 @@ export interface Company {}
 export interface VendorOrganization {
     id: number;
     name: string;
+    alias?: string | null;
+    msme?: string | null;
+    pan?: string | null;
     address?: string;
     status: boolean;
     createdAt: string;
@@ -198,7 +201,7 @@ export interface VendorGst {
     id: number;
     orgId: number;
     gstState: string;
-    gstNum: string;
+    gstNo: string;
     status: boolean;
     createdAt: string;
     updatedAt: string;
@@ -220,6 +223,7 @@ export interface Vendor {
     organizationId?: number | null;
     name: string;
     email?: string;
+    mobile?: string;
     address?: string;
     status: boolean;
     createdAt: string;
@@ -228,6 +232,9 @@ export interface Vendor {
     organization?: {
         id: number;
         name: string;
+        alias?: string | null;
+        msme?: string | null;
+        pan?: string | null;
         address?: string;
     } | null;
 }
@@ -253,13 +260,13 @@ export interface VendorOrganizationWithRelations extends VendorOrganization {
 export interface CreateVendorGstDto {
     orgId: number;
     gstState: string;
-    gstNum: string;
+    gstNo: string;
     status?: boolean;
 }
 
 export interface UpdateVendorGstDto {
     gstState?: string;
-    gstNum?: string;
+    gstNo?: string;
     status?: boolean;
 }
 

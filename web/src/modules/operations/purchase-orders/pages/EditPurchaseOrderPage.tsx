@@ -34,6 +34,7 @@ const defaultFormValues: PurchaseOrderFormValues = {
     category: "",
     poDate: "",
     sellerId: "",
+    sellerSource: "",
     sellerName: "",
     sellerEmail: "",
     sellerAddress: "",
@@ -149,6 +150,7 @@ export default function EditPurchaseOrderPage() {
         if (!selectedSellerId || selectedSellerId === "__create_new__") return;
         const party = parties.find((p: any) => String(p.id) === selectedSellerId);
         if (!party) return;
+        form.setValue("sellerSource", party.source === "vendor_org" ? "vendor_org" : "party");
         form.setValue("sellerName", party.name || "");
         form.setValue("sellerEmail", party.email || "");
         form.setValue("sellerAddress", party.address || "");
@@ -157,7 +159,7 @@ export default function EditPurchaseOrderPage() {
         form.setValue("sellerMsmeNo", party.msme || "");
         form.setValue("contactPersonName", party.contactPerson || "");
         form.setValue("contactPersonEmail", party.email || "");
-        form.setValue("contactPersonPhone", party.mobileNumber || "");
+        form.setValue("contactPersonPhone", party.mobileNumber || party.mobile || "");
     }, [selectedSellerId, parties, form]);
 
     useEffect(() => {
@@ -186,7 +188,8 @@ export default function EditPurchaseOrderPage() {
             piAttachments: poData.piAttachments ? (typeof poData.piAttachments === 'string' ? JSON.parse(poData.piAttachments) : poData.piAttachments) : [],
             category: poData.category || "",
             poDate: formatDateForInput(poData.poDate),
-            sellerId: "",
+            sellerId: poData.sellerOrganizationId ? String(poData.sellerOrganizationId) : "",
+            sellerSource: poData.sellerOrganizationId ? "vendor_org" : "",
             sellerName: poData.sellerName || "",
             sellerEmail: poData.sellerEmail || "",
             sellerAddress: poData.sellerAddress || "",

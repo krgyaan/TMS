@@ -21,6 +21,7 @@ export interface CreatePartyDTO {
     type?: string;
     contact_person?: string;
     mobile_number?: string;
+    source?: "vendor_org" | "party";
 }
 
 export interface Beneficiary {

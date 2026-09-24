@@ -349,7 +349,7 @@ const GSTTable = ({ gsts, orgId }: { gsts: any[], orgId: number }) => {
                     {gsts.map((gst) => (
                         <tr key={gst.id} className="border-b last:border-0 hover:bg-accent/50">
                             <td className="p-3">{gst.gstState}</td>
-                            <td className="p-3 font-mono text-sm">{gst.gstNum}</td>
+                            <td className="p-3 font-mono text-sm">{gst.gstNo}</td>
                             <td className="p-3">
                                 <Badge variant={gst.status ? 'default' : 'secondary'} className="text-xs">
                                     {gst.status ? 'Active' : 'Inactive'}

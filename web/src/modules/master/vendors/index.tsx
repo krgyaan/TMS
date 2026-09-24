@@ -300,7 +300,7 @@ const VendorsPage = () => {
                                                 <span className="text-sm font-medium text-muted-foreground w-8">{index + 1}.</span>
                                                 <div>
                                                     <div className="font-medium">{gst.gstState}</div>
-                                                    <div className="text-sm text-muted-foreground font-mono mt-1">{gst.gstNum}</div>
+                                                    <div className="text-sm text-muted-foreground font-mono mt-1">{gst.gstNo}</div>
                                                 </div>
                                             </div>
                                         </div>

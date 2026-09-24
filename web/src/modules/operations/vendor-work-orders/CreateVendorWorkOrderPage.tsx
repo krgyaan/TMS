@@ -39,6 +39,7 @@ const defaultFormValues: VendorWorkOrderFormValues = {
   woDate: formatDateForInput(new Date()),
   category: "",
   sellerId: "",
+  sellerSource: "",
   sellerName: "",
   sellerEmail: "",
   sellerAddress: "",
@@ -145,6 +146,7 @@ export default function CreateVendorWorkOrderPage() {
     if (!selectedSellerId || selectedSellerId === "__create_new__") return;
     const party = parties.find((p: any) => String(p.id) === selectedSellerId);
     if (!party) return;
+    form.setValue("sellerSource", party.source === "vendor_org" ? "vendor_org" : "party");
     form.setValue("sellerName", party.name || "");
     form.setValue("sellerEmail", party.email || "");
     form.setValue("sellerAddress", party.address || "");
@@ -153,7 +155,7 @@ export default function CreateVendorWorkOrderPage() {
     form.setValue("sellerMsmeNo", party.msme || "");
     form.setValue("contactPersonName", party.contactPerson || "");
     form.setValue("contactPersonEmail", party.email || "");
-    form.setValue("contactPersonPhone", party.mobileNumber || "");
+    form.setValue("contactPersonPhone", party.mobileNumber || party.mobile || "");
   }, [selectedSellerId, parties, form]);
 
   useEffect(() => {
