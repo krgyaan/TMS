@@ -2,6 +2,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { TableCell } from "@/components/ui/table";
 import { Eye } from "lucide-react";
 import { paths } from "@/app/routes/paths";
+import type { MetricBucket } from "../helpers/tender-executive.types";
 
 const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-IN", {
@@ -18,7 +19,7 @@ const formatDate = (date: string | Date) => {
     }).format(new Date(date));
 };
 
-export function MetricCell({ data, strong = false }: { data: any; strong?: boolean }) {
+export function MetricCell({ data, strong = false }: { data: MetricBucket; strong?: boolean }) {
     if (!data || data.count === 0) {
         return <TableCell className="text-center text-muted-foreground">·</TableCell>;
     }

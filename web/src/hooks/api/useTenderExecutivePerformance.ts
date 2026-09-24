@@ -1,103 +1,72 @@
 import { useQuery } from "@tanstack/react-query";
 import { tenderExecutivePerformanceService } from "@/services/api/tender-executive-performance.service";
-import type { PerformanceQuery } from "@/modules/performance/tender-executive/helpers/tender-executive.types";
+import type { PerformanceQuery, StageQuery } from "@/modules/performance/tender-executive/helpers/tender-executive.types";
 
 export const performanceKeys = {
     root: ["performance"] as const,
 
-    summary: (q: PerformanceQuery | null) => [...performanceKeys.root, "summary", q] as const,
     outcomes: (q: PerformanceQuery | null) => [...performanceKeys.root, "outcomes", q] as const,
     stageMatrix: (q: PerformanceQuery | null) => [...performanceKeys.root, "stage-matrix", q] as const,
-    tenders: (q: PerformanceQuery | null) => [...performanceKeys.root, "tenders", q] as const,
-    trends: (q: PerformanceQuery | null) => [...performanceKeys.root, "trends", q] as const,
-    scoring: (q: PerformanceQuery | null) => [...performanceKeys.root, "scoring", q] as const,
-    stageBacklog: (q: any) => ["stage-backlog", q] as const,
-    stageBacklogV2: (q: any) => ["performance", "stage-backlog-v2", q],
-    emdBalance: (q: any) => ["emd-balance", q] as const,
-    emdCashFlow: (query: any) => ["performance", "emd-cashflow", query],
+    stageBacklogV2: (q: StageQuery) => ["performance", "stage-backlog-v2", q] as const,
+    emdCashFlow: (q: StageQuery) => ["performance", "emd-cashflow", q] as const,
 };
 
-/* ===================== SUMMARY ===================== */
-
-export const usePerformanceSummary = (query: PerformanceQuery | null) =>
-    useQuery({
-        queryKey: performanceKeys.summary(query),
-        queryFn: () => tenderExecutivePerformanceService.getPerformanceSummary(query!),
-        enabled: !!query?.userId,
-    });
+/* ===================== OUTCOMES ===================== */
 
 export const usePerformanceOutcomes = (query: PerformanceQuery | null) =>
     useQuery({
         queryKey: performanceKeys.outcomes(query),
-        queryFn: () => tenderExecutivePerformanceService.getPerformanceOutcomes(query!),
+        queryFn: () => {
+            if (!query) {
+                throw new Error("Performance query is required");
+            }
+
+            return tenderExecutivePerformanceService.getPerformanceOutcomes(query);
+        },
         enabled: !!query?.userId,
     });
+
+/* ===================== STAGE MATRIX ===================== */
 
 export const useStageMatrix = (query: PerformanceQuery | null) =>
     useQuery({
         queryKey: performanceKeys.stageMatrix(query),
-        queryFn: () => tenderExecutivePerformanceService.getStageMatrix(query!),
+        queryFn: () => {
+            if (!query) {
+                throw new Error("Performance query is required");
+            }
+
+            return tenderExecutivePerformanceService.getStageMatrix(query);
+        },
         enabled: !!query?.userId,
     });
 
-export const useTenderList = (query: PerformanceQuery | null) =>
-    useQuery({
-        queryKey: performanceKeys.tenders(query),
-        queryFn: () => tenderExecutivePerformanceService.getTenderList(query!),
-        enabled: !!query?.userId,
-    });
+/* ===================== STAGE BACKLOG ===================== */
 
-export const usePerformanceTrends = (query: PerformanceQuery | null) =>
-    useQuery({
-        queryKey: performanceKeys.trends(query),
-        queryFn: () => tenderExecutivePerformanceService.getPerformanceTrends(query!),
-        enabled: !!query?.userId,
-    });
-
-export const useExecutiveScoring = (query: PerformanceQuery | null) =>
-    useQuery({
-        queryKey: performanceKeys.scoring(query),
-        queryFn: () => tenderExecutivePerformanceService.getExecutiveScoring(query!),
-        enabled: !!query?.userId,
-    });
-
-/* ================================
-   USER + TEAM BACKLOG / EMD HOOKS
-=============================== */
-
-export const useStageBacklog = (query: any) =>
-    useQuery({
-        queryKey: performanceKeys.stageBacklog(query),
-        queryFn: () => tenderExecutivePerformanceService.getExecutiveBacklog(query),
-        enabled: !!query?.fromDate && !!query?.toDate && ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId)),
-    });
-
-export const useStageBacklogV2 = (query: any) =>
+export const useStageBacklogV2 = (query: StageQuery) =>
     useQuery({
         queryKey: performanceKeys.stageBacklogV2(query),
-        queryFn: () => tenderExecutivePerformanceService.getStageBacklogV2(query),
+        queryFn: () => {
+            if (!query.fromDate || !query.toDate) {
+                throw new Error("Date range is required");
+            }
+
+            return tenderExecutivePerformanceService.getStageBacklogV2(query);
+        },
         enabled: !!query.fromDate && !!query.toDate && ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId)),
     });
 
-export const useEmdBalance = (query: any) =>
-    useQuery({
-        queryKey: performanceKeys.emdBalance(query),
-        queryFn: () => tenderExecutivePerformanceService.getEmdBalance(query),
-        enabled: !!query?.fromDate && !!query?.toDate && ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId)),
-    });
+/* ===================== EMD CASH FLOW ===================== */
 
-export const useEmdCashFlow = (query: { view: "user" | "team"; userId?: number; teamId?: number; fromDate?: string; toDate?: string }) =>
+export const useEmdCashFlow = (query: StageQuery) =>
     useQuery({
         queryKey: performanceKeys.emdCashFlow(query),
-        queryFn: () =>
-            tenderExecutivePerformanceService.getEmdCashFlow(
-                query as {
-                    view: "user" | "team";
-                    userId?: number;
-                    teamId?: number;
-                    fromDate: string;
-                    toDate: string;
-                }
-            ),
-        enabled: !!query?.fromDate && !!query?.toDate && ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId)),
+        queryFn: () => {
+            if (!query.fromDate || !query.toDate) {
+                throw new Error("Date range is required");
+            }
+
+            return tenderExecutivePerformanceService.getEmdCashFlow(query);
+        },
+        enabled: !!query.fromDate && !!query.toDate && ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId)),
     });

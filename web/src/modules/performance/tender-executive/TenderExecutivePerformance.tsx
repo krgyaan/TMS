@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
-import { CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, Tooltip as RechartsTooltip, ResponsiveContainer, XAxis, YAxis } from "recharts";
 
 /* UI Components */
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
@@ -12,14 +11,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { ROW_HELP_TEXT } from "./helpers/stage-matrix-help";
-import { useExecutiveScoring, usePerformanceOutcomes, usePerformanceSummary, usePerformanceTrends, useStageMatrix } from "@/hooks/api/useTenderExecutivePerformance";
-import type { TenderKpiKey } from "./helpers/tender-executive.types";
+import { usePerformanceOutcomes, useStageMatrix } from "@/hooks/api/useTenderExecutivePerformance";
+import type { StageMatrixDrilldownItem, TenderKpiKey } from "./helpers/tender-executive.types";
 
 /* Icons */
 import { paths } from "@/app/routes/paths";
 import { Combobox } from "@/components/form/SelectField";
 import { useUsersByRole } from "@/hooks/api/useUsers";
-import { AlertTriangle, Briefcase, Calendar as CalendarIcon, CheckCircle2, Clock, Download, Eye, FileText, Info, Search, Target, TrendingUp, Trophy, XCircle } from "lucide-react";
+import { AlertTriangle, Briefcase, Calendar as CalendarIcon, CheckCircle2, Clock, Download, Eye, FileText, Info, Search, Trophy, XCircle, type LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { EmdBacklogTable } from "./components/EmdBacklogTable";
 import { StageBacklogV4Table } from "./components/StageBacklogV4Table";
@@ -53,6 +52,19 @@ const formatLabel = (label: string) => {
 
 export type Scope = { view: "user"; userId: number } | { view: "team"; teamId: number } | { view: null };
 
+const KPI_LABELS: Record<TenderKpiKey, string> = {
+    ALLOCATED: "Allocated",
+    PENDING: "Pending",
+    APPROVED: "Approved",
+    REJECTED: "Rejected",
+    BID: "Bid",
+    MISSED: "Missed",
+    DISQUALIFIED: "Disqualified",
+    RESULT_AWAITED: "Result Awaited",
+    LOST: "Lost",
+    WON: "Won",
+};
+
 // const TEAM_OPTIONS = [
 //     { label: "All Teams", value: "all" },
 //     { label: "AC Team", value: 1 }, // ← actual team ID
@@ -83,39 +95,15 @@ export default function TenderExecutivePerformance() {
 
     const { data: users } = useUsersByRole(5);
 
-    const { data: summary } = usePerformanceSummary(userQuery);
     const { data: outcomes } = usePerformanceOutcomes(userQuery);
     const { data: stageMatrix } = useStageMatrix(userQuery);
-    const { data: trends = [] } = usePerformanceTrends(userQuery);
-    const { data: scoring } = useExecutiveScoring(userQuery);
 
     const STAGES = stageMatrix?.stages ?? [];
     const STAGE_MATRIX = stageMatrix?.rows ?? [];
 
-    console.log({ "kpi data": outcomes });
+    type KpiItem = { key: TenderKpiKey; label: string; count: number; icon: LucideIcon; color: string; bg: string };
 
-    // console.log("TENDERS:", tenders);
-
-    const SCORING_COLORS: Record<ScoringKey, string> = {
-        "Work Completion": "#6366F1",
-        "On Time Work": "#22C55E",
-        "Win Rate": "#F59E0B",
-    };
-
-    const SCORING_DATA = scoring
-        ? [
-              { name: "Work Completion", score: scoring.workCompletion },
-              { name: "On Time Work", score: scoring.onTimeWork },
-              { name: "Win Rate", score: scoring.winRate },
-          ].map(item => ({
-              ...item,
-              fill: SCORING_COLORS[item.name as keyof typeof SCORING_COLORS],
-          }))
-        : [];
-
-    // const totalScore = scoring?.total ?? (SCORING_DATA.length ? Math.round(SCORING_DATA.reduce((sum, item) => sum + item.score, 0) / SCORING_DATA.length) : 0);
-
-    const PRE_BID_KPIS = useMemo(() => {
+    const PRE_BID_KPIS = useMemo<KpiItem[]>(() => {
         if (!outcomes) return [];
 
         return [
@@ -154,7 +142,7 @@ export default function TenderExecutivePerformance() {
         ];
     }, [outcomes]);
 
-    const POST_BID_KPIS = useMemo(() => {
+    const POST_BID_KPIS = useMemo<KpiItem[]>(() => {
         if (!outcomes) return [];
 
         return [
@@ -232,7 +220,7 @@ export default function TenderExecutivePerformance() {
         return tendersByKpi[selectedMetric] ?? [];
     }, [outcomes, selectedMetric]);
 
-    const renderKpiCard = kpi => {
+    const renderKpiCard = (kpi: KpiItem) => {
         const isSelected = selectedMetric === kpi.key;
 
         return (
@@ -406,13 +394,13 @@ export default function TenderExecutivePerformance() {
                                             <TableRow key={tender.id}>
                                                 <TableCell className="font-medium text-muted-foreground">{tender.tenderNo}</TableCell>
                                                 <TableCell>{tender.organizationName}</TableCell>
-                                                <TableCell className="max-w-[300px] truncate" title={tender.tenderName}>
+                                                <TableCell className="max-w-[300px] truncate" title={tender.tenderName ?? undefined}>
                                                     {tender.tenderName}
                                                 </TableCell>
                                                 <TableCell className="text-right font-medium">{formatCurrency(tender.value)}</TableCell>
                                                 <TableCell>
-                                                    <Badge variant={tender.status === "Won" ? "default" : tender.status === "Lost" ? "destructive" : "secondary"}>
-                                                        {tender.status}
+                                                    <Badge variant={tender.statusBucket === "WON" ? "default" : tender.statusBucket === "LOST" ? "destructive" : "secondary"}>
+                                                        {KPI_LABELS[tender.statusBucket]}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-right">
@@ -498,7 +486,7 @@ export default function TenderExecutivePerformance() {
                                                             <TableCell key={j} className="text-center p-2">
                                                                 {val !== null ? (
                                                                     (() => {
-                                                                        const drilldown = (row as any).drilldown?.[j] ?? [];
+                                                                        const drilldown = row.drilldown[j] ?? [];
 
                                                                         return (
                                                                             <Popover>
@@ -527,9 +515,9 @@ export default function TenderExecutivePerformance() {
                                                                                         {drilldown.length === 0 ? (
                                                                                             <p className="text-xs text-muted-foreground">No tenders</p>
                                                                                         ) : (
-                                                                                            drilldown.map((t: any) => (
-                                                                                                <div className="flex justify-between">
-                                                                                                    <div key={t.tenderId} className="border-b pb-2 text-xs space-y-1">
+                                                                                            drilldown.map((t: StageMatrixDrilldownItem) => (
+                                                                                                <div key={t.tenderId} className="flex justify-between">
+                                                                                                    <div className="border-b pb-2 text-xs space-y-1">
                                                                                                         <div className="font-medium">{t.tenderNo ?? `Tender #${t.tenderId}`}</div>
 
                                                                                                         {t.tenderName && (
@@ -542,7 +530,7 @@ export default function TenderExecutivePerformance() {
                                                                                                             </div>
                                                                                                         )}
 
-                                                                                                        {t.daysOverdue !== null && (
+                                                                                                        {t.daysOverdue != null && (
                                                                                                             <div className="text-red-600 font-medium">
                                                                                                                 {t.daysOverdue} days overdue
                                                                                                             </div>

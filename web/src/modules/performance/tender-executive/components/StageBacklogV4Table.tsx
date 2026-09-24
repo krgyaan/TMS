@@ -3,25 +3,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useStageBacklogV2 } from "@/hooks/api/useTenderExecutivePerformance";
 import { MetricCell } from "./MetricCell";
 import { ColumnHeader } from "./emd-helpers";
-
-/* ================================
-   SHARED ROW
-================================ */
-
-function MetricRow({ label, bucket, color }: { label: string; bucket?: any; color?: "green" | "red" | "yellow" }) {
-    return (
-        <TableRow>
-            <TableCell className="font-medium w-[65%]">{label}</TableCell>
-            <MetricCell bucket={bucket} color={color} />
-        </TableRow>
-    );
-}
+import type { StageBacklogStage } from "../helpers/tender-executive.types";
 
 /* ================================
    ASSIGNMENT
-================================ */
+=============================== */
 
-function AssignmentTable({ stage }: { stage: any }) {
+function AssignmentTable({ stage }: { stage: StageBacklogStage }) {
     return (
         <Card className="border-0 ring-1 ring-border/50 shadow-sm">
             <CardContent className="p-0">
@@ -68,7 +56,7 @@ function AssignmentTable({ stage }: { stage: any }) {
    APPROVAL
 ================================ */
 
-function ApprovalTable({ stage }: { stage: any }) {
+function ApprovalTable({ stage }: { stage: StageBacklogStage }) {
     return (
         <Card className="border-0 ring-1 ring-border/50 shadow-sm">
             <CardContent className="p-0">
@@ -115,7 +103,7 @@ function ApprovalTable({ stage }: { stage: any }) {
    BID / SUBMISSION
 ================================ */
 
-function BidTable({ stage }: { stage: any }) {
+function BidTable({ stage }: { stage: StageBacklogStage }) {
     return (
         <Card className="border-0 ring-1 ring-border/50 shadow-sm">
             <CardContent className="p-0">
@@ -162,7 +150,7 @@ function BidTable({ stage }: { stage: any }) {
    RESULT AWAITED
 ================================ */
 
-function ResultTable({ stage }: { stage: any }) {
+function ResultTable({ stage }: { stage: StageBacklogStage }) {
     return (
         <Card className="border-0 ring-1 ring-border/50 shadow-sm">
             <CardContent className="p-0">
@@ -209,7 +197,7 @@ function ResultTable({ stage }: { stage: any }) {
    WON
 ================================ */
 
-function WonTable({ stage }: { stage: any }) {
+function WonTable({ stage }: { stage: StageBacklogStage }) {
     return (
         <Card className="border-0 ring-1 ring-border/50 shadow-sm">
             <CardContent className="p-0">
@@ -242,7 +230,7 @@ function WonTable({ stage }: { stage: any }) {
    LOST
 ================================ */
 
-function LostTable({ stage }: { stage: any }) {
+function LostTable({ stage }: { stage: StageBacklogStage }) {
     return (
         <Card className="border-0 ring-1 ring-border/50 shadow-sm">
             <CardContent className="p-0">

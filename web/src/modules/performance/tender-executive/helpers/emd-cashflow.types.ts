@@ -1,24 +1,32 @@
+import type { MetricDrilldownItem } from "./tender-executive.types";
+
+export interface EmdCashFlowDrilldownItem extends MetricDrilldownItem {
+    instrumentId: number;
+    instrumentType: string;
+}
+
 export interface EmdMetricBucket {
     count: number;
     value: number;
-    drilldown: {
-        tenderId: number;
-        tenderNo?: string;
-        tenderName?: string;
-        instrumentType: string;
-        amount: number;
-        requestedAt: string;
-        returnedAt?: string | null;
-    }[];
+    drilldown: EmdCashFlowDrilldownItem[];
+}
+
+export interface OtherThanTmsEntry {
+    requestId: number;
+    name: string | null;
+    value: number;
+    instrumentType: string;
+    status: string | null;
+    action: number | null;
 }
 
 export interface EmdCashFlowResponse {
-    paid: {
-        prior: EmdMetricBucket;
-        during: EmdMetricBucket;
-    };
-    received: {
-        priorPaid: EmdMetricBucket;
-        duringPaid: EmdMetricBucket;
-    };
+    from: string;
+    to: string;
+    paidPriorNotReceived: EmdMetricBucket;
+    paidDuring: EmdMetricBucket;
+    receivedForPrior: EmdMetricBucket;
+    receivedForDuring: EmdMetricBucket;
+    pendingAtEnd: EmdMetricBucket;
+    otherThanTms: OtherThanTmsEntry[] | null;
 }

@@ -1,7 +1,5 @@
 /* ===================== TYPES ===================== */
 
-import { access } from "fs";
-
 export interface PerformanceQuery {
     userId: number | null;
     fromDate: string | null; // yyyy-mm-dd
@@ -16,20 +14,20 @@ export interface StageQuery {
     fromDate: string;
     toDate: string;
 }
-export interface PerformanceSummary {
-    tendersHandled: number;
-    stagesApplicable: number;
-    stagesCompleted: number;
-    stagesPending: number;
-    stagesOnTime: number;
-    stagesLate: number;
-    completionRate: number;
-    onTimeRate: number;
-}
 
 export type TenderKpiKey = "ALLOCATED" | "PENDING" | "APPROVED" | "REJECTED" | "BID" | "MISSED" | "DISQUALIFIED" | "RESULT_AWAITED" | "LOST" | "WON";
 
-export type PerformanceOutcomes = {
+export interface OutcomeTender {
+    id: number;
+    tenderNo: string | null;
+    tenderName: string | null;
+    organizationName: string | null;
+    dueDate: string | null; // ISO string
+    value: number;
+    statusBucket: TenderKpiKey;
+}
+
+export interface PerformanceOutcomes {
     allocated: number;
     pending: number;
     approved: number;
@@ -40,26 +38,27 @@ export type PerformanceOutcomes = {
     won: number;
     lost: number;
     disqualified: number;
-    notBid?: number;
+    tendersByKpi?: Record<TenderKpiKey, OutcomeTender[]>;
+}
 
-    tendersByKpi: Record<
-        TenderKpiKey,
-        {
-            id: number;
-            tenderNo: string;
-            tenderName: string;
-            organizationName: string;
-            dueDate: string; // ISO string
-            value: number;
-            statusBucket: TenderKpiKey;
-        }[]
-    >;
-};
+export type StageMatrixRowKey = "done" | "onTime" | "late" | "pending" | "overdue" | "notApplicable";
+
+export interface StageMatrixDrilldownItem {
+    tenderId: number;
+    tenderNo?: string | null;
+    tenderName?: string | null;
+    stageKey: string;
+    deadline?: string | null;
+    completedAt?: string | null;
+    daysOverdue?: number | null;
+    meta?: Record<string, string | number | boolean | null>;
+}
 
 export interface StageMatrixRow {
-    key: string;
+    key: StageMatrixRowKey;
     label: string;
     data: number[];
+    drilldown: StageMatrixDrilldownItem[][];
 }
 
 export interface StageMatrixResponse {
@@ -67,25 +66,51 @@ export interface StageMatrixResponse {
     rows: StageMatrixRow[];
 }
 
-export interface TenderListRow {
-    id: number | null;
-    tenderNo: string;
-    tenderName: string;
-    organizationName: string | null;
+export interface MetricDrilldownItem {
+    tenderId: number;
+    tenderNo?: string | null;
+    tenderName?: string | null;
     value: number;
-    status: "Result Awaited" | "Won" | "Lost" | "Missed" | "Not Bid";
-    dueDate: string;
+    instrumentType?: string;
+    transferDate?: string | null;
 }
 
-export interface PerformanceTrends {
-    label: string;
-    completion: number;
-    onTime: number;
+export interface MetricBucket {
+    count: number;
+    value: number;
+    drilldown: MetricDrilldownItem[];
 }
 
-export interface ExecutiveScoring {
-    workCompletion: number;
-    onTimeWork: number;
-    winRate: number;
-    total: number;
+export interface StageBacklogBucket {
+    count: number;
+    value: number;
+    drilldown: MetricDrilldownItem[];
+}
+
+export interface StageBacklogDuring {
+    total: StageBacklogBucket;
+    completed: StageBacklogBucket;
+    pending?: StageBacklogBucket;
+    rejected?: StageBacklogBucket;
+    received?: StageBacklogBucket;
+    disqualified?: StageBacklogBucket;
+}
+
+export interface StageBacklogStage {
+    opening: StageBacklogBucket;
+    total: StageBacklogBucket;
+    during: StageBacklogDuring;
+}
+
+export interface StageBacklogV2Response {
+    from: string;
+    to: string;
+    stages: {
+        assigned: StageBacklogStage;
+        approved: StageBacklogStage;
+        bid: StageBacklogStage;
+        resultAwaited: StageBacklogStage;
+        won: StageBacklogStage;
+        lost: StageBacklogStage;
+    };
 }

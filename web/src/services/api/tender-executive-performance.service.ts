@@ -1,22 +1,16 @@
 import { BaseApiService } from "./base.service";
+import type { EmdCashFlowResponse } from "@/modules/performance/tender-executive/helpers/emd-cashflow.types";
 import type {
-    ExecutiveScoring,
     PerformanceOutcomes,
     PerformanceQuery,
-    PerformanceSummary,
-    PerformanceTrends,
+    StageBacklogV2Response,
     StageMatrixResponse,
     StageQuery,
-    TenderListRow,
 } from "@/modules/performance/tender-executive/helpers/tender-executive.types";
 
 class TenderExecutivePerformanceApiService extends BaseApiService {
     constructor() {
         super("/performance/tender-executive");
-    }
-
-    getPerformanceSummary(params: PerformanceQuery): Promise<PerformanceSummary> {
-        return this.get<PerformanceSummary>("/summary", { params });
     }
 
     getPerformanceOutcomes(params: PerformanceQuery): Promise<PerformanceOutcomes> {
@@ -27,32 +21,12 @@ class TenderExecutivePerformanceApiService extends BaseApiService {
         return this.get<StageMatrixResponse>("/stage-matrix", { params });
     }
 
-    getTenderList(params: PerformanceQuery): Promise<TenderListRow[]> {
-        return this.get<TenderListRow[]>("/tenders", { params });
+    getStageBacklogV2(params: StageQuery): Promise<StageBacklogV2Response> {
+        return this.get<StageBacklogV2Response>("/stage-backlog", { params });
     }
 
-    getPerformanceTrends(params: PerformanceQuery): Promise<PerformanceTrends> {
-        return this.get<PerformanceTrends>("/trends", { params });
-    }
-
-    getExecutiveScoring(params: PerformanceQuery): Promise<ExecutiveScoring> {
-        return this.get<ExecutiveScoring>("/scoring", { params });
-    }
-
-    getExecutiveBacklog(params: StageQuery): Promise<ExecutiveScoring> {
-        return this.get<ExecutiveScoring>("/stage-backlog", { params });
-    }
-
-    getStageBacklogV2(params: ExecutiveScoring): Promise<ExecutiveScoring> {
-        return this.get<ExecutiveScoring>("/stage-backlog", { params });
-    }
-
-    getEmdBalance(params: StageQuery): Promise<ExecutiveScoring> {
-        return this.get<ExecutiveScoring>("/emd-balance", { params });
-    }
-
-    getEmdCashFlow(params: { view: "user" | "team"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
-        return this.get("/emd-cashflow", { params });
+    getEmdCashFlow(params: StageQuery): Promise<EmdCashFlowResponse> {
+        return this.get<EmdCashFlowResponse>("/emd-cashflow", { params });
     }
 }
 
