@@ -5,7 +5,7 @@ import { VendorGstsService } from "@/modules/master/vendor-gsts/vendor-gsts.serv
 const CreateVendorGstSchema = z.object({
     orgId: z.number().min(1),
     gstState: z.string().min(1).max(255),
-    gstNum: z.string().min(1).max(255),
+    gstNo: z.string().min(1).max(255),
     status: z.boolean().optional().default(true),
 });
 

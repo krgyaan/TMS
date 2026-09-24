@@ -17,6 +17,9 @@ import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-
 import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
 import { paymentRequests } from "@/db/schemas/operations";
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
+import { vendorOrganizations } from "@/db/schemas/vendors/vendor-organizations.schema";
+import { vendors } from "@/db/schemas/vendors/vendors.schema";
+import { vendorGsts } from "@/db/schemas/vendors/vendor-gsts.schema";
 import { woBasicDetails } from "@/db/schemas/operations/work-order.schema";
 import { users } from "@/db/schemas";
 
@@ -100,6 +103,7 @@ export class VendorWorkOrderService {
                     projectName: body.projectName,
 
                     sellerName: body.sellerName,
+                    sellerOrganizationId: body.sellerOrganizationId || null,
                     sellerAddress: body.sellerAddress,
                     sellerEmail: body.sellerEmail,
                     sellerGstNo: body.sellerGstNo,
@@ -216,6 +220,7 @@ export class VendorWorkOrderService {
                 .set({
                     woDate: body.woDate,
                     sellerName: body.sellerName,
+                    sellerOrganizationId: body.sellerOrganizationId || null,
                     sellerAddress: body.sellerAddress,
                     sellerEmail: body.sellerEmail,
                     sellerGstNo: body.sellerGstNo,
@@ -1083,19 +1088,86 @@ export class VendorWorkOrderService {
     }
 
     async listParties(type?: string) {
-        const query = this.db
-            .select()
-            .from(projectParties)
-            .orderBy(desc(projectParties.id));
+        const conditions = type ? [eq(projectParties.type, type)] : [];
 
-        if (type) {
-            query.where(eq(projectParties.type, type));
+        const partyQuery = this.db
+            .select()
+            .from(projectParties);
+
+        if (conditions.length > 0) {
+            partyQuery.where(and(...conditions));
         }
 
-        return query;
+        const partyRows = await partyQuery.orderBy(desc(projectParties.id));
+
+        if (type && type !== "seller") {
+            return partyRows.map((p) => ({ ...p, source: "party" as const }));
+        }
+
+        const orgRows = await this.db
+            .select({
+                id: vendorOrganizations.id,
+                name: vendorOrganizations.name,
+                alias: vendorOrganizations.alias,
+                gstNo: vendorGsts.gstNo,
+                msme: vendorOrganizations.msme,
+                pan: vendorOrganizations.pan,
+                address: vendorOrganizations.address,
+                email: vendors.email,
+                mobile: vendors.mobile,
+                isActive: vendorOrganizations.status,
+                createdAt: vendorOrganizations.createdAt,
+            })
+            .from(vendorOrganizations)
+            .leftJoin(vendorGsts, eq(vendorGsts.orgId, vendorOrganizations.id))
+            .leftJoin(vendors, eq(vendors.orgId, vendorOrganizations.id))
+            .where(eq(vendorOrganizations.status, true))
+            .orderBy(desc(vendorOrganizations.createdAt));
+
+        const orgMap = new Map<number, any>();
+        for (const row of orgRows) {
+            const existing = orgMap.get(row.id);
+            if (existing) {
+                if (!existing.gstNo && row.gstNo) existing.gstNo = row.gstNo;
+                if (!existing.email && row.email) existing.email = row.email;
+                if (!existing.mobile && row.mobile) existing.mobile = row.mobile;
+            } else {
+                orgMap.set(row.id, {
+                    ...row,
+                    type: "seller",
+                    source: "vendor_org",
+                });
+            }
+        }
+
+        const sellerOrgs = [...orgMap.values()];
+        const legacySellers = partyRows.filter(
+            (p) => p.type === "seller" && !p.vendorOrganizationId,
+        ).map((p) => ({ ...p, source: "party" as const }));
+        const otherParties = partyRows.filter((p) => p.type !== "seller");
+
+        return [...sellerOrgs, ...legacySellers, ...otherParties];
     }
 
     async createParty(body: any) {
+        const type = body.type || "seller";
+
+        if (type === "seller") {
+            const [org] = await this.db
+                .insert(vendorOrganizations)
+                .values({
+                    name: body.name,
+                    alias: body.alias || null,
+                    msme: body.msme || null,
+                    pan: body.pan || null,
+                    address: body.address || null,
+                })
+                .returning();
+
+            this.logger.info(`Seller created as vendor org: ${org.name} (ID: ${org.id})`);
+            return { ...org, type: "seller", source: "vendor_org" };
+        }
+
         return (
             await this.db
                 .insert(projectParties)
@@ -1107,7 +1179,7 @@ export class VendorWorkOrderService {
                     gstNo: body.gstNo || null,
                     pan: body.pan || null,
                     msme: body.msme || null,
-                    type: body.type || "seller",
+                    type,
                     contactPerson: body.contact_person || null,
                     mobileNumber: body.mobile_number || null,
                 })
@@ -1115,7 +1187,33 @@ export class VendorWorkOrderService {
         )[0];
     }
 
-    async activateParty(id: number) {
+    async activateParty(id: number, source?: string) {
+        if (source === "vendor_org") {
+            const rows = await this.db
+                .update(vendorOrganizations)
+                .set({ status: true, updatedAt: new Date() })
+                .where(eq(vendorOrganizations.id, id))
+                .returning();
+            if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
+            return { ...rows[0], type: "seller", source: "vendor_org", isActive: true };
+        }
+
+        const [party] = await this.db
+            .select()
+            .from(projectParties)
+            .where(eq(projectParties.id, id))
+            .limit(1);
+
+        if (party?.vendorOrganizationId) {
+            const rows = await this.db
+                .update(vendorOrganizations)
+                .set({ status: true, updatedAt: new Date() })
+                .where(eq(vendorOrganizations.id, party.vendorOrganizationId))
+                .returning();
+            if (!rows[0]) throw new NotFoundException(`Vendor organization not found for party ${id}`);
+            return { ...party, isActive: true, source: "vendor_org" };
+        }
+
         const rows = await this.db
             .update(projectParties)
             .set({ isActive: true, updatedAt: new Date() })
@@ -1125,10 +1223,36 @@ export class VendorWorkOrderService {
         if (!rows[0]) {
             throw new NotFoundException(`Party with ID ${id} not found`);
         }
-        return rows[0];
+        return { ...rows[0], source: "party" };
     }
 
-    async deactivateParty(id: number) {
+    async deactivateParty(id: number, source?: string) {
+        if (source === "vendor_org") {
+            const rows = await this.db
+                .update(vendorOrganizations)
+                .set({ status: false, updatedAt: new Date() })
+                .where(eq(vendorOrganizations.id, id))
+                .returning();
+            if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
+            return { ...rows[0], type: "seller", source: "vendor_org", isActive: false };
+        }
+
+        const [party] = await this.db
+            .select()
+            .from(projectParties)
+            .where(eq(projectParties.id, id))
+            .limit(1);
+
+        if (party?.vendorOrganizationId) {
+            const rows = await this.db
+                .update(vendorOrganizations)
+                .set({ status: false, updatedAt: new Date() })
+                .where(eq(vendorOrganizations.id, party.vendorOrganizationId))
+                .returning();
+            if (!rows[0]) throw new NotFoundException(`Vendor organization not found for party ${id}`);
+            return { ...party, isActive: false, source: "vendor_org" };
+        }
+
         const rows = await this.db
             .update(projectParties)
             .set({ isActive: false, updatedAt: new Date() })
@@ -1138,10 +1262,54 @@ export class VendorWorkOrderService {
         if (!rows[0]) {
             throw new NotFoundException(`Party with ID ${id} not found`);
         }
-        return rows[0];
+        return { ...rows[0], source: "party" };
     }
 
     async updateParty(id: number, body: any) {
+        const source = body?.source;
+
+        if (source === "vendor_org") {
+            const rows = await this.db
+                .update(vendorOrganizations)
+                .set({
+                    name: body.name ?? undefined,
+                    alias: body.alias ?? undefined,
+                    msme: body.msme ?? undefined,
+                    pan: body.pan ?? undefined,
+                    address: body.address ?? undefined,
+                    updatedAt: new Date(),
+                })
+                .where(eq(vendorOrganizations.id, id))
+                .returning();
+            if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
+
+            return { ...rows[0], type: "seller", source: "vendor_org", isActive: rows[0].status };
+        }
+
+        const [existing] = await this.db
+            .select()
+            .from(projectParties)
+            .where(eq(projectParties.id, id))
+            .limit(1);
+
+        if (!existing) {
+            throw new NotFoundException(`Party with ID ${id} not found`);
+        }
+
+        if (existing.vendorOrganizationId) {
+            await this.db
+                .update(vendorOrganizations)
+                .set({
+                    name: body.name ?? undefined,
+                    alias: body.alias ?? undefined,
+                    msme: body.msme ?? undefined,
+                    pan: body.pan ?? undefined,
+                    address: body.address ?? undefined,
+                    updatedAt: new Date(),
+                })
+                .where(eq(vendorOrganizations.id, existing.vendorOrganizationId));
+        }
+
         const rows = await this.db
             .update(projectParties)
             .set({
@@ -1163,7 +1331,7 @@ export class VendorWorkOrderService {
         if (!rows[0]) {
             throw new NotFoundException(`Party with ID ${id} not found`);
         }
-        return rows[0];
+        return { ...rows[0], source: existing.vendorOrganizationId ? "vendor_org" : "party" };
     }
 
     async getPdf(id: number, version?: string) {
@@ -1247,33 +1415,46 @@ export class VendorWorkOrderService {
     private async syncParty(body: any) {
         if (!body.sellerName) return;
 
-        const existing = await this.db
-            .select()
-            .from(projectParties)
-            .where(eq(projectParties.name, body.sellerName))
-            .then(rows => rows[0]);
-
-        if (existing) {
+        if (body.sellerOrganizationId) {
             await this.db
-                .update(projectParties)
+                .update(vendorOrganizations)
                 .set({
-                    email: body.sellerEmail || existing.email,
-                    address: body.sellerAddress || existing.address,
-                    gstNo: body.sellerGstNo || existing.gstNo,
-                    pan: body.sellerPan || existing.pan,
-                    msme: body.sellerMsme || existing.msme,
+                    name: body.sellerName,
+                    address: body.sellerAddress || undefined,
+                    msme: body.sellerMsmeNo || undefined,
+                    pan: body.sellerPanNo || undefined,
+                    updatedAt: new Date(),
                 })
-                .where(eq(projectParties.id, existing.id));
+                .where(eq(vendorOrganizations.id, body.sellerOrganizationId));
         } else {
-            await this.db.insert(projectParties).values({
-                name: body.sellerName,
-                email: body.sellerEmail,
-                address: body.sellerAddress,
-                gstNo: body.sellerGstNo,
-                pan: body.sellerPanNo,
-                msme: body.sellerMsmeNo,
-                type: "seller",
-            });
+            const existing = await this.db
+                .select()
+                .from(projectParties)
+                .where(eq(projectParties.name, body.sellerName))
+                .then(rows => rows[0]);
+
+            if (existing) {
+                await this.db
+                    .update(projectParties)
+                    .set({
+                        email: body.sellerEmail || existing.email,
+                        address: body.sellerAddress || existing.address,
+                        gstNo: body.sellerGstNo || existing.gstNo,
+                        pan: body.sellerPanNo || existing.pan,
+                        msme: body.sellerMsmeNo || existing.msme,
+                    })
+                    .where(eq(projectParties.id, existing.id));
+            } else {
+                await this.db.insert(projectParties).values({
+                    name: body.sellerName,
+                    email: body.sellerEmail,
+                    address: body.sellerAddress,
+                    gstNo: body.sellerGstNo,
+                    pan: body.sellerPanNo,
+                    msme: body.sellerMsmeNo,
+                    type: "seller",
+                });
+            }
         }
 
         if (body.shipToName) {

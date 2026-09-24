@@ -13,6 +13,7 @@ export const vendorWorkOrders = pgTable(
         contactPersonName: varchar("contact_person_name", { length: 255 }),
         contactPersonPhone: varchar("contact_person_phone", { length: 20 }),
         contactPersonEmail: varchar("contact_person_email", { length: 255 }),
+        sellerOrganizationId: bigint("seller_organization_id", { mode: "number" }),
         sellerName: varchar("seller_name", { length: 255 }),
         sellerAddress: text("seller_address"),
         sellerEmail: varchar("seller_email", { length: 255 }),
@@ -22,7 +23,7 @@ export const vendorWorkOrders = pgTable(
         sellerMsmeNo: varchar("seller_msme_no", { length: 50 }),
         woDate: date("wo_date"),
         woNumber: varchar("wo_number", { length: 255 }),
-        termsAndConditions: jsonb("terms_and_conditions").notNull().default('[]'),
+        termsAndConditions: jsonb("terms_and_conditions").notNull().default("[]"),
         woRaisedBy: bigint("wo_raised_by", { mode: "number" }),
         certRecipient: bigint("cert_recipient", { mode: "number" }),
         certRecipients: jsonb("cert_recipients").notNull().default([]),
@@ -41,12 +42,12 @@ export const vendorWorkOrders = pgTable(
         generatedPdfVersions: jsonb("generated_pdf_versions").notNull().default({}),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     },
-    table => ([
+    table => [
         index("idx_vwo_number").on(table.woNumber),
         index("idx_vwo_tender_id").on(table.tenderId),
         index("idx_vwo_date").on(table.woDate),
         index("idx_vwo_seller_name").on(table.sellerName),
-    ])
+    ]
 );
 
 export type VendorWorkOrder = typeof vendorWorkOrders.$inferSelect;

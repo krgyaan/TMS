@@ -1,7 +1,8 @@
-import { pgTable, integer, varchar, text, boolean, timestamp, bigserial } from "drizzle-orm/pg-core";
+import { pgTable, varchar, text, boolean, timestamp, bigserial, bigint } from "drizzle-orm/pg-core";
 
 export const projectParties = pgTable("project_parties", {
-    id: bigserial("id", { mode: "number" }).primaryKey(), 
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    vendorOrganizationId: bigint("vendor_organization_id", { mode: "number" }),
     name: varchar("name", { length: 255 }),
     alias: varchar("alias", { length: 255 }),
     gstNo: varchar("gst_no", { length: 50 }),

@@ -500,7 +500,6 @@
         "breakpoints":  true
     },
     {
-<<<<<<< HEAD
       "idx": 95,
       "version": "7",
       "when": 1788500000000,
@@ -513,26 +512,20 @@
       "when": 1789500000000,
       "tag": "0137_create_tender_extractions",
       "breakpoints": true
-=======
-        "idx":  95,
-        "version":  "7",
-        "when":  1789200000000,
-        "tag":  "0136_multi_order_support",
-        "breakpoints":  true
     },
     {
-        "idx": 96,
-        "when": 1789500000000,
-        "tag": "0136_create_tender_extractions",
-        "breakpoints": true
+      "idx": 97,
+      "version": "7",
+      "when": 1789600000000,
+      "tag": "0141_merge_vendor_po_parties",
+      "breakpoints": true
     },
     {
-        "idx":  97,
-        "version":  "7",
-        "when":  1788500000000,
-        "tag":  "0136_add_created_by_to_hrms_complaints",
-        "breakpoints":  true
->>>>>>> upstream/main
+      "idx": 98,
+      "version": "7",
+      "when": 1789700000000,
+      "tag": "0142_remove_duplicate_vendor_contact_fields",
+      "breakpoints": true
     }
   ]
 }

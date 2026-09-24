@@ -13,6 +13,9 @@ import { users } from "@/db/schemas";
 import { projects } from "@/db/schemas/master/projects.schema";
 import { paymentRequests, purchaseInvoices, saleInvoiceItems, saleInvoices } from "@/db/schemas/operations";
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
+import { vendorOrganizations } from "@/db/schemas/vendors/vendor-organizations.schema";
+import { vendors } from "@/db/schemas/vendors/vendors.schema";
+import { vendorGsts } from "@/db/schemas/vendors/vendor-gsts.schema";
 import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { tryMaterializePoInventory, poHasPurchaseInvoice } from "@/modules/operations/inventory/inventory.materialize";
@@ -307,6 +310,7 @@ export class PurchaseOrderService {
                 projectName: body.projectName,
 
                 sellerName: body.sellerName,
+                sellerOrganizationId: body.sellerOrganizationId || null,
                 sellerAddress: body.sellerAddress,
                 sellerEmail: body.sellerEmail,
                 sellerGstNo: body.sellerGstNo,
@@ -855,6 +859,33 @@ export class PurchaseOrderService {
     }
 
     async createParty(body: any) {
+        const type = body.type || "seller";
+
+        if (type === "seller") {
+            const [org] = await this.db
+                .insert(vendorOrganizations)
+                .values({
+                    name: body.name,
+                    alias: body.alias || null,
+                    msme: body.msme || null,
+                    pan: body.pan || null,
+                    address: body.address || null,
+                })
+                .returning();
+
+            if (org.name) {
+                await this.clientDirectorySyncService.syncToClientDirectory([{
+                    name: org.name,
+                    email: body.email || null,
+                    phone: body.mobile_number || null,
+                    org: null,
+                }]);
+            }
+
+            this.logger.info(`Seller created as vendor org: ${org.name} (ID: ${org.id})`);
+            return { ...org, type: "seller", source: "vendor_org" };
+        }
+
         const party = (
             await this.db
             .insert(projectParties)
@@ -866,7 +897,7 @@ export class PurchaseOrderService {
                 gstNo: body.gstNo || null,
                 pan: body.pan || null,
                 msme: body.msme || null,
-                type: body.type || "seller",
+                type,
                 contactPerson: body.contact_person || null,
                 mobileNumber: body.mobile_number || null,
             })
@@ -883,7 +914,7 @@ export class PurchaseOrderService {
         }
 
         this.logger.info(`Party created: ${party.name} (ID: ${party.id}, type: ${party.type})`);
-        return party;
+        return { ...party, source: "party" };
     }
 
     async updatePurchaseOrder(id: number, body: any, userId?: number) {
@@ -914,6 +945,7 @@ export class PurchaseOrderService {
                     poDate: body.poDate,
 
                     sellerName: body.sellerName,
+                    sellerOrganizationId: body.sellerOrganizationId || null,
                     sellerAddress: body.sellerAddress,
                     sellerEmail: body.sellerEmail,
                     sellerGstNo: body.sellerGstNo,
@@ -1011,7 +1043,19 @@ export class PurchaseOrderService {
     }
 
     private async syncPartyFromPO(body: any) {
-        if (body.sellerId) {
+        if (body.sellerOrganizationId) {
+            await this.db
+                .update(vendorOrganizations)
+                .set({
+                    name: body.sellerName,
+                    alias: body.sellerAlias || null,
+                    msme: body.sellerMsmeNo || null,
+                    pan: body.sellerPanNo || null,
+                    address: body.sellerAddress || null,
+                    updatedAt: new Date(),
+                })
+                .where(eq(vendorOrganizations.id, body.sellerOrganizationId));
+        } else if (body.sellerId) {
             await this.db
                 .update(projectParties)
                 .set({
@@ -1374,14 +1418,88 @@ export class PurchaseOrderService {
             conditions.push(eq(projectParties.type, type));
         }
 
-        return this.db
+        const partyRows = await this.db
             .select()
             .from(projectParties)
             .where(and(...conditions))
             .orderBy(desc(projectParties.createdAt));
+
+        if (type && type !== "seller") {
+            return partyRows.map((p) => ({ ...p, source: "party" as const }));
+        }
+
+        const orgRows = await this.db
+            .select({
+                id: vendorOrganizations.id,
+                name: vendorOrganizations.name,
+                alias: vendorOrganizations.alias,
+                gstNo: vendorGsts.gstNo,
+                msme: vendorOrganizations.msme,
+                pan: vendorOrganizations.pan,
+                address: vendorOrganizations.address,
+                email: vendors.email,
+                mobile: vendors.mobile,
+                isActive: vendorOrganizations.status,
+                createdAt: vendorOrganizations.createdAt,
+            })
+            .from(vendorOrganizations)
+            .leftJoin(vendorGsts, eq(vendorGsts.orgId, vendorOrganizations.id))
+            .leftJoin(vendors, eq(vendors.orgId, vendorOrganizations.id))
+            .where(eq(vendorOrganizations.status, true))
+            .orderBy(desc(vendorOrganizations.createdAt));
+
+        const orgMap = new Map<number, any>();
+        for (const row of orgRows) {
+            const existing = orgMap.get(row.id);
+            if (existing) {
+                if (!existing.gstNo && row.gstNo) existing.gstNo = row.gstNo;
+                if (!existing.email && row.email) existing.email = row.email;
+                if (!existing.mobile && row.mobile) existing.mobile = row.mobile;
+            } else {
+                orgMap.set(row.id, {
+                    ...row,
+                    type: "seller",
+                    source: "vendor_org",
+                });
+            }
+        }
+
+        const sellerOrgs = [...orgMap.values()];
+        const legacySellers = partyRows.filter(
+            (p) => p.type === "seller" && !p.vendorOrganizationId,
+        ).map((p) => ({ ...p, source: "party" as const }));
+        const otherParties = partyRows.filter((p) => p.type !== "seller");
+
+        return [...sellerOrgs, ...legacySellers, ...otherParties];
     }
 
-    async activateParty(id: number) {
+    async activateParty(id: number, source?: string) {
+        if (source === "vendor_org") {
+            const rows = await this.db
+                .update(vendorOrganizations)
+                .set({ status: true, updatedAt: new Date() })
+                .where(eq(vendorOrganizations.id, id))
+                .returning();
+            if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
+            return { ...rows[0], type: "seller", source: "vendor_org", isActive: true };
+        }
+
+        const [party] = await this.db
+            .select()
+            .from(projectParties)
+            .where(eq(projectParties.id, id))
+            .limit(1);
+
+        if (party?.vendorOrganizationId) {
+            const rows = await this.db
+                .update(vendorOrganizations)
+                .set({ status: true, updatedAt: new Date() })
+                .where(eq(vendorOrganizations.id, party.vendorOrganizationId))
+                .returning();
+            if (!rows[0]) throw new NotFoundException(`Vendor organization not found for party ${id}`);
+            return { ...party, isActive: true, source: "vendor_org" };
+        }
+
         const rows = await this.db
             .update(projectParties)
             .set({ isActive: true, updatedAt: new Date() })
@@ -1391,10 +1509,36 @@ export class PurchaseOrderService {
         if (!rows[0]) {
             throw new NotFoundException(`Party with ID ${id} not found`);
         }
-        return rows[0];
+        return { ...rows[0], source: "party" };
     }
 
-    async deactivateParty(id: number) {
+    async deactivateParty(id: number, source?: string) {
+        if (source === "vendor_org") {
+            const rows = await this.db
+                .update(vendorOrganizations)
+                .set({ status: false, updatedAt: new Date() })
+                .where(eq(vendorOrganizations.id, id))
+                .returning();
+            if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
+            return { ...rows[0], type: "seller", source: "vendor_org", isActive: false };
+        }
+
+        const [party] = await this.db
+            .select()
+            .from(projectParties)
+            .where(eq(projectParties.id, id))
+            .limit(1);
+
+        if (party?.vendorOrganizationId) {
+            const rows = await this.db
+                .update(vendorOrganizations)
+                .set({ status: false, updatedAt: new Date() })
+                .where(eq(vendorOrganizations.id, party.vendorOrganizationId))
+                .returning();
+            if (!rows[0]) throw new NotFoundException(`Vendor organization not found for party ${id}`);
+            return { ...party, isActive: false, source: "vendor_org" };
+        }
+
         const rows = await this.db
             .update(projectParties)
             .set({ isActive: false, updatedAt: new Date() })
@@ -1404,10 +1548,54 @@ export class PurchaseOrderService {
         if (!rows[0]) {
             throw new NotFoundException(`Party with ID ${id} not found`);
         }
-        return rows[0];
+        return { ...rows[0], source: "party" };
     }
 
     async updateParty(id: number, body: any) {
+        const source = body?.source;
+
+        if (source === "vendor_org") {
+            const rows = await this.db
+                .update(vendorOrganizations)
+                .set({
+                    name: body.name ?? undefined,
+                    alias: body.alias ?? undefined,
+                    msme: body.msme ?? undefined,
+                    pan: body.pan ?? undefined,
+                    address: body.address ?? undefined,
+                    updatedAt: new Date(),
+                })
+                .where(eq(vendorOrganizations.id, id))
+                .returning();
+            if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
+
+            return { ...rows[0], type: "seller", source: "vendor_org", isActive: rows[0].status };
+        }
+
+        const [existing] = await this.db
+            .select()
+            .from(projectParties)
+            .where(eq(projectParties.id, id))
+            .limit(1);
+
+        if (!existing) {
+            throw new NotFoundException(`Party with ID ${id} not found`);
+        }
+
+        if (existing.vendorOrganizationId) {
+            await this.db
+                .update(vendorOrganizations)
+                .set({
+                    name: body.name ?? undefined,
+                    alias: body.alias ?? undefined,
+                    msme: body.msme ?? undefined,
+                    pan: body.pan ?? undefined,
+                    address: body.address ?? undefined,
+                    updatedAt: new Date(),
+                })
+                .where(eq(vendorOrganizations.id, existing.vendorOrganizationId));
+        }
+
         const rows = await this.db
             .update(projectParties)
             .set({
@@ -1439,6 +1627,6 @@ export class PurchaseOrderService {
             }]);
         }
 
-        return rows[0];
+        return { ...rows[0], source: existing.vendorOrganizationId ? "vendor_org" : "party" };
     }
 }

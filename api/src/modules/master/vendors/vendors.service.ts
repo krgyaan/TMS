@@ -11,7 +11,7 @@ import { vendorFiles } from "@db/schemas/vendors/vendor-files.schema";
 export class VendorsService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-        private readonly clientDirectorySyncService: ClientDirectorySyncService,
+        private readonly clientDirectorySyncService: ClientDirectorySyncService
     ) {}
 
     /**
@@ -30,6 +30,9 @@ export class VendorsService {
             organization: {
                 id: vendorOrganizations.id,
                 name: vendorOrganizations.name,
+                alias: vendorOrganizations.alias,
+                msme: vendorOrganizations.msme,
+                pan: vendorOrganizations.pan,
                 address: vendorOrganizations.address,
             },
         };
@@ -98,12 +101,14 @@ export class VendorsService {
         };
         const rows = await this.db.insert(vendors).values(trimmedData).returning();
         const vendor = rows[0];
-        await this.clientDirectorySyncService.syncToClientDirectory([{
-            name: vendor.name,
-            email: vendor.email,
-            phone: vendor.mobile,
-            org: null,
-        }]);
+        await this.clientDirectorySyncService.syncToClientDirectory([
+            {
+                name: vendor.name,
+                email: vendor.email,
+                phone: vendor.mobile,
+                org: null,
+            },
+        ]);
         return vendor;
     }
 
@@ -126,12 +131,14 @@ export class VendorsService {
         }
         const vendor = rows[0];
         if (data.name || data.email || data.mobile) {
-            await this.clientDirectorySyncService.syncToClientDirectory([{
-                name: vendor.name,
-                email: vendor.email,
-                phone: vendor.mobile,
-                org: null,
-            }]);
+            await this.clientDirectorySyncService.syncToClientDirectory([
+                {
+                    name: vendor.name,
+                    email: vendor.email,
+                    phone: vendor.mobile,
+                    org: null,
+                },
+            ]);
         }
         return vendor;
     }
