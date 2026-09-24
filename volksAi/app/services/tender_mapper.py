@@ -1954,7 +1954,7 @@ def build_infosheet_data(
                 "were extracted (MAIN_SOURCED protected; not overrideable by ATC)."
             )
 
-    # 31. SD Duration
+    # 31. SD Durationdsdsd
     sd_duration_display = resolve_field("SD Duration (Months)", r"SD Duration \(Months\)[:\-\s]+([^\n]+)")
 
     # 32. Physical Docs Submission Required
