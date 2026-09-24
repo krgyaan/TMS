@@ -9,7 +9,7 @@ import { getFrontendTimersBatch, getFrontendTimer } from '@/modules/timers/timer
 import { ValidatedBody } from '@/decorators/validated-body.decorator';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { PermissionGuard } from '@/modules/auth/guards/permission.guard';
-import { CanRead, CanCreate, CanUpdate, CanDelete } from '@/modules/auth/decorators/permissions.decorator';
+import { CanRead, CanCreate, CanUpdate, CanDelete, RequireAnyPermission } from '@/modules/auth/decorators/permissions.decorator';
 
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @Controller('tenders')
@@ -208,7 +208,10 @@ export class TenderInfoController {
     }
 
     @Post('generate-name')
-    @CanCreate('tenders')
+    @RequireAnyPermission(
+        { module: 'tenders', action: 'create' },
+        { module: 'tenders', action: 'update' },
+    )
     async generateName(@Body() body: unknown) {
         const parsed = GenerateTenderNameSchema.parse(body);
         return this.tenderInfosService.generateTenderName(

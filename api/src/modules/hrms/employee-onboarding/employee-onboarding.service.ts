@@ -32,14 +32,6 @@ import { OnboardingService } from '../onboarding/onboarding.service';
 
 const EMPLOYEE_DOCS_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'hrms', 'employee-documents');
 
-const REQUIRED_DOC_TYPES = [
-  'Aadhar Card',
-  'PAN Card',
-  'Graduation Certificate',
-  'Passport Size Photo',
-  'Bank Passbook / Cancelled Cheque',
-];
-
 // ─── DTOs ─────────────────────────────────────────────────────────────────────
 
 export interface SubmitSignupDto {
@@ -519,10 +511,7 @@ export class EmployeeOnboardingService {
         ? 'approved'
         : 'pending';
 
-    const allRequiredSubmitted = REQUIRED_DOC_TYPES.every((type) =>
-      obDocsRows.some((d: any) => d.docType === type && (d.status === 'submitted' || d.status === 'resubmitted'))
-    );
-    const documentStatus = allRequiredSubmitted
+    const documentStatus = obDocsRows.length > 0
       ? (obDocsRows.some(d => d.status === 'resubmitted') ? 'resubmitted' : 'submitted')
       : 'pending';
     const documentHrStatus = documents.some((d: any) => d.hrStatus === 'rejected')
@@ -1886,9 +1875,7 @@ export class EmployeeOnboardingService {
       .from(onboardingDocuments)
       .where(eq(onboardingDocuments.onboardingId, onboardingId));
 
-    const allRequiredSubmitted = REQUIRED_DOC_TYPES.every((type) =>
-      currentDocs.some((d: any) => d.docType === type && (d.status === 'submitted' || d.status === 'resubmitted'))
-    );
+    const documentsSubmitted = currentDocs.length > 0;
     const docsApproved = currentDocs.length > 0 && currentDocs.every((d: any) => d.hrStatus === 'approved');
     const docsRejected = currentDocs.some((d: any) => d.hrStatus === 'rejected');
     const docsResubmitted = currentDocs.some((d: any) => d.status === 'resubmitted');
@@ -1897,7 +1884,7 @@ export class EmployeeOnboardingService {
     if (docsApproved) newDocumentStatus = 'approved';
     else if (docsRejected) newDocumentStatus = 'rejected';
     else if (docsResubmitted) newDocumentStatus = 'resubmitted';
-    else if (allRequiredSubmitted) newDocumentStatus = 'submitted';
+    else if (documentsSubmitted) newDocumentStatus = 'submitted';
     else newDocumentStatus = 'pending';
 
     // 6. Induction
