@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useStageBacklogV2 } from "../tender-executive.hooks";
+import { useStageBacklogV2 } from "@/hooks/api/useTenderExecutivePerformance";
 import { MetricCell } from "./MetricCell";
 import { ColumnHeader } from "./emd-helpers";
 

@@ -3,7 +3,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Eye, Info } from "lucide-react";
-import { useStageBacklogV2 } from "../tender-executive.hooks";
+import { useStageBacklogV2 } from "@/hooks/api/useTenderExecutivePerformance";
 import { paths } from "@/app/routes/paths";
 
 /* ================================

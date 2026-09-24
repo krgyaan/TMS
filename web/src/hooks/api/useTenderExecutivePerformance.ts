@@ -1,17 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-    getPerformanceSummary,
-    getPerformanceOutcomes,
-    getStageMatrix,
-    getTenderList,
-    getPerformanceTrends,
-    getExecutiveScoring,
-    getExecutiveBacklog,
-    getEmdBalance,
-    getEmdCashFlow,
-    getStageBacklogV2,
-} from "./tender-executive.api";
-import type { PerformanceQuery } from "./tender-executive.types";
+import { tenderExecutivePerformanceService } from "@/services/api/tender-executive-performance.service";
+import type { PerformanceQuery } from "@/modules/performance/tender-executive/helpers/tender-executive.types";
 
 export const performanceKeys = {
     root: ["performance"] as const,
@@ -33,67 +22,67 @@ export const performanceKeys = {
 export const usePerformanceSummary = (query: PerformanceQuery | null) =>
     useQuery({
         queryKey: performanceKeys.summary(query),
-        queryFn: () => getPerformanceSummary(query!),
+        queryFn: () => tenderExecutivePerformanceService.getPerformanceSummary(query!),
         enabled: !!query?.userId,
     });
 
 export const usePerformanceOutcomes = (query: PerformanceQuery | null) =>
     useQuery({
         queryKey: performanceKeys.outcomes(query),
-        queryFn: () => getPerformanceOutcomes(query!),
+        queryFn: () => tenderExecutivePerformanceService.getPerformanceOutcomes(query!),
         enabled: !!query?.userId,
     });
 
 export const useStageMatrix = (query: PerformanceQuery | null) =>
     useQuery({
         queryKey: performanceKeys.stageMatrix(query),
-        queryFn: () => getStageMatrix(query!),
+        queryFn: () => tenderExecutivePerformanceService.getStageMatrix(query!),
         enabled: !!query?.userId,
     });
 
 export const useTenderList = (query: PerformanceQuery | null) =>
     useQuery({
         queryKey: performanceKeys.tenders(query),
-        queryFn: () => getTenderList(query!),
+        queryFn: () => tenderExecutivePerformanceService.getTenderList(query!),
         enabled: !!query?.userId,
     });
 
 export const usePerformanceTrends = (query: PerformanceQuery | null) =>
     useQuery({
         queryKey: performanceKeys.trends(query),
-        queryFn: () => getPerformanceTrends(query!),
+        queryFn: () => tenderExecutivePerformanceService.getPerformanceTrends(query!),
         enabled: !!query?.userId,
     });
 
 export const useExecutiveScoring = (query: PerformanceQuery | null) =>
     useQuery({
         queryKey: performanceKeys.scoring(query),
-        queryFn: () => getExecutiveScoring(query!),
+        queryFn: () => tenderExecutivePerformanceService.getExecutiveScoring(query!),
         enabled: !!query?.userId,
     });
 
 /* ================================
    USER + TEAM BACKLOG / EMD HOOKS
-================================ */
+=============================== */
 
 export const useStageBacklog = (query: any) =>
     useQuery({
         queryKey: performanceKeys.stageBacklog(query),
-        queryFn: () => getExecutiveBacklog(query),
+        queryFn: () => tenderExecutivePerformanceService.getExecutiveBacklog(query),
         enabled: !!query?.fromDate && !!query?.toDate && ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId)),
     });
 
 export const useStageBacklogV2 = (query: any) =>
     useQuery({
         queryKey: performanceKeys.stageBacklogV2(query),
-        queryFn: () => getStageBacklogV2(query),
+        queryFn: () => tenderExecutivePerformanceService.getStageBacklogV2(query),
         enabled: !!query.fromDate && !!query.toDate && ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId)),
     });
 
 export const useEmdBalance = (query: any) =>
     useQuery({
         queryKey: performanceKeys.emdBalance(query),
-        queryFn: () => getEmdBalance(query),
+        queryFn: () => tenderExecutivePerformanceService.getEmdBalance(query),
         enabled: !!query?.fromDate && !!query?.toDate && ((query.view === "user" && !!query.userId) || (query.view === "team" && !!query.teamId)),
     });
 
@@ -101,7 +90,7 @@ export const useEmdCashFlow = (query: { view: "user" | "team"; userId?: number; 
     useQuery({
         queryKey: performanceKeys.emdCashFlow(query),
         queryFn: () =>
-            getEmdCashFlow(
+            tenderExecutivePerformanceService.getEmdCashFlow(
                 query as {
                     view: "user" | "team";
                     userId?: number;

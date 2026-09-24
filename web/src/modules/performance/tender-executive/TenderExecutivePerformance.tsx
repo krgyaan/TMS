@@ -11,30 +11,15 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-import { ROW_HELP_TEXT } from "./stage-matrix-help";
-import { useExecutiveScoring, usePerformanceOutcomes, usePerformanceSummary, usePerformanceTrends, useStageMatrix } from "./tender-executive.hooks";
-import type { TenderKpiKey } from "./tender-executive.types";
+import { ROW_HELP_TEXT } from "./helpers/stage-matrix-help";
+import { useExecutiveScoring, usePerformanceOutcomes, usePerformanceSummary, usePerformanceTrends, useStageMatrix } from "@/hooks/api/useTenderExecutivePerformance";
+import type { TenderKpiKey } from "./helpers/tender-executive.types";
 
 /* Icons */
 import { paths } from "@/app/routes/paths";
 import { Combobox } from "@/components/form/SelectField";
 import { useUsersByRole } from "@/hooks/api/useUsers";
-import {
-    AlertTriangle,
-    Briefcase,
-    Calendar as CalendarIcon,
-    CheckCircle2,
-    Clock,
-    Download,
-    Eye,
-    FileText,
-    Info,
-    Search,
-    Target,
-    TrendingUp,
-    Trophy,
-    XCircle
-} from "lucide-react";
+import { AlertTriangle, Briefcase, Calendar as CalendarIcon, CheckCircle2, Clock, Download, Eye, FileText, Info, Search, Target, TrendingUp, Trophy, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { EmdBacklogTable } from "./components/EmdBacklogTable";
 import { StageBacklogV4Table } from "./components/StageBacklogV4Table";

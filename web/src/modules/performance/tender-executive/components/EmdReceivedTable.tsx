@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useEmdCashFlow } from "../tender-executive.hooks";
+import { useEmdCashFlow } from "@/hooks/api/useTenderExecutivePerformance";
 import { ColumnHeader } from "./emd-helpers";
 import { MetricCell } from "./MetricCell";
 
