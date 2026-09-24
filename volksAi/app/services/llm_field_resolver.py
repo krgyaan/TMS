@@ -183,7 +183,7 @@ AMBIGUITY_FIELD_DEFINITIONS: Dict[str, str] = {
     ),
     "payment_terms_installation_display": (
         "Percentage of contract/order value paid upon completion of installation, testing, and commissioning milestone "
-        "(e.g. '30%', '20%', '15%'). Must pair with the supply milestone. "
+        "(e.g. '30%', '20%', '15%'). For pure-supply tenders with no installation/commissioning scope, installation terms are NOT APPLICABLE / null — NEVER invent an installation percentage. "
         "CRITICAL RULE: If the candidate value matches the installation milestone in the scoped clauses (e.g. '30%', '20%', '15%'), "
         "choose action='confirm'. NEVER override with figures not explicitly present in the scoped text. "
         "Return as percentage string (e.g. '30%', '20%', '15%')."
@@ -260,9 +260,11 @@ Correct reasoning: the bid number is the literal alphanumeric code following "Ge
 Common mistake to avoid: capturing "One Hundred Twenty" as a string instead of the integer 120; conflating the GeM bid number with an internal tender reference number if both appear nearby.
 
 ### Category: payment_terms (Supply %, Installation %)
-Clause: "Terms of Payment: 70% payment against supply and balance 30% after successful installation and commissioning at site."
-Correct reasoning: supply percentage = 70, installation percentage = 30. These two must sum close to 100 (allowing for a small retention/warranty holdback elsewhere in the clause) -- if they do not, re-read the clause rather than reporting an inconsistent pair.
-Common mistake to avoid: swapping supply and installation percentages when the clause lists installation before supply in a different sentence order; missing a third milestone (e.g. "10% on warranty completion") that changes the supply/installation split.
+Clause (Split tender): "Terms of Payment: 70% payment against supply and balance 30% after successful installation and commissioning at site."
+Correct reasoning: supply percentage = 70, installation percentage = 30.
+Clause (Pure-supply tender): "100% payment will be released upon receipt and acceptance of materials at site."
+Correct reasoning: supply percentage = 100, installation percentage = null / "Not Applicable". Pure-supply tenders genuinely have no installation component; NEVER invent, infer, or hallucinate an installation percentage just to make supply and installation sum to 100%. If installation is not part of the tender scope or not mentioned in the payment terms clause, report installation as null / "Not Applicable".
+Common mistake to avoid: inventing an installation percentage when the tender is pure supply; swapping supply and installation percentages when the clause lists installation before supply in a different sentence order; missing a third milestone (e.g. "10% on warranty completion") that changes the supply/installation split.
 
 ### Category: pbg_sd (PBG/SD percentage, mode, duration)
 Clause: "Successful bidder shall submit a Performance Bank Guarantee (PBG) of 3% of the contract value, valid for 63 months (60 months warranty + 3 months claim period), in the form of a Bank Guarantee from a Nationalized/Scheduled Bank."
@@ -378,7 +380,7 @@ FIELD_PROMPT_MAP: Dict[str, Tuple[str, str, str, Any]] = {
     ),
     "payment_terms_installation_display": (
         "payment_terms_installation_pct", "integer",
-        "% paid on installation/commissioning/site acceptance (integer, e.g. 30, 20, 15)",
+        "% paid on installation/commissioning/site acceptance (integer, e.g. 30, 20, 15). Set null / Not Applicable for pure-supply tenders without installation.",
         _fmt_pct,
     ),
     "ld_percentage_display": (
