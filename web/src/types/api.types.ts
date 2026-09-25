@@ -189,10 +189,9 @@ export interface VendorOrganization {
 
 export interface VendorFile {
     id: number;
-    vendorId: number;
+    orgId: number;
     name: string;
     filePath: string;
-    status: boolean;
     createdAt: string;
     updatedAt: string;
 }
@@ -286,13 +285,13 @@ export interface UpdateVendorAccountDto {
 }
 
 export interface CreateVendorFileDto {
-    vendorId: number;
+    orgId: number;
     name: string;
     filePath: string;
 }
 
 export interface UpdateVendorFileDto {
-    vendorId?: number;
+    orgId?: number;
     name?: string;
     filePath?: string;
 }
@@ -300,6 +299,9 @@ export interface UpdateVendorFileDto {
 export interface CreateVendorOrganizationWithRelationsDto {
     organization: {
         name: string;
+        alias?: string | null;
+        msme?: string | null;
+        pan?: string | null;
         address?: string;
         status?: boolean;
     };
@@ -311,13 +313,16 @@ export interface CreateVendorOrganizationWithRelationsDto {
         mobile: string;
         address?: string;
         status?: boolean;
-        files?: Omit<CreateVendorFileDto, "vendorId">[];
     }>;
+    files?: Omit<CreateVendorFileDto, "orgId">[];
 }
 
 export interface UpdateVendorOrganizationWithRelationsDto {
     organization?: {
         name?: string;
+        alias?: string | null;
+        msme?: string | null;
+        pan?: string | null;
         address?: string;
         status?: boolean;
     };
@@ -338,9 +343,13 @@ export interface UpdateVendorOrganizationWithRelationsDto {
             mobile: string;
             address?: string;
             status?: boolean;
-            files?: Omit<CreateVendorFileDto, "vendorId">[];
         }>;
         update?: Array<{ id: number; data: Partial<CreateVendorDto> }>;
+        delete?: number[];
+    };
+    files?: {
+        create?: Omit<CreateVendorFileDto, "orgId">[];
+        update?: Array<{ id: number; data: UpdateVendorFileDto }>;
         delete?: number[];
     };
 }
@@ -421,8 +430,10 @@ export interface CreateVendorDto {
 export interface UpdateVendorDto extends Partial<CreateVendorDto> {}
 
 export interface CreateVendorOrganizationDto {
-    orgId?: number;
     name: string;
+    alias?: string | null;
+    msme?: string | null;
+    pan?: string | null;
     address?: string;
     status?: boolean;
 }

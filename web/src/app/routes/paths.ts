@@ -283,6 +283,9 @@ export const paths = {
         inventory: "/accounts/inventory",
         inventoryProject: (projectId: number) => `/accounts/inventory?projectId=${projectId}`,
         vendorMaster: "/accounts/vendor-master",
+        vendorMasterCreate: "/accounts/vendor-master/create",
+        vendorMasterEdit: (id: number | string) => `/accounts/vendor-master/${id}/edit`,
+        parties: "/accounts/parties",
     },
 
     

@@ -71,7 +71,7 @@ export const PersonSection = ({ orgId }: Props) => {
 
             update(editingIndex, formState);
 
-            if (orgId && person?.id) {
+            if (orgId && existing?.id) {
                 updateVendor.mutate({
                     id: existing.id,
                     data: formState,

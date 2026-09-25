@@ -41,7 +41,10 @@ const Accounts_PaymentRequestTabs = lazy(() => import("@/modules/operations/paym
 const Accounts_SaleInvoiceTabs = lazy(() => import("@/modules/operations/sale-invoices/SaleInvoiceTabsPage"));
 const Accounts_VendorWorkOrderTabs = lazy(() => import("@/modules/operations/vendor-work-orders/VendorWorkOrderTabsPage"));
 const Accounts_VwoClosure = lazy(() => import("@/modules/operations/vendor-work-orders/pages/VwoClosurePage"));
-const Accounts_VendorMaster = lazy(() => import("@/modules/operations/vendor-master/PartyListPage"));
+const Accounts_VendorMaster = lazy(() => import("@/modules/master/vendors"));
+const Accounts_VendorMaster_Create = lazy(() => import("@/modules/master/vendors/create"));
+const Accounts_VendorMaster_Edit = lazy(() => import("@/modules/master/vendors/edit"));
+const Accounts_Parties = lazy(() => import("@/modules/operations/vendor-master/PartyListPage"));
 const Accounts_InventoryPage = lazy(() => import("@/modules/operations/inventory/pages/InventoryPage"));
 
 export default function AccountsRoutes() {
@@ -81,6 +84,9 @@ export default function AccountsRoutes() {
             <Route path="purchase-orders" element={<RouteWrapper><Accounts_PurchaseOrderTabs /></RouteWrapper>} />
             <Route path="purchase-orders/:poId/closure" element={<RouteWrapper><Accounts_PoClosure /></RouteWrapper>} />
             <Route path="vendor-master" element={<RouteWrapper><Accounts_VendorMaster /></RouteWrapper>} />
+            <Route path="vendor-master/create" element={<RouteWrapper><Accounts_VendorMaster_Create /></RouteWrapper>} />
+            <Route path="vendor-master/:id/edit" element={<RouteWrapper><Accounts_VendorMaster_Edit /></RouteWrapper>} />
+            <Route path="parties" element={<RouteWrapper><Accounts_Parties /></RouteWrapper>} />
             <Route path="sale-invoices" element={<RouteWrapper><Accounts_SaleInvoiceTabs /></RouteWrapper>} />
             <Route path="vendor-work-orders" element={<RouteWrapper><Accounts_VendorWorkOrderTabs /></RouteWrapper>} />
             <Route path="vendor-work-orders/:id/closure" element={<RouteWrapper><Accounts_VwoClosure /></RouteWrapper>} />

@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form } from '@/components/ui/form';
@@ -9,130 +9,43 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { useCreateVendorOrganizationWithRelations } from '@/hooks/api/useVendorOrganizations';
-import { paths } from '@/app/routes/paths';
-import { GstSection } from './components/GstSection';
-import { AccountSection } from './components/AccountSection';
-import { PersonSection } from './components/PersonSection';
-import { FileSection } from './components/FileSection';
-import { AlertCircle, Plus } from 'lucide-react';
+import { useCreateVendorOrganization } from '@/hooks/api/useVendorOrganizations';
+import { vendorAreaBase } from './vendorAreaPath';
+import { AlertCircle } from 'lucide-react';
 
-const VendorFormSchema = z.object({
-    organization: z.object({
-        name: z.string().min(1, 'Organization name is required').max(255),
-        alias: z.string().max(255).optional(),
-        msme: z.string().max(50).optional(),
-        pan: z.string().max(100).optional(),
-        address: z.string().max(500).optional(),
-        status: z.boolean().default(true),
-    }),
-    gsts: z
-        .array(
-            z.object({
-                gstState: z.string().min(1, 'GST state is required'),
-                gstNo: z.string().min(1, 'GST number is required'),
-                status: z.boolean().default(true),
-            }),
-        )
-        .optional()
-        .default([]),
-    accounts: z
-        .array(
-            z.object({
-                bankAccountName: z.string().min(1, 'Account name is required'),
-                accountNum: z.string().min(1, 'Account number is required'),
-                ifscCode: z.string().min(1, 'IFSC code is required'),
-                status: z.boolean().default(true),
-            }),
-        )
-        .optional()
-        .default([]),
-    persons: z
-        .array(
-            z.object({
-                name: z.string().min(1, 'Person name is required'),
-                email: z.string().email('Invalid email').min(1, 'Email is required'),
-                mobile: z.string().min(1, 'Mobile number is required'),
-                address: z.string().optional(),
-                status: z.boolean().default(true),
-                files: z
-                    .array(
-                        z.object({
-                            name: z.string().min(1, 'File name is required'),
-                            filePath: z.string().min(1, 'File path is required'),
-                            status: z.boolean().default(true),
-                        }),
-                    )
-                    .optional()
-                    .default([]),
-            }),
-        )
-        .optional()
-        .default([]),
-    files: z
-        .array(
-            z.object({
-                personIndex: z.number().min(0),
-                name: z.string().min(1, 'File name is required'),
-                filePath: z.string().min(1, 'File path is required'),
-                status: z.boolean().default(true),
-            }),
-        )
-        .optional()
-        .default([]),
+const OrgFormSchema = z.object({
+    name: z.string().min(1, 'Organization name is required').max(255),
+    alias: z.string().max(255).optional(),
+    msme: z.string().max(50).optional(),
+    pan: z.string().max(100).optional(),
+    address: z.string().max(500).optional(),
+    status: z.boolean().default(true),
 });
 
-type VendorFormValues = z.infer<typeof VendorFormSchema>;
+type OrgFormValues = z.infer<typeof OrgFormSchema>;
 
 const CreateVendorPage = () => {
     const navigate = useNavigate();
-    const createVendor = useCreateVendorOrganizationWithRelations();
+    const location = useLocation();
+    const basePath = vendorAreaBase(location.pathname);
+    const createOrg = useCreateVendorOrganization();
 
-    const form = useForm<VendorFormValues>({
-        resolver: zodResolver(VendorFormSchema),
+    const form = useForm<OrgFormValues>({
+        resolver: zodResolver(OrgFormSchema),
         defaultValues: {
-            organization: {
-                name: '',
-                alias: '',
-                msme: '',
-                pan: '',
-                address: '',
-                status: true,
-            },
-            gsts: [],
-            accounts: [],
-            persons: [],
-            files: [],
+            name: '',
+            alias: '',
+            msme: '',
+            pan: '',
+            address: '',
+            status: true,
         },
     });
 
-    const handleSubmit = async (values: VendorFormValues) => {
+    const handleSubmit = async (values: OrgFormValues) => {
         try {
-            // Transform files to attach to persons
-            const personsWithFiles = values.persons.map((person, index) => {
-                const personFiles = values.files
-                    .filter((file) => file.personIndex === index)
-                    .map((file) => ({
-                        name: file.name,
-                        filePath: file.filePath,
-                        status: file.status,
-                    }));
-
-                return {
-                    ...person,
-                    files: [...(person.files || []), ...personFiles],
-                };
-            });
-
-            const payload = {
-                organization: values.organization,
-                gsts: values.gsts || [],
-                accounts: values.accounts || [],
-                persons: personsWithFiles,
-            };
-
-            await createVendor.mutateAsync(payload);
-            navigate(paths.master.vendors);
+            const org = await createOrg.mutateAsync(values);
+            navigate(`${basePath}/${org.id}/edit`);
         } catch (error) {
             // Error handling is done in the hook
         }
@@ -144,17 +57,16 @@ const CreateVendorPage = () => {
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Create Vendor Organization</h1>
                     <p className="text-muted-foreground mt-2">
-                        Add a new vendor organization with GST, accounts, persons, and files
+                        Create the organisation first, then add GSTs, accounts, persons, and files on the edit page.
                     </p>
                 </div>
-                <Button variant="outline" onClick={() => navigate(paths.master.vendors)}>
+                <Button variant="outline" onClick={() => navigate(basePath)}>
                     Cancel
                 </Button>
             </div>
 
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                    {/* Organization Details */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Organization Details</CardTitle>
@@ -162,7 +74,7 @@ const CreateVendorPage = () => {
                         <CardContent className="space-y-4">
                             <FormField
                                 control={form.control}
-                                name="organization.name"
+                                name="name"
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Organization Name *</FormLabel>
@@ -176,7 +88,7 @@ const CreateVendorPage = () => {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <FormField
                                     control={form.control}
-                                    name="organization.alias"
+                                    name="alias"
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Alias</FormLabel>
@@ -189,12 +101,12 @@ const CreateVendorPage = () => {
                                 />
                                 <FormField
                                     control={form.control}
-                                    name="organization.msme"
+                                    name="msme"
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>MSME</FormLabel>
                                             <FormControl>
-                                                <Input placeholder="UDYAM-XX-00-0000000" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value.toUpperCase())} />
+                                                <Input placeholder="UDYAM-XX-00-0000000" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value.toUpperCase())} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -202,12 +114,12 @@ const CreateVendorPage = () => {
                                 />
                                 <FormField
                                     control={form.control}
-                                    name="organization.pan"
+                                    name="pan"
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>PAN</FormLabel>
                                             <FormControl>
-                                                <Input placeholder="ABCDE1234F" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value.toUpperCase())} />
+                                                <Input placeholder="ABCDE1234F" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value.toUpperCase())} />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -216,16 +128,12 @@ const CreateVendorPage = () => {
                             </div>
                             <FormField
                                 control={form.control}
-                                name="organization.address"
+                                name="address"
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Address</FormLabel>
                                         <FormControl>
-                                            <Textarea
-                                                placeholder="Enter organization address"
-                                                rows={3}
-                                                {...field}
-                                            />
+                                            <Textarea placeholder="Enter organization address" rows={3} {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -233,14 +141,11 @@ const CreateVendorPage = () => {
                             />
                             <FormField
                                 control={form.control}
-                                name="organization.status"
+                                name="status"
                                 render={({ field }) => (
                                     <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                                         <FormControl>
-                                            <Checkbox
-                                                checked={field.value}
-                                                onCheckedChange={field.onChange}
-                                            />
+                                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                                         </FormControl>
                                         <div className="space-y-1 leading-none">
                                             <FormLabel>Active</FormLabel>
@@ -251,37 +156,19 @@ const CreateVendorPage = () => {
                         </CardContent>
                     </Card>
 
-                    {/* GST Section */}
-                    <GstSection />
-
-                    {/* Account Section */}
-                    <AccountSection />
-
-                    {/* Person Section */}
-                    <PersonSection />
-
-                    {/* File Section */}
-                    <FileSection />
-
-                    {/* Submit Buttons */}
                     <div className="flex flex-col items-end gap-4 pt-4 border-t">
                         {Object.keys(form.formState.errors).length > 0 && (
                             <div className="text-sm text-destructive flex items-center gap-2">
                                 <AlertCircle className="h-4 w-4" />
-                                Please fix the validation errors (check organization details and ensure all added persons have a valid email and mobile number).
+                                Please fix the validation errors.
                             </div>
                         )}
                         <div className="flex items-center gap-4">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => navigate(paths.master.vendors)}
-                                disabled={createVendor.isPending}
-                            >
+                            <Button type="button" variant="outline" onClick={() => navigate(basePath)} disabled={createOrg.isPending}>
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={createVendor.isPending}>
-                                {createVendor.isPending ? 'Creating...' : 'Create Organization'}
+                            <Button type="submit" disabled={createOrg.isPending}>
+                                {createOrg.isPending ? 'Creating...' : 'Create Organization'}
                             </Button>
                         </div>
                     </div>

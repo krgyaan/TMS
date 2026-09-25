@@ -8,8 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
 import { Plus, Edit, Trash2 } from "lucide-react";
 
 import { useCreateVendorFile, useUpdateVendorFile, useDeleteVendorFile } from "@/hooks/api/useVendorFiles";
@@ -17,25 +15,21 @@ import { DialogDescription } from "@radix-ui/react-dialog";
 
 type FileForm = {
     id?: number;
-    personIndex: number;
     name: string;
     filePath: string;
-    status: boolean;
 };
 
 type Props = {
-    orgId?: number;
+    orgId: number;
 };
 
 export const FileSection = ({ orgId }: Props) => {
-    const { control, getValues, watch } = useFormContext();
+    const { control, getValues } = useFormContext();
 
     const { fields, append, remove, update } = useFieldArray({
         control,
         name: "files",
     });
-
-    const persons = watch("persons") || [];
 
     const createFile = useCreateVendorFile();
     const updateFile = useUpdateVendorFile();
@@ -45,10 +39,8 @@ export const FileSection = ({ orgId }: Props) => {
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
     const emptyFile: FileForm = {
-        personIndex: 0,
         name: "",
         filePath: "",
-        status: true,
     };
 
     const [formState, setFormState] = useState<FileForm>(emptyFile);
@@ -67,63 +59,41 @@ export const FileSection = ({ orgId }: Props) => {
     };
 
     const handleSave = () => {
-        const persons = getValues("persons");
-        const selectedPerson = persons?.[formState.personIndex];
+        const payload = {
+            orgId,
+            name: formState.name,
+            filePath: formState.filePath,
+        };
 
-        if (orgId) {
-            // Edit mode logic - needs existing person ID
-            if (!selectedPerson?.id) return;
+        if (editingIndex !== null) {
+            const existing = getValues(`files.${editingIndex}`);
 
-            const payload = {
-                vendorId: selectedPerson.id,
-                name: formState.name,
-                filePath: formState.filePath,
-            };
-
-            if (editingIndex !== null) {
-                const existing = getValues(`files.${editingIndex}`);
-
-                if (existing?.id) {
-                    updateFile.mutate(
-                        {
-                            id: existing.id,
-                            data: payload,
-                        },
-                        {
-                            onSuccess: updated => {
-                                update(editingIndex, {
-                                    ...updated,
-                                    personIndex: formState.personIndex,
-                                    status: true,
-                                });
-                            },
-                        }
-                    );
-                } else {
-                    update(editingIndex, { ...existing, ...formState });
-                }
-            } else {
-                createFile.mutate(payload, {
-                    onSuccess: created => {
-                        append({
-                            ...created,
-                            personIndex: formState.personIndex,
-                            status: true,
-                        });
+            if (existing?.id) {
+                updateFile.mutate(
+                    {
+                        id: existing.id,
+                        data: payload,
                     },
-                });
+                    {
+                        onSuccess: updated => {
+                            update(editingIndex, updated);
+                        },
+                    }
+                );
+            } else {
+                update(editingIndex, formState);
             }
         } else {
-            // Create mode logic - just append to field array
-            if (editingIndex !== null) {
-                update(editingIndex, formState);
-            } else {
-                append(formState);
-            }
+            createFile.mutate(payload, {
+                onSuccess: created => {
+                    append(created);
+                },
+            });
         }
 
         setOpen(false);
     };
+
     const handleDelete = (index: number) => {
         const file = getValues(`files.${index}`);
 
@@ -140,7 +110,7 @@ export const FileSection = ({ orgId }: Props) => {
                 <div className="flex items-center justify-between">
                     <CardTitle>Files</CardTitle>
 
-                    <Button type="button" variant="outline" size="sm" onClick={openAdd} disabled={persons.length === 0}>
+                    <Button type="button" variant="outline" size="sm" onClick={openAdd}>
                         <Plus className="h-4 w-4 mr-2" />
                         Add File
                     </Button>
@@ -148,7 +118,7 @@ export const FileSection = ({ orgId }: Props) => {
             </CardHeader>
 
             <CardContent className="space-y-3">
-                {persons.length === 0 && <div className="text-center py-4 text-muted-foreground text-sm">Add at least one person before adding files.</div>}
+                {fields.length === 0 && <div className="text-center py-4 text-muted-foreground text-sm">No files added yet.</div>}
 
                 {fields.map((file, index) => (
                     <Card key={file.id} className="p-4">
@@ -172,8 +142,6 @@ export const FileSection = ({ orgId }: Props) => {
                 ))}
             </CardContent>
 
-            {/* Dialog */}
-
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent>
                     <DialogHeader>
@@ -182,24 +150,6 @@ export const FileSection = ({ orgId }: Props) => {
                     </DialogHeader>
 
                     <div className="space-y-4">
-                        <div>
-                            <label className="text-sm font-medium">Person</label>
-
-                            <Select value={formState.personIndex.toString()} onValueChange={v => setFormState({ ...formState, personIndex: Number(v) })}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select person" />
-                                </SelectTrigger>
-
-                                <SelectContent>
-                                    {persons.map((person: any, idx: number) => (
-                                        <SelectItem key={idx} value={idx.toString()}>
-                                            {person.name || `Person ${idx + 1}`}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
                         <div>
                             <label className="text-sm font-medium">File Name</label>
                             <Input value={formState.name} onChange={e => setFormState({ ...formState, name: e.target.value })} />

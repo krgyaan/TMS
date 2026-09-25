@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
@@ -19,7 +19,7 @@ import { useCreateVendorGst, useUpdateVendorGst, useDeleteVendorGst } from "@/ho
 import { useCreateVendorAccount, useUpdateVendorAccount, useDeleteVendorAccount } from "@/hooks/api/useVendorAccounts";
 import { useCreateVendorFile, useUpdateVendorFile, useDeleteVendorFile } from "@/hooks/api/useVendorFiles";
 import { useCreateVendor, useUpdateVendor } from "@/hooks/api/useVendors";
-import { paths } from "@/app/routes/paths";
+import { vendorAreaBase } from "./vendorAreaPath";
 import { GstSection } from "./components/GstSection";
 import { AccountSection } from "./components/AccountSection";
 import { PersonSection } from "./components/PersonSection";
@@ -70,12 +70,24 @@ const VendorFormSchema = z.object({
         )
         .optional()
         .default([]),
+    files: z
+        .array(
+            z.object({
+                id: z.number().optional(),
+                name: z.string().min(1, "File name is required"),
+                filePath: z.string().min(1, "File path is required"),
+            })
+        )
+        .optional()
+        .default([]),
 });
 
 type VendorFormValues = z.infer<typeof VendorFormSchema>;
 
 const EditVendorPage = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const basePath = vendorAreaBase(location.pathname);
     const { id } = useParams<{ id: string }>();
     const orgId = id ? parseInt(id) : null;
 
@@ -105,6 +117,7 @@ const EditVendorPage = () => {
             gsts: [],
             accounts: [],
             persons: [],
+            files: [],
         },
     });
 
@@ -122,6 +135,7 @@ const EditVendorPage = () => {
                 gsts: (organization as any).gsts || [],
                 accounts: (organization as any).accounts || [],
                 persons: (organization as any).persons || [],
+                files: (organization as any).files || [],
             });
         }
     }, [organization, form]);
@@ -156,7 +170,7 @@ const EditVendorPage = () => {
                     organization: values.organization,
                 },
             });
-            navigate(paths.master.vendors);
+            navigate(basePath);
         } catch (error) {
             // Error handling is done in the hook
         }
@@ -169,7 +183,7 @@ const EditVendorPage = () => {
                     <h1 className="text-3xl font-bold tracking-tight">Edit Vendor Organization</h1>
                     <p className="text-muted-foreground mt-2">Update vendor organization details and manage related entities</p>
                 </div>
-                <Button variant="outline" onClick={() => navigate(paths.master.vendors)}>
+                <Button variant="outline" onClick={() => navigate(basePath)}>
                     Cancel
                 </Button>
             </div>
@@ -308,7 +322,7 @@ const EditVendorPage = () => {
                             </div>
                         )}
                         <div className="flex items-center gap-4">
-                            <Button type="button" variant="outline" onClick={() => navigate(paths.master.vendors)} disabled={updateVendor.isPending}>
+                            <Button type="button" variant="outline" onClick={() => navigate(basePath)} disabled={updateVendor.isPending}>
                                 Cancel
                             </Button>
                             <Button type="submit" disabled={updateVendor.isPending}>
@@ -457,12 +471,8 @@ const PersonList = ({ orgId, persons }: { orgId: number; persons: any[] }) => {
     );
 };
 
-const FileList = ({ files, persons }: { files: any[]; persons: any[] }) => {
+const FileList = ({ files }: { files: any[] }) => {
     const deleteFile = useDeleteVendorFile();
-    const getPersonName = (vendorId: number) => {
-        const person = persons.find(p => p.id === vendorId);
-        return person?.name || "Unknown";
-    };
 
     return (
         <div className="space-y-4">
@@ -481,7 +491,7 @@ const FileList = ({ files, persons }: { files: any[]; persons: any[] }) => {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <div className="font-medium">{file.name}</div>
-                                    <div className="text-sm text-muted-foreground">Person: {getPersonName(file.vendorId)}</div>
+                                    <div className="text-sm text-muted-foreground">{file.filePath}</div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Button variant="ghost" size="icon">
