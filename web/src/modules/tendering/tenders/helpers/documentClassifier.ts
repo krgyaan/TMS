@@ -13,6 +13,7 @@ export interface ClassifiedDocument {
     scores?: Record<string, number>;
 }
 
+//test
 export const CATEGORY_INFO: Record<
     DocumentCategory,
     {

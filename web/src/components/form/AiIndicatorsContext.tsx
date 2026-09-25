@@ -45,6 +45,28 @@ const LLM_FALLBACK_FIELDS = new Set([
     'customEligibilityCriteria',
 ]);
 
+export const OPTION_CODE_TO_LABEL: Record<string, string> = {
+    // PBG / SD
+    PBG: 'Performance Bank Guarantee',
+    // EMD / Modes
+    BG: 'Bank Guarantee',
+    DD: 'Demand Draft',
+    FDR: 'Fixed Deposit Receipt',
+    SB: 'Surety Bond',
+    BANK_TRANSFER: 'Bank Transfer',
+    PORTAL: 'Pay on Portal',
+    // MAF
+    YES_GENERAL: 'Yes - General',
+    YES_PROJECT_SPECIFIC: 'Yes - Project Specific',
+    NO: 'No',
+    // Criteria & Physical Docs
+    NOT_APPLICABLE: 'Not Applicable',
+    AMOUNT: 'Amount',
+    ONLY_EMD: 'Only EMD',
+    ONLY_OTHER_DOCUMENT: 'Only Other Document',
+    EMD_AND_OTHER_DOCUMENTS: 'EMD + Other Documents',
+};
+
 function formatDisplayValue(val: unknown): string {
     if (val === null || val === undefined || val === '') return '—';
     if (typeof val === 'boolean') return val ? 'Yes' : 'No';
@@ -53,7 +75,10 @@ function formatDisplayValue(val: unknown): string {
         if (typeof val[0] === 'object') {
             return val.map((item) => JSON.stringify(item)).join('; ');
         }
-        return val.join(', ');
+        return val.map((item) => OPTION_CODE_TO_LABEL[String(item)] || String(item)).join(', ');
+    }
+    if (typeof val === 'string' && OPTION_CODE_TO_LABEL[val]) {
+        return OPTION_CODE_TO_LABEL[val];
     }
     if (typeof val === 'number') {
         return Number.isInteger(val) ? val.toLocaleString('en-IN') : val.toString();
