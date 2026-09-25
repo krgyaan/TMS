@@ -5,14 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { ROW_HELP_TEXT } from "./helpers/stage-matrix-help";
 import { usePerformanceOutcomes, useStageMatrix } from "@/hooks/api/useTenderExecutivePerformance";
-import type { StageMatrixDrilldownItem, TenderKpiKey } from "./helpers/tender-executive.types";
+import type { TenderKpiKey } from "./helpers/tender-executive.types";
 
 /* Icons */
 import { paths } from "@/app/routes/paths";
@@ -22,6 +21,7 @@ import { AlertTriangle, Briefcase, Calendar as CalendarIcon, CheckCircle2, Clock
 import { useNavigate } from "react-router-dom";
 import { EmdBacklogTable } from "./components/EmdBacklogTable";
 import { StageBacklogV4Table } from "./components/StageBacklogV4Table";
+import { ScoreDrilldownPopover } from "./components/ScoreDrilldownPopover";
 
 /* ================================
    HELPERS
@@ -341,11 +341,6 @@ export default function TenderExecutivePerformance() {
                 {/* ===== EMD BACKLOG ===== */}
                 {sharedQuery && <EmdBacklogTable {...sharedQuery} />}
 
-                {/* {sharedQuery && <EmdPaidTable {...sharedQuery} />} */}
-                {/* ===== EMD RECEIVED ===== */}
-
-                {/* {sharedQuery && <EmdBalanceTable {...sharedQuery} />} */}
-
                 {scope.view === "user" && (
                     <>
                         {/* ===== KPI CARDS ===== */}
@@ -487,81 +482,34 @@ export default function TenderExecutivePerformance() {
                                                                 {val !== null ? (
                                                                     (() => {
                                                                         const drilldown = row.drilldown[j] ?? [];
+                                                                        const tenders = drilldown.map(item => ({
+                                                                            tenderId: item.tenderId,
+                                                                            tenderNo: item.tenderNo ?? `Tender #${item.tenderId}`,
+                                                                            tenderName: item.tenderName ?? "Tender name unavailable",
+                                                                            value: 0,
+                                                                            date: item.completedAt ?? item.deadline ?? null,
+                                                                        }));
 
                                                                         return (
-                                                                            <Popover>
-                                                                                <PopoverTrigger asChild>
+                                                                            <ScoreDrilldownPopover
+                                                                                title={`${row.label} · ${formatLabel(STAGES[j])}`}
+                                                                                tenders={tenders}
+                                                                                trigger={
                                                                                     <div
                                                                                         className={`
-                                                                                mx-auto flex items-center justify-center w-8 h-8 rounded-full text-sm cursor-pointer font-bold
-                                                                                ${rowType === "success" ? "bg-emerald-100/70 text-emerald-700" : ""}   // onTime
-                                                                                ${rowType === "completed" ? "bg-green-100/70 text-green-700" : ""}    // done
-                                                                                ${rowType === "warning" ? "bg-amber-100/70 text-amber-700" : ""}      // late
-                                                                                ${rowType === "info" ? "bg-sky-100/70 text-sky-700" : ""}             // pending
-                                                                                ${rowType === "destructive" ? "bg-destructive/10 text-destructive" : ""} // overdue
-                                                                                ${rowType === "default" ? "bg-muted text-muted-foreground" : ""}   // notApplicable
-                                                                            `}
+                                                                                        mx-auto flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-sm font-bold
+                                                                                        ${rowType === "success" ? "bg-emerald-100/70 text-emerald-700" : ""}
+                                                                                        ${rowType === "completed" ? "bg-green-100/70 text-green-700" : ""}
+                                                                                        ${rowType === "warning" ? "bg-amber-100/70 text-amber-700" : ""}
+                                                                                        ${rowType === "info" ? "bg-sky-100/70 text-sky-700" : ""}
+                                                                                        ${rowType === "destructive" ? "bg-destructive/10 text-destructive" : ""}
+                                                                                        ${rowType === "default" ? "bg-muted text-muted-foreground" : ""}
+                                                                                    `}
                                                                                     >
                                                                                         {val}
                                                                                     </div>
-                                                                                </PopoverTrigger>
-
-                                                                                <PopoverContent className="w-80 max-h-72 overflow-auto">
-                                                                                    <div className="space-y-2">
-                                                                                        <div className="font-semibold text-sm">
-                                                                                            {row.label} — {formatLabel(STAGES[j])}
-                                                                                        </div>
-
-                                                                                        {drilldown.length === 0 ? (
-                                                                                            <p className="text-xs text-muted-foreground">No tenders</p>
-                                                                                        ) : (
-                                                                                            drilldown.map((t: StageMatrixDrilldownItem) => (
-                                                                                                <div key={t.tenderId} className="flex justify-between">
-                                                                                                    <div className="border-b pb-2 text-xs space-y-1">
-                                                                                                        <div className="font-medium">{t.tenderNo ?? `Tender #${t.tenderId}`}</div>
-
-                                                                                                        {t.tenderName && (
-                                                                                                            <div className="text-muted-foreground truncate">{t.tenderName}</div>
-                                                                                                        )}
-
-                                                                                                        {t.deadline && (
-                                                                                                            <div className="text-muted-foreground">
-                                                                                                                Due: {new Date(t.deadline).toLocaleDateString()}
-                                                                                                            </div>
-                                                                                                        )}
-
-                                                                                                        {t.daysOverdue != null && (
-                                                                                                            <div className="text-red-600 font-medium">
-                                                                                                                {t.daysOverdue} days overdue
-                                                                                                            </div>
-                                                                                                        )}
-
-                                                                                                        {t.meta && Object.keys(t.meta).length > 0 && (
-                                                                                                            <div className="italic text-muted-foreground">
-                                                                                                                {Object.entries(t.meta)
-                                                                                                                    .map(([k, v]) => `${k}: ${v}`)
-                                                                                                                    .join(", ")}
-                                                                                                            </div>
-                                                                                                        )}
-                                                                                                    </div>
-                                                                                                    <div>
-                                                                                                        <button
-                                                                                                            onClick={ev => {
-                                                                                                                ev.stopPropagation();
-                                                                                                                window.open(paths.tendering.tenderView(t.tenderId), "_blank");
-                                                                                                            }}
-                                                                                                            className="h-7 w-7 flex items-center justify-center rounded-md
-                                                                                                                                        text-muted-foreground hover:text-primary hover:bg-muted"
-                                                                                                        >
-                                                                                                            <Eye className="h-4 w-4" />
-                                                                                                        </button>
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                            ))
-                                                                                        )}
-                                                                                    </div>
-                                                                                </PopoverContent>
-                                                                            </Popover>
+                                                                                }
+                                                                            />
                                                                         );
                                                                     })()
                                                                 ) : (
