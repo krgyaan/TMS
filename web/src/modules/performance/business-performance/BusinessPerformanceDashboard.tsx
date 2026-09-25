@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 /* UI Components */
@@ -77,9 +77,11 @@ function getInitialSelection(search: string): PersistedSelection {
     }
 
     try {
-        const stored = JSON.parse(localStorage.getItem(persistedSelectionKey) ?? "null") as PersistedSelection | null;
-        if (stored && Number.isFinite(stored.item) && yearToDateRange(stored.year)) {
-            return { item: stored.item, year: stored.year };
+        const storedParams = new URLSearchParams(localStorage.getItem(persistedSelectionKey) ?? "");
+        const storedItem = Number(storedParams.get("item"));
+        const storedYear = storedParams.get("year") ?? "";
+        if (Number.isFinite(storedItem) && yearToDateRange(storedYear)) {
+            return { item: storedItem, year: storedYear };
         }
     } catch {
         localStorage.removeItem(persistedSelectionKey);
@@ -147,6 +149,12 @@ export default function BusinessPerformanceDashboard() {
         };
     });
 
+    useEffect(() => {
+        if (location.search || !appliedParams) return;
+        const search = new URLSearchParams({ item: String(appliedParams.headingId), year: selectedFinancialYear });
+        navigate({ search: `?${search.toString()}` }, { replace: true });
+    }, [appliedParams, location.search, navigate, selectedFinancialYear]);
+
     // Fetch headings for dropdown
     const { data: headings = [] } = useItemHeadings();
 
@@ -175,7 +183,13 @@ export default function BusinessPerformanceDashboard() {
         const search = new URLSearchParams();
         search.set("item", String(params.headingId));
         if (selectedFinancialYear) search.set("year", selectedFinancialYear);
-        localStorage.setItem(persistedSelectionKey, JSON.stringify({ item: params.headingId, year: selectedFinancialYear }));
+        localStorage.setItem(
+            persistedSelectionKey,
+            new URLSearchParams({
+                item: String(params.headingId),
+                year: selectedFinancialYear,
+            }).toString()
+        );
         navigate({ search: `?${search.toString()}` }, { replace: true });
     };
 

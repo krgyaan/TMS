@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 /* UI Components */
@@ -59,12 +59,12 @@ const getInitialFilters = (search: string): LocationPerformanceFilters => {
     try {
         const stored = localStorage.getItem(LOCATION_PERFORMANCE_STORAGE_KEY);
         if (stored) {
-            const filters = JSON.parse(stored) as Partial<LocationPerformanceFilters>;
+            const storedParams = new URLSearchParams(stored);
             return {
-                selectedHeadingId: parseNumber(String(filters.selectedHeadingId ?? ""), 0),
-                selectedLocation: parseOptionalNumber(filters.selectedLocation),
-                selectedTeam: parseNumber(String(filters.selectedTeam ?? ""), 0),
-                selectedFinancialYear: typeof filters.selectedFinancialYear === "string" ? filters.selectedFinancialYear : "",
+                selectedHeadingId: parseNumber(storedParams.get("item"), 0),
+                selectedLocation: parseOptionalNumber(storedParams.get("location")),
+                selectedTeam: parseNumber(storedParams.get("team"), 0),
+                selectedFinancialYear: storedParams.get("year") ?? "",
             };
         }
     } catch {
@@ -160,6 +160,16 @@ export default function LocationPerformanceDashboard() {
     const [selectedFinancialYear, setSelectedFinancialYear] = useState(initialFilters.selectedFinancialYear);
     const [appliedParams, setAppliedParams] = useState<LocationPerformanceParams | null>(() => toAppliedParams(initialFilters));
 
+    useEffect(() => {
+        if (location.search || !appliedParams) return;
+        const search = new URLSearchParams();
+        if (appliedParams.headingId) search.set("item", String(appliedParams.headingId));
+        search.set("location", String(appliedParams.location));
+        if (appliedParams.team) search.set("team", String(appliedParams.team));
+        if (appliedParams.year) search.set("year", appliedParams.year);
+        navigate({ search: `?${search.toString()}` }, { replace: true });
+    }, [appliedParams, location.search, navigate]);
+
     // Fetch headings for dropdown
     const { data: headings = [] } = useItemHeadings();
 
@@ -198,15 +208,7 @@ export default function LocationPerformanceDashboard() {
         if (selectedFinancialYear) search.set("year", selectedFinancialYear);
 
         try {
-            localStorage.setItem(
-                LOCATION_PERFORMANCE_STORAGE_KEY,
-                JSON.stringify({
-                    selectedHeadingId,
-                    selectedLocation,
-                    selectedTeam,
-                    selectedFinancialYear,
-                } satisfies LocationPerformanceFilters)
-            );
+            localStorage.setItem(LOCATION_PERFORMANCE_STORAGE_KEY, search.toString());
         } catch (error) {
             void error;
         }

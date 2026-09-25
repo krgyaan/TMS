@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 /* UI Components */
@@ -71,12 +71,18 @@ function readCustomerPerformanceFilters(search: string): CustomerPerformanceFilt
         const stored = localStorage.getItem(CUSTOMER_PERFORMANCE_FILTERS_KEY);
         if (!stored) return { item: null, orgId: null, team: "combined", year: "" };
 
-        const parsed = JSON.parse(stored) as Partial<CustomerPerformanceFilters>;
+        const storedParams = new URLSearchParams(stored);
+        const rawItem = storedParams.get("item");
+        const rawOrgId = storedParams.get("orgId");
+        const parsedItem = rawItem !== null ? Number(rawItem) : NaN;
+        const parsedOrgId = rawOrgId !== null ? Number(rawOrgId) : NaN;
+        const storedTeam = storedParams.get("team");
+
         return {
-            item: typeof parsed.item === "number" && Number.isFinite(parsed.item) ? parsed.item : null,
-            orgId: typeof parsed.orgId === "number" && Number.isFinite(parsed.orgId) ? parsed.orgId : null,
-            team: parsed.team === "AC" || parsed.team === "DC" ? parsed.team : "combined",
-            year: typeof parsed.year === "string" ? parsed.year : "",
+            item: Number.isFinite(parsedItem) ? parsedItem : null,
+            orgId: Number.isFinite(parsedOrgId) ? parsedOrgId : null,
+            team: storedTeam === "AC" || storedTeam === "DC" ? storedTeam : "combined",
+            year: storedParams.get("year") ?? "",
         };
     } catch {
         return { item: null, orgId: null, team: "combined", year: "" };
@@ -85,7 +91,12 @@ function readCustomerPerformanceFilters(search: string): CustomerPerformanceFilt
 
 function writeCustomerPerformanceFilters(filters: CustomerPerformanceFilters): void {
     try {
-        localStorage.setItem(CUSTOMER_PERFORMANCE_FILTERS_KEY, JSON.stringify(filters));
+        const params = new URLSearchParams();
+        if (filters.item !== null) params.set("item", String(filters.item));
+        if (filters.orgId !== null) params.set("orgId", String(filters.orgId));
+        if (filters.team === "AC" || filters.team === "DC") params.set("team", filters.team);
+        if (filters.year) params.set("year", filters.year);
+        localStorage.setItem(CUSTOMER_PERFORMANCE_FILTERS_KEY, params.toString());
     } catch {
         return;
     }
@@ -184,6 +195,16 @@ export default function CustomerPerformanceDashboard() {
             toDate: range.toDate,
         };
     });
+
+    useEffect(() => {
+        if (location.search || !appliedParams) return;
+        const search = new URLSearchParams();
+        if (appliedParams.org !== undefined) search.set("orgId", String(appliedParams.org));
+        if (appliedParams.teamCategory !== undefined) search.set("team", appliedParams.teamCategory);
+        if (appliedParams.itemHeading !== undefined) search.set("item", String(appliedParams.itemHeading));
+        if (initialFilters.year) search.set("year", initialFilters.year);
+        navigate({ search: `?${search.toString()}` }, { replace: true });
+    }, [appliedParams, initialFilters.year, location.search, navigate]);
 
     // Fetch headings for dropdown
     const { data: headings = [] } = useItemHeadings();

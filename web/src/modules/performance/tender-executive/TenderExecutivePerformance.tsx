@@ -65,13 +65,11 @@ function parsePositiveId(value: string | null) {
 
 function parseStoredScope(): Scope {
     try {
-        const stored = JSON.parse(localStorage.getItem(SCOPE_STORAGE_KEY) ?? "null") as { view?: string; userId?: number; teamId?: number } | null;
-        if (stored?.view === "user" && Number.isInteger(stored.userId) && stored.userId! > 0) {
-            return { view: "user", userId: stored.userId! };
-        }
-        if (stored?.view === "team" && Number.isInteger(stored.teamId) && stored.teamId! > 0) {
-            return { view: "team", teamId: stored.teamId! };
-        }
+        const stored = new URLSearchParams(localStorage.getItem(SCOPE_STORAGE_KEY) ?? "");
+        const userId = parsePositiveId(stored.get("userId"));
+        const teamId = parsePositiveId(stored.get("teamId"));
+        if (userId) return { view: "user", userId };
+        if (teamId) return { view: "team", teamId };
     } catch {
         localStorage.removeItem(SCOPE_STORAGE_KEY);
     }
@@ -108,8 +106,9 @@ export default function TenderExecutivePerformance() {
         const urlDate = searchParams.get("fromDate");
         if (isDateString(urlDate)) return urlDate;
         try {
-            const stored = JSON.parse(localStorage.getItem(SCOPE_STORAGE_KEY) ?? "null") as { fromDate?: string } | null;
-            return isDateString(stored?.fromDate ?? null) ? stored!.fromDate! : null;
+            const stored = new URLSearchParams(localStorage.getItem(SCOPE_STORAGE_KEY) ?? "");
+            const storedDate = stored.get("fromDate");
+            return isDateString(storedDate) ? storedDate : null;
         } catch {
             return null;
         }
@@ -118,8 +117,9 @@ export default function TenderExecutivePerformance() {
         const urlDate = searchParams.get("toDate");
         if (isDateString(urlDate)) return urlDate;
         try {
-            const stored = JSON.parse(localStorage.getItem(SCOPE_STORAGE_KEY) ?? "null") as { toDate?: string } | null;
-            return isDateString(stored?.toDate ?? null) ? stored!.toDate! : null;
+            const stored = new URLSearchParams(localStorage.getItem(SCOPE_STORAGE_KEY) ?? "");
+            const storedDate = stored.get("toDate");
+            return isDateString(storedDate) ? storedDate : null;
         } catch {
             return null;
         }
@@ -153,16 +153,7 @@ export default function TenderExecutivePerformance() {
         if (fromDate) params.set("fromDate", fromDate);
         if (toDate) params.set("toDate", toDate);
 
-        localStorage.setItem(
-            SCOPE_STORAGE_KEY,
-            JSON.stringify({
-                view: scope.view,
-                userId: scope.view === "user" ? scope.userId : undefined,
-                teamId: scope.view === "team" ? scope.teamId : undefined,
-                fromDate,
-                toDate,
-            })
-        );
+        localStorage.setItem(SCOPE_STORAGE_KEY, params.toString());
         setSearchParams(params, { replace: true });
     }, [fromDate, scope, setSearchParams, toDate]);
 
