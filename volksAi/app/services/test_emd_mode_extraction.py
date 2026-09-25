@@ -83,7 +83,7 @@ def test_emd_mode_extracted_from_emd_section():
 
     dto = map_to_tms_dto(infosheet)
     assert dto.get("emdModes") is not None
-    assert set(dto.get("emdModes")) == {"Bank Transfer", "Demand Draft", "Bank Guarantee"}
+    assert set(dto.get("emdModes")) == {"BANK_TRANSFER", "DD", "BG"}
 
 
 def test_emd_mode_does_not_sweep_all_5_instruments_from_boilerplate():

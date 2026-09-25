@@ -55,7 +55,7 @@ def test_pbg_mode_extracted_when_explicit_pbg_clause_present():
 
     dto = map_to_tms_dto(infosheet)
     assert dto.get("pbgMode") is not None
-    assert set(dto.get("pbgMode")) == {"DD", "FDR", "Bank Guarantee"}
+    assert set(dto.get("pbgMode")) == {"DD", "FDR", "PBG"}
 
 
 def test_pbg_mode_missing_when_pbg_clause_exists_but_omits_modes():

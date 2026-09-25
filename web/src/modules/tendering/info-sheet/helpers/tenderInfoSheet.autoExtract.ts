@@ -273,7 +273,26 @@ export function populateFormFromExtraction(
         if (!isNaN(num)) setField('emdAmount', num);
     }
     if (Array.isArray(fields.emdModes?.value) && fields.emdModes.value.length > 0) {
-        setField('emdModes', fields.emdModes.value.map(String));
+        const VALID_EMD = new Set(['DD', 'PORTAL', 'BANK_TRANSFER', 'FDR', 'BG', 'SB']);
+        const LEGACY_EMD_MAP: Record<string, string> = {
+            'BANK GUARANTEE': 'BG',
+            'DEMAND DRAFT': 'DD',
+            'BANK TRANSFER': 'BANK_TRANSFER',
+            'FIXED DEPOSIT': 'FDR',
+            'FIXED DEPOSIT RECEIPT': 'FDR',
+            'SURETY BOND': 'SB',
+            'INSURANCE SURETY BOND': 'SB',
+            'PAY ON PORTAL': 'PORTAL',
+        };
+        const mappedModes = fields.emdModes.value
+            .map((v) => {
+                const s = String(v).trim().toUpperCase();
+                return VALID_EMD.has(s) ? s : (LEGACY_EMD_MAP[s] || null);
+            })
+            .filter((v): v is string => Boolean(v));
+        if (mappedModes.length > 0) {
+            setField('emdModes', Array.from(new Set(mappedModes)));
+        }
     }
 
     // ─── 2. Tender Fee ──────────────────────────────────────────────────────
@@ -385,7 +404,24 @@ export function populateFormFromExtraction(
         if (!isNaN(num) && num >= 0) setField('pbgDurationMonths', num);
     }
     if (Array.isArray(fields.pbgMode?.value) && fields.pbgMode.value.length > 0) {
-        setField('pbgForm', fields.pbgMode.value.map(String));
+        const VALID_PBG = new Set(['DD', 'FDR', 'PBG', 'SB']);
+        const LEGACY_PBG_MAP: Record<string, string> = {
+            'BANK GUARANTEE': 'PBG',
+            'DEMAND DRAFT': 'DD',
+            'FIXED DEPOSIT': 'FDR',
+            'FIXED DEPOSIT RECEIPT': 'FDR',
+            'SURETY BOND': 'SB',
+            'INSURANCE SURETY BOND': 'SB',
+        };
+        const mappedModes = fields.pbgMode.value
+            .map((v) => {
+                const s = String(v).trim().toUpperCase();
+                return VALID_PBG.has(s) ? s : (LEGACY_PBG_MAP[s] || null);
+            })
+            .filter((v): v is string => Boolean(v));
+        if (mappedModes.length > 0) {
+            setField('pbgForm', Array.from(new Set(mappedModes)));
+        }
     }
 
     // ─── 9. Security Deposit (SD) ───────────────────────────────────────────
@@ -398,7 +434,24 @@ export function populateFormFromExtraction(
         if (!isNaN(num) && num >= 0) setField('sdDurationMonths', num);
     }
     if (Array.isArray(fields.sdMode?.value) && fields.sdMode.value.length > 0) {
-        setField('sdForm', fields.sdMode.value.map(String));
+        const VALID_SD = new Set(['DD', 'FDR', 'PBG', 'SB']);
+        const LEGACY_SD_MAP: Record<string, string> = {
+            'BANK GUARANTEE': 'PBG',
+            'DEMAND DRAFT': 'DD',
+            'FIXED DEPOSIT': 'FDR',
+            'FIXED DEPOSIT RECEIPT': 'FDR',
+            'SURETY BOND': 'SB',
+            'INSURANCE SURETY BOND': 'SB',
+        };
+        const mappedModes = fields.sdMode.value
+            .map((v) => {
+                const s = String(v).trim().toUpperCase();
+                return VALID_SD.has(s) ? s : (LEGACY_SD_MAP[s] || null);
+            })
+            .filter((v): v is string => Boolean(v));
+        if (mappedModes.length > 0) {
+            setField('sdForm', Array.from(new Set(mappedModes)));
+        }
     }
 
     // ─── 10. Liquidated Damages (LD) ────────────────────────────────────────

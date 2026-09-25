@@ -1954,7 +1954,7 @@ def build_infosheet_data(
                 "were extracted (MAIN_SOURCED protected; not overrideable by ATC)."
             )
 
-    # 31. SD Durationdsdsd
+    # 31. SD Duration
     sd_duration_display = resolve_field("SD Duration (Months)", r"SD Duration \(Months\)[:\-\s]+([^\n]+)")
 
     # 32. Physical Docs Submission Required
@@ -1962,7 +1962,7 @@ def build_infosheet_data(
     if _is_missing(physical_docs_required_display) or physical_docs_required_display == "NA":
         _clean_text_for_phys = re.sub(
             r"Mandating\s+submission\s+of\s+documents\s+in\s+physical\s+form[^\n\.]*",
-            "", 
+            "", full_text, flags=re.IGNORECASE
         )
         _has_phys_mandate = bool(
             re.search(r"(?:submitted\s+in\s+Original\s*\(?(?:in\s+)?physical\s+form\)?|physical\s+form\s+within\s+(\d+|\w+)\s*\(?\w*\)?\s*days|submission\s+of\s+physical\s+document(?:s)?\s+(?:is\s+)?mandatory|(?:submit|submission\s+of)[^\n\.]+?original\s+(?:physical\s+)?(?:EMD|DD|BG|document)|original\s+(?:physical\s+)?(?:EMD|DD|BG|document)[^\n\.]+?(?:must|shall|to)\s+be\s+submitted|hard\s+cop(?:y|ies)\s+(?:of\s+[^\n\.]+?\s+)?(?:must|shall|to)\s+be\s+submitted)", _clean_text_for_phys, re.IGNORECASE)
