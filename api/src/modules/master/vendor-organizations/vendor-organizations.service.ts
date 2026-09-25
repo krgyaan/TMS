@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, ConflictException } from "@nestjs/common";
-import { eq, inArray, asc } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { vendorOrganizations, type VendorOrganization, type NewVendorOrganization } from "@db/schemas/vendors/vendor-organizations.schema";
@@ -50,12 +50,8 @@ export class VendorOrganizationsService {
         // Get all bank accounts for this organization
         const accounts = await this.db.select().from(vendorAccs).where(eq(vendorAccs.orgId, id));
 
-        // Get all files from all persons in this organization
-        const personIds = persons.map(p => p.id);
-        let files: (typeof vendorFiles.$inferSelect)[] = [];
-        if (personIds.length > 0) {
-            files = await this.db.select().from(vendorFiles).where(inArray(vendorFiles.vendorId, personIds));
-        }
+        // Get all files for this organization
+        const files = await this.db.select().from(vendorFiles).where(eq(vendorFiles.orgId, id));
 
         return {
             ...organization,
@@ -89,15 +85,19 @@ export class VendorOrganizationsService {
 
                 const accounts = await this.db.select().from(vendorAccs).where(eq(vendorAccs.orgId, org.id));
 
+                const files = await this.db.select().from(vendorFiles).where(eq(vendorFiles.orgId, org.id));
+
                 return {
                     ...org,
                     persons,
                     gsts,
                     accounts,
+                    files,
                     _counts: {
                         persons: persons.length,
                         gsts: gsts.length,
                         accounts: accounts.length,
+                        files: files.length,
                     },
                 };
             })
@@ -153,11 +153,8 @@ export class VendorOrganizationsService {
         organization: NewVendorOrganization;
         gsts?: Omit<NewVendorGst, "orgId">[];
         accounts?: Omit<NewVendorAcc, "orgId">[];
-        persons?: Array<
-            Omit<NewVendor, "orgId"> & {
-                files?: Omit<NewVendorFile, "vendorId">[];
-            }
-        >;
+        persons?: Omit<NewVendor, "orgId">[];
+        files?: Omit<NewVendorFile, "orgId">[];
     }) {
         // Create organization first
         const organization = await this.create(data.organization);
@@ -182,35 +179,28 @@ export class VendorOrganizationsService {
             );
         }
 
-        // Create persons and their files
+        // Create persons
         if (data.persons && data.persons.length > 0) {
-            for (const personData of data.persons) {
-                const { files, ...personFields } = personData;
-                const trimmedPersonFields = {
+            await this.db.insert(vendors).values(
+                data.persons.map(personFields => ({
                     ...personFields,
                     name: personFields.name?.trim(),
                     email: personFields.email?.trim(),
                     mobile: personFields.mobile?.trim(),
                     address: personFields.address?.trim(),
-                };
-                const person = await this.db
-                    .insert(vendors)
-                    .values({
-                        ...trimmedPersonFields,
-                        orgId: organization.id,
-                    })
-                    .returning();
+                    orgId: organization.id,
+                }))
+            );
+        }
 
-                // Create files for this person
-                if (files && files.length > 0 && person[0]) {
-                    await this.db.insert(vendorFiles).values(
-                        files.map(file => ({
-                            ...file,
-                            vendorId: person[0].id,
-                        }))
-                    );
-                }
-            }
+        // Create files (belong to the organization)
+        if (data.files && data.files.length > 0) {
+            await this.db.insert(vendorFiles).values(
+                data.files.map(file => ({
+                    ...file,
+                    orgId: organization.id,
+                }))
+            );
         }
 
         // Return organization with all relations
@@ -235,12 +225,13 @@ export class VendorOrganizationsService {
                 delete?: number[];
             };
             persons?: {
-                create?: Array<
-                    Omit<NewVendor, "orgId"> & {
-                        files?: Omit<NewVendorFile, "vendorId">[];
-                    }
-                >;
+                create?: Omit<NewVendor, "orgId">[];
                 update?: Array<{ id: number; data: Partial<Omit<NewVendor, "orgId">> }>;
+                delete?: number[];
+            };
+            files?: {
+                create?: Omit<NewVendorFile, "orgId">[];
+                update?: Array<{ id: number; data: Partial<Omit<NewVendorFile, "orgId">> }>;
                 delete?: number[];
             };
         }
@@ -303,32 +294,16 @@ export class VendorOrganizationsService {
         // Handle persons
         if (data.persons) {
             if (data.persons.create && data.persons.create.length > 0) {
-                for (const personData of data.persons.create) {
-                    const { files, ...personFields } = personData;
-                    const trimmedPersonFields = {
+                await this.db.insert(vendors).values(
+                    data.persons.create.map(personFields => ({
                         ...personFields,
                         name: personFields.name?.trim(),
                         email: personFields.email?.trim(),
                         mobile: personFields.mobile?.trim(),
                         address: personFields.address?.trim(),
-                    };
-                    const person = await this.db
-                        .insert(vendors)
-                        .values({
-                            ...trimmedPersonFields,
-                            orgId: id,
-                        })
-                        .returning();
-
-                    if (files && files.length > 0 && person[0]) {
-                        await this.db.insert(vendorFiles).values(
-                            files.map(file => ({
-                                ...file,
-                                vendorId: person[0].id,
-                            }))
-                        );
-                    }
-                }
+                        orgId: id,
+                    }))
+                );
             }
             if (data.persons.update) {
                 for (const { id: personId, data: personData } of data.persons.update) {
@@ -348,6 +323,31 @@ export class VendorOrganizationsService {
             if (data.persons.delete && data.persons.delete.length > 0) {
                 for (const personId of data.persons.delete) {
                     await this.db.delete(vendors).where(eq(vendors.id, personId));
+                }
+            }
+        }
+
+        // Handle files (belong to the organization)
+        if (data.files) {
+            if (data.files.create && data.files.create.length > 0) {
+                await this.db.insert(vendorFiles).values(
+                    data.files.create.map(file => ({
+                        ...file,
+                        orgId: id,
+                    }))
+                );
+            }
+            if (data.files.update) {
+                for (const { id: fileId, data: fileData } of data.files.update) {
+                    await this.db
+                        .update(vendorFiles)
+                        .set({ ...fileData, updatedAt: new Date() })
+                        .where(eq(vendorFiles.id, fileId));
+                }
+            }
+            if (data.files.delete && data.files.delete.length > 0) {
+                for (const fileId of data.files.delete) {
+                    await this.db.delete(vendorFiles).where(eq(vendorFiles.id, fileId));
                 }
             }
         }

@@ -71,8 +71,10 @@ export class VendorsService {
         // Get vendor with organization
         const vendor = await this.findById(id);
 
-        // Get vendor files
-        const files = await this.db.select().from(vendorFiles).where(eq(vendorFiles.vendorId, id));
+        // Get files for this vendor's organization
+        const files = vendor.organizationId
+            ? await this.db.select().from(vendorFiles).where(eq(vendorFiles.orgId, vendor.organizationId))
+            : [];
 
         return {
             ...vendor,
@@ -101,14 +103,16 @@ export class VendorsService {
         };
         const rows = await this.db.insert(vendors).values(trimmedData).returning();
         const vendor = rows[0];
-        await this.clientDirectorySyncService.syncToClientDirectory([
-            {
-                name: vendor.name,
-                email: vendor.email,
-                phone: vendor.mobile,
-                org: null,
-            },
-        ]);
+        if (vendor.name) {
+            await this.clientDirectorySyncService.syncToClientDirectory([
+                {
+                    name: vendor.name,
+                    email: vendor.email,
+                    phone: vendor.mobile,
+                    org: null,
+                },
+            ]);
+        }
         return vendor;
     }
 
@@ -130,7 +134,7 @@ export class VendorsService {
             throw new NotFoundException(`Vendor with ID ${id} not found`);
         }
         const vendor = rows[0];
-        if (data.name || data.email || data.mobile) {
+        if (vendor.name && (data.name || data.email || data.mobile)) {
             await this.clientDirectorySyncService.syncToClientDirectory([
                 {
                     name: vendor.name,

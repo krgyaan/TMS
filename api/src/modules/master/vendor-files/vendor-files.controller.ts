@@ -3,7 +3,7 @@ import { z } from "zod";
 import { VendorFilesService } from "@/modules/master/vendor-files/vendor-files.service";
 
 const CreateVendorFileSchema = z.object({
-    vendorId: z.number().min(1),
+    orgId: z.number().min(1),
     name: z.string().min(1).max(255),
     filePath: z.string().min(1).max(255),
 });
@@ -24,9 +24,9 @@ export class VendorFilesController {
         return this.vendorFilesService.findById(id);
     }
 
-    @Get("vendor/:vendorId")
-    async getByVendor(@Param("vendorId", ParseIntPipe) vendorId: number) {
-        return this.vendorFilesService.findByVendor(vendorId);
+    @Get("org/:orgId")
+    async getByOrg(@Param("orgId", ParseIntPipe) orgId: number) {
+        return this.vendorFilesService.findByOrg(orgId);
     }
 
     @Post()

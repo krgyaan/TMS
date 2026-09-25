@@ -22,8 +22,8 @@ export class VendorFilesService {
         return result[0];
     }
 
-    async findByVendor(vendorId: number): Promise<VendorFile[]> {
-        return this.db.select().from(vendorFiles).where(eq(vendorFiles.vendorId, vendorId));
+    async findByOrg(orgId: number): Promise<VendorFile[]> {
+        return this.db.select().from(vendorFiles).where(eq(vendorFiles.orgId, orgId));
     }
 
     async create(data: NewVendorFile): Promise<VendorFile> {
