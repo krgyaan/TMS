@@ -59,6 +59,35 @@ function yearToDateRange(year: string | null): { fromDate: string; toDate: strin
     return { fromDate: `${startYear}-04-01`, toDate: `${endYear}-03-31` };
 }
 
+const persistedSelectionKey = "business-performance-selection";
+
+type PersistedSelection = {
+    item: number | null;
+    year: string;
+};
+
+function getInitialSelection(search: string): PersistedSelection {
+    const params = new URLSearchParams(search);
+    const urlItem = params.get("item");
+    const urlYear = params.get("year");
+    const urlHeadingId = urlItem !== null ? Number(urlItem) : NaN;
+
+    if (urlYear && yearToDateRange(urlYear) && Number.isFinite(urlHeadingId)) {
+        return { item: urlHeadingId, year: urlYear };
+    }
+
+    try {
+        const stored = JSON.parse(localStorage.getItem(persistedSelectionKey) ?? "null") as PersistedSelection | null;
+        if (stored && Number.isFinite(stored.item) && yearToDateRange(stored.year)) {
+            return { item: stored.item, year: stored.year };
+        }
+    } catch {
+        localStorage.removeItem(persistedSelectionKey);
+    }
+
+    return { item: null, year: "" };
+}
+
 /* ================================
    EXPORT UTILITIES
 =============================== */
@@ -103,24 +132,16 @@ export default function BusinessPerformanceDashboard() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    // Filter States (initialised from URL params so the page can be shared/bookmarked)
-    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(() => {
-        const raw = new URLSearchParams(location.search).get("item");
-        const parsed = raw !== null ? Number(raw) : NaN;
-        return Number.isFinite(parsed) ? parsed : null;
-    });
-    const [selectedFinancialYear, setSelectedFinancialYear] = useState<string>(() => {
-        return new URLSearchParams(location.search).get("year") ?? "";
-    });
+    const initialSelection = getInitialSelection(location.search);
+
+    // Filter States (initialised from URL params, then localStorage)
+    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(initialSelection.item);
+    const [selectedFinancialYear, setSelectedFinancialYear] = useState<string>(initialSelection.year);
     const [appliedParams, setAppliedParams] = useState<BusinessPerformanceParams | null>(() => {
-        const search = new URLSearchParams(location.search);
-        const rawHeading = search.get("item");
-        const headingId = rawHeading !== null ? Number(rawHeading) : NaN;
-        const year = search.get("year");
-        const range = yearToDateRange(year);
-        if (!range || !Number.isFinite(headingId)) return null;
+        const range = yearToDateRange(initialSelection.year);
+        if (!range || initialSelection.item === null) return null;
         return {
-            headingId,
+            headingId: initialSelection.item,
             fromDate: range.fromDate,
             toDate: range.toDate,
         };
@@ -154,6 +175,7 @@ export default function BusinessPerformanceDashboard() {
         const search = new URLSearchParams();
         search.set("item", String(params.headingId));
         if (selectedFinancialYear) search.set("year", selectedFinancialYear);
+        localStorage.setItem(persistedSelectionKey, JSON.stringify({ item: params.headingId, year: selectedFinancialYear }));
         navigate({ search: `?${search.toString()}` }, { replace: true });
     };
 

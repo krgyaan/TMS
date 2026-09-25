@@ -41,6 +41,56 @@ const AC_DC_OPTIONS: { id: string; name: string }[] = [
     { id: "DC", name: "DC" },
 ];
 
+const CUSTOMER_PERFORMANCE_FILTERS_KEY = "customer-performance-filters";
+
+interface CustomerPerformanceFilters {
+    item: number | null;
+    orgId: number | null;
+    team: string;
+    year: string;
+}
+
+function readCustomerPerformanceFilters(search: string): CustomerPerformanceFilters {
+    const searchParams = new URLSearchParams(search);
+    if (["item", "orgId", "team", "year"].some(key => searchParams.has(key))) {
+        const rawItem = searchParams.get("item");
+        const rawOrgId = searchParams.get("orgId");
+        const parsedItem = rawItem !== null ? Number(rawItem) : NaN;
+        const parsedOrgId = rawOrgId !== null ? Number(rawOrgId) : NaN;
+        const team = searchParams.get("team");
+
+        return {
+            item: Number.isFinite(parsedItem) ? parsedItem : null,
+            orgId: Number.isFinite(parsedOrgId) ? parsedOrgId : null,
+            team: team === "AC" || team === "DC" ? team : "combined",
+            year: searchParams.get("year") ?? "",
+        };
+    }
+
+    try {
+        const stored = localStorage.getItem(CUSTOMER_PERFORMANCE_FILTERS_KEY);
+        if (!stored) return { item: null, orgId: null, team: "combined", year: "" };
+
+        const parsed = JSON.parse(stored) as Partial<CustomerPerformanceFilters>;
+        return {
+            item: typeof parsed.item === "number" && Number.isFinite(parsed.item) ? parsed.item : null,
+            orgId: typeof parsed.orgId === "number" && Number.isFinite(parsed.orgId) ? parsed.orgId : null,
+            team: parsed.team === "AC" || parsed.team === "DC" ? parsed.team : "combined",
+            year: typeof parsed.year === "string" ? parsed.year : "",
+        };
+    } catch {
+        return { item: null, orgId: null, team: "combined", year: "" };
+    }
+}
+
+function writeCustomerPerformanceFilters(filters: CustomerPerformanceFilters): void {
+    try {
+        localStorage.setItem(CUSTOMER_PERFORMANCE_FILTERS_KEY, JSON.stringify(filters));
+    } catch {
+        return;
+    }
+}
+
 /**
  * Build the list of selectable Financial Years: "2025-26" style (Apr–Mar), current FY + previous years.
  */
@@ -118,37 +168,18 @@ export default function CustomerPerformanceDashboard() {
     const navigate = useNavigate();
 
     // Restore filters from the URL so a reload (or shared link) keeps the selection.
-    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(() => {
-        const raw = new URLSearchParams(location.search).get("item");
-        const parsed = raw !== null ? Number(raw) : NaN;
-        return Number.isFinite(parsed) ? parsed : null;
-    });
-    const [selectedOrganization, setSelectedOrganization] = useState<number | null>(() => {
-        const raw = new URLSearchParams(location.search).get("orgId");
-        const parsed = raw !== null ? Number(raw) : NaN;
-        return Number.isFinite(parsed) ? parsed : null;
-    });
-    const [selectedTeamCategory, setSelectedTeamCategory] = useState<string>(() => {
-        const raw = new URLSearchParams(location.search).get("team");
-        return raw === "AC" || raw === "DC" ? raw : "combined";
-    });
-    const [selectedFinancialYear, setSelectedFinancialYear] = useState<string>(() => {
-        return new URLSearchParams(location.search).get("year") ?? "";
-    });
+    const initialFilters = useMemo(() => readCustomerPerformanceFilters(location.search), [location.search]);
+    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(initialFilters.item);
+    const [selectedOrganization, setSelectedOrganization] = useState<number | null>(initialFilters.orgId);
+    const [selectedTeamCategory, setSelectedTeamCategory] = useState<string>(initialFilters.team);
+    const [selectedFinancialYear, setSelectedFinancialYear] = useState<string>(initialFilters.year);
     const [appliedParams, setAppliedParams] = useState<CustomerPerformanceParams | null>(() => {
-        const search = new URLSearchParams(location.search);
-        const rawOrg = search.get("orgId");
-        const orgId = rawOrg !== null ? Number(rawOrg) : NaN;
-        const rawHeading = search.get("item");
-        const headingId = rawHeading !== null ? Number(rawHeading) : NaN;
-        const teamCategory = search.get("team");
-        const year = search.get("year");
-        const range = yearToDateRange(year);
+        const range = yearToDateRange(initialFilters.year);
         if (!range) return null;
         return {
-            org: Number.isFinite(orgId) ? orgId : undefined,
-            teamCategory: teamCategory === "AC" || teamCategory === "DC" ? teamCategory : undefined,
-            itemHeading: Number.isFinite(headingId) ? headingId : undefined,
+            org: initialFilters.orgId ?? undefined,
+            teamCategory: initialFilters.team === "AC" || initialFilters.team === "DC" ? initialFilters.team : undefined,
+            itemHeading: initialFilters.item ?? undefined,
             fromDate: range.fromDate,
             toDate: range.toDate,
         };
@@ -203,6 +234,12 @@ export default function CustomerPerformanceDashboard() {
         if (params.teamCategory !== undefined) search.set("team", params.teamCategory);
         if (params.itemHeading !== undefined) search.set("item", String(params.itemHeading));
         if (activeYear) search.set("year", activeYear);
+        writeCustomerPerformanceFilters({
+            item: selectedHeadingId,
+            orgId: selectedOrganization,
+            team: selectedTeamCategory,
+            year: activeYear,
+        });
         navigate({ search: `?${search.toString()}` }, { replace: true });
     };
 

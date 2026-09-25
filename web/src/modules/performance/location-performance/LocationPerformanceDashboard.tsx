@@ -22,6 +22,79 @@ import LocationDonutChart from "./components/LocationDonutChart";
 /* ================================
    HELPERS
 =============================== */
+const LOCATION_PERFORMANCE_STORAGE_KEY = "location-performance-filters";
+
+type LocationPerformanceFilters = {
+    selectedHeadingId: number;
+    selectedLocation: number | null;
+    selectedTeam: number;
+    selectedFinancialYear: string;
+};
+
+const parseNumber = (value: string | null, fallback: number): number => {
+    if (value === null) return fallback;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const parseOptionalNumber = (value: unknown): number | null => {
+    if (value === null || value === undefined || value === "") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+};
+
+const getInitialFilters = (search: string): LocationPerformanceFilters => {
+    const urlParams = new URLSearchParams(search);
+    const hasUrlFilters = ["item", "location", "team", "year"].some(key => urlParams.has(key));
+
+    if (hasUrlFilters) {
+        return {
+            selectedHeadingId: parseNumber(urlParams.get("item"), 0),
+            selectedLocation: parseOptionalNumber(urlParams.get("location")),
+            selectedTeam: parseNumber(urlParams.get("team"), 0),
+            selectedFinancialYear: urlParams.get("year") ?? "",
+        };
+    }
+
+    try {
+        const stored = localStorage.getItem(LOCATION_PERFORMANCE_STORAGE_KEY);
+        if (stored) {
+            const filters = JSON.parse(stored) as Partial<LocationPerformanceFilters>;
+            return {
+                selectedHeadingId: parseNumber(String(filters.selectedHeadingId ?? ""), 0),
+                selectedLocation: parseOptionalNumber(filters.selectedLocation),
+                selectedTeam: parseNumber(String(filters.selectedTeam ?? ""), 0),
+                selectedFinancialYear: typeof filters.selectedFinancialYear === "string" ? filters.selectedFinancialYear : "",
+            };
+        }
+    } catch {
+        return {
+            selectedHeadingId: 0,
+            selectedLocation: null,
+            selectedTeam: 0,
+            selectedFinancialYear: "",
+        };
+    }
+
+    return {
+        selectedHeadingId: 0,
+        selectedLocation: null,
+        selectedTeam: 0,
+        selectedFinancialYear: "",
+    };
+};
+
+const toAppliedParams = (filters: LocationPerformanceFilters): LocationPerformanceParams | null => {
+    const range = yearToDateRange(filters.selectedFinancialYear);
+    if (!range || filters.selectedLocation === null) return null;
+    return {
+        headingId: filters.selectedHeadingId > 0 ? filters.selectedHeadingId : undefined,
+        location: filters.selectedLocation,
+        team: filters.selectedTeam > 0 ? filters.selectedTeam : undefined,
+        year: filters.selectedFinancialYear || undefined,
+    };
+};
+
 const getGpColor = (gp: number | null | undefined): string => {
     if (gp === null || gp === undefined) return "text-muted-foreground";
     if (gp >= 20) return "text-green-600";
@@ -78,43 +151,14 @@ export default function LocationPerformanceDashboard() {
     const location = useLocation();
     const navigate = useNavigate();
 
+    const initialFilters = getInitialFilters(location.search);
+
     // Filter States (initialized from URL params for shareable/bookmarkable links)
-    const [selectedHeadingId, setSelectedHeadingId] = useState<number>(() => {
-        const raw = new URLSearchParams(location.search).get("item");
-        const parsed = raw !== null ? Number(raw) : NaN;
-        return Number.isFinite(parsed) ? parsed : 0;
-    });
-    const [selectedLocation, setSelectedLocation] = useState<number | null>(() => {
-        const raw = new URLSearchParams(location.search).get("location");
-        const parsed = raw !== null ? Number(raw) : NaN;
-        return Number.isFinite(parsed) ? parsed : null;
-    });
-    const [selectedTeam, setSelectedTeam] = useState<number>(() => {
-        const raw = new URLSearchParams(location.search).get("team");
-        const parsed = raw !== null ? Number(raw) : NaN;
-        return Number.isFinite(parsed) ? parsed : 0;
-    });
-    const [selectedFinancialYear, setSelectedFinancialYear] = useState<string>(() => {
-        return new URLSearchParams(location.search).get("year") ?? "";
-    });
-    const [appliedParams, setAppliedParams] = useState<LocationPerformanceParams | null>(() => {
-        const search = new URLSearchParams(location.search);
-        const rawHeading = search.get("item");
-        const headingId = rawHeading !== null ? Number(rawHeading) : NaN;
-        const rawLocation = search.get("location");
-        const loc = rawLocation !== null ? Number(rawLocation) : NaN;
-        const rawTeam = search.get("team");
-        const team = rawTeam !== null ? Number(rawTeam) : NaN;
-        const year = search.get("year");
-        const range = yearToDateRange(year);
-        if (!range || !Number.isFinite(loc)) return null;
-        return {
-            headingId: Number.isFinite(headingId) && headingId > 0 ? headingId : undefined,
-            location: loc,
-            team: Number.isFinite(team) && team > 0 ? team : undefined,
-            year: year ?? undefined,
-        };
-    });
+    const [selectedHeadingId, setSelectedHeadingId] = useState(initialFilters.selectedHeadingId);
+    const [selectedLocation, setSelectedLocation] = useState<number | null>(initialFilters.selectedLocation);
+    const [selectedTeam, setSelectedTeam] = useState(initialFilters.selectedTeam);
+    const [selectedFinancialYear, setSelectedFinancialYear] = useState(initialFilters.selectedFinancialYear);
+    const [appliedParams, setAppliedParams] = useState<LocationPerformanceParams | null>(() => toAppliedParams(initialFilters));
 
     // Fetch headings for dropdown
     const { data: headings = [] } = useItemHeadings();
@@ -152,6 +196,21 @@ export default function LocationPerformanceDashboard() {
         search.set("location", String(params.location));
         if (params.team) search.set("team", String(params.team));
         if (selectedFinancialYear) search.set("year", selectedFinancialYear);
+
+        try {
+            localStorage.setItem(
+                LOCATION_PERFORMANCE_STORAGE_KEY,
+                JSON.stringify({
+                    selectedHeadingId,
+                    selectedLocation,
+                    selectedTeam,
+                    selectedFinancialYear,
+                } satisfies LocationPerformanceFilters)
+            );
+        } catch (error) {
+            void error;
+        }
+
         navigate({ search: `?${search.toString()}` }, { replace: true });
     };
 
