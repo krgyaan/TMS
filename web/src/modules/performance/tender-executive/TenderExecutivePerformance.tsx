@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 /* UI Components */
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ import { paths } from "@/app/routes/paths";
 import { Combobox } from "@/components/form/SelectField";
 import { useUsersByRole } from "@/hooks/api/useUsers";
 import { AlertTriangle, Briefcase, Calendar as CalendarIcon, CheckCircle2, Clock, Download, Eye, FileText, Info, Search, Trophy, XCircle, type LucideIcon } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { EmdBacklogTable } from "./components/EmdBacklogTable";
 import { StageBacklogV4Table } from "./components/StageBacklogV4Table";
 import { ScoreDrilldownPopover } from "./components/ScoreDrilldownPopover";
@@ -52,6 +52,33 @@ const formatLabel = (label: string) => {
 
 export type Scope = { view: "user"; userId: number } | { view: "team"; teamId: number } | { view: null };
 
+const SCOPE_STORAGE_KEY = "tms:tender-executive-scope";
+
+function isDateString(value: string | null): value is string {
+    return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function parsePositiveId(value: string | null) {
+    const id = Number(value);
+    return value !== null && Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function parseStoredScope(): Scope {
+    try {
+        const stored = JSON.parse(localStorage.getItem(SCOPE_STORAGE_KEY) ?? "null") as { view?: string; userId?: number; teamId?: number } | null;
+        if (stored?.view === "user" && Number.isInteger(stored.userId) && stored.userId! > 0) {
+            return { view: "user", userId: stored.userId! };
+        }
+        if (stored?.view === "team" && Number.isInteger(stored.teamId) && stored.teamId! > 0) {
+            return { view: "team", teamId: stored.teamId! };
+        }
+    } catch {
+        localStorage.removeItem(SCOPE_STORAGE_KEY);
+    }
+
+    return { view: null };
+}
+
 const KPI_LABELS: Record<TenderKpiKey, string> = {
     ALLOCATED: "Allocated",
     PENDING: "Pending",
@@ -76,11 +103,68 @@ const KPI_LABELS: Record<TenderKpiKey, string> = {
 ================================ */
 
 export default function TenderExecutivePerformance() {
-    const [fromDate, setFromDate] = useState<string | null>();
-    const [toDate, setToDate] = useState<string | null>();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [fromDate, setFromDate] = useState<string | null>(() => {
+        const urlDate = searchParams.get("fromDate");
+        if (isDateString(urlDate)) return urlDate;
+        try {
+            const stored = JSON.parse(localStorage.getItem(SCOPE_STORAGE_KEY) ?? "null") as { fromDate?: string } | null;
+            return isDateString(stored?.fromDate ?? null) ? stored!.fromDate! : null;
+        } catch {
+            return null;
+        }
+    });
+    const [toDate, setToDate] = useState<string | null>(() => {
+        const urlDate = searchParams.get("toDate");
+        if (isDateString(urlDate)) return urlDate;
+        try {
+            const stored = JSON.parse(localStorage.getItem(SCOPE_STORAGE_KEY) ?? "null") as { toDate?: string } | null;
+            return isDateString(stored?.toDate ?? null) ? stored!.toDate! : null;
+        } catch {
+            return null;
+        }
+    });
     const [selectedMetric, setSelectedMetric] = useState<TenderKpiKey | null>(null);
-    const [scope, setScope] = useState<Scope>({ view: null });
+    const [scope, setScope] = useState<Scope>(() => {
+        const userId = parsePositiveId(searchParams.get("userId"));
+        const teamId = parsePositiveId(searchParams.get("teamId"));
+        if (userId) return { view: "user", userId };
+        if (teamId) return { view: "team", teamId };
+        return parseStoredScope();
+    });
     const navigate = useNavigate();
+
+    useEffect(() => {
+        const userId = parsePositiveId(searchParams.get("userId"));
+        const teamId = parsePositiveId(searchParams.get("teamId"));
+        const urlScope: Scope = userId ? { view: "user", userId } : teamId ? { view: "team", teamId } : parseStoredScope();
+
+        setScope(current => {
+            if (urlScope.view === "user" && current.view === "user" && current.userId === urlScope.userId) return current;
+            if (urlScope.view === "team" && current.view === "team" && current.teamId === urlScope.teamId) return current;
+            return urlScope;
+        });
+    }, [searchParams]);
+
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (scope.view === "user") params.set("userId", String(scope.userId));
+        if (scope.view === "team") params.set("teamId", String(scope.teamId));
+        if (fromDate) params.set("fromDate", fromDate);
+        if (toDate) params.set("toDate", toDate);
+
+        localStorage.setItem(
+            SCOPE_STORAGE_KEY,
+            JSON.stringify({
+                view: scope.view,
+                userId: scope.view === "user" ? scope.userId : undefined,
+                teamId: scope.view === "team" ? scope.teamId : undefined,
+                fromDate,
+                toDate,
+            })
+        );
+        setSearchParams(params, { replace: true });
+    }, [fromDate, scope, setSearchParams, toDate]);
 
     const baseRange = fromDate && toDate ? { fromDate, toDate } : null;
 
