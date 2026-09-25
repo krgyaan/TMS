@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 /* UI Components */
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/form/SelectField";
 import CustomerCategoryTable from "./components/CustomerCategoryTable";
 import CustomerBarChart from "./components/CustomerBarChart";
@@ -47,46 +48,43 @@ interface CustomerPerformanceFilters {
     item: number | null;
     orgId: number | null;
     team: string;
-    year: string;
+    fromDate: string;
+    toDate: string;
 }
+
+const isValidDate = (value: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(value);
 
 function readCustomerPerformanceFilters(search: string): CustomerPerformanceFilters {
     const searchParams = new URLSearchParams(search);
-    if (["item", "orgId", "team", "year"].some(key => searchParams.has(key))) {
-        const rawItem = searchParams.get("item");
-        const rawOrgId = searchParams.get("orgId");
-        const parsedItem = rawItem !== null ? Number(rawItem) : NaN;
-        const parsedOrgId = rawOrgId !== null ? Number(rawOrgId) : NaN;
-        const team = searchParams.get("team");
+    const hasUrlFilters = ["item", "orgId", "team", "fromDate", "toDate", "year"].some(key => searchParams.has(key));
+    const source = hasUrlFilters ? searchParams : new URLSearchParams(localStorage.getItem(CUSTOMER_PERFORMANCE_FILTERS_KEY) ?? "");
 
-        return {
-            item: Number.isFinite(parsedItem) ? parsedItem : null,
-            orgId: Number.isFinite(parsedOrgId) ? parsedOrgId : null,
-            team: team === "AC" || team === "DC" ? team : "combined",
-            year: searchParams.get("year") ?? "",
-        };
+    const rawItem = source.get("item");
+    const rawOrgId = source.get("orgId");
+    const parsedItem = rawItem !== null ? Number(rawItem) : NaN;
+    const parsedOrgId = rawOrgId !== null ? Number(rawOrgId) : NaN;
+    const team = source.get("team");
+    const legacyYear = source.get("year");
+    let fromDate = source.get("fromDate") ?? "";
+    let toDate = source.get("toDate") ?? "";
+
+    if ((!isValidDate(fromDate) || !isValidDate(toDate)) && legacyYear) {
+        const match = /^(\d{4})-(\d{2})$/.exec(legacyYear);
+        if (match) {
+            fromDate = `${match[1]}-04-01`;
+            toDate = `${2000 + Number(match[2])}-03-31`;
+        }
     }
 
-    try {
-        const stored = localStorage.getItem(CUSTOMER_PERFORMANCE_FILTERS_KEY);
-        if (!stored) return { item: null, orgId: null, team: "combined", year: "" };
+    const validRange = isValidDate(fromDate) && isValidDate(toDate) && fromDate <= toDate;
 
-        const storedParams = new URLSearchParams(stored);
-        const rawItem = storedParams.get("item");
-        const rawOrgId = storedParams.get("orgId");
-        const parsedItem = rawItem !== null ? Number(rawItem) : NaN;
-        const parsedOrgId = rawOrgId !== null ? Number(rawOrgId) : NaN;
-        const storedTeam = storedParams.get("team");
-
-        return {
-            item: Number.isFinite(parsedItem) ? parsedItem : null,
-            orgId: Number.isFinite(parsedOrgId) ? parsedOrgId : null,
-            team: storedTeam === "AC" || storedTeam === "DC" ? storedTeam : "combined",
-            year: storedParams.get("year") ?? "",
-        };
-    } catch {
-        return { item: null, orgId: null, team: "combined", year: "" };
-    }
+    return {
+        item: Number.isFinite(parsedItem) ? parsedItem : null,
+        orgId: Number.isFinite(parsedOrgId) ? parsedOrgId : null,
+        team: team === "AC" || team === "DC" ? team : "combined",
+        fromDate: validRange ? fromDate : "",
+        toDate: validRange ? toDate : "",
+    };
 }
 
 function writeCustomerPerformanceFilters(filters: CustomerPerformanceFilters): void {
@@ -95,38 +93,12 @@ function writeCustomerPerformanceFilters(filters: CustomerPerformanceFilters): v
         if (filters.item !== null) params.set("item", String(filters.item));
         if (filters.orgId !== null) params.set("orgId", String(filters.orgId));
         if (filters.team === "AC" || filters.team === "DC") params.set("team", filters.team);
-        if (filters.year) params.set("year", filters.year);
+        if (filters.fromDate) params.set("fromDate", filters.fromDate);
+        if (filters.toDate) params.set("toDate", filters.toDate);
         localStorage.setItem(CUSTOMER_PERFORMANCE_FILTERS_KEY, params.toString());
     } catch {
         return;
     }
-}
-
-/**
- * Build the list of selectable Financial Years: "2025-26" style (Apr–Mar), current FY + previous years.
- */
-function buildFinancialYearOptions(): { id: string; name: string }[] {
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const fiscalStartYear = today.getMonth() >= 3 ? currentYear : currentYear - 1;
-    const options: { id: string; name: string }[] = [];
-    for (let y = fiscalStartYear; y >= fiscalStartYear - 8; y--) {
-        options.push({ id: `${y}-${String((y + 1) % 100).padStart(2, "0")}`, name: `${y}-${(y + 1) % 100}` });
-    }
-    return options;
-}
-
-/**
- * Convert a Financial Year selection like "2024-25" into fromDate/toDate strings (2024-04-01 .. 2025-03-31).
- */
-function yearToDateRange(year: string | null): { fromDate: string; toDate: string } | null {
-    if (!year) return null;
-
-    const match = /^(\d{4})-(\d{2})$/.exec(year);
-    if (!match) return null;
-    const startYear = Number(match[1]);
-    const endYear = 2000 + Number(match[2]);
-    return { fromDate: `${startYear}-04-01`, toDate: `${endYear}-03-31` };
 }
 
 /* ================================
@@ -183,16 +155,16 @@ export default function CustomerPerformanceDashboard() {
     const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(initialFilters.item);
     const [selectedOrganization, setSelectedOrganization] = useState<number | null>(initialFilters.orgId);
     const [selectedTeamCategory, setSelectedTeamCategory] = useState<string>(initialFilters.team);
-    const [selectedFinancialYear, setSelectedFinancialYear] = useState<string>(initialFilters.year);
+    const [fromDate, setFromDate] = useState<string>(initialFilters.fromDate);
+    const [toDate, setToDate] = useState<string>(initialFilters.toDate);
     const [appliedParams, setAppliedParams] = useState<CustomerPerformanceParams | null>(() => {
-        const range = yearToDateRange(initialFilters.year);
-        if (!range) return null;
+        if (!initialFilters.fromDate || !initialFilters.toDate) return null;
         return {
             org: initialFilters.orgId ?? undefined,
             teamCategory: initialFilters.team === "AC" || initialFilters.team === "DC" ? initialFilters.team : undefined,
             itemHeading: initialFilters.item ?? undefined,
-            fromDate: range.fromDate,
-            toDate: range.toDate,
+            fromDate: initialFilters.fromDate,
+            toDate: initialFilters.toDate,
         };
     });
 
@@ -202,9 +174,10 @@ export default function CustomerPerformanceDashboard() {
         if (appliedParams.org !== undefined) search.set("orgId", String(appliedParams.org));
         if (appliedParams.teamCategory !== undefined) search.set("team", appliedParams.teamCategory);
         if (appliedParams.itemHeading !== undefined) search.set("item", String(appliedParams.itemHeading));
-        if (initialFilters.year) search.set("year", initialFilters.year);
+        search.set("fromDate", appliedParams.fromDate ?? "");
+        search.set("toDate", appliedParams.toDate ?? "");
         navigate({ search: `?${search.toString()}` }, { replace: true });
-    }, [appliedParams, initialFilters.year, location.search, navigate]);
+    }, [appliedParams, location.search, navigate]);
 
     // Fetch headings for dropdown
     const { data: headings = [] } = useItemHeadings();
@@ -224,27 +197,19 @@ export default function CustomerPerformanceDashboard() {
     // Fetch customer performance data
     const { data, isLoading: dataLoading } = useCustomerPerformance(appliedParams);
 
-    // Financial Year dropdown options
-    const financialYearOptions = useMemo(() => buildFinancialYearOptions(), []);
-
-    const activeYear = selectedFinancialYear;
-
-    const handleFinancialYearChange = (v: string) => {
-        setSelectedFinancialYear(v);
-    };
+    const dateError = fromDate && toDate && fromDate > toDate ? "From Date must be on or before To Date" : null;
 
     // Build params for submission
     const params = useMemo<CustomerPerformanceParams | null>(() => {
-        const range = yearToDateRange(activeYear);
-        if (!range) return null;
+        if (!fromDate || !toDate || dateError) return null;
         return {
             org: selectedOrganization ?? undefined,
             teamCategory: selectedTeamCategory === "AC" || selectedTeamCategory === "DC" ? selectedTeamCategory : undefined,
             itemHeading: selectedHeadingId ?? undefined,
-            fromDate: range.fromDate,
-            toDate: range.toDate,
+            fromDate,
+            toDate,
         };
-    }, [selectedOrganization, selectedTeamCategory, selectedHeadingId, activeYear]);
+    }, [dateError, fromDate, selectedHeadingId, selectedOrganization, selectedTeamCategory, toDate]);
 
     // Handle form submission
     const handleSubmit = () => {
@@ -254,12 +219,14 @@ export default function CustomerPerformanceDashboard() {
         if (params.org !== undefined) search.set("orgId", String(params.org));
         if (params.teamCategory !== undefined) search.set("team", params.teamCategory);
         if (params.itemHeading !== undefined) search.set("item", String(params.itemHeading));
-        if (activeYear) search.set("year", activeYear);
+        search.set("fromDate", params.fromDate ?? "");
+        search.set("toDate", params.toDate ?? "");
         writeCustomerPerformanceFilters({
             item: selectedHeadingId,
             orgId: selectedOrganization,
             team: selectedTeamCategory,
-            year: activeYear,
+            fromDate: params.fromDate ?? "",
+            toDate: params.toDate ?? "",
         });
         navigate({ search: `?${search.toString()}` }, { replace: true });
     };
@@ -300,9 +267,9 @@ export default function CustomerPerformanceDashboard() {
             { key: "tenders", label: "Tenders" },
         ];
 
-        const filename = `Customer_Performance_${activeYear || "all"}`;
+        const filename = `Customer_Performance_${appliedParams?.fromDate ?? ""}_to_${appliedParams?.toDate ?? ""}`;
         exportToCSV(allData, filename, headers);
-    }, [data, activeYear]);
+    }, [appliedParams, data]);
 
     return (
         <div className="min-h-screen bg-muted/10 pb-12">
@@ -311,7 +278,7 @@ export default function CustomerPerformanceDashboard() {
                 <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight">Customer Dashboard</h1>
-                        <p className="text-muted-foreground mt-1">Analyze customer tenders by organization, team, item heading and year.</p>
+                        <p className="text-muted-foreground mt-1">Analyze customer tenders by organization, team, item heading and date range.</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" onClick={handleExportReport} disabled={!appliedParams || !data}>
@@ -360,10 +327,16 @@ export default function CustomerPerformanceDashboard() {
                                 />
                             </div>
 
-                            {/* Financial Year */}
+                            {/* From Date */}
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Financial Year</label>
-                                <Combobox value={selectedFinancialYear} onChange={handleFinancialYearChange} options={financialYearOptions} placeholder="Select Financial Year" />
+                                <label className="text-sm font-medium">From Date</label>
+                                <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} />
+                            </div>
+
+                            {/* To Date */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">To Date</label>
+                                <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
                             </div>
 
                             {/* Submit Button */}
@@ -371,13 +344,14 @@ export default function CustomerPerformanceDashboard() {
                                 <Filter className="mr-2 h-4 w-4" /> Submit
                             </Button>
                         </div>
+                        {dateError && <p className="mt-2 text-sm text-destructive">{dateError}</p>}
                     </CardContent>
                 </Card>
 
                 {/* ===== CONDITIONAL CONTENT ===== */}
                 {!appliedParams ? (
                     <div className="bg-muted rounded-lg p-6 text-center">
-                        <span className="text-muted-foreground">Please select a year to view the report.</span>
+                        <span className="text-muted-foreground">Please select a From Date and To Date to view the report.</span>
                     </div>
                 ) : dataLoading ? (
                     <div className="bg-muted rounded-lg p-6 text-center">

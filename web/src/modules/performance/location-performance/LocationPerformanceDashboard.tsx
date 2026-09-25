@@ -4,12 +4,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 /* UI Components */
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 /* Icons */
-import { Filter, Download } from "lucide-react";
+import { Filter, Download, Calendar as CalendarIcon } from "lucide-react";
 
 /* Custom Hooks */
-import { useLocationPerformance, useItemHeadings, buildFinancialYearOptions, yearToDateRange, type LocationPerformanceParams } from "@/hooks/api/useLocationPerformance";
+import { useLocationPerformance, useItemHeadings, type LocationPerformanceParams } from "@/hooks/api/useLocationPerformance";
 import { useLocationsTrue } from "@/hooks/api/useLocations";
 import { useTeams } from "@/hooks/api/useTeams";
 import { Combobox } from "@/components/form/SelectField";
@@ -28,8 +29,11 @@ type LocationPerformanceFilters = {
     selectedHeadingId: number;
     selectedLocation: number | null;
     selectedTeam: number;
-    selectedFinancialYear: string;
+    fromDate: string;
+    toDate: string;
 };
+
+const isValidDate = (value: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(value);
 
 const parseNumber = (value: string | null, fallback: number): number => {
     if (value === null) return fallback;
@@ -45,53 +49,40 @@ const parseOptionalNumber = (value: unknown): number | null => {
 
 const getInitialFilters = (search: string): LocationPerformanceFilters => {
     const urlParams = new URLSearchParams(search);
-    const hasUrlFilters = ["item", "location", "team", "year"].some(key => urlParams.has(key));
+    const hasUrlFilters = ["item", "location", "team", "fromDate", "toDate", "year"].some(key => urlParams.has(key));
+    const source = hasUrlFilters ? urlParams : new URLSearchParams(localStorage.getItem(LOCATION_PERFORMANCE_STORAGE_KEY) ?? "");
 
-    if (hasUrlFilters) {
-        return {
-            selectedHeadingId: parseNumber(urlParams.get("item"), 0),
-            selectedLocation: parseOptionalNumber(urlParams.get("location")),
-            selectedTeam: parseNumber(urlParams.get("team"), 0),
-            selectedFinancialYear: urlParams.get("year") ?? "",
-        };
-    }
+    let fromDate = source.get("fromDate") ?? "";
+    let toDate = source.get("toDate") ?? "";
+    const legacyYear = source.get("year");
 
-    try {
-        const stored = localStorage.getItem(LOCATION_PERFORMANCE_STORAGE_KEY);
-        if (stored) {
-            const storedParams = new URLSearchParams(stored);
-            return {
-                selectedHeadingId: parseNumber(storedParams.get("item"), 0),
-                selectedLocation: parseOptionalNumber(storedParams.get("location")),
-                selectedTeam: parseNumber(storedParams.get("team"), 0),
-                selectedFinancialYear: storedParams.get("year") ?? "",
-            };
+    if ((!isValidDate(fromDate) || !isValidDate(toDate)) && legacyYear) {
+        const match = /^(\d{4})-(\d{2})$/.exec(legacyYear);
+        if (match) {
+            fromDate = `${match[1]}-04-01`;
+            toDate = `${2000 + Number(match[2])}-03-31`;
         }
-    } catch {
-        return {
-            selectedHeadingId: 0,
-            selectedLocation: null,
-            selectedTeam: 0,
-            selectedFinancialYear: "",
-        };
     }
+
+    const validRange = isValidDate(fromDate) && isValidDate(toDate) && fromDate <= toDate;
 
     return {
-        selectedHeadingId: 0,
-        selectedLocation: null,
-        selectedTeam: 0,
-        selectedFinancialYear: "",
+        selectedHeadingId: parseNumber(source.get("item"), 0),
+        selectedLocation: parseOptionalNumber(source.get("location")),
+        selectedTeam: parseNumber(source.get("team"), 0),
+        fromDate: validRange ? fromDate : "",
+        toDate: validRange ? toDate : "",
     };
 };
 
 const toAppliedParams = (filters: LocationPerformanceFilters): LocationPerformanceParams | null => {
-    const range = yearToDateRange(filters.selectedFinancialYear);
-    if (!range || filters.selectedLocation === null) return null;
+    if (filters.selectedLocation === null || !filters.fromDate || !filters.toDate) return null;
     return {
         headingId: filters.selectedHeadingId > 0 ? filters.selectedHeadingId : undefined,
         location: filters.selectedLocation,
         team: filters.selectedTeam > 0 ? filters.selectedTeam : undefined,
-        year: filters.selectedFinancialYear || undefined,
+        fromDate: filters.fromDate,
+        toDate: filters.toDate,
     };
 };
 
@@ -157,7 +148,8 @@ export default function LocationPerformanceDashboard() {
     const [selectedHeadingId, setSelectedHeadingId] = useState(initialFilters.selectedHeadingId);
     const [selectedLocation, setSelectedLocation] = useState<number | null>(initialFilters.selectedLocation);
     const [selectedTeam, setSelectedTeam] = useState(initialFilters.selectedTeam);
-    const [selectedFinancialYear, setSelectedFinancialYear] = useState(initialFilters.selectedFinancialYear);
+    const [fromDate, setFromDate] = useState(initialFilters.fromDate);
+    const [toDate, setToDate] = useState(initialFilters.toDate);
     const [appliedParams, setAppliedParams] = useState<LocationPerformanceParams | null>(() => toAppliedParams(initialFilters));
 
     useEffect(() => {
@@ -166,7 +158,8 @@ export default function LocationPerformanceDashboard() {
         if (appliedParams.headingId) search.set("item", String(appliedParams.headingId));
         search.set("location", String(appliedParams.location));
         if (appliedParams.team) search.set("team", String(appliedParams.team));
-        if (appliedParams.year) search.set("year", appliedParams.year);
+        search.set("fromDate", appliedParams.fromDate);
+        search.set("toDate", appliedParams.toDate);
         navigate({ search: `?${search.toString()}` }, { replace: true });
     }, [appliedParams, location.search, navigate]);
 
@@ -180,21 +173,19 @@ export default function LocationPerformanceDashboard() {
 
     const { data: teams = [] } = useTeams();
 
-    // Financial Year dropdown options
-    const financialYearOptions = useMemo(() => buildFinancialYearOptions(), []);
+    const dateError = fromDate && toDate && fromDate > toDate ? "From Date must be on or before To Date" : null;
 
     // Build params for submission
-    const params = useMemo(() => {
-        if (!selectedLocation) return null;
-        const range = yearToDateRange(selectedFinancialYear);
-        if (!range) return null;
+    const params = useMemo<LocationPerformanceParams | null>(() => {
+        if (!selectedLocation || !fromDate || !toDate || dateError) return null;
         return {
             headingId: selectedHeadingId > 0 ? selectedHeadingId : undefined,
             location: selectedLocation,
             team: selectedTeam > 0 ? selectedTeam : undefined,
-            year: selectedFinancialYear,
+            fromDate,
+            toDate,
         };
-    }, [selectedHeadingId, selectedLocation, selectedTeam, selectedFinancialYear]);
+    }, [dateError, fromDate, selectedHeadingId, selectedLocation, selectedTeam, toDate]);
 
     // Handle form submission
     const handleSubmit = () => {
@@ -205,7 +196,8 @@ export default function LocationPerformanceDashboard() {
         if (params.headingId) search.set("item", String(params.headingId));
         search.set("location", String(params.location));
         if (params.team) search.set("team", String(params.team));
-        if (selectedFinancialYear) search.set("year", selectedFinancialYear);
+        search.set("fromDate", params.fromDate);
+        search.set("toDate", params.toDate);
 
         try {
             localStorage.setItem(LOCATION_PERFORMANCE_STORAGE_KEY, search.toString());
@@ -255,9 +247,9 @@ export default function LocationPerformanceDashboard() {
             { key: "tenders", label: "Tenders" },
         ];
 
-        const filename = `Location_Performance_${headingName}_${selectedFinancialYear}`;
+        const filename = `Location_Performance_${headingName}_${appliedParams?.fromDate ?? ""}_to_${appliedParams?.toDate ?? ""}`;
         exportToCSV(allData, filename, headers);
-    }, [data, headings, selectedHeadingId, selectedFinancialYear]);
+    }, [appliedParams, data, headings, selectedHeadingId]);
 
     return (
         <div className="min-h-screen bg-muted/10 pb-12">
@@ -266,7 +258,7 @@ export default function LocationPerformanceDashboard() {
                 <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight">Location Performance</h1>
-                        <p className="text-muted-foreground mt-1">Analyze location performance metrics by item heading, state, team and financial year.</p>
+                        <p className="text-muted-foreground mt-1">Analyze location performance metrics by item heading, state, team and date range.</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" onClick={handleExportReport} disabled={!appliedParams || !data}>
@@ -278,7 +270,7 @@ export default function LocationPerformanceDashboard() {
                 {/* ===== FILTER CARD ===== */}
                 <Card className="shadow-sm">
                     <CardContent className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-5 w-full gap-4 items-end">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 w-full gap-4 items-end">
                             {/* State */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">State</label>
@@ -324,15 +316,22 @@ export default function LocationPerformanceDashboard() {
                                 />
                             </div>
 
-                            {/* Financial Year */}
+                            {/* From Date */}
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Financial Year</label>
-                                <Combobox
-                                    value={selectedFinancialYear}
-                                    onChange={v => setSelectedFinancialYear(v)}
-                                    options={financialYearOptions}
-                                    placeholder="Select Financial Year"
-                                />
+                                <label className="text-sm font-medium">From Date</label>
+                                <div className="relative">
+                                    <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                    <Input type="date" className="pl-9" value={fromDate} onChange={e => setFromDate(e.target.value)} />
+                                </div>
+                            </div>
+
+                            {/* To Date */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">To Date</label>
+                                <div className="relative">
+                                    <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                    <Input type="date" className="pl-9" value={toDate} onChange={e => setToDate(e.target.value)} />
+                                </div>
                             </div>
 
                             {/* Submit Button */}
@@ -340,13 +339,14 @@ export default function LocationPerformanceDashboard() {
                                 <Filter className="mr-2 h-4 w-4" /> Submit
                             </Button>
                         </div>
+                        {dateError && <p className="mt-2 text-sm text-destructive">{dateError}</p>}
                     </CardContent>
                 </Card>
 
                 {/* ===== CONDITIONAL CONTENT ===== */}
                 {!appliedParams ? (
                     <div className="bg-muted rounded-lg p-6 text-center">
-                        <span className="text-muted-foreground">Please select a State and Financial Year to view the report.</span>
+                        <span className="text-muted-foreground">Please select a State, From Date and To Date to view the report.</span>
                     </div>
                 ) : dataLoading ? (
                     <div className="bg-muted rounded-lg p-6 text-center">

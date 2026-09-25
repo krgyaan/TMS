@@ -15,7 +15,8 @@ export interface LocationPerformanceParams {
     headingId?: number;
     location?: number;
     team?: number;
-    year?: string;
+    fromDate: string;
+    toDate: string;
 }
 
 // ─── API response (mirrors backend shape exactly) ──────────────────────────────
