@@ -1115,6 +1115,7 @@ export class VendorWorkOrderService {
                 address: vendorOrganizations.address,
                 email: vendors.email,
                 mobile: vendors.mobile,
+                contactPerson: vendors.name,
                 isActive: vendorOrganizations.status,
                 createdAt: vendorOrganizations.createdAt,
             })
@@ -1131,6 +1132,7 @@ export class VendorWorkOrderService {
                 if (!existing.gstNo && row.gstNo) existing.gstNo = row.gstNo;
                 if (!existing.email && row.email) existing.email = row.email;
                 if (!existing.mobile && row.mobile) existing.mobile = row.mobile;
+                if (!existing.contactPerson && row.contactPerson) existing.contactPerson = row.contactPerson;
             } else {
                 orgMap.set(row.id, {
                     ...row,
@@ -1163,6 +1165,20 @@ export class VendorWorkOrderService {
                     address: body.address || null,
                 })
                 .returning();
+
+            await this.db.insert(vendors).values({
+                orgId: org.id,
+                name: body.contact_person || null,
+                email: body.email || null,
+                mobile: body.mobile_number || null,
+                address: null,
+            });
+
+            await this.db.insert(vendorGsts).values({
+                orgId: org.id,
+                gstState: body.gstState || null,
+                gstNo: body.gstNo || null,
+            });
 
             this.logger.info(`Seller created as vendor org: ${org.name} (ID: ${org.id})`);
             return { ...org, type: "seller", source: "vendor_org" };
@@ -1282,6 +1298,9 @@ export class VendorWorkOrderService {
                 .where(eq(vendorOrganizations.id, id))
                 .returning();
             if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
+
+            await this.syncPersonForOrg(id, body);
+            await this.syncGstForOrg(id, body);
 
             return { ...rows[0], type: "seller", source: "vendor_org", isActive: rows[0].status };
         }
@@ -1416,6 +1435,7 @@ export class VendorWorkOrderService {
         if (!body.sellerName) return;
 
         if (body.sellerOrganizationId) {
+            const orgId = body.sellerOrganizationId;
             await this.db
                 .update(vendorOrganizations)
                 .set({
@@ -1425,7 +1445,10 @@ export class VendorWorkOrderService {
                     pan: body.sellerPanNo || undefined,
                     updatedAt: new Date(),
                 })
-                .where(eq(vendorOrganizations.id, body.sellerOrganizationId));
+                .where(eq(vendorOrganizations.id, orgId));
+
+            await this.syncPersonForOrg(orgId, body);
+            await this.syncGstForOrg(orgId, body);
         } else {
             const existing = await this.db
                 .select()
@@ -1482,6 +1505,70 @@ export class VendorWorkOrderService {
                     type: "ship_to",
                 });
             }
+        }
+    }
+
+    private async syncPersonForOrg(orgId: number, body: any) {
+        const [person] = await this.db
+            .select()
+            .from(vendors)
+            .where(eq(vendors.orgId, orgId))
+            .limit(1);
+
+        const name = body.contactPersonName ?? body.contact_person ?? null;
+        const email = body.contactPersonEmail ?? body.sellerEmail ?? null;
+        const mobile = body.contactPersonPhone ?? body.mobile_number ?? null;
+
+        if (person) {
+            await this.db
+                .update(vendors)
+                .set({
+                    name,
+                    email,
+                    mobile,
+                    updatedAt: new Date(),
+                })
+                .where(eq(vendors.id, person.id));
+        } else {
+            await this.db.insert(vendors).values({
+                orgId,
+                name,
+                email,
+                mobile,
+                address: null,
+            });
+        }
+    }
+
+    private async syncGstForOrg(orgId: number, body: any) {
+        const [gst] = await this.db
+            .select()
+            .from(vendorGsts)
+            .where(eq(vendorGsts.orgId, orgId))
+            .limit(1);
+
+        const hasGstNo = body.sellerGstNo !== undefined || body.gstNo !== undefined;
+        const hasGstState = body.gstState !== undefined;
+        const gstNo = body.sellerGstNo ?? body.gstNo;
+        const gstState = body.gstState;
+
+        if (gst) {
+            if (hasGstNo || hasGstState) {
+                await this.db
+                    .update(vendorGsts)
+                    .set({
+                        ...(hasGstNo ? { gstNo } : {}),
+                        ...(hasGstState ? { gstState } : {}),
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(vendorGsts.id, gst.id));
+            }
+        } else {
+            await this.db.insert(vendorGsts).values({
+                orgId,
+                gstState: hasGstState ? gstState : null,
+                gstNo: hasGstNo ? gstNo : null,
+            });
         }
     }
 

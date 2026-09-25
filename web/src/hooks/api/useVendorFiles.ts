@@ -9,7 +9,7 @@ export const vendorFilesKey = {
     lists: () => [...vendorFilesKey.all, 'list'] as const,
     details: () => [...vendorFilesKey.all, 'detail'] as const,
     detail: (id: number) => [...vendorFilesKey.details(), id] as const,
-    byVendor: (vendorId: number) => [...vendorFilesKey.all, 'vendor', vendorId] as const,
+    byOrg: (orgId: number) => [...vendorFilesKey.all, 'org', orgId] as const,
 };
 
 export const useVendorFiles = () => {
@@ -27,11 +27,11 @@ export const useVendorFile = (id: number | null) => {
     });
 };
 
-export const useVendorFilesByVendor = (vendorId: number | null) => {
+export const useVendorFilesByOrg = (orgId: number | null) => {
     return useQuery({
-        queryKey: vendorFilesKey.byVendor(vendorId!),
-        queryFn: () => vendorFilesService.getByVendor(vendorId!),
-        enabled: !!vendorId,
+        queryKey: vendorFilesKey.byOrg(orgId!),
+        queryFn: () => vendorFilesService.getByOrg(orgId!),
+        enabled: !!orgId,
     });
 };
 

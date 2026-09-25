@@ -496,7 +496,7 @@ const VendorMasterListPage: React.FC = () => {
                         pan: editParty.pan || "",
                         msme: editParty.msme || "",
                         contact_person: editParty.contactPerson || "",
-                        mobile_number: editParty.mobileNumber || "",
+                        mobile_number: editParty.mobileNumber || editParty.mobile || "",
                     }}
                 />
             )}

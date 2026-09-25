@@ -90,6 +90,23 @@ export const useUpdateVendorOrganization = () => {
     });
 };
 
+export const useSetVendorOrganizationStatus = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, status }: { id: number; status: boolean }) => vendorOrganizationsService.update(id, { status }),
+        onSuccess: (_, { status }) => {
+            queryClient.invalidateQueries({
+                queryKey: vendorOrganizationsKey.all,
+            });
+            toast.success(status ? "Vendor Organization activated" : "Vendor Organization deactivated");
+        },
+        onError: error => {
+            toast.error(handleQueryError(error));
+        },
+    });
+};
+
 export const useCreateVendorOrganizationWithRelations = () => {
     const queryClient = useQueryClient();
 

@@ -18,8 +18,8 @@ class VendorFilesService extends BaseApiService {
         return this.get<VendorFile>(`/${id}`);
     }
 
-    async getByVendor(vendorId: number): Promise<VendorFile[]> {
-        return this.get<VendorFile[]>(`/vendor/${vendorId}`);
+    async getByOrg(orgId: number): Promise<VendorFile[]> {
+        return this.get<VendorFile[]>(`/org/${orgId}`);
     }
 
     async create(data: CreateVendorFileDto): Promise<VendorFile> {
