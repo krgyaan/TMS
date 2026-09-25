@@ -1363,10 +1363,13 @@ export class TenderExecutiveService {
         const bidOpening = await exec(`
         ${baseSelect}
         JOIN tender_information tin ON tin.tender_id = ti.id
+        JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
           AND tin.created_at < '${from}'
-          AND ti.status NOT IN (${excludedStatuses})
+          AND st.status = true
+          AND st.tender_category = 'prep'
+          AND ti.status NOT IN (0, 1, 2, 3)
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1377,11 +1380,15 @@ export class TenderExecutiveService {
 
         const bidDuringTotal = await exec(`
         ${baseSelect}
-        JOIN tender_information tin ON tin.tender_id = ti.id
-         AND ti.status NOT IN (${excludedStatuses})
         WHERE ${baseWhere()}
+          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND EXISTS (
+                SELECT 1
+                FROM tender_information tin
+                WHERE tin.tender_id = ti.id
+                AND tin.created_at BETWEEN '${from}' AND '${to}'
+          )
           AND ti.tl_status = 1
-          AND tin.created_at BETWEEN '${from}' AND '${to}'
     `);
 
         const bidDuringCompleted = await exec(`
@@ -1411,10 +1418,13 @@ export class TenderExecutiveService {
         const bidTotal = await exec(`
         ${baseSelect}
         JOIN tender_information tin ON tin.tender_id = ti.id
+        JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
           AND tin.created_at <= '${to}'
-          AND ti.status NOT IN (${excludedStatuses})
+          AND st.status = true
+          AND st.tender_category = 'prep'
+          AND ti.status NOT IN (0, 1, 2, 3)
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
