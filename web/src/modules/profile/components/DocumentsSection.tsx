@@ -94,7 +94,7 @@ interface UploadedDocument extends DocumentData {
 
 // ─── REQUIRED DOCUMENT DEFINITIONS ───────────────────────────────────────────
 
-const REQUIRED_DOCUMENTS: DocumentType[] = [
+const AVAILABLE_DOCUMENTS: DocumentType[] = [
   // Identity Documents
   { id: "aadhar", docType: "Aadhar Card", docCategory: "Identity Documents", uploaded: false },
   { id: "pan", docType: "PAN Card", docCategory: "Identity Documents", uploaded: false },
@@ -590,10 +590,9 @@ export const DocumentsSection: React.FC = () => {
   const DOCUMENTS: UploadedDocument[] = data?.documents || [];
 
   // Determine pending documents
-  const uploadedDocTypes = new Set(DOCUMENTS.map((d) => d.docType));
-  const pendingDocuments = REQUIRED_DOCUMENTS.filter((d) => !uploadedDocTypes.has(d.docType));
+  const pendingDocuments = AVAILABLE_DOCUMENTS.filter((d) => !DOCUMENTS.some((uploaded) => uploaded.docType === d.docType));
 
-  const categories = [...new Set([...DOCUMENTS.map((d) => d.docCategory), ...REQUIRED_DOCUMENTS.map((d) => d.docCategory)])];
+  const categories = [...new Set([...DOCUMENTS.map((d) => d.docCategory), ...AVAILABLE_DOCUMENTS.map((d) => d.docCategory)])];
 
   // Filters
   const filteredUploaded = DOCUMENTS.filter((d) => {
@@ -672,7 +671,7 @@ export const DocumentsSection: React.FC = () => {
                 )}
               >
                 <CloudUpload className="h-3.5 w-3.5" />
-                To Upload ({pendingDocuments.length})
+                 Available to upload ({pendingDocuments.length})
               </Button>
             </div>
 
@@ -776,12 +775,12 @@ export const DocumentsSection: React.FC = () => {
                       <div className="h-16 w-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
                         <CheckCircle2 className="h-8 w-8 text-emerald-500" />
                       </div>
-                      <h3 className="text-sm font-bold mb-1 text-emerald-700">All documents uploaded!</h3>
-                      <p className="text-xs text-emerald-600/70">
-                        {searchQuery || activeCategory !== "all"
-                          ? "No pending documents match your filter"
-                          : "You've uploaded all documents from the list"}
-                      </p>
+                       <h3 className="text-sm font-bold mb-1 text-emerald-700">No more upload options</h3>
+                       <p className="text-xs text-emerald-600/70">
+                         {searchQuery || activeCategory !== "all"
+                           ? "No upload options match your filter"
+                           : "You have uploaded all available document types"}
+                       </p>
                     </CardContent>
                   </Card>
                 )}
