@@ -455,13 +455,10 @@ def resolve_atc_anchor_fields(
             res["ld_percentage_per_week"] = rate_val
             res["max_ld_percentage"] = float(max_raw)
 
-    if "ld_percentage_per_week" not in res and _RE_PRS_FALLBACK_KW.search(full_text):
-        res["ld_percentage_per_week"] = 0.5
-        res["max_ld_percentage"] = 5.0
-
     # 4. Security Deposit Mode, Required, Percentage, Duration
     sd_alias_pattern = r"(?:" + "|".join([re.escape(a).replace(r"\ ", r"\s+") for a in ATC_CLAUSE_ALIASES["security_deposit"]]) + r")"
     c38_match = None
+    c38_duration = None
     for sd_section_match in re.finditer(
         sd_alias_pattern + r"([\s\S]*?)(?=\n\s*(?:SECTION|ANNEXURE|CLAUSE|\d+[\.\s]|\Z))",
         full_text, re.IGNORECASE
@@ -472,12 +469,9 @@ def resolve_atc_anchor_fields(
             c38_match = m
             m_dur = re.search(r"within\s+(\d+)\s+days", sd_body, re.IGNORECASE)
             if m_dur:
-                res["sd_duration"] = int(m_dur.group(1))
+                c38_duration = int(m_dur.group(1))
             logger.info("[ATC_ALIAS] Matched 'security_deposit' section body via concept alias: %r", m.group(0)[:60])
             break
-
-    if c38_match:
-        res["sd_percentage"] = float(c38_match.group(1))
 
     # Precedence: 1. Wingdings Checkbox Detection
     sd_checkbox_resolved = False
@@ -500,10 +494,28 @@ def resolve_atc_anchor_fields(
                     )
                     break
 
-    # Precedence: 2. Fallback to Text-Only Regex Inference
-    if not sd_checkbox_resolved and c38_match:
-        res["sd_required"] = True
-        logger.info("[ATC_ANCHOR] Resolved field 'sd_required' via TEXT_FALLBACK: Clause 38 regex match")
+    # Precedence: 2. Specific textual requirement (NOT generic Clause 38 boilerplate)
+    if not sd_checkbox_resolved:
+        m_sd_explicit = re.search(
+            r"(?:Security\s+Deposit|Contract\s+Performance\s+Security|CPS/SD)\s*(?:[:\-\s]+|\bis\b\s*)(APPLICABLE|NOT\s+APPLICABLE|REQUIRED|NOT\s+REQUIRED)",
+            full_text, re.IGNORECASE
+        )
+        if m_sd_explicit:
+            val = m_sd_explicit.group(1).upper()
+            is_req = val in ("APPLICABLE", "REQUIRED")
+            res["sd_required"] = is_req
+            sd_checkbox_resolved = True
+            logger.info("[ATC_ANCHOR] Resolved field 'sd_required' via SPECIFIC_STATEMENT: %s -> %s", val, is_req)
+        elif re.search(r"(?:shall\s+submit|shall\s+furnish|is\s+required\s+to\s+submit)\s+(?:a\s+)?Security\s+Deposit", full_text, re.IGNORECASE):
+            res["sd_required"] = True
+            sd_checkbox_resolved = True
+            logger.info("[ATC_ANCHOR] Resolved field 'sd_required' via SPECIFIC_MANDATE in text (True)")
+
+    # Only assign sd_percentage / sd_duration if SD is confirmed required
+    if res.get("sd_required") is True and c38_match:
+        res["sd_percentage"] = float(c38_match.group(1))
+        if c38_duration:
+            res["sd_duration"] = c38_duration
 
     return res
 
@@ -932,11 +944,12 @@ def generate_bidder_readiness_summary(
     summary["readiness_disqualifiers_display"] = "Standard GeM/GAIL Terms (Zero deviation allowed on EMD, PBG, BEC, Delivery)"
 
     # 11. Penalty / Risk Exposure
-    ld_rate = res_dict.get("ld_percentage_display", "0.5% per week")
-    is_gem = "GEM/" in str(res_dict.get("tender_id_display", "") or "") or "gem" in str(res_dict.get("organization", "")).lower()
-    ld_max_default = "10%" if is_gem else "5%"
-    ld_max = res_dict.get("max_ld_percentage_display", ld_max_default)
-    summary["readiness_penalty_risk_display"] = f"LD / PRS: {ld_rate}  |  Max Penalty Cap: {ld_max}"
+    ld_rate = res_dict.get("ld_percentage_display", "NA")
+    ld_max = res_dict.get("max_ld_percentage_display", "NA")
+    if ld_rate not in ("NA", "⚠️ MISSING", None, ""):
+        summary["readiness_penalty_risk_display"] = f"LD / PRS: {ld_rate}  |  Max Penalty Cap: {ld_max}"
+    else:
+        summary["readiness_penalty_risk_display"] = "Not Specified"
 
     return summary
 
@@ -1336,40 +1349,34 @@ def build_infosheet_data(
         logger.warning(f"[BUG_FIX] Excluded bank name/advisory leak from emd_mode_display: {emd_mode_display!r}")
         emd_mode_display = "NA"
 
-    # Prioritize Tag (E) section text if present for exact EMD mode
-    search_text_for_emd = tag_e_match.group(1) if tag_e_match else full_text
-    search_lower = search_text_for_emd.lower()
-
-    if _is_missing(emd_mode_display) or emd_mode_display in ("NA", "Not Found", "Bank Guarantee"):
+    # If EMD is explicitly not required or zero, EMD mode is Not Applicable
+    if str(emd_required_display).lower() in ("no", "not required", "not applicable") or (emd_total == 0.0 and emd_required_display != "Yes"):
+        emd_mode_display = "Not Applicable"
+    elif _is_missing(emd_mode_display) or emd_mode_display in ("NA", "Not Found"):
+        # Prioritize Tag (E) section text if present, or scoped EMD section
+        emd_section_match = tag_e_match or re.search(
+            r"(?:(?:SECTION|CLAUSE|ANNEXURE|\d+[\.\s]|\([A-Z0-9]{1,3}\))\s*)?(?:BID\s+SECURITY|EARNEST\s+MONEY\s+DEPOSIT|EMD\s+DETAIL)(.*?)(?=\n\s*(?:SECTION|ANNEXURE|CLAUSE|\d+[\.\s]|\([A-Z0-9]{1,3}\)|\Z))",
+            full_text, re.IGNORECASE | re.DOTALL
+        )
+        emd_block = emd_section_match.group(1).lower() if emd_section_match else ""
         modes_found = []
-        if any(k in search_lower for k in ["banker's cheque", "bankers cheque", "imps", "neft", "rtgs", "online banking", "bank transfer", "online payment"]):
-            modes_found.append("BT")
-        if "demand draft" in search_lower:
-            modes_found.append("DD")
-        if "surety bond" in search_lower or "insurance surety" in search_lower:
-            modes_found.append("SB")
-        if "fixed deposit" in search_lower or "fdr" in search_lower:
-            modes_found.append("FDR")
-        if "bank guarantee" in search_lower or "bg" in search_lower:
-            if "BT" not in modes_found:
-                modes_found.append("BG")
-                
-        if not modes_found:
-            search_lower_all = full_text.lower()
-            if any(k in search_lower_all for k in ["banker's cheque", "bankers cheque", "imps", "neft", "rtgs", "online banking", "bank transfer", "online payment"]):
+        if emd_block:
+            if any(k in emd_block for k in ["banker's cheque", "bankers cheque", "imps", "neft", "rtgs", "online banking", "bank transfer", "online payment"]):
                 modes_found.append("BT")
-            if "demand draft" in search_lower_all:
+            if "demand draft" in emd_block or re.search(r"\bdd\b", emd_block):
                 modes_found.append("DD")
-            if "surety bond" in search_lower_all or "insurance surety" in search_lower_all:
+            if "surety bond" in emd_block or "insurance surety" in emd_block:
                 modes_found.append("SB")
-            if "fixed deposit" in search_lower_all or "fdr" in search_lower_all:
+            if "fixed deposit" in emd_block or re.search(r"\bfdr\b", emd_block):
                 modes_found.append("FDR")
-            if "bank guarantee" in search_lower_all or "bg" in search_lower_all:
+            if "bank guarantee" in emd_block or re.search(r"\bbg\b", emd_block):
                 modes_found.append("BG")
                 
         if modes_found:
             emd_mode_display = "/".join(modes_found)
-            logger.info(f"[ATC_ANCHOR] Resolved field 'emd_mode' via IFB Clause (E) check ({emd_mode_display})")
+            logger.info(f"[ATC_ANCHOR] Resolved field 'emd_mode' via EMD section check ({emd_mode_display})")
+        else:
+            emd_mode_display = "NA"
 
     # 16. Bid Validity
     bid_validity_days_display = resolve_field(["Bid Offer Validity (Days)", "Bid Offer Validity", "Bid Validity Period", "bid_validity_days", "Bid Validity"], r"(?:Bid Offer Validity|Bid Validity)(?: \(Days\))?[:\-\s]+([^\n]+)", None)
@@ -1597,8 +1604,8 @@ def build_infosheet_data(
         full_text, re.IGNORECASE
     )
     # Determine whether installation is SITC-scoped (inclusive in supply) or has a separate period
-    _is_sitc = bool(re.search(r"(?:Supply,?\s*Installation,?\s*Testing\s+and\s+Commissioning|\bSITC\b)", full_text, re.IGNORECASE))
-    _is_vendor_scope_install = bool(re.search(r"(?:installation\s+(?:will\s+be|shall\s+be|is)\s+in\s+the\s+scope\s+of\s+vendor|scope\s+of\s+vendor|vendor\s+scope)", full_text, re.IGNORECASE))
+    _is_sitc = bool(re.search(r"(?:Supply,?\s*Installation,?\s*(?:Testing\s+and\s+)?Commissioning|\bSITC\b)", full_text, re.IGNORECASE))
+    _is_vendor_scope_install = bool(re.search(r"(?:installation\s+(?:will\s+be|shall\s+be|is)\s+in\s+the\s+scope\s+of\s+vendor|(?:vendor\s+scope|scope\s+of\s+vendor)[^\n\.]*?install|install[^\n\.]*?(?:vendor\s+scope|scope\s+of\s+vendor))", full_text, re.IGNORECASE))
     _install_days_in_text = (
         re.search(r"(\d+)\s*(?:days?|day)\s+(?:for|of)\s+installation\s+(?:period|time|work|completion)", full_text, re.IGNORECASE)
         or re.search(r"(?:within|period\s+of|time\s+for)\s+(\d+)\s*(?:days?|day)\s+(?:for|of)?\s*installation", full_text, re.IGNORECASE)
@@ -1617,17 +1624,27 @@ def build_infosheet_data(
             delivery_time_installation_display = f"{int(_install_days_in_text.group(1))} Days"
             installation_inclusive_display = "No"
             logger.info(f"[ATC_ANCHOR] Resolved field 'delivery_time_installation' via regex in text ({delivery_time_installation_display})")
-        elif not _is_missing(delivery_time_supply_display) and delivery_time_supply_display not in ("NA", "Not Found"):
-            delivery_time_installation_display = str(delivery_time_supply_display)
-            installation_inclusive_display = "Yes" if (_is_sitc or _is_vendor_scope_install) else "No"
-            logger.info(f"[ATC_ANCHOR] Inherited installation delivery time from supply ({delivery_time_installation_display})")
         elif _is_sitc:
             delivery_time_installation_display = "Inclusive (SITC Scope)"
             installation_inclusive_display = "Yes"
             logger.info("[ATC_ANCHOR] Resolved field 'delivery_time_installation' via SECTION_HEADING: Scope of Supply SITC (Inclusive)")
         else:
-            delivery_time_installation_display = "NA"
-            installation_inclusive_display = "No"
+            _has_install_scope = _is_vendor_scope_install or any(
+                kw in full_text.lower()
+                for kw in [
+                    "installation and commissioning", "installation & commissioning",
+                    "erection and commissioning", "supply and installation",
+                    "supply & installation", "installation, testing"
+                ]
+            )
+            if _has_install_scope:
+                delivery_time_installation_display = "NA"
+                installation_inclusive_display = "No"
+                logger.info("[ATC_ANCHOR] Installation in scope but delivery time omitted: NA")
+            else:
+                delivery_time_installation_display = "Not Applicable"
+                installation_inclusive_display = "No"
+                logger.info("[ATC_ANCHOR] Pure supply tender: delivery_time_installation is Not Applicable")
     else:
         installation_inclusive_display = "No"
 
@@ -1643,38 +1660,26 @@ def build_infosheet_data(
             r"(?:Contract\s+Performance\s+Security|Performance\s+Bank\s+Guarantee|Security\s+Deposit|CPBG|CPS)(.*?)(?=\n\s*(?:SECTION|ANNEXURE|CLAUSE|\d+[\.\s]|\Z))",
             full_text, re.IGNORECASE | re.DOTALL
         )
-        pbg_block = pbg_clause_match.group(1).lower() if pbg_clause_match else full_text.lower()
+        pbg_block = pbg_clause_match.group(1).lower() if pbg_clause_match else ""
         modes_found = []
-        if "demand draft" in pbg_block or " dd " in pbg_block:
-            modes_found.append("DD")
-        if any(k in pbg_block for k in ["imps", "neft", "rtgs", "online banking", "online transfer", "online payment"]):
-            modes_found.append("Online Transfer")
-        if "surety bond" in pbg_block or "insurance surety" in pbg_block:
-            modes_found.append("Insurance Surety Bond")
-        if "fixed deposit" in pbg_block or "fdr" in pbg_block:
-            modes_found.append("FDR")
-        if "bank guarantee" in pbg_block or "bg" in pbg_block:
-            modes_found.append("Bank Guarantee")
-            
-        if not modes_found:
-            search_lower_all = full_text.lower()
-            if "demand draft" in search_lower_all or " dd " in search_lower_all:
+        if pbg_block:
+            if "demand draft" in pbg_block or re.search(r"\bdd\b", pbg_block):
                 modes_found.append("DD")
-            if any(k in search_lower_all for k in ["imps", "neft", "rtgs", "online banking", "online transfer", "online payment"]):
+            if any(k in pbg_block for k in ["imps", "neft", "rtgs", "online banking", "online transfer", "online payment"]):
                 modes_found.append("Online Transfer")
-            if "surety bond" in search_lower_all or "insurance surety" in search_lower_all:
+            if "surety bond" in pbg_block or "insurance surety" in pbg_block:
                 modes_found.append("Insurance Surety Bond")
-            if "fixed deposit" in search_lower_all or "fdr" in search_lower_all:
+            if "fixed deposit" in pbg_block or re.search(r"\bfdr\b", pbg_block):
                 modes_found.append("FDR")
-            if "bank guarantee" in search_lower_all or "bg" in search_lower_all or "performance bank guarantee" in search_lower_all:
+            if "bank guarantee" in pbg_block or re.search(r"\bbg\b", pbg_block):
                 modes_found.append("Bank Guarantee")
         
         if modes_found:
             pbg_mode_display = " / ".join(modes_found)
-            logger.info(f"[ATC_ANCHOR] Resolved field 'pbg_mode' via CLAUSE_NUMBER_FALLBACK: Clause 38.5 ({pbg_mode_display})")
+            logger.info(f"[ATC_ANCHOR] Resolved field 'pbg_mode' via PBG clause ({pbg_mode_display})")
         else:
-            pbg_mode_display = "N/A"
-            logger.info("[ATC_ANCHOR] Resolved field 'pbg_mode' default: N/A")
+            pbg_mode_display = "NA"
+            logger.info("[ATC_ANCHOR] Resolved field 'pbg_mode' default: NA")
 
     # 23-24. Payment Terms (Scope of Work / SCC / GCC / ATC specific)
     payment_terms_supply_display = resolve_field(
@@ -1761,7 +1766,14 @@ def build_infosheet_data(
         lambda v: not _is_missing(v) and v not in ("NA", "Not Found") and "%" in str(v) and str(v) not in ("15%", "5%")
     )
 
-    if _is_missing(payment_terms_installation_display) or payment_terms_installation_display in ("NA", "Not Found"):
+    has_install_scope = any(
+        kw in full_text.lower()
+        for kw in ["installation and commissioning", "installation & commissioning", "sitc", "erection and commissioning", "supply and installation", "supply & installation"]
+    )
+    if str(payment_terms_supply_display).strip() == "100%" or not has_install_scope:
+        if _is_missing(payment_terms_installation_display) or payment_terms_installation_display in ("NA", "Not Found"):
+            payment_terms_installation_display = "Not Applicable"
+    elif _is_missing(payment_terms_installation_display) or payment_terms_installation_display in ("NA", "Not Found"):
         payment_terms_installation_display = "NA"
 
     # 25. SD (in form of)
@@ -1812,16 +1824,13 @@ def build_infosheet_data(
             max_ld_percentage_display = f"{max_str}%"
             logger.info(f"[ATC_ANCHOR] Resolved field 'prs_ld' via CLAUSE_NUMBER_FALLBACK: Clause 26.0 ({ld_percentage_display}, max {max_ld_percentage_display})")
         else:
-            ld_percentage_display = "0.5% per week"
-            is_gem = "GEM/" in str(tender_id_display or "") or "gem.gov.in" in full_text.lower() or "ld charges as per gem" in full_text.lower()
-            max_ld_percentage_display = "10%" if is_gem else "5%"
-            logger.info(f"[ATC_ANCHOR] Resolved field 'prs_ld' via {'GeM GTC' if is_gem else 'GAIL GCC'} default (0.5% per week, max {max_ld_percentage_display})")
+            ld_percentage_display = "NA"
+            max_ld_percentage_display = "NA"
 
     if _is_missing(ld_percentage_display) or ld_percentage_display in ("NA", "Not Found"):
-        ld_percentage_display = "0.5% per week"
+        ld_percentage_display = "NA"
     if _is_missing(max_ld_percentage_display) or max_ld_percentage_display in ("NA", "Not Found"):
-        is_gem = "GEM/" in str(tender_id_display or "") or "gem.gov.in" in full_text.lower() or "ld charges as per gem" in full_text.lower()
-        max_ld_percentage_display = "10%" if is_gem else "5%"
+        max_ld_percentage_display = "NA"
 
     # PBG Required & Checkbox Matching
     pbg_required_raw = resolve_field(
@@ -1883,6 +1892,33 @@ def build_infosheet_data(
 
     # 29. Security Deposit
     sd_percentage_display = resolve_field(["Security Deposit %", "sd_percentage"], r"Security Deposit %[:\-\s]+([^\n]+)")
+    sd_required_display = resolve_field(["Security Deposit Required", "sd_required"], r"Security Deposit Required[:\-\s]+([^\n]+)")
+    if _is_missing(sd_required_display) or sd_required_display in ("NA", "Not Found"):
+        m_sd_explicit = re.search(
+            r"(?:Security\s+Deposit|Contract\s+Performance\s+Security|CPS/SD)\s*(?:[:\-\s]+|\bis\b\s*)(APPLICABLE|NOT\s+APPLICABLE|REQUIRED|NOT\s+REQUIRED)",
+            full_text, re.IGNORECASE
+        )
+        if m_sd_explicit:
+            val = m_sd_explicit.group(1).upper()
+            sd_required_display = "Yes" if val in ("APPLICABLE", "REQUIRED") else "No"
+        elif re.search(r"(?:shall\s+submit|shall\s+furnish|is\s+required\s+to\s+submit)\s+(?:a\s+)?Security\s+Deposit", full_text, re.IGNORECASE):
+            sd_required_display = "Yes"
+        else:
+            sd_required_display = "NA"
+
+    if (_is_missing(sd_percentage_display) or sd_percentage_display in ("NA", "Not Found")) and sd_required_display == "Yes":
+        m_sd_pct = re.search(r"(?:Security\s+Deposit|CPS/SD)(?:\s*\(SD\))?\s+(?:of\s+)?(\d+(?:\.\d+)?)\s*%", full_text, re.IGNORECASE)
+        if m_sd_pct:
+            val_f = float(m_sd_pct.group(1))
+            sd_percentage_display = f"{int(val_f)}%" if val_f.is_integer() else f"{val_f}%"
+
+    if sd_required_display == "No":
+        sd_percentage_display = "Not Applicable"
+        sd_duration_display = "Not Applicable"
+        sd_mode_display = "Not Applicable"
+    elif not _is_missing(sd_percentage_display) and sd_percentage_display not in ("NA", "Not Found", "Not Applicable", "0%", "0.0%", "₹0.00", None, ""):
+        if sd_required_display in ("NA", "Not Found", None, ""):
+            sd_required_display = "Yes"
 
     # 30. PBG Duration
     pbg_duration_raw = resolve_field(
@@ -1903,10 +1939,6 @@ def build_infosheet_data(
         pbg_percentage_display = "Not Applicable"
         pbg_duration_display = "Not Applicable"
         pbg_mode_display = "Not Applicable"
-        sd_required_display = "No"
-        sd_percentage_display = "Not Applicable"
-        sd_duration_display = "Not Applicable"
-        sd_mode_display = "Not Applicable"
 
     # PBG Required derivation rule: if PBG % or PBG Duration was successfully extracted
     # but PBG Required itself is still "NA" or absent, derive it as "Yes".
@@ -1928,12 +1960,26 @@ def build_infosheet_data(
     # 32. Physical Docs Submission Required
     physical_docs_required_display = resolve_field("Physical Docs Required", r"Physical Docs Required[:\-\s]+([^\n]+)")
     if _is_missing(physical_docs_required_display) or physical_docs_required_display == "NA":
-        if re.search(r"(?:submitted\s+in\s+Original\s+in\s+physical\s+form|physical\s+form\s+within\s+(\d+|\w+)\s*\(?\w*\)?\s*days|submission\s+of\s+physical\s+document)", full_text, re.IGNORECASE):
+        _clean_text_for_phys = re.sub(
+            r"Mandating\s+submission\s+of\s+documents\s+in\s+physical\s+form[^\n\.]*",
+            "", full_text, flags=re.IGNORECASE
+        )
+        _has_phys_mandate = bool(
+            re.search(r"(?:submitted\s+in\s+Original\s*\(?(?:in\s+)?physical\s+form\)?|physical\s+form\s+within\s+(\d+|\w+)\s*\(?\w*\)?\s*days|submission\s+of\s+physical\s+document(?:s)?\s+(?:is\s+)?mandatory|(?:submit|submission\s+of)[^\n\.]+?original\s+(?:physical\s+)?(?:EMD|DD|BG|document)|original\s+(?:physical\s+)?(?:EMD|DD|BG|document)[^\n\.]+?(?:must|shall|to)\s+be\s+submitted|hard\s+cop(?:y|ies)\s+(?:of\s+[^\n\.]+?\s+)?(?:must|shall|to)\s+be\s+submitted)", _clean_text_for_phys, re.IGNORECASE)
+        )
+        _has_phys_exemption = bool(
+            re.search(r"(?:no\s+physical\s+(?:documents?|submission|copies?)|physical\s+(?:submission|documents?|copies?)[^\n\.]*?(?:not\s+required|exempt|dispensed\s+with|nil)|hard\s+cop(?:y|ies)[^\n\.]*?(?:not\s+required|exempt|dispensed\s+with)|(?:online\s+(?:bidding|tender|submission)\s+only[^\n\.]*?(?:no\s+physical|no\s+hard)))", full_text, re.IGNORECASE)
+        )
+        if _has_phys_mandate:
             physical_docs_required_display = "Yes"
-            logger.info("[ATC_ANCHOR] Resolved field 'physical_docs_required' via ITB Clause 4.0 (Yes)")
-        else:
+            logger.info("[ATC_ANCHOR] Resolved field 'physical_docs_required' via explicit physical submission clause (Yes)")
+        elif _has_phys_exemption:
             physical_docs_required_display = "No"
-            physical_docs_deadline_display = "N/A"
+            physical_docs_deadline_display = "Not Applicable"
+            logger.info("[ATC_ANCHOR] Resolved field 'physical_docs_required' via explicit exemption / online only clause (No)")
+        else:
+            physical_docs_required_display = "NA"
+            physical_docs_deadline_display = "NA"
 
     # 33. Physical Docs Submission Deadline
     physical_docs_deadline_display = resolve_field(["Physical Docs Deadline", "physical_docs_deadline", "Physical Document Submission Deadline"], r"Physical Docs Deadline[:\-\s]+([^\n]+)")
@@ -1945,17 +1991,24 @@ def build_infosheet_data(
         )
         if phys_dl_m:
             raw_dl_str = phys_dl_m.group(0).strip()
-            num_m = re.search(r"\b(\d+|seven|ten|five)\b", raw_dl_str, re.IGNORECASE)
-            num_val = num_m.group(1).lower() if num_m else "7"
-            w_map = {"seven": 7, "ten": 10, "five": 5}
-            days_count = w_map.get(num_val, num_val)
-            physical_docs_deadline_display = f"Within {days_count} days of Bid Due Date"
-            logger.info(f"[ATC_ANCHOR] Resolved field 'physical_docs_deadline' via ITB clause ({physical_docs_deadline_display})")
-        elif physical_docs_required_display == "Yes":
-            physical_docs_deadline_display = "Within 7 days of Bid Due Date"
-            logger.info("[ATC_ANCHOR] Resolved field 'physical_docs_deadline' via Standard ITB Clause 4.0 default (Within 7 days of Bid Due Date)")
-        elif physical_docs_required_display == "No":
-            physical_docs_deadline_display = "N/A"
+            num_m = re.search(r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|1|2|3|4|5|6|7|8|9|10|14|15|21|30)\b", raw_dl_str, re.IGNORECASE)
+            if num_m:
+                raw_n = num_m.group(1).lower()
+                w_map = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+                days_count = w_map.get(raw_n, raw_n)
+                physical_docs_deadline_display = f"Within {days_count} days of Bid Due Date"
+                logger.info(f"[ATC_ANCHOR] Resolved field 'physical_docs_deadline' via ITB clause ({physical_docs_deadline_display})")
+            else:
+                physical_docs_deadline_display = "NA"
+        elif str(physical_docs_required_display).lower() in ("no", "not applicable"):
+            physical_docs_deadline_display = "Not Applicable"
+        else:
+            physical_docs_deadline_display = "NA"
+
+    # If deadline was found, derive physical_docs_required as Yes
+    if physical_docs_required_display in ("NA", None, "", "Not Found"):
+        if not _is_missing(physical_docs_deadline_display) and physical_docs_deadline_display not in ("NA", "Not Found", "Not Applicable", "N/A"):
+            physical_docs_required_display = "Yes"
 
     # 34. Age (in yrs) / Experience Years (BEC Sl. 1)
     word_to_num = {
@@ -2700,7 +2753,7 @@ def build_infosheet_data(
             clean_pairs.append(f"{k_str}: {v_str}")
         return ", ".join(clean_pairs)
 
-    def _extract_direct_tender_schedules(text: str, default_del: str = "90") -> List[Dict[str, Any]]:
+    def _extract_direct_tender_schedules(text: str, default_del: str = "NA") -> List[Dict[str, Any]]:
         direct_schedules = []
         eval_sched_m = re.search(r"(?:Evaluation\s+Schedules|मूVयांकन\s+अनुसूिचयां)[\s\S]+?(?=(?:Consignees|\n\s*[A-Z\s]{4,}\s*\(\s*\d+\s*(?:set|pieces|nos|meter|foot)\s*\)|Buyer\s+Added|तकनीक|\Z))", text, re.IGNORECASE)
         if eval_sched_m:
@@ -2757,7 +2810,10 @@ def build_infosheet_data(
             pass
 
     # If direct_schs extracted structured evaluation schedules or multiple BOQ items, use it
-    direct_schs = _extract_direct_tender_schedules(full_text, default_del=delivery_time_supply_display.replace(" Days", "").replace(" days", "") if delivery_time_supply_display not in ("NA", "⚠️ MISSING") else "90")
+    direct_schs = _extract_direct_tender_schedules(
+        full_text,
+        default_del=delivery_time_supply_display.replace(" Days", "").replace(" days", "") if delivery_time_supply_display not in ("NA", "⚠️ MISSING", "Not Found", None) else "NA"
+    )
     if direct_schs and (len(direct_schs) >= len(schedules_list) or any(s.get("quantity") in ("Not Found", "NA", 96130, 15) for s in schedules_list)):
         schedules_list = direct_schs
         
@@ -2769,11 +2825,12 @@ def build_infosheet_data(
         clean_qty = _format_qty_clean(qty)
         days = sch.get("delivery_days", "NA")
         if days in ("Not Found", "NA", None, ""):
-            days = delivery_time_supply_display.replace(" Days", "").replace(" days", "") if delivery_time_supply_display not in ("NA", "⚠️ MISSING") else "NA"
+            days = delivery_time_supply_display.replace(" Days", "").replace(" days", "") if delivery_time_supply_display not in ("NA", "⚠️ MISSING", "Not Found", None) else "NA"
         specs = sch.get("technical_specs", {})
         specs_str = _clean_technical_specs(specs)
         specs_part = f" | Specs: {specs_str}" if specs_str else ""
-        detail = f"Sch {sch_num} | Qty: {clean_qty} | Delivery: {days} days | {desc}{specs_part}"
+        del_part = f"Delivery: {days} days" if str(days).upper() not in ("NA", "NOT FOUND", "NONE", "") else "Delivery: NA"
+        detail = f"Sch {sch_num} | Qty: {clean_qty} | {del_part} | {desc}{specs_part}"
         
         if idx == 0: schedule_1_details_display = detail
         elif idx == 1: schedule_2_details_display = detail
@@ -2932,6 +2989,7 @@ def build_infosheet_data(
         "max_ld_percentage_display": max_ld_percentage_display,
         "pbg_required_display": pbg_required_display,
         "pbg_percentage_display": pbg_percentage_display,
+        "sd_required_display": sd_required_display,
         "sd_percentage_display": sd_percentage_display,
         "pbg_duration_display": pbg_duration_display,
         "sd_duration_display": sd_duration_display,
@@ -3017,7 +3075,7 @@ def build_infosheet_data(
         "sd_mode": sd_mode_display,
         "sd_percentage": sd_percentage_display,
         "sd_duration": sd_duration_display,
-        "prs_ld": f"{ld_percentage_display} (Max: {max_ld_percentage_display})",
+        "prs_ld": f"{ld_percentage_display} (Max: {max_ld_percentage_display})" if ld_percentage_display not in ("NA", "⚠️ MISSING", None, "") else "NA",
     }
  
     name_to_key = {
@@ -3112,26 +3170,17 @@ def build_infosheet_data(
 
     explicit_na_keys = set()
     
-    # 1. Security deposit & PBG fields: NA when PBG/SD is Not Required or pct is zero/missing
-    pbg_val = res_dict.get("pbg_percentage_display") or res_dict.get("pbg_required_display")
-    sd_pct_val = res_dict.get("sd_percentage_display")
-    has_pbg = pbg_val not in (None, "", "NA", "N/A", "Not Found", "No", "Not Applicable")
-    has_sd_pct = sd_pct_val not in (None, "", "NA", "N/A", "Not Found", "₹0.00", "0.0", 0, "0%", "0.00%", "Not Applicable")
-    if has_pbg and not has_sd_pct:
-        # Only mark numeric SD percentage/duration as NA if not defined, preserve extracted SD Mode/Required
-        if res_dict.get("sd_mode_display") in (None, "", "NA", "N/A"):
-            explicit_na_keys.add("sd_mode_display")
-        explicit_na_keys.update(["sd_percentage_display", "sd_duration_display"])
-
+    # 1. Security deposit & PBG fields: NA when PBG/SD is Not Required
     if str(res_dict.get("pbg_required_display", "")).lower() in ("no", "not required", "not applicable"):
         explicit_na_keys.update([
-            "pbg_percentage_display", "pbg_duration_display", "pbg_mode_display",
-            "sd_required_display", "sd_percentage_display", "sd_duration_display", "sd_mode_display"
+            "pbg_percentage_display", "pbg_duration_display", "pbg_mode_display"
         ])
     if str(res_dict.get("sd_required_display", "")).lower() in ("no", "not required", "not applicable"):
         explicit_na_keys.update(["sd_required_display", "sd_percentage_display", "sd_duration_display", "sd_mode_display"])
 
-    # Fee modes when fees are zero or not required
+    # Fee and EMD modes when fees are zero or not required
+    if str(res_dict.get("emd_required_display", "")).lower() in ("no", "not required", "not applicable") or str(res_dict.get("emd_amount_display", "")).strip() in ("₹0.00", "₹0", "0", "Nil", "Not Applicable", "NA"):
+        explicit_na_keys.add("emd_mode_display")
     if str(res_dict.get("processing_fee_mode_display", "")).lower() in ("not applicable", "na", "n/a", "nil"):
         explicit_na_keys.add("processing_fee_mode_display")
     if str(res_dict.get("tender_fee_mode_display", "")).lower() in ("not applicable", "na", "n/a", "nil"):
@@ -3152,9 +3201,30 @@ def build_infosheet_data(
             "net_worth_type_display", "net_worth_value_display"
         ])
 
-    # 3. Delivery Time Installation: NA when supply only / no SITC
-    del_inst = res_dict.get("delivery_time_installation_display")
-    if del_inst in ("N/A", "NA", "Not Applicable", None, ""):
+    # 2b. Payment Terms Installation: NA when pure supply / 100% supply / no installation scope
+    pay_inst = str(res_dict.get("payment_terms_installation_display", "")).strip().lower()
+    pay_sup = str(res_dict.get("payment_terms_supply_display", "")).strip()
+    if pay_sup == "100%" or pay_inst in ("not applicable", "n/a", "na", "nil", "none", ""):
+        has_install_scope = any(
+            kw in full_text.lower()
+            for kw in ["installation and commissioning", "installation & commissioning", "sitc", "erection and commissioning", "supply and installation", "supply & installation"]
+        )
+        if not has_install_scope or pay_sup == "100%":
+            res_dict["payment_terms_installation_display"] = "Not Applicable"
+            explicit_na_keys.add("payment_terms_installation_display")
+
+    # 3. Delivery Time Installation: NA when pure supply / no installation scope
+    del_inst_str = str(res_dict.get("delivery_time_installation_display", "")).strip().lower()
+    has_install_scope = (
+        bool(re.search(r"(?:Supply,?\s*Installation,?\s*(?:Testing\s+and\s+)?Commissioning|\bSITC\b)", full_text, re.IGNORECASE))
+        or bool(re.search(r"(?:installation\s+(?:will\s+be|shall\s+be|is)\s+in\s+the\s+scope\s+of\s+vendor|(?:vendor\s+scope|scope\s+of\s+vendor)[^\n\.]*?install|install[^\n\.]*?(?:vendor\s+scope|scope\s+of\s+vendor))", full_text, re.IGNORECASE))
+        or any(kw in full_text.lower() for kw in ["installation and commissioning", "installation & commissioning", "erection and commissioning", "supply and installation", "supply & installation", "installation, testing"])
+    )
+    if not has_install_scope:
+        if del_inst_str in ("na", "n/a", "none", "", "not found"):
+            res_dict["delivery_time_installation_display"] = "Not Applicable"
+        explicit_na_keys.add("delivery_time_installation_display")
+    elif del_inst_str in ("not applicable", "inclusive (sitc scope)"):
         explicit_na_keys.add("delivery_time_installation_display")
 
     # 4. TE Rejection Reason: NA when TE recommendation is Pass / Qualified / N/A
@@ -3169,11 +3239,18 @@ def build_infosheet_data(
 
     # 6. Physical docs tracking: NA when offline submission not required
     phys_req = str(res_dict.get("physical_docs_required_display", "")).lower()
-    if phys_req in ("no", "na", "n/a", "not required"):
+    if phys_req in ("no", "not required", "not applicable"):
         explicit_na_keys.update([
             "physical_docs_deadline_display", "docket_slip_upload_display",
             "physical_docs_uploaded_display", "courier_provider_display",
             "courier_docket_no_display", "courier_delivery_time_display"
+        ])
+    else:
+        # Operational tracking fields are always NA until a physical courier is uploaded
+        explicit_na_keys.update([
+            "docket_slip_upload_display", "physical_docs_uploaded_display",
+            "courier_provider_display", "courier_docket_no_display",
+            "courier_delivery_time_display"
         ])
 
     # 7. Secondary/Tertiary Client contacts & Schedules: NA when tender only has 1 client/schedule

@@ -227,8 +227,26 @@ export class PdfExtractionProcessor implements OnModuleInit {
                     usage: extractionResult.llm_usage,
                 });
             } catch (usageErr: unknown) {
-                this.logger.warn(
-                    `[PdfExtractionProcessor] Failed to record Claude usage for job ${job.id}: ${(usageErr as Error).message}`,
+                const fallbackUsagePayload = {
+                    tag: 'CLAUDE_USAGE_FALLBACK_RECOVERY',
+                    tenderId,
+                    jobId: job.id,
+                    userId: userId || null,
+                    failureTimestamp: new Date().toISOString(),
+                    error: (usageErr as Error).message,
+                    llm_usage: extractionResult.llm_usage,
+                };
+                this.logger.error(
+                    `[CLAUDE_USAGE_FALLBACK_RECOVERY] Failed to record Claude usage for job ${job.id}: ${JSON.stringify(fallbackUsagePayload)}`,
+                    {
+                        event_type: 'claude_usage_save',
+                        action: 'processor_usage_failure_fallback_logged',
+                        tenderId,
+                        jobId: job.id,
+                        error: (usageErr as Error).message,
+                        stack: (usageErr as Error).stack,
+                        fallbackUsagePayload,
+                    },
                 );
             }
         }
@@ -291,13 +309,37 @@ export class PdfExtractionProcessor implements OnModuleInit {
                     persistedFieldsCount,
                 });
             } catch (dbErr: any) {
-                this.logger.error(`[AutoExtract] Failed to persist extraction for tender ${tenderId}: ${dbErr?.message}`, {
-                    event_type: 'autoextract_save',
-                    action: 'save_failure',
+                const underlyingError = dbErr?.cause?.message || dbErr?.message || String(dbErr);
+                const fallbackRecoveryPayload = {
+                    tag: 'EXTRACTION_FALLBACK_RECOVERY',
                     tenderId,
-                    error: dbErr?.message,
-                    stack: dbErr?.stack,
-                });
+                    jobId: job.id,
+                    userId: userId || null,
+                    failureTimestamp: new Date().toISOString(),
+                    error: underlyingError,
+                    rawExtraction: {
+                        fields: extractionResult.fields,
+                        missing_fields: extractionResult.missing_fields,
+                        extraction_version: extractionResult.extraction_version || '1.0.0',
+                        processing_time_ms: extractionResult.processing_time_ms,
+                    },
+                };
+
+                this.logger.error(
+                    `[EXTRACTION_FALLBACK_RECOVERY] Failed to persist extraction to database: ${JSON.stringify(fallbackRecoveryPayload)}`,
+                    {
+                        event_type: 'autoextract_save',
+                        action: 'save_failure_fallback_logged',
+                        tenderId,
+                        jobId: job.id,
+                        error: underlyingError,
+                        stack: dbErr?.stack,
+                        fallbackRecoveryPayload,
+                    },
+                );
+
+                const saveErrorMsg = `EXTRACTION_SAVE_FAILED: Failed to persist extraction result for tender ${tenderId} to database: ${underlyingError}`;
+                throw new Error(saveErrorMsg);
             }
         }
 

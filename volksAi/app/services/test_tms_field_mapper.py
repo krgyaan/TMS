@@ -315,11 +315,11 @@ def test_map_to_tms_dto_enum_normalization():
     dto_1 = map_to_tms_dto(raw_input_1)
 
     assert dto_1["emdModes"] == [
-        "Bank Transfer",
-        "Demand Draft",
-        "Surety Bond",
-        "Fixed Deposit",
-        "Bank Guarantee",
+        "BANK_TRANSFER",
+        "DD",
+        "SB",
+        "FDR",
+        "BG",
     ]
     assert dto_1["commercialEvaluation"] == "ITEM_WISE_GST_INCLUSIVE"
     assert dto_1["mafRequired"] == "YES_PROJECT_SPECIFIC"
@@ -344,3 +344,39 @@ def test_map_to_tms_dto_enum_normalization():
     assert dto_2["reverseAuctionApplicable"] == "NO"
     assert dto_2["avgAnnualTurnoverType"] == "AMOUNT"
     assert dto_2["workingCapitalType"] == "AMOUNT"
+
+
+def test_batch_1_pbg_sd_emd_mapping():
+    """
+    Batch 1 Tests: PBG Mode, SD Mode, and EMD Mode enum normalization.
+    Tests valid option codes, multi-value combinations, and unmapped novel values.
+    """
+    # 1. PBG Mode
+    assert map_to_tms_dto({"pbg_mode_display": "Bank Guarantee"})["pbgMode"] == ["PBG"]
+    assert map_to_tms_dto({"pbg_mode_display": "Demand Draft"})["pbgMode"] == ["DD"]
+    assert map_to_tms_dto({"pbg_mode_display": "Fixed Deposit Receipt"})["pbgMode"] == ["FDR"]
+    assert map_to_tms_dto({"pbg_mode_display": "Insurance Surety Bond"})["pbgMode"] == ["SB"]
+    assert map_to_tms_dto({"pbg_mode_display": "Bank Guarantee / DD / FDR / Surety Bond"})["pbgMode"] == ["PBG", "DD", "FDR", "SB"]
+    # PBG unmapped novel value: must log warning and return None (unselected/missing)
+    assert map_to_tms_dto({"pbg_mode_display": "Cryptocurrency"})["pbgMode"] is None
+    assert map_to_tms_dto({"pbg_mode_display": "Bank Guarantee / Bitcoin"})["pbgMode"] == ["PBG"]
+
+    # 2. SD Mode (shared option set with PBG Mode)
+    assert map_to_tms_dto({"sd_mode_display": "Bank Guarantee / DD"})["sdMode"] == ["PBG", "DD"]
+    assert map_to_tms_dto({"sd_mode_display": "FDR / Insurance Surety Bond"})["sdMode"] == ["FDR", "SB"]
+    assert map_to_tms_dto({"sd_mode_display": "Novel Instrument"})["sdMode"] is None
+
+    # 3. EMD Mode
+    assert map_to_tms_dto({"emd_mode_display": "Bank Guarantee"})["emdModes"] == ["BG"]
+    assert map_to_tms_dto({"emd_mode_display": "Demand Draft"})["emdModes"] == ["DD"]
+    assert map_to_tms_dto({"emd_mode_display": "Bank Transfer"})["emdModes"] == ["BANK_TRANSFER"]
+    assert map_to_tms_dto({"emd_mode_display": "NEFT / RTGS"})["emdModes"] == ["BANK_TRANSFER"]
+    assert map_to_tms_dto({"emd_mode_display": "Pay on Portal"})["emdModes"] == ["PORTAL"]
+    assert map_to_tms_dto({"emd_mode_display": "Fixed Deposit"})["emdModes"] == ["FDR"]
+    assert map_to_tms_dto({"emd_mode_display": "Surety Bond"})["emdModes"] == ["SB"]
+    assert map_to_tms_dto({"emd_mode_display": "BT/DD/SB/FDR/BG/Portal"})["emdModes"] == [
+        "BANK_TRANSFER", "DD", "SB", "FDR", "BG", "PORTAL"
+    ]
+    # EMD unmapped novel value: must return None
+    assert map_to_tms_dto({"emd_mode_display": "Gold Bullion"})["emdModes"] is None
+    assert map_to_tms_dto({"emd_mode_display": "Demand Draft / Gold Bullion"})["emdModes"] == ["DD"]

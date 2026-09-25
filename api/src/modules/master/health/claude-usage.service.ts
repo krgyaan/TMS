@@ -291,10 +291,48 @@ export class ClaudeUsageService {
                 `Recorded ${insertedRows.length} Claude token usage row(s) for tender ${tenderId}, user ${userId}`,
             );
         } catch (dbErr: unknown) {
-            this.logger.error(`Failed to insert claude_token_usage: ${(dbErr as Error).message}`);
+            const underlyingError = (dbErr as any)?.cause?.message || (dbErr as Error).message || String(dbErr);
+            const fallbackUsagePayload = {
+                tag: 'CLAUDE_USAGE_FALLBACK_RECOVERY',
+                tenderId: tenderId ?? null,
+                jobId: jobId ?? null,
+                userId: userId ?? null,
+                failureTimestamp: new Date().toISOString(),
+                error: underlyingError,
+                records: insertedRows.map((row) => ({
+                    tenderId: row.tenderId,
+                    userId: row.userId,
+                    jobId: row.jobId,
+                    callType: row.callType,
+                    model: row.model,
+                    inputTokens: row.inputTokens,
+                    outputTokens: row.outputTokens,
+                    cacheCreationTokens: row.cacheCreationTokens,
+                    cacheReadTokens: row.cacheReadTokens,
+                    totalTokens: row.totalTokens,
+                    estimatedCostUsd: row.estimatedCostUsd,
+                    durationMs: row.durationMs,
+                })),
+            };
+
+            this.logger.error(
+                `[CLAUDE_USAGE_FALLBACK_RECOVERY] Failed to insert claude_token_usage: ${JSON.stringify(fallbackUsagePayload)}`,
+                {
+                    event_type: 'claude_usage_save',
+                    action: 'save_failure_fallback_logged',
+                    tenderId,
+                    jobId,
+                    userId,
+                    error: underlyingError,
+                    stack: (dbErr as Error).stack,
+                    fallbackUsagePayload,
+                },
+            );
         }
 
         // Update real-time sliding window TPM for each stage's tokens
+        // NOTE: Updating TPM even when DB insert fails ensures live rate limiting remains
+        // accurate to prevent provider throttling; live TPM and DB totals may temporarily diverge until recovery.
         for (const row of insertedRows) {
             const toks = row.totalTokens ?? 0;
             if (toks > 0) {

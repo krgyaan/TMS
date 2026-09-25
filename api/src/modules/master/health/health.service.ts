@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger, OnApplicationBootstrap } from "@nestjs/common";
 import { sql } from "drizzle-orm";
 import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
@@ -33,7 +33,9 @@ const QUEUE_DEFINITIONS: { key: string; token: string }[] = [
 ];
 
 @Injectable()
-export class HealthService {
+export class HealthService implements OnApplicationBootstrap {
+    private readonly logger = new Logger(HealthService.name);
+
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         @Inject("REDIS_CONNECTION") private readonly redis: IORedis | null,
@@ -43,6 +45,47 @@ export class HealthService {
         @Inject("GENERIC_QUEUE") private readonly genericQueue: Queue,
         private readonly claudeUsageService: ClaudeUsageService,
     ) {}
+
+    async onApplicationBootstrap(): Promise<void> {
+        await this.verifyRequiredTablesStartup();
+    }
+
+    async verifyRequiredTablesStartup(): Promise<{ missingTables: string[]; existingTables: string[] }> {
+        const requiredTables = ['tender_extractions', 'claude_token_usage'];
+        try {
+            const result = await this.db.execute<{ table_name: string }>(sql`
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                  AND table_name IN ('tender_extractions', 'claude_token_usage')
+            `);
+
+            const rows = Array.isArray(result) ? result : (result as any)?.rows || [];
+            const existing = new Set<string>(rows.map((r: any) => String(r.table_name)));
+            const missing = requiredTables.filter((t) => !existing.has(t));
+
+            if (missing.length > 0) {
+                this.logger.error(
+                    `[CRITICAL DATABASE INTEGRITY ERROR] Required table(s) missing from database: [${missing.join(', ')}]. ` +
+                    `Auto-extraction result persistence and Claude token usage tracking WILL FAIL until database migrations are applied!`,
+                );
+            } else {
+                this.logger.log(`[DatabaseIntegrity] Required AI extraction tables verified: [${requiredTables.join(', ')}]`);
+            }
+
+            return {
+                missingTables: missing,
+                existingTables: Array.from(existing),
+            };
+        } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            this.logger.error(`[DatabaseIntegrity] Failed to check required database tables on startup: ${errMsg}`);
+            return {
+                missingTables: requiredTables,
+                existingTables: [],
+            };
+        }
+    }
 
     private queues(): Record<string, Queue> {
         return {
@@ -109,9 +152,26 @@ export class HealthService {
         const startedAt = Date.now();
         try {
             await this.db.execute(sql`SELECT 1`);
+            const tableCheck = await this.verifyRequiredTablesStartup();
+
+            if (tableCheck.missingTables.length > 0) {
+                return {
+                    status: "degraded",
+                    data: {
+                        latencyMs: Date.now() - startedAt,
+                        error: `Required database table(s) missing: ${tableCheck.missingTables.join(', ')}`,
+                        missingTables: tableCheck.missingTables,
+                        requiredTables: ['tender_extractions', 'claude_token_usage'],
+                    },
+                };
+            }
+
             return {
                 status: "ok",
-                data: { latencyMs: Date.now() - startedAt },
+                data: {
+                    latencyMs: Date.now() - startedAt,
+                    verifiedTables: tableCheck.existingTables,
+                },
             };
         } catch (err: unknown) {
             return {
