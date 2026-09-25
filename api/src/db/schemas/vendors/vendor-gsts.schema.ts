@@ -6,8 +6,8 @@ export const vendorGsts = pgTable("vendor_gsts", {
         .primaryKey()
         .default(sql`nextval('vendor_gsts_id_seq')`),
     orgId: bigint("org_id", { mode: "number" }).notNull(),
-    gstState: varchar("gst_state", { length: 255 }).notNull(),
-    gstNo: varchar("gst_no", { length: 255 }).notNull(),
+    gstState: varchar("gst_state", { length: 255 }),
+    gstNo: varchar("gst_no", { length: 255 }),
     createdAt: timestamp("created_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }),
 });

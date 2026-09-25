@@ -1,10 +1,10 @@
 import { relations } from 'drizzle-orm';
 import { vendorFiles } from './vendor-files.schema';
-import { vendors } from './vendors.schema';
+import { vendorOrganizations } from './vendor-organizations.schema';
 
 export const vendorFilesRelations = relations(vendorFiles, ({ one }) => ({
-  vendor: one(vendors, {
-    fields: [vendorFiles.vendorId],
-    references: [vendors.id],
+  organization: one(vendorOrganizations, {
+    fields: [vendorFiles.orgId],
+    references: [vendorOrganizations.id],
   }),
 }));
