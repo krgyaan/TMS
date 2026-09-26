@@ -94,7 +94,7 @@ export const AccountSection = ({ orgId }: VendorSectionProps) => {
                 <div className="flex items-center justify-between">
                     <CardTitle>Bank Accounts</CardTitle>
 
-                    <Button variant="outline" size="sm" onClick={openAdd}>
+                    <Button type="button" variant="outline" size="sm" onClick={openAdd}>
                         <Plus className="h-4 w-4 mr-2" />
                         Add Account
                     </Button>
@@ -116,11 +116,11 @@ export const AccountSection = ({ orgId }: VendorSectionProps) => {
                             </div>
 
                             <div className="flex gap-2">
-                                <Button variant="ghost" size="icon" onClick={() => openEdit(index)}>
+                                <Button type="button" variant="ghost" size="icon" onClick={() => openEdit(index)}>
                                     <Edit className="h-4 w-4" />
                                 </Button>
 
-                                <Button variant="ghost" size="icon" onClick={() => handleDelete(index)}>
+                                <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(index)}>
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
                             </div>
@@ -138,7 +138,7 @@ export const AccountSection = ({ orgId }: VendorSectionProps) => {
                         <DialogDescription className="hidden">Add or edit account details</DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-2">
                         <FieldWrapper control={dialogForm.control} name="bankAccountName" label="Account Name">
                             {field => <Input placeholder="e.g. Current Account" {...field} value={field.value ?? ""} />}
                         </FieldWrapper>
@@ -168,11 +168,13 @@ export const AccountSection = ({ orgId }: VendorSectionProps) => {
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setOpen(false)}>
+                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                             Cancel
                         </Button>
 
-                        <Button onClick={handleSave}>Save</Button>
+                        <Button type="button" onClick={handleSave}>
+                            Save
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

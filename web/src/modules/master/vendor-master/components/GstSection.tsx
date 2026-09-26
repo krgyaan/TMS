@@ -139,7 +139,7 @@ export const GstSection = ({ orgId }: VendorSectionProps) => {
                         <DialogDescription className="hidden">Add or edit GST details</DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-2">
                         <FieldWrapper control={dialogForm.control} name="gstState" label="GST State">
                             {field => <Input placeholder="e.g. Maharashtra" {...field} value={field.value ?? ""} />}
                         </FieldWrapper>

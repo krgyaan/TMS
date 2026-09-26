@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
+import { CompactFileUploader } from "@/components/file-upload";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { useCreateVendorFile, useUpdateVendorFile, useDeleteVendorFile } from "@/hooks/api/useVendorFiles";
 import { DialogDescription } from "@radix-ui/react-dialog";
@@ -113,11 +114,11 @@ export const FileSection = ({ orgId }: VendorSectionProps) => {
                             </div>
 
                             <div className="flex gap-2">
-                                <Button variant="ghost" size="icon" onClick={() => openEdit(index)}>
+                                <Button type="button" variant="ghost" size="icon" onClick={() => openEdit(index)}>
                                     <Edit className="h-4 w-4" />
                                 </Button>
 
-                                <Button variant="ghost" size="icon" onClick={() => handleDelete(index)}>
+                                <Button type="button" variant="ghost" size="icon" onClick={() => handleDelete(index)}>
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
                             </div>
@@ -133,24 +134,30 @@ export const FileSection = ({ orgId }: VendorSectionProps) => {
                         <DialogDescription className="hidden">Add or edit file details</DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-2">
                         <FieldWrapper control={dialogForm.control} name="name" label="File Name">
                             {field => <Input placeholder="e.g. GST Certificate" {...field} value={field.value ?? ""} />}
                         </FieldWrapper>
 
-                        <FieldWrapper control={dialogForm.control} name="filePath" label="File Path">
-                            {field => (
-                                <Input placeholder="/uploads/document.pdf" {...field} value={field.value ?? ""} />
+                        <FieldWrapper control={dialogForm.control} name="filePath" label="File">
+                            {() => (
+                                <CompactFileUploader
+                                    context="vendor-documents"
+                                    value={dialogForm.watch("filePath") || undefined}
+                                    onChange={path => dialogForm.setValue("filePath", path ?? "")}
+                                />
                             )}
                         </FieldWrapper>
                     </div>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setOpen(false)}>
+                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                             Cancel
                         </Button>
 
-                        <Button onClick={handleSave}>Save</Button>
+                        <Button type="button" onClick={handleSave}>
+                            Save
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

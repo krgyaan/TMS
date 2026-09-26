@@ -11,4 +11,10 @@ export const masterConfigs: Record<string, FileConfig> = {
         allowedMimeTypes: [...DOCS, ...OFFICE],
         allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx"],
     },
+    "vendor-documents": {
+        maxFiles: 1,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx"],
+    },
 };

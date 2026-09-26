@@ -134,13 +134,13 @@ export const PersonSection = ({ orgId }: VendorSectionProps) => {
             {/* Dialog */}
 
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="sm:max-w-[500px]">
+                <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{editingIndex !== null ? "Edit Person" : "Add Person"}</DialogTitle>
                         <DialogDescription className="hidden">Add or edit person details</DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-2">
                         <FieldWrapper control={dialogForm.control} name="name" label="Name *">
                             {field => <Input placeholder="e.g. John Doe" {...field} value={field.value ?? ""} />}
                         </FieldWrapper>

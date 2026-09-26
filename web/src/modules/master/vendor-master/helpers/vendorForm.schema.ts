@@ -37,7 +37,7 @@ export const PersonFormSchema = z.object({
 export const FileFormSchema = z.object({
     id: z.number().optional(),
     name: z.string().min(1, "File name is required"),
-    filePath: z.string().min(1, "File path is required"),
+    filePath: z.string().min(1, "Upload a file first"),
 });
 
 export const VendorFormSchema = z.object({
