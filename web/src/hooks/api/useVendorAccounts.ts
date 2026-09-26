@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { vendorAccountsService } from '@/services/api';
+import { vendorApi } from '@/services/api';
 import type { CreateVendorAccountDto, UpdateVendorAccountDto } from '@/types/api.types';
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
@@ -15,14 +15,14 @@ export const vendorAccountsKey = {
 export const useVendorAccounts = () => {
     return useQuery({
         queryKey: vendorAccountsKey.lists(),
-        queryFn: () => vendorAccountsService.getAll(),
+        queryFn: () => vendorApi.getAllAccounts(),
     });
 };
 
 export const useVendorAccount = (id: number | null) => {
     return useQuery({
         queryKey: vendorAccountsKey.detail(id!),
-        queryFn: () => vendorAccountsService.getById(id!),
+        queryFn: () => vendorApi.getAccountById(id!),
         enabled: !!id,
     });
 };
@@ -30,7 +30,7 @@ export const useVendorAccount = (id: number | null) => {
 export const useVendorAccountsByOrganization = (orgId: number | null) => {
     return useQuery({
         queryKey: vendorAccountsKey.byOrganization(orgId!),
-        queryFn: () => vendorAccountsService.getByOrganization(orgId!),
+        queryFn: () => vendorApi.getAccountsByOrganization(orgId!),
         enabled: !!orgId,
     });
 };
@@ -39,7 +39,7 @@ export const useCreateVendorAccount = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: CreateVendorAccountDto) => vendorAccountsService.create(data),
+        mutationFn: (data: CreateVendorAccountDto) => vendorApi.createAccount(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: vendorAccountsKey.lists() });
             toast.success('Vendor Account created successfully');
@@ -55,7 +55,7 @@ export const useUpdateVendorAccount = () => {
 
     return useMutation({
         mutationFn: ({ id, data }: { id: number; data: UpdateVendorAccountDto }) =>
-            vendorAccountsService.update(id, data),
+            vendorApi.updateAccount(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: vendorAccountsKey.lists() });
             queryClient.invalidateQueries({ queryKey: vendorAccountsKey.detail(variables.id) });
@@ -71,7 +71,7 @@ export const useDeleteVendorAccount = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (id: number) => vendorAccountsService.deleteItem(id),
+        mutationFn: (id: number) => vendorApi.deleteAccount(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: vendorAccountsKey.lists() });
             toast.success('Vendor Account deleted successfully');

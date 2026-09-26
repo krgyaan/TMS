@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { vendorOrganizationsService } from "@/services/api";
+import { vendorApi } from "@/services/api";
 import type {
     CreateVendorOrganizationDto,
     UpdateVendorOrganizationDto,
@@ -20,21 +20,21 @@ export const vendorOrganizationsKey = {
 export const useVendorOrganizations = () => {
     return useQuery({
         queryKey: vendorOrganizationsKey.lists(),
-        queryFn: () => vendorOrganizationsService.getAll(),
+        queryFn: () => vendorApi.getAllOrganizations(),
     });
 };
 
 export const useVendorOrganizationsWithRelations = () => {
     return useQuery({
         queryKey: vendorOrganizationsKey.withRelations(),
-        queryFn: () => vendorOrganizationsService.getAllWithRelations(),
+        queryFn: () => vendorApi.getAllOrganizationsWithRelations(),
     });
 };
 
 export const useVendorOrganization = (id: number | null) => {
     return useQuery({
         queryKey: vendorOrganizationsKey.detail(id!),
-        queryFn: () => vendorOrganizationsService.getById(id!),
+        queryFn: () => vendorApi.getOrganizationById(id!),
         enabled: !!id,
     });
 };
@@ -42,7 +42,7 @@ export const useVendorOrganization = (id: number | null) => {
 export const useVendorOrganizationWithRelations = (id: number | null) => {
     return useQuery({
         queryKey: [...vendorOrganizationsKey.detail(id!), 'withRelations'],
-        queryFn: () => vendorOrganizationsService.getByIdWithRelations(id!),
+        queryFn: () => vendorApi.getOrganizationByIdWithRelations(id!),
         enabled: !!id,
     });
 };
@@ -51,7 +51,7 @@ export const useCreateVendorOrganization = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: CreateVendorOrganizationDto) => vendorOrganizationsService.create(data),
+        mutationFn: (data: CreateVendorOrganizationDto) => vendorApi.createOrganization(data),
         onSuccess: () => {
             queryClient.invalidateQueries({
                 queryKey: vendorOrganizationsKey.lists(),
@@ -71,7 +71,7 @@ export const useUpdateVendorOrganization = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateVendorOrganizationDto }) => vendorOrganizationsService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: UpdateVendorOrganizationDto }) => vendorApi.updateOrganization(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({
                 queryKey: vendorOrganizationsKey.lists(),
@@ -94,7 +94,7 @@ export const useSetVendorOrganizationStatus = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, status }: { id: number; status: boolean }) => vendorOrganizationsService.update(id, { status }),
+        mutationFn: ({ id, status }: { id: number; status: boolean }) => vendorApi.updateOrganization(id, { status }),
         onSuccess: (_, { status }) => {
             queryClient.invalidateQueries({
                 queryKey: vendorOrganizationsKey.all,
@@ -112,7 +112,7 @@ export const useCreateVendorOrganizationWithRelations = () => {
 
     return useMutation({
         mutationFn: (data: CreateVendorOrganizationWithRelationsDto) =>
-            vendorOrganizationsService.createWithRelations(data),
+            vendorApi.createOrganizationWithRelations(data),
         onSuccess: () => {
             queryClient.invalidateQueries({
                 queryKey: vendorOrganizationsKey.lists(),
@@ -138,7 +138,7 @@ export const useUpdateVendorOrganizationWithRelations = () => {
         }: {
             id: number;
             data: UpdateVendorOrganizationWithRelationsDto;
-        }) => vendorOrganizationsService.updateWithRelations(id, data),
+        }) => vendorApi.updateOrganizationWithRelations(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({
                 queryKey: vendorOrganizationsKey.lists(),
@@ -161,7 +161,7 @@ export const useUpdateVendorOrganizationWithRelations = () => {
 //   const queryClient = useQueryClient();
 
 //   return useMutation({
-//     mutationFn: (id: number) => vendorOrganizationsService.delete(id),
+//     mutationFn: (id: number) => vendorApi.deleteOrganization(id),
 //     onSuccess: () => {
 //       queryClient.invalidateQueries({
 //         queryKey: vendorOrganizationsKey.lists(),

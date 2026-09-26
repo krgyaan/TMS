@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { vendorsService } from "@/services/api";
+import { vendorApi } from "@/services/api";
 import type { CreateVendorDto, UpdateVendorDto } from "@/types/api.types";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";
@@ -16,14 +16,14 @@ export const vendorsKey = {
 export const useVendors = () => {
     return useQuery({
         queryKey: vendorsKey.lists(),
-        queryFn: () => vendorsService.getAll(),
+        queryFn: () => vendorApi.getAllVendors(),
     });
 };
 
 export const useVendor = (id: number | null) => {
     return useQuery({
         queryKey: vendorsKey.detail(id!),
-        queryFn: () => vendorsService.getById(id!),
+        queryFn: () => vendorApi.getVendorById(id!),
         enabled: !!id,
     });
 };
@@ -31,7 +31,7 @@ export const useVendor = (id: number | null) => {
 export const useVendorWithRelations = (id: number | null) => {
     return useQuery({
         queryKey: vendorsKey.withRelations(id!),
-        queryFn: () => vendorsService.getByIdWithRelations(id!),
+        queryFn: () => vendorApi.getVendorByIdWithRelations(id!),
         enabled: !!id,
     });
 };
@@ -39,7 +39,7 @@ export const useVendorWithRelations = (id: number | null) => {
 export const useVendorsByOrganization = (organizationId: number | null) => {
     return useQuery({
         queryKey: [...vendorsKey.all, "organization", organizationId],
-        queryFn: () => vendorsService.getByOrganization(organizationId!),
+        queryFn: () => vendorApi.getVendorsByOrganization(organizationId!),
         enabled: !!organizationId,
     });
 };
@@ -48,7 +48,7 @@ export const useCreateVendor = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: CreateVendorDto) => vendorsService.create(data),
+        mutationFn: (data: CreateVendorDto) => vendorApi.createVendor(data),
 
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: vendorsKey.lists() });
@@ -70,7 +70,7 @@ export const useUpdateVendor = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateVendorDto }) => vendorsService.update(id, data),
+        mutationFn: ({ id, data }: { id: number; data: UpdateVendorDto }) => vendorApi.updateVendor(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: vendorsKey.lists() });
 
@@ -90,7 +90,7 @@ export const useDeleteVendor = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (id: number) => vendorsService.deleteVendor(id),
+        mutationFn: (id: number) => vendorApi.deleteVendor(id),
 
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: vendorsKey.all });
