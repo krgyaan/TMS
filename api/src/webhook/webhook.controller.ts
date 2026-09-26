@@ -11,6 +11,8 @@ import type { Request } from 'express';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 
+import { Public } from '@/modules/auth/decorators/public.decorator';
+
 interface OpenwaWebhookPayload {
   event: string;
   sessionId: string;
@@ -28,6 +30,7 @@ interface OpenwaWebhookPayload {
   };
 }
 
+@Public()
 @Controller('webhook/openwa')
 export class WebhookController {
   private readonly logger = new Logger(WebhookController.name);

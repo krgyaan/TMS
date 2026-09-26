@@ -1,19 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
 import { ExtractionPreviewPanel } from './ExtractionPreviewPanel';
 import { realDualDocData } from './realExtractionData';
-import { extractFieldIndicators } from '../helpers/tenderInfoSheet.autoExtract';
+import { extractFieldIndicators, populateFormFromExtraction } from '../helpers/tenderInfoSheet.autoExtract';
 import { AiIndicatorsContext, AiFieldIndicator } from '@/components/form/AiIndicatorsContext';
-import { Sparkles, Layers, FileText, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Layers, FileText, CheckCircle2, CheckSquare, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Form } from '@/components/ui/form';
+import { MultiSelectField } from '@/components/form/MultiSelectField';
+import { pbgFormOptions, sdFormOptions, paymentModeOptions, type TenderInfoSheetFormValues } from '../helpers/tenderInfoSheet.types';
 
 export default function ExtractionPreviewDemoPage() {
-    const [activeTab, setActiveTab] = useState<'badges' | 'split'>('badges');
+    const [activeTab, setActiveTab] = useState<'badges' | 'dropdowns' | 'split'>('dropdowns');
 
     // Build real indicators using extractFieldIndicators
     const indicators = extractFieldIndicators(
         realDualDocData.fields as any,
         realDualDocData.missing_fields
     );
+
+    const form = useForm<TenderInfoSheetFormValues>({
+        defaultValues: {
+            pbgForm: [],
+            sdForm: [],
+            emdModes: [],
+            pbgRequired: 'YES',
+            sdRequired: 'YES',
+            emdRequired: 'YES',
+        },
+    });
+
+    useEffect(() => {
+        populateFormFromExtraction(form, realDualDocData.fields as any, { overwriteExisting: true });
+    }, [form]);
 
     const gailNoidaDocs = JSON.stringify({
         schemaVersion: 1,
@@ -46,6 +66,20 @@ export default function ExtractionPreviewDemoPage() {
                         <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 p-1.5 rounded-xl">
                             <button
                                 type="button"
+                                id="tab-dropdowns"
+                                onClick={() => setActiveTab('dropdowns')}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                    activeTab === 'dropdowns'
+                                        ? 'bg-indigo-600 text-white shadow-sm'
+                                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                                }`}
+                            >
+                                <CheckSquare className="h-3.5 w-3.5" />
+                                Batch 1 Dropdown Enums
+                            </button>
+
+                            <button
+                                type="button"
                                 id="tab-badges"
                                 onClick={() => setActiveTab('badges')}
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
@@ -73,6 +107,137 @@ export default function ExtractionPreviewDemoPage() {
                             </button>
                         </div>
                     </div>
+
+                    {/* Tab 0: Batch 1 Dropdowns Verification */}
+                    {activeTab === 'dropdowns' && (
+                        <div className="space-y-4">
+                            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur-sm">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 border-b border-slate-800/80 pb-4">
+                                    <div>
+                                        <h3 className="font-semibold text-slate-200 text-base flex items-center gap-2">
+                                            <CheckSquare className="h-5 w-5 text-indigo-400" />
+                                            Batch 1 Enum Dropdowns Verification (PBG Mode, SD Mode, EMD Mode)
+                                        </h3>
+                                        <p className="text-xs text-slate-400 mt-1">
+                                            Demonstrates normalized option codes (<code className="text-indigo-300">PBG</code>, <code className="text-indigo-300">BG</code>, <code className="text-indigo-300">DD</code>, <code className="text-indigo-300">FDR</code>, etc.) properly matching and populating frontend multi-select chips with human-readable labels.
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-8 text-xs border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700"
+                                            onClick={() => {
+                                                populateFormFromExtraction(form, realDualDocData.fields as any, { overwriteExisting: true });
+                                            }}
+                                        >
+                                            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                                            Reset Extracted
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="secondary"
+                                            className="h-8 text-xs bg-indigo-600 hover:bg-indigo-500 text-white"
+                                            onClick={() => {
+                                                form.setValue('pbgForm', ['PBG', 'DD', 'FDR', 'SB']);
+                                                form.setValue('sdForm', ['PBG', 'DD']);
+                                                form.setValue('emdModes', ['BG', 'DD', 'BANK_TRANSFER', 'PORTAL']);
+                                            }}
+                                        >
+                                            Select All Test Codes
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <Form {...form}>
+                                    <form className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        {/* 1. PBG Form */}
+                                        <div className="p-4 rounded-lg border border-slate-800 bg-slate-950/60 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-mono text-emerald-400 font-semibold">1. PBG Mode (Full)</span>
+                                                <span className="text-[10px] text-slate-400 font-mono">Options: DD, FDR, PBG, SB</span>
+                                            </div>
+                                            <MultiSelectField
+                                                control={form.control}
+                                                name="pbgForm"
+                                                label="PBG (in form of)"
+                                                options={pbgFormOptions.map((o) => ({
+                                                    value: String(o.value),
+                                                    label: o.label,
+                                                }))}
+                                                placeholder="Select PBG forms"
+                                            />
+                                            <div className="p-2.5 rounded bg-slate-900 border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
+                                                <div className="text-slate-300 font-medium">Selected Codes (form value):</div>
+                                                <div className="font-mono text-indigo-300">
+                                                    {JSON.stringify(form.watch('pbgForm') || [])}
+                                                </div>
+                                                <div className="text-[10px] text-slate-500">
+                                                    Source: &quot;Bank Guarantee&quot; normalized to &quot;PBG&quot; &rarr; displays &quot;Performance Bank Guarantee&quot; chip.
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 2. SD Form */}
+                                        <div className="p-4 rounded-lg border border-slate-800 bg-slate-950/60 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-mono text-emerald-400 font-semibold">2. SD Mode (Shared Full)</span>
+                                                <span className="text-[10px] text-slate-400 font-mono">Options: DD, FDR, PBG, SB</span>
+                                            </div>
+                                            <MultiSelectField
+                                                control={form.control}
+                                                name="sdForm"
+                                                label="SD (in form of)"
+                                                options={sdFormOptions.map((o) => ({
+                                                    value: String(o.value),
+                                                    label: o.label,
+                                                }))}
+                                                placeholder="Select SD forms"
+                                            />
+                                            <div className="p-2.5 rounded bg-slate-900 border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
+                                                <div className="text-slate-300 font-medium">Selected Codes (form value):</div>
+                                                <div className="font-mono text-indigo-300">
+                                                    {JSON.stringify(form.watch('sdForm') || [])}
+                                                </div>
+                                                <div className="text-[10px] text-slate-500">
+                                                    Shares identical declarative mapping table with PBG Mode.
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* 3. EMD Modes */}
+                                        <div className="p-4 rounded-lg border border-slate-800 bg-slate-950/60 space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-mono text-emerald-400 font-semibold">3. EMD Mode (Short)</span>
+                                                <span className="text-[10px] text-slate-400 font-mono">Options: BG, DD, BT, FDR, SB, PORTAL</span>
+                                            </div>
+                                            <MultiSelectField
+                                                control={form.control}
+                                                name="emdModes"
+                                                label="EMD Mode"
+                                                options={paymentModeOptions.map((o) => ({
+                                                    value: String(o.value),
+                                                    label: o.label,
+                                                }))}
+                                                placeholder="Select payment modes"
+                                            />
+                                            <div className="p-2.5 rounded bg-slate-900 border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
+                                                <div className="text-slate-300 font-medium">Selected Codes (form value):</div>
+                                                <div className="font-mono text-indigo-300">
+                                                    {JSON.stringify(form.watch('emdModes') || [])}
+                                                </div>
+                                                <div className="text-[10px] text-slate-500">
+                                                    Uses &quot;BG&quot; (Bank Guarantee) rather than &quot;PBG&quot; to match EMD options.
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </Form>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Tab 1: Form Field Badges */}
                     {activeTab === 'badges' && (

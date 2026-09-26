@@ -5,33 +5,199 @@ infosheet extraction fields into TMS DTO-compliant output (matching Zod schemas)
 Reference: TMS TenderInfoSheetPayloadSchema (info-sheet.dto.ts)
 """
 
+import logging
 import re
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
+logger = logging.getLogger(__name__)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Normalization Mappings & Constants
+# Centralized Declarative Normalization Tables
 # ─────────────────────────────────────────────────────────────────────────────
 
-EMD_MODE_NORMALIZATION: Dict[str, str] = {
-    "BG": "Bank Guarantee",
-    "DD": "Demand Draft",
-    "BT": "Bank Transfer",
-    "SB": "Surety Bond",
-    "FDR": "Fixed Deposit",
-    "FD": "Fixed Deposit",
-    "NEFT": "Bank Transfer",
-    "RTGS": "Bank Transfer",
-    "ONLINE": "Bank Transfer",
-    "ONLINE TRANSFER": "Bank Transfer",
-    "BANK GUARANTEE": "Bank Guarantee",
-    "DEMAND DRAFT": "Demand Draft",
-    "BANK TRANSFER": "Bank Transfer",
-    "SURETY BOND": "Surety Bond",
-    "FIXED DEPOSIT": "Fixed Deposit",
-    "INSURANCE SURETY BOND": "Insurance Surety Bond",
+# 1. PBG Mode & SD Mode (Literally identical option set: DD, FDR, PBG, SB)
+PAYMENT_INSTRUMENT_FULL_MAPPING: Dict[str, str] = {
+    # PBG
+    "PBG": "PBG",
+    "BG": "PBG",
+    "BANK GUARANTEE": "PBG",
+    "PERFORMANCE BANK GUARANTEE": "PBG",
+    "PERFORMANCE GUARANTEE": "PBG",
+    "CPBG": "PBG",
+    "CPS": "PBG",
+    "E-PBG": "PBG",
+    "E-BG": "PBG",
+    "EPBG": "PBG",
+    # DD
+    "DD": "DD",
+    "DEMAND DRAFT": "DD",
+    "DEDUCTION": "DD",
+    "DD/DEDUCTION": "DD",
+    "BANKERS CHEQUE": "DD",
+    "BANKER'S CHEQUE": "DD",
+    "PAY ORDER": "DD",
+    # FDR
+    "FDR": "FDR",
+    "FD": "FDR",
+    "FIXED DEPOSIT": "FDR",
+    "FIXED DEPOSIT RECEIPT": "FDR",
+    "TERM DEPOSIT": "FDR",
+    # SB
+    "SB": "SB",
+    "SURETY BOND": "SB",
+    "INSURANCE SURETY BOND": "SB",
+    "SURETY BONDS": "SB",
+    "INSURANCE BOND": "SB",
 }
+
+# 2. EMD Mode (Options: BG, DD, BANK_TRANSFER, FDR, SB, PORTAL)
+PAYMENT_INSTRUMENT_SHORT_MAPPING: Dict[str, str] = {
+    # BG
+    "BG": "BG",
+    "BANK GUARANTEE": "BG",
+    "E-BG": "BG",
+    "PBG": "BG",
+    # DD
+    "DD": "DD",
+    "DEMAND DRAFT": "DD",
+    "BANKERS CHEQUE": "DD",
+    "BANKER'S CHEQUE": "DD",
+    "PAY ORDER": "DD",
+    # BANK_TRANSFER
+    "BANK_TRANSFER": "BANK_TRANSFER",
+    "BANK TRANSFER": "BANK_TRANSFER",
+    "BT": "BANK_TRANSFER",
+    "NEFT": "BANK_TRANSFER",
+    "RTGS": "BANK_TRANSFER",
+    "IMPS": "BANK_TRANSFER",
+    "ONLINE TRANSFER": "BANK_TRANSFER",
+    "WIRE TRANSFER": "BANK_TRANSFER",
+    "ONLINE BANKING": "BANK_TRANSFER",
+    "ONLINE PAYMENT": "BANK_TRANSFER",
+    "ONLINE": "BANK_TRANSFER",
+    "TRANSFER": "BANK_TRANSFER",
+    # FDR
+    "FDR": "FDR",
+    "FD": "FDR",
+    "FIXED DEPOSIT": "FDR",
+    "FIXED DEPOSIT RECEIPT": "FDR",
+    "TERM DEPOSIT": "FDR",
+    # SB
+    "SB": "SB",
+    "SURETY BOND": "SB",
+    "INSURANCE SURETY BOND": "SB",
+    "SURETY BONDS": "SB",
+    # PORTAL
+    "PORTAL": "PORTAL",
+    "PAY ON PORTAL": "PORTAL",
+    "PAYMENT ON PORTAL": "PORTAL",
+    "PAYMENT GATEWAY": "PORTAL",
+    "GEM PORTAL": "PORTAL",
+    "PORTAL PAYMENT": "PORTAL",
+}
+
+# 3. Tender Fee & Processing Fee Modes (Literally identical option set: DD, PORTAL, BANK_TRANSFER)
+FEE_MODE_MAPPING: Dict[str, str] = {
+    # DD
+    "DD": "DD",
+    "DEMAND DRAFT": "DD",
+    "BANKERS CHEQUE": "DD",
+    "BANKER'S CHEQUE": "DD",
+    "PAY ORDER": "DD",
+    # PORTAL
+    "PORTAL": "PORTAL",
+    "PAY ON PORTAL": "PORTAL",
+    "PAYMENT ON PORTAL": "PORTAL",
+    "PAYMENT GATEWAY": "PORTAL",
+    "GEM PORTAL": "PORTAL",
+    "PORTAL PAYMENT": "PORTAL",
+    # BANK_TRANSFER
+    "BANK_TRANSFER": "BANK_TRANSFER",
+    "BANK TRANSFER": "BANK_TRANSFER",
+    "BT": "BANK_TRANSFER",
+    "NEFT": "BANK_TRANSFER",
+    "RTGS": "BANK_TRANSFER",
+    "IMPS": "BANK_TRANSFER",
+    "ONLINE TRANSFER": "BANK_TRANSFER",
+    "ONLINE": "BANK_TRANSFER",
+    "WIRE TRANSFER": "BANK_TRANSFER",
+    "ONLINE BANKING": "BANK_TRANSFER",
+    "ONLINE PAYMENT": "BANK_TRANSFER",
+}
+
+# 4. Financial Criteria (Avg Annual Turnover & Solvency Certificate share: NOT_APPLICABLE, AMOUNT)
+FINANCIAL_CRITERIA_MAPPING: Dict[str, str] = {
+    "NOT_APPLICABLE": "NOT_APPLICABLE",
+    "NOT APPLICABLE": "NOT_APPLICABLE",
+    "EXEMPT": "NOT_APPLICABLE",
+    "EXEMPTED": "NOT_APPLICABLE",
+    "NA": "NOT_APPLICABLE",
+    "N/A": "NOT_APPLICABLE",
+    "NIL": "NOT_APPLICABLE",
+    "NONE": "NOT_APPLICABLE",
+    "NO": "NOT_APPLICABLE",
+    "AMOUNT": "AMOUNT",
+    "POSITIVE": "AMOUNT",
+    "VALUE": "AMOUNT",
+    "YES": "AMOUNT",
+    "APPLICABLE": "AMOUNT",
+    "REQUIRED": "AMOUNT",
+}
+
+# 5. MAF Required (Options: YES_GENERAL, YES_PROJECT_SPECIFIC, NO)
+MAF_REQUIRED_MAPPING: Dict[str, str] = {
+    "YES_PROJECT_SPECIFIC": "YES_PROJECT_SPECIFIC",
+    "YES - PROJECT SPECIFIC": "YES_PROJECT_SPECIFIC",
+    "YES — PROJECT SPECIFIC": "YES_PROJECT_SPECIFIC",
+    "PROJECT SPECIFIC": "YES_PROJECT_SPECIFIC",
+    "PROJECT-SPECIFIC": "YES_PROJECT_SPECIFIC",
+    "YES (PROJECT SPECIFIC)": "YES_PROJECT_SPECIFIC",
+    "YES_GENERAL": "YES_GENERAL",
+    "YES": "YES_GENERAL",
+    "TRUE": "YES_GENERAL",
+    "REQUIRED": "YES_GENERAL",
+    "APPLICABLE": "YES_GENERAL",
+    "YES - GENERAL": "YES_GENERAL",
+    "YES — GENERAL": "YES_GENERAL",
+    "NO": "NO",
+    "FALSE": "NO",
+    "NOT REQUIRED": "NO",
+    "NOT APPLICABLE": "NO",
+}
+
+# 6. Physical Document Type (Options: ONLY_EMD, ONLY_OTHER_DOCUMENT, EMD_AND_OTHER_DOCUMENTS)
+PHYSICAL_DOC_TYPE_MAPPING: Dict[str, str] = {
+    "ONLY_EMD": "ONLY_EMD",
+    "ONLY EMD": "ONLY_EMD",
+    "EMD ONLY": "ONLY_EMD",
+    "ONLY_OTHER_DOCUMENT": "ONLY_OTHER_DOCUMENT",
+    "ONLY OTHER DOCUMENT": "ONLY_OTHER_DOCUMENT",
+    "ONLY OTHER DOCUMENTS": "ONLY_OTHER_DOCUMENT",
+    "OTHER DOCUMENTS ONLY": "ONLY_OTHER_DOCUMENT",
+    "OTHER DOCUMENT ONLY": "ONLY_OTHER_DOCUMENT",
+    "EMD_AND_OTHER_DOCUMENTS": "EMD_AND_OTHER_DOCUMENTS",
+    "EMD + OTHER DOCUMENTS": "EMD_AND_OTHER_DOCUMENTS",
+    "EMD AND OTHER DOCUMENTS": "EMD_AND_OTHER_DOCUMENTS",
+    "BOTH": "EMD_AND_OTHER_DOCUMENTS",
+}
+
+# Master registry mapping field names to their declarative mapping table
+FIELD_MAPPING_REGISTRY: Dict[str, Dict[str, str]] = {
+    "pbgMode": PAYMENT_INSTRUMENT_FULL_MAPPING,
+    "sdMode": PAYMENT_INSTRUMENT_FULL_MAPPING,
+    "emdModes": PAYMENT_INSTRUMENT_SHORT_MAPPING,
+    "tenderFeeModes": FEE_MODE_MAPPING,
+    "processingFeeModes": FEE_MODE_MAPPING,
+    "avgAnnualTurnoverType": FINANCIAL_CRITERIA_MAPPING,
+    "solvencyCertificateType": FINANCIAL_CRITERIA_MAPPING,
+    "mafRequired": MAF_REQUIRED_MAPPING,
+    "physicalDocType": PHYSICAL_DOC_TYPE_MAPPING,
+}
+
+# Legacy alias for backward compatibility
+EMD_MODE_NORMALIZATION = PAYMENT_INSTRUMENT_SHORT_MAPPING
 
 # Explicitly excluded prefix/keys per Phase 1 scope decision
 EXCLUDED_PREFIXES = ("doc_", "schedule_", "readiness_")
@@ -161,23 +327,66 @@ def _parse_modes(val: Any, delimiters: str = r"[/,]+") -> Optional[List[str]]:
     return result or None
 
 
-def _normalize_emd_modes(val: Any) -> Optional[List[str]]:
+def normalize_enum_value(
+    raw_val: Any,
+    mapping_table: Dict[str, str],
+    field_name: str,
+) -> Optional[str]:
     """
-    Splits on '/' and normalizes:
-    BG -> Bank Guarantee, DD -> Demand Draft, BT -> Bank Transfer,
-    SB -> Surety Bond, FDR -> Fixed Deposit.
+    Normalizes a single raw value against a declarative mapping table.
+    Looks up case-insensitively and trimmed.
+    Logs a warning if an unrecognized/novel value is encountered and returns None (unselected).
     """
-    raw_modes = _parse_modes(val, delimiters=r"[/,]+")
-    if not raw_modes:
+    if _is_empty(raw_val):
+        return None
+    s = str(raw_val).strip()
+    key = s.upper()
+
+    # Direct match in table
+    if key in mapping_table:
+        return mapping_table[key]
+
+    # Partial / substring match against known keys (longest key first)
+    for pattern in sorted(mapping_table.keys(), key=len, reverse=True):
+        if pattern in key or (len(key) >= 4 and key in pattern):
+            return mapping_table[pattern]
+
+    # Truly novel / unrecognized value: log warning and leave unselected per policy
+    logger.warning(
+        f"[ENUM_NORMALIZER] Unmapped novel value '{s}' for field '{field_name}'. "
+        f"Leaving field unselected / missing per policy."
+    )
+    return None
+
+
+def normalize_enum_list(
+    raw_val: Any,
+    mapping_table: Dict[str, str],
+    field_name: str,
+    delimiters: str = r"[/,]+",
+) -> Optional[List[str]]:
+    """
+    Splits string on delimiters (or handles list of strings),
+    runs each item through normalize_enum_value,
+    deduplicates preserving order,
+    and returns list of valid enum codes or None if empty.
+    """
+    raw_items = _parse_modes(raw_val, delimiters=delimiters)
+    if not raw_items:
         return None
 
-    normalized = []
-    for mode in raw_modes:
-        key = mode.upper().strip()
-        norm_val = EMD_MODE_NORMALIZATION.get(key, mode)
-        if norm_val not in normalized:
-            normalized.append(norm_val)
+    normalized: List[str] = []
+    for item in raw_items:
+        code = normalize_enum_value(item, mapping_table, field_name)
+        if code and code not in normalized:
+            normalized.append(code)
+
     return normalized or None
+
+
+def _normalize_emd_modes(val: Any) -> Optional[List[str]]:
+    """Legacy helper delegating to centralized normalize_enum_list."""
+    return normalize_enum_list(val, PAYMENT_INSTRUMENT_SHORT_MAPPING, "emdModes")
 
 
 def _map_commercial_evaluation(val: Any) -> Optional[str]:
@@ -472,7 +681,7 @@ def map_to_tms_dto(raw_infosheet_data: Dict[str, Any]) -> Dict[str, Any]:
         # EMD
         "emdAmount": _parse_float(raw.get("emd_amount_display")),
         "emdRequired": _map_emd_required(raw.get("emd_required_display")),
-        "emdModes": _normalize_emd_modes(raw.get("emd_mode_display")),
+        "emdModes": normalize_enum_list(raw.get("emd_mode_display"), PAYMENT_INSTRUMENT_SHORT_MAPPING, "emdModes"),
 
         # Tender Value
         "tenderValue": tender_value,
@@ -494,12 +703,12 @@ def map_to_tms_dto(raw_infosheet_data: Dict[str, Any]) -> Dict[str, Any]:
 
         # PBG
         "pbgRequired": _map_yes_no(raw.get("pbg_required_display")),
-        "pbgMode": _parse_modes(raw.get("pbg_mode_display")),
+        "pbgMode": normalize_enum_list(raw.get("pbg_mode_display"), PAYMENT_INSTRUMENT_FULL_MAPPING, "pbgMode"),
         "pbgPercentage": _parse_percentage_float(raw.get("pbg_percentage_display")),
         "pbgDurationMonths": _parse_int(raw.get("pbg_duration_display")),
 
         # Security Deposit
-        "sdMode": _parse_modes(raw.get("sd_mode_display")),
+        "sdMode": normalize_enum_list(raw.get("sd_mode_display"), PAYMENT_INSTRUMENT_FULL_MAPPING, "sdMode"),
         "sdPercentage": _parse_percentage_float(raw.get("sd_percentage_display")),
         "sdDurationMonths": _parse_int(raw.get("sd_duration_display")),
 
