@@ -1,19 +1,17 @@
-import { useMemo, useState } from "react";
-import { CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, Tooltip as RechartsTooltip, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 /* UI Components */
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-import { ROW_HELP_TEXT } from "./stage-matrix-help";
-import { useExecutiveScoring, usePerformanceOutcomes, usePerformanceSummary, usePerformanceTrends, useStageMatrix } from "./tender-executive.hooks";
-import type { TenderKpiKey } from "./tender-executive.types";
+import { ROW_HELP_TEXT } from "./helpers/stage-matrix-help";
+import { usePerformanceOutcomes, useStageMatrix } from "@/hooks/api/useTenderExecutivePerformance";
+import type { TenderKpiKey } from "./helpers/tender-executive.types";
 
 /* Icons */
 import { paths } from "@/app/routes/paths";
@@ -28,16 +26,18 @@ import {
     Download,
     Eye,
     FileText,
+    Filter,
     Info,
     Search,
-    Target,
-    TrendingUp,
     Trophy,
-    XCircle
+    X,
+    XCircle,
+    type LucideIcon,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { EmdBacklogTable } from "./components/EmdBacklogTable";
 import { StageBacklogV4Table } from "./components/StageBacklogV4Table";
+import { ScoreDrilldownPopover } from "./components/ScoreDrilldownPopover";
 
 /* ================================
    HELPERS
@@ -68,6 +68,72 @@ const formatLabel = (label: string) => {
 
 export type Scope = { view: "user"; userId: number } | { view: "team"; teamId: number } | { view: null };
 
+const SCOPE_STORAGE_KEY = "tms:tender-executive-scope";
+
+function isDateString(value: string | null): value is string {
+    return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function parsePositiveId(value: string | null) {
+    const id = Number(value);
+    return value !== null && Number.isInteger(id) && id > 0 ? id : null;
+}
+
+type InitialFilters = {
+    scope: Scope;
+    fromDate: string | null;
+    toDate: string | null;
+};
+
+const FILTER_KEYS = ["userId", "teamId", "fromDate", "toDate"];
+
+function readFiltersFrom(source: URLSearchParams): InitialFilters {
+    const userId = parsePositiveId(source.get("userId"));
+    const teamId = parsePositiveId(source.get("teamId"));
+    const rawFrom = source.get("fromDate");
+    const rawTo = source.get("toDate");
+
+    return {
+        scope: userId ? { view: "user", userId } : teamId ? { view: "team", teamId } : { view: null },
+        fromDate: isDateString(rawFrom) ? rawFrom : null,
+        toDate: isDateString(rawTo) ? rawTo : null,
+    };
+}
+
+function readInitialFilters(search: string): InitialFilters {
+    const params = new URLSearchParams(search);
+    if (FILTER_KEYS.some(key => params.has(key))) {
+        return readFiltersFrom(params);
+    }
+
+    try {
+        return readFiltersFrom(new URLSearchParams(localStorage.getItem(SCOPE_STORAGE_KEY) ?? ""));
+    } catch {
+        localStorage.removeItem(SCOPE_STORAGE_KEY);
+        return { scope: { view: null }, fromDate: null, toDate: null };
+    }
+}
+
+function isSameScope(a: Scope, b: Scope) {
+    if (a.view !== b.view) return false;
+    if (a.view === "user" && b.view === "user") return a.userId === b.userId;
+    if (a.view === "team" && b.view === "team") return a.teamId === b.teamId;
+    return true;
+}
+
+const KPI_LABELS: Record<TenderKpiKey, string> = {
+    ALLOCATED: "Allocated",
+    PENDING: "Pending",
+    APPROVED: "Approved",
+    REJECTED: "Rejected",
+    BID: "Bid",
+    MISSED: "Missed",
+    DISQUALIFIED: "Disqualified",
+    RESULT_AWAITED: "Result Awaited",
+    LOST: "Lost",
+    WON: "Won",
+};
+
 // const TEAM_OPTIONS = [
 //     { label: "All Teams", value: "all" },
 //     { label: "AC Team", value: 1 }, // ← actual team ID
@@ -79,58 +145,121 @@ export type Scope = { view: "user"; userId: number } | { view: "team"; teamId: n
 ================================ */
 
 export default function TenderExecutivePerformance() {
-    const [fromDate, setFromDate] = useState<string | null>();
-    const [toDate, setToDate] = useState<string | null>();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [initialFilters] = useState(() => readInitialFilters(searchParams.toString()));
+
+    const [draftScope, setDraftScope] = useState<Scope>(initialFilters.scope);
+    const [draftFromDate, setDraftFromDate] = useState<string | null>(initialFilters.fromDate);
+    const [draftToDate, setDraftToDate] = useState<string | null>(initialFilters.toDate);
+
+    const [appliedScope, setAppliedScope] = useState<Scope>(initialFilters.scope);
+    const [appliedFromDate, setAppliedFromDate] = useState<string | null>(initialFilters.fromDate);
+    const [appliedToDate, setAppliedToDate] = useState<string | null>(initialFilters.toDate);
+
     const [selectedMetric, setSelectedMetric] = useState<TenderKpiKey | null>(null);
-    const [scope, setScope] = useState<Scope>({ view: null });
     const navigate = useNavigate();
+    const lastWrittenRef = useRef<string>(searchParams.toString());
+    const restoredRef = useRef(false);
+    const hydratedRef = useRef(false);
 
-    const baseRange = fromDate && toDate ? { fromDate, toDate } : null;
+    useEffect(() => {
+        if (restoredRef.current) return;
+        restoredRef.current = true;
 
-    const userQuery = baseRange && scope.view === "user" ? { ...baseRange, view: "user" as const, userId: (scope as { view: "user"; userId: number }).userId } : null;
+        if (searchParams.toString()) return;
+        const cached = localStorage.getItem(SCOPE_STORAGE_KEY) ?? "";
+        if (!cached) return;
+
+        lastWrittenRef.current = cached;
+        setSearchParams(new URLSearchParams(cached), { replace: true });
+    }, [searchParams, setSearchParams]);
+
+    useEffect(() => {
+        const current = searchParams.toString();
+
+        if (!hydratedRef.current) {
+            if (current === lastWrittenRef.current) hydratedRef.current = true;
+            return;
+        }
+
+        if (current === lastWrittenRef.current) return;
+
+        const userId = parsePositiveId(searchParams.get("userId"));
+        const teamId = parsePositiveId(searchParams.get("teamId"));
+        const urlScope: Scope = userId ? { view: "user", userId } : teamId ? { view: "team", teamId } : { view: null };
+        const rawFrom = searchParams.get("fromDate");
+        const rawTo = searchParams.get("toDate");
+        const urlFrom = isDateString(rawFrom) ? rawFrom : null;
+        const urlTo = isDateString(rawTo) ? rawTo : null;
+
+        setDraftScope(current => (isSameScope(current, urlScope) ? current : urlScope));
+        setAppliedScope(current => (isSameScope(current, urlScope) ? current : urlScope));
+        setDraftFromDate(current => (current === urlFrom ? current : urlFrom));
+        setAppliedFromDate(current => (current === urlFrom ? current : urlFrom));
+        setDraftToDate(current => (current === urlTo ? current : urlTo));
+        setAppliedToDate(current => (current === urlTo ? current : urlTo));
+    }, [searchParams]);
+
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (appliedScope.view === "user") params.set("userId", String(appliedScope.userId));
+        if (appliedScope.view === "team") params.set("teamId", String(appliedScope.teamId));
+        if (appliedFromDate) params.set("fromDate", appliedFromDate);
+        if (appliedToDate) params.set("toDate", appliedToDate);
+
+        const next = params.toString();
+        lastWrittenRef.current = next;
+        if (next) localStorage.setItem(SCOPE_STORAGE_KEY, next);
+        setSearchParams(prev => (next === prev.toString() ? prev : params), { replace: true });
+    }, [appliedFromDate, appliedScope, appliedToDate, setSearchParams]);
+
+    const dateError = draftFromDate && draftToDate && draftFromDate > draftToDate ? "From Date must be on or before To Date" : null;
+    const canSubmit = draftScope.view !== null && !!draftFromDate && !!draftToDate && !dateError;
+    const hasAnyFilter =
+        draftScope.view !== null || !!draftFromDate || !!draftToDate || appliedScope.view !== null || !!appliedFromDate || !!appliedToDate || selectedMetric !== null;
+
+    const handleSubmit = () => {
+        if (!canSubmit) return;
+        setAppliedScope(draftScope);
+        setAppliedFromDate(draftFromDate);
+        setAppliedToDate(draftToDate);
+    };
+
+    const handleClear = () => {
+        setDraftScope({ view: null });
+        setDraftFromDate(null);
+        setDraftToDate(null);
+        setAppliedScope({ view: null });
+        setAppliedFromDate(null);
+        setAppliedToDate(null);
+        setSelectedMetric(null);
+        localStorage.removeItem(SCOPE_STORAGE_KEY);
+        lastWrittenRef.current = "";
+        setSearchParams({}, { replace: true });
+    };
+
+    const baseRange = appliedFromDate && appliedToDate ? { fromDate: appliedFromDate, toDate: appliedToDate } : null;
+
+    const userQuery = baseRange && appliedScope.view === "user" ? { ...baseRange, view: "user" as const, userId: (appliedScope as { view: "user"; userId: number }).userId } : null;
 
     const sharedQuery =
-        baseRange && scope.view === "user"
-            ? { ...baseRange, view: "user" as const, userId: (scope as { view: "user"; userId: number }).userId }
-            : baseRange && scope.view === "team"
-              ? { ...baseRange, view: "team" as const, teamId: (scope as { view: "team"; teamId: number }).teamId }
+        baseRange && appliedScope.view === "user"
+            ? { ...baseRange, view: "user" as const, userId: (appliedScope as { view: "user"; userId: number }).userId }
+            : baseRange && appliedScope.view === "team"
+              ? { ...baseRange, view: "team" as const, teamId: (appliedScope as { view: "team"; teamId: number }).teamId }
               : null;
 
     const { data: users } = useUsersByRole(5);
 
-    const { data: summary } = usePerformanceSummary(userQuery);
     const { data: outcomes } = usePerformanceOutcomes(userQuery);
     const { data: stageMatrix } = useStageMatrix(userQuery);
-    const { data: trends = [] } = usePerformanceTrends(userQuery);
-    const { data: scoring } = useExecutiveScoring(userQuery);
 
     const STAGES = stageMatrix?.stages ?? [];
     const STAGE_MATRIX = stageMatrix?.rows ?? [];
 
-    console.log({ "kpi data": outcomes });
+    type KpiItem = { key: TenderKpiKey; label: string; count: number; icon: LucideIcon; color: string; bg: string };
 
-    // console.log("TENDERS:", tenders);
-
-    const SCORING_COLORS: Record<ScoringKey, string> = {
-        "Work Completion": "#6366F1",
-        "On Time Work": "#22C55E",
-        "Win Rate": "#F59E0B",
-    };
-
-    const SCORING_DATA = scoring
-        ? [
-              { name: "Work Completion", score: scoring.workCompletion },
-              { name: "On Time Work", score: scoring.onTimeWork },
-              { name: "Win Rate", score: scoring.winRate },
-          ].map(item => ({
-              ...item,
-              fill: SCORING_COLORS[item.name as keyof typeof SCORING_COLORS],
-          }))
-        : [];
-
-    // const totalScore = scoring?.total ?? (SCORING_DATA.length ? Math.round(SCORING_DATA.reduce((sum, item) => sum + item.score, 0) / SCORING_DATA.length) : 0);
-
-    const PRE_BID_KPIS = useMemo(() => {
+    const PRE_BID_KPIS = useMemo<KpiItem[]>(() => {
         if (!outcomes) return [];
 
         return [
@@ -169,7 +298,7 @@ export default function TenderExecutivePerformance() {
         ];
     }, [outcomes]);
 
-    const POST_BID_KPIS = useMemo(() => {
+    const POST_BID_KPIS = useMemo<KpiItem[]>(() => {
         if (!outcomes) return [];
 
         return [
@@ -247,7 +376,7 @@ export default function TenderExecutivePerformance() {
         return tendersByKpi[selectedMetric] ?? [];
     }, [outcomes, selectedMetric]);
 
-    const renderKpiCard = kpi => {
+    const renderKpiCard = (kpi: KpiItem) => {
         const isSelected = selectedMetric === kpi.key;
 
         return (
@@ -304,18 +433,16 @@ export default function TenderExecutivePerformance() {
 
                 <Card className="shadow-sm">
                     <CardContent className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div className="flex flex-wrap items-end gap-4">
                             {/* TEAM SELECT */}
-                            <div className="space-y-2">
+                            <div className="min-w-[200px] flex-1 space-y-2">
                                 <label className="text-sm font-medium">Team</label>
                                 <Combobox
-                                    value={scope.view === "team" ? String(scope.teamId) : ""}
-                                    onChange={v =>
-                                        setScope({
-                                            view: "team",
-                                            teamId: Number(v),
-                                        })
-                                    }
+                                    value={draftScope.view === "team" ? String(draftScope.teamId) : ""}
+                                    onChange={v => {
+                                        const teamId = parsePositiveId(v);
+                                        setDraftScope(teamId ? { view: "team", teamId } : { view: null });
+                                    }}
                                     options={[
                                         { id: "1", name: "AC Team" },
                                         { id: "2", name: "DC Team" },
@@ -325,39 +452,48 @@ export default function TenderExecutivePerformance() {
                             </div>
 
                             {/* USER SELECT */}
-                            <div className="space-y-2">
+                            <div className="min-w-[200px] flex-1 space-y-2">
                                 <label className="text-sm font-medium">Team Member</label>
                                 <Combobox
-                                    disabled={scope.view === "team"}
-                                    value={scope.view === "user" ? String(scope.userId) : ""}
-                                    onChange={v =>
-                                        setScope({
-                                            view: "user",
-                                            userId: Number(v),
-                                        })
-                                    }
+                                    disabled={draftScope.view === "team"}
+                                    value={draftScope.view === "user" ? String(draftScope.userId) : ""}
+                                    onChange={v => {
+                                        const userId = parsePositiveId(v);
+                                        setDraftScope(userId ? { view: "user", userId } : { view: null });
+                                    }}
                                     options={users?.map(u => ({ id: u.id.toString(), name: u.name })) ?? []}
                                     placeholder="Select User"
                                 />
                             </div>
                             {/* FROM DATE */}
-                            <div className="space-y-2">
+                            <div className="w-[165px] shrink-0 space-y-2">
                                 <label className="text-sm font-medium">From Date</label>
                                 <div className="relative">
                                     <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input type="date" className="pl-9" value={fromDate ?? ""} onChange={e => setFromDate(e.target.value || null)} />
+                                    <Input type="date" className="pl-9" value={draftFromDate ?? ""} onChange={e => setDraftFromDate(e.target.value || null)} />
                                 </div>
                             </div>
 
                             {/* TO DATE */}
-                            <div className="space-y-2">
+                            <div className="w-[165px] shrink-0 space-y-2">
                                 <label className="text-sm font-medium">To Date</label>
                                 <div className="relative">
                                     <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input type="date" className="pl-9" value={toDate ?? ""} onChange={e => setToDate(e.target.value || null)} />
+                                    <Input type="date" className="pl-9" value={draftToDate ?? ""} onChange={e => setDraftToDate(e.target.value || null)} />
                                 </div>
                             </div>
+
+                            {/* ACTIONS */}
+                            <div className="flex shrink-0 gap-2">
+                                <Button onClick={handleSubmit} disabled={!canSubmit}>
+                                    <Filter className="mr-2 h-4 w-4" /> Submit
+                                </Button>
+                                <Button variant="outline" onClick={handleClear} disabled={!hasAnyFilter}>
+                                    <X className="mr-2 h-4 w-4" /> Clear
+                                </Button>
+                            </div>
                         </div>
+                        {dateError && <p className="mt-2 text-sm text-destructive">{dateError}</p>}
                     </CardContent>
                 </Card>
 
@@ -368,12 +504,7 @@ export default function TenderExecutivePerformance() {
                 {/* ===== EMD BACKLOG ===== */}
                 {sharedQuery && <EmdBacklogTable {...sharedQuery} />}
 
-                {/* {sharedQuery && <EmdPaidTable {...sharedQuery} />} */}
-                {/* ===== EMD RECEIVED ===== */}
-
-                {/* {sharedQuery && <EmdBalanceTable {...sharedQuery} />} */}
-
-                {scope.view === "user" && (
+                {appliedScope.view === "user" && (
                     <>
                         {/* ===== KPI CARDS ===== */}
                         <div className="space-y-6 hidden">
@@ -421,13 +552,13 @@ export default function TenderExecutivePerformance() {
                                             <TableRow key={tender.id}>
                                                 <TableCell className="font-medium text-muted-foreground">{tender.tenderNo}</TableCell>
                                                 <TableCell>{tender.organizationName}</TableCell>
-                                                <TableCell className="max-w-[300px] truncate" title={tender.tenderName}>
+                                                <TableCell className="max-w-[300px] truncate" title={tender.tenderName ?? undefined}>
                                                     {tender.tenderName}
                                                 </TableCell>
                                                 <TableCell className="text-right font-medium">{formatCurrency(tender.value)}</TableCell>
                                                 <TableCell>
-                                                    <Badge variant={tender.status === "Won" ? "default" : tender.status === "Lost" ? "destructive" : "secondary"}>
-                                                        {tender.status}
+                                                    <Badge variant={tender.statusBucket === "WON" ? "default" : tender.statusBucket === "LOST" ? "destructive" : "secondary"}>
+                                                        {KPI_LABELS[tender.statusBucket]}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-right">
@@ -513,82 +644,35 @@ export default function TenderExecutivePerformance() {
                                                             <TableCell key={j} className="text-center p-2">
                                                                 {val !== null ? (
                                                                     (() => {
-                                                                        const drilldown = (row as any).drilldown?.[j] ?? [];
+                                                                        const drilldown = row.drilldown[j] ?? [];
+                                                                        const tenders = drilldown.map(item => ({
+                                                                            tenderId: item.tenderId,
+                                                                            tenderNo: item.tenderNo ?? `Tender #${item.tenderId}`,
+                                                                            tenderName: item.tenderName ?? "Tender name unavailable",
+                                                                            value: 0,
+                                                                            date: item.completedAt ?? item.deadline ?? null,
+                                                                        }));
 
                                                                         return (
-                                                                            <Popover>
-                                                                                <PopoverTrigger asChild>
+                                                                            <ScoreDrilldownPopover
+                                                                                title={`${row.label} · ${formatLabel(STAGES[j])}`}
+                                                                                tenders={tenders}
+                                                                                trigger={
                                                                                     <div
                                                                                         className={`
-                                                                                mx-auto flex items-center justify-center w-8 h-8 rounded-full text-sm cursor-pointer font-bold
-                                                                                ${rowType === "success" ? "bg-emerald-100/70 text-emerald-700" : ""}   // onTime
-                                                                                ${rowType === "completed" ? "bg-green-100/70 text-green-700" : ""}    // done
-                                                                                ${rowType === "warning" ? "bg-amber-100/70 text-amber-700" : ""}      // late
-                                                                                ${rowType === "info" ? "bg-sky-100/70 text-sky-700" : ""}             // pending
-                                                                                ${rowType === "destructive" ? "bg-destructive/10 text-destructive" : ""} // overdue
-                                                                                ${rowType === "default" ? "bg-muted text-muted-foreground" : ""}   // notApplicable
-                                                                            `}
+                                                                                        mx-auto flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-sm font-bold
+                                                                                        ${rowType === "success" ? "bg-emerald-100/70 text-emerald-700" : ""}
+                                                                                        ${rowType === "completed" ? "bg-green-100/70 text-green-700" : ""}
+                                                                                        ${rowType === "warning" ? "bg-amber-100/70 text-amber-700" : ""}
+                                                                                        ${rowType === "info" ? "bg-sky-100/70 text-sky-700" : ""}
+                                                                                        ${rowType === "destructive" ? "bg-destructive/10 text-destructive" : ""}
+                                                                                        ${rowType === "default" ? "bg-muted text-muted-foreground" : ""}
+                                                                                    `}
                                                                                     >
                                                                                         {val}
                                                                                     </div>
-                                                                                </PopoverTrigger>
-
-                                                                                <PopoverContent className="w-80 max-h-72 overflow-auto">
-                                                                                    <div className="space-y-2">
-                                                                                        <div className="font-semibold text-sm">
-                                                                                            {row.label} — {formatLabel(STAGES[j])}
-                                                                                        </div>
-
-                                                                                        {drilldown.length === 0 ? (
-                                                                                            <p className="text-xs text-muted-foreground">No tenders</p>
-                                                                                        ) : (
-                                                                                            drilldown.map((t: any) => (
-                                                                                                <div className="flex justify-between">
-                                                                                                    <div key={t.tenderId} className="border-b pb-2 text-xs space-y-1">
-                                                                                                        <div className="font-medium">{t.tenderNo ?? `Tender #${t.tenderId}`}</div>
-
-                                                                                                        {t.tenderName && (
-                                                                                                            <div className="text-muted-foreground truncate">{t.tenderName}</div>
-                                                                                                        )}
-
-                                                                                                        {t.deadline && (
-                                                                                                            <div className="text-muted-foreground">
-                                                                                                                Due: {new Date(t.deadline).toLocaleDateString()}
-                                                                                                            </div>
-                                                                                                        )}
-
-                                                                                                        {t.daysOverdue !== null && (
-                                                                                                            <div className="text-red-600 font-medium">
-                                                                                                                {t.daysOverdue} days overdue
-                                                                                                            </div>
-                                                                                                        )}
-
-                                                                                                        {t.meta && Object.keys(t.meta).length > 0 && (
-                                                                                                            <div className="italic text-muted-foreground">
-                                                                                                                {Object.entries(t.meta)
-                                                                                                                    .map(([k, v]) => `${k}: ${v}`)
-                                                                                                                    .join(", ")}
-                                                                                                            </div>
-                                                                                                        )}
-                                                                                                    </div>
-                                                                                                    <div>
-                                                                                                        <button
-                                                                                                            onClick={ev => {
-                                                                                                                ev.stopPropagation();
-                                                                                                                window.open(paths.tendering.tenderView(t.tenderId), "_blank");
-                                                                                                            }}
-                                                                                                            className="h-7 w-7 flex items-center justify-center rounded-md
-                                                                                                                                        text-muted-foreground hover:text-primary hover:bg-muted"
-                                                                                                        >
-                                                                                                            <Eye className="h-4 w-4" />
-                                                                                                        </button>
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                            ))
-                                                                                        )}
-                                                                                    </div>
-                                                                                </PopoverContent>
-                                                                            </Popover>
+                                                                                }
+                                                                            />
                                                                         );
                                                                     })()
                                                                 ) : (

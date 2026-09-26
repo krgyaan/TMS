@@ -7,16 +7,6 @@ import * as path from 'path';
 
 const EMPLOYEE_DOCS_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'hrms', 'employee-documents');
 
-//final list of requires docs every employee needs to upload
-const REQUIRED_DOC_TYPES = [
-  'Aadhar Card',
-  'PAN Card',
-  'Graduation Certificate',
-  'Passport Size Photo',
-  'Bank Passbook / Cancelled Cheque',
-]; 
-
-
 import { users } from '@/db/schemas/auth/users.schema';
 import { roles } from '@/db/schemas/auth/roles.schema';
 import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
