@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,27 +22,63 @@ import RfqsSentTable from "./components/RfqsSentTable";
 import TenderCountBarChart from "./components/TenderCountBarChart";
 import DonutChartPerformance from "./components/DonutChartPerformance";
 
+const storageKey = "oem-performance-filters";
+
+function readSubmittedParams(search: string): OemPerformanceParams | null {
+    const searchParams = new URLSearchParams(search);
+    const rawOemId = searchParams.get("oemId");
+    const from = searchParams.get("fromDate");
+    const to = searchParams.get("toDate");
+    const oemId = rawOemId !== null ? Number(rawOemId) : NaN;
+
+    if (Number.isFinite(oemId) && from && to) {
+        return { oemId, fromDate: from, toDate: to };
+    }
+
+    try {
+        const stored = localStorage.getItem(storageKey);
+        if (!stored) return null;
+
+        const storedParams = new URLSearchParams(stored);
+        const storedOemId = Number(storedParams.get("oemId"));
+        const storedFromDate = storedParams.get("fromDate");
+        const storedToDate = storedParams.get("toDate");
+        if (Number.isFinite(storedOemId) && storedFromDate && storedToDate) {
+            return { oemId: storedOemId, fromDate: storedFromDate, toDate: storedToDate };
+        }
+
+        try {
+            const legacy = JSON.parse(stored) as Partial<OemPerformanceParams>;
+            if (Number.isFinite(Number(legacy.oemId)) && legacy.fromDate && legacy.toDate) {
+                return { oemId: Number(legacy.oemId), fromDate: legacy.fromDate, toDate: legacy.toDate };
+            }
+        } catch {
+            return null;
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
 export default function OemPerformancePage() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    // Restore filters from the URL so a reload (or shared link) keeps the selection.
-    const [selectedOemId, setSelectedOemId] = useState<number | null>(() => {
-        const raw = new URLSearchParams(location.search).get("oemId");
-        const parsed = raw !== null ? Number(raw) : NaN;
-        return Number.isFinite(parsed) ? parsed : null;
-    });
-    const [fromDate, setFromDate] = useState<string | null>(() => new URLSearchParams(location.search).get("fromDate"));
-    const [toDate, setToDate] = useState<string | null>(() => new URLSearchParams(location.search).get("toDate"));
-    const [appliedParams, setAppliedParams] = useState<OemPerformanceParams | null>(() => {
-        const search = new URLSearchParams(location.search);
-        const rawOemId = search.get("oemId");
-        const oemId = rawOemId !== null ? Number(rawOemId) : NaN;
-        const from = search.get("fromDate");
-        const to = search.get("toDate");
-        if (!Number.isFinite(oemId) || !from || !to) return null;
-        return { oemId, fromDate: from, toDate: to };
-    });
+    const [appliedParams, setAppliedParams] = useState<OemPerformanceParams | null>(() => readSubmittedParams(location.search));
+    const [selectedOemId, setSelectedOemId] = useState<number | null>(() => appliedParams?.oemId ?? null);
+    const [fromDate, setFromDate] = useState<string | null>(() => appliedParams?.fromDate ?? null);
+    const [toDate, setToDate] = useState<string | null>(() => appliedParams?.toDate ?? null);
+
+    useEffect(() => {
+        if (location.search || !appliedParams) return;
+        const search = new URLSearchParams({
+            oemId: String(appliedParams.oemId),
+            fromDate: appliedParams.fromDate,
+            toDate: appliedParams.toDate,
+        });
+        navigate({ search: `?${search.toString()}` }, { replace: true });
+    }, [appliedParams, location.search, navigate]);
 
     const params = useMemo(() => {
         if (!selectedOemId || !fromDate || !toDate) return null;
@@ -195,6 +231,14 @@ export default function OemPerformancePage() {
                 onSubmit={() => {
                     if (!params) return;
                     setAppliedParams(params);
+                    localStorage.setItem(
+                        storageKey,
+                        new URLSearchParams({
+                            oemId: String(params.oemId),
+                            fromDate: params.fromDate,
+                            toDate: params.toDate,
+                        }).toString()
+                    );
                     const search = new URLSearchParams({
                         oemId: String(params.oemId),
                         fromDate: params.fromDate,

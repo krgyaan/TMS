@@ -57,3 +57,4 @@ export { inventoryApi } from "./inventory.api";
 export { customerPerformanceService } from "./customer-performance.service";
 export { businessPerformanceService } from "./business-performance.service";
 export { locationPerformanceService } from "./location-performance.service";
+export { tenderExecutivePerformanceService } from "./tender-executive-performance.service";

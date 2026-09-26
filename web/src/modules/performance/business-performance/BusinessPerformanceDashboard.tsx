@@ -1,12 +1,13 @@
-import { useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 /* UI Components */
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 /* Icons */
-import { Filter, Download } from "lucide-react";
+import { Filter, Download, Calendar as CalendarIcon } from "lucide-react";
 
 /* Custom Hooks */
 import { useItemHeadings, useBusinessPerformance } from "@/hooks/api/useBusinessPerformance";
@@ -32,36 +33,44 @@ const titleCase = (str: string): string => {
     return str.replace(/_/g, " ").replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 };
 
-/**
- * Build the list of selectable Financial Years: "2025-26" style (Apr–Mar), current FY + previous years.
- */
-function buildFinancialYearOptions(): { id: string; name: string }[] {
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const fiscalStartYear = today.getMonth() >= 3 ? currentYear : currentYear - 1;
-    const options: { id: string; name: string }[] = [];
-    for (let y = fiscalStartYear; y >= fiscalStartYear - 8; y--) {
-        options.push({ id: `${y}-${String((y + 1) % 100).padStart(2, "0")}`, name: `${y}-${(y + 1) % 100}` });
+const persistedSelectionKey = "business-performance-selection";
+
+function isValidDate(value: string): boolean {
+    return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function getInitialSelection(search: string): { item: number | null; fromDate: string; toDate: string } {
+    const params = new URLSearchParams(search);
+    const readParams = (source: URLSearchParams) => {
+        const rawItem = source.get("item");
+        const item = rawItem !== null ? Number(rawItem) : null;
+        const fromDate = source.get("fromDate") ?? "";
+        const toDate = source.get("toDate") ?? "";
+        const validRange = isValidDate(fromDate) && isValidDate(toDate) && fromDate <= toDate;
+        return { item: item !== null && Number.isFinite(item) ? item : null, fromDate: validRange ? fromDate : "", toDate: validRange ? toDate : "" };
+    };
+
+    if (["item", "fromDate", "toDate", "year"].some(key => params.has(key))) {
+        const legacy = params.get("year");
+        if (legacy) {
+            const match = /^(\d{4})-(\d{2})$/.exec(legacy);
+            if (match) {
+                const itemValue = Number(params.get("item"));
+                return { item: Number.isFinite(itemValue) ? itemValue : null, fromDate: `${match[1]}-04-01`, toDate: `${2000 + Number(match[2])}-03-31` };
+            }
+        }
+        return readParams(params);
     }
-    return options;
+
+    try {
+        const stored = localStorage.getItem(persistedSelectionKey);
+        if (!stored) return { item: null, fromDate: "", toDate: "" };
+        return readParams(new URLSearchParams(stored));
+    } catch {
+        return { item: null, fromDate: "", toDate: "" };
+    }
 }
 
-/**
- * Convert a Financial Year selection like "2024-25" into fromDate/toDate strings (2024-04-01 .. 2025-03-31).
- */
-function yearToDateRange(year: string | null): { fromDate: string; toDate: string } | null {
-    if (!year) return null;
-
-    const match = /^(\d{4})-(\d{2})$/.exec(year);
-    if (!match) return null;
-    const startYear = Number(match[1]);
-    const endYear = 2000 + Number(match[2]);
-    return { fromDate: `${startYear}-04-01`, toDate: `${endYear}-03-31` };
-}
-
-/* ================================
-   EXPORT UTILITIES
-=============================== */
 const exportToCSV = (data: Record<string, unknown>[], filename: string, headers: { key: string; label: string }[]) => {
     if (data.length === 0) {
         alert("No data to export");
@@ -96,85 +105,59 @@ const exportToCSV = (data: Record<string, unknown>[], filename: string, headers:
     document.body.removeChild(link);
 };
 
-/* ================================
-   MAIN COMPONENT
-=============================== */
 export default function BusinessPerformanceDashboard() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    // Filter States (initialised from URL params so the page can be shared/bookmarked)
-    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(() => {
-        const raw = new URLSearchParams(location.search).get("item");
-        const parsed = raw !== null ? Number(raw) : NaN;
-        return Number.isFinite(parsed) ? parsed : null;
-    });
-    const [selectedFinancialYear, setSelectedFinancialYear] = useState<string>(() => {
-        return new URLSearchParams(location.search).get("year") ?? "";
-    });
+    const initialSelection = getInitialSelection(location.search);
+
+    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(initialSelection.item);
+    const [fromDate, setFromDate] = useState<string>(initialSelection.fromDate);
+    const [toDate, setToDate] = useState<string>(initialSelection.toDate);
     const [appliedParams, setAppliedParams] = useState<BusinessPerformanceParams | null>(() => {
-        const search = new URLSearchParams(location.search);
-        const rawHeading = search.get("item");
-        const headingId = rawHeading !== null ? Number(rawHeading) : NaN;
-        const year = search.get("year");
-        const range = yearToDateRange(year);
-        if (!range || !Number.isFinite(headingId)) return null;
-        return {
-            headingId,
-            fromDate: range.fromDate,
-            toDate: range.toDate,
-        };
+        if (!initialSelection.item || !initialSelection.fromDate || !initialSelection.toDate) return null;
+        return { headingId: initialSelection.item, fromDate: initialSelection.fromDate, toDate: initialSelection.toDate };
     });
 
-    // Fetch headings for dropdown
-    const { data: headings = [] } = useItemHeadings();
+    useEffect(() => {
+        if (location.search || !appliedParams) return;
+        const search = new URLSearchParams({
+            item: String(appliedParams.headingId),
+            fromDate: appliedParams.fromDate,
+            toDate: appliedParams.toDate,
+        });
+        navigate({ search: `?${search.toString()}` }, { replace: true });
+    }, [appliedParams, location.search, navigate]);
 
-    // Fetch business performance data
+    const { data: headings = [] } = useItemHeadings();
     const { data, isLoading: dataLoading } = useBusinessPerformance(appliedParams);
 
-    // Financial Year dropdown options
-    const financialYearOptions = useMemo(() => buildFinancialYearOptions(), []);
+    const dateError = fromDate && toDate && fromDate > toDate ? "From Date must be on or before To Date" : null;
 
-    // Build params for submission
     const params = useMemo<BusinessPerformanceParams | null>(() => {
-        const range = yearToDateRange(selectedFinancialYear);
-        if (!range || !selectedHeadingId) return null;
-        return {
-            headingId: selectedHeadingId,
-            fromDate: range.fromDate,
-            toDate: range.toDate,
-        };
-    }, [selectedHeadingId, selectedFinancialYear]);
+        if (!selectedHeadingId || !fromDate || !toDate || dateError) return null;
+        return { headingId: selectedHeadingId, fromDate, toDate };
+    }, [dateError, fromDate, selectedHeadingId, toDate]);
 
-    // Handle form submission
     const handleSubmit = () => {
         if (!params) return;
         setAppliedParams(params);
 
-        const search = new URLSearchParams();
-        search.set("item", String(params.headingId));
-        if (selectedFinancialYear) search.set("year", selectedFinancialYear);
+        const search = new URLSearchParams({ item: String(params.headingId), fromDate: params.fromDate, toDate: params.toDate });
+        localStorage.setItem(persistedSelectionKey, search.toString());
         navigate({ search: `?${search.toString()}` }, { replace: true });
     };
 
-    // Export handler
     const handleExportReport = useCallback(() => {
-        if (!data) return;
+        if (!data || !appliedParams) return;
 
-        const selectedHeading = headings.find(h => h.id === selectedHeadingId);
+        const selectedHeading = headings.find(h => h.id === appliedParams.headingId);
         const headingName = selectedHeading?.name || "Unknown";
 
         const allData: Record<string, unknown>[] = [];
 
-        // Add summary data
         Object.entries(data.summary).forEach(([category, summaryData]) => {
-            allData.push({
-                section: "Summary",
-                category: titleCase(category),
-                count: summaryData.count,
-                value: summaryData.value,
-                tenders: summaryData.tender.join(", "),
-            });
+            allData.push({ section: "Summary", category: titleCase(category), count: summaryData.count, value: summaryData.value, tenders: summaryData.tender.join(", ") });
         });
 
         const headers = [
@@ -185,14 +168,13 @@ export default function BusinessPerformanceDashboard() {
             { key: "tenders", label: "Tenders" },
         ];
 
-        const filename = `Business_Performance_${headingName}_${selectedFinancialYear || "all"}`;
+        const filename = `Business_Performance_${headingName}_${appliedParams.fromDate}_to_${appliedParams.toDate}`;
         exportToCSV(allData, filename, headers);
-    }, [data, headings, selectedHeadingId, selectedFinancialYear]);
+    }, [appliedParams, data, headings]);
 
     return (
         <div className="min-h-screen bg-muted/10 pb-12">
             <div className="mx-auto max-w-7xl p-6 space-y-8">
-                {/* ===== HEADER ===== */}
                 <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight">Business Performance</h1>
@@ -205,11 +187,9 @@ export default function BusinessPerformanceDashboard() {
                     </div>
                 </div>
 
-                {/* ===== FILTER CARD ===== */}
                 <Card className="shadow-sm">
                     <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 w-full gap-4 items-end">
-                            {/* Item Heading Select */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 w-full gap-4 items-end">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Item Heading</label>
                                 <Combobox
@@ -220,29 +200,33 @@ export default function BusinessPerformanceDashboard() {
                                 />
                             </div>
 
-                            {/* Financial Year */}
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Financial Year</label>
-                                <Combobox
-                                    value={selectedFinancialYear}
-                                    onChange={v => setSelectedFinancialYear(v)}
-                                    options={financialYearOptions}
-                                    placeholder="Select Financial Year"
-                                />
+                                <label className="text-sm font-medium">From Date</label>
+                                <div className="relative">
+                                    <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                    <Input type="date" className="pl-9" value={fromDate} onChange={e => setFromDate(e.target.value)} />
+                                </div>
                             </div>
 
-                            {/* Submit Button */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">To Date</label>
+                                <div className="relative">
+                                    <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                    <Input type="date" className="pl-9" value={toDate} onChange={e => setToDate(e.target.value)} />
+                                </div>
+                            </div>
+
                             <Button onClick={handleSubmit} disabled={!params} className="justify-self-center">
                                 <Filter className="mr-2 h-4 w-4" /> Submit
                             </Button>
                         </div>
+                        {dateError && <p className="mt-2 text-sm text-destructive">{dateError}</p>}
                     </CardContent>
                 </Card>
 
-                {/* ===== CONDITIONAL CONTENT ===== */}
                 {!appliedParams ? (
                     <div className="bg-muted rounded-lg p-6 text-center">
-                        <span className="text-muted-foreground">Please select an Item Heading and Financial Year to view the report.</span>
+                        <span className="text-muted-foreground">Please select an Item Heading, From Date and To Date to view the report.</span>
                     </div>
                 ) : dataLoading ? (
                     <div className="bg-muted rounded-lg p-6 text-center">
@@ -250,7 +234,6 @@ export default function BusinessPerformanceDashboard() {
                     </div>
                 ) : (
                     <>
-                        {/* ===== CATEGORY TABLES ===== */}
                         <BusinessCategoryTable params={appliedParams} categoryKey="tenders_assigned" title="Tenders Assigned" description="All tenders assigned in this period." />
                         <BusinessCategoryTable params={appliedParams} categoryKey="tenders_approved" title="Tenders Approved" description="Tenders approved by the team lead." />
                         <BusinessCategoryTable params={appliedParams} categoryKey="tenders_missed" title="Tenders Missed" description="Tenders that were missed for submission." />
@@ -273,9 +256,7 @@ export default function BusinessPerformanceDashboard() {
                         <BusinessCategoryTable params={appliedParams} categoryKey="emd_paid" title="EMD Paid" description="Tenders where the EMD has been paid." />
                         <BusinessCategoryTable params={appliedParams} categoryKey="emd_returned" title="EMD Returned" description="Tenders where the EMD has been returned." />
 
-                        {/* ===== AVERAGE GP + CHARTS (bottom) ===== */}
                         <div className="space-y-4">
-                            {/* Average GP Card - Full Width Row */}
                             <div className="grid grid-cols-1">
                                 <Card className="shadow-sm">
                                     <CardContent className="p-5">
@@ -290,7 +271,6 @@ export default function BusinessPerformanceDashboard() {
                                 </Card>
                             </div>
 
-                            {/* Bar Chart + Donut Chart - Side by Side */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 <BusinessBarChart params={appliedParams} />
                                 <BusinessDonutChart params={appliedParams} />

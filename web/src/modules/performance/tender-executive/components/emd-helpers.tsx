@@ -1,6 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Info } from "lucide-react";
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-IN", {
         style: "currency",
