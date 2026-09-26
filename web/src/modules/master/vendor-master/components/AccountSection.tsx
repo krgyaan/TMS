@@ -53,6 +53,14 @@ export const AccountSection = ({ orgId }: VendorSectionProps) => {
     };
 
     const handleSave = dialogForm.handleSubmit(values => {
+        const accountNum = values.accountNum.trim().toLowerCase();
+        const siblings = getValues("accounts");
+
+        if (siblings.some((account, index) => index !== editingIndex && (account.accountNum ?? "").trim().toLowerCase() === accountNum)) {
+            dialogForm.setError("accountNum", { message: "Account number already exists" });
+            return;
+        }
+
         if (editingIndex !== null) {
             const existing = getValues(`accounts.${editingIndex}`);
 

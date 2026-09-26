@@ -55,6 +55,20 @@ export const PersonSection = ({ orgId }: VendorSectionProps) => {
     };
 
     const handleSave = dialogForm.handleSubmit(values => {
+        const mobile = values.mobile.trim().toLowerCase();
+        const email = values.email.trim().toLowerCase();
+        const siblings = getValues("persons");
+
+        if (mobile && siblings.some((person, index) => index !== editingIndex && (person.mobile ?? "").trim().toLowerCase() === mobile)) {
+            dialogForm.setError("mobile", { message: "Mobile number already exists" });
+            return;
+        }
+
+        if (email && siblings.some((person, index) => index !== editingIndex && (person.email ?? "").trim().toLowerCase() === email)) {
+            dialogForm.setError("email", { message: "Email already exists" });
+            return;
+        }
+
         if (editingIndex !== null) {
             const existing = getValues(`persons.${editingIndex}`);
 

@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, ConflictException } from "@nestjs/common";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, and, ne, sql } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
@@ -15,6 +15,87 @@ export class VendorMasterService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly clientDirectorySyncService: ClientDirectorySyncService
     ) {}
+
+    private async assertUniqueGstNo(orgId: number, gstNo: string | null | undefined, excludeId?: number): Promise<void> {
+        const trimmed = gstNo?.trim();
+        if (!trimmed) return;
+
+        const normalized = trimmed.toLowerCase();
+        const conds = [eq(vendorGsts.orgId, orgId), sql`lower(trim(${vendorGsts.gstNo})) = ${normalized}`];
+        if (excludeId !== undefined) {
+            conds.push(ne(vendorGsts.id, excludeId));
+        }
+
+        const rows = await this.db.select({ id: vendorGsts.id }).from(vendorGsts).where(and(...conds)).limit(1);
+        if (rows[0]) {
+            throw new ConflictException(`GST number "${trimmed}" already exists for this organization`);
+        }
+    }
+
+    private async assertUniqueAccountNum(orgId: number, accountNum: string, excludeId?: number): Promise<void> {
+        const trimmed = accountNum.trim();
+        if (!trimmed) return;
+
+        const normalized = trimmed.toLowerCase();
+        const conds = [eq(vendorAccs.orgId, orgId), sql`lower(trim(${vendorAccs.accountNum})) = ${normalized}`];
+        if (excludeId !== undefined) {
+            conds.push(ne(vendorAccs.id, excludeId));
+        }
+
+        const rows = await this.db.select({ id: vendorAccs.id }).from(vendorAccs).where(and(...conds)).limit(1);
+        if (rows[0]) {
+            throw new ConflictException(`Account number "${trimmed}" already exists for this organization`);
+        }
+    }
+
+    private async assertUniquePersonContact(
+        orgId: number,
+        data: { mobile?: string | null; email?: string | null },
+        excludeId?: number
+    ): Promise<void> {
+        const mobile = data.mobile?.trim();
+        if (mobile) {
+            const conds = [eq(vendors.orgId, orgId), sql`trim(${vendors.mobile}) = ${mobile}`];
+            if (excludeId !== undefined) {
+                conds.push(ne(vendors.id, excludeId));
+            }
+
+            const rows = await this.db.select({ id: vendors.id }).from(vendors).where(and(...conds)).limit(1);
+            if (rows[0]) {
+                throw new ConflictException(`Mobile number "${mobile}" already exists for this organization`);
+            }
+        }
+
+        const emailTrimmed = data.email?.trim();
+        if (emailTrimmed) {
+            const normalized = emailTrimmed.toLowerCase();
+            const conds = [eq(vendors.orgId, orgId), sql`lower(trim(${vendors.email})) = ${normalized}`];
+            if (excludeId !== undefined) {
+                conds.push(ne(vendors.id, excludeId));
+            }
+
+            const rows = await this.db.select({ id: vendors.id }).from(vendors).where(and(...conds)).limit(1);
+            if (rows[0]) {
+                throw new ConflictException(`Email "${emailTrimmed}" already exists for this organization`);
+            }
+        }
+    }
+
+    private assertArrayUnique<T>(items: T[] | undefined, key: (item: T) => string | null | undefined, label: string): void {
+        if (!items) return;
+
+        const seen = new Set<string>();
+        for (const item of items) {
+            const trimmed = key(item)?.trim();
+            if (!trimmed) continue;
+
+            const normalized = trimmed.toLowerCase();
+            if (seen.has(normalized)) {
+                throw new ConflictException(`Duplicate ${label} "${trimmed}" in the request`);
+            }
+            seen.add(normalized);
+        }
+    }
 
     /**
      * Get all vendor organizations (flat list)
@@ -160,6 +241,11 @@ export class VendorMasterService {
         persons?: Omit<NewVendor, "orgId">[];
         files?: Omit<NewVendorFile, "orgId">[];
     }) {
+        this.assertArrayUnique(data.gsts, gst => gst.gstNo, "GST number");
+        this.assertArrayUnique(data.accounts, acc => acc.accountNum, "Account number");
+        this.assertArrayUnique(data.persons, person => person.mobile, "Mobile number");
+        this.assertArrayUnique(data.persons, person => person.email, "Email");
+
         // Create organization first
         const organization = await this.createOrganization(data.organization);
 
@@ -240,6 +326,43 @@ export class VendorMasterService {
             };
         }
     ) {
+        if (data.gsts) {
+            this.assertArrayUnique(data.gsts.create, gst => gst.gstNo, "GST number");
+            for (const gst of data.gsts.create ?? []) {
+                await this.assertUniqueGstNo(id, gst.gstNo);
+            }
+            for (const { id: gstId, data: gstData } of data.gsts.update ?? []) {
+                if (gstData.gstNo !== undefined) {
+                    await this.assertUniqueGstNo(id, gstData.gstNo, gstId);
+                }
+            }
+        }
+
+        if (data.accounts) {
+            this.assertArrayUnique(data.accounts.create, acc => acc.accountNum, "Account number");
+            for (const acc of data.accounts.create ?? []) {
+                await this.assertUniqueAccountNum(id, acc.accountNum);
+            }
+            for (const { id: accId, data: accData } of data.accounts.update ?? []) {
+                if (accData.accountNum !== undefined) {
+                    await this.assertUniqueAccountNum(id, accData.accountNum, accId);
+                }
+            }
+        }
+
+        if (data.persons) {
+            this.assertArrayUnique(data.persons.create, person => person.mobile, "Mobile number");
+            this.assertArrayUnique(data.persons.create, person => person.email, "Email");
+            for (const person of data.persons.create ?? []) {
+                await this.assertUniquePersonContact(id, person);
+            }
+            for (const { id: personId, data: personData } of data.persons.update ?? []) {
+                if (personData.mobile !== undefined || personData.email !== undefined) {
+                    await this.assertUniquePersonContact(id, personData, personId);
+                }
+            }
+        }
+
         // Update organization
         if (data.organization) {
             await this.updateOrganization(id, data.organization);
@@ -445,6 +568,9 @@ export class VendorMasterService {
             mobile: data.mobile?.trim(),
             address: data.address?.trim(),
         };
+        if (trimmedData.orgId) {
+            await this.assertUniquePersonContact(trimmedData.orgId, trimmedData);
+        }
         const rows = await this.db.insert(vendors).values(trimmedData).returning();
         const vendor = rows[0];
         if (vendor.name) {
@@ -468,6 +594,13 @@ export class VendorMasterService {
             mobile: data.mobile?.trim(),
             address: data.address?.trim(),
         };
+        if (trimmedData.mobile !== undefined || trimmedData.email !== undefined) {
+            const existing = await this.findVendorById(id);
+            const targetOrgId = data.orgId ?? existing.organizationId;
+            if (targetOrgId) {
+                await this.assertUniquePersonContact(targetOrgId, trimmedData, id);
+            }
+        }
         const rows = await this.db
             .update(vendors)
             .set({ ...trimmedData, updatedAt: new Date() })
@@ -518,11 +651,16 @@ export class VendorMasterService {
     }
 
     async createGst(data: NewVendorGst): Promise<VendorGst> {
+        await this.assertUniqueGstNo(data.orgId, data.gstNo);
         const rows = await this.db.insert(vendorGsts).values(data).returning();
         return rows[0];
     }
 
     async updateGst(id: number, data: Partial<NewVendorGst>): Promise<VendorGst> {
+        if (data.gstNo !== undefined) {
+            const existing = await this.findGstById(id);
+            await this.assertUniqueGstNo(existing.orgId, data.gstNo, id);
+        }
         const rows = await this.db
             .update(vendorGsts)
             .set({ ...data, updatedAt: new Date() })
@@ -562,11 +700,16 @@ export class VendorMasterService {
     }
 
     async createAccount(data: NewVendorAcc): Promise<VendorAcc> {
+        await this.assertUniqueAccountNum(data.orgId, data.accountNum);
         const rows = await this.db.insert(vendorAccs).values(data).returning();
         return rows[0];
     }
 
     async updateAccount(id: number, data: Partial<NewVendorAcc>): Promise<VendorAcc> {
+        if (data.accountNum !== undefined) {
+            const existing = await this.findAccountById(id);
+            await this.assertUniqueAccountNum(existing.orgId, data.accountNum, id);
+        }
         const rows = await this.db
             .update(vendorAccs)
             .set({ ...data, updatedAt: new Date() })

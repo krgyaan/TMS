@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useUpdateVendorOrganizationWithRelations, useVendorOrganizationWithRelations } from "@/hooks/api/useVendorOrganizations";
+import { useUpdateVendorOrganizationWithRelations, useVendorOrganizationWithRelations, useVendorOrganizations } from "@/hooks/api/useVendorOrganizations";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle } from "lucide-react";
 import { useEffect } from "react";
@@ -27,6 +27,7 @@ const EditVendorPage = () => {
     const orgId = id ? parseInt(id) : null;
 
     const { data: organization, isLoading, error } = useVendorOrganizationWithRelations(orgId);
+    const { data: organizations } = useVendorOrganizations();
     const updateVendor = useUpdateVendorOrganizationWithRelations();
 
     const form = useForm<VendorFormValues>({
@@ -73,6 +74,13 @@ const EditVendorPage = () => {
 
     const handleSubmit = async (values: VendorFormValues) => {
         if (!orgId) return;
+
+        const name = values.organization.name.trim().toLowerCase();
+
+        if (organizations?.some(org => org.id !== orgId && org.name.trim().toLowerCase() === name)) {
+            form.setError("organization.name", { message: "Organization name already exists" });
+            return;
+        }
 
         try {
             await updateVendor.mutateAsync({

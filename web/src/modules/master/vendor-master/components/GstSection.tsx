@@ -54,6 +54,14 @@ export const GstSection = ({ orgId }: VendorSectionProps) => {
     };
 
     const handleSave = dialogForm.handleSubmit(values => {
+        const gstNo = values.gstNo.trim().toLowerCase();
+        const siblings = getValues("gsts");
+
+        if (siblings.some((gst, index) => index !== editingIndex && (gst.gstNo ?? "").trim().toLowerCase() === gstNo)) {
+            dialogForm.setError("gstNo", { message: "GST number already exists" });
+            return;
+        }
+
         if (editingIndex !== null) {
             const existing = getValues(`gsts.${editingIndex}`);
 

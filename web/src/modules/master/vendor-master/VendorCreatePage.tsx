@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form } from '@/components/ui/form';
-import { useCreateVendorOrganization } from '@/hooks/api/useVendorOrganizations';
+import { useCreateVendorOrganization, useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
 import { OrgFormSchema, type OrgFormValues } from './helpers/vendorForm.schema';
 import { vendorAreaBase } from './vendorAreaPath';
 import { VendorOrgFields } from './components/VendorOrgFields';
@@ -14,6 +14,7 @@ const CreateVendorPage = () => {
     const location = useLocation();
     const basePath = vendorAreaBase(location.pathname);
     const createOrg = useCreateVendorOrganization();
+    const { data: organizations } = useVendorOrganizations();
 
     const form = useForm<OrgFormValues>({
         resolver: zodResolver(OrgFormSchema),
@@ -28,6 +29,13 @@ const CreateVendorPage = () => {
     });
 
     const handleSubmit = async (values: OrgFormValues) => {
+        const name = values.name.trim().toLowerCase();
+
+        if (organizations?.some(org => org.name.trim().toLowerCase() === name)) {
+            form.setError('name', { message: 'Organization name already exists' });
+            return;
+        }
+
         try {
             const org = await createOrg.mutateAsync(values);
             navigate(`${basePath}/${org.id}/edit`);
