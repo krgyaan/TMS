@@ -30,7 +30,7 @@ import { formatDateForInput, mapFormToCreateDTO } from "../helpers/purchaseOrder
 import type { CreatePartyDTO } from "../helpers/purchaseOrder.types";
 import type { CreatePurchaseInvoiceDTO } from "@/modules/operations/purchase-invoices/helpers/purchaseInvoice.types";
 import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "../helpers/purchaseOrder.schema";
-import { PartyFormDialog, type CreatePartyPayload } from "@/modules/operations/vendor-master/PartyFormDialog";
+import { PartyFormDialog, type CreatePartyPayload } from "@/modules/master/vendor-master/components/PartyFormDialog";
 import { InvoiceUploadField } from "@/modules/operations/purchase-invoices/components/InvoiceUploadField";
 import { Label } from "@/components/ui/label";
 
@@ -123,7 +123,7 @@ export default function CreatePurchaseOrderPage() {
   const [partyCreationType, setPartyCreationType] = useState<"seller" | "ship_to">("seller");
 
   const form = useForm<PurchaseOrderFormValues>({
-    resolver: zodResolver(purchaseOrderFormSchema) as any,
+    resolver: zodResolver(purchaseOrderFormSchema),
     defaultValues: defaultFormValues,
   });
   const selectedSellerId = form.watch("sellerId");

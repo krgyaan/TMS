@@ -26,7 +26,7 @@ import { TermsField } from "../components/TermsField";
 import { formatDateForInput, mapFormToUpdateDTO } from "../helpers/purchaseOrder.mapper";
 import type { CreatePartyDTO } from "../helpers/purchaseOrder.types";
 import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "../helpers/purchaseOrder.schema";
-import { PartyFormDialog, type CreatePartyPayload } from "@/modules/operations/vendor-master/PartyFormDialog";
+import { PartyFormDialog, type CreatePartyPayload } from "@/modules/master/vendor-master/components/PartyFormDialog";
 
 const defaultFormValues: PurchaseOrderFormValues = {
     poType: "new",
@@ -59,6 +59,11 @@ const defaultFormValues: PurchaseOrderFormValues = {
     accessoriesPackagingListAttachments: [],
     termsAndConditions: [],
     remarks: "",
+    uploadInvoice: "no",
+    invoiceDate: "",
+    invoiceValue: null,
+    invoiceGst: null,
+    invoiceFile: [],
 };
 
 const FormSkeleton = () => (
@@ -121,7 +126,7 @@ export default function EditPurchaseOrderPage() {
     const [partyCreationType, setPartyCreationType] = useState<"seller" | "ship_to">("seller");
 
     const form = useForm<PurchaseOrderFormValues>({
-        resolver: zodResolver(purchaseOrderFormSchema) as any,
+        resolver: zodResolver(purchaseOrderFormSchema),
         defaultValues: defaultFormValues,
     });
     const selectedSellerId = form.watch("sellerId");
@@ -220,6 +225,11 @@ export default function EditPurchaseOrderPage() {
             accessoriesPackagingListAttachments: poData.accessoriesPackagingListAttachments ? (typeof poData.accessoriesPackagingListAttachments === 'string' ? JSON.parse(poData.accessoriesPackagingListAttachments) : poData.accessoriesPackagingListAttachments) : [],
             termsAndConditions: poData.termsAndConditions ? (typeof poData.termsAndConditions === 'string' ? JSON.parse(poData.termsAndConditions) : poData.termsAndConditions) : [],
             remarks: poData.remarks || "",
+            uploadInvoice: "no",
+            invoiceDate: "",
+            invoiceValue: null,
+            invoiceGst: null,
+            invoiceFile: [],
         });
     }, [poData, form]);
 
@@ -273,7 +283,7 @@ export default function EditPurchaseOrderPage() {
     if (isPOError || !poData) {
         return (
             <NotFound
-                message={(poError as any)?.message || "The purchase order you're looking for doesn't exist or has been removed."}
+                message={poError?.message || "The purchase order you're looking for doesn't exist or has been removed."}
                 onBack={() => navigate(-1)}
             />
         );

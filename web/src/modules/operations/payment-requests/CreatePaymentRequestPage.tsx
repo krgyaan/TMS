@@ -20,8 +20,8 @@ import { useForm } from "react-hook-form";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { PaymentAgainstField } from "./components/PaymentAgainstField";
-import { BeneficiaryFormDialog } from "@/modules/operations/vendor-master/components/BeneficiaryFormDialog";
-import type { BeneficiaryFormValues } from "@/modules/operations/vendor-master/vendor-master.types";
+import { BeneficiaryFormDialog } from "@/modules/master/vendor-master/components/BeneficiaryFormDialog";
+import type { BeneficiaryFormValues } from "@/modules/master/vendor-master/components/vendor-master.types";
 import { mapPaymentRequestFormToCreateDTO } from "./helpers/paymentRequest.mapper";
 import { paymentRequestFormSchema, type PaymentRequestFormValues } from "./helpers/paymentRequest.schema";
 

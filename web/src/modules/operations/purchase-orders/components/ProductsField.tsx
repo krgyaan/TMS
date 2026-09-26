@@ -20,21 +20,21 @@ interface ProductsFieldProps {
 export function ProductsField({ control }: ProductsFieldProps) {
     const { fields, append, remove } = useFieldArray({
         control,
-        name: "products" as any,
+        name: "products",
     });
 
-    const products = useWatch({ control, name: "products" as any }) || [];
+    const products = useWatch({ control, name: "products" }) || [];
 
     const calculations = useMemo(() => calculateTotals(products), [products]);
 
     const addProduct = () => {
-        append({ description: "", qty: null, rate: null, gstRate: 18, unit: "" } as any);
+        append({ description: "", qty: null, rate: null, gstRate: 18, unit: "" });
     };
 
     const duplicateProduct = (index: number) => {
         const source = products[index];
         if (!source) return;
-        append({ ...source } as any);
+        append({ ...source });
     };
 
     return (
@@ -90,14 +90,14 @@ export function ProductsField({ control }: ProductsFieldProps) {
                                         {index + 1}
                                     </TableCell>
                                     <TableCell className="p-1 align-top pt-2">
-                                        <FieldWrapper control={control} name={`products.${index}.description` as any} label="">
+                                        <FieldWrapper control={control} name={`products.${index}.description`} label="">
                                             {(fieldProps) => (
                                                 <Textarea {...fieldProps} placeholder="Enter description" rows={2} className="min-h-[36px]" />
                                             )}
                                         </FieldWrapper>
                                     </TableCell>
                                     <TableCell className="p-1 align-top pt-2">
-                                        <FieldWrapper control={control} name={`products.${index}.qty` as any} label="">
+                                        <FieldWrapper control={control} name={`products.${index}.qty`} label="">
                                             {(fieldProps) => (
                                                 <NumberInput
                                                     value={fieldProps.value}
@@ -111,7 +111,7 @@ export function ProductsField({ control }: ProductsFieldProps) {
                                         </FieldWrapper>
                                     </TableCell>
                                     <TableCell className="p-1 align-top pt-2">
-                                        <FieldWrapper control={control} name={`products.${index}.unit` as any} label="">
+                                        <FieldWrapper control={control} name={`products.${index}.unit`} label="">
                                             {(fieldProps) => (
                                                 <Input
                                                     value={fieldProps.value}
@@ -124,7 +124,7 @@ export function ProductsField({ control }: ProductsFieldProps) {
                                         </FieldWrapper>
                                     </TableCell>
                                     <TableCell className="p-1 align-top pt-2">
-                                        <FieldWrapper control={control} name={`products.${index}.rate` as any} label="">
+                                        <FieldWrapper control={control} name={`products.${index}.rate`} label="">
                                             {(fieldProps) => (
                                                 <NumberInput
                                                     value={fieldProps.value}
@@ -138,7 +138,7 @@ export function ProductsField({ control }: ProductsFieldProps) {
                                         </FieldWrapper>
                                     </TableCell>
                                     <TableCell className="p-1 align-top pt-2">
-                                        <FieldWrapper control={control} name={`products.${index}.gstRate` as any} label="">
+                                        <FieldWrapper control={control} name={`products.${index}.gstRate`} label="">
                                             {(fieldProps) => (
                                                 <Select
                                                     value={String(fieldProps.value ?? 18)}
