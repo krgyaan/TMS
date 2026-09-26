@@ -17,7 +17,23 @@ import type { TenderKpiKey } from "./helpers/tender-executive.types";
 import { paths } from "@/app/routes/paths";
 import { Combobox } from "@/components/form/SelectField";
 import { useUsersByRole } from "@/hooks/api/useUsers";
-import { AlertTriangle, Briefcase, Calendar as CalendarIcon, CheckCircle2, Clock, Download, Eye, FileText, Info, Search, Trophy, XCircle, type LucideIcon } from "lucide-react";
+import {
+    AlertTriangle,
+    Briefcase,
+    Calendar as CalendarIcon,
+    CheckCircle2,
+    Clock,
+    Download,
+    Eye,
+    FileText,
+    Filter,
+    Info,
+    Search,
+    Trophy,
+    X,
+    XCircle,
+    type LucideIcon,
+} from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { EmdBacklogTable } from "./components/EmdBacklogTable";
 import { StageBacklogV4Table } from "./components/StageBacklogV4Table";
@@ -77,6 +93,41 @@ function parseStoredScope(): Scope {
     return { view: null };
 }
 
+type InitialFilters = {
+    scope: Scope;
+    fromDate: string | null;
+    toDate: string | null;
+};
+
+function readInitialFilters(search: string): InitialFilters {
+    const params = new URLSearchParams(search);
+    const userId = parsePositiveId(params.get("userId"));
+    const teamId = parsePositiveId(params.get("teamId"));
+    const scope: Scope = userId ? { view: "user", userId } : teamId ? { view: "team", teamId } : parseStoredScope();
+
+    const urlFrom = params.get("fromDate");
+    const urlTo = params.get("toDate");
+    if (isDateString(urlFrom) || isDateString(urlTo)) {
+        return { scope, fromDate: isDateString(urlFrom) ? urlFrom : null, toDate: isDateString(urlTo) ? urlTo : null };
+    }
+
+    try {
+        const stored = new URLSearchParams(localStorage.getItem(SCOPE_STORAGE_KEY) ?? "");
+        const storedFrom = stored.get("fromDate");
+        const storedTo = stored.get("toDate");
+        return { scope, fromDate: isDateString(storedFrom) ? storedFrom : null, toDate: isDateString(storedTo) ? storedTo : null };
+    } catch {
+        return { scope, fromDate: null, toDate: null };
+    }
+}
+
+function isSameScope(a: Scope, b: Scope) {
+    if (a.view !== b.view) return false;
+    if (a.view === "user" && b.view === "user") return a.userId === b.userId;
+    if (a.view === "team" && b.view === "team") return a.teamId === b.teamId;
+    return true;
+}
+
 const KPI_LABELS: Record<TenderKpiKey, string> = {
     ALLOCATED: "Allocated",
     PENDING: "Pending",
@@ -102,70 +153,83 @@ const KPI_LABELS: Record<TenderKpiKey, string> = {
 
 export default function TenderExecutivePerformance() {
     const [searchParams, setSearchParams] = useSearchParams();
-    const [fromDate, setFromDate] = useState<string | null>(() => {
-        const urlDate = searchParams.get("fromDate");
-        if (isDateString(urlDate)) return urlDate;
-        try {
-            const stored = new URLSearchParams(localStorage.getItem(SCOPE_STORAGE_KEY) ?? "");
-            const storedDate = stored.get("fromDate");
-            return isDateString(storedDate) ? storedDate : null;
-        } catch {
-            return null;
-        }
-    });
-    const [toDate, setToDate] = useState<string | null>(() => {
-        const urlDate = searchParams.get("toDate");
-        if (isDateString(urlDate)) return urlDate;
-        try {
-            const stored = new URLSearchParams(localStorage.getItem(SCOPE_STORAGE_KEY) ?? "");
-            const storedDate = stored.get("toDate");
-            return isDateString(storedDate) ? storedDate : null;
-        } catch {
-            return null;
-        }
-    });
+    const [initialFilters] = useState(() => readInitialFilters(searchParams.toString()));
+
+    const [draftScope, setDraftScope] = useState<Scope>(initialFilters.scope);
+    const [draftFromDate, setDraftFromDate] = useState<string | null>(initialFilters.fromDate);
+    const [draftToDate, setDraftToDate] = useState<string | null>(initialFilters.toDate);
+
+    const [appliedScope, setAppliedScope] = useState<Scope>(initialFilters.scope);
+    const [appliedFromDate, setAppliedFromDate] = useState<string | null>(initialFilters.fromDate);
+    const [appliedToDate, setAppliedToDate] = useState<string | null>(initialFilters.toDate);
+
     const [selectedMetric, setSelectedMetric] = useState<TenderKpiKey | null>(null);
-    const [scope, setScope] = useState<Scope>(() => {
-        const userId = parsePositiveId(searchParams.get("userId"));
-        const teamId = parsePositiveId(searchParams.get("teamId"));
-        if (userId) return { view: "user", userId };
-        if (teamId) return { view: "team", teamId };
-        return parseStoredScope();
-    });
     const navigate = useNavigate();
 
     useEffect(() => {
         const userId = parsePositiveId(searchParams.get("userId"));
         const teamId = parsePositiveId(searchParams.get("teamId"));
-        const urlScope: Scope = userId ? { view: "user", userId } : teamId ? { view: "team", teamId } : parseStoredScope();
+        const urlScope: Scope = userId ? { view: "user", userId } : teamId ? { view: "team", teamId } : { view: null };
+        const rawFrom = searchParams.get("fromDate");
+        const rawTo = searchParams.get("toDate");
+        const urlFrom = isDateString(rawFrom) ? rawFrom : null;
+        const urlTo = isDateString(rawTo) ? rawTo : null;
 
-        setScope(current => {
-            if (urlScope.view === "user" && current.view === "user" && current.userId === urlScope.userId) return current;
-            if (urlScope.view === "team" && current.view === "team" && current.teamId === urlScope.teamId) return current;
-            return urlScope;
-        });
+        setDraftScope(current => (isSameScope(current, urlScope) ? current : urlScope));
+        setAppliedScope(current => (isSameScope(current, urlScope) ? current : urlScope));
+        setDraftFromDate(current => (current === urlFrom ? current : urlFrom));
+        setAppliedFromDate(current => (current === urlFrom ? current : urlFrom));
+        setDraftToDate(current => (current === urlTo ? current : urlTo));
+        setAppliedToDate(current => (current === urlTo ? current : urlTo));
     }, [searchParams]);
 
     useEffect(() => {
         const params = new URLSearchParams();
-        if (scope.view === "user") params.set("userId", String(scope.userId));
-        if (scope.view === "team") params.set("teamId", String(scope.teamId));
-        if (fromDate) params.set("fromDate", fromDate);
-        if (toDate) params.set("toDate", toDate);
+        if (appliedScope.view === "user") params.set("userId", String(appliedScope.userId));
+        if (appliedScope.view === "team") params.set("teamId", String(appliedScope.teamId));
+        if (appliedFromDate) params.set("fromDate", appliedFromDate);
+        if (appliedToDate) params.set("toDate", appliedToDate);
 
-        localStorage.setItem(SCOPE_STORAGE_KEY, params.toString());
-        setSearchParams(params, { replace: true });
-    }, [fromDate, scope, setSearchParams, toDate]);
+        const next = params.toString();
+        localStorage.setItem(SCOPE_STORAGE_KEY, next);
+        if (next !== searchParams.toString()) {
+            setSearchParams(params, { replace: true });
+        }
+    }, [appliedFromDate, appliedScope, appliedToDate, searchParams, setSearchParams]);
 
-    const baseRange = fromDate && toDate ? { fromDate, toDate } : null;
+    const dateError = draftFromDate && draftToDate && draftFromDate > draftToDate ? "From Date must be on or before To Date" : null;
+    const canSubmit = draftScope.view !== null && !!draftFromDate && !!draftToDate && !dateError;
+    const hasAnyFilter =
+        draftScope.view !== null || !!draftFromDate || !!draftToDate || appliedScope.view !== null || !!appliedFromDate || !!appliedToDate || selectedMetric !== null;
 
-    const userQuery = baseRange && scope.view === "user" ? { ...baseRange, view: "user" as const, userId: (scope as { view: "user"; userId: number }).userId } : null;
+    const handleSubmit = () => {
+        if (!canSubmit) return;
+        setAppliedScope(draftScope);
+        setAppliedFromDate(draftFromDate);
+        setAppliedToDate(draftToDate);
+    };
+
+    const handleClear = () => {
+        setDraftScope({ view: null });
+        setDraftFromDate(null);
+        setDraftToDate(null);
+        setAppliedScope({ view: null });
+        setAppliedFromDate(null);
+        setAppliedToDate(null);
+        setSelectedMetric(null);
+        localStorage.removeItem(SCOPE_STORAGE_KEY);
+        setSearchParams({}, { replace: true });
+    };
+
+    const baseRange = appliedFromDate && appliedToDate ? { fromDate: appliedFromDate, toDate: appliedToDate } : null;
+
+    const userQuery = baseRange && appliedScope.view === "user" ? { ...baseRange, view: "user" as const, userId: (appliedScope as { view: "user"; userId: number }).userId } : null;
 
     const sharedQuery =
-        baseRange && scope.view === "user"
-            ? { ...baseRange, view: "user" as const, userId: (scope as { view: "user"; userId: number }).userId }
-            : baseRange && scope.view === "team"
-              ? { ...baseRange, view: "team" as const, teamId: (scope as { view: "team"; teamId: number }).teamId }
+        baseRange && appliedScope.view === "user"
+            ? { ...baseRange, view: "user" as const, userId: (appliedScope as { view: "user"; userId: number }).userId }
+            : baseRange && appliedScope.view === "team"
+              ? { ...baseRange, view: "team" as const, teamId: (appliedScope as { view: "team"; teamId: number }).teamId }
               : null;
 
     const { data: users } = useUsersByRole(5);
@@ -352,18 +416,16 @@ export default function TenderExecutivePerformance() {
 
                 <Card className="shadow-sm">
                     <CardContent className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
                             {/* TEAM SELECT */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Team</label>
                                 <Combobox
-                                    value={scope.view === "team" ? String(scope.teamId) : ""}
-                                    onChange={v =>
-                                        setScope({
-                                            view: "team",
-                                            teamId: Number(v),
-                                        })
-                                    }
+                                    value={draftScope.view === "team" ? String(draftScope.teamId) : ""}
+                                    onChange={v => {
+                                        const teamId = parsePositiveId(v);
+                                        setDraftScope(teamId ? { view: "team", teamId } : { view: null });
+                                    }}
                                     options={[
                                         { id: "1", name: "AC Team" },
                                         { id: "2", name: "DC Team" },
@@ -376,14 +438,12 @@ export default function TenderExecutivePerformance() {
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Team Member</label>
                                 <Combobox
-                                    disabled={scope.view === "team"}
-                                    value={scope.view === "user" ? String(scope.userId) : ""}
-                                    onChange={v =>
-                                        setScope({
-                                            view: "user",
-                                            userId: Number(v),
-                                        })
-                                    }
+                                    disabled={draftScope.view === "team"}
+                                    value={draftScope.view === "user" ? String(draftScope.userId) : ""}
+                                    onChange={v => {
+                                        const userId = parsePositiveId(v);
+                                        setDraftScope(userId ? { view: "user", userId } : { view: null });
+                                    }}
                                     options={users?.map(u => ({ id: u.id.toString(), name: u.name })) ?? []}
                                     placeholder="Select User"
                                 />
@@ -393,7 +453,7 @@ export default function TenderExecutivePerformance() {
                                 <label className="text-sm font-medium">From Date</label>
                                 <div className="relative">
                                     <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input type="date" className="pl-9" value={fromDate ?? ""} onChange={e => setFromDate(e.target.value || null)} />
+                                    <Input type="date" className="pl-9" value={draftFromDate ?? ""} onChange={e => setDraftFromDate(e.target.value || null)} />
                                 </div>
                             </div>
 
@@ -402,10 +462,21 @@ export default function TenderExecutivePerformance() {
                                 <label className="text-sm font-medium">To Date</label>
                                 <div className="relative">
                                     <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input type="date" className="pl-9" value={toDate ?? ""} onChange={e => setToDate(e.target.value || null)} />
+                                    <Input type="date" className="pl-9" value={draftToDate ?? ""} onChange={e => setDraftToDate(e.target.value || null)} />
                                 </div>
                             </div>
+
+                            {/* ACTIONS */}
+                            <div className="flex gap-2 md:justify-self-end">
+                                <Button onClick={handleSubmit} disabled={!canSubmit}>
+                                    <Filter className="mr-2 h-4 w-4" /> Submit
+                                </Button>
+                                <Button variant="outline" onClick={handleClear} disabled={!hasAnyFilter}>
+                                    <X className="mr-2 h-4 w-4" /> Clear
+                                </Button>
+                            </div>
                         </div>
+                        {dateError && <p className="mt-2 text-sm text-destructive">{dateError}</p>}
                     </CardContent>
                 </Card>
 
@@ -416,7 +487,7 @@ export default function TenderExecutivePerformance() {
                 {/* ===== EMD BACKLOG ===== */}
                 {sharedQuery && <EmdBacklogTable {...sharedQuery} />}
 
-                {scope.view === "user" && (
+                {appliedScope.view === "user" && (
                     <>
                         {/* ===== KPI CARDS ===== */}
                         <div className="space-y-6 hidden">

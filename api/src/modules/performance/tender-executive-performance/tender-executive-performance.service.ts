@@ -1245,7 +1245,6 @@ export class TenderExecutiveService {
                 SELECT 1
                 FROM tender_information tin
                 WHERE tin.tender_id = ti.id
-                AND tin.created_at BETWEEN '${from}' AND '${to}'
             )
             `);
 
@@ -1292,9 +1291,8 @@ export class TenderExecutiveService {
 
         const approvedOpening = await exec(`
         ${baseSelect}
-        JOIN tender_information tin ON tin.tender_id = ti.id
         WHERE ${baseWhere()}
-          AND tin.created_at < '${from}'
+          AND ti.created_at < '${from}'
           AND ti.tl_status IN (0,3)
     `);
 
@@ -1302,7 +1300,7 @@ export class TenderExecutiveService {
         ${baseSelect}
         JOIN tender_information tin ON tin.tender_id = ti.id
         WHERE ${baseWhere()}
-          AND tin.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.created_at BETWEEN '${from}' AND '${to}'
           AND ti.tl_status = 1
     `);
 
@@ -1314,7 +1312,6 @@ export class TenderExecutiveService {
             SELECT 1
             FROM tender_information tin
             WHERE tin.tender_id = ti.id
-            AND tin.created_at BETWEEN '${from}' AND '${to}'
         )
         AND ti.tl_status = 1
         `);
@@ -1327,7 +1324,6 @@ export class TenderExecutiveService {
             SELECT 1
             FROM tender_information tin
             WHERE tin.tender_id = ti.id
-            AND tin.created_at BETWEEN '${from}' AND '${to}'
         )
         AND ti.tl_status = 2
         `);
@@ -1352,7 +1348,7 @@ export class TenderExecutiveService {
         ${baseSelect}
         JOIN tender_information tin ON tin.tender_id = ti.id
         WHERE ${baseWhere()}
-          AND tin.created_at < '${to}'
+          AND ti.created_at BETWEEN '${from}' AND '${to}'
           AND ti.tl_status IN (0,3)
     `);
 
@@ -1362,11 +1358,10 @@ export class TenderExecutiveService {
 
         const bidOpening = await exec(`
         ${baseSelect}
-        JOIN tender_information tin ON tin.tender_id = ti.id
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
-          AND tin.created_at < '${from}'
+          AND ti.created_at < '${from}'
           AND st.status = true
           AND st.tender_category = 'prep'
           AND ti.status NOT IN (0, 1, 2, 3)
@@ -1386,7 +1381,6 @@ export class TenderExecutiveService {
                 SELECT 1
                 FROM tender_information tin
                 WHERE tin.tender_id = ti.id
-                AND tin.created_at BETWEEN '${from}' AND '${to}'
           )
           AND ti.tl_status = 1
     `);
@@ -1394,6 +1388,8 @@ export class TenderExecutiveService {
         const bidDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
+          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.tl_status = 1
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1403,32 +1399,52 @@ export class TenderExecutiveService {
           )
     `);
 
-        const missedDuringCompleted = await exec(`
+        const dnbDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND EXISTS (
+          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.tl_status = 1
+          AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
-                  AND bs.status = 'Tender Missed'
-                  AND bs.created_at BETWEEN '${from}' AND '${to}'
+                  AND bs.status = 'Bid Submitted'
+                  AND bs.created_at <= '${to}'
+          )
+          AND (
+                EXISTS (
+                      SELECT 1
+                      FROM tender_status_history tsh
+                      JOIN statuses st ON st.id = tsh.new_status
+                      WHERE tsh.tender_id = ti.id
+                        AND st.status = true
+                        AND st.tender_category = 'dnb'
+                        AND tsh.created_at BETWEEN '${from}' AND '${to}'
+                )
+                OR
+                EXISTS (
+                      SELECT 1
+                      FROM bid_submissions bs
+                      WHERE bs.tender_id = ti.id
+                        AND bs.status = 'Tender Missed'
+                        AND bs.created_at BETWEEN '${from}' AND '${to}'
+                )
           )
     `);
 
         const bidTotal = await exec(`
         ${baseSelect}
-        JOIN tender_information tin ON tin.tender_id = ti.id
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
-          AND tin.created_at <= '${to}'
+          AND ti.created_at BETWEEN '${from}' AND '${to}'
           AND st.status = true
           AND st.tender_category = 'prep'
-          AND ti.status NOT IN (0, 1, 2, 3)
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
+                  AND bs.status IN ('Bid Submitted', 'Tender Missed')
                   AND bs.created_at <= '${to}'
           )
     `);
@@ -1441,6 +1457,7 @@ export class TenderExecutiveService {
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.status NOT IN (${excludedStatuses})
+          AND ti.created_at < '${from}'
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1461,6 +1478,7 @@ export class TenderExecutiveService {
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.status NOT IN (${excludedStatuses})
+          AND ti.created_at BETWEEN '${from}' AND '${to}'
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1473,6 +1491,7 @@ export class TenderExecutiveService {
         const wonDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
+          AND ti.created_at BETWEEN '${from}' AND '${to}'
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
@@ -1485,6 +1504,7 @@ export class TenderExecutiveService {
         const lostDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
+          AND ti.created_at BETWEEN '${from}' AND '${to}'
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
@@ -1497,7 +1517,8 @@ export class TenderExecutiveService {
         const resultAwaitedDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND EXISTS (
+          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
@@ -1509,12 +1530,13 @@ export class TenderExecutiveService {
         const disqualifiedDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
+          AND ti.created_at BETWEEN '${from}' AND '${to}'
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND tr.status ILIKE 'disqualified'
-                  AND tr.created_at BETWEEN '${from}' AND '${to}'
+                AND tr.status ILIKE 'disqualified'
+                AND tr.created_at BETWEEN '${from}' AND '${to}'
           )
     `);
 
@@ -1522,6 +1544,7 @@ export class TenderExecutiveService {
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.status NOT IN (${excludedStatuses})
+          AND ti.created_at BETWEEN '${from}' AND '${to}'
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1541,6 +1564,7 @@ export class TenderExecutiveService {
         const resultAwaitedDuringPending = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
+          AND ti.created_at BETWEEN '${from}' AND '${to}'
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1559,6 +1583,7 @@ export class TenderExecutiveService {
         const wonOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
+          AND ti.created_at < '${from}'
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
@@ -1571,6 +1596,7 @@ export class TenderExecutiveService {
         const lostOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
+          AND ti.created_at < '${from}'
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
@@ -1693,9 +1719,9 @@ export class TenderExecutiveService {
                             drilldown: this.mapDrilldown(bidDuringCompleted),
                         },
                         pending: {
-                            count: missedDuringCompleted.length,
-                            value: this.sumValue(missedDuringCompleted),
-                            drilldown: this.mapDrilldown(missedDuringCompleted),
+                            count: dnbDuringCompleted.length,
+                            value: this.sumValue(dnbDuringCompleted),
+                            drilldown: this.mapDrilldown(dnbDuringCompleted),
                         },
                     },
                 },
