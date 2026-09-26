@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { FormControl, Form, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { useCreateVendorAccount, useUpdateVendorAccount, useDeleteVendorAccount } from "@/hooks/api/useVendorAccounts";
@@ -146,34 +146,36 @@ export const AccountSection = ({ orgId }: VendorSectionProps) => {
                         <DialogDescription className="hidden">Add or edit account details</DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-4 pt-2">
-                        <FieldWrapper control={dialogForm.control} name="bankAccountName" label="Account Name">
-                            {field => <Input placeholder="e.g. Current Account" {...field} value={field.value ?? ""} />}
-                        </FieldWrapper>
+                    <Form {...dialogForm}>
+                        <div className="space-y-4 pt-2">
+                            <FieldWrapper control={dialogForm.control} name="bankAccountName" label="Account Name">
+                                {field => <Input placeholder="e.g. Current Account" {...field} value={field.value ?? ""} />}
+                            </FieldWrapper>
 
-                        <FieldWrapper control={dialogForm.control} name="accountNum" label="Account Number">
-                            {field => <Input placeholder="e.g. 1234567890123456" {...field} value={field.value ?? ""} />}
-                        </FieldWrapper>
+                            <FieldWrapper control={dialogForm.control} name="accountNum" label="Account Number">
+                                {field => <Input placeholder="e.g. 1234567890123456" {...field} value={field.value ?? ""} />}
+                            </FieldWrapper>
 
-                        <FieldWrapper control={dialogForm.control} name="ifscCode" label="IFSC Code">
-                            {field => <Input placeholder="e.g. HDFC0001234" {...field} value={field.value ?? ""} />}
-                        </FieldWrapper>
+                            <FieldWrapper control={dialogForm.control} name="ifscCode" label="IFSC Code">
+                                {field => <Input placeholder="e.g. HDFC0001234" {...field} value={field.value ?? ""} />}
+                            </FieldWrapper>
 
-                        <FormField
-                            control={dialogForm.control}
-                            name="status"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                    <FormControl>
-                                        <Checkbox checked={field.value} onCheckedChange={checked => field.onChange(checked === true)} />
-                                    </FormControl>
-                                    <div className="space-y-1 leading-none">
-                                        <FormLabel>Active</FormLabel>
-                                    </div>
-                                </FormItem>
-                            )}
-                        />
-                    </div>
+                            <FormField
+                                control={dialogForm.control}
+                                name="status"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                        <FormControl>
+                                            <Checkbox checked={field.value} onCheckedChange={checked => field.onChange(checked === true)} />
+                                        </FormControl>
+                                        <div className="space-y-1 leading-none">
+                                            <FormLabel>Active</FormLabel>
+                                        </div>
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                    </Form>
 
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => setOpen(false)}>

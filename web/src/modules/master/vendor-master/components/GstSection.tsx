@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { FormControl, Form, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { useCreateVendorGst, useUpdateVendorGst, useDeleteVendorGst } from "@/hooks/api/useVendorGsts";
@@ -147,36 +147,38 @@ export const GstSection = ({ orgId }: VendorSectionProps) => {
                         <DialogDescription className="hidden">Add or edit GST details</DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-4 pt-2">
-                        <FieldWrapper control={dialogForm.control} name="gstState" label="GST State">
-                            {field => <Input placeholder="e.g. Maharashtra" {...field} value={field.value ?? ""} />}
-                        </FieldWrapper>
+                    <Form {...dialogForm}>
+                        <div className="space-y-4 pt-2">
+                            <FieldWrapper control={dialogForm.control} name="gstState" label="GST State">
+                                {field => <Input placeholder="e.g. Maharashtra" {...field} value={field.value ?? ""} />}
+                            </FieldWrapper>
 
-                        <FieldWrapper control={dialogForm.control} name="gstNo" label="GST Number">
-                            {field => <Input placeholder="22AAAAA0000A1Z5" {...field} value={field.value ?? ""} />}
-                        </FieldWrapper>
+                            <FieldWrapper control={dialogForm.control} name="gstNo" label="GST Number">
+                                {field => <Input placeholder="22AAAAA0000A1Z5" {...field} value={field.value ?? ""} />}
+                            </FieldWrapper>
 
-                        <FieldWrapper control={dialogForm.control} name="address" label="Address">
-                            {field => (
-                                <Textarea rows={3} placeholder="Enter GST registered address" {...field} value={field.value ?? ""} />
-                            )}
-                        </FieldWrapper>
+                            <FieldWrapper control={dialogForm.control} name="address" label="Address">
+                                {field => (
+                                    <Textarea rows={3} placeholder="Enter GST registered address" {...field} value={field.value ?? ""} />
+                                )}
+                            </FieldWrapper>
 
-                        <FormField
-                            control={dialogForm.control}
-                            name="status"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                    <FormControl>
-                                        <Checkbox checked={field.value} onCheckedChange={checked => field.onChange(checked === true)} />
-                                    </FormControl>
-                                    <div className="space-y-1 leading-none">
-                                        <FormLabel>Active</FormLabel>
-                                    </div>
-                                </FormItem>
-                            )}
-                        />
-                    </div>
+                            <FormField
+                                control={dialogForm.control}
+                                name="status"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                        <FormControl>
+                                            <Checkbox checked={field.value} onCheckedChange={checked => field.onChange(checked === true)} />
+                                        </FormControl>
+                                        <div className="space-y-1 leading-none">
+                                            <FormLabel>Active</FormLabel>
+                                        </div>
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                    </Form>
 
                     <DialogFooter>
                         <Button variant="outline" type="button" onClick={() => setOpen(false)}>

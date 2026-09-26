@@ -7,7 +7,7 @@ import { useState } from "react";
 import { useFieldArray, useFormContext, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { FormControl, Form, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { useCreateVendor, useDeleteVendor, useUpdateVendor } from "@/hooks/api/useVendors";
 import { DialogDescription } from "@radix-ui/react-dialog";
@@ -154,40 +154,42 @@ export const PersonSection = ({ orgId }: VendorSectionProps) => {
                         <DialogDescription className="hidden">Add or edit person details</DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-4 pt-2">
-                        <FieldWrapper control={dialogForm.control} name="name" label="Name *">
-                            {field => <Input placeholder="e.g. John Doe" {...field} value={field.value ?? ""} />}
-                        </FieldWrapper>
+                    <Form {...dialogForm}>
+                        <div className="space-y-4 pt-2">
+                            <FieldWrapper control={dialogForm.control} name="name" label="Name *">
+                                {field => <Input placeholder="e.g. John Doe" {...field} value={field.value ?? ""} />}
+                            </FieldWrapper>
 
-                        <FieldWrapper control={dialogForm.control} name="email" label="Email">
-                            {field => (
-                                <Input type="email" placeholder="john@company.com" {...field} value={field.value ?? ""} />
-                            )}
-                        </FieldWrapper>
+                            <FieldWrapper control={dialogForm.control} name="email" label="Email">
+                                {field => (
+                                    <Input type="email" placeholder="john@company.com" {...field} value={field.value ?? ""} />
+                                )}
+                            </FieldWrapper>
 
-                        <FieldWrapper control={dialogForm.control} name="mobile" label="Mobile">
-                            {field => <Input placeholder="Phone number" {...field} value={field.value ?? ""} />}
-                        </FieldWrapper>
+                            <FieldWrapper control={dialogForm.control} name="mobile" label="Mobile">
+                                {field => <Input placeholder="Phone number" {...field} value={field.value ?? ""} />}
+                            </FieldWrapper>
 
-                        <FieldWrapper control={dialogForm.control} name="address" label="Address">
-                            {field => <Textarea rows={3} placeholder="Enter address" {...field} value={field.value ?? ""} />}
-                        </FieldWrapper>
+                            <FieldWrapper control={dialogForm.control} name="address" label="Address">
+                                {field => <Textarea rows={3} placeholder="Enter address" {...field} value={field.value ?? ""} />}
+                            </FieldWrapper>
 
-                        <FormField
-                            control={dialogForm.control}
-                            name="status"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                    <FormControl>
-                                        <Checkbox checked={field.value} onCheckedChange={checked => field.onChange(checked === true)} />
-                                    </FormControl>
-                                    <div className="space-y-1 leading-none">
-                                        <FormLabel>Active</FormLabel>
-                                    </div>
-                                </FormItem>
-                            )}
-                        />
-                    </div>
+                            <FormField
+                                control={dialogForm.control}
+                                name="status"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                        <FormControl>
+                                            <Checkbox checked={field.value} onCheckedChange={checked => field.onChange(checked === true)} />
+                                        </FormControl>
+                                        <div className="space-y-1 leading-none">
+                                            <FormLabel>Active</FormLabel>
+                                        </div>
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                    </Form>
 
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => setOpen(false)}>
