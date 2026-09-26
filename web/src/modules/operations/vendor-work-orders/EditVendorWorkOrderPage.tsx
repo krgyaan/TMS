@@ -29,7 +29,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { formatDateForInput, mapVwoFormToUpdateDTO } from "./helpers/vwoForm.mapper";
 import { vendorWorkOrderFormSchema, type VendorWorkOrderFormValues } from "./helpers/vwoForm.schema";
-import { PartyFormDialog, type CreatePartyPayload } from "@/modules/operations/vendor-master/PartyFormDialog";
+import { PartyFormDialog, type CreatePartyPayload } from "@/modules/master/vendor-master/components/PartyFormDialog";
 
 const defaultFormValues: VendorWorkOrderFormValues = {
   woDate: formatDateForInput(new Date()),
@@ -58,6 +58,11 @@ const defaultFormValues: VendorWorkOrderFormValues = {
   scopeOfWork: [],
   accessoriesPackagingListAttachments: [],
   remarks: "",
+  uploadInvoice: "no",
+  invoiceDate: "",
+  invoiceValue: null,
+  invoiceGst: null,
+  invoiceFile: [],
 };
 
 const FormSkeleton = () => (
@@ -132,6 +137,11 @@ function mapVwoDataToFormValues(data: any): VendorWorkOrderFormValues {
       scopeOfWork: parseAttachments(data.scopeOfWork),
       accessoriesPackagingListAttachments: parseAttachments(data.accessoriesPackagingListAttachments),
       remarks: data.remarks || "",
+      uploadInvoice: "no",
+      invoiceDate: "",
+      invoiceValue: null,
+      invoiceGst: null,
+      invoiceFile: [],
     };
   } catch (err) {
     console.error("[VWO Edit] Error mapping VWO data to form values:", err, "Raw data:", data);
@@ -161,7 +171,7 @@ export default function EditVendorWorkOrderPage() {
   const { data: vwoData, isLoading: isVwoLoading } = useVendorWorkOrderDetails(vwoId);
 
   const form = useForm<VendorWorkOrderFormValues>({
-    resolver: zodResolver(vendorWorkOrderFormSchema) as any,
+    resolver: zodResolver(vendorWorkOrderFormSchema),
     defaultValues: defaultFormValues,
   });
 

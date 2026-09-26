@@ -33,7 +33,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { formatDateForInput, mapVwoFormToCreateDTO } from "./helpers/vwoForm.mapper";
 import { vendorWorkOrderFormSchema, type VendorWorkOrderFormValues } from "./helpers/vwoForm.schema";
-import { PartyFormDialog, type CreatePartyPayload } from "@/modules/operations/vendor-master/PartyFormDialog";
+import { PartyFormDialog, type CreatePartyPayload } from "@/modules/master/vendor-master/components/PartyFormDialog";
 
 const defaultFormValues: VendorWorkOrderFormValues = {
   woDate: formatDateForInput(new Date()),
@@ -117,7 +117,7 @@ export default function CreateVendorWorkOrderPage() {
   const [partyCreationType, setPartyCreationType] = useState<"seller" | "ship_to">("seller");
 
   const form = useForm<VendorWorkOrderFormValues>({
-    resolver: zodResolver(vendorWorkOrderFormSchema) as any,
+    resolver: zodResolver(vendorWorkOrderFormSchema),
     defaultValues: defaultFormValues,
   });
   const selectedSellerId = form.watch("sellerId");
