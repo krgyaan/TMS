@@ -69,11 +69,6 @@ import { TenderStatusModule } from "@/modules/master/tender-status/tender-status
 import { TqTypesModule } from "@/modules/master/tq-types/tq-types.module";
 import { UserProfilesModule } from "@/modules/master/user-profiles/user-profiles.module";
 import { UsersModule } from "@/modules/master/users/users.module";
-import { VendorAccountsModule } from "@/modules/master/vendor-accounts/vendor-accounts.module";
-import { VendorFilesModule } from "@/modules/master/vendor-files/vendor-files.module";
-import { VendorGstsModule } from "@/modules/master/vendor-gsts/vendor-gsts.module";
-import { VendorOrganizationsModule } from "@/modules/master/vendor-organizations/vendor-organizations.module";
-import { VendorsModule } from "@/modules/master/vendors/vendors.module";
 import { WebsitesModule } from "@/modules/master/websites/websites.module";
 import { WoBasicDetailsModule } from "@/modules/operations/wo-basic-details/wo-basic-details.module";
 import { SchedulerModule } from "@/modules/scheduler/scheduler.module";
@@ -140,6 +135,7 @@ import { OpenwaModule } from "./openwa/openwa.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { CashFlowModule } from "./modules/operations/cash-flows/cash-flow.module";
 import { WebhookController } from "./webhook/webhook.controller";
+import { VendorMasterModule } from "./modules/master/vendor-master/vendor-master.module";
 
 @Module({
     imports: [
@@ -188,11 +184,7 @@ import { WebhookController } from "./webhook/webhook.controller";
         OrganizationsModule,
         StatusesModule,
         TqTypesModule,
-        VendorOrganizationsModule,
-        VendorsModule,
-        VendorGstsModule,
-        VendorAccountsModule,
-        VendorFilesModule,
+        VendorMasterModule,
         GoogleIntegrationModule,
         CashFlowModule,
         AuthModule,

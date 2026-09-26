@@ -104,9 +104,9 @@ const Master_LeadType_Create = lazy(() => import("@/modules/master/lead-type/cre
 const Master_LeadType_Edit = lazy(() => import("@/modules/master/lead-type/edit"));
 
 // Vendors (Unified)
-const Master_Vendors = lazy(() => import("@/modules/master/vendors"));
-const Master_Vendors_Create = lazy(() => import("@/modules/master/vendors/create"));
-const Master_Vendors_Edit = lazy(() => import("@/modules/master/vendors/edit"));
+const Master_Vendors = lazy(() => import("@/modules/master/vendor-master/VendorListPage"));
+const Master_Vendors_Create = lazy(() => import("@/modules/master/vendor-master/VendorCreatePage"));
+const Master_Vendors_Edit = lazy(() => import("@/modules/master/vendor-master/VendorEditPage"));
 
 //Circulars
 const Master_Circular = lazy(() => import("@/modules/master/circulars/CircularDashboardSection"))

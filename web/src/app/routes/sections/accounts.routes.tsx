@@ -41,10 +41,10 @@ const Accounts_PaymentRequestTabs = lazy(() => import("@/modules/operations/paym
 const Accounts_SaleInvoiceTabs = lazy(() => import("@/modules/operations/sale-invoices/SaleInvoiceTabsPage"));
 const Accounts_VendorWorkOrderTabs = lazy(() => import("@/modules/operations/vendor-work-orders/VendorWorkOrderTabsPage"));
 const Accounts_VwoClosure = lazy(() => import("@/modules/operations/vendor-work-orders/pages/VwoClosurePage"));
-const Accounts_VendorMaster = lazy(() => import("@/modules/master/vendors"));
-const Accounts_VendorMaster_Create = lazy(() => import("@/modules/master/vendors/create"));
-const Accounts_VendorMaster_Edit = lazy(() => import("@/modules/master/vendors/edit"));
-const Accounts_Parties = lazy(() => import("@/modules/operations/vendor-master/PartyListPage"));
+const Accounts_VendorMaster = lazy(() => import("@/modules/master/vendor-master/VendorListPage"));
+const Accounts_VendorMaster_Create = lazy(() => import("@/modules/master/vendor-master/VendorCreatePage"));
+const Accounts_VendorMaster_Edit = lazy(() => import("@/modules/master/vendor-master/VendorEditPage"));
+const Accounts_Parties = lazy(() => import("@/modules/master/vendor-master/PartyListPage"));
 const Accounts_InventoryPage = lazy(() => import("@/modules/operations/inventory/pages/InventoryPage"));
 
 export default function AccountsRoutes() {
