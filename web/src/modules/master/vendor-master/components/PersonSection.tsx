@@ -4,18 +4,25 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
-import { useFieldArray, useFormContext } from "react-hook-form";
-
+import { useFieldArray, useFormContext, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-
-import { FormControl, FormItem, FormLabel } from "@/components/ui/form";
-
+import { FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { useCreateVendor, useDeleteVendor, useUpdateVendor } from "@/hooks/api/useVendors";
 import { DialogDescription } from "@radix-ui/react-dialog";
 import { Edit, Plus, Trash2 } from "lucide-react";
 import { personApiToForm, toCreatePersonDto, toUpdatePersonDto } from "../helpers/vendorForm.mappers";
-import type { PersonFormValues, VendorFormValues } from "../helpers/vendorForm.schema";
+import { PersonFormSchema, type PersonFormValues, type VendorFormValues } from "../helpers/vendorForm.schema";
 import type { VendorSectionProps } from "../helpers/vendorForm.types";
+
+const emptyPerson: PersonFormValues = {
+    name: "",
+    email: "",
+    mobile: "",
+    address: "",
+    status: true,
+};
 
 export const PersonSection = ({ orgId }: VendorSectionProps) => {
     const { control, getValues } = useFormContext<VendorFormValues>();
@@ -29,54 +36,49 @@ export const PersonSection = ({ orgId }: VendorSectionProps) => {
     const createVendor = useCreateVendor();
     const deleteVendor = useDeleteVendor();
 
-    const emptyPerson: PersonFormValues = {
-        name: "",
-        email: "",
-        mobile: "",
-        address: "",
-        status: true,
-    };
-
-    const [formState, setFormState] = useState<PersonFormValues>(emptyPerson);
+    const dialogForm = useForm<PersonFormValues>({
+        resolver: zodResolver(PersonFormSchema),
+        defaultValues: emptyPerson,
+    });
 
     const openAdd = () => {
         setEditingIndex(null);
-        setFormState(emptyPerson);
+        dialogForm.reset(emptyPerson);
         setOpen(true);
     };
 
     const openEdit = (index: number) => {
         const person = getValues(`persons.${index}`);
         setEditingIndex(index);
-        setFormState(person);
+        dialogForm.reset(person);
         setOpen(true);
     };
 
-    const handleSave = () => {
+    const handleSave = dialogForm.handleSubmit(values => {
         if (editingIndex !== null) {
             const existing = getValues(`persons.${editingIndex}`);
 
             if (orgId && existing?.id) {
                 updateVendor.mutate({
                     id: existing.id,
-                    data: toUpdatePersonDto(formState),
+                    data: toUpdatePersonDto(values),
                 });
             }
-            update(editingIndex, { ...existing, ...formState });
+            update(editingIndex, { ...existing, ...values });
         } else {
             if (orgId) {
-                createVendor.mutate(toCreatePersonDto(formState, orgId), {
+                createVendor.mutate(toCreatePersonDto(values, orgId), {
                     onSuccess: created => {
                         append(personApiToForm(created));
                     },
                 });
             } else {
-                append(formState);
+                append(values);
             }
         }
 
         setOpen(false);
-    };
+    });
 
     const handleDelete = (index: number) => {
         const person = getValues(`persons.${index}`);
@@ -92,7 +94,7 @@ export const PersonSection = ({ orgId }: VendorSectionProps) => {
         <Card>
             <CardHeader>
                 <div className="flex items-center justify-between">
-                    <CardTitle>Persons (Vendors)</CardTitle>
+                    <CardTitle>Persons</CardTitle>
 
                     <Button type="button" variant="outline" size="sm" onClick={openAdd}>
                         <Plus className="h-4 w-4 mr-2" />
@@ -139,46 +141,38 @@ export const PersonSection = ({ orgId }: VendorSectionProps) => {
                     </DialogHeader>
 
                     <div className="space-y-4">
-                        <FormItem>
-                            <FormLabel>Name *</FormLabel>
-                            <FormControl>
-                                <Input value={formState.name} onChange={e => setFormState({ ...formState, name: e.target.value })} />
-                            </FormControl>
-                        </FormItem>
+                        <FieldWrapper control={dialogForm.control} name="name" label="Name *">
+                            {field => <Input placeholder="e.g. John Doe" {...field} value={field.value ?? ""} />}
+                        </FieldWrapper>
 
-                        <FormItem>
-                            <FormLabel>Email</FormLabel>
-                            <FormControl>
-                                <Input value={formState.email} onChange={e => setFormState({ ...formState, email: e.target.value })} />
-                            </FormControl>
-                        </FormItem>
+                        <FieldWrapper control={dialogForm.control} name="email" label="Email">
+                            {field => (
+                                <Input type="email" placeholder="john@company.com" {...field} value={field.value ?? ""} />
+                            )}
+                        </FieldWrapper>
 
-                        <FormItem>
-                            <FormLabel>Mobile</FormLabel>
-                            <FormControl>
-                                <Input value={formState.mobile} onChange={e => setFormState({ ...formState, mobile: e.target.value })} />
-                            </FormControl>
-                        </FormItem>
+                        <FieldWrapper control={dialogForm.control} name="mobile" label="Mobile">
+                            {field => <Input placeholder="Phone number" {...field} value={field.value ?? ""} />}
+                        </FieldWrapper>
 
-                        <FormItem>
-                            <FormLabel>Address</FormLabel>
-                            <FormControl>
-                                <Textarea rows={3} value={formState.address} onChange={e => setFormState({ ...formState, address: e.target.value })} />
-                            </FormControl>
-                        </FormItem>
+                        <FieldWrapper control={dialogForm.control} name="address" label="Address">
+                            {field => <Textarea rows={3} placeholder="Enter address" {...field} value={field.value ?? ""} />}
+                        </FieldWrapper>
 
-                        <div className="flex items-center space-x-2">
-                            <Checkbox
-                                checked={formState.status}
-                                onCheckedChange={checked =>
-                                    setFormState({
-                                        ...formState,
-                                        status: checked as boolean,
-                                    })
-                                }
-                            />
-                            <FormLabel>Active</FormLabel>
-                        </div>
+                        <FormField
+                            control={dialogForm.control}
+                            name="status"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                    <FormControl>
+                                        <Checkbox checked={field.value} onCheckedChange={checked => field.onChange(checked === true)} />
+                                    </FormControl>
+                                    <div className="space-y-1 leading-none">
+                                        <FormLabel>Active</FormLabel>
+                                    </div>
+                                </FormItem>
+                            )}
+                        />
                     </div>
 
                     <DialogFooter>

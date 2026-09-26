@@ -13,6 +13,7 @@ export const GstFormSchema = z.object({
     id: z.number().optional(),
     gstState: z.string().min(1, "GST state is required"),
     gstNo: z.string().min(1, "GST number is required"),
+    address: z.string().max(500).optional(),
     status: z.boolean(),
 });
 

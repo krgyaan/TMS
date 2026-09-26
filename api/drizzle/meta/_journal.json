@@ -533,6 +533,13 @@
       "when": 1789800000000,
       "tag": "0143_vendor_files_org_and_nullable_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1789900000000,
+      "tag": "0144_add_vendor_gsts_address",
+      "breakpoints": true
     }
   ]
 }

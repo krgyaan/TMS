@@ -1,15 +1,22 @@
 import { useState } from "react";
-import { useFormContext, useFieldArray } from "react-hook-form";
+import { useFormContext, useFieldArray, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { useCreateVendorFile, useUpdateVendorFile, useDeleteVendorFile } from "@/hooks/api/useVendorFiles";
 import { DialogDescription } from "@radix-ui/react-dialog";
 import { fileApiToForm, toCreateFileDto, toUpdateFileDto } from "../helpers/vendorForm.mappers";
-import type { FileFormValues, VendorFormValues } from "../helpers/vendorForm.schema";
+import { FileFormSchema, type FileFormValues, type VendorFormValues } from "../helpers/vendorForm.schema";
 import type { VendorSectionProps } from "../helpers/vendorForm.types";
+
+const emptyFile: FileFormValues = {
+    name: "",
+    filePath: "",
+};
 
 export const FileSection = ({ orgId }: VendorSectionProps) => {
     const { control, getValues } = useFormContext<VendorFormValues>();
@@ -23,27 +30,25 @@ export const FileSection = ({ orgId }: VendorSectionProps) => {
     const [open, setOpen] = useState(false);
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-    const emptyFile: FileFormValues = {
-        name: "",
-        filePath: "",
-    };
-
-    const [formState, setFormState] = useState<FileFormValues>(emptyFile);
+    const dialogForm = useForm<FileFormValues>({
+        resolver: zodResolver(FileFormSchema),
+        defaultValues: emptyFile,
+    });
 
     const openAdd = () => {
         setEditingIndex(null);
-        setFormState(emptyFile);
+        dialogForm.reset(emptyFile);
         setOpen(true);
     };
 
     const openEdit = (index: number) => {
         const file = getValues(`files.${index}`);
         setEditingIndex(index);
-        setFormState(file);
+        dialogForm.reset(file);
         setOpen(true);
     };
 
-    const handleSave = () => {
+    const handleSave = dialogForm.handleSubmit(values => {
         if (editingIndex !== null) {
             const existing = getValues(`files.${editingIndex}`);
 
@@ -51,7 +56,7 @@ export const FileSection = ({ orgId }: VendorSectionProps) => {
                 updateFile.mutate(
                     {
                         id: existing.id,
-                        data: toUpdateFileDto(formState),
+                        data: toUpdateFileDto(values),
                     },
                     {
                         onSuccess: updated => {
@@ -60,10 +65,10 @@ export const FileSection = ({ orgId }: VendorSectionProps) => {
                     }
                 );
             } else {
-                update(editingIndex, formState);
+                update(editingIndex, values);
             }
         } else {
-            createFile.mutate(toCreateFileDto(formState, orgId), {
+            createFile.mutate(toCreateFileDto(values, orgId), {
                 onSuccess: created => {
                     append(fileApiToForm(created));
                 },
@@ -71,7 +76,7 @@ export const FileSection = ({ orgId }: VendorSectionProps) => {
         }
 
         setOpen(false);
-    };
+    });
 
     const handleDelete = (index: number) => {
         const file = getValues(`files.${index}`);
@@ -129,15 +134,15 @@ export const FileSection = ({ orgId }: VendorSectionProps) => {
                     </DialogHeader>
 
                     <div className="space-y-4">
-                        <div>
-                            <label className="text-sm font-medium">File Name</label>
-                            <Input value={formState.name} onChange={e => setFormState({ ...formState, name: e.target.value })} />
-                        </div>
+                        <FieldWrapper control={dialogForm.control} name="name" label="File Name">
+                            {field => <Input placeholder="e.g. GST Certificate" {...field} value={field.value ?? ""} />}
+                        </FieldWrapper>
 
-                        <div>
-                            <label className="text-sm font-medium">File Path</label>
-                            <Input value={formState.filePath} onChange={e => setFormState({ ...formState, filePath: e.target.value })} />
-                        </div>
+                        <FieldWrapper control={dialogForm.control} name="filePath" label="File Path">
+                            {field => (
+                                <Input placeholder="/uploads/document.pdf" {...field} value={field.value ?? ""} />
+                            )}
+                        </FieldWrapper>
                     </div>
 
                     <DialogFooter>

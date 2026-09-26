@@ -1,12 +1,9 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+import { Form } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { useUpdateVendorOrganizationWithRelations, useVendorOrganizationWithRelations } from "@/hooks/api/useVendorOrganizations";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle } from "lucide-react";
@@ -17,6 +14,7 @@ import { AccountSection } from "./components/AccountSection";
 import { FileSection } from "./components/FileSection";
 import { GstSection } from "./components/GstSection";
 import { PersonSection } from "./components/PersonSection";
+import { VendorOrgFields } from "./components/VendorOrgFields";
 import { vendorOrgToFormValues } from "./helpers/vendorForm.mappers";
 import { VendorFormSchema, type VendorFormValues } from "./helpers/vendorForm.schema";
 import { vendorAreaBase } from "./vendorAreaPath";
@@ -109,87 +107,7 @@ const EditVendorPage = () => {
                             <CardTitle>Organization Details</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <FormField
-                                control={form.control}
-                                name="organization.name"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Organization Name *</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder="Enter organization name" {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <FormField
-                                    control={form.control}
-                                    name="organization.alias"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Alias</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="e.g. Factory, HO" {...field} value={field.value ?? ""} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="organization.msme"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>MSME</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="UDYAM-XX-00-0000000" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value.toUpperCase())} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="organization.pan"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>PAN</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="ABCDE1234F" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value.toUpperCase())} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-                            <FormField
-                                control={form.control}
-                                name="organization.address"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Address</FormLabel>
-                                        <FormControl>
-                                            <Textarea placeholder="Enter organization address" rows={3} {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="organization.status"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                        <FormControl>
-                                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                                        </FormControl>
-                                        <div className="space-y-1 leading-none">
-                                            <FormLabel>Active</FormLabel>
-                                        </div>
-                                    </FormItem>
-                                )}
-                            />
+                            <VendorOrgFields control={form.control} prefix="organization." />
                         </CardContent>
                     </Card>
 
@@ -199,7 +117,13 @@ const EditVendorPage = () => {
                             <CardTitle>Related Entities</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <Tabs defaultValue="gsts" className="w-full">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <GstSection orgId={orgId!} />
+                                <AccountSection orgId={orgId!} />
+                                <PersonSection orgId={orgId!} />
+                                <FileSection orgId={orgId!} />
+                            </div>
+                            <Tabs defaultValue="gsts" className="w-full hidden">
                                 <TabsList className="grid w-full grid-cols-4">
                                     <TabsTrigger value="gsts">GST Numbers</TabsTrigger>
                                     <TabsTrigger value="accounts">Bank Accounts</TabsTrigger>
@@ -227,21 +151,13 @@ const EditVendorPage = () => {
                     </Card>
 
                     {/* Submit Buttons */}
-                    <div className="flex flex-col items-end gap-4 pt-4 border-t">
-                        {Object.keys(form.formState.errors).length > 0 && (
-                            <div className="text-sm text-destructive flex items-center gap-2">
-                                <AlertCircle className="h-4 w-4" />
-                                Please fix the validation errors (check organization details and ensure all added persons have a valid email and mobile number).
-                            </div>
-                        )}
-                        <div className="flex items-center gap-4">
-                            <Button type="button" variant="outline" onClick={() => navigate(basePath)} disabled={updateVendor.isPending}>
-                                Cancel
-                            </Button>
-                            <Button type="submit" disabled={updateVendor.isPending}>
-                                {updateVendor.isPending ? "Updating..." : "Update Organization"}
-                            </Button>
-                        </div>
+                    <div className="flex items-center justify-end gap-4 pt-4 border-t">
+                        <Button type="button" variant="outline" onClick={() => navigate(basePath)} disabled={updateVendor.isPending}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" disabled={updateVendor.isPending}>
+                            {updateVendor.isPending ? "Updating..." : "Update Organization"}
+                        </Button>
                     </div>
                 </form>
             </Form>

@@ -1,21 +1,26 @@
 import { useState } from "react";
-import { useFormContext, useFieldArray } from "react-hook-form";
-
+import { useFormContext, useFieldArray, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-
+import { FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { Plus, Edit, Trash2 } from "lucide-react";
-
 import { useCreateVendorAccount, useUpdateVendorAccount, useDeleteVendorAccount } from "@/hooks/api/useVendorAccounts";
 import { DialogDescription } from "@radix-ui/react-dialog";
 import { accountApiToForm, toCreateAccountDto, toUpdateAccountDto } from "../helpers/vendorForm.mappers";
-import type { AccountFormValues, VendorFormValues } from "../helpers/vendorForm.schema";
+import { AccountFormSchema, type AccountFormValues, type VendorFormValues } from "../helpers/vendorForm.schema";
 import type { VendorSectionProps } from "../helpers/vendorForm.types";
+
+const emptyAccount: AccountFormValues = {
+    bankAccountName: "",
+    accountNum: "",
+    ifscCode: "",
+    status: true,
+};
 
 export const AccountSection = ({ orgId }: VendorSectionProps) => {
     const { control, getValues } = useFormContext<VendorFormValues>();
@@ -29,53 +34,49 @@ export const AccountSection = ({ orgId }: VendorSectionProps) => {
     const [open, setOpen] = useState(false);
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-    const emptyAccount: AccountFormValues = {
-        bankAccountName: "",
-        accountNum: "",
-        ifscCode: "",
-        status: true,
-    };
-
-    const [formState, setFormState] = useState<AccountFormValues>(emptyAccount);
+    const dialogForm = useForm<AccountFormValues>({
+        resolver: zodResolver(AccountFormSchema),
+        defaultValues: emptyAccount,
+    });
 
     const openAdd = () => {
         setEditingIndex(null);
-        setFormState(emptyAccount);
+        dialogForm.reset(emptyAccount);
         setOpen(true);
     };
 
     const openEdit = (index: number) => {
         const account = getValues(`accounts.${index}`);
         setEditingIndex(index);
-        setFormState(account);
+        dialogForm.reset(account);
         setOpen(true);
     };
 
-    const handleSave = () => {
+    const handleSave = dialogForm.handleSubmit(values => {
         if (editingIndex !== null) {
             const existing = getValues(`accounts.${editingIndex}`);
 
             if (orgId && existing?.id) {
                 updateAccount.mutate({
                     id: existing.id,
-                    data: toUpdateAccountDto(formState),
+                    data: toUpdateAccountDto(values),
                 });
             }
-            update(editingIndex, { ...existing, ...formState });
+            update(editingIndex, { ...existing, ...values });
         } else {
             if (orgId) {
-                createAccount.mutate(toCreateAccountDto(formState, orgId), {
+                createAccount.mutate(toCreateAccountDto(values, orgId), {
                     onSuccess: created => {
                         append(accountApiToForm(created));
                     },
                 });
             } else {
-                append(formState);
+                append(values);
             }
         }
 
         setOpen(false);
-    };
+    });
 
     const handleDelete = (index: number) => {
         const account = getValues(`accounts.${index}`);
@@ -138,33 +139,32 @@ export const AccountSection = ({ orgId }: VendorSectionProps) => {
                     </DialogHeader>
 
                     <div className="space-y-4">
-                        <div>
-                            <label className="text-sm font-medium">Account Name</label>
-                            <Input value={formState.bankAccountName} onChange={e => setFormState({ ...formState, bankAccountName: e.target.value })} />
-                        </div>
+                        <FieldWrapper control={dialogForm.control} name="bankAccountName" label="Account Name">
+                            {field => <Input placeholder="e.g. Current Account" {...field} value={field.value ?? ""} />}
+                        </FieldWrapper>
 
-                        <div>
-                            <label className="text-sm font-medium">Account Number</label>
-                            <Input value={formState.accountNum} onChange={e => setFormState({ ...formState, accountNum: e.target.value })} />
-                        </div>
+                        <FieldWrapper control={dialogForm.control} name="accountNum" label="Account Number">
+                            {field => <Input placeholder="e.g. 1234567890123456" {...field} value={field.value ?? ""} />}
+                        </FieldWrapper>
 
-                        <div>
-                            <label className="text-sm font-medium">IFSC Code</label>
-                            <Input value={formState.ifscCode} onChange={e => setFormState({ ...formState, ifscCode: e.target.value })} />
-                        </div>
+                        <FieldWrapper control={dialogForm.control} name="ifscCode" label="IFSC Code">
+                            {field => <Input placeholder="e.g. HDFC0001234" {...field} value={field.value ?? ""} />}
+                        </FieldWrapper>
 
-                        <div className="flex items-center gap-2">
-                            <Checkbox
-                                checked={formState.status}
-                                onCheckedChange={checked =>
-                                    setFormState({
-                                        ...formState,
-                                        status: checked as boolean,
-                                    })
-                                }
-                            />
-                            <span className="text-sm">Active</span>
-                        </div>
+                        <FormField
+                            control={dialogForm.control}
+                            name="status"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                    <FormControl>
+                                        <Checkbox checked={field.value} onCheckedChange={checked => field.onChange(checked === true)} />
+                                    </FormControl>
+                                    <div className="space-y-1 leading-none">
+                                        <FormLabel>Active</FormLabel>
+                                    </div>
+                                </FormItem>
+                            )}
+                        />
                     </div>
 
                     <DialogFooter>

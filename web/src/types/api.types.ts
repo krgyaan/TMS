@@ -201,6 +201,7 @@ export interface VendorGst {
     orgId: number;
     gstState: string;
     gstNo: string;
+    address?: string;
     status: boolean;
     createdAt: string;
     updatedAt: string;
@@ -260,12 +261,14 @@ export interface CreateVendorGstDto {
     orgId: number;
     gstState: string;
     gstNo: string;
+    address?: string;
     status?: boolean;
 }
 
 export interface UpdateVendorGstDto {
     gstState?: string;
     gstNo?: string;
+    address?: string;
     status?: boolean;
 }
 

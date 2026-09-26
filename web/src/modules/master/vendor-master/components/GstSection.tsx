@@ -1,16 +1,27 @@
 import { useState } from "react";
-import { useFormContext, useFieldArray } from "react-hook-form";
+import { useFormContext, useFieldArray, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { useCreateVendorGst, useUpdateVendorGst, useDeleteVendorGst } from "@/hooks/api/useVendorGsts";
 import { DialogDescription } from "@radix-ui/react-dialog";
 import { gstApiToForm, toCreateGstDto, toUpdateGstDto } from "../helpers/vendorForm.mappers";
-import type { GstFormValues, VendorFormValues } from "../helpers/vendorForm.schema";
+import { GstFormSchema, type GstFormValues, type VendorFormValues } from "../helpers/vendorForm.schema";
 import type { VendorSectionProps } from "../helpers/vendorForm.types";
+
+const emptyGst: GstFormValues = {
+    gstState: "",
+    gstNo: "",
+    address: "",
+    status: true,
+};
 
 export const GstSection = ({ orgId }: VendorSectionProps) => {
     const { control, getValues } = useFormContext<VendorFormValues>();
@@ -24,52 +35,49 @@ export const GstSection = ({ orgId }: VendorSectionProps) => {
     const [open, setOpen] = useState(false);
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-    const emptyGst: GstFormValues = {
-        gstState: "",
-        gstNo: "",
-        status: true,
-    };
-
-    const [formState, setFormState] = useState<GstFormValues>(emptyGst);
+    const dialogForm = useForm<GstFormValues>({
+        resolver: zodResolver(GstFormSchema),
+        defaultValues: emptyGst,
+    });
 
     const openAdd = () => {
         setEditingIndex(null);
-        setFormState(emptyGst);
+        dialogForm.reset(emptyGst);
         setOpen(true);
     };
 
     const openEdit = (index: number) => {
         const gst = getValues(`gsts.${index}`);
         setEditingIndex(index);
-        setFormState(gst);
+        dialogForm.reset(gst);
         setOpen(true);
     };
 
-    const handleSave = () => {
+    const handleSave = dialogForm.handleSubmit(values => {
         if (editingIndex !== null) {
             const existing = getValues(`gsts.${editingIndex}`);
 
             if (orgId && existing?.id) {
                 updateGst.mutate({
                     id: existing.id,
-                    data: toUpdateGstDto(formState),
+                    data: toUpdateGstDto(values),
                 });
             }
-            update(editingIndex, { ...existing, ...formState });
+            update(editingIndex, { ...existing, ...values });
         } else {
             if (orgId) {
-                createGst.mutate(toCreateGstDto(formState, orgId), {
+                createGst.mutate(toCreateGstDto(values, orgId), {
                     onSuccess: created => {
                         append(gstApiToForm(created));
                     },
                 });
             } else {
-                append(formState);
+                append(values);
             }
         }
 
         setOpen(false);
-    };
+    });
 
     const handleDelete = (index: number) => {
         const gst = getValues(`gsts.${index}`);
@@ -104,6 +112,8 @@ export const GstSection = ({ orgId }: VendorSectionProps) => {
                                 <div className="font-medium">{gst.gstNo || "GST Number"}</div>
 
                                 <div className="text-sm text-muted-foreground">State: {gst.gstState}</div>
+
+                                {gst.address && <div className="text-sm text-muted-foreground">{gst.address}</div>}
                             </div>
 
                             <div className="flex gap-2">
@@ -130,28 +140,34 @@ export const GstSection = ({ orgId }: VendorSectionProps) => {
                     </DialogHeader>
 
                     <div className="space-y-4">
-                        <div>
-                            <label className="text-sm font-medium">GST State</label>
-                            <Input value={formState.gstState} onChange={e => setFormState({ ...formState, gstState: e.target.value })} />
-                        </div>
+                        <FieldWrapper control={dialogForm.control} name="gstState" label="GST State">
+                            {field => <Input placeholder="e.g. Maharashtra" {...field} value={field.value ?? ""} />}
+                        </FieldWrapper>
 
-                        <div>
-                            <label className="text-sm font-medium">GST Number</label>
-                            <Input value={formState.gstNo} onChange={e => setFormState({ ...formState, gstNo: e.target.value })} />
-                        </div>
+                        <FieldWrapper control={dialogForm.control} name="gstNo" label="GST Number">
+                            {field => <Input placeholder="22AAAAA0000A1Z5" {...field} value={field.value ?? ""} />}
+                        </FieldWrapper>
 
-                        <div className="flex items-center gap-2">
-                            <Checkbox
-                                checked={formState.status}
-                                onCheckedChange={checked =>
-                                    setFormState({
-                                        ...formState,
-                                        status: checked as boolean,
-                                    })
-                                }
-                            />
-                            <span className="text-sm">Active</span>
-                        </div>
+                        <FieldWrapper control={dialogForm.control} name="address" label="Address">
+                            {field => (
+                                <Textarea rows={3} placeholder="Enter GST registered address" {...field} value={field.value ?? ""} />
+                            )}
+                        </FieldWrapper>
+
+                        <FormField
+                            control={dialogForm.control}
+                            name="status"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                    <FormControl>
+                                        <Checkbox checked={field.value} onCheckedChange={checked => field.onChange(checked === true)} />
+                                    </FormControl>
+                                    <div className="space-y-1 leading-none">
+                                        <FormLabel>Active</FormLabel>
+                                    </div>
+                                </FormItem>
+                            )}
+                        />
                     </div>
 
                     <DialogFooter>

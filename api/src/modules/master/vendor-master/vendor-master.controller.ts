@@ -27,6 +27,7 @@ const CreateVendorGstSchema = z.object({
     orgId: z.number().min(1),
     gstState: z.string().min(1).max(255).nullish(),
     gstNo: z.string().min(1).max(255).nullish(),
+    address: z.string().trim().max(500).optional(),
     status: z.boolean().optional().default(true),
 });
 

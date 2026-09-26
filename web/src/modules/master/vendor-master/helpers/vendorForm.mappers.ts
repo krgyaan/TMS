@@ -21,7 +21,8 @@ export const gstApiToForm = (gst: VendorGst): GstFormValues => ({
     id: gst.id,
     gstState: gst.gstState,
     gstNo: gst.gstNo,
-    status: gst.status,
+    address: gst.address ?? "",
+    status: gst.status ?? true,
 });
 
 export const accountApiToForm = (account: VendorAcc): AccountFormValues => ({
@@ -29,7 +30,7 @@ export const accountApiToForm = (account: VendorAcc): AccountFormValues => ({
     bankAccountName: account.bankAccountName,
     accountNum: account.accountNum,
     ifscCode: account.ifscCode,
-    status: account.status,
+    status: account.status ?? true,
 });
 
 export const personApiToForm = (person: Vendor): PersonFormValues => ({
@@ -38,7 +39,7 @@ export const personApiToForm = (person: Vendor): PersonFormValues => ({
     email: person.email ?? "",
     mobile: person.mobile ?? "",
     address: person.address,
-    status: person.status,
+    status: person.status ?? true,
 });
 
 export const fileApiToForm = (file: VendorFile): FileFormValues => ({
@@ -68,12 +69,14 @@ export const toCreateGstDto = (gst: GstFormValues, orgId: number): CreateVendorG
     orgId,
     gstState: gst.gstState,
     gstNo: gst.gstNo,
+    address: gst.address,
     status: gst.status,
 });
 
 export const toUpdateGstDto = (gst: GstFormValues): UpdateVendorGstDto => ({
     gstState: gst.gstState,
     gstNo: gst.gstNo,
+    address: gst.address,
     status: gst.status,
 });
 
