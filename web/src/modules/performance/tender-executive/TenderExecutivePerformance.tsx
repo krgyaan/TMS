@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 /* UI Components */
 import { Badge } from "@/components/ui/badge";
@@ -79,45 +79,38 @@ function parsePositiveId(value: string | null) {
     return value !== null && Number.isInteger(id) && id > 0 ? id : null;
 }
 
-function parseStoredScope(): Scope {
-    try {
-        const stored = new URLSearchParams(localStorage.getItem(SCOPE_STORAGE_KEY) ?? "");
-        const userId = parsePositiveId(stored.get("userId"));
-        const teamId = parsePositiveId(stored.get("teamId"));
-        if (userId) return { view: "user", userId };
-        if (teamId) return { view: "team", teamId };
-    } catch {
-        localStorage.removeItem(SCOPE_STORAGE_KEY);
-    }
-
-    return { view: null };
-}
-
 type InitialFilters = {
     scope: Scope;
     fromDate: string | null;
     toDate: string | null;
 };
 
+const FILTER_KEYS = ["userId", "teamId", "fromDate", "toDate"];
+
+function readFiltersFrom(source: URLSearchParams): InitialFilters {
+    const userId = parsePositiveId(source.get("userId"));
+    const teamId = parsePositiveId(source.get("teamId"));
+    const rawFrom = source.get("fromDate");
+    const rawTo = source.get("toDate");
+
+    return {
+        scope: userId ? { view: "user", userId } : teamId ? { view: "team", teamId } : { view: null },
+        fromDate: isDateString(rawFrom) ? rawFrom : null,
+        toDate: isDateString(rawTo) ? rawTo : null,
+    };
+}
+
 function readInitialFilters(search: string): InitialFilters {
     const params = new URLSearchParams(search);
-    const userId = parsePositiveId(params.get("userId"));
-    const teamId = parsePositiveId(params.get("teamId"));
-    const scope: Scope = userId ? { view: "user", userId } : teamId ? { view: "team", teamId } : parseStoredScope();
-
-    const urlFrom = params.get("fromDate");
-    const urlTo = params.get("toDate");
-    if (isDateString(urlFrom) || isDateString(urlTo)) {
-        return { scope, fromDate: isDateString(urlFrom) ? urlFrom : null, toDate: isDateString(urlTo) ? urlTo : null };
+    if (FILTER_KEYS.some(key => params.has(key))) {
+        return readFiltersFrom(params);
     }
 
     try {
-        const stored = new URLSearchParams(localStorage.getItem(SCOPE_STORAGE_KEY) ?? "");
-        const storedFrom = stored.get("fromDate");
-        const storedTo = stored.get("toDate");
-        return { scope, fromDate: isDateString(storedFrom) ? storedFrom : null, toDate: isDateString(storedTo) ? storedTo : null };
+        return readFiltersFrom(new URLSearchParams(localStorage.getItem(SCOPE_STORAGE_KEY) ?? ""));
     } catch {
-        return { scope, fromDate: null, toDate: null };
+        localStorage.removeItem(SCOPE_STORAGE_KEY);
+        return { scope: { view: null }, fromDate: null, toDate: null };
     }
 }
 
@@ -165,8 +158,32 @@ export default function TenderExecutivePerformance() {
 
     const [selectedMetric, setSelectedMetric] = useState<TenderKpiKey | null>(null);
     const navigate = useNavigate();
+    const lastWrittenRef = useRef<string>(searchParams.toString());
+    const restoredRef = useRef(false);
+    const hydratedRef = useRef(false);
 
     useEffect(() => {
+        if (restoredRef.current) return;
+        restoredRef.current = true;
+
+        if (searchParams.toString()) return;
+        const cached = localStorage.getItem(SCOPE_STORAGE_KEY) ?? "";
+        if (!cached) return;
+
+        lastWrittenRef.current = cached;
+        setSearchParams(new URLSearchParams(cached), { replace: true });
+    }, [searchParams, setSearchParams]);
+
+    useEffect(() => {
+        const current = searchParams.toString();
+
+        if (!hydratedRef.current) {
+            if (current === lastWrittenRef.current) hydratedRef.current = true;
+            return;
+        }
+
+        if (current === lastWrittenRef.current) return;
+
         const userId = parsePositiveId(searchParams.get("userId"));
         const teamId = parsePositiveId(searchParams.get("teamId"));
         const urlScope: Scope = userId ? { view: "user", userId } : teamId ? { view: "team", teamId } : { view: null };
@@ -191,11 +208,10 @@ export default function TenderExecutivePerformance() {
         if (appliedToDate) params.set("toDate", appliedToDate);
 
         const next = params.toString();
-        localStorage.setItem(SCOPE_STORAGE_KEY, next);
-        if (next !== searchParams.toString()) {
-            setSearchParams(params, { replace: true });
-        }
-    }, [appliedFromDate, appliedScope, appliedToDate, searchParams, setSearchParams]);
+        lastWrittenRef.current = next;
+        if (next) localStorage.setItem(SCOPE_STORAGE_KEY, next);
+        setSearchParams(prev => (next === prev.toString() ? prev : params), { replace: true });
+    }, [appliedFromDate, appliedScope, appliedToDate, setSearchParams]);
 
     const dateError = draftFromDate && draftToDate && draftFromDate > draftToDate ? "From Date must be on or before To Date" : null;
     const canSubmit = draftScope.view !== null && !!draftFromDate && !!draftToDate && !dateError;
@@ -218,6 +234,7 @@ export default function TenderExecutivePerformance() {
         setAppliedToDate(null);
         setSelectedMetric(null);
         localStorage.removeItem(SCOPE_STORAGE_KEY);
+        lastWrittenRef.current = "";
         setSearchParams({}, { replace: true });
     };
 
@@ -416,9 +433,9 @@ export default function TenderExecutivePerformance() {
 
                 <Card className="shadow-sm">
                     <CardContent className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                        <div className="flex flex-wrap items-end gap-4">
                             {/* TEAM SELECT */}
-                            <div className="space-y-2">
+                            <div className="min-w-[200px] flex-1 space-y-2">
                                 <label className="text-sm font-medium">Team</label>
                                 <Combobox
                                     value={draftScope.view === "team" ? String(draftScope.teamId) : ""}
@@ -435,7 +452,7 @@ export default function TenderExecutivePerformance() {
                             </div>
 
                             {/* USER SELECT */}
-                            <div className="space-y-2">
+                            <div className="min-w-[200px] flex-1 space-y-2">
                                 <label className="text-sm font-medium">Team Member</label>
                                 <Combobox
                                     disabled={draftScope.view === "team"}
@@ -449,7 +466,7 @@ export default function TenderExecutivePerformance() {
                                 />
                             </div>
                             {/* FROM DATE */}
-                            <div className="space-y-2">
+                            <div className="w-[165px] shrink-0 space-y-2">
                                 <label className="text-sm font-medium">From Date</label>
                                 <div className="relative">
                                     <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -458,7 +475,7 @@ export default function TenderExecutivePerformance() {
                             </div>
 
                             {/* TO DATE */}
-                            <div className="space-y-2">
+                            <div className="w-[165px] shrink-0 space-y-2">
                                 <label className="text-sm font-medium">To Date</label>
                                 <div className="relative">
                                     <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -467,7 +484,7 @@ export default function TenderExecutivePerformance() {
                             </div>
 
                             {/* ACTIONS */}
-                            <div className="flex gap-2 md:justify-self-end">
+                            <div className="flex shrink-0 gap-2">
                                 <Button onClick={handleSubmit} disabled={!canSubmit}>
                                     <Filter className="mr-2 h-4 w-4" /> Submit
                                 </Button>
