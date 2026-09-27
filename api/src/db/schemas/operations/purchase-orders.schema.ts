@@ -12,6 +12,7 @@ export const purchaseOrders = pgTable(
         contactPersonName: varchar("contact_person_name", { length: 255 }),
         contactPersonPhone: varchar("contact_person_phone", { length: 20 }),
         contactPersonEmail: varchar("contact_person_email", { length: 255 }),
+        sellerOrganizationId: bigint("seller_organization_id", { mode: "number" }),
         sellerName: varchar("seller_name", { length: 255 }),
         sellerAddress: text("seller_address"),
         sellerEmail: varchar("seller_email", { length: 255 }),
@@ -21,12 +22,12 @@ export const purchaseOrders = pgTable(
         sellerMsmeNo: varchar("seller_msme_no", { length: 50 }),
         quotationNo: varchar("quotation_no", { length: 100 }),
         quotationDate: date("quotation_date"),
-        poType: varchar("po_type", { length: 20 }).notNull().default('new'),
+        poType: varchar("po_type", { length: 20 }).notNull().default("new"),
         piAttachments: text("pi_attachments"),
         category: varchar("category", { length: 100 }),
         poDate: date("po_date"),
         poNumber: varchar("po_number", { length: 255 }),
-        termsAndConditions: jsonb("terms_and_conditions").notNull().default('[]'),
+        termsAndConditions: jsonb("terms_and_conditions").notNull().default("[]"),
         poRaisedBy: bigint("po_raised_by", { mode: "number" }),
         certRecipient: bigint("cert_recipient", { mode: "number" }),
         certRecipients: jsonb("cert_recipients").notNull().default([]),
@@ -45,12 +46,12 @@ export const purchaseOrders = pgTable(
         generatedPdfVersions: jsonb("generated_pdf_versions").notNull().default({}),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     },
-    table => ([
+    table => [
         index("idx_po_number").on(table.poNumber),
         index("idx_po_tender_id").on(table.tenderId),
         index("idx_po_date").on(table.poDate),
         index("idx_po_seller_name").on(table.sellerName),
-    ])
+    ]
 );
 
 // Types

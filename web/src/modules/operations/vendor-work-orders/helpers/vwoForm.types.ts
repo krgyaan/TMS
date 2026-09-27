@@ -51,6 +51,7 @@ export interface CreateVendorWorkOrderDTO {
     woDate: string;
     category?: string;
     sellerId?: number;
+    sellerOrganizationId?: number;
     shipToPartyId?: number;
     sellerName: string;
     sellerEmail?: string;
@@ -86,6 +87,7 @@ export interface UpdateVendorWorkOrderDTO {
     woDate: string;
     category?: string;
     sellerId?: number;
+    sellerOrganizationId?: number;
     shipToPartyId?: number;
     sellerName: string;
     sellerEmail?: string;

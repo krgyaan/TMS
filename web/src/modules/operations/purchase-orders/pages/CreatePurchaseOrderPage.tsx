@@ -30,7 +30,7 @@ import { formatDateForInput, mapFormToCreateDTO } from "../helpers/purchaseOrder
 import type { CreatePartyDTO } from "../helpers/purchaseOrder.types";
 import type { CreatePurchaseInvoiceDTO } from "@/modules/operations/purchase-invoices/helpers/purchaseInvoice.types";
 import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "../helpers/purchaseOrder.schema";
-import { PartyFormDialog, type CreatePartyPayload } from "@/modules/operations/vendor-master/PartyFormDialog";
+import { PartyFormDialog, type CreatePartyPayload } from "@/modules/master/vendor-master/components/PartyFormDialog";
 import { InvoiceUploadField } from "@/modules/operations/purchase-invoices/components/InvoiceUploadField";
 import { Label } from "@/components/ui/label";
 
@@ -40,6 +40,7 @@ const defaultFormValues: PurchaseOrderFormValues = {
   category: "",
   poDate: formatDateForInput(new Date()),
   sellerId: "",
+  sellerSource: "",
   sellerName: "",
   sellerEmail: "",
   sellerAddress: "",
@@ -122,7 +123,7 @@ export default function CreatePurchaseOrderPage() {
   const [partyCreationType, setPartyCreationType] = useState<"seller" | "ship_to">("seller");
 
   const form = useForm<PurchaseOrderFormValues>({
-    resolver: zodResolver(purchaseOrderFormSchema) as any,
+    resolver: zodResolver(purchaseOrderFormSchema),
     defaultValues: defaultFormValues,
   });
   const selectedSellerId = form.watch("sellerId");
@@ -152,6 +153,7 @@ export default function CreatePurchaseOrderPage() {
     if (!selectedSellerId || selectedSellerId === "__create_new__") return;
     const party = parties.find((p: any) => String(p.id) === selectedSellerId);
     if (!party) return;
+    form.setValue("sellerSource", party.source === "vendor_org" ? "vendor_org" : "party");
     form.setValue("sellerName", party.name || "");
     form.setValue("sellerEmail", party.email || "");
     form.setValue("sellerAddress", party.address || "");
@@ -160,7 +162,7 @@ export default function CreatePurchaseOrderPage() {
     form.setValue("sellerMsmeNo", party.msme || "");
     form.setValue("contactPersonName", party.contactPerson || "");
     form.setValue("contactPersonEmail", party.email || "");
-    form.setValue("contactPersonPhone", party.mobileNumber || "");
+    form.setValue("contactPersonPhone", party.mobileNumber || party.mobile || "");
   }, [selectedSellerId, parties, form]);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { vendorGstsService } from '@/services/api';
+import { vendorApi } from '@/services/api';
 import type { CreateVendorGstDto, UpdateVendorGstDto } from '@/types/api.types';
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
@@ -15,14 +15,14 @@ export const vendorGstsKey = {
 export const useVendorGsts = () => {
     return useQuery({
         queryKey: vendorGstsKey.lists(),
-        queryFn: () => vendorGstsService.getAll(),
+        queryFn: () => vendorApi.getAllGsts(),
     });
 };
 
 export const useVendorGst = (id: number | null) => {
     return useQuery({
         queryKey: vendorGstsKey.detail(id!),
-        queryFn: () => vendorGstsService.getById(id!),
+        queryFn: () => vendorApi.getGstById(id!),
         enabled: !!id,
     });
 };
@@ -30,7 +30,7 @@ export const useVendorGst = (id: number | null) => {
 export const useVendorGstsByOrganization = (orgId: number | null) => {
     return useQuery({
         queryKey: vendorGstsKey.byOrganization(orgId!),
-        queryFn: () => vendorGstsService.getByOrganization(orgId!),
+        queryFn: () => vendorApi.getGstsByOrganization(orgId!),
         enabled: !!orgId,
     });
 };
@@ -39,7 +39,7 @@ export const useCreateVendorGst = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: CreateVendorGstDto) => vendorGstsService.create(data),
+        mutationFn: (data: CreateVendorGstDto) => vendorApi.createGst(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: vendorGstsKey.lists() });
             toast.success('Vendor GST created successfully');
@@ -55,7 +55,7 @@ export const useUpdateVendorGst = () => {
 
     return useMutation({
         mutationFn: ({ id, data }: { id: number; data: UpdateVendorGstDto }) =>
-            vendorGstsService.update(id, data),
+            vendorApi.updateGst(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: vendorGstsKey.lists() });
             queryClient.invalidateQueries({ queryKey: vendorGstsKey.detail(variables.id) });
@@ -71,7 +71,7 @@ export const useDeleteVendorGst = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (id: number) => vendorGstsService.deleteItem(id),
+        mutationFn: (id: number) => vendorApi.deleteGst(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: vendorGstsKey.lists() });
             toast.success('Vendor GST deleted successfully');

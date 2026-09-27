@@ -16,13 +16,13 @@ interface VWOTermsFieldProps {
 export function VWOTermsField({ control }: VWOTermsFieldProps) {
   const { fields, append, remove } = useFieldArray({
     control,
-    name: "termsAndConditions" as any,
+    name: "termsAndConditions",
   });
 
-  const rows = useWatch({ control, name: "termsAndConditions" as any }) || [];
+  const rows = useWatch({ control, name: "termsAndConditions" }) || [];
 
   const usedFields = new Set(
-    rows.map((r: any) => r?.field).filter(Boolean)
+    rows.map(r => r?.field).filter(Boolean)
   );
 
   const availableOptions = VWO_TERMS_OPTIONS.filter(
@@ -48,7 +48,7 @@ export function VWOTermsField({ control }: VWOTermsFieldProps) {
           type="button"
           variant="outline"
           size="sm"
-          onClick={() => append({ field: "", value: "" } as any)}
+          onClick={() => append({ field: "", value: "" })}
           disabled={availableOptions.length === 0 && fields.length > 0}
         >
           <Plus className="mr-2 h-4 w-4" />
@@ -75,7 +75,7 @@ export function VWOTermsField({ control }: VWOTermsFieldProps) {
                 <TableCell className="p-1 align-top pt-2">
                   <Controller
                     control={control}
-                    name={`termsAndConditions.${index}.field` as any}
+                    name={`termsAndConditions.${index}.field`}
                     render={({ field: selectField }) => (
                       <Select
                         value={selectField.value || ""}
@@ -101,7 +101,7 @@ export function VWOTermsField({ control }: VWOTermsFieldProps) {
                 <TableCell className="p-1 align-top pt-2">
                   <Controller
                     control={control}
-                    name={`termsAndConditions.${index}.value` as any}
+                    name={`termsAndConditions.${index}.value`}
                     render={({ field: valueField }) => (
                       <Textarea
                         {...valueField}

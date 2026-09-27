@@ -26,7 +26,7 @@ import { TermsField } from "../components/TermsField";
 import { formatDateForInput, mapFormToUpdateDTO } from "../helpers/purchaseOrder.mapper";
 import type { CreatePartyDTO } from "../helpers/purchaseOrder.types";
 import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "../helpers/purchaseOrder.schema";
-import { PartyFormDialog, type CreatePartyPayload } from "@/modules/operations/vendor-master/PartyFormDialog";
+import { PartyFormDialog, type CreatePartyPayload } from "@/modules/master/vendor-master/components/PartyFormDialog";
 
 const defaultFormValues: PurchaseOrderFormValues = {
     poType: "new",
@@ -34,6 +34,7 @@ const defaultFormValues: PurchaseOrderFormValues = {
     category: "",
     poDate: "",
     sellerId: "",
+    sellerSource: "",
     sellerName: "",
     sellerEmail: "",
     sellerAddress: "",
@@ -58,6 +59,11 @@ const defaultFormValues: PurchaseOrderFormValues = {
     accessoriesPackagingListAttachments: [],
     termsAndConditions: [],
     remarks: "",
+    uploadInvoice: "no",
+    invoiceDate: "",
+    invoiceValue: null,
+    invoiceGst: null,
+    invoiceFile: [],
 };
 
 const FormSkeleton = () => (
@@ -120,7 +126,7 @@ export default function EditPurchaseOrderPage() {
     const [partyCreationType, setPartyCreationType] = useState<"seller" | "ship_to">("seller");
 
     const form = useForm<PurchaseOrderFormValues>({
-        resolver: zodResolver(purchaseOrderFormSchema) as any,
+        resolver: zodResolver(purchaseOrderFormSchema),
         defaultValues: defaultFormValues,
     });
     const selectedSellerId = form.watch("sellerId");
@@ -149,6 +155,7 @@ export default function EditPurchaseOrderPage() {
         if (!selectedSellerId || selectedSellerId === "__create_new__") return;
         const party = parties.find((p: any) => String(p.id) === selectedSellerId);
         if (!party) return;
+        form.setValue("sellerSource", party.source === "vendor_org" ? "vendor_org" : "party");
         form.setValue("sellerName", party.name || "");
         form.setValue("sellerEmail", party.email || "");
         form.setValue("sellerAddress", party.address || "");
@@ -157,7 +164,7 @@ export default function EditPurchaseOrderPage() {
         form.setValue("sellerMsmeNo", party.msme || "");
         form.setValue("contactPersonName", party.contactPerson || "");
         form.setValue("contactPersonEmail", party.email || "");
-        form.setValue("contactPersonPhone", party.mobileNumber || "");
+        form.setValue("contactPersonPhone", party.mobileNumber || party.mobile || "");
     }, [selectedSellerId, parties, form]);
 
     useEffect(() => {
@@ -186,7 +193,8 @@ export default function EditPurchaseOrderPage() {
             piAttachments: poData.piAttachments ? (typeof poData.piAttachments === 'string' ? JSON.parse(poData.piAttachments) : poData.piAttachments) : [],
             category: poData.category || "",
             poDate: formatDateForInput(poData.poDate),
-            sellerId: "",
+            sellerId: poData.sellerOrganizationId ? String(poData.sellerOrganizationId) : "",
+            sellerSource: poData.sellerOrganizationId ? "vendor_org" : "",
             sellerName: poData.sellerName || "",
             sellerEmail: poData.sellerEmail || "",
             sellerAddress: poData.sellerAddress || "",
@@ -217,6 +225,11 @@ export default function EditPurchaseOrderPage() {
             accessoriesPackagingListAttachments: poData.accessoriesPackagingListAttachments ? (typeof poData.accessoriesPackagingListAttachments === 'string' ? JSON.parse(poData.accessoriesPackagingListAttachments) : poData.accessoriesPackagingListAttachments) : [],
             termsAndConditions: poData.termsAndConditions ? (typeof poData.termsAndConditions === 'string' ? JSON.parse(poData.termsAndConditions) : poData.termsAndConditions) : [],
             remarks: poData.remarks || "",
+            uploadInvoice: "no",
+            invoiceDate: "",
+            invoiceValue: null,
+            invoiceGst: null,
+            invoiceFile: [],
         });
     }, [poData, form]);
 
@@ -270,7 +283,7 @@ export default function EditPurchaseOrderPage() {
     if (isPOError || !poData) {
         return (
             <NotFound
-                message={(poError as any)?.message || "The purchase order you're looking for doesn't exist or has been removed."}
+                message={poError?.message || "The purchase order you're looking for doesn't exist or has been removed."}
                 onBack={() => navigate(-1)}
             />
         );

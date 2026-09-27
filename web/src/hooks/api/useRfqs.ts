@@ -3,7 +3,7 @@ import type { VendorOrganizationWithRelations } from "@/types/api.types";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";
 import { rfqsService } from "@/services/api";
-import { vendorOrganizationsService } from "@/services/api";
+import { vendorApi } from "@/services/api";
 import type { CreateRfqDto, RfqDashboardFilters, UpdateRfqDto } from "@/modules/tendering/rfqs/helpers/rfq.types";
 import { useTeamFilter } from "@/hooks/useTeamFilter";
 
@@ -127,7 +127,7 @@ export const useRfqVendors = (rfqToIds: string | undefined) => {
             if (ids.length === 0) return [];
 
             // Fetch all vendor organizations with relations
-            const responses = await Promise.all(ids.map(id => vendorOrganizationsService.getByIdWithRelations(id)));
+            const responses = await Promise.all(ids.map(id => vendorApi.getOrganizationByIdWithRelations(id)));
 
             return responses;
         },

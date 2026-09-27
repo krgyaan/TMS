@@ -37,14 +37,14 @@ export class VendorWorkOrderController {
 
     @Patch("parties/:id/activate")
     @HttpCode(HttpStatus.OK)
-    activateParty(@Param("id", ParseIntPipe) id: number) {
-        return this.service.activateParty(id);
+    activateParty(@Param("id", ParseIntPipe) id: number, @Query("source") source?: string) {
+        return this.service.activateParty(id, source);
     }
 
     @Patch("parties/:id/deactivate")
     @HttpCode(HttpStatus.OK)
-    deactivateParty(@Param("id", ParseIntPipe) id: number) {
-        return this.service.deactivateParty(id);
+    deactivateParty(@Param("id", ParseIntPipe) id: number, @Query("source") source?: string) {
+        return this.service.deactivateParty(id, source);
     }
 
     @Get("parties")

@@ -29,12 +29,13 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { formatDateForInput, mapVwoFormToUpdateDTO } from "./helpers/vwoForm.mapper";
 import { vendorWorkOrderFormSchema, type VendorWorkOrderFormValues } from "./helpers/vwoForm.schema";
-import { PartyFormDialog, type CreatePartyPayload } from "@/modules/operations/vendor-master/PartyFormDialog";
+import { PartyFormDialog, type CreatePartyPayload } from "@/modules/master/vendor-master/components/PartyFormDialog";
 
 const defaultFormValues: VendorWorkOrderFormValues = {
   woDate: formatDateForInput(new Date()),
   category: "",
   sellerId: "",
+  sellerSource: "",
   sellerName: "",
   sellerEmail: "",
   sellerAddress: "",
@@ -57,6 +58,11 @@ const defaultFormValues: VendorWorkOrderFormValues = {
   scopeOfWork: [],
   accessoriesPackagingListAttachments: [],
   remarks: "",
+  uploadInvoice: "no",
+  invoiceDate: "",
+  invoiceValue: null,
+  invoiceGst: null,
+  invoiceFile: [],
 };
 
 const FormSkeleton = () => (
@@ -100,7 +106,8 @@ function mapVwoDataToFormValues(data: any): VendorWorkOrderFormValues {
     return {
       woDate: formatDateForInput(data.woDate) || formatDateForInput(new Date()),
       category: data.category || "",
-      sellerId: data.sellerId ? String(data.sellerId) : "",
+      sellerId: data.sellerOrganizationId ? String(data.sellerOrganizationId) : (data.sellerId ? String(data.sellerId) : ""),
+      sellerSource: data.sellerOrganizationId ? "vendor_org" : "",
       sellerName: data.sellerName || "",
       sellerEmail: data.sellerEmail || "",
       sellerAddress: data.sellerAddress || "",
@@ -130,6 +137,11 @@ function mapVwoDataToFormValues(data: any): VendorWorkOrderFormValues {
       scopeOfWork: parseAttachments(data.scopeOfWork),
       accessoriesPackagingListAttachments: parseAttachments(data.accessoriesPackagingListAttachments),
       remarks: data.remarks || "",
+      uploadInvoice: "no",
+      invoiceDate: "",
+      invoiceValue: null,
+      invoiceGst: null,
+      invoiceFile: [],
     };
   } catch (err) {
     console.error("[VWO Edit] Error mapping VWO data to form values:", err, "Raw data:", data);
@@ -159,7 +171,7 @@ export default function EditVendorWorkOrderPage() {
   const { data: vwoData, isLoading: isVwoLoading } = useVendorWorkOrderDetails(vwoId);
 
   const form = useForm<VendorWorkOrderFormValues>({
-    resolver: zodResolver(vendorWorkOrderFormSchema) as any,
+    resolver: zodResolver(vendorWorkOrderFormSchema),
     defaultValues: defaultFormValues,
   });
 
@@ -201,6 +213,7 @@ export default function EditVendorWorkOrderPage() {
     if (!selectedSellerId || selectedSellerId === "__create_new__") return;
     const party = parties.find((p: any) => String(p.id) === selectedSellerId);
     if (!party) return;
+    form.setValue("sellerSource", party.source === "vendor_org" ? "vendor_org" : "party");
     form.setValue("sellerName", party.name || "");
     form.setValue("sellerEmail", party.email || "");
     form.setValue("sellerAddress", party.address || "");
@@ -209,7 +222,7 @@ export default function EditVendorWorkOrderPage() {
     form.setValue("sellerMsmeNo", party.msme || "");
     form.setValue("contactPersonName", party.contactPerson || "");
     form.setValue("contactPersonEmail", party.email || "");
-    form.setValue("contactPersonPhone", party.mobileNumber || "");
+    form.setValue("contactPersonPhone", party.mobileNumber || party.mobile || "");
   }, [selectedSellerId, parties, form]);
 
   useEffect(() => {

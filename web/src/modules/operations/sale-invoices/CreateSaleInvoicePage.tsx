@@ -27,7 +27,7 @@ import { SIFormPreview } from "./components/SIFormPreview";
 import { formatCurrency, formatDateForInput, mapSaleInvoiceFormToCreateDTO } from "./helpers/saleInvoice.mapper";
 import { saleInvoiceFormSchema, type SaleInvoiceFormValues } from "./helpers/saleInvoice.schema";
 import type { ProjectInventoryItem } from "./helpers/saleInvoice.types";
-import { PartyFormDialog, type CreatePartyPayload } from "@/modules/operations/vendor-master/PartyFormDialog";
+import { PartyFormDialog, type CreatePartyPayload } from "@/modules/master/vendor-master/components/PartyFormDialog";
 
 const defaultFormValues: SaleInvoiceFormValues = {
     invoiceDate: formatDateForInput(new Date()),
