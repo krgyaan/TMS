@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { usePerformanceOutcomes, useStageMatrix, usePerformanceSummary, useTenderList, usePerformanceTrends, useExecutiveScoring } from "./team-leader.hooks";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ROW_HELP_TEXT } from "../tender-executive/stage-matrix-help";
+import { ROW_HELP_TEXT } from "../tender-executive/helpers/stage-matrix-help";
 
 /* Icons */
 import {
@@ -36,7 +36,7 @@ import {
     Info,
 } from "lucide-react";
 import { useUser, useUsers, useUsersByRole } from "@/hooks/api/useUsers";
-import type { TenderKpiKey } from "../tender-executive/tender-executive.types";
+import type { TenderKpiKey } from "../tender-executive/helpers/tender-executive.types";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Combobox } from "@/components/form/SelectField";

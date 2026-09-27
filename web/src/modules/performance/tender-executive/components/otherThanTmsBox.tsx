@@ -2,6 +2,7 @@ import { TableCell } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Clock } from "lucide-react";
+import type { OtherThanTmsEntry } from "../helpers/emd-cashflow.types";
 
 const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-IN", {
@@ -10,14 +11,15 @@ const formatCurrency = (amount: number) =>
         maximumFractionDigits: 0,
     }).format(amount);
 
-function isReturned(instrumentType: string, action: number): boolean {
+function isReturned(instrumentType: string, action: number | null): boolean {
+    if (!action) return false;
     if (["DD", "FDR"].includes(instrumentType)) return [3, 4, 5, 6, 7].includes(action);
     if (["Portal Payment", "Bank Transfer"].includes(instrumentType)) return [3, 4].includes(action);
     if (instrumentType === "BG") return [8, 9].includes(action);
     return false;
 }
 
-export function OtherThanTmsBox({ entries }: { entries: any[] }) {
+export function OtherThanTmsBox({ entries }: { entries: OtherThanTmsEntry[] }) {
     if (!entries?.length) {
         return <TableCell className="text-center text-muted-foreground">·</TableCell>;
     }
