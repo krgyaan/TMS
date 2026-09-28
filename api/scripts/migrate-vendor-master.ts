@@ -1,10 +1,10 @@
-/**
- * One-off data migration: reads the "VM" sheet of the creditor-master workbook
- * and upserts it into vendor_organizations / vendors / vendor_gsts.
+/**\
+ * One-off data migration: reads the vendor-master workbook (first worksheet) and
+ * upserts it into vendor_organizations / vendors / vendor_gsts.
  *
  * Usage (from the api/ directory; DATABASE_URL is loaded from api/.env):
- *   pnpm migrate:vendor-master ../Creditor_Master.xlsx --dry-run   # SELECT-only preview
- *   pnpm migrate:vendor-master ../Creditor_Master.xlsx             # apply
+ *   pnpm migrate:vendor-master ../tms_sheet.xlsx --dry-run   # SELECT-only preview
+ *   pnpm migrate:vendor-master ../tms_sheet.xlsx             # apply
  *
  * Every write this run makes is recorded to ./migration-logs/:
  *   - vendor-master-<runId>.log.txt         human-readable log of every insert/update
@@ -79,7 +79,7 @@ async function main() {
         process.exit(1);
     }
 
-    const { vendors: parsedVendors, warnings, anomalies } = parseVmSheet(filePath);
+    const { vendors: parsedVendors, warnings, anomalies, notes } = parseVmSheet(filePath);
     const logger = new MigrationLogger("./migration-logs", dryRun ? "vendor-master-dryrun" : "vendor-master");
 
     console.log(`Parsed ${parsedVendors.length} vendors (deduped by name) from "${filePath}".`);
@@ -109,6 +109,15 @@ async function main() {
         for (const a of anomalies) {
             console.warn(` - [${a.vendorName}] ${a.message}`);
             logger.log(`ANOMALY [${a.vendorName}] ${a.message}`);
+        }
+    }
+
+    if (notes.length) {
+        console.info(`\n${notes.length} GSTIN(s) accepted under a retired state code - logged for review:`);
+        logger.summary(`${notes.length} GSTIN retirement note(s):`);
+        for (const n of notes) {
+            console.info(` - [${n.vendorName}] ${n.message}`);
+            logger.log(`NOTE [${n.vendorName}] ${n.message}`);
         }
     }
 
