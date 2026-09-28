@@ -190,12 +190,15 @@ AMBIGUITY_FIELD_DEFINITIONS: Dict[str, str] = {
     ),
     "delivery_time_supply_display": (
         "Goods supply delivery timeline in days (e.g. '90 Days', '140 Days', '150 Days'). "
-        "Differentiate goods delivery period from overall total contract or FOA completion period "
-        "(e.g. 160 days total completion vs 90 days delivery). Return formatted with 'Days' (e.g. '90 Days')."
+        "Differentiate goods delivery period from overall total contract or FOA completion period. "
+        "If no distinct supply-only figure is literally stated in the text, return null. "
+        "Never return a number with attached qualifying prose."
     ),
     "delivery_time_installation_display": (
         "Installation and commissioning timeline in days (e.g. '90 Days', '140 Days', '150 Days', '365 Days'). "
-        "Return formatted with 'Days' (e.g. '90 Days')."
+        "If no distinct installation-only figure is literally stated, return null, unless the document explicitly states "
+        "installation is included in the supply period, in which case return 'Inclusive (SITC Scope)'. "
+        "Never return a number with attached qualifying prose."
     ),
 }
 
@@ -1509,12 +1512,12 @@ class LLMFieldResolver:
             "choose action='override', provide the corrected 'resolved_value', and a clear one-line 'reasoning'. "
             "CRITICAL: Never invent, extrapolate, or hallucinate figures (such as 95% or 5%) not literally present in the scoped clauses.\n"
             "3. SPECIAL RULE FOR DELIVERY TIME FIELDS (delivery_time_supply_display, delivery_time_installation_display):\n"
-            "   - If the tender clauses state an overall contract completion or delivery period (e.g. 150 Days, 90 Days, 140 Days, 365 Days) "
-            "but do NOT isolate a distinct supply-only figure, DO NOT collapse the value to a bare 'Not Specified' or null!\n"
-            "   - Instead, choose action='override' and return the total period accompanied by a clear qualification, e.g.:\n"
-            "     '{candidate_days} (total completion) — no distinct supply-only figure found in scoped clauses'.\n"
-            "   - For installation delivery time, if included in total contract or not separated: "
-            "'{candidate_days} (total completion) — installation included in total period'.\n\n"
+            "   - If no distinct supply-only or installation-only figure is literally stated in the scoped clauses, "
+            "choose action='override' with resolved_value=null for that field.\n"
+            "   - Only return 'Inclusive (SITC Scope)' for delivery_time_installation_display when the document "
+            "explicitly states installation is included in the supply period.\n"
+            "   - NEVER return a number with attached qualifying prose (such as '{candidate_days} (total completion)' or any prose explanation). "
+            "Return either a clean formatted string with 'Days' (e.g. '90 Days'), 'Inclusive (SITC Scope)', or null.\n\n"
             "Fields to review:\n" + "\n\n".join(field_prompts) + "\n\n"
             "Scoped Tender Clauses:\n--- START OF RELEVANT CLAUSES ---\n"
             f"{combined_scoped_text}\n--- END OF RELEVANT CLAUSES ---"
@@ -1552,19 +1555,6 @@ class LLMFieldResolver:
                 action = d.get("action", "confirm")
                 resolved_val = d.get("resolved_value")
                 reasoning = d.get("reasoning", "")
-
-                # ISSUE 5 FALLBACK GUARD FOR DELIVERY TIME:
-                # When Claude returns 'Not Specified' or empty for delivery_time fields,
-                # but a candidate exists from Layer 1 regex, return candidate with qualification
-                # rather than collapsing to a bare "Not Specified".
-                if f_name in ("delivery_time_supply_display", "delivery_time_installation_display"):
-                    cand_val = candidates.get(f_name)
-                    if (not resolved_val or str(resolved_val).strip() in ("Not Specified", "None", "NA", "null")) and cand_val and str(cand_val) not in ("NA", "Not Found", "None"):
-                        target_type = "supply-only" if "supply" in f_name else "installation-only"
-                        resolved_val = f"{cand_val} (total completion) — no distinct {target_type} figure found in scoped clauses"
-                        action = "override"
-                        if not reasoning:
-                            reasoning = f"Total completion period retained as fallback: no separate {target_type} schedule isolated in scoped clauses."
 
                 results[f_name] = {
                     "action": action,
