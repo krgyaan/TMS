@@ -1,5 +1,13 @@
 # Vendor Master workbook — data quality report
 
+> **SUPERSEDED.** This report describes `Creditor_Master.xlsx`, which no longer exists —
+> the source is now `tms_sheet.xlsx` (sheet `Sheet1`), documented in
+> [`tms-sheet-data-quality.md`](./tms-sheet-data-quality.md). The current database was
+> loaded from this older export, so its §7 cleanup SQL still describes real rows, but
+> **§7.1 must not be run**: the fixed `(` → `9` GSTINs are already present under their
+> corrected values once the new migration runs, and updating the stale rows instead of
+> deleting them would create duplicates. Use §8 of the new report.
+
 **Source:** `Creditor_Master.xlsx`, sheet `VM`
 **Detected by:** `scripts/parseVm.ts` + `scripts/migrate-vendor-master.ts --dry-run`
 **Scope:** 424 vendors parsed (deduped by name), 903 non-empty GST cells

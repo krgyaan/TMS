@@ -16,3 +16,6 @@ volksAi/venv/
 volksAi/__pycache__/
 volksAi/.env
 volksAi/app/storage/
+
+# Vendor master workbooks - contain vendor emails, phone numbers and PANs
+*.xlsx
