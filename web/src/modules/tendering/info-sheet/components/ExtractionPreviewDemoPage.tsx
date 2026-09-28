@@ -37,8 +37,8 @@ export default function ExtractionPreviewDemoPage() {
 
     const gailNoidaDocs = JSON.stringify({
         schemaVersion: 1,
-        mainTender: 'tender-documents/1789208787800_GAIL_Split_Noida.pdf',
-        atc: ['tender-documents/1789208858034_ATcSPlit.pdf'],
+        mainTender: '/sample-tender.pdf',
+        atc: ['/sample-tender.pdf'],
         boq: null,
         otherDocuments: [],
     });

@@ -149,6 +149,14 @@ export const ExtractionPreviewPanel: React.FC<ExtractionPreviewPanelProps> = ({
 
     const resolvePdfUrl = (rawPath: string | null | undefined): string | null => {
         if (!rawPath) return null;
+        if (
+            rawPath.startsWith('http://') ||
+            rawPath.startsWith('https://') ||
+            rawPath.startsWith('/') ||
+            rawPath.startsWith('blob:')
+        ) {
+            return rawPath;
+        }
         const normalized = rawPath.includes('/') ? rawPath : `tender-documents/${rawPath}`;
         return fileUploadService.getFileUrl(normalized);
     };
