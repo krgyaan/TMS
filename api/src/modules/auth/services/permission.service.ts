@@ -21,6 +21,8 @@ export type UserPermissionContext = {
     dataScope: DataScope;
 };
 
+const USER_ONLY_MODULES = new Set(['tenders']);
+
 // Cache structure for permissions
 type PermissionCache = {
     rolePermissions: Map<number, Set<string>>; // roleId -> Set<"module:action">
@@ -63,8 +65,14 @@ export class PermissionService implements OnModuleInit {
 
         const permKey = `${check.module}:${check.action}`;
 
-        // 1. Check user-level override first
         const userOverrides = this.cache.userOverrides.get(context.userId);
+
+        // user-only modules: access comes solely from a granted user permission
+        if (USER_ONLY_MODULES.has(check.module)) {
+            return userOverrides?.get(permKey) === true;
+        }
+
+        // 1. Check user-level override first
         if (userOverrides?.has(permKey)) {
             return userOverrides.get(permKey)!;
         }
@@ -144,18 +152,33 @@ export class PermissionService implements OnModuleInit {
 
         const perms = new Set<string>();
 
-        // Add role permissions
+        // Add role permissions (skipping user-only modules)
         if (roleId) {
             const rolePerms = this.cache.rolePermissions.get(roleId);
             if (rolePerms) {
-                rolePerms.forEach((p) => perms.add(p));
+                rolePerms.forEach((p) => {
+                    const module = p.split(':')[0];
+                    if (!USER_ONLY_MODULES.has(module)) {
+                        perms.add(p);
+                    }
+                });
             }
         }
 
-        // Apply user overrides
+        // Apply user permissions
         const userOverrides = this.cache.userOverrides.get(userId);
         if (userOverrides) {
             userOverrides.forEach((granted, perm) => {
+                // For user-only modules access exists solely from grants
+                if (USER_ONLY_MODULES.has(perm.split(':')[0])) {
+                    if (granted) {
+                        perms.add(perm);
+                    } else {
+                        perms.delete(perm);
+                    }
+                    return;
+                }
+                // For other modules a user-level grant can add/deny on top of role
                 if (granted) {
                     perms.add(perm);
                 } else {
@@ -186,20 +209,34 @@ export class PermissionService implements OnModuleInit {
 
         const perms = new Set<string>();
 
+        // Add role permissions (skipping user-only modules)
         const roleId = user.roleId;
-
-        // Add role permissions
         if (roleId) {
             const rolePerms = this.cache.rolePermissions.get(roleId);
             if (rolePerms) {
-                rolePerms.forEach((p) => perms.add(p));
+                rolePerms.forEach((p) => {
+                    const module = p.split(':')[0];
+                    if (!USER_ONLY_MODULES.has(module)) {
+                        perms.add(p);
+                    }
+                });
             }
         }
 
-        // Apply user overrides
+        // Apply user permissions
         const userOverrides = this.cache.userOverrides.get(id);
         if (userOverrides) {
             userOverrides.forEach((granted, perm) => {
+                // For user-only modules access exists solely from grants
+                if (USER_ONLY_MODULES.has(perm.split(':')[0])) {
+                    if (granted) {
+                        perms.add(perm);
+                    } else {
+                        perms.delete(perm);
+                    }
+                    return;
+                }
+                // For other modules a user-level grant can add/deny on top of role
                 if (granted) {
                     perms.add(perm);
                 } else {
@@ -262,7 +299,7 @@ export class PermissionService implements OnModuleInit {
     }
 
     /**
-     * Remove user permission override (revert to role default)
+     * Remove a user's permission row entirely
      */
     async removeUserPermissionOverride(
         userId: number,

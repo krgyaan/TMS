@@ -82,6 +82,17 @@ export function useUpdatePaymentRequestStatus() {
     });
 }
 
+export function useRevertPaymentRequestStatus() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: { status: string; remark: string } }) =>
+            paymentRequestApi.revertStatus(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["payment-requests"] });
+        },
+    });
+}
+
 export function useUploadPaymentInvoiceAfterPayment() {
     const queryClient = useQueryClient();
     return useMutation({

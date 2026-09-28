@@ -33,12 +33,13 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { formatDateForInput, mapVwoFormToCreateDTO } from "./helpers/vwoForm.mapper";
 import { vendorWorkOrderFormSchema, type VendorWorkOrderFormValues } from "./helpers/vwoForm.schema";
-import { PartyFormDialog, type CreatePartyPayload } from "@/modules/operations/vendor-master/PartyFormDialog";
+import { PartyFormDialog, type CreatePartyPayload } from "@/modules/master/vendor-master/components/PartyFormDialog";
 
 const defaultFormValues: VendorWorkOrderFormValues = {
   woDate: formatDateForInput(new Date()),
   category: "",
   sellerId: "",
+  sellerSource: "",
   sellerName: "",
   sellerEmail: "",
   sellerAddress: "",
@@ -116,7 +117,7 @@ export default function CreateVendorWorkOrderPage() {
   const [partyCreationType, setPartyCreationType] = useState<"seller" | "ship_to">("seller");
 
   const form = useForm<VendorWorkOrderFormValues>({
-    resolver: zodResolver(vendorWorkOrderFormSchema) as any,
+    resolver: zodResolver(vendorWorkOrderFormSchema),
     defaultValues: defaultFormValues,
   });
   const selectedSellerId = form.watch("sellerId");
@@ -145,6 +146,7 @@ export default function CreateVendorWorkOrderPage() {
     if (!selectedSellerId || selectedSellerId === "__create_new__") return;
     const party = parties.find((p: any) => String(p.id) === selectedSellerId);
     if (!party) return;
+    form.setValue("sellerSource", party.source === "vendor_org" ? "vendor_org" : "party");
     form.setValue("sellerName", party.name || "");
     form.setValue("sellerEmail", party.email || "");
     form.setValue("sellerAddress", party.address || "");
@@ -153,7 +155,7 @@ export default function CreateVendorWorkOrderPage() {
     form.setValue("sellerMsmeNo", party.msme || "");
     form.setValue("contactPersonName", party.contactPerson || "");
     form.setValue("contactPersonEmail", party.email || "");
-    form.setValue("contactPersonPhone", party.mobileNumber || "");
+    form.setValue("contactPersonPhone", party.mobileNumber || party.mobile || "");
   }, [selectedSellerId, parties, form]);
 
   useEffect(() => {

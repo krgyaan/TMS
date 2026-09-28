@@ -14,17 +14,17 @@ export class CustomerPerformanceController {
 
     /**
      * GET /performance/customer
-     *   ?org=1&teamId=2&itemHeading=3&fromDate=2024-01-01&toDate=2024-12-31
+     *   ?org=1&teamCategory=AC&itemHeading=3&fromDate=2024-01-01&toDate=2024-12-31
      *
-     * All filters are optional — mirrors Laravel where each filter is
-     * only applied when($filters['x']) i.e. when non-empty.
+     * All filters are optional. teamCategory is "AC" | "DC" (Combined = omitted,
+     * i.e. no category filter applied).
      */
     @Get()
     @CanRead("performance.customer")
     getCustomerPerformance(@Query() query: Record<string, string>) {
         const parsed = customerPerformanceQuerySchema.safeParse({
             org: query.org,
-            teamId: query.teamId,
+            teamCategory: query.teamCategory,
             itemHeading: query.itemHeading,
             fromDate: query.fromDate,
             toDate: query.toDate,

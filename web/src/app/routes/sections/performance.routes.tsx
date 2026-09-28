@@ -7,7 +7,7 @@ const Perf_TeamLeader = lazy(() => import("@/modules/performance/team-leader/Tea
 const Perf_Business = lazy(() => import("@/modules/performance/business-performance/BusinessPerformanceDashboard"));
 const Perf_OperationTeam = lazy(() => import("@/modules/performance/operation-team"));
 const Perf_AccountTeam = lazy(() => import("@/modules/performance/account-team"));
-const Perf_OEM = lazy(() => import("@/modules/performance/oem-dashboard/OemPerformanceDashboard"));
+const Perf_OEM = lazy(() => import("@/modules/performance/oem-dashboard/OemPerformancePage"));
 const Perf_Customer = lazy(() => import("@/modules/performance/customer-performance/CustomerPerformanceDashboard"));
 const Perf_Location = lazy(() => import("@/modules/performance/location-performance/LocationPerformanceDashboard"));
 

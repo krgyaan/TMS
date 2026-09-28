@@ -1,8 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ColDef } from "ag-grid-community";
-import type { CustomCellRendererProps } from "ag-grid-react";
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +16,8 @@ import { useTeamFilter } from "@/hooks/useTeamFilter";
 import type { ProjectMasterListRow } from "@/modules/shared/master-project/helpers/projectMaster.types";
 import { dateCol } from "@/components/data-grid";
 import { Badge } from "@/components/ui/badge";
+import { formatINR } from "@/hooks/useINRFormatter";
+import type { CustomCellRendererProps } from "ag-grid-react";
 
 const IconAction: React.FC<{
     icon: React.ElementType;
@@ -178,6 +178,22 @@ export default function ProjectListPage() {
                 },
                 sortable: true,
                 filter: true,
+            },
+            {
+                field: "totalPaymentDone",
+                headerName: "Payment Done",
+                sortable: true,
+                filter: true,
+                width: 160,
+                valueFormatter: (p) => formatINR(Number(p.data?.totalPaymentDone)),
+            },
+            {
+                field: "totalInvoicesReceived",
+                headerName: "Invoices Received",
+                sortable: true,
+                filter: true,
+                width: 180,
+                valueFormatter: (p) => formatINR(Number(p.data?.totalInvoicesReceived)),
             },
             {
                 headerName: "",

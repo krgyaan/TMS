@@ -11,6 +11,7 @@ import { useHasWCInsurance } from "@/hooks/api/useProjectInsurance";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { getShortId } from "@/lib/id-utils";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
+import { calculateTds } from "@/modules/operations/payment-requests/helpers/tds-calculator";
 import { PaymentRequestDetailDialog } from "@/modules/operations/payment-requests/components/PaymentRequestDetailDialog";
 import type { ColDef, GridApi, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
@@ -84,6 +85,17 @@ export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
             headerName: "Amount",
             sortable: true,
             valueFormatter: (p: ValueFormatterParams<PaymentRequestRow>) => formatINR(p.value),
+        },
+        {
+            field: "netPayable" as keyof PaymentRequestRow,
+            headerName: "Net Payable",
+            sortable: false,
+            valueGetter: (p) => {
+                const amount = Number(p.data?.amount || 0);
+                const tdsPct = Number(p.data?.tdsPercentage || 0);
+                return tdsPct > 0 ? calculateTds(amount, tdsPct).netPayable : amount;
+            },
+            valueFormatter: (p: ValueFormatterParams) => formatINR(p.value),
         },
         {
             field: "paymentAgainst",

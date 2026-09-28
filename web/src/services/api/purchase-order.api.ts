@@ -37,15 +37,17 @@ class PurchaseOrderApiService extends BaseApiService {
         return this.post('/parties', data);
     }
 
-    async activateParty(id: number): Promise<any> {
-        return this.patch(`/parties/${id}/activate`);
+    async activateParty(id: number, source?: string): Promise<any> {
+        const qs = source ? `?source=${encodeURIComponent(source)}` : "";
+        return this.patch(`/parties/${id}/activate${qs}`);
     }
 
-    async deactivateParty(id: number): Promise<any> {
-        return this.patch(`/parties/${id}/deactivate`);
+    async deactivateParty(id: number, source?: string): Promise<any> {
+        const qs = source ? `?source=${encodeURIComponent(source)}` : "";
+        return this.patch(`/parties/${id}/deactivate${qs}`);
     }
 
-    async updateParty(id: number, data: Partial<CreatePartyDTO>): Promise<any> {
+    async updateParty(id: number, data: Partial<CreatePartyDTO> & { source?: string }): Promise<any> {
         return this.patch(`/parties/${id}`, data);
     }
 
@@ -63,6 +65,22 @@ class PurchaseOrderApiService extends BaseApiService {
 
     async bulkCreatePurchaseInvoices(id: number, items: any[]): Promise<any> {
         return this.post(`/${id}/bulk-purchase-invoices`, { items });
+    }
+
+    async updatePaymentRequest(poId: number, prId: number, data: any): Promise<any> {
+        return this.put(`/${poId}/payment-requests/${prId}`, data);
+    }
+
+    async deletePaymentRequest(poId: number, prId: number): Promise<any> {
+        return this.delete(`/${poId}/payment-requests/${prId}`);
+    }
+
+    async updatePurchaseInvoice(poId: number, piId: number, data: any): Promise<any> {
+        return this.put(`/${poId}/purchase-invoices/${piId}`, data);
+    }
+
+    async deletePurchaseInvoice(poId: number, piId: number): Promise<any> {
+        return this.delete(`/${poId}/purchase-invoices/${piId}`);
     }
 
     getPurchaseOrderPdfUrl(id: number, version?: string): string {

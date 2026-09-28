@@ -1,7 +1,6 @@
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TableCell } from "@/components/ui/table";
-import { Eye } from "lucide-react";
-import { paths } from "@/app/routes/paths";
+import type { MetricBucket } from "../helpers/tender-executive.types";
+import { ScoreDrilldownPopover } from "./ScoreDrilldownPopover";
 
 const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-IN", {
@@ -10,65 +9,35 @@ const formatCurrency = (amount: number) =>
         maximumFractionDigits: 0,
     }).format(amount);
 
-const formatDate = (date: string | Date) => {
-    return new Intl.DateTimeFormat("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-    }).format(new Date(date));
-};
-
-export function MetricCell({ data, strong = false }: { data: any; strong?: boolean }) {
+export function MetricCell({ data, strong = false }: { data: MetricBucket; strong?: boolean }) {
     if (!data || data.count === 0) {
         return <TableCell className="text-center text-muted-foreground">·</TableCell>;
     }
 
+    const tenders = data.drilldown.map(item => ({
+        tenderId: item.tenderId,
+        tenderNo: item.tenderNo ?? `Tender #${item.tenderId}`,
+        tenderName: item.tenderName ?? "Tender name unavailable",
+        value: item.value,
+        date: item.transferDate ?? null,
+    }));
+
     return (
         <TableCell className="text-center">
-            <Popover>
-                <PopoverTrigger asChild>
+            <ScoreDrilldownPopover
+                title={`${data.count} tenders · ${formatCurrency(data.value)}`}
+                tenders={tenders}
+                trigger={
                     <div
-                        className={`mx-auto flex flex-col items-center justify-center
-                        min-w-[64px] px-3 py-1 rounded-xl cursor-pointer text-sm font-bold
-                        ${strong ? "bg-primary/10 text-primary" : "bg-muted"}`}
+                        className={`mx-auto flex min-w-[64px] cursor-pointer flex-col items-center justify-center rounded-xl px-3 py-1 text-sm font-bold ${
+                            strong ? "bg-primary/10 text-primary" : "bg-muted"
+                        }`}
                     >
                         <span>{data.count}</span>
                         <span className="text-[11px] font-normal text-muted-foreground">{formatCurrency(data.value)}</span>
                     </div>
-                </PopoverTrigger>
-
-                <PopoverContent className="w-96 max-h-72 overflow-auto">
-                    <div className="space-y-2">
-                        <div className="font-semibold text-sm">
-                            {data.count} EMDs · {formatCurrency(data.value)}
-                        </div>
-
-                        {data.drilldown.map(e => (
-                            <div key={`${e.tenderId}-${e.instrumentType}`} className="border-b pb-2 text-xs space-y-1 flex justify-between gap-2">
-                                <div className="min-w-0">
-                                    <div className="font-medium truncate">{e.tenderNo ?? `Tender #${e.tenderId}`}</div>
-                                    {e.tenderName && <div className="text-muted-foreground truncate">{e.tenderName}</div>}
-                                    <div>
-                                        {e.instrumentType} · {formatCurrency(e.value)}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">{e.transferDate ? formatDate(e.transferDate) : "-"}</div>
-                                </div>
-
-                                <button
-                                    onClick={ev => {
-                                        ev.stopPropagation();
-                                        window.open(paths.tendering.tenderView(e.tenderId), "_blank");
-                                    }}
-                                    className="h-7 w-7 flex items-center justify-center rounded-md
-                                    text-muted-foreground hover:text-primary hover:bg-muted"
-                                >
-                                    <Eye className="h-4 w-4" />
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                </PopoverContent>
-            </Popover>
+                }
+            />
         </TableCell>
     );
 }

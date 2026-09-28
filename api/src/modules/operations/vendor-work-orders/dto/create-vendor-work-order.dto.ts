@@ -6,6 +6,7 @@ export const createVendorWorkOrderSchema = z.object({
     projectName: z.string().optional(),
     woDate: z.string().min(1, "WO date is required"),
     sellerId: z.number().optional(),
+    sellerOrganizationId: z.number().optional(),
     shipToPartyId: z.number().optional(),
     category: z.string().optional().default(""),
 
@@ -27,17 +28,25 @@ export const createVendorWorkOrderSchema = z.object({
     shipToGst: z.string().optional().default(""),
     shipToPan: z.string().optional().default(""),
 
-    products: z.array(z.object({
-        description: z.string().min(1, "Description is required"),
-        qty: z.number(),
-        rate: z.number(),
-        gstRate: z.number().default(18),
-    })).min(1, "At least one product is required"),
+    products: z
+        .array(
+            z.object({
+                description: z.string().min(1, "Description is required"),
+                qty: z.number(),
+                rate: z.number(),
+                gstRate: z.number().default(18),
+            })
+        )
+        .min(1, "At least one product is required"),
 
-    termsAndConditions: z.array(z.object({
-        field: z.string(),
-        value: z.string(),
-    })).optional(),
+    termsAndConditions: z
+        .array(
+            z.object({
+                field: z.string(),
+                value: z.string(),
+            })
+        )
+        .optional(),
 
     remarks: z.string().optional().default(""),
     scopeOfWork: z.string().optional(),

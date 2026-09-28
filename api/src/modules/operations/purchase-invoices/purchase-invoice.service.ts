@@ -4,6 +4,7 @@ import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
 import { tryMaterializePoInventory } from "@/modules/operations/inventory/inventory.materialize";
+import { CashFlowService } from "@/modules/operations/cash-flows/cash-flow.service";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -12,6 +13,7 @@ export class PurchaseInvoiceService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
+        private readonly cashFlowService: CashFlowService,
     ) {}
 
     async generateNumber(projectName?: string, series = "PI") {
@@ -71,6 +73,41 @@ export class PurchaseInvoiceService {
         });
 
         this.logger.info(`Purchase Invoice created: ${invoiceNo}`);
+
+        const valuePreGst = Number(body.valuePreGst ?? 0);
+        const gstAmount = Number(body.gstAmount ?? 0);
+        const totalAmount = valuePreGst + gstAmount;
+
+        if (pi.projectId) {
+            await this.cashFlowService.create({
+                projectId: pi.projectId,
+                eventType: 'invoice_uploaded',
+                amount: totalAmount.toString(),
+                direction: 'outflow',
+                referenceType: 'purchase_invoice',
+                referenceId: pi.id,
+                referenceNo: invoiceNo,
+                gstAmount: gstAmount.toString(),
+                remark: `Purchase invoice uploaded: ${invoiceNo}`,
+                createdBy: userId,
+            }).catch((err) => this.logger.warn(`Cash flow creation failed for invoice #${pi.id}: ${err}`));
+
+            if (gstAmount > 0) {
+                await this.cashFlowService.create({
+                    projectId: pi.projectId,
+                    eventType: 'gst_booked',
+                    amount: gstAmount.toString(),
+                    direction: 'adjustment',
+                    referenceType: 'purchase_invoice',
+                    referenceId: pi.id,
+                    referenceNo: invoiceNo,
+                    gstAmount: gstAmount.toString(),
+                    remark: `GST @ 18% booked on invoice ${invoiceNo}`,
+                    createdBy: userId,
+                }).catch((err) => this.logger.warn(`Cash flow creation failed for GST booked invoice #${pi.id}: ${err}`));
+            }
+        }
+
         return pi;
     }
 

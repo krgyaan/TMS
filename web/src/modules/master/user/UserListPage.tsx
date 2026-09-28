@@ -6,17 +6,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePermissions } from "@/hooks/api/usePermissions";
 import { useRoles } from "@/hooks/api/useRoles";
 import { useTeams } from "@/hooks/api/useTeams";
 import { useDeleteUser, useUsers } from "@/hooks/api/useUsers";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { RolesDrawer } from "@/modules/master/role/components/RolesDrawer";
 import { TeamsDrawer } from "@/modules/master/team/components/TeamsDrawer";
 import type { User } from "@/types/api.types";
-import type { ColDef, RowSelectionOptions } from "ag-grid-community";
-import { AlertCircle, ArrowRight, KeyRound, Shield, UserRound, Users } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import type { ColDef, GridApi, GridReadyEvent, RowSelectionOptions } from "ag-grid-community";
+import { AlertCircle, ArrowRight, KeyRound, Search, Shield, UserRound, Users } from "lucide-react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import UserView from "./components/UserView";
 
@@ -35,6 +37,17 @@ export default function UserListPage() {
     const [viewState, setViewState] = useState<{ open: boolean; data: User | null }>({ open: false, data: null });
     const [rolesDrawerOpen, setRolesDrawerOpen] = useState(false);
     const [teamsDrawerOpen, setTeamsDrawerOpen] = useState(false);
+    const [gridApi, setGridApi] = useState<GridApi | null>(null);
+    const [search, setSearch] = useState("");
+    const debouncedSearch = useDebouncedSearch(search, 300);
+
+    useEffect(() => {
+        gridApi?.setGridOption("quickFilterText", debouncedSearch || undefined);
+    }, [gridApi, debouncedSearch]);
+
+    const onGridReady = useCallback((event: GridReadyEvent<User>) => {
+        setGridApi(event.api);
+    }, []);
 
     const employeeActions: ActionItem<User>[] = [
         {
@@ -229,15 +242,28 @@ export default function UserListPage() {
                     <CardTitle>Employees</CardTitle>
                     <CardDescription>List of all Employees</CardDescription>
                     <CardAction>
-                        <Button variant="default" asChild>
-                            <NavLink to={paths.master.users_create}>Add New Employee</NavLink>
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search employees..."
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    className="pl-8 w-64"
+                                />
+                            </div>
+                            <Button variant="default" asChild>
+                                <NavLink to={paths.master.users_create}>Add New Employee</NavLink>
+                            </Button>
+                        </div>
                     </CardAction>
                 </CardHeader>
                 <CardContent className="px-3">
                     <DataTable
                         data={users || []}
                         columnDefs={colDefs}
+                        onGridReady={onGridReady}
                         gridOptions={{
                             defaultColDef: { editable: false, filter: true },
                             rowSelection,

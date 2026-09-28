@@ -1,15 +1,11 @@
-// src/modules/accounts/checklist/checklist.module.ts
 import { Module } from "@nestjs/common";
+import { AuthModule } from "@/modules/auth/auth.module";
 import { AccountChecklistController } from "./account-checklist.controller";
-import { AccountChecklistService } from "./account-checklist.service";
-import { MailerModule } from "@/mailer/mailer.module";
-import { GoogleIntegrationModule } from "@/modules/integrations/google/google.module";
-import { CoreModule } from "@/core/core.module";
+import { AccountChecklistServiceModule } from "./account-checklist-service.module";
 
 @Module({
-    imports: [MailerModule, GoogleIntegrationModule, CoreModule],
+    imports: [AccountChecklistServiceModule, AuthModule],
     controllers: [AccountChecklistController],
-    providers: [AccountChecklistService],
-    exports: [AccountChecklistService],
+    exports: [AccountChecklistServiceModule],
 })
 export class AccountChecklistModule {}

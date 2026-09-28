@@ -38,7 +38,6 @@ export default function UserPermissionsForm({ userId, allPermissions, userPermis
     };
 
     const handlePermissionsSave = async () => {
-        if (selectedPermissions.size === 0) return;
         const permissionsArray = Array.from(selectedPermissions.entries()).map(([permissionId, granted]) => ({
             permissionId,
             granted,
@@ -54,9 +53,9 @@ export default function UserPermissionsForm({ userId, allPermissions, userPermis
     return (
         <div className="space-y-4 rounded-md border p-4">
             <div>
-                <p className="text-sm font-semibold">Permission Overrides</p>
+                <p className="text-sm font-semibold">Permissions</p>
                 <p className="text-xs text-muted-foreground">
-                    Grant or deny specific permissions for this user beyond what their role provides.
+                    Tender access is granted only here. Other modules also use the user's role permissions.
                 </p>
             </div>
             <PermissionSelector
@@ -81,7 +80,7 @@ export default function UserPermissionsForm({ userId, allPermissions, userPermis
                 <Button
                     type="button"
                     onClick={handlePermissionsSave}
-                    disabled={selectedPermissions.size === 0 || saving}
+                    disabled={saving}
                 >
                     {assignPermissions.isPending ? "Saving..." : "Save Permissions"}
                 </Button>

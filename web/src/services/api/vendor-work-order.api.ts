@@ -46,6 +46,22 @@ class VendorWorkOrderApiService extends BaseApiService {
         return this.post<any>(`/${id}/bulk-purchase-invoices`, { items });
     }
 
+    async updatePaymentRequest(vwoId: number, prId: number, data: any) {
+        return this.put<any>(`/${vwoId}/payment-requests/${prId}`, data);
+    }
+
+    async deletePaymentRequest(vwoId: number, prId: number) {
+        return this.delete<any>(`/${vwoId}/payment-requests/${prId}`);
+    }
+
+    async updatePurchaseInvoice(vwoId: number, piId: number, data: any) {
+        return this.put<any>(`/${vwoId}/purchase-invoices/${piId}`, data);
+    }
+
+    async deletePurchaseInvoice(vwoId: number, piId: number) {
+        return this.delete<any>(`/${vwoId}/purchase-invoices/${piId}`);
+    }
+
     async getByProject(projectId: number) {
         return this.get<any[]>(`/project/${projectId}`);
     }

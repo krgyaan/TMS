@@ -7,6 +7,8 @@ import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { woBasicDetails, woDetails } from "@/db/schemas/operations/work-order.schema";
 import { employeeImprests } from "@/db/schemas/shared/employee-imprest.schema";
 import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
+import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
+import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { and, count, desc, eq, ilike, or, sql } from "drizzle-orm";
@@ -33,6 +35,8 @@ export interface ProjectListRow {
     tenderNo: string | null;
     teamMemberName: string | null;
     enquiryId: number | null;
+    totalPaymentDone?: number;
+    totalInvoicesReceived?: number;
 }
 
 @Injectable()
@@ -241,6 +245,27 @@ export class ProjectDashboardService {
 
         const where = whereConditions.length > 0 ? and(...whereConditions) : undefined;
 
+        // Subquery for payment done amounts per project
+        const paymentDoneSubquery = this.db
+            .select({
+                projectId: paymentRequests.projectId,
+                paymentDoneTotal: sql<number>`COALESCE(SUM(amount::numeric), 0)`.as('paymentDoneTotal'),
+            })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.status, 'payment_done'))
+            .groupBy(paymentRequests.projectId)
+            .as('paymentDone');
+
+        // Subquery for invoices received per project
+        const invoicesSubquery = this.db
+            .select({
+                projectId: purchaseInvoices.projectId,
+                invoicesTotal: sql<number>`COALESCE(SUM((value_pre_gst + gst_amount)::numeric), 0)`.as('invoicesTotal'),
+            })
+            .from(purchaseInvoices)
+            .groupBy(purchaseInvoices.projectId)
+            .as('invoicesReceived');
+
         const [rows, [{ total }]] = await Promise.all([
             this.db
                 .select({
@@ -255,11 +280,21 @@ export class ProjectDashboardService {
                     tenderNo: tenderInfos.tenderNo,
                     teamMemberName: users.name,
                     enquiryId: projects.enquiryId,
+                    totalPaymentDone: paymentDoneSubquery.paymentDoneTotal,
+                    totalInvoicesReceived: invoicesSubquery.invoicesTotal,
                 })
                 .from(projects)
                 .leftJoin(tenderInfos, eq(tenderInfos.id, projects.tenderId as any))
                 .leftJoin(users, eq(users.id, tenderInfos.teamMember as any))
                 .leftJoin(teams, eq(teams.name, projects.teamName))
+                .leftJoin(
+                    paymentDoneSubquery,
+                    eq(projects.id, paymentDoneSubquery.projectId)
+                )
+                .leftJoin(
+                    invoicesSubquery,
+                    eq(projects.id, invoicesSubquery.projectId)
+                )
                 .where(where as any)
                 .orderBy(desc(projects.poDate))
                 .limit(limit)
@@ -283,6 +318,8 @@ export class ProjectDashboardService {
             tenderNo: row.tenderNo,
             teamMemberName: row.teamMemberName,
             enquiryId: row.enquiryId,
+            totalPaymentDone: Number(row.totalPaymentDone ?? 0),
+            totalInvoicesReceived: Number(row.totalInvoicesReceived ?? 0),
         }));
 
         return {

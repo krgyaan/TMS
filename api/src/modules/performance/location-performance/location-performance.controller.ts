@@ -12,20 +12,14 @@ import { locationPerformanceQuerySchema } from "./zod/location-performance.dto";
 export class LocationPerformanceController {
     constructor(private readonly service: LocationPerformanceService) {}
 
-    /**
-     * GET /performance/business?heading=1&fromDate=2024-01-01&toDate=2024-12-31
-     * Replaces: POST /performance/business in Laravel
-     */
     @Get()
     @CanRead("performance.location")
     getLocationPerformance(@Query() query: Record<string, string>) {
         const parsed = locationPerformanceQuerySchema.safeParse({
-            area: query.area,
             team: query.team,
             location: query.location,
             heading: query.heading,
-            fromDate: query.fromDate,
-            toDate: query.toDate,
+            year: query.year,
         });
 
         if (!parsed.success) {

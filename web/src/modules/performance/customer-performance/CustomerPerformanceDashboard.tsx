@@ -1,47 +1,115 @@
-import { useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 /* UI Components */
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Combobox } from "@/components/form/SelectField";
+import CustomerCategoryTable from "./components/CustomerCategoryTable";
+import CustomerBarChart from "./components/CustomerBarChart";
+import CustomerDonutChart from "./components/CustomerDonutChart";
 
 /* Icons */
-import { Filter, Download, Calendar as CalendarIcon } from "lucide-react";
+import { Filter, Download } from "lucide-react";
 
 /* Custom Hooks */
-import { useItemHeadings, useCustomerPerformance } from "./customer-performance.hooks";
+import { useItemHeadings } from "@/hooks/api/useItemHeadings";
+import { useCustomerPerformance } from "@/hooks/api/useCustomerPerformance";
 import { useOrganizationsTrue } from "@/hooks/api/useOrganizations";
 import { useTeams } from "@/hooks/api/useTeams";
-import { Combobox } from "@/components/form/SelectField";
+
+import type { CustomerPerformanceParams } from "./helpers/customer-performance.types";
 
 /* ================================
    HELPERS
-================================ */
-const formatCurrency = (amount: number | string): string => {
-    const numericAmount = typeof amount === "string" ? parseFloat(amount) : amount;
-
-    if (isNaN(numericAmount)) {
-        return "₹0";
-    }
-
-    return new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-    }).format(numericAmount);
-};
-
+=============================== */
 const titleCase = (str: string): string => {
     return str.replace(/_/g, " ").replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 };
 
+const getGpColor = (gp: number | null | undefined): string => {
+    if (gp === null || gp === undefined) return "text-muted-foreground";
+    if (gp >= 20) return "text-green-600";
+    if (gp >= 10) return "text-blue-600";
+    if (gp >= 0) return "text-yellow-600";
+    return "text-red-600";
+};
+
+const AC_DC_OPTIONS: { id: string; name: string }[] = [
+    { id: "combined", name: "All" },
+    { id: "AC", name: "AC" },
+    { id: "DC", name: "DC" },
+];
+
+const CUSTOMER_PERFORMANCE_FILTERS_KEY = "customer-performance-filters";
+
+interface CustomerPerformanceFilters {
+    item: number | null;
+    orgId: number | null;
+    team: string;
+    fromDate: string;
+    toDate: string;
+}
+
+const isValidDate = (value: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(value);
+
+function readCustomerPerformanceFilters(search: string): CustomerPerformanceFilters {
+    const searchParams = new URLSearchParams(search);
+    const hasUrlFilters = ["item", "orgId", "team", "fromDate", "toDate", "year"].some(key => searchParams.has(key));
+    const source = hasUrlFilters ? searchParams : new URLSearchParams(localStorage.getItem(CUSTOMER_PERFORMANCE_FILTERS_KEY) ?? "");
+
+    const rawItem = source.get("item");
+    const rawOrgId = source.get("orgId");
+    const parsedItem = rawItem !== null ? Number(rawItem) : NaN;
+    const parsedOrgId = rawOrgId !== null ? Number(rawOrgId) : NaN;
+    const team = source.get("team");
+    const legacyYear = source.get("year");
+    let fromDate = source.get("fromDate") ?? "";
+    let toDate = source.get("toDate") ?? "";
+
+    if ((!isValidDate(fromDate) || !isValidDate(toDate)) && legacyYear) {
+        const match = /^(\d{4})-(\d{2})$/.exec(legacyYear);
+        if (match) {
+            fromDate = `${match[1]}-04-01`;
+            toDate = `${2000 + Number(match[2])}-03-31`;
+        }
+    }
+
+    const validRange = isValidDate(fromDate) && isValidDate(toDate) && fromDate <= toDate;
+
+    return {
+        item: Number.isFinite(parsedItem) ? parsedItem : null,
+        orgId: Number.isFinite(parsedOrgId) ? parsedOrgId : null,
+        team: team === "AC" || team === "DC" ? team : "combined",
+        fromDate: validRange ? fromDate : "",
+        toDate: validRange ? toDate : "",
+    };
+}
+
+function writeCustomerPerformanceFilters(filters: CustomerPerformanceFilters): void {
+    try {
+        const params = new URLSearchParams();
+        if (filters.item !== null) params.set("item", String(filters.item));
+        if (filters.orgId !== null) params.set("orgId", String(filters.orgId));
+        if (filters.team === "AC" || filters.team === "DC") params.set("team", filters.team);
+        if (filters.fromDate) params.set("fromDate", filters.fromDate);
+        if (filters.toDate) params.set("toDate", filters.toDate);
+        localStorage.setItem(CUSTOMER_PERFORMANCE_FILTERS_KEY, params.toString());
+    } catch {
+        return;
+    }
+}
+
 /* ================================
    EXPORT UTILITIES
-================================ */
-const exportToCSV = (data: any[], filename: string, headers: { key: string; label: string }[]) => {
+=============================== */
+interface CsvHeader {
+    key: string;
+    label: string;
+}
+
+const exportToCSV = (data: Record<string, unknown>[], filename: string, headers: CsvHeader[]) => {
     if (data.length === 0) {
         alert("No data to export");
         return;
@@ -77,51 +145,97 @@ const exportToCSV = (data: any[], filename: string, headers: { key: string; labe
 
 /* ================================
    MAIN COMPONENT
-================================ */
+=============================== */
 export default function CustomerPerformanceDashboard() {
-    // Filter States
-    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(null);
-    const [selectedOrganization, setSelectedOrganization] = useState<number | null>(null);
-    const [selectedTeam, setSelectedTeam] = useState<number | null>(null);
-    const [fromDate, setFromDate] = useState<string>("");
-    const [toDate, setToDate] = useState<string>("");
-    const [appliedParams, setAppliedParams] = useState<CustomerPerformanceParams | null>(null);
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    // Restore filters from the URL so a reload (or shared link) keeps the selection.
+    const initialFilters = useMemo(() => readCustomerPerformanceFilters(location.search), [location.search]);
+    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(initialFilters.item);
+    const [selectedOrganization, setSelectedOrganization] = useState<number | null>(initialFilters.orgId);
+    const [selectedTeamCategory, setSelectedTeamCategory] = useState<string>(initialFilters.team);
+    const [fromDate, setFromDate] = useState<string>(initialFilters.fromDate);
+    const [toDate, setToDate] = useState<string>(initialFilters.toDate);
+    const [appliedParams, setAppliedParams] = useState<CustomerPerformanceParams | null>(() => {
+        if (!initialFilters.fromDate || !initialFilters.toDate) return null;
+        return {
+            org: initialFilters.orgId ?? undefined,
+            teamCategory: initialFilters.team === "AC" || initialFilters.team === "DC" ? initialFilters.team : undefined,
+            itemHeading: initialFilters.item ?? undefined,
+            fromDate: initialFilters.fromDate,
+            toDate: initialFilters.toDate,
+        };
+    });
+
+    useEffect(() => {
+        if (location.search || !appliedParams) return;
+        const search = new URLSearchParams();
+        if (appliedParams.org !== undefined) search.set("orgId", String(appliedParams.org));
+        if (appliedParams.teamCategory !== undefined) search.set("team", appliedParams.teamCategory);
+        if (appliedParams.itemHeading !== undefined) search.set("item", String(appliedParams.itemHeading));
+        search.set("fromDate", appliedParams.fromDate ?? "");
+        search.set("toDate", appliedParams.toDate ?? "");
+        navigate({ search: `?${search.toString()}` }, { replace: true });
+    }, [appliedParams, location.search, navigate]);
 
     // Fetch headings for dropdown
-    const { data: headings = [], isLoading: headingsLoading } = useItemHeadings();
-    const { data: organizations = [] } = useOrganizationsTrue();
+    const { data: headings = [] } = useItemHeadings();
     const { data: teams = [] } = useTeams();
+    const { data: organizations = [] } = useOrganizationsTrue();
+
+    // Client-side join: attach team name to each heading
+    const headingsWithTeams = useMemo(
+        () =>
+            headings.map(h => ({
+                ...h,
+                team: teams.find(t => t.id === (h as { team_id?: number }).team_id)?.name || "",
+            })),
+        [headings, teams]
+    );
 
     // Fetch customer performance data
     const { data, isLoading: dataLoading } = useCustomerPerformance(appliedParams);
 
+    const dateError = fromDate && toDate && fromDate > toDate ? "From Date must be on or before To Date" : null;
+
     // Build params for submission
-    const params = useMemo(() => {
-        if (!fromDate || !toDate) return null;
+    const params = useMemo<CustomerPerformanceParams | null>(() => {
+        if (!fromDate || !toDate || dateError) return null;
         return {
             org: selectedOrganization ?? undefined,
-            teamId: selectedTeam ?? undefined,
+            teamCategory: selectedTeamCategory === "AC" || selectedTeamCategory === "DC" ? selectedTeamCategory : undefined,
             itemHeading: selectedHeadingId ?? undefined,
             fromDate,
             toDate,
         };
-    }, [selectedOrganization, selectedTeam, selectedHeadingId, fromDate, toDate]);
+    }, [dateError, fromDate, selectedHeadingId, selectedOrganization, selectedTeamCategory, toDate]);
 
     // Handle form submission
     const handleSubmit = () => {
-        if (params) {
-            setAppliedParams(params);
-        }
+        if (!params) return;
+        setAppliedParams(params);
+        const search = new URLSearchParams();
+        if (params.org !== undefined) search.set("orgId", String(params.org));
+        if (params.teamCategory !== undefined) search.set("team", params.teamCategory);
+        if (params.itemHeading !== undefined) search.set("item", String(params.itemHeading));
+        search.set("fromDate", params.fromDate ?? "");
+        search.set("toDate", params.toDate ?? "");
+        writeCustomerPerformanceFilters({
+            item: selectedHeadingId,
+            orgId: selectedOrganization,
+            team: selectedTeamCategory,
+            fromDate: params.fromDate ?? "",
+            toDate: params.toDate ?? "",
+        });
+        navigate({ search: `?${search.toString()}` }, { replace: true });
     };
 
     // Export handler
     const handleExportReport = useCallback(() => {
         if (!data) return;
 
-        const selectedHeading = selectedHeadingId ? headings.find(h => h.id === selectedHeadingId) : undefined;
-        const headingName = selectedHeading?.name || "Unknown";
-
-        const allData: any[] = [];
+        const allData: Record<string, unknown>[] = [];
 
         // Add summary data
         Object.entries(data.summary).forEach(([category, summaryData]) => {
@@ -153,12 +267,9 @@ export default function CustomerPerformanceDashboard() {
             { key: "tenders", label: "Tenders" },
         ];
 
-        const filename = `Business_Performance_${headingName}_${fromDate}_to_${toDate}`;
+        const filename = `Customer_Performance_${appliedParams?.fromDate ?? ""}_to_${appliedParams?.toDate ?? ""}`;
         exportToCSV(allData, filename, headers);
-    }, [data, headings, selectedHeadingId, fromDate, toDate]);
-
-    // Extract summary entries for rendering
-    const summaryEntries = data?.summary ? Object.entries(data.summary) : [];
+    }, [appliedParams, data]);
 
     return (
         <div className="min-h-screen bg-muted/10 pb-12">
@@ -166,8 +277,8 @@ export default function CustomerPerformanceDashboard() {
                 {/* ===== HEADER ===== */}
                 <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight">Customer Performance</h1>
-                        <p className="text-muted-foreground mt-1">Analyze customer performance metrics by item heading and date range.</p>
+                        <h1 className="text-3xl font-bold tracking-tight">Customer Dashboard</h1>
+                        <p className="text-muted-foreground mt-1">Analyze customer tenders by organization, team, item heading and date range.</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" onClick={handleExportReport} disabled={!appliedParams || !data}>
@@ -179,73 +290,68 @@ export default function CustomerPerformanceDashboard() {
                 {/* ===== FILTER CARD ===== */}
                 <Card className="shadow-sm">
                     <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-3 w-full gap-1">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 w-full gap-4 items-end">
                             {/* Organization Select */}
-                            <div>
-                                <label className="text-sm font-medium">Organization</label>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Select Organization</label>
                                 <Combobox
                                     value={selectedOrganization ? selectedOrganization.toString() : ""}
                                     onChange={v => setSelectedOrganization(v ? Number(v) : null)}
-                                    options={organizations.map(org => ({ id: org.id.toString(), name: `${org.acronym}` }))}
+                                    options={organizations.map(org => ({ id: org.id.toString(), name: `${org.name} (${org.acronym ?? ""})` }))}
                                     placeholder="Select Organization"
                                 />
                             </div>
 
-                            <div>
-                                <label>Team</label>
+                            {/* AC / DC / All */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Select Team</label>
                                 <Combobox
-                                    value={selectedTeam ? selectedTeam.toString() : ""}
-                                    onChange={v => setSelectedTeam(v ? Number(v) : null)}
-                                    options={teams.slice(0, 2).map(team => ({ id: team.id.toString(), name: `${team.name.toUpperCase()}` }))}
-                                    placeholder="Select Team"
+                                    value={selectedTeamCategory}
+                                    onChange={v => setSelectedTeamCategory(v || "combined")}
+                                    options={AC_DC_OPTIONS}
+                                    placeholder="Select AC/DC"
                                 />
                             </div>
 
                             {/* Item Heading Select */}
-                            <div className="w-full">
-                                <label className="text-sm font-medium">Item Heading</label>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Select Item Heading</label>
                                 <Combobox
                                     value={selectedHeadingId ? selectedHeadingId.toString() : ""}
                                     onChange={v => setSelectedHeadingId(v ? Number(v) : null)}
-                                    options={headings.map(heading => ({ id: heading.id.toString(), name: `${heading.name} (${heading.team})` }))}
+                                    options={[
+                                        { id: "", name: "All" },
+                                        ...[...headingsWithTeams].sort((a, b) => a.name.localeCompare(b.name)).map(heading => ({ id: heading.id.toString(), name: heading.name })),
+                                    ]}
                                     placeholder="Select Item Heading"
                                 />
                             </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full justify-center items-center md:px-50 ">
                             {/* From Date */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">From Date</label>
-                                <div className="relative">
-                                    <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input type="date" className="pl-9" value={fromDate} onChange={e => setFromDate(e.target.value)} />
-                                </div>
+                                <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} />
                             </div>
 
                             {/* To Date */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">To Date</label>
-                                <div className="relative">
-                                    <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input type="date" className="pl-9" value={toDate} onChange={e => setToDate(e.target.value)} />
-                                </div>
+                                <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
                             </div>
-                        </div>
 
-                        <div className="flex justify-center items-center w-full p-3">
                             {/* Submit Button */}
-                            <Button onClick={handleSubmit} disabled={!params}>
+                            <Button onClick={handleSubmit} disabled={!params} className="justify-self-center">
                                 <Filter className="mr-2 h-4 w-4" /> Submit
                             </Button>
                         </div>
+                        {dateError && <p className="mt-2 text-sm text-destructive">{dateError}</p>}
                     </CardContent>
                 </Card>
 
                 {/* ===== CONDITIONAL CONTENT ===== */}
                 {!appliedParams ? (
                     <div className="bg-muted rounded-lg p-6 text-center">
-                        <span className="text-muted-foreground">Please select an Item Heading and Date Range to view the report.</span>
+                        <span className="text-muted-foreground">Please select a From Date and To Date to view the report.</span>
                     </div>
                 ) : dataLoading ? (
                     <div className="bg-muted rounded-lg p-6 text-center">
@@ -253,72 +359,47 @@ export default function CustomerPerformanceDashboard() {
                     </div>
                 ) : (
                     <>
-                        {/* ===== SUMMARY CARDS ===== */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {summaryEntries.map(([name, value]) => (
-                                <Card key={name} className="shadow-sm hover:shadow-md transition-shadow">
-                                    <CardContent className="p-3">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            {/* <TrendingUp className="h-5 w-5 text-primary" /> */}
-                                            <span className="font-semibold text-lg">{titleCase(name)}</span>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-sm text-muted-foreground">
-                                                Count: <span className="font-medium text-foreground">{value.count}</span>
+                        {/* ===== CATEGORY TABLES ===== */}
+                        <CustomerCategoryTable params={appliedParams} categoryKey="assigned" title="Tenders Assigned" description="All tenders assigned to this customer." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="approved" title="Tenders Approved" description="Tenders that reached a result stage." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="missed" title="Tenders Missed" description="Tenders that were missed for submission." />
+                        <CustomerCategoryTable
+                            params={appliedParams}
+                            categoryKey="did_not_bid"
+                            title="Tender Did Not Bid"
+                            description="Tenders that were not bid for submission."
+                        />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="bid" title="Tenders Bid" description="Tenders where a bid has been submitted." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="results_awaited" title="Tender Results Awaited" description="Tenders awaiting final results." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="disqualified" title="Tenders Disqualified" description="Tenders that were disqualified." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="won" title="Tenders Won" description="Tenders that were won." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="lost" title="Tenders Lost" description="Tenders that were lost." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="emd_paid" title="EMD Paid" description="Tenders where the EMD has been paid." />
+                        <CustomerCategoryTable params={appliedParams} categoryKey="emd_returned" title="EMD Returned" description="Tenders where the EMD has been returned." />
+
+                        {/* ===== AVERAGE GP + CHARTS ===== */}
+                        <div className="space-y-4">
+                            {/* Average GP Card - Full Width Row */}
+                            <div className="grid grid-cols-1">
+                                <Card className="shadow-sm">
+                                    <CardContent className="p-5">
+                                        <div className="flex flex-wrap items-center gap-6">
+                                            <p className="text-sm text-muted-foreground">Average GP</p>
+                                            <p className={`text-3xl font-bold ${getGpColor(data?.avgGrossMargin)}`}>
+                                                {data?.avgGrossMargin !== null && data?.avgGrossMargin !== undefined ? `${data.avgGrossMargin.toFixed(2)}%` : "—"}
                                             </p>
-                                            <p className="text-xl font-bold text-orange-400">{formatCurrency(value.value)}</p>
+                                            <p className="text-xs text-muted-foreground">Average approved gross margin across tenders.</p>
                                         </div>
                                     </CardContent>
                                 </Card>
-                            ))}
-                        </div>
+                            </div>
 
-                        {/* ===== TENDER SUMMARY TABLE ===== */}
-                        <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                            <CardHeader className="pb-4">
-                                <CardTitle className="text-lg">Tender Summary Details</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="overflow-x-auto">
-                                    <Table>
-                                        <TableHeader className="bg-muted/50">
-                                            <TableRow>
-                                                <TableHead className="font-semibold">Category</TableHead>
-                                                <TableHead className="font-semibold">Count</TableHead>
-                                                <TableHead className="font-semibold">Value</TableHead>
-                                                <TableHead className="font-semibold">Tenders</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {summaryEntries.length === 0 ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                                        No summary data available.
-                                                    </TableCell>
-                                                </TableRow>
-                                            ) : (
-                                                summaryEntries.map(([name, value]) => (
-                                                    <TableRow key={name} className="hover:bg-muted/30 transition-colors">
-                                                        <TableCell className="font-medium">{titleCase(name)}</TableCell>
-                                                        <TableCell className="tabular-nums">{value.count}</TableCell>
-                                                        <TableCell className="tabular-nums">{formatCurrency(value.value)}</TableCell>
-                                                        <TableCell>
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {value.tender.map((tender, idx) => (
-                                                                    <Badge key={idx} variant="secondary" className="font-normal border border-gray-200">
-                                                                        {tender}
-                                                                    </Badge>
-                                                                ))}
-                                                            </div>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            </CardContent>
-                        </Card>
+                            {/* Bar Chart + Donut Chart - Side by Side */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <CustomerBarChart params={appliedParams} />
+                                <CustomerDonutChart params={appliedParams} />
+                            </div>
+                        </div>
                     </>
                 )}
             </div>

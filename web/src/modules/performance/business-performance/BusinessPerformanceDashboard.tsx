@@ -1,81 +1,77 @@
-import React, { useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 /* UI Components */
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 /* Icons */
-import { Filter, Download, Calendar as CalendarIcon, TrendingUp, MapPin, Building2, Package } from "lucide-react";
+import { Filter, Download, Calendar as CalendarIcon } from "lucide-react";
 
 /* Custom Hooks */
-import { useItemHeadings, useBusinessPerformance } from "./business-performance.hooks"; // not created yet
+import { useItemHeadings, useBusinessPerformance } from "@/hooks/api/useBusinessPerformance";
 import { Combobox } from "@/components/form/SelectField";
 
-/* ================================
-   TYPES
-================================ */
-interface BusinessPerformanceParams {
-    headingId: number;
-    fromDate: string;
-    toDate: string;
-}
+/* Types */
+import type { BusinessPerformanceParams } from "./helpers/business-performance.types";
 
-interface Heading {
-    id: number;
-    name: string;
-    team: string;
-}
+/* Components */
+import BusinessCategoryTable from "./components/BusinessCategoryTable";
+import BusinessBarChart from "./components/BusinessBarChart";
+import BusinessDonutChart from "./components/BusinessDonutChart";
 
-interface SummaryItem {
-    count: number;
-    value: number;
-    tender: string[];
-}
-
-interface MetricData {
-    count: number;
-    value: number;
-}
-
-interface BusinessPerformanceData {
-    items: { name: string }[];
-    summary: Record<string, SummaryItem>;
-    metrics: {
-        by_region: Record<string, MetricData>;
-        by_state: Record<string, MetricData>;
-        by_item: Record<string, MetricData>;
-    };
-}
-
-/* ================================
-   HELPERS
-================================ */
-const formatCurrency = (amount: number | string): string => {
-    const numericAmount = typeof amount === "string" ? parseFloat(amount) : amount;
-
-    if (isNaN(numericAmount)) {
-        return "₹0";
-    }
-
-    return new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-    }).format(numericAmount);
+const getGpColor = (gp: number | null | undefined): string => {
+    if (gp === null || gp === undefined) return "text-muted-foreground";
+    if (gp >= 20) return "text-green-600";
+    if (gp >= 10) return "text-blue-600";
+    if (gp >= 0) return "text-yellow-600";
+    return "text-red-600";
 };
 
 const titleCase = (str: string): string => {
     return str.replace(/_/g, " ").replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 };
 
-/* ================================
-   EXPORT UTILITIES
-================================ */
-const exportToCSV = (data: any[], filename: string, headers: { key: string; label: string }[]) => {
+const persistedSelectionKey = "business-performance-selection";
+
+function isValidDate(value: string): boolean {
+    return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function getInitialSelection(search: string): { item: number | null; fromDate: string; toDate: string } {
+    const params = new URLSearchParams(search);
+    const readParams = (source: URLSearchParams) => {
+        const rawItem = source.get("item");
+        const item = rawItem !== null ? Number(rawItem) : null;
+        const fromDate = source.get("fromDate") ?? "";
+        const toDate = source.get("toDate") ?? "";
+        const validRange = isValidDate(fromDate) && isValidDate(toDate) && fromDate <= toDate;
+        return { item: item !== null && Number.isFinite(item) ? item : null, fromDate: validRange ? fromDate : "", toDate: validRange ? toDate : "" };
+    };
+
+    if (["item", "fromDate", "toDate", "year"].some(key => params.has(key))) {
+        const legacy = params.get("year");
+        if (legacy) {
+            const match = /^(\d{4})-(\d{2})$/.exec(legacy);
+            if (match) {
+                const itemValue = Number(params.get("item"));
+                return { item: Number.isFinite(itemValue) ? itemValue : null, fromDate: `${match[1]}-04-01`, toDate: `${2000 + Number(match[2])}-03-31` };
+            }
+        }
+        return readParams(params);
+    }
+
+    try {
+        const stored = localStorage.getItem(persistedSelectionKey);
+        if (!stored) return { item: null, fromDate: "", toDate: "" };
+        return readParams(new URLSearchParams(stored));
+    } catch {
+        return { item: null, fromDate: "", toDate: "" };
+    }
+}
+
+const exportToCSV = (data: Record<string, unknown>[], filename: string, headers: { key: string; label: string }[]) => {
     if (data.length === 0) {
         alert("No data to export");
         return;
@@ -109,91 +105,59 @@ const exportToCSV = (data: any[], filename: string, headers: { key: string; labe
     document.body.removeChild(link);
 };
 
-/* ================================
-   MAIN COMPONENT
-================================ */
 export default function BusinessPerformanceDashboard() {
-    // Filter States
-    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(null);
-    const [fromDate, setFromDate] = useState<string>("");
-    const [toDate, setToDate] = useState<string>("");
-    const [appliedParams, setAppliedParams] = useState<BusinessPerformanceParams | null>(null);
+    const location = useLocation();
+    const navigate = useNavigate();
 
-    // Fetch headings for dropdown
-    const { data: headings = [], isLoading: headingsLoading } = useItemHeadings();
-    console.log({ message: "Headings data" }, headings);
+    const initialSelection = getInitialSelection(location.search);
 
-    // Fetch business performance data
+    const [selectedHeadingId, setSelectedHeadingId] = useState<number | null>(initialSelection.item);
+    const [fromDate, setFromDate] = useState<string>(initialSelection.fromDate);
+    const [toDate, setToDate] = useState<string>(initialSelection.toDate);
+    const [appliedParams, setAppliedParams] = useState<BusinessPerformanceParams | null>(() => {
+        if (!initialSelection.item || !initialSelection.fromDate || !initialSelection.toDate) return null;
+        return { headingId: initialSelection.item, fromDate: initialSelection.fromDate, toDate: initialSelection.toDate };
+    });
+
+    useEffect(() => {
+        if (location.search || !appliedParams) return;
+        const search = new URLSearchParams({
+            item: String(appliedParams.headingId),
+            fromDate: appliedParams.fromDate,
+            toDate: appliedParams.toDate,
+        });
+        navigate({ search: `?${search.toString()}` }, { replace: true });
+    }, [appliedParams, location.search, navigate]);
+
+    const { data: headings = [] } = useItemHeadings();
     const { data, isLoading: dataLoading } = useBusinessPerformance(appliedParams);
 
-    // Build params for submission
-    const params = useMemo(() => {
-        if (!selectedHeadingId || !fromDate || !toDate) return null;
-        return {
-            headingId: selectedHeadingId,
-            fromDate,
-            toDate,
-        };
-    }, [selectedHeadingId, fromDate, toDate]);
+    const dateError = fromDate && toDate && fromDate > toDate ? "From Date must be on or before To Date" : null;
 
-    // Handle form submission
+    const params = useMemo<BusinessPerformanceParams | null>(() => {
+        if (!selectedHeadingId || !fromDate || !toDate || dateError) return null;
+        return { headingId: selectedHeadingId, fromDate, toDate };
+    }, [dateError, fromDate, selectedHeadingId, toDate]);
+
     const handleSubmit = () => {
-        if (params) {
-            setAppliedParams(params);
-        }
+        if (!params) return;
+        setAppliedParams(params);
+
+        const search = new URLSearchParams({ item: String(params.headingId), fromDate: params.fromDate, toDate: params.toDate });
+        localStorage.setItem(persistedSelectionKey, search.toString());
+        navigate({ search: `?${search.toString()}` }, { replace: true });
     };
 
-    // Export handler
     const handleExportReport = useCallback(() => {
-        if (!data) return;
+        if (!data || !appliedParams) return;
 
-        const selectedHeading = headings.find(h => h.id === selectedHeadingId);
+        const selectedHeading = headings.find(h => h.id === appliedParams.headingId);
         const headingName = selectedHeading?.name || "Unknown";
 
-        const allData: any[] = [];
+        const allData: Record<string, unknown>[] = [];
 
-        // Add summary data
         Object.entries(data.summary).forEach(([category, summaryData]) => {
-            allData.push({
-                section: "Summary",
-                category: titleCase(category),
-                count: summaryData.count,
-                value: summaryData.value,
-                tenders: summaryData.tender.join(", "),
-            });
-        });
-
-        // Add region data
-        Object.entries(data.metrics.by_region).forEach(([region, metricData]) => {
-            allData.push({
-                section: "Region Analysis",
-                category: region,
-                count: metricData.count,
-                value: metricData.value,
-                tenders: "",
-            });
-        });
-
-        // Add state data
-        Object.entries(data.metrics.by_state).forEach(([state, metricData]) => {
-            allData.push({
-                section: "State Analysis",
-                category: state,
-                count: metricData.count,
-                value: metricData.value,
-                tenders: "",
-            });
-        });
-
-        // Add item data
-        Object.entries(data.metrics.by_item).forEach(([item, metricData]) => {
-            allData.push({
-                section: "Item Analysis",
-                category: item,
-                count: metricData.count,
-                value: metricData.value,
-                tenders: "",
-            });
+            allData.push({ section: "Summary", category: titleCase(category), count: summaryData.count, value: summaryData.value, tenders: summaryData.tender.join(", ") });
         });
 
         const headers = [
@@ -204,17 +168,13 @@ export default function BusinessPerformanceDashboard() {
             { key: "tenders", label: "Tenders" },
         ];
 
-        const filename = `Business_Performance_${headingName}_${fromDate}_to_${toDate}`;
+        const filename = `Business_Performance_${headingName}_${appliedParams.fromDate}_to_${appliedParams.toDate}`;
         exportToCSV(allData, filename, headers);
-    }, [data, headings, selectedHeadingId, fromDate, toDate]);
-
-    // Extract summary entries for rendering
-    const summaryEntries = data ? Object.entries(data.summary) : [];
+    }, [appliedParams, data, headings]);
 
     return (
         <div className="min-h-screen bg-muted/10 pb-12">
             <div className="mx-auto max-w-7xl p-6 space-y-8">
-                {/* ===== HEADER ===== */}
                 <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight">Business Performance</h1>
@@ -227,22 +187,19 @@ export default function BusinessPerformanceDashboard() {
                     </div>
                 </div>
 
-                {/* ===== FILTER CARD ===== */}
                 <Card className="shadow-sm">
-                    <CardContent className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                            {/* Item Heading Select */}
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 w-full gap-4 items-end">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Item Heading</label>
                                 <Combobox
                                     value={selectedHeadingId ? selectedHeadingId.toString() : ""}
                                     onChange={v => setSelectedHeadingId(v ? Number(v) : null)}
-                                    options={headings.map(heading => ({ id: heading.id.toString(), name: `${heading.name} (${heading.team})` }))}
+                                    options={[...headings].sort((a, b) => a.name.localeCompare(b.name)).map(heading => ({ id: heading.id.toString(), name: `${heading.name}` }))}
                                     placeholder="Select Item Heading"
                                 />
                             </div>
 
-                            {/* From Date */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">From Date</label>
                                 <div className="relative">
@@ -251,7 +208,6 @@ export default function BusinessPerformanceDashboard() {
                                 </div>
                             </div>
 
-                            {/* To Date */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">To Date</label>
                                 <div className="relative">
@@ -260,18 +216,17 @@ export default function BusinessPerformanceDashboard() {
                                 </div>
                             </div>
 
-                            {/* Submit Button */}
-                            <Button onClick={handleSubmit} disabled={!params}>
+                            <Button onClick={handleSubmit} disabled={!params} className="justify-self-center">
                                 <Filter className="mr-2 h-4 w-4" /> Submit
                             </Button>
                         </div>
+                        {dateError && <p className="mt-2 text-sm text-destructive">{dateError}</p>}
                     </CardContent>
                 </Card>
 
-                {/* ===== CONDITIONAL CONTENT ===== */}
                 {!appliedParams ? (
                     <div className="bg-muted rounded-lg p-6 text-center">
-                        <span className="text-muted-foreground">Please select an Item Heading and Date Range to view the report.</span>
+                        <span className="text-muted-foreground">Please select an Item Heading, From Date and To Date to view the report.</span>
                     </div>
                 ) : dataLoading ? (
                     <div className="bg-muted rounded-lg p-6 text-center">
@@ -279,209 +234,47 @@ export default function BusinessPerformanceDashboard() {
                     </div>
                 ) : (
                     <>
-                        {/* ===== ITEMS INFO ===== */}
-                        {data?.items && (
-                            <Card className="shadow-sm">
-                                <CardContent className="p-4">
-                                    {data.items.length > 0 ? (
-                                        <p className="text-sm">
-                                            The following items belong to the selected heading: <strong>{data.items.map(item => item.name).join(", ")}</strong>
-                                        </p>
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">No items found under the selected heading.</p>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )}
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_assigned" title="Tenders Assigned" description="All tenders assigned in this period." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_approved" title="Tenders Approved" description="Tenders approved by the team lead." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_missed" title="Tenders Missed" description="Tenders that were missed for submission." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_not_bid" title="Tenders Did Not Bid" description="Tenders assigned but not bid on." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_bid" title="Tenders Bid" description="Tenders where a bid has been submitted." />
+                        <BusinessCategoryTable
+                            params={appliedParams}
+                            categoryKey="tender_results_awaited"
+                            title="Tender Results Awaited"
+                            description="Tenders awaiting final results."
+                        />
+                        <BusinessCategoryTable
+                            params={appliedParams}
+                            categoryKey="tenders_disqualified"
+                            title="Tenders Disqualified"
+                            description="Tenders that were disqualified."
+                        />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_won" title="Tenders Won" description="Tenders that were won." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="tenders_lost" title="Tenders Lost" description="Tenders that were lost." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="emd_paid" title="EMD Paid" description="Tenders where the EMD has been paid." />
+                        <BusinessCategoryTable params={appliedParams} categoryKey="emd_returned" title="EMD Returned" description="Tenders where the EMD has been returned." />
 
-                        {/* ===== SUMMARY CARDS ===== */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {summaryEntries.map(([name, value]) => (
-                                <Card key={name} className="shadow-sm hover:shadow-md transition-shadow">
-                                    <CardContent className="p-3">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            {/* <TrendingUp className="h-5 w-5 text-primary" /> */}
-                                            <span className="font-semibold text-lg">{titleCase(name)}</span>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-sm text-muted-foreground">
-                                                Count: <span className="font-medium text-foreground">{value.count}</span>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1">
+                                <Card className="shadow-sm">
+                                    <CardContent className="p-5">
+                                        <div className="flex flex-wrap items-center gap-6">
+                                            <p className="text-sm text-muted-foreground">Average GP</p>
+                                            <p className={`text-3xl font-bold ${getGpColor(data?.avgGrossMargin)}`}>
+                                                {data?.avgGrossMargin !== null && data?.avgGrossMargin !== undefined ? `${data.avgGrossMargin.toFixed(2)}%` : "—"}
                                             </p>
-                                            <p className="text-xl font-bold text-orange-400">{formatCurrency(value.value)}</p>
+                                            <p className="text-xs text-muted-foreground">Average approved gross margin across tenders.</p>
                                         </div>
                                     </CardContent>
                                 </Card>
-                            ))}
-                        </div>
+                            </div>
 
-                        {/* ===== TENDER SUMMARY TABLE ===== */}
-                        <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                            <CardHeader className="pb-4">
-                                <CardTitle className="text-lg">Tender Summary Details</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="overflow-x-auto">
-                                    <Table>
-                                        <TableHeader className="bg-muted/50">
-                                            <TableRow>
-                                                <TableHead className="font-semibold">Category</TableHead>
-                                                <TableHead className="font-semibold">Count</TableHead>
-                                                <TableHead className="font-semibold">Value</TableHead>
-                                                <TableHead className="font-semibold">Tenders</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {summaryEntries.length === 0 ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                                                        No summary data available.
-                                                    </TableCell>
-                                                </TableRow>
-                                            ) : (
-                                                summaryEntries.map(([name, value]) => (
-                                                    <TableRow key={name} className="hover:bg-muted/30 transition-colors">
-                                                        <TableCell className="font-medium">{titleCase(name)}</TableCell>
-                                                        <TableCell className="tabular-nums">{value.count}</TableCell>
-                                                        <TableCell className="tabular-nums">{formatCurrency(value.value)}</TableCell>
-                                                        <TableCell>
-                                                            <div className="flex flex-wrap gap-1">
-                                                                {value.tender.map((tender, idx) => (
-                                                                    <Badge key={idx} variant="secondary" className="font-normal border border-gray-200">
-                                                                        {tender}
-                                                                    </Badge>
-                                                                ))}
-                                                            </div>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* ===== METRICS TABLES (3 columns) ===== */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {/* Region-wise Analysis */}
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                                <CardHeader className="pb-4">
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <MapPin className="h-5 w-5 text-blue-600" />
-                                        Region-wise Analysis
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="overflow-x-auto">
-                                        <Table>
-                                            <TableHeader className="bg-muted/50">
-                                                <TableRow>
-                                                    <TableHead className="font-semibold">Region</TableHead>
-                                                    <TableHead className="font-semibold">Count</TableHead>
-                                                    <TableHead className="font-semibold">Value</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {data?.metrics?.by_region && Object.entries(data.metrics.by_region).length > 0 ? (
-                                                    Object.entries(data.metrics.by_region).map(([region, metricData]) => (
-                                                        <TableRow key={region} className="hover:bg-muted/30 transition-colors">
-                                                            <TableCell className="font-medium">{region}</TableCell>
-                                                            <TableCell className="tabular-nums">{metricData.count}</TableCell>
-                                                            <TableCell className="tabular-nums">{formatCurrency(metricData.value)}</TableCell>
-                                                        </TableRow>
-                                                    ))
-                                                ) : (
-                                                    <TableRow>
-                                                        <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                                                            No region data available.
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* State-wise Analysis */}
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                                <CardHeader className="pb-4">
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <Building2 className="h-5 w-5 text-green-600" />
-                                        State-wise Analysis
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="overflow-x-auto">
-                                        <Table>
-                                            <TableHeader className="bg-muted/50">
-                                                <TableRow>
-                                                    <TableHead className="font-semibold">State</TableHead>
-                                                    <TableHead className="font-semibold">Count</TableHead>
-                                                    <TableHead className="font-semibold">Value</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {data?.metrics?.by_state && Object.entries(data.metrics.by_state).length > 0 ? (
-                                                    Object.entries(data.metrics.by_state).map(([state, metricData]) => (
-                                                        <TableRow key={state} className="hover:bg-muted/30 transition-colors">
-                                                            <TableCell className="font-medium">{state}</TableCell>
-                                                            <TableCell className="tabular-nums">{metricData.count}</TableCell>
-                                                            <TableCell className="tabular-nums">{formatCurrency(metricData.value)}</TableCell>
-                                                        </TableRow>
-                                                    ))
-                                                ) : (
-                                                    <TableRow>
-                                                        <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                                                            No state data available.
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* Item-wise Analysis */}
-                            <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                                <CardHeader className="pb-4">
-                                    <CardTitle className="text-lg flex items-center gap-2">
-                                        <Package className="h-5 w-5 text-purple-600" />
-                                        Item-wise Analysis
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="overflow-x-auto">
-                                        <Table>
-                                            <TableHeader className="bg-muted/50">
-                                                <TableRow>
-                                                    <TableHead className="font-semibold">Item</TableHead>
-                                                    <TableHead className="font-semibold">Count</TableHead>
-                                                    <TableHead className="font-semibold">Value</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {data?.metrics?.by_item && Object.entries(data.metrics.by_item).length > 0 ? (
-                                                    Object.entries(data.metrics.by_item).map(([item, metricData]) => (
-                                                        <TableRow key={item} className="hover:bg-muted/30 transition-colors">
-                                                            <TableCell className="font-medium">{item}</TableCell>
-                                                            <TableCell className="tabular-nums">{metricData.count}</TableCell>
-                                                            <TableCell className="tabular-nums">{formatCurrency(metricData.value)}</TableCell>
-                                                        </TableRow>
-                                                    ))
-                                                ) : (
-                                                    <TableRow>
-                                                        <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
-                                                            No item data available.
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <BusinessBarChart params={appliedParams} />
+                                <BusinessDonutChart params={appliedParams} />
+                            </div>
                         </div>
                     </>
                 )}

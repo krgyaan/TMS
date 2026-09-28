@@ -11,6 +11,7 @@ import { WoDetailsSection } from "@/modules/operations/wo-details/components/WoD
 import { KickOffSection } from "@/modules/operations/kick-off/components/KickOffSection";
 import { ContractAgreementSection } from "@/modules/operations/contract-agreement/components/ContractAgreementSection";
 import { PoDashboardSection } from "@/modules/operations/purchase-orders/components/PoDashboardSection";
+import { CashFlowSection } from "@/modules/operations/project-dashboard/sections/CashFlowSection";
 import { paths } from "@/app/routes/paths";
 
 export default function ProjectShowPage() {
@@ -24,7 +25,7 @@ export default function ProjectShowPage() {
     const woBasicDetailId = overview?.woBasicDetail?.id ?? null;
 
     const { steps, woDetailId } = useWoStepStatuses(null, woBasicDetailId);
-    const [activeTab, setActiveTab] = useState<"operation" | "tendering">("operation");
+    const [activeTab, setActiveTab] = useState<"operation" | "tendering" | "cash-flow">("operation");
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["basic-details"]));
 
@@ -65,13 +66,14 @@ export default function ProjectShowPage() {
     }
 
     return (
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "operation" | "tendering")}>
-            <TabsList className="mb-4">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "operation" | "tendering" | "cash-flow")}>
+            <TabsList className="m-auto">
                 <TabsTrigger value="operation">Operation Details</TabsTrigger>
                 <TabsTrigger value="tendering">Tendering Details</TabsTrigger>
+                <TabsTrigger value="cash-flow">Cash Flow</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="operation">
+            <TabsContent value="operation" className="mt-6">
                 {woBasicDetailId ? (
                     <ShowPageLayout
                         steps={steps}
@@ -92,7 +94,7 @@ export default function ProjectShowPage() {
                 )}
             </TabsContent>
 
-            <TabsContent value="tendering">
+            <TabsContent value="tendering" className="mt-6">
                 {activeTab === "tendering" && tenderId ? (
                     <TenderViewPage
                         tenderId={tenderId}
@@ -106,6 +108,10 @@ export default function ProjectShowPage() {
                         </CardContent>
                     </Card>
                 )}
+            </TabsContent>
+
+            <TabsContent value="cash-flow" className="mt-6">
+                <CashFlowSection projectId={projectId} />
             </TabsContent>
         </Tabs>
     );

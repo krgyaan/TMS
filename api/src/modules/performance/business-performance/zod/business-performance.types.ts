@@ -1,33 +1,43 @@
 // ─── DB row shapes (internal) ─────────────────────────────────────────────────
 
 export interface TenderRow {
-    id: number;
     tenderId: number;
-    team: number;
-    location: number;
-    item: number;
     tenderName: string;
     gstValues: string;
     bidStatus: "Submission Pending" | "Bid Submitted" | "Tender Missed";
     tenderStatus: number;
-    state: string | null;
-    region: string | null;
-    itemHeadingName: string | null;
-    headingTeam: string | null;
-    itemName: string | null;
-    itemTeam: string | null;
 }
 
 export interface AssignedTenderRow {
     id: number;
-    team: number;
     tenderName: string;
     gstValues: string;
     tlStatus: number;
-    tenderStatus: number;
-    state: string | null;
-    region: string | null;
+}
+
+export interface EmdTenderRow {
+    id: number;
+    tenderName: string;
+    gstValues: string;
+    hasEmdPaid: boolean | null;
+    hasEmdReturned: boolean | null;
+}
+
+export interface BusinessTenderRow {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: Date;
+    gstValues: string;
+    member: string | null;
+    team: string | null;
     itemName: string | null;
+    status: number;
+    tlStatus: number;
+    bidStatus: "Submission Pending" | "Bid Submitted" | "Tender Missed" | null;
+    hasEmdPaid: boolean | null;
+    hasEmdReturned: boolean | null;
+    avgGrossMargin: number | null;
 }
 
 export interface ItemRow {
@@ -58,25 +68,31 @@ export interface BusinessSummary {
     tender_results_awaited: SummaryItem;
     tenders_won: SummaryItem;
     tenders_lost: SummaryItem;
-}
-
-export interface MetricEntry {
-    count: number;
-    value: number;
-}
-
-export interface BusinessMetrics {
-    by_region: Record<string, MetricEntry>;
-    by_state: Record<string, MetricEntry>;
-    by_item: Record<string, MetricEntry>;
-    total_count: number;
-    total_value: number;
+    emd_paid: SummaryItem;
+    emd_returned: SummaryItem;
+    tenders_not_bid: SummaryItem;
 }
 
 export interface BusinessPerformanceResponse {
     items: ItemRow[];
     summary: BusinessSummary;
-    metrics: BusinessMetrics;
+    tenderList: BusinessTenderListItem[];
+    avgGrossMargin: number | null;
+}
+
+export interface BusinessTenderListItem {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: string;
+    gstValues: string;
+    member: string;
+    team: string;
+    item: string;
+    status: string;
+    bidStatus: string;
+    avgGrossMargin: string | null;
+    category: string[];
 }
 
 export interface ItemHeadingsResponse {

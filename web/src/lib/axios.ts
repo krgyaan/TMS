@@ -1,5 +1,5 @@
 import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
-import { clearAuthSession } from './auth'
+import { clearAuthSession, getStoredUser } from './auth'
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'
 
@@ -15,10 +15,38 @@ export const axiosInstance: AxiosInstance = axios.create({
 // Flag to prevent multiple simultaneous redirects
 let isRedirecting = false
 
+// Endpoints that may be called without a logged-in session. These are the only
+// requests allowed to reach the server once the local session is cleared
+// (e.g. right after logout, when React Query observers refetch and would
+// otherwise fire unauthenticated calls like GET /teams).
+const PUBLIC_PATHS = [
+    '/auth/login',
+    '/auth/logout',
+    '/auth/me',
+    '/auth/forgot-password',
+    '/auth/verify-otp',
+    '/auth/reset-password',
+    '/auth/change-password',
+    '/auth/permissions',
+    '/auth/google',
+    '/auth/refresh',
+    '/health',
+];
+
+const isPublicPath = (path: string): boolean =>
+    PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
+
 // Request interceptor - No need to add token manually (cookies are automatic)
 axiosInstance.interceptors.request.use(
-    (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
-        // Cookies are sent automatically, no manual token handling needed
+    (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig | Promise<InternalAxiosRequestConfig> => {
+        // Once the stored session is gone, block non-public requests client-side so
+        // no auth-required call (e.g. /teams) ever reaches the server unauthenticated.
+        if (!getStoredUser()) {
+            const path = (config.url ?? '').split('?')[0];
+            if (!isPublicPath(path)) {
+                return Promise.reject(new axios.CanceledError('Session has been cleared'));
+            }
+        }
         return config
     },
     (error: AxiosError) => {

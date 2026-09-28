@@ -9,6 +9,7 @@ export interface OrderProductRow {
     id: number;
     description: string;
     qty: number | string;
+    unit: string | null;
     rate: number | string;
     taxableAmount: number | string;
     gstRate: number | string;

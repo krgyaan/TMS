@@ -27,6 +27,14 @@ export const useRole = (id: number | null) => {
     });
 };
 
+export const useRolePermissions = (id: number | null) => {
+    return useQuery({
+        queryKey: [...rolesKey.details(), id!, "permissions"] as const,
+        queryFn: () => rolesService.getRolePermissions(id!),
+        enabled: !!id,
+    });
+};
+
 export const useCreateRole = () => {
     const queryClient = useQueryClient();
 
@@ -80,6 +88,7 @@ export const useAssignRolePermissions = () => {
         mutationFn: ({ roleId, permissionIds }: { roleId: number; permissionIds: number[] }) =>
             rolesService.assignPermissions(roleId, permissionIds),
         onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: [...rolesKey.details(), variables.roleId, "permissions"] });
             queryClient.invalidateQueries({ queryKey: rolesKey.detail(variables.roleId) });
             queryClient.invalidateQueries({ queryKey: rolesKey.lists() });
             toast.success('Permissions assigned successfully');

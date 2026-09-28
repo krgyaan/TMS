@@ -9,9 +9,21 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { purchaseOrderApi } from "@/services/api/purchase-order.api";
 import { FileUploader } from "@/components/file-upload";
-import { AlertCircle, CheckCircle2, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Plus, Save, Trash2, Edit } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { CanUpdate } from "@/components/PermissionGuard";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { AdminOnly } from "@/components/RoleGuard";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "default" | "outline" | "success" | "destructive" }> = {
     pending: { label: "Pending", variant: "outline" },
@@ -20,7 +32,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "secondary" | "def
     rejected: { label: "Rejected", variant: "destructive" },
 };
 
-const BUDGET_CATEGORIES = ["Supply", "Admin/Misc.", "Buyback/Sale", "GEM Charges","Warranty"];
+const BUDGET_CATEGORIES = ["Supply", "Admin/Misc.", "Buyback/Sale", "GEM Charges", "Warranty"];
 
 interface PoClosureData {
     id: number;
@@ -110,6 +122,38 @@ const PoClosurePage: React.FC = () => {
     const [savingPayments, setSavingPayments] = useState(false);
     const [savingInvoices, setSavingInvoices] = useState(false);
     const [saveMsg, setSaveMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+    // Delete confirmation state
+    const [deletePaymentRequest, setDeletePaymentRequest] = useState<{ id: number; requestNo: string } | null>(null);
+    const [deletePurchaseInvoice, setDeletePurchaseInvoice] = useState<{ id: number; invoiceNo: string } | null>(null);
+
+    const handleDeletePaymentRequest = async () => {
+        if (!deletePaymentRequest || !po) return;
+        try {
+            await purchaseOrderApi.deletePaymentRequest(id, deletePaymentRequest.id);
+            setSaveMsg({ type: "success", text: `Payment request ${deletePaymentRequest.requestNo} deleted.` });
+            await fetchData();
+        } catch (err) {
+            console.error(err);
+            setSaveMsg({ type: "error", text: "Failed to delete payment request." });
+        } finally {
+            setDeletePaymentRequest(null);
+        }
+    };
+
+    const handleDeletePurchaseInvoice = async () => {
+        if (!deletePurchaseInvoice || !po) return;
+        try {
+            await purchaseOrderApi.deletePurchaseInvoice(id, deletePurchaseInvoice.id);
+            setSaveMsg({ type: "success", text: `Purchase invoice ${deletePurchaseInvoice.invoiceNo} deleted.` });
+            await fetchData();
+        } catch (err) {
+            console.error(err);
+            setSaveMsg({ type: "error", text: "Failed to delete purchase invoice." });
+        } finally {
+            setDeletePurchaseInvoice(null);
+        }
+    };
 
     const fetchData = async () => {
         const res = await purchaseOrderApi.getClosureData(id);
@@ -523,6 +567,7 @@ const PoClosurePage: React.FC = () => {
                                         <TableHead className="text-xs uppercase">Status</TableHead>
                                         <TableHead className="text-xs uppercase">Mode</TableHead>
                                         <TableHead className="text-xs uppercase">UTR</TableHead>
+                                        <TableHead className="text-xs uppercase">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -536,7 +581,35 @@ const PoClosurePage: React.FC = () => {
                                                 <TableCell className="text-sm text-right font-medium">{formatINR(Number(pr.amount || 0))}</TableCell>
                                                 <TableCell><Badge variant={cfg.variant}>{cfg.label}</Badge></TableCell>
                                                 <TableCell className="text-sm">{pr.paymentMode || "—"}</TableCell>
-                                                <TableCell className="text-sm font-mono">{pr.utrNumber || "—"}</TableCell>
+                                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{pr.utrNumber || "—"}</TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <CanUpdate module="accounts.payment-requests">
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-8 w-8 p-0"
+                                                                onClick={() => navigate(paths.operations.editProjectPaymentRequestPage(pr.id, po.projectId))}
+                                                                title="Edit Payment Request"
+                                                            >
+                                                                <Edit className="h-4 w-4" />
+                                                            </Button>
+                                                        </CanUpdate>
+                                                        <AdminOnly>
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-8 w-8 p-0 text-destructive"
+                                                                onClick={() => setDeletePaymentRequest({ id: pr.id, requestNo: pr.requestNo || `#${pr.id}` })}
+                                                                title="Delete Payment Request"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </AdminOnly>
+                                                    </div>
+                                                </TableCell>
                                             </TableRow>
                                         );
                                     })}
@@ -566,6 +639,7 @@ const PoClosurePage: React.FC = () => {
                                         <TableHead className="text-xs uppercase text-right">Pre-GST</TableHead>
                                         <TableHead className="text-xs uppercase text-right">GST</TableHead>
                                         <TableHead className="text-xs uppercase text-right">Total</TableHead>
+                                        <TableHead className="text-xs uppercase">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -580,6 +654,34 @@ const PoClosurePage: React.FC = () => {
                                                 <TableCell className="text-sm text-right">{formatINR(Number(inv.valuePreGst || 0))}</TableCell>
                                                 <TableCell className="text-sm text-right">{formatINR(Number(inv.gstAmount || 0))}</TableCell>
                                                 <TableCell className="text-sm text-right font-medium">{formatINR(piTotal)}</TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <CanUpdate module="accounts.purchase-invoices">
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-8 w-8 p-0"
+                                                                onClick={() => navigate(paths.operations.editProjectPurchaseInvoicePage(inv.id, po.projectId))}
+                                                                title="Edit Purchase Invoice"
+                                                            >
+                                                                <Edit className="h-4 w-4" />
+                                                            </Button>
+                                                        </CanUpdate>
+                                                        <AdminOnly>
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-8 w-8 p-0 text-destructive"
+                                                                onClick={() => setDeletePurchaseInvoice({ id: inv.id, invoiceNo: inv.invoiceNo || `#${inv.id}` })}
+                                                                title="Delete Purchase Invoice"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </AdminOnly>
+                                                    </div>
+                                                </TableCell>
                                             </TableRow>
                                         );
                                     })}
@@ -598,6 +700,42 @@ const PoClosurePage: React.FC = () => {
                     </Button>
                 )}
             </CardFooter>
+
+            {/* Delete Payment Request Confirmation Dialog */}
+            <AlertDialog open={!!deletePaymentRequest} onOpenChange={(open) => !open && setDeletePaymentRequest(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Payment Request</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete payment request <strong>{deletePaymentRequest?.requestNo}</strong>? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setDeletePaymentRequest(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeletePaymentRequest} className="bg-destructive hover:bg-destructive/90">
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Delete Purchase Invoice Confirmation Dialog */}
+            <AlertDialog open={!!deletePurchaseInvoice} onOpenChange={(open) => !open && setDeletePurchaseInvoice(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Purchase Invoice</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete purchase invoice <strong>{deletePurchaseInvoice?.invoiceNo}</strong>? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setDeletePurchaseInvoice(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeletePurchaseInvoice} className="bg-destructive hover:bg-destructive/90">
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Card>
     );
 };

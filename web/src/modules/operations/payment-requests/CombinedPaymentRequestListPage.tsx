@@ -1,5 +1,6 @@
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import { FileUploader } from "@/components/file-upload";
+import { Combobox, type SelectOption } from "@/components/form/SelectField";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,20 +14,19 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
-import { useAllPaymentRequests, usePaymentRequestDetails, useUpdatePaymentRequestStatus, useUploadPaymentInvoiceAfterPayment } from "@/hooks/api/useProjectPaymentRequests";
+import { useAllPaymentRequests, useRevertPaymentRequestStatus, useUpdatePaymentRequestStatus, useUploadPaymentInvoiceAfterPayment } from "@/hooks/api/useProjectPaymentRequests";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { useTeamFilter } from "@/hooks/useTeamFilter";
 import { referenceName } from "@/lib/id-utils";
+import { PaymentRequestViewModal } from "@/modules/operations/payment-requests/components/PaymentRequestViewModal";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
-import { fileUploadService } from "@/services/api/file-upload.service";
-import { purchaseOrderApi } from "@/services/api/purchase-order.api";
-import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
+import { calculateTds } from "@/modules/operations/payment-requests/helpers/tds-calculator";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
-import { Ban, Banknote, CheckCircle2, Copy, Eye, Search, Upload } from "lucide-react";
+import { Ban, Banknote, CheckCircle2, Copy, Eye, RotateCcw, Search, Upload } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
@@ -58,6 +58,11 @@ const CombinedPaymentRequestListPage: React.FC = () => {
     const [uploadInvoiceFiles, setUploadInvoiceFiles] = useState<string[]>([]);
     const [uploadInvoiceError, setUploadInvoiceError] = useState("");
     const uploadInvoiceMutation = useUploadPaymentInvoiceAfterPayment();
+
+    const [revertRow, setRevertRow] = useState<PaymentRequestRow | null>(null);
+    const [revertStatus, setRevertStatus] = useState("");
+    const [revertRemark, setRevertRemark] = useState("");
+    const revertMutation = useRevertPaymentRequestStatus();
 
     const rows = useMemo(() => (data ?? []) as PaymentRequestRow[], [data]);
 
@@ -114,6 +119,11 @@ const CombinedPaymentRequestListPage: React.FC = () => {
         rejected: visibleRows.filter((r) => r.status === "rejected").length,
     }), [visibleRows]);
 
+    const revertStatusOptions: SelectOption[] = useMemo(
+        () => Object.entries(STATUS_CONFIG).map(([key, config]) => ({ id: key, name: config.label })),
+        [],
+    );
+
     const onGridReady = useCallback((event: GridReadyEvent<PaymentRequestRow>) => {
         setGridApi(event.api);
     }, []);
@@ -131,6 +141,12 @@ const CombinedPaymentRequestListPage: React.FC = () => {
         setUploadInvoiceRow(row);
         setUploadInvoiceFiles([]);
         setUploadInvoiceError("");
+    }, []);
+
+    const handleRevert = useCallback((row: PaymentRequestRow) => {
+        setRevertRow(row);
+        setRevertStatus("");
+        setRevertRemark("");
     }, []);
 
     const CATEGORIES_NEED_INVOICE_AFTER_PAYMENT = useMemo(() => new Set([
@@ -181,6 +197,22 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             setRejectRow(null); setRejectionReason(""); } catch {}
     }, [rejectRow, rejectionReason, updateStatusMutation]);
 
+    const confirmRevert = useCallback(async () => {
+        if (!revertRow || !revertStatus || !revertRemark.trim()) return;
+        try {
+            await revertMutation.mutateAsync({
+                id: revertRow.id,
+                data: { status: revertStatus, remark: `Status Reverted - ${revertRemark.trim()}` },
+            });
+            toast.success("Payment request reverted successfully");
+            setRevertRow(null);
+            setRevertStatus("");
+            setRevertRemark("");
+        } catch {
+            toast.error("Failed to revert payment request");
+        }
+    }, [revertRow, revertStatus, revertRemark, revertMutation]);
+
     const actions: ActionItem<PaymentRequestRow>[] = useMemo(() => [
         { label: "View Details", icon: <Eye className="h-4 w-4" />, onClick: handleView },
         { label: "Maker Done", icon: <CheckCircle2 className="h-4 w-4" />, onClick: handleMakerDone, visible: (row) => row.status === "pending" },
@@ -192,7 +224,13 @@ const CombinedPaymentRequestListPage: React.FC = () => {
             visible: (row) => row.status !== "rejected" && row.status !== "po_approval_pending" && CATEGORIES_NEED_INVOICE_AFTER_PAYMENT.has(row.paymentAgainst),
         },
         { label: "Reject", icon: <Ban className="h-4 w-4" />, onClick: handleReject, className: "text-red-600", visible: (row) => row.status === "pending" || row.status === "maker_done" },
-    ], [handleView, handleMakerDone, handlePaymentDone, handleUploadInvoice, handleReject, CATEGORIES_NEED_INVOICE_AFTER_PAYMENT]);
+        {
+            label: "Revert",
+            icon: <RotateCcw className="h-4 w-4" />,
+            onClick: handleRevert,
+            visible: (row) => !isOperationsSection && ["rejected", "payment_done", "maker_done"].includes(row.status),
+        },
+    ], [handleView, handleMakerDone, handlePaymentDone, handleUploadInvoice, handleReject, handleRevert, CATEGORIES_NEED_INVOICE_AFTER_PAYMENT, isOperationsSection]);
 
     const columns = useMemo<ColDef<PaymentRequestRow>[]>(() => [
         {
@@ -254,10 +292,15 @@ const CombinedPaymentRequestListPage: React.FC = () => {
 
         },
         {
-            field: "amount",
-            headerName: "Amount",
-            sortable: true,
-            valueFormatter: (p: ValueFormatterParams<PaymentRequestRow>) => formatINR(p.value),
+            field: "netPayable" as keyof PaymentRequestRow,
+            headerName: "Net Payable",
+            sortable: false,
+            valueGetter: (p) => {
+                const amount = Number(p.data?.amount || 0);
+                const tdsPct = Number(p.data?.tdsPercentage || 0);
+                return tdsPct > 0 ? calculateTds(amount, tdsPct).netPayable : amount;
+            },
+            valueFormatter: (p: ValueFormatterParams) => formatINR(p.value),
         },
         {
             field: "paymentAgainst",
@@ -315,9 +358,6 @@ const CombinedPaymentRequestListPage: React.FC = () => {
         },
     ], [actions]);
 
-    const { data: detailData, isLoading: isDetailLoading } = usePaymentRequestDetails(viewingId ?? 0);
-    const detail = detailData as PaymentRequestRow | undefined;
-
     return (
         <>
             <Card>
@@ -361,199 +401,12 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                     )}
                 </CardContent>
             </Card>
-
             {/* View Modal */}
-            <Dialog open={viewingId !== null} onOpenChange={(open) => { if (!open) setViewingId(null); }}>
-                <DialogContent className="sm:max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Payment Request Details</DialogTitle>
-                        <DialogDescription>Full details of the selected request</DialogDescription>
-                    </DialogHeader>
-                    {isDetailLoading ? (
-                        <div className="space-y-4 py-4">{ [1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-8 w-full" />) }</div>
-                    ) : detail ? (
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-4">
-                            <div className="col-span-2">
-                                <Label className="text-muted-foreground text-xs">Request No</Label>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <p className="font-mono font-medium">{referenceName(detail.requestNo)}</p>
-                                        </TooltipTrigger>
-                                        <TooltipContent>{detail.requestNo}</TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
-                            </div>
-                            {detail.projectId != null && (
-                                <div>
-                                    <Label className="text-muted-foreground text-xs">Project</Label>
-                                    <p>{detail.projectName || "—"}</p>
-                                </div>
-                            )}
-                            <div>
-                                <Label className="text-muted-foreground text-xs">Party Name</Label>
-                                <p>{detail.partyName}</p>
-                            </div>
-                            <div>
-                                <Label className="text-muted-foreground text-xs">Amount</Label>
-                                <p className="font-medium">{formatINR(detail.amount)}</p>
-                            </div>
-                            <div>
-                                <Label className="text-muted-foreground text-xs">Account Number</Label>
-                                <p className="font-mono">{detail.accountNumber}</p>
-                            </div>
-                            <div>
-                                <Label className="text-muted-foreground text-xs">Bank Name</Label>
-                                <p>{detail.bankName || "—"}</p>
-                            </div>
-                            <div>
-                                <Label className="text-muted-foreground text-xs">IFSC</Label>
-                                <p className="font-mono">{detail.ifsc}</p>
-                            </div>
-                            <div>
-                                <Label className="text-muted-foreground text-xs">Category</Label>
-                                <p>{PAYMENT_AGAINST_LABELS[detail.paymentAgainst] || detail.paymentAgainst || "—"}</p>
-                            </div>
-                            <div>
-                                <Label className="text-muted-foreground text-xs">Payment Mode</Label>
-                                <p>{detail.paymentMode || "BANK_TRANSFER"}</p>
-                            </div>
-                            {detail.portalLink && (
-                                <div className="col-span-2">
-                                    <Label className="text-muted-foreground text-xs">Portal Link</Label>
-                                    <p className="text-blue-600 underline break-all">{detail.portalLink}</p>
-                                </div>
-                            )}
-                            <div>
-                                <Label className="text-muted-foreground text-xs">Status</Label>
-                                <Badge variant="outline" className={STATUS_CONFIG[detail.status]?.color || ""}>{STATUS_CONFIG[detail.status]?.label || detail.status}</Badge>
-                            </div>
-                            <div>
-                                <Label className="text-muted-foreground text-xs">Requested By</Label>
-                                <p>{detail.requestedByName || "—"}</p>
-                            </div>
-                            <div>
-                                <Label className="text-muted-foreground text-xs">Created At</Label>
-                                <p>{formatDateTime(detail.createdAt)}</p>
-                            </div>
-                            {detail.utrNumber &&
-                                <div>
-                                    <Label className="text-muted-foreground text-xs">UTR Number</Label>
-                                    <p className="font-mono">{detail.utrNumber}</p>
-                                </div>
-                            }
-                            {detail.rejectionReason &&
-                                <div className="col-span-2">
-                                    <Label className="text-muted-foreground text-xs">Rejection Reason</Label>
-                                    <p className="text-red-600">{detail.rejectionReason}</p>
-                                </div>
-                            }
-                            {detail.remark &&
-                                <div className="col-span-2">
-                                    <Label className="text-muted-foreground text-xs">Remark</Label>
-                                    <p>{detail.remark}</p>
-                                </div>
-                            }
-                            {detail.billFiles && detail.billFiles.length > 0 && (
-                                <div className="col-span-2">
-                                    <Label className="text-muted-foreground text-xs">Bill / Proof Files</Label>
-                                    <div className="flex flex-wrap gap-2 mt-1">
-                                        {detail.billFiles.map((f: string, i: number) => (
-                                            <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                            {detail.uploadInvoice?.length > 0 && (
-                                <div className="col-span-2">
-                                    <Label className="text-muted-foreground text-xs">Upload Invoice</Label>
-                                    <div className="flex flex-wrap gap-2 mt-1">
-                                        {detail.uploadInvoice.map((f: string, i: number) => (
-                                            <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                            {detail.uploadPI?.length > 0 && (
-                                <div className="col-span-2">
-                                    <Label className="text-muted-foreground text-xs">Upload PI</Label>
-                                    <div className="flex flex-wrap gap-2 mt-1">
-                                        {detail.uploadPI.map((f: string, i: number) => (
-                                            <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                            {detail.uploadInvoiceAfterPayment?.length > 0 && (
-                                <div className="col-span-2">
-                                    <Label className="text-muted-foreground text-xs">Upload Invoice after Payment</Label>
-                                    <div className="flex flex-wrap gap-2 mt-1">
-                                        {detail.uploadInvoiceAfterPayment.map((f: string, i: number) => (
-                                            <a key={i} href={fileUploadService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                            {detail.purchaseOrderId && (
-                                <div className="col-span-2 space-y-2">
-                                    <Label className="text-muted-foreground text-xs">PO Details</Label>
-                                    <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">PO Number:</span>
-                                            <span className="font-medium">{detail.poNumber || `#${detail.purchaseOrderId}`}</span>
-                                        </div>
-                                        {detail.poFile && (
-                                            <div className="flex justify-between">
-                                                <span className="text-muted-foreground">PO File:</span>
-                                                <a href={fileUploadService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download PO</a>
-                                            </div>
-                                        )}
-                                        <div className="flex justify-between"><span className="text-muted-foreground">Grand Total:</span><span>{formatINR(detail.poGrandTotal || 0)}</span></div>
-                                        <div className="flex justify-between"><span className="text-muted-foreground">TDS %:</span><span>{detail.poTdsPercentage || "0"}%</span></div>
-                                        <div className="flex justify-between"><span className="text-muted-foreground">TDS Amount:</span><span>{formatINR(detail.poTdsAmount || 0)}</span></div>
-                                        <div className="flex justify-between"><span className="text-muted-foreground">Amount After TDS:</span><span>{formatINR(detail.poAmountAfterTds || 0)}</span></div>
-                                        <div className="flex justify-between"><span className="text-muted-foreground">Payment Requested:</span><span>{formatINR(detail.poTotalPaymentRequested || 0)}</span></div>
-                                        <div className="flex justify-between"><span className="text-muted-foreground">Maker Done:</span><span>{formatINR(detail.poTotalMakerDone || 0)}</span></div>
-                                        <div className="flex justify-between"><span className="text-muted-foreground">Payment Done:</span><span>{formatINR(detail.poTotalPaymentDone || 0)}</span></div>
-                                        <div className="pt-2">
-                                            <a href={purchaseOrderApi.getPurchaseOrderPdfUrl(detail.purchaseOrderId)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-xs">
-                                                View Latest PO PDF
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                            {detail.vendorWorkOrderId && (
-                                <div className="col-span-2 space-y-2">
-                                    <Label className="text-muted-foreground text-xs">VWO Details</Label>
-                                    <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-sm">
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">VWO Number:</span>
-                                            <span className="font-medium">{detail.vwoNumber || `#${detail.vendorWorkOrderId}`}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">VWO File:</span>
-                                            <a href={vendorWorkOrderApi.getPdfDownloadUrl(detail.vendorWorkOrderId)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">Download VWO</a>
-                                        </div>
-                                        <div className="flex justify-between"><span className="text-muted-foreground">Grand Total:</span><span>{formatINR(detail.vwoGrandTotal || 0)}</span></div>
-                                        <div className="flex justify-between"><span className="text-muted-foreground">TDS %:</span><span>{detail.vwoTdsPercentage || "0"}%</span></div>
-                                        <div className="flex justify-between"><span className="text-muted-foreground">TDS Amount:</span><span>{formatINR(detail.vwoTdsAmount || 0)}</span></div>
-                                        <div className="flex justify-between"><span className="text-muted-foreground">Amount After TDS:</span><span>{formatINR(detail.vwoAmountAfterTds || 0)}</span></div>
-                                        <div className="flex justify-between"><span className="text-muted-foreground">Payment Requested:</span><span>{formatINR(detail.vwoTotalPaymentRequested || 0)}</span></div>
-                                        <div className="flex justify-between"><span className="text-muted-foreground">Maker Done:</span><span>{formatINR(detail.vwoTotalMakerDone || 0)}</span></div>
-                                        <div className="flex justify-between"><span className="text-muted-foreground">Payment Done:</span><span>{formatINR(detail.vwoTotalPaymentDone || 0)}</span></div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <p className="text-muted-foreground py-4 text-center">No details found.</p>
-                    )}
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setViewingId(null)}>Close</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <PaymentRequestViewModal
+                viewingId={viewingId}
+                onClose={() => setViewingId(null)}
+            />
+
 
             {/* Maker Done Dialog */}
             <Dialog open={makerDoneRow !== null} onOpenChange={(open) => { if (!open) setMakerDoneRow(null); }}>
@@ -661,6 +514,45 @@ const CombinedPaymentRequestListPage: React.FC = () => {
                         <Button variant="outline" onClick={() => { setUploadInvoiceRow(null); setUploadInvoiceFiles([]); setUploadInvoiceError(""); }}>Cancel</Button>
                         <Button onClick={confirmUploadInvoice} disabled={uploadInvoiceMutation.isPending}>
                             {uploadInvoiceMutation.isPending ? "Uploading..." : "Submit"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Revert Status Dialog */}
+            <Dialog open={revertRow !== null} onOpenChange={(open) => { if (!open) { setRevertRow(null); setRevertStatus(""); setRevertRemark(""); } }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Revert Payment Request</DialogTitle>
+                        <DialogDescription>Change the status of this payment request</DialogDescription>
+                    </DialogHeader>
+                    {revertRow &&
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-1">
+                                <p className="text-sm"><strong>Request No:</strong> {revertRow.requestNo}</p>
+                                <p className="text-sm"><strong>Party:</strong> {revertRow.partyName}</p>
+                                <p className="text-sm"><strong>Amount:</strong> {formatINR(revertRow.amount)}</p>
+                                <p className="text-sm"><strong>Current Status:</strong> <Badge variant="outline" className={STATUS_CONFIG[revertRow.status]?.color || ""}>{STATUS_CONFIG[revertRow.status]?.label || revertRow.status}</Badge></p>
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="revert-status">New Status <span className="text-destructive">*</span></Label>
+                                <Combobox
+                                    value={revertStatus}
+                                    onChange={setRevertStatus}
+                                    options={revertStatusOptions}
+                                    placeholder="Select status..."
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="revert-remark">Remark <span className="text-destructive">*</span></Label>
+                                <Textarea id="revert-remark" value={revertRemark} onChange={(e) => setRevertRemark(e.target.value)} placeholder="Explain why this request is being reverted..." rows={3} />
+                            </div>
+                        </div>
+                    }
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => { setRevertRow(null); setRevertStatus(""); setRevertRemark(""); }}>Cancel</Button>
+                        <Button onClick={confirmRevert} disabled={!revertStatus || !revertRemark.trim() || revertMutation.isPending}>
+                            {revertMutation.isPending ? "Reverting..." : "Revert"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

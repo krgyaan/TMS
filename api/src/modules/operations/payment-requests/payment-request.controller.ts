@@ -46,6 +46,15 @@ export class PaymentRequestController {
         return this.service.updateStatus(id, body);
     }
 
+    @Patch(":id/revert")
+    @HttpCode(HttpStatus.OK)
+    revertStatus(
+        @Param("id", ParseIntPipe) id: number,
+        @Body() body: { status: string; remark: string },
+    ) {
+        return this.service.revertStatus(id, body);
+    }
+
     @Patch(":id/upload-invoice-after-payment")
     @HttpCode(HttpStatus.OK)
     uploadInvoiceAfterPayment(

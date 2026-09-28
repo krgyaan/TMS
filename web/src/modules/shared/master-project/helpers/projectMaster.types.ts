@@ -36,6 +36,8 @@ export interface ProjectMasterListRow extends ProjectMasterResponse {
     tenderName?: string | null;
     tenderNo?: string | null;
     teamMemberName?: string | null;
+    totalPaymentDone?: number;
+    totalInvoicesReceived?: number;
 }
 
 export interface CreateProjectMasterDto {

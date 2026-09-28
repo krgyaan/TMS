@@ -107,8 +107,8 @@ export function Combobox({
     return (
         <DropdownMenu open={open} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild disabled={disabled}>
-                <Button type="button" variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between" disabled={disabled}>
-                    {selected ? selected.name : placeholder}
+                <Button type="button" variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between min-w-0" disabled={disabled}>
+                    <span className="truncate">{selected ? selected.name : placeholder}</span>
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"

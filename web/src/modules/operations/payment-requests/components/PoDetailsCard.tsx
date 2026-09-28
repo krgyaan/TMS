@@ -11,7 +11,7 @@ interface PoDetailsCardProps {
 }
 
 export const PoDetailsCard: React.FC<PoDetailsCardProps> = ({ po, requestAmount }) => {
-    const cap = po.amountAfterTds ? Number(po.amountAfterTds) : Number(po.grandTotal || 0);
+    const cap = Number(po.grandTotal || 0);
     const remaining = cap - Number(po.totalPaymentRequested || 0);
     const isExhausted = remaining <= 0;
     const exceedsRemaining = requestAmount != null && requestAmount > 0 && requestAmount > remaining;
@@ -43,19 +43,6 @@ export const PoDetailsCard: React.FC<PoDetailsCardProps> = ({ po, requestAmount 
                     <span>Grand Total:</span>
                     <span>{formatINR(po.grandTotal || 0)}</span>
                 </div>
-                {po.tdsPercentage && Number(po.tdsPercentage) > 0 && (
-                    <>
-                        <div className="border-t my-1.5" />
-                        <div className="flex justify-between text-destructive">
-                            <span>TDS @ {Number(po.tdsPercentage)}%:</span>
-                            <span>-{formatINR(po.tdsAmount || 0)}</span>
-                        </div>
-                        <div className="flex justify-between font-semibold">
-                            <span>Amount After TDS:</span>
-                            <span>{formatINR(po.amountAfterTds || 0)}</span>
-                        </div>
-                    </>
-                )}
                 <div className="border-t my-1.5" />
                 <div className="flex justify-between">
                     <span className="text-muted-foreground">Payment Requested:</span>

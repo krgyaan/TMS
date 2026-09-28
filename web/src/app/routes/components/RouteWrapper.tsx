@@ -1,9 +1,11 @@
 import React, { Suspense } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Loading component
 function RouteLoader() {
@@ -40,7 +42,19 @@ function RouteErrorFallback({ error, resetErrorBoundary }: any) {
 }
 
 // Main wrapper
-export function RouteWrapper({ children }: { children: React.ReactNode }) {
+export function RouteWrapper({
+    children,
+    permission,
+}: {
+    children: React.ReactNode;
+    permission?: { module: string; action: string };
+}) {
+    const { hasPermission } = useAuth();
+
+    if (permission && !hasPermission(permission.module, permission.action)) {
+        return <Navigate to="/" replace />;
+    }
+
     return (
         <ErrorBoundary FallbackComponent={RouteErrorFallback}>
             <Suspense fallback={<RouteLoader />}>

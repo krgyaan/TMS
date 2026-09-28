@@ -71,14 +71,12 @@ export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ contro
 
     const remainingPo = React.useMemo(() => {
         if (!selectedPo) return 0;
-        const cap = selectedPo.amountAfterTds ? Number(selectedPo.amountAfterTds) : Number(selectedPo.grandTotal || 0);
-        return cap - Number(selectedPo.totalPaymentRequested || 0);
+        return Number(selectedPo.grandTotal || 0) - Number(selectedPo.totalPaymentRequested || 0);
     }, [selectedPo]);
 
     const remainingVwo = React.useMemo(() => {
         if (!selectedVwo) return 0;
-        const cap = selectedVwo.amountAfterTds ? Number(selectedVwo.amountAfterTds) : Number(selectedVwo.grandTotal || 0);
-        return cap - Number(selectedVwo.totalPaymentRequested || 0);
+        return Number(selectedVwo.grandTotal || 0) - Number(selectedVwo.totalPaymentRequested || 0);
     }, [selectedVwo]);
 
     const remaining = paymentAgainst === "vwo" ? remainingVwo : remainingPo;

@@ -6,7 +6,7 @@ import dbConfig, { validateDbEnv } from "@/config/db.config";
 import googleConfig, { validateGoogleEnv } from "@/config/google.config";
 import redisConfig, { validateRedisEnv } from "@/config/redis.config";
 import { DatabaseModule } from "@/db/database.module";
-import { AccountChecklistModule } from "./account-checklist.module";
+import { AccountChecklistServiceModule } from "./account-checklist-service.module";
 import { AccountChecklistWorker } from "./account-checklist.worker";
 import { LoggerModule } from "@/logger/logger.module";
 
@@ -26,7 +26,7 @@ import { LoggerModule } from "@/logger/logger.module";
         }),
         DatabaseModule,
         LoggerModule,
-        AccountChecklistModule,
+        AccountChecklistServiceModule,
     ],
     providers: [AccountChecklistWorker],
 })

@@ -2,26 +2,21 @@
 
 export interface TenderRow {
     id: number;
-    team: number;
-    teamName: string | null;
     tenderNo: string;
     tenderName: string;
     dueDate: Date;
     gstValues: string;
-    organizationName: string | null;
-    rfqTo: string | null;
-    oemNotAllowed: string[] | null;
-    tlStatus: number;
-    teamMember: number | null;
+    teamName: string | null;
     teamMemberName: string | null;
+    tlStatus: number;
     status: number;
-    rfqId: number | null;
-    rfqCreatedAt: Date | null;
-    rfqResponseReceiptDatetime: Date | null;
+    sentToOem: boolean;
+    notAllowedForOem: boolean;
 }
 
 export interface BidTenderRow {
     tenderId: number;
+    tenderNo: string;
     tenderName: string;
     gstValues: string;
     bidStatus: "Submission Pending" | "Bid Submitted" | "Tender Missed";
@@ -29,19 +24,35 @@ export interface BidTenderRow {
     submissionDatetime: Date | null;
 }
 
-// ─── Summary item (mirrors Laravel's addToSummary shape) ─────────────────────
+export interface RfqInfoRow {
+    tenderId: number;
+    rfqSentOn: Date | null;
+    responseOn: Date | null;
+}
+
+// ─── Summary item ─────────────────────────────────────────────────────────────
+
+export interface SummarizableTender {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    gstValues: string;
+}
+
+export interface TenderRef {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    value: number;
+}
 
 export interface SummaryItem {
     count: number;
     value: number;
-    tenders: string[];
+    tenders: TenderRef[];
 }
 
-// ─── API response — mirrors Laravel's compact() output ───────────────────────
-// Only 3 intentional changes from the original:
-//   1. teamName + organizationName resolved server-side (was team bigint)
-//   2. reason field added to NotAllowedTenderRow
-//   3. rfqResponseOn: string | null instead of "Not Yet" string
+// ─── API response ─────────────────────────────────────────────────────────────
 
 export interface OemSummary {
     tendersAssigned: SummaryItem;
@@ -75,12 +86,44 @@ export interface RfqSentToOemRow {
     team: string;
     rfqSentOn: string;
     rfqResponseOn: string | null; // null = not yet responded
+    createdAt: string;
+}
+
+export interface LifecycleTenderRow {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: string;
+    gstValues: string;
+    member: string;
+    team: string;
+    createdAt: string;
+    status: string;
 }
 
 export interface OemPerformanceResponse {
     summary: OemSummary;
     notAllowedTenders: NotAllowedTenderRow[];
     rfqsSentToOem: RfqSentToOemRow[];
+    missedTenders: LifecycleTenderRow[];
+    wonTenders: LifecycleTenderRow[];
+    lostTenders: LifecycleTenderRow[];
+    disqualifiedTenders: LifecycleTenderRow[];
+    resultsAwaitedTenders: LifecycleTenderRow[];
+    bidTenders: LifecycleTenderRow[];
+    quotationReceivedTenders: LifecycleTenderRow[];
+    monthlyTrend: MonthlyTrendPoint[];
+}
+
+// ─── Monthly trend (Won / Missed / Lost per calendar month) ───────────────────
+
+export interface MonthlyTrendPoint {
+    month: string; // "2024-01" — sortable key
+    label: string; // "Jan '24" — display label
+    won: number;
+    missed: number;
+    lost: number;
+    total: number; // won + missed + lost
 }
 
 // ─── Reason map (Laravel's TenderInfo::REASON) ────────────────────────────────

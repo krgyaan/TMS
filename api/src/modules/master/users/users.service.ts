@@ -286,7 +286,8 @@ export class UsersService {
         return role ?? null;
     }
 
-    // NEW: Assign permissions to user (bulk)
+    // NEW: Assign permissions to user (bulk) - replaces ALL user permissions with the given set.
+    // An empty set clears all permissions.
     async assignPermissions(userId: number, permissionIds: number[], granted: boolean[]): Promise<void> {
         // Verify user exists
         const user = await this.findById(userId);
@@ -298,10 +299,6 @@ export class UsersService {
             throw new Error("permissionIds and granted arrays must have the same length");
         }
 
-        if (permissionIds.length === 0) {
-            return;
-        }
-
         // Verify permissions exist
         const existingPermissions = await this.db.select().from(permissions).where(inArray(permissions.id, permissionIds));
 
@@ -310,17 +307,19 @@ export class UsersService {
         }
 
         await this.db.transaction(async (tx) => {
-            // Delete existing user permissions for these permission IDs
-            await tx.delete(userPermissions).where(and(eq(userPermissions.userId, userId), inArray(userPermissions.permissionId, permissionIds)));
+            // Delete ALL existing user permissions (full replace)
+            await tx.delete(userPermissions).where(eq(userPermissions.userId, userId));
 
-            // Insert new permissions
-            const values = permissionIds.map((permissionId, index) => ({
-                userId,
-                permissionId,
-                granted: granted[index],
-            }));
+            // Insert the new set of permissions
+            if (permissionIds.length > 0) {
+                const values = permissionIds.map((permissionId, index) => ({
+                    userId,
+                    permissionId,
+                    granted: granted[index],
+                }));
 
-            await tx.insert(userPermissions).values(values);
+                await tx.insert(userPermissions).values(values);
+            }
         });
 
         await this.permissionService.refreshUserOverrides(userId);

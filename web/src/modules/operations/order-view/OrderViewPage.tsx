@@ -328,7 +328,7 @@ export const OrderViewPage: React.FC<OrderViewPageProps> = ({
                                         {data.products.map((product, idx) => (
                                             <TableRow key={product.id} className="hover:bg-muted/30">
                                                 <TableCell className="text-sm">{idx + 1}</TableCell>
-                                                <TableCell className="text-sm">{product.description}</TableCell>
+                                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{product.description}</TableCell>
                                                 <TableCell className="text-sm text-right">{product.qty} {product.unit}</TableCell>
                                                 <TableCell className="text-sm text-right">{formatINR(product.rate)}</TableCell>
                                                 <TableCell className="text-sm text-right">{formatINR(product.taxableAmount)}</TableCell>

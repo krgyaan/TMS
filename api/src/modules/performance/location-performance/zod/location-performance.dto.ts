@@ -4,18 +4,19 @@ export const locationPerformanceQuerySchema = z
     .object({
         heading: z.coerce.number().int().positive({ message: "A valid item heading must be selected" }).optional(),
         team: z.coerce.number().int().positive().optional(),
-        area: z.string().optional(),
         location: z.coerce.number().int().positive().optional(),
-        fromDate: z.string().date("Invalid from date"),
-        toDate: z.string().date("Invalid to date"),
+        year: z
+            .string()
+            .regex(/^\d{4}-\d{2}$/, "Invalid financial year")
+            .optional(),
     })
-    .refine(d => d.area || d.location, {
-        message: "Both area and location cannot be null",
-        path: ["area"],
+    .refine(d => d.location, {
+        message: "Location must be selected",
+        path: ["location"],
     })
-    .refine(d => new Date(d.fromDate) <= new Date(d.toDate), {
-        message: "fromDate must be before or equal to toDate",
-        path: ["fromDate"],
+    .refine(d => d.year, {
+        message: "Financial year must be selected",
+        path: ["year"],
     });
 
 export type LocationPerformanceQuery = z.infer<typeof locationPerformanceQuerySchema>;
