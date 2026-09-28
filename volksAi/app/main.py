@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.logging import setup_logging, get_logger
-from app.routers import health, extract, classify
+from app.routers import health, extract, classify, bidding_requirements
 
 if hasattr(sys.stdout, "reconfigure"):
     try:
@@ -69,8 +69,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount health, extraction, and classification routers
+# Mount health, extraction, classification, and bidding-requirements routers
 app.include_router(health.router)
 app.include_router(extract.router)
 app.include_router(classify.router)
+app.include_router(bidding_requirements.router)
 

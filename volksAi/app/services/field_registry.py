@@ -183,6 +183,21 @@ FIELD_REGISTRY: Dict[str, FieldDefinition] = {
             "relaxation of prior turnover", "financial criteria exempt",
         ],
     },
+    "site_visit": {
+        "keywords": [
+            "site visit", "site inspection", "inspection of site", "visit to site", "site survey",
+            "mandatory site visit", "site visit certificate", "visit the site", "deemed site visit",
+        ],
+        "hindi": ["साइट का दौरा", "स्थल निरीक्षण"],
+    },
+    "sample_submission": {
+        "keywords": [
+            "sample submission", "submission of sample", "submission of samples", "sample testing",
+            "testing of sample", "testing of samples", "sample evaluation", "advance sample",
+            "prototype sample", "pre-dispatch sample", "sample required",
+        ],
+        "hindi": ["नमूना जमा करना", "नमूना परीक्षण"],
+    },
 }
 
 

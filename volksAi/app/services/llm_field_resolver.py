@@ -190,12 +190,15 @@ AMBIGUITY_FIELD_DEFINITIONS: Dict[str, str] = {
     ),
     "delivery_time_supply_display": (
         "Goods supply delivery timeline in days (e.g. '90 Days', '140 Days', '150 Days'). "
-        "Differentiate goods delivery period from overall total contract or FOA completion period "
-        "(e.g. 160 days total completion vs 90 days delivery). Return formatted with 'Days' (e.g. '90 Days')."
+        "Differentiate goods delivery period from overall total contract or FOA completion period. "
+        "If no distinct supply-only figure is literally stated in the text, return null. "
+        "Never return a number with attached qualifying prose."
     ),
     "delivery_time_installation_display": (
         "Installation and commissioning timeline in days (e.g. '90 Days', '140 Days', '150 Days', '365 Days'). "
-        "Return formatted with 'Days' (e.g. '90 Days')."
+        "If no distinct installation-only figure is literally stated, return null, unless the document explicitly states "
+        "installation is included in the supply period, in which case return 'Inclusive (SITC Scope)'. "
+        "Never return a number with attached qualifying prose."
     ),
 }
 
@@ -203,7 +206,9 @@ AMBIGUITY_FIELD_DEFINITIONS: Dict[str, str] = {
 # GAIL / GeM ATC Anchor Knowledge Base
 # Compiled from: GAIL GCC-Goods Rev.1 (2022), BDS Section-III, all ATC samples
 # ─────────────────────────────────────────────────────────────────────────────
-UNIVERSAL_TENDER_SYSTEM_INSTRUCTION = """You are an expert procurement auditor and document parsing AI specialized in Indian Government, PSU, GeM (Government e-Marketplace), Metro Rail Corporations (e.g. DMRC, BMRC, MMRDA), Indian Railways, Defence, and State Procurement tenders.
+UNIVERSAL_TENDER_SYSTEM_INSTRUCTION = """EXAMPLE VALUES ARE FORMAT ILLUSTRATIONS ONLY: every example value shown in a field description or anywhere in these instructions (e.g. "Rs. [X] Lakhs", "[N] years") is a format illustration, never real tender data, and must never appear verbatim in your output. If a value you are about to return matches an example character-for-character, treat that as an extraction error -- re-check the source text and return the value it literally states, or return null.
+
+You are an expert procurement auditor and document parsing AI specialized in Indian Government, PSU, GeM (Government e-Marketplace), Metro Rail Corporations (e.g. DMRC, BMRC, MMRDA), Indian Railways, Defence, and State Procurement tenders.
 
 ## Core Extraction Principles:
 1. STRICT ADHERENCE TO THE DOCUMENT: Extract ONLY values explicitly stated in the provided tender text. NEVER guess, extrapolate, or hallucinate organization names, officer names, emails, phone numbers, or addresses.
@@ -212,12 +217,19 @@ UNIVERSAL_TENDER_SYSTEM_INSTRUCTION = """You are an expert procurement auditor a
 4. Numerical Precision:
    - For Estimated Value & EMD: Extract exact amounts (e.g. "₹15,00,000" or "1500000"). If EMD is exempt or not required, indicate accordingly.
    - For Experience Years: Extract single clean integer (e.g. 3, 5, 7).
-   - For Work Order Values & Turnover: Always preserve units (e.g. "Rs. 62.14 Lakhs", "₹62,14,000").
-   - For Payment Terms: Extract supply percentage (e.g. 70, 80) and installation percentage (e.g. 30, 20).
-   - For PBG / Security Deposit: Extract exact percentage (e.g. 3%, 5%, 10%) and validity period in months.
-   - For Liquidated Damages (LD / PRS): Extract weekly rate (e.g. 0.5%) and maximum cap (e.g. 5.0% or 10.0%).
+   - For Work Order Values & Turnover: Always preserve units as written (e.g. "Rs. [X] Lakhs" or "Rs. [X] Crore"), only if literally stated in the text.
+   - For Payment Terms: Extract the supply percentage ("X% on supply") and installation percentage ("Y% on installation"), only if literally stated in the text.
+   - For PBG / Security Deposit: Extract the percentage of contract value ("X% of contract value") and validity period ("N months"), only if literally stated in the text.
+   - For Liquidated Damages (LD / PRS): Extract the weekly rate ("X% per week") and maximum cap ("Y% cap"), only if literally stated in the text.
+   - X, Y and N above are placeholders, not values: never fill them with a typical, customary, or default rate. If the clause does not state the number, return null.
    - For MAF (Manufacturer Authorization Form): Return true if required from OEM/Manufacturer, otherwise false.
-5. Contacts & Submission:
+5. Clause-purpose check for eligibility thresholds: before using a turnover, net worth, working capital, solvency or order-value figure as the answer to a general eligibility (BEC) field, confirm the surrounding text states it as this tender's general eligibility requirement for bidders. The same "annual turnover of [X] or more" phrasing appears in unrelated clauses that are NOT the BEC requirement:
+   - EMD / bid-security exemption lists (e.g. "sellers having annual turnover of INR [X] Crore or more ... are exempted from EMD");
+   - MSE / Startup relaxation clauses ("relaxation of prior turnover and prior experience");
+   - bank-guarantee issuer conditions ("a commercial bank having net worth in excess of Rs [X] crores");
+   - vendor-assessment or purchase-preference rules.
+   A figure taken from such a clause answers a different question. If no general BEC clause states the figure, return null -- or "Not Applicable" only when the BEC explicitly says the criterion is not applicable.
+6. Contacts & Submission:
    - Extract primary dealing officer / contact person name, email, phone from the document.
    - Extract physical documents submission / courier address from the document.
    - NEVER inject external names or emails. If not in the text, return null.
@@ -230,7 +242,7 @@ UNIVERSAL_TENDER_SYSTEM_INSTRUCTION = """You are an expert procurement auditor a
 - SCC: Special Conditions of Contract -- tender-specific overrides, usually Section-V; second-highest precedence after BDS.
 - BEC: Bid Evaluation Criteria -- Section-II; contains technical/financial eligibility thresholds (turnover, net worth, experience, order value).
 - EMD: Earnest Money Deposit -- bid security paid at submission; may be exempted for MSE/Startup/certain categories -- check exemption clauses carefully before marking a field missing.
-- PBG: Performance Bank Guarantee -- security deposited by the successful bidder after award, typically 3-10% of contract value.
+- PBG: Performance Bank Guarantee -- security deposited by the successful bidder after award, as a percentage of contract value stated in the tender.
 - ePBG: Electronic Performance Bank Guarantee -- the GeM-portal digital equivalent of a PBG, functionally identical for extraction purposes.
 - CPS: Contract Performance Security -- an alternate/older label some authorities use in place of "PBG" or "Security Deposit"; treat consistently with PBG/SD fields.
 - SD: Security Deposit -- functions like a PBG on non-GeM tenders; some authorities use SD instead of / alongside PBG.
@@ -244,7 +256,7 @@ UNIVERSAL_TENDER_SYSTEM_INSTRUCTION = """You are an expert procurement auditor a
 - Consignee: the delivery/destination address for goods -- distinct from the buyer's communication/courier address for physical bid documents.
 
 ## Additional Edge-Case Handling Rules:
-- Percentages: always extract the bare numeric percentage value (e.g. 5 for "5%"), never include the "%" symbol in a numeric-typed field.
+- Percentages: always extract the bare numeric percentage value (e.g. X for "X%"), never include the "%" symbol in a numeric-typed field.
 - Currency amounts: preserve the original magnitude and unit exactly as written (Lakhs/Crores/Rs./₹); do not silently convert units.
 - Date ranges or "Financial Year" references: extract as written; do not infer a specific calendar date unless one is explicitly stated.
 - Conflicting values across sections: prefer the more specific/later section (BDS/SCC over GCC/GTC; tender-specific clause over generic boilerplate).
@@ -260,25 +272,25 @@ Correct reasoning: the bid number is the literal alphanumeric code following "Ge
 Common mistake to avoid: capturing "One Hundred Twenty" as a string instead of the integer 120; conflating the GeM bid number with an internal tender reference number if both appear nearby.
 
 ### Category: payment_terms (Supply %, Installation %)
-Clause (Split tender): "Terms of Payment: 70% payment against supply and balance 30% after successful installation and commissioning at site."
-Correct reasoning: supply percentage = 70, installation percentage = 30.
+Clause (Split tender): "Terms of Payment: [A]% payment against supply and balance [B]% after successful installation and commissioning at site."
+Correct reasoning: supply percentage = A, installation percentage = B -- whatever numbers the clause actually states in those positions.
 Clause (Pure-supply tender): "100% payment will be released upon receipt and acceptance of materials at site."
 Correct reasoning: supply percentage = 100, installation percentage = null / "Not Applicable". Pure-supply tenders genuinely have no installation component; NEVER invent, infer, or hallucinate an installation percentage just to make supply and installation sum to 100%. If installation is not part of the tender scope or not mentioned in the payment terms clause, report installation as null / "Not Applicable".
-Common mistake to avoid: inventing an installation percentage when the tender is pure supply; swapping supply and installation percentages when the clause lists installation before supply in a different sentence order; missing a third milestone (e.g. "10% on warranty completion") that changes the supply/installation split.
+Common mistake to avoid: inventing an installation percentage when the tender is pure supply; swapping supply and installation percentages when the clause lists installation before supply in a different sentence order; missing a third milestone (e.g. "[Z]% on warranty completion") that changes the supply/installation split.
 
 ### Category: pbg_sd (PBG/SD percentage, mode, duration)
-Clause: "Successful bidder shall submit a Performance Bank Guarantee (PBG) of 3% of the contract value, valid for 63 months (60 months warranty + 3 months claim period), in the form of a Bank Guarantee from a Nationalized/Scheduled Bank."
-Correct reasoning: PBG percentage = 3, PBG duration = 63 months (use the total stated duration, not just the warranty component), PBG mode = "Bank Guarantee". If the clause instead says "Security Deposit" with no separate PBG clause, map the same fields to the SD-equivalent display keys instead of leaving both blank.
-Common mistake to avoid: using only the "60 months warranty" figure and dropping the additional claim-period months explicitly added by the clause.
+Clause: "Successful bidder shall submit a Performance Bank Guarantee (PBG) of [P]% of the contract value, valid for [T] months ([W] months warranty + [C] months claim period), in the form of a Bank Guarantee from a Nationalized/Scheduled Bank."
+Correct reasoning: PBG percentage = P, PBG duration = T months (use the total stated duration, not just the warranty component W), PBG mode = "Bank Guarantee". If the clause instead says "Security Deposit" with no separate PBG clause, map the same fields to the SD-equivalent display keys instead of leaving both blank.
+Common mistake to avoid: using only the warranty figure W and dropping the additional claim-period months C explicitly added by the clause.
 
 ### Category: prs_ld (Liquidated Damages / Price Reduction Schedule)
-Clause: "In case of delay, LD @ 0.5% of the delayed portion per week of delay or part thereof, subject to a maximum of 10% of the total contract value."
-Correct reasoning: LD/PRS weekly rate = 0.5, maximum cap = 10. Do not confuse the weekly rate with the maximum cap -- they are always two distinct numbers in the same clause.
+Clause: "In case of delay, LD @ [R]% of the delayed portion per week of delay or part thereof, subject to a maximum of [M]% of the total contract value."
+Correct reasoning: LD/PRS weekly rate = R, maximum cap = M. Do not confuse the weekly rate with the maximum cap -- they are always two distinct numbers in the same clause. If the clause states only one of them, return the other as null rather than a customary figure.
 Common mistake to avoid: reporting only one of the two numbers when both are present in the same sentence; treating "part thereof" as a separate numeric value.
 
 ### Category: bec_criteria (Turnover, Net Worth, Experience, Order Value, MAF)
-Clause: "Bidder must have average annual turnover of Rs. 50 Lakhs during last 3 financial years. Financial criteria: Net worth NOT APPLICABLE for this tender. Bidder must submit a valid Manufacturer's Authorization Form if not the OEM."
-Correct reasoning: average annual turnover = "Rs. 50 Lakhs" (3 years), net worth should be marked explicitly not-applicable (a definite answer, not a missing field), and MAF is conditionally required (true) only if the bidder is a reseller/dealer -- report MAF as required since the document states the condition explicitly, regardless of which category the actual bidder falls into.
+Clause: "Bidder must have average annual turnover of Rs. [X] Lakhs during last [N] financial years. Financial criteria: Net worth NOT APPLICABLE for this tender. Bidder must submit a valid Manufacturer's Authorization Form if not the OEM."
+Correct reasoning: average annual turnover = "Rs. [X] Lakhs" with X copied from the clause ([N] years), net worth should be marked explicitly not-applicable (a definite answer, not a missing field), and MAF is conditionally required (true) only if the bidder is a reseller/dealer -- report MAF as required since the document states the condition explicitly, regardless of which category the actual bidder falls into.
 Common mistake to avoid: treating an explicit "NOT APPLICABLE" as if the field were simply absent from the document; missing the qualifying condition attached to a requirement (e.g. MAF required "if not OEM").
 
 ### Category: delivery_timeline (Supply days, Installation days)
@@ -375,22 +387,22 @@ def _fmt_years(v) -> Optional[str]:
 FIELD_PROMPT_MAP: Dict[str, Tuple[str, str, str, Any]] = {
     "payment_terms_supply_display": (
         "payment_terms_supply_pct", "integer",
-        "% of contract value paid on supply/delivery/receipt of materials (integer, e.g. 70, 80, 85)",
+        "% of contract value paid on supply/delivery/receipt of materials, as an integer X, only if literally stated in the text",
         _fmt_pct,
     ),
     "payment_terms_installation_display": (
         "payment_terms_installation_pct", "integer",
-        "% paid on installation/commissioning/site acceptance (integer, e.g. 30, 20, 15). Set null / Not Applicable for pure-supply tenders without installation.",
+        "% paid on installation/commissioning/site acceptance, as an integer Y, only if literally stated in the text. Set null / Not Applicable for pure-supply tenders without installation.",
         _fmt_pct,
     ),
     "ld_percentage_display": (
         "ld_percentage_per_week", "number",
-        "PRS/LD rate as % per complete week of delay — search 'PRICE REDUCTION SCHEDULE (PRS)', NOT 'Liquidated Damages' (decimal, e.g. 0.5)",
+        "PRS/LD rate as X% per complete week of delay — search 'PRICE REDUCTION SCHEDULE (PRS)', NOT 'Liquidated Damages' (decimal X, only if literally stated in the text)",
         _fmt_pct_decimal,
     ),
     "max_ld_percentage_display": (
         "max_ld_percentage", "number",
-        "Maximum PRS/LD cap as % of total order value (decimal, e.g. 5.0)",
+        "Maximum PRS/LD cap as Y% of total order value (decimal Y, only if literally stated in the text)",
         _fmt_pct_decimal,
     ),
     "sd_required_display": (
@@ -405,22 +417,22 @@ FIELD_PROMPT_MAP: Dict[str, Tuple[str, str, str, Any]] = {
     ),
     "sd_percentage_display": (
         "sd_percentage", "number",
-        "Security Deposit percentage of contract value (decimal, e.g. 5.0)",
+        "Security Deposit percentage of contract value (decimal X, only if literally stated in the text)",
         _fmt_pct_decimal,
     ),
     "sd_duration_display": (
         "sd_duration_months", "integer",
-        "Security Deposit validity duration in months (integer, e.g. 30)",
+        "Security Deposit validity duration in months (integer N, only if literally stated in the text)",
         _fmt_int,
     ),
     "pbg_percentage_display": (
         "pbg_percentage", "number",
-        "Performance Bank Guarantee (PBG) percentage of contract value (decimal, e.g. 5.0 for 5%)",
+        "Performance Bank Guarantee (PBG) percentage of contract value (decimal X for X%, only if literally stated in the text)",
         _fmt_pct_decimal,
     ),
     "pbg_duration_display": (
         "pbg_duration_months", "integer",
-        "Performance Bank Guarantee (PBG) validity duration in months (integer, e.g. 30)",
+        "Performance Bank Guarantee (PBG) validity duration in months (integer N, only if literally stated in the text)",
         _fmt_int,
     ),
     "maf_required_display": (
@@ -505,37 +517,37 @@ FIELD_PROMPT_MAP: Dict[str, Tuple[str, str, str, Any]] = {
     ),
     "order_value_1_display": (
         "order_value_1", "string",
-        "Executed work order value for 1st/single executed order from BEC technical eligibility. If presented as a multi-part split table (Part A + Part B), extract or sum the values for all quoted parts (e.g. 'Rs. 61.00 Lac' or '₹61,00,000.00').",
+        "Executed work order value for 1st/single executed order from BEC technical eligibility, only if literally stated in the text. If presented as a multi-part split table (Part A + Part B), extract or sum the values for all quoted parts (format e.g. '[X] Lakhs' or '[X] Crore').",
         _fmt_str,
     ),
     "order_value_2_display": (
         "order_value_2", "string",
-        "Executed work order value for 2nd executed order (if 2 orders required in BEC criteria).",
+        "Executed work order value for 2nd executed order (if 2 orders required in BEC criteria), only if literally stated in the text (format e.g. '[X] Lakhs' or '[X] Crore').",
         _fmt_str,
     ),
     "order_value_3_display": (
         "order_value_3", "string",
-        "Executed work order value for 3rd executed order (if 3 orders required in BEC criteria).",
+        "Executed work order value for 3rd executed order (if 3 orders required in BEC criteria), only if literally stated in the text (format e.g. '[X] Lakhs' or '[X] Crore').",
         _fmt_str,
     ),
     "avg_annual_turnover_value_display": (
         "avg_annual_turnover_value", "string",
-        "Minimum Average Annual Turnover value required in BEC criteria. Extract single or combined multi-part total (e.g. 'Rs. 61.00 Lac' or '₹61,00,000.00').",
+        "Minimum Average Annual Turnover value required in BEC criteria, only if literally stated in the text. Extract single or combined multi-part total (format e.g. '[X] Lakhs' or '[X] Crore'). Use only the general BEC requirement for bidders -- never a figure from an EMD-exemption, MSE/Startup relaxation or bank-guarantee clause.",
         _fmt_str,
     ),
     "working_capital_value_display": (
         "working_capital_value", "string",
-        "Minimum Working Capital value required in BEC criteria. Extract single or combined multi-part total (e.g. 'Rs. 12.00 Lac' or '₹12,00,000.00').",
+        "Minimum Working Capital value required in BEC criteria, only if literally stated in the text. Extract single or combined multi-part total (format e.g. '[X] Lakhs' or '[X] Crore'). Use only the general BEC requirement for bidders -- never a figure from an EMD-exemption, MSE/Startup relaxation or bank-guarantee clause.",
         _fmt_str,
     ),
     "solvency_certificate_value_display": (
         "solvency_certificate_value", "string",
-        "Minimum Solvency Certificate value required in BEC criteria (e.g. 'Rs. 50.00 Lac' or 'Not Applicable').",
+        "Minimum Solvency Certificate value required in BEC criteria, only if literally stated in the text (format e.g. '[X] Lakhs' or '[X] Crore', or 'Not Applicable' if the BEC says so). Use only the general BEC requirement for bidders -- never a figure from an EMD-exemption, MSE/Startup relaxation or bank-guarantee clause.",
         _fmt_str,
     ),
     "net_worth_value_display": (
         "net_worth_value", "string",
-        "Net worth requirement from BEC criteria (e.g. 'Must be positive' or monetary threshold).",
+        "Net worth requirement from BEC criteria (e.g. 'Must be positive' or a monetary threshold in the format '[X] Lakhs' / '[X] Crore'), only if literally stated in the text. Use only the general BEC requirement for bidders -- never a figure from an EMD-exemption, MSE/Startup relaxation or bank-guarantee clause.",
         _fmt_str,
     ),
     "eligibility_criterion_years_display": (
@@ -1500,12 +1512,12 @@ class LLMFieldResolver:
             "choose action='override', provide the corrected 'resolved_value', and a clear one-line 'reasoning'. "
             "CRITICAL: Never invent, extrapolate, or hallucinate figures (such as 95% or 5%) not literally present in the scoped clauses.\n"
             "3. SPECIAL RULE FOR DELIVERY TIME FIELDS (delivery_time_supply_display, delivery_time_installation_display):\n"
-            "   - If the tender clauses state an overall contract completion or delivery period (e.g. 150 Days, 90 Days, 140 Days, 365 Days) "
-            "but do NOT isolate a distinct supply-only figure, DO NOT collapse the value to a bare 'Not Specified' or null!\n"
-            "   - Instead, choose action='override' and return the total period accompanied by a clear qualification, e.g.:\n"
-            "     '{candidate_days} (total completion) — no distinct supply-only figure found in scoped clauses'.\n"
-            "   - For installation delivery time, if included in total contract or not separated: "
-            "'{candidate_days} (total completion) — installation included in total period'.\n\n"
+            "   - If no distinct supply-only or installation-only figure is literally stated in the scoped clauses, "
+            "choose action='override' with resolved_value=null for that field.\n"
+            "   - Only return 'Inclusive (SITC Scope)' for delivery_time_installation_display when the document "
+            "explicitly states installation is included in the supply period.\n"
+            "   - NEVER return a number with attached qualifying prose (such as '{candidate_days} (total completion)' or any prose explanation). "
+            "Return either a clean formatted string with 'Days' (e.g. '90 Days'), 'Inclusive (SITC Scope)', or null.\n\n"
             "Fields to review:\n" + "\n\n".join(field_prompts) + "\n\n"
             "Scoped Tender Clauses:\n--- START OF RELEVANT CLAUSES ---\n"
             f"{combined_scoped_text}\n--- END OF RELEVANT CLAUSES ---"
@@ -1543,19 +1555,6 @@ class LLMFieldResolver:
                 action = d.get("action", "confirm")
                 resolved_val = d.get("resolved_value")
                 reasoning = d.get("reasoning", "")
-
-                # ISSUE 5 FALLBACK GUARD FOR DELIVERY TIME:
-                # When Claude returns 'Not Specified' or empty for delivery_time fields,
-                # but a candidate exists from Layer 1 regex, return candidate with qualification
-                # rather than collapsing to a bare "Not Specified".
-                if f_name in ("delivery_time_supply_display", "delivery_time_installation_display"):
-                    cand_val = candidates.get(f_name)
-                    if (not resolved_val or str(resolved_val).strip() in ("Not Specified", "None", "NA", "null")) and cand_val and str(cand_val) not in ("NA", "Not Found", "None"):
-                        target_type = "supply-only" if "supply" in f_name else "installation-only"
-                        resolved_val = f"{cand_val} (total completion) — no distinct {target_type} figure found in scoped clauses"
-                        action = "override"
-                        if not reasoning:
-                            reasoning = f"Total completion period retained as fallback: no separate {target_type} schedule isolated in scoped clauses."
 
                 results[f_name] = {
                     "action": action,

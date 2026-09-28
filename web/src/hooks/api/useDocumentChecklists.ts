@@ -60,6 +60,21 @@ export const useDocumentChecklistByTender = (tenderId: number) => {
     });
 };
 
+/**
+ * On-demand AI analysis (VolksAI) of a tender's main + ATC documents for
+ * suggested bidding requirements. A mutation, not a query: this is a slow,
+ * costed LLM call that should run only when the user asks for it, never
+ * automatically on mount or refetch.
+ */
+export const useSuggestedBiddingRequirements = () => {
+    return useMutation({
+        mutationFn: (tenderId: number) => documentChecklistService.getSuggestedRequirements(tenderId),
+        onError: (error: any) => {
+            toast.error(error?.response?.data?.message || 'Failed to analyze bidding requirements for this tender');
+        },
+    });
+};
+
 export const useCreateDocumentChecklist = () => {
     const queryClient = useQueryClient();
 

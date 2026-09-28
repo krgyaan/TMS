@@ -88,11 +88,35 @@ function CallTypeBadge({ callType }: { callType: string }) {
             </Badge>
         );
     }
+    if (callType === 'bidding_requirements') {
+        return (
+            <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 text-[11px]">
+                Requirement Analysis
+            </Badge>
+        );
+    }
+    if (callType === 'main_extraction') {
+        return (
+            <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 text-[11px]">
+                Main Extraction
+            </Badge>
+        );
+    }
+    // Unknown call types show their raw value so new stages are never mislabeled
     return (
-        <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 text-[11px]">
-            Main Extraction
+        <Badge variant="outline" className="border-muted-foreground/30 bg-muted text-muted-foreground text-[11px]">
+            {formatCallType(callType)}
         </Badge>
     );
+}
+
+function formatCallType(callType: string): string {
+    if (!callType) return 'Unknown';
+    return callType
+        .split('_')
+        .filter(Boolean)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
 }
 
 export function ClaudeTelemetrySection() {

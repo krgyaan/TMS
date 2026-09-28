@@ -223,5 +223,22 @@ MAIN_FIELD_ALIASES: Dict[str, List[str]] = {
         "Pre-Bid Date and Time",
         "Pre-Bid Venue",
         "pre_bid_meeting"
+    ],
+    "site_visit": [
+        "Site Visit",
+        "Site Inspection",
+        "Site Survey",
+        "Mandatory Site Visit",
+        "Site Visit Required",
+        "site_visit"
+    ],
+    "sample_submission": [
+        "Sample Submission",
+        "Sample Testing",
+        "Sample Required",
+        "Submission of Sample",
+        "Submission of Samples",
+        "Testing of Samples",
+        "sample_submission"
     ]
 }

@@ -1,10 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { HealthController } from './health.controller';
-import { HealthService } from './health.service';
+import { HealthController } from '@/modules/master/health/health.controller';
+import { HealthService } from '@/modules/master/health/health.service';
 import { ClaudeUsageService } from './claude-usage.service';
-import { AdminUsageService } from './admin-usage.service';
+import { AdminUsageService } from '@/modules/master/health/admin-usage.service';
 import { RolesGuard } from '@/modules/auth/guards/roles.guard';
 import { RoleName } from '@/common/constants/roles.constant';
 import { ROLES_KEY } from '@/modules/auth/decorators/roles.decorator';

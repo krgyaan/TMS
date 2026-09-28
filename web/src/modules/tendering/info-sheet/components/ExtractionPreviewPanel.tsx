@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { fileUploadService } from '@/services/api/file-upload.service';
 import { parseTenderDocuments } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import type { ExtractedField } from '../helpers/tenderInfoSheet.autoExtract';
+import { isCitationLocated } from '@/components/form/AiIndicatorsContext';
 
 export interface ExtractionPreviewPanelProps {
     fields?: Record<string, ExtractedField> | null;
@@ -149,6 +150,14 @@ export const ExtractionPreviewPanel: React.FC<ExtractionPreviewPanelProps> = ({
 
     const resolvePdfUrl = (rawPath: string | null | undefined): string | null => {
         if (!rawPath) return null;
+        if (
+            rawPath.startsWith('http://') ||
+            rawPath.startsWith('https://') ||
+            rawPath.startsWith('/') ||
+            rawPath.startsWith('blob:')
+        ) {
+            return rawPath;
+        }
         const normalized = rawPath.includes('/') ? rawPath : `tender-documents/${rawPath}`;
         return fileUploadService.getFileUrl(normalized);
     };
@@ -529,9 +538,9 @@ export const ExtractionPreviewPanel: React.FC<ExtractionPreviewPanelProps> = ({
                                                             <span className="font-semibold text-sky-300 flex items-center gap-1 text-[11px]">
                                                                 <FileText className="h-3 w-3" /> Main Tender
                                                             </span>
-                                                            {mainSource?.page && (
+                                                            {isCitationLocated(mainSource) && (
                                                                 <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-sky-950/60 text-sky-300 border border-sky-800/40">
-                                                                    Page {mainSource.page}
+                                                                    Page {mainSource?.page}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -551,9 +560,9 @@ export const ExtractionPreviewPanel: React.FC<ExtractionPreviewPanelProps> = ({
                                                             <span className="font-semibold text-emerald-300 flex items-center gap-1 text-[11px]">
                                                                 <FileText className="h-3 w-3" /> ATC Document
                                                             </span>
-                                                            {atcSource?.page && (
+                                                            {isCitationLocated(atcSource) && (
                                                                 <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/40">
-                                                                    Page {atcSource.page}
+                                                                    Page {atcSource?.page}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -576,9 +585,9 @@ export const ExtractionPreviewPanel: React.FC<ExtractionPreviewPanelProps> = ({
                                                         {formatDisplayValue(displayedValue)}
                                                     </div>
 
-                                                    {displayedSource?.page && (
+                                                    {isCitationLocated(displayedSource) && (
                                                         <span className="text-[10px] font-mono text-slate-400 px-1.5 py-0.2 rounded bg-slate-800/70 border border-slate-700/50 flex-shrink-0">
-                                                            Page {displayedSource.page}
+                                                            Page {displayedSource?.page}
                                                         </span>
                                                     )}
                                                 </div>

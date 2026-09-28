@@ -34,7 +34,9 @@ ATC_SOURCED_LABELS = {
     "SD Percentage", "LD Percentage per Week", "Max LD Percentage", "Courier Address", "MAF Required",
     "Price Reduction Schedule (PRS)", "Price Reduction Schedule", "PRS",
     "maf_required", "sd_mode", "sd_required", "sd_percentage", "sd_duration", "ld_percentage_per_week",
-    "max_ld_percentage", "payment_terms_supply_percent", "payment_terms_installation_percent"
+    "max_ld_percentage", "payment_terms_supply_percent", "payment_terms_installation_percent",
+    "Pre-Bid Meeting", "pre_bid_meeting", "Site Visit", "site_visit", "Sample Submission", "sample_submission",
+    "MII Purchase Preference", "mii_purchase_preference", "mii_preference"
 }
 
 MAIN_SOURCED_LABELS = {
@@ -50,10 +52,14 @@ AMBIGUOUS_LABELS = {
 }
 
 
-def _find_atc_anchor_citation(key: str, atc_page_texts: List[Dict[str, Any]]) -> Tuple[int, str]:
-    """Finds the page number and a contextual text snippet for an ATC anchor field."""
+def _find_atc_anchor_citation(key: str, atc_page_texts: List[Dict[str, Any]]) -> Tuple[Optional[int], str]:
+    """
+    Finds the page number and a contextual text snippet for an ATC anchor field.
+    Returns (None, "") when no anchor phrase is found -- the caller must not be
+    handed a guessed page.
+    """
     if not atc_page_texts:
-        return 1, ""
+        return None, ""
     patterns = {
         "maf_required": [r"oem\s+authorization", r"manufacturer\s+authorization", r"authorization\s+certificate", r"\bmaf\b"],
         "payment_terms_supply_percent": [r"terms\s+of\s+payment", r"payment\s+terms", r"payment.*supply", r"payment"],
@@ -70,6 +76,10 @@ def _find_atc_anchor_citation(key: str, atc_page_texts: List[Dict[str, Any]]) ->
         "delivery_time_supply": [r"delivery\s+time", r"contract\s+period", r"delivery\s+period", r"delivery"],
         "client_contacts": [r"contact\s+person", r"nodal\s+officer", r"email", r"telephone", r"phone"],
         "courier_address": [r"courier\s+address", r"postal\s+address", r"consignee\s+address", r"address"],
+        "pre_bid_meeting": [r"pre[\s\-]?bid\s+meeting", r"pre[\s\-]?bid\s+conference", r"pre[\s\-]?bid"],
+        "site_visit": [r"site\s+visit", r"site\s+inspection", r"visit\s+to\s+site", r"site\s+survey"],
+        "sample_submission": [r"sample\s+submission", r"submission\s+of\s+samples?", r"sample\s+testing", r"advance\s+sample", r"prototype\s+sample"],
+        "mii_preference": [r"make\s+in\s+india", r"mii\s+purchase\s+preference", r"local\s+content"],
     }
     key_patterns = patterns.get(key, [re.escape(key.replace("_", " "))])
     for page in atc_page_texts:
@@ -77,7 +87,7 @@ def _find_atc_anchor_citation(key: str, atc_page_texts: List[Dict[str, Any]]) ->
         for pat in key_patterns:
             m = re.search(pat, text, re.IGNORECASE)
             if m:
-                p_num = page.get("page", page.get("page_number", 1))
+                p_num = page.get("page", page.get("page_number"))
                 start = max(0, m.start() - 30)
                 end = min(len(text), m.end() + 70)
                 snip = text[start:end].replace("\n", " ").strip()
@@ -86,8 +96,145 @@ def _find_atc_anchor_citation(key: str, atc_page_texts: List[Dict[str, Any]]) ->
                 if end < len(text):
                     snip = snip + "..."
                 return p_num, snip
-    first_p = atc_page_texts[0].get("page", atc_page_texts[0].get("page_number", 1)) if atc_page_texts else 1
-    return first_p, ""
+    return None, ""
+
+
+_GEM_BID_NO_RE = re.compile(r"\bGEM/\d{4}/[A-Z]/\d{5,}\b", re.IGNORECASE)
+# "TENDER NO.: GAIL/KL/C&P/P25258/DG/MECH/2025", "Tender Number - XYZ/123", "TENDER NO: GEM/2024/B/..."
+_TENDER_NO_RE = re.compile(
+    r"\bTENDER\s*(?:NO|NUMBER|REF(?:ERENCE)?\s*NO)\s*\.?\s*[:\-–]?\s*([A-Z0-9][A-Z0-9/&\-_.]{4,}[A-Z0-9])",
+    re.IGNORECASE,
+)
+
+
+def extract_document_identity(page_texts: Optional[List[Dict[str, Any]]]) -> Dict[str, Any]:
+    """
+    Reads a single document's own self-stated identifiers from its text: GeM bid
+    numbers ("GEM/2025/B/7021103") and "TENDER NO.: ..." references.
+
+    Documents repeat their own number on most pages and may mention other bids
+    once or twice (stale templates, references), so the most frequent value is
+    taken as the document's number and every value found is kept for comparison.
+    """
+    from collections import Counter
+
+    gem_counts: Counter = Counter()
+    tender_counts: Counter = Counter()
+    for p in page_texts or []:
+        if not isinstance(p, dict):
+            continue
+        text = p.get("text") or ""
+        gem_counts.update(m.group(0).upper() for m in _GEM_BID_NO_RE.finditer(text))
+        for m in _TENDER_NO_RE.finditer(text):
+            value = m.group(1).upper().rstrip(".")
+            if not _GEM_BID_NO_RE.fullmatch(value):  # GeM numbers are already counted above
+                tender_counts[value] += 1
+
+    return {
+        "gem_bid_number": gem_counts.most_common(1)[0][0] if gem_counts else None,
+        "tender_number": tender_counts.most_common(1)[0][0] if tender_counts else None,
+        "gem_bid_numbers": dict(gem_counts.most_common()),
+        "tender_numbers": dict(tender_counts.most_common()),
+    }
+
+
+def build_document_identity_check(
+    main_identity: Optional[Dict[str, Any]],
+    atc_identity: Optional[Dict[str, Any]],
+    *,
+    has_atc: bool,
+    same_document: bool = False,
+) -> Dict[str, Any]:
+    """
+    Compares the main tender's and ATC's own stated numbers. Always returns a
+    populated result so the check's reliability is visible, not only failures.
+
+    match: True  -> the main tender's number appears in the ATC
+           False -> both documents state numbers of the same kind and none are shared
+           None  -> unverifiable (no ATC, same file, or a number missing on either side)
+    Never blocks extraction.
+    """
+    main_identity = main_identity or {}
+    atc_identity = atc_identity or {}
+    main_number = main_identity.get("gem_bid_number") or main_identity.get("tender_number")
+    atc_number = atc_identity.get("gem_bid_number") or atc_identity.get("tender_number")
+
+    result: Dict[str, Any] = {
+        "mainDocumentNumber": main_number,
+        "atcDocumentNumber": atc_number if has_atc and not same_document else None,
+        "match": None,
+        "status": "unverifiable",
+        "basis": None,
+        "mainNumbersFound": {**main_identity.get("gem_bid_numbers", {}), **main_identity.get("tender_numbers", {})},
+        "atcNumbersFound": {**atc_identity.get("gem_bid_numbers", {}), **atc_identity.get("tender_numbers", {})}
+        if has_atc and not same_document else {},
+    }
+
+    if not has_atc:
+        result["status"] = "no_atc"
+        return result
+    if same_document:
+        result["status"] = "same_document"
+        return result
+
+    # Compare like with like: GeM bid numbers first, then tender reference numbers.
+    for basis, primary_key, all_key in (
+        ("gem_bid_number", "gem_bid_number", "gem_bid_numbers"),
+        ("tender_number", "tender_number", "tender_numbers"),
+    ):
+        main_primary = main_identity.get(primary_key)
+        atc_all = set(atc_identity.get(all_key) or {})
+        if main_primary and atc_all:
+            result["basis"] = basis
+            result["mainDocumentNumber"] = main_primary
+            if main_primary in atc_all:
+                result["match"] = True
+                result["status"] = "match"
+                result["atcDocumentNumber"] = main_primary
+            else:
+                result["match"] = False
+                result["status"] = "mismatch"
+                result["atcDocumentNumber"] = atc_identity.get(primary_key)
+            return result
+
+    return result
+
+
+def build_page_tagged_text(
+    page_texts: List[Dict[str, Any]],
+    atc_page_texts: Optional[List[Dict[str, Any]]] = None,
+) -> str:
+    """
+    Read-only consumer of already-computed page_texts / atc_page_texts (the same
+    per-page dicts produced by extract_pdf_text_hybrid(), each carrying at least
+    "page" and "text"): assembles a single string with each page's text labeled
+    by document and page number, e.g. "[Main Page 1]: ...", "[ATC Page 3]: ...",
+    for feeding into a page-aware LLM call that needs to cite its source page.
+
+    Does NOT mutate page_texts, atc_page_texts, or any caller state -- this is a
+    new, standalone utility alongside the existing ingestion pipeline, not a
+    change to it. Works with main-document-only input when atc_page_texts is
+    empty or None (no ATC document for the tender).
+    """
+    parts: List[str] = []
+
+    for p in (page_texts or []):
+        if not isinstance(p, dict):
+            continue
+        page_num = p.get("page", p.get("page_number", 1))
+        text = (p.get("text") or "").strip()
+        if text:
+            parts.append(f"[Main Page {page_num}]: {text}")
+
+    for p in (atc_page_texts or []):
+        if not isinstance(p, dict):
+            continue
+        page_num = p.get("page", p.get("page_number", 1))
+        text = (p.get("text") or "").strip()
+        if text:
+            parts.append(f"[ATC Page {page_num}]: {text}")
+
+    return "\n\n".join(parts)
 
 
 def _collect_field_snapshots(sections_list: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
@@ -107,7 +254,9 @@ def _collect_field_snapshots(sections_list: List[Dict[str, Any]]) -> Dict[str, D
             fid = f.get("id", "").strip()
             val = f.get("value")
             st = f.get("status")
-            page = f.get("sourcePage", 1)
+            # No page recorded -> None. Never default to page 1: a guessed page renders
+            # as a verified citation downstream.
+            page = f.get("sourcePage")
             snip = f.get("sourceSnippet") or ""
             conf = f.get("confidence", 85.0)
 
@@ -215,6 +364,9 @@ def ingest_parent_tender_pdf(
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 1: Extracting text & page structures from PDF...")
     page_texts = extract_pdf_text_hybrid(str(pdf_path), pages_dir)
     all_pages = list(page_texts)
+    # Read before anything is appended to page_texts (self-classified ATC aliases it).
+    main_identity = extract_document_identity(page_texts)
+    atc_identity: Optional[Dict[str, Any]] = None
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 1 complete: Extracted {len(all_pages)} text pages")
 
     # 2. Extract clickable hyperlinks and document mentions
@@ -385,6 +537,8 @@ def ingest_parent_tender_pdf(
             else:
                 atc_pages_dir = job_dir / "atc_pages"
                 atc_page_texts = extract_pdf_text_hybrid(str(atc_path), atc_pages_dir)
+                # The primary ATC's own number, before spec/schedule child PDFs are merged in.
+                atc_identity = extract_document_identity(atc_page_texts)
                 all_pages.extend(atc_page_texts)
                 atc_sections = extract_tender_fields(atc_page_texts, f"{title_raw} ATC", document_type="generic_nit")
 
@@ -1096,6 +1250,21 @@ def ingest_parent_tender_pdf(
         infosheet_data["_dual_sources"] = dual_sources
         infosheet_data["_self_classified_atc"] = is_self_classified_atc
         infosheet_data["_has_atc"] = has_atc
+        identity_check = build_document_identity_check(
+            main_identity,
+            atc_identity,
+            has_atc=has_atc,
+            same_document=bool(atc_path is not None and str(atc_path) == str(pdf_path)),
+        )
+        infosheet_data["_document_identity_check"] = identity_check
+        if identity_check["match"] is False:
+            logger.warning(
+                "[IDENTITY_CHECK][Job %s] Main tender states %s but ATC states %s -- documents may belong to different tenders.",
+                job_id, identity_check["mainDocumentNumber"], identity_check["atcDocumentNumber"],
+            )
+        else:
+            logger.info("[IDENTITY_CHECK][Job %s] status=%s main=%s atc=%s", job_id,
+                        identity_check["status"], identity_check["mainDocumentNumber"], identity_check["atcDocumentNumber"])
 
     # Return built infosheet dict directly with zero side effects
     return infosheet_data

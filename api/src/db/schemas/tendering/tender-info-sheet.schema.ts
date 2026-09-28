@@ -51,6 +51,9 @@ export const tenderInformation = pgTable("tender_information", {
     physicalDocsRequired: varchar("physical_docs_required", { length: 5 }),
     physicalDocType: varchar("physical_doc_type", { length: 50 }),
     physicalDocsDeadline: timestamp("physical_docs_deadline"),
+    preBidMeeting: text("pre_bid_meeting"),
+    siteVisit: text("site_visit"),
+    sampleSubmission: text("sample_submission"),
     techEligibilityAge: integer("technical_eligibility_age"),
 
     workValueType: varchar("work_value_type", { length: 50 }), // "WORKS_VALUES" | "CUSTOM"

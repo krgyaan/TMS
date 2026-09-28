@@ -200,7 +200,7 @@ FIELD_MAPPING_REGISTRY: Dict[str, Dict[str, str]] = {
 EMD_MODE_NORMALIZATION = PAYMENT_INSTRUMENT_SHORT_MAPPING
 
 # Explicitly excluded prefix/keys per Phase 1 scope decision
-EXCLUDED_PREFIXES = ("doc_", "schedule_", "readiness_")
+EXCLUDED_PREFIXES = ("schedule_",)
 EXCLUDED_EXACT_KEYS = {
     "consignee_address_display",
     "docket_slip_upload_display",
@@ -208,7 +208,6 @@ EXCLUDED_EXACT_KEYS = {
     "courier_docket_display",
     "courier_delivery_time_display",
     "mse_preference_display",
-    "mii_preference_display",
     "startup_preference_display",
     "reserved_for_mse_display",
 }
@@ -418,6 +417,24 @@ def _map_yes_no(val: Any) -> Optional[str]:
     if "YES" in s:
         return "YES"
     return "NO"
+
+
+def _map_yes_no_or_none(val: Any) -> Optional[str]:
+    """Maps truthy/yes -> 'YES', falsey/no -> 'NO', empty/not specified -> None."""
+    if _is_empty(val):
+        return None
+    s = str(val).strip().upper()
+    if s in ("NOT SPECIFIED", "NA", "N/A", "NONE", "NOT FOUND"):
+        return None
+    if s.startswith("NO"):
+        return "NO"
+    if s.startswith("YES"):
+        return "YES"
+    if "YES" in s or "MANDATORY" in s:
+        return "YES"
+    if "NO" in s:
+        return "NO"
+    return None
 
 
 def _map_emd_required(val: Any) -> Optional[str]:
@@ -719,6 +736,38 @@ def map_to_tms_dto(raw_infosheet_data: Dict[str, Any]) -> Dict[str, Any]:
         # Physical Documents
         "physicalDocsRequired": _map_yes_no(raw.get("physical_docs_required_display")),
         "physicalDocsDeadline": _parse_physical_docs_deadline(raw.get("physical_docs_deadline_display"), raw),
+
+        # Before-Bidding Requirements
+        # Pre-Bid Meeting (single composed free-text string; "N/A"/"NA" sentinels -> None)
+        "preBidMeeting": None if _is_empty(raw.get("pre_bid_meeting_display")) or str(raw.get("pre_bid_meeting_display")).strip().lower() in ("na", "n/a", "none", "none specified / no pre-bid meeting scheduled") else str(raw.get("pre_bid_meeting_display")).strip(),
+
+        # Site Visit / Survey
+        "siteVisit": None if _is_empty(raw.get("site_visit_display") or raw.get("readiness_site_visit_display")) or str(raw.get("site_visit_display") or raw.get("readiness_site_visit_display")).strip().lower() in ("not specified", "na", "n/a", "none") else str(raw.get("site_visit_display") or raw.get("readiness_site_visit_display")).strip(),
+        "siteVisitRequired": _map_yes_no_or_none(raw.get("site_visit_display") or raw.get("readiness_site_visit_display")),
+
+        # Sample Submission / Testing
+        "sampleSubmission": None if _is_empty(raw.get("sample_submission_display")) or str(raw.get("sample_submission_display")).strip().lower() in ("not specified", "na", "n/a", "none") else str(raw.get("sample_submission_display")).strip(),
+        "sampleSubmissionRequired": _map_yes_no_or_none(raw.get("sample_submission_display")),
+
+        # Make in India (MII) Preference
+        "miiPreference": None if _is_empty(raw.get("mii_preference_display")) or str(raw.get("mii_preference_display")).strip().lower() in ("na", "n/a", "none") else str(raw.get("mii_preference_display")).strip(),
+        "miiRequired": _map_yes_no_or_none(raw.get("mii_preference_display")),
+
+        # Required Documents from Seller
+        "requiredDocuments": [
+            str(raw[f"doc_{i}_display"]).strip()
+            for i in range(1, 10)
+            if not _is_empty(raw.get(f"doc_{i}_display")) and str(raw[f"doc_{i}_display"]).strip().lower() not in ("na", "n/a", "none", "nil", "not found")
+        ] or None,
+        "doc1": None if _is_empty(raw.get("doc_1_display")) or str(raw.get("doc_1_display")).strip().lower() in ("na", "n/a", "none") else str(raw.get("doc_1_display")).strip(),
+        "doc2": None if _is_empty(raw.get("doc_2_display")) or str(raw.get("doc_2_display")).strip().lower() in ("na", "n/a", "none") else str(raw.get("doc_2_display")).strip(),
+        "doc3": None if _is_empty(raw.get("doc_3_display")) or str(raw.get("doc_3_display")).strip().lower() in ("na", "n/a", "none") else str(raw.get("doc_3_display")).strip(),
+        "doc4": None if _is_empty(raw.get("doc_4_display")) or str(raw.get("doc_4_display")).strip().lower() in ("na", "n/a", "none") else str(raw.get("doc_4_display")).strip(),
+        "doc5": None if _is_empty(raw.get("doc_5_display")) or str(raw.get("doc_5_display")).strip().lower() in ("na", "n/a", "none") else str(raw.get("doc_5_display")).strip(),
+        "doc6": None if _is_empty(raw.get("doc_6_display")) or str(raw.get("doc_6_display")).strip().lower() in ("na", "n/a", "none") else str(raw.get("doc_6_display")).strip(),
+        "doc7": None if _is_empty(raw.get("doc_7_display")) or str(raw.get("doc_7_display")).strip().lower() in ("na", "n/a", "none") else str(raw.get("doc_7_display")).strip(),
+        "doc8": None if _is_empty(raw.get("doc_8_display")) or str(raw.get("doc_8_display")).strip().lower() in ("na", "n/a", "none") else str(raw.get("doc_8_display")).strip(),
+        "doc9": None if _is_empty(raw.get("doc_9_display")) or str(raw.get("doc_9_display")).strip().lower() in ("na", "n/a", "none") else str(raw.get("doc_9_display")).strip(),
 
         # Technical Work Orders & Financial
         "orderValue1": _parse_float(raw.get("order_value_1_display")),

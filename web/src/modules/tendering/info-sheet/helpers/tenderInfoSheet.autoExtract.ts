@@ -1,21 +1,9 @@
 import type { UseFormReturn } from 'react-hook-form';
 import type { TenderInfoSheetFormValues } from './tenderInfoSheet.types';
 
-export interface FieldSourceCitation {
-    value: unknown;
-    raw_value: string;
-    page: number;
-    snippet: string;
-    confidence?: number;
-    status?: string;
-}
+import type { FieldSources } from '@/components/form/AiIndicatorsContext';
 
-export interface FieldSources {
-    self_classified_atc: boolean;
-    has_conflict: boolean;
-    main_tender: FieldSourceCitation | null;
-    atc: FieldSourceCitation | null;
-}
+export type { FieldSourceCitation, FieldSources } from '@/components/form/AiIndicatorsContext';
 
 export interface ExtractedField<T = unknown> {
     value: T;
@@ -66,6 +54,9 @@ export const EXTRACTION_TO_FORM_FIELD_MAP: Record<string, keyof TenderInfoSheetF
     maxLdPercentage: 'maxLdPercentage',
     physicalDocsRequired: 'physicalDocsRequired',
     physicalDocsDeadline: 'physicalDocsDeadline',
+    preBidMeeting: 'preBidMeeting',
+    siteVisit: 'siteVisit',
+    sampleSubmission: 'sampleSubmission',
     orderValue1: 'orderValue1',
     orderValue2: 'orderValue2',
     orderValue3: 'orderValue3',
@@ -476,6 +467,17 @@ export function populateFormFromExtraction(
     }
     if (fields.physicalDocsDeadline?.value) {
         setField('physicalDocsDeadline', String(fields.physicalDocsDeadline.value));
+    }
+
+    // ─── 11b. Before-Bidding Requirements ───────────────────────────────────
+    if (fields.preBidMeeting?.value) {
+        setField('preBidMeeting', String(fields.preBidMeeting.value));
+    }
+    if (fields.siteVisit?.value) {
+        setField('siteVisit', String(fields.siteVisit.value));
+    }
+    if (fields.sampleSubmission?.value) {
+        setField('sampleSubmission', String(fields.sampleSubmission.value));
     }
 
     // ─── 12. Work Values & Tech Eligibility ─────────────────────────────────
