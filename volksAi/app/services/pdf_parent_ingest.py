@@ -99,6 +99,107 @@ def _find_atc_anchor_citation(key: str, atc_page_texts: List[Dict[str, Any]]) ->
     return None, ""
 
 
+_GEM_BID_NO_RE = re.compile(r"\bGEM/\d{4}/[A-Z]/\d{5,}\b", re.IGNORECASE)
+# "TENDER NO.: GAIL/KL/C&P/P25258/DG/MECH/2025", "Tender Number - XYZ/123", "TENDER NO: GEM/2024/B/..."
+_TENDER_NO_RE = re.compile(
+    r"\bTENDER\s*(?:NO|NUMBER|REF(?:ERENCE)?\s*NO)\s*\.?\s*[:\-–]?\s*([A-Z0-9][A-Z0-9/&\-_.]{4,}[A-Z0-9])",
+    re.IGNORECASE,
+)
+
+
+def extract_document_identity(page_texts: Optional[List[Dict[str, Any]]]) -> Dict[str, Any]:
+    """
+    Reads a single document's own self-stated identifiers from its text: GeM bid
+    numbers ("GEM/2025/B/7021103") and "TENDER NO.: ..." references.
+
+    Documents repeat their own number on most pages and may mention other bids
+    once or twice (stale templates, references), so the most frequent value is
+    taken as the document's number and every value found is kept for comparison.
+    """
+    from collections import Counter
+
+    gem_counts: Counter = Counter()
+    tender_counts: Counter = Counter()
+    for p in page_texts or []:
+        if not isinstance(p, dict):
+            continue
+        text = p.get("text") or ""
+        gem_counts.update(m.group(0).upper() for m in _GEM_BID_NO_RE.finditer(text))
+        for m in _TENDER_NO_RE.finditer(text):
+            value = m.group(1).upper().rstrip(".")
+            if not _GEM_BID_NO_RE.fullmatch(value):  # GeM numbers are already counted above
+                tender_counts[value] += 1
+
+    return {
+        "gem_bid_number": gem_counts.most_common(1)[0][0] if gem_counts else None,
+        "tender_number": tender_counts.most_common(1)[0][0] if tender_counts else None,
+        "gem_bid_numbers": dict(gem_counts.most_common()),
+        "tender_numbers": dict(tender_counts.most_common()),
+    }
+
+
+def build_document_identity_check(
+    main_identity: Optional[Dict[str, Any]],
+    atc_identity: Optional[Dict[str, Any]],
+    *,
+    has_atc: bool,
+    same_document: bool = False,
+) -> Dict[str, Any]:
+    """
+    Compares the main tender's and ATC's own stated numbers. Always returns a
+    populated result so the check's reliability is visible, not only failures.
+
+    match: True  -> the main tender's number appears in the ATC
+           False -> both documents state numbers of the same kind and none are shared
+           None  -> unverifiable (no ATC, same file, or a number missing on either side)
+    Never blocks extraction.
+    """
+    main_identity = main_identity or {}
+    atc_identity = atc_identity or {}
+    main_number = main_identity.get("gem_bid_number") or main_identity.get("tender_number")
+    atc_number = atc_identity.get("gem_bid_number") or atc_identity.get("tender_number")
+
+    result: Dict[str, Any] = {
+        "mainDocumentNumber": main_number,
+        "atcDocumentNumber": atc_number if has_atc and not same_document else None,
+        "match": None,
+        "status": "unverifiable",
+        "basis": None,
+        "mainNumbersFound": {**main_identity.get("gem_bid_numbers", {}), **main_identity.get("tender_numbers", {})},
+        "atcNumbersFound": {**atc_identity.get("gem_bid_numbers", {}), **atc_identity.get("tender_numbers", {})}
+        if has_atc and not same_document else {},
+    }
+
+    if not has_atc:
+        result["status"] = "no_atc"
+        return result
+    if same_document:
+        result["status"] = "same_document"
+        return result
+
+    # Compare like with like: GeM bid numbers first, then tender reference numbers.
+    for basis, primary_key, all_key in (
+        ("gem_bid_number", "gem_bid_number", "gem_bid_numbers"),
+        ("tender_number", "tender_number", "tender_numbers"),
+    ):
+        main_primary = main_identity.get(primary_key)
+        atc_all = set(atc_identity.get(all_key) or {})
+        if main_primary and atc_all:
+            result["basis"] = basis
+            result["mainDocumentNumber"] = main_primary
+            if main_primary in atc_all:
+                result["match"] = True
+                result["status"] = "match"
+                result["atcDocumentNumber"] = main_primary
+            else:
+                result["match"] = False
+                result["status"] = "mismatch"
+                result["atcDocumentNumber"] = atc_identity.get(primary_key)
+            return result
+
+    return result
+
+
 def build_page_tagged_text(
     page_texts: List[Dict[str, Any]],
     atc_page_texts: Optional[List[Dict[str, Any]]] = None,
@@ -263,6 +364,9 @@ def ingest_parent_tender_pdf(
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 1: Extracting text & page structures from PDF...")
     page_texts = extract_pdf_text_hybrid(str(pdf_path), pages_dir)
     all_pages = list(page_texts)
+    # Read before anything is appended to page_texts (self-classified ATC aliases it).
+    main_identity = extract_document_identity(page_texts)
+    atc_identity: Optional[Dict[str, Any]] = None
     logger.info(f"[INGEST_PIPELINE][Job {job_id}] Step 1 complete: Extracted {len(all_pages)} text pages")
 
     # 2. Extract clickable hyperlinks and document mentions
@@ -433,6 +537,8 @@ def ingest_parent_tender_pdf(
             else:
                 atc_pages_dir = job_dir / "atc_pages"
                 atc_page_texts = extract_pdf_text_hybrid(str(atc_path), atc_pages_dir)
+                # The primary ATC's own number, before spec/schedule child PDFs are merged in.
+                atc_identity = extract_document_identity(atc_page_texts)
                 all_pages.extend(atc_page_texts)
                 atc_sections = extract_tender_fields(atc_page_texts, f"{title_raw} ATC", document_type="generic_nit")
 
@@ -1144,6 +1250,21 @@ def ingest_parent_tender_pdf(
         infosheet_data["_dual_sources"] = dual_sources
         infosheet_data["_self_classified_atc"] = is_self_classified_atc
         infosheet_data["_has_atc"] = has_atc
+        identity_check = build_document_identity_check(
+            main_identity,
+            atc_identity,
+            has_atc=has_atc,
+            same_document=bool(atc_path is not None and str(atc_path) == str(pdf_path)),
+        )
+        infosheet_data["_document_identity_check"] = identity_check
+        if identity_check["match"] is False:
+            logger.warning(
+                "[IDENTITY_CHECK][Job %s] Main tender states %s but ATC states %s -- documents may belong to different tenders.",
+                job_id, identity_check["mainDocumentNumber"], identity_check["atcDocumentNumber"],
+            )
+        else:
+            logger.info("[IDENTITY_CHECK][Job %s] status=%s main=%s atc=%s", job_id,
+                        identity_check["status"], identity_check["mainDocumentNumber"], identity_check["atcDocumentNumber"])
 
     # Return built infosheet dict directly with zero side effects
     return infosheet_data

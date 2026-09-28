@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
-from app.services.pdf_parent_ingest import ingest_parent_tender_pdf
+from app.services.pdf_parent_ingest import build_document_identity_check, ingest_parent_tender_pdf
 from app.services.tms_field_mapper import map_to_tms_dto
 from app.services.tender_mapper import (
     FIELD_STATUS_MISSING,
@@ -555,6 +555,10 @@ async def extract_tender(
             is_self_classified_atc: bool = bool(infosheet_data.get("_self_classified_atc", False))
             has_atc: bool = bool(infosheet_data.get("_has_atc", bool(atc_paths)))
             ambiguous_field_conflicts: Dict[str, Any] = infosheet_data.get("_ambiguous_field_conflicts", {})
+            # Always present, including when unverifiable, so the check's own reliability is visible.
+            document_identity_check: Dict[str, Any] = infosheet_data.get("_document_identity_check") or build_document_identity_check(
+                None, None, has_atc=has_atc, same_document=is_self_classified_atc
+            )
 
             # 1. Transform raw extraction dictionary into TMS DTO shape
             tms_dto: Dict[str, Any] = map_to_tms_dto(infosheet_data)
@@ -599,6 +603,7 @@ async def extract_tender(
                 "self_classified_atc": is_self_classified_atc,
                 "has_atc": has_atc,
                 "ambiguous_field_conflicts": ambiguous_field_conflicts,
+                "documentIdentityCheck": document_identity_check,
             }
 
 

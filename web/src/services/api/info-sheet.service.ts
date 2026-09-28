@@ -31,6 +31,7 @@ class InfoSheetsService extends BaseApiService {
         self_classified_atc?: boolean;
         has_atc?: boolean;
         ambiguous_field_conflicts?: Record<string, any>;
+        documentIdentityCheck?: import('@/modules/tendering/info-sheet/helpers/documentIdentity').DocumentIdentityCheck | null;
         processing_time_ms?: number;
     }> {
         return this.post(`/${tenderId}/auto-extract`, { force })
@@ -81,6 +82,7 @@ class InfoSheetsService extends BaseApiService {
         self_classified_atc?: boolean;
         has_atc?: boolean;
         ambiguous_field_conflicts?: Record<string, any>;
+        documentIdentityCheck?: import('@/modules/tendering/info-sheet/helpers/documentIdentity').DocumentIdentityCheck | null;
         error?: string;
     }> {
         return this.get(`/auto-extract/${jobId}`)

@@ -36,6 +36,7 @@ import { infoSheetFieldOptions } from '@/modules/tendering/tender-approval/helpe
 import { TenderInformationFormSchema } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.schema';
 import { workValueTypeOptions } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
 import { buildDefaultValues, mapResponseToForm, mapFormToPayload } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.mappers';
+import { getIdentityMismatchBanner, type DocumentIdentityCheck } from '@/modules/tendering/info-sheet/helpers/documentIdentity';
 
 interface TenderInformationFormProps {
     tenderId: number;
@@ -78,8 +79,11 @@ export function TenderInformationForm({
         has_atc?: boolean;
         missing_fields?: string[];
         processing_time_ms?: number;
+        documentIdentityCheck?: DocumentIdentityCheck | null;
     } | null>(null);
     const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    const identityMismatch = getIdentityMismatchBanner(extractionData?.documentIdentityCheck);
 
     const discrepancyCount = useMemo(() => {
         if (!extractionData?.fields) return 0;
@@ -164,6 +168,7 @@ export function TenderInformationForm({
                     has_atc: res.has_atc,
                     missing_fields: res.missing_fields,
                     processing_time_ms: res.processing_time_ms,
+                    documentIdentityCheck: res.documentIdentityCheck,
                 });
                 const populateResult = populateFormFromExtraction(form, res.fields as any);
                 const indicators = extractFieldIndicators(res.fields as any, res.missing_fields);
@@ -210,6 +215,7 @@ export function TenderInformationForm({
                             has_atc: statusRes.has_atc,
                             missing_fields: statusRes.missing_fields,
                             processing_time_ms: statusRes.processing_time_ms,
+                            documentIdentityCheck: statusRes.documentIdentityCheck,
                         });
 
                         const populateResult = populateFormFromExtraction(form, statusRes.fields as any);
@@ -507,6 +513,30 @@ export function TenderInformationForm({
             </CardHeader>
 
             <CardContent>
+                {identityMismatch && (
+                    <Alert
+                        role="alert"
+                        data-testid="document-identity-mismatch"
+                        className="mb-6 border-red-500 bg-red-50 dark:bg-red-950/60"
+                    >
+                        <AlertCircle className="h-4 w-4 text-red-600" />
+                        <AlertDescription className="text-red-800 dark:text-red-200">
+                            <div className="space-y-1.5">
+                                <p className="font-semibold">
+                                    The main tender and the ATC document appear to belong to different tenders.
+                                </p>
+                                <p className="text-sm">
+                                    Main tender states{' '}
+                                    <span className="font-mono font-semibold">{identityMismatch.mainDocumentNumber}</span>
+                                    {' '}but the ATC states{' '}
+                                    <span className="font-mono font-semibold">{identityMismatch.atcDocumentNumber}</span>.
+                                    Values extracted from the ATC may come from another tender. Check the uploaded
+                                    documents before relying on this info sheet.
+                                </p>
+                            </div>
+                        </AlertDescription>
+                    </Alert>
+                )}
                 {showPreview && extractionData && (
                     <ExtractionPreviewPanel
                         fields={extractionData.fields}
