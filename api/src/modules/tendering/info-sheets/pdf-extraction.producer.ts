@@ -8,6 +8,7 @@ import { DRIZZLE } from '@db/database.module';
 import { tenderExtractions } from '@db/schemas/tendering';
 import { eq } from 'drizzle-orm';
 import {
+    DocumentIdentityCheck,
     PdfExtractionJobData,
     PdfExtractionJobResult,
     PdfExtractionJobState,
@@ -23,6 +24,7 @@ export interface EnqueueExtractionResult {
     self_classified_atc?: boolean;
     has_atc?: boolean;
     ambiguous_field_conflicts?: Record<string, any>;
+    documentIdentityCheck?: DocumentIdentityCheck | null;
     processing_time_ms?: number;
 }
 
@@ -104,6 +106,9 @@ export class PdfExtractionProducer {
                         missing_fields: saved.missingFields || [],
                         self_classified_atc: selfClassifiedAtc,
                         has_atc: hasAtc,
+                        // Not persisted in tender_extractions (needs a column + migration), so a
+                        // DB-cached result cannot report the identity check. null = unknown, not a match.
+                        documentIdentityCheck: null,
                     };
                 }
             } catch (dbErr: any) {
@@ -134,6 +139,7 @@ export class PdfExtractionProducer {
                     self_classified_atc: existing.result?.self_classified_atc,
                     has_atc: existing.result?.has_atc,
                     ambiguous_field_conflicts: existing.result?.ambiguous_field_conflicts,
+                    documentIdentityCheck: existing.result?.documentIdentityCheck,
                 };
             }
 
@@ -225,6 +231,7 @@ export class PdfExtractionProducer {
                     self_classified_atc: existingJob.returnvalue?.self_classified_atc,
                     has_atc: existingJob.returnvalue?.has_atc,
                     ambiguous_field_conflicts: existingJob.returnvalue?.ambiguous_field_conflicts,
+                    documentIdentityCheck: existingJob.returnvalue?.documentIdentityCheck,
                 };
             }
 

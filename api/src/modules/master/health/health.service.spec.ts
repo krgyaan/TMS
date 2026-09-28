@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HealthService } from './health.service';
-import { ClaudeUsageService } from './claude-usage.service';
+import { ClaudeUsageService } from '@/modules/master/claude-usage/claude-usage.service';
 import { DRIZZLE } from '@/db/database.module';
 
 describe('HealthService Database Integrity & Startup Checks (Step 3)', () => {

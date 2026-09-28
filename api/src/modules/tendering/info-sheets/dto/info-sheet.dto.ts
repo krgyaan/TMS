@@ -137,6 +137,15 @@ export const TenderInfoSheetPayloadSchema = z
             .optional()
             .nullable(),
 
+        // Pre-Bid Meeting (free text: date/time, venue, MS Teams details)
+        preBidMeeting: optionalString,
+
+        // Site Visit / Survey (free text: mandatory/deemed/advisory + details)
+        siteVisit: optionalString,
+
+        // Sample Submission / Testing (free text: requirement + qty/deadline/lab details)
+        sampleSubmission: optionalString,
+
         // Technical Eligibility
         techEligibilityAge: optionalNumber(
             z.coerce.number().int().nonnegative()

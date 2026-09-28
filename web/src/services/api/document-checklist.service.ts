@@ -5,6 +5,7 @@ import type {
     TenderDocumentChecklistDashboardRow,
     CreateDocumentChecklistDto,
     UpdateDocumentChecklistDto,
+    BiddingRequirementsAnalysisResult,
 } from '@/modules/tendering/checklists/helpers/documentChecklist.types';
 import type { PaginatedResult } from '@/types/api.types';
 
@@ -64,6 +65,14 @@ class DocumentChecklistService extends BaseApiService {
 
     async getByTenderId(tenderId: number): Promise<TenderDocumentChecklist | null> {
         return this.get<TenderDocumentChecklist>(`/tender/${tenderId}`);
+    }
+
+    /**
+     * AI-suggested bidding requirements for this tender (VolksAI analysis of the
+     * tender's main + ATC documents, bridged through the API). Read-only.
+     */
+    async getSuggestedRequirements(tenderId: number): Promise<BiddingRequirementsAnalysisResult> {
+        return this.get<BiddingRequirementsAnalysisResult>(`/tender/${tenderId}/bidding-requirements`);
     }
 
     async create(data: CreateDocumentChecklistDto): Promise<TenderDocumentChecklist> {

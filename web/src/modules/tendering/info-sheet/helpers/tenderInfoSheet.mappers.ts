@@ -115,6 +115,9 @@ export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderI
     physicalDocsRequired: undefined,
     physicalDocType: undefined,
     physicalDocsDeadline: '',
+    preBidMeeting: '',
+    siteVisit: '',
+    sampleSubmission: '',
 
     techEligibilityAgeYears: 0,
 
@@ -242,6 +245,9 @@ export const mapResponseToForm = (
                 ? data.physicalDocsDeadline
                 : data.physicalDocsDeadline.toISOString())
             : '',
+        preBidMeeting: data.preBidMeeting ?? '',
+        siteVisit: data.siteVisit ?? '',
+        sampleSubmission: data.sampleSubmission ?? '',
 
         techEligibilityAgeYears: toNumber(data.techEligibilityAge),
         oemExperience: data.oemExperience as 'YES' | 'NO' | null,
@@ -412,6 +418,9 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
             physicalDocsRequired: null,
             physicalDocType: null,
             physicalDocsDeadline: null,
+            preBidMeeting: null,
+            siteVisit: null,
+            sampleSubmission: null,
             techEligibilityAge: null,
             workValueType: null,
             orderValue1: null,
@@ -564,6 +573,9 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
             values.physicalDocsRequired === 'YES'
                 ? (values.physicalDocsDeadline || null)
                 : null,
+        preBidMeeting: values.preBidMeeting?.trim() || null,
+        siteVisit: values.siteVisit?.trim() || null,
+        sampleSubmission: values.sampleSubmission?.trim() || null,
 
         techEligibilityAge: safeNumber(values.techEligibilityAgeYears),
 

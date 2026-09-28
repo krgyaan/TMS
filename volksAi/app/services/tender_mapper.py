@@ -858,22 +858,25 @@ def generate_bidder_readiness_summary(
     summary = {}
 
     # 1. Site Visit Required? (Distinguish mandatory scheduled visit vs deemed acknowledgment)
-    site_visit_mandatory = re.search(
-        r"(?:mandatory\s+site\s+visit|site\s+visit\s+is\s+mandatory|must\s+visit\s+site\s+and\s+obtain\s+certificate|site\s+visit\s+certificate\s+mandatory)",
-        full_text, re.IGNORECASE
-    )
-    site_visit_deemed = re.search(
-        r"(?:vendor|bidder|contractor)\s+(?:has\s+visited|shall\s+be\s+deemed\s+to\s+have\s+visited|is\s+advised\s+to\s+visit)\s+(?:the\s+)?(?:work\s+sites?|site)",
-        full_text, re.IGNORECASE
-    )
-    if site_visit_mandatory:
-        summary["readiness_site_visit_display"] = "Yes (Mandatory site inspection and certificate required prior to bidding)"
-    elif site_visit_deemed:
-        summary["readiness_site_visit_display"] = "No / Self-Certification (Deemed site visit acknowledgment in SCC; no mandatory scheduled visit)"
-    elif "site visit" in full_text.lower():
-        summary["readiness_site_visit_display"] = "Not mandatory / Self-acquaintance (Bidder advised to inspect site before bidding)"
+    if res_dict.get("site_visit_display") and res_dict["site_visit_display"] not in ("NA", "N/A"):
+        summary["readiness_site_visit_display"] = res_dict["site_visit_display"]
     else:
-        summary["readiness_site_visit_display"] = "Not specified"
+        site_visit_mandatory = re.search(
+            r"(?:mandatory\s+site\s+visit|site\s+visit\s+is\s+mandatory|must\s+visit\s+site\s+and\s+obtain\s+certificate|site\s+visit\s+certificate\s+mandatory)",
+            full_text, re.IGNORECASE
+        )
+        site_visit_deemed = re.search(
+            r"(?:vendor|bidder|contractor)\s+(?:has\s+visited|shall\s+be\s+deemed\s+to\s+have\s+visited|is\s+advised\s+to\s+visit)\s+(?:the\s+)?(?:work\s+sites?|site)",
+            full_text, re.IGNORECASE
+        )
+        if site_visit_mandatory:
+            summary["readiness_site_visit_display"] = "Yes (Mandatory site inspection and certificate required prior to bidding)"
+        elif site_visit_deemed:
+            summary["readiness_site_visit_display"] = "No / Self-Certification (Deemed site visit acknowledgment in SCC; no mandatory scheduled visit)"
+        elif "site visit" in full_text.lower():
+            summary["readiness_site_visit_display"] = "Not mandatory / Self-acquaintance (Bidder advised to inspect site before bidding)"
+        else:
+            summary["readiness_site_visit_display"] = "Not specified"
 
     # 2. Pre-Bid Meeting
     pre_bid = res_dict.get("pre_bid_meeting_display", "NA")
@@ -2679,8 +2682,10 @@ def build_infosheet_data(
         m_time = re.search(r"\b(\d{1,2}[:\.]\d{2}(?:\s*(?:AM|PM|HRS|Hours))?)\b", block, re.IGNORECASE)
         if m_date:
             d_str = m_date.group(1)
+            post_date_block = block[m_date.end():]
+            m_time = re.search(r"(?:at\s+|time[:\s]+)?\b(\d{1,2}[:\.]\d{2}(?:\s*(?:AM|PM|HRS|Hours))?)\b", post_date_block, re.IGNORECASE)
             t_str = f" {m_time.group(1)}" if m_time else ""
-            atc_pb_clause = f"{d_str}{t_str}"
+            atc_pb_clause = f"{d_str}{t_str}".strip()
             parts.append(atc_pb_clause)
             
             # Check for Microsoft Teams meeting credentials
@@ -2717,6 +2722,81 @@ def build_infosheet_data(
         pre_bid_display = ", ".join(parts)
     else:
         pre_bid_display = "N/A"
+
+    # 40b. Site Visit / Survey Requirement
+    site_visit_val = resolve_field(
+        ["Site Visit", "Site Inspection", "Site Survey", "Mandatory Site Visit", "Site Visit Required", "site_visit"],
+        default=None
+    )
+    m_sv_direct = re.search(
+        r"(?:Site\s+Visit\s+Required|Mandatory\s+Site\s+Visit|Site\s+Inspection\s+Required)[\s\S]{0,80}?\b(Yes|No|Mandatory|Not\s+Applicable|NA)\b",
+        full_text, re.IGNORECASE
+    )
+    site_visit_mandatory = re.search(
+        r"(?:mandatory\s+site\s+visit|site\s+visit\s+is\s+mandatory|must\s+visit\s+site\s+and\s+obtain\s+certificate|site\s+visit\s+certificate\s+mandatory|prior\s+to\s+bidding[^\n\.]*?visit\s+the\s+site|bidder\s+must\s+visit\s+the\s+site)",
+        full_text, re.IGNORECASE
+    )
+    site_visit_deemed = re.search(
+        r"(?:vendor|bidder|contractor)\s+(?:has\s+visited|shall\s+be\s+deemed\s+to\s+have\s+visited|is\s+advised\s+to\s+visit)\s+(?:the\s+)?(?:work\s+sites?|site)",
+        full_text, re.IGNORECASE
+    )
+    site_visit_no = (
+        (m_sv_direct and m_sv_direct.group(1).lower() in ("no", "not applicable", "na"))
+        or (site_visit_val and str(site_visit_val).strip().lower() in ("no", "not required", "not applicable", "false", "na"))
+        or bool(re.search(r"site\s+visit\s+(?:is\s+)?(?:not\s+required|not\s+applicable|not\s+mandatory)", full_text, re.IGNORECASE))
+    )
+
+    if site_visit_mandatory or (site_visit_val and any(kw in str(site_visit_val).lower() for kw in ["mandatory", "must visit", "required"])) or (m_sv_direct and m_sv_direct.group(1).lower() in ("yes", "mandatory")):
+        sv_date_m = re.search(r"(?:site\s+visit|site\s+inspection|obtain\s+certificate)[^\n]{0,120}?(?:on|before|date[:\s]+)\s*(\d{1,2}[\.\-\/]\d{1,2}[\.\-\/]\d{2,4})", full_text, re.IGNORECASE)
+        date_extra = f" by {sv_date_m.group(1)}" if sv_date_m else ""
+        site_visit_display = f"Yes (Mandatory site inspection and certificate required prior to bidding{date_extra})"
+    elif site_visit_no:
+        site_visit_display = "No"
+    elif site_visit_deemed:
+        site_visit_display = "No / Self-Certification (Deemed site visit acknowledgment in SCC; no mandatory scheduled visit)"
+    elif "site visit" in full_text.lower() or "site inspection" in full_text.lower():
+        site_visit_display = "Not mandatory / Self-acquaintance (Bidder advised to inspect site before bidding)"
+    else:
+        site_visit_display = "Not specified"
+
+    # 40c. Sample Submission / Testing Requirement
+    sample_val = resolve_field(
+        ["Sample Submission", "Sample Testing", "Sample Required", "Submission of Sample", "Submission of Samples", "sample_submission", "Testing of Samples"],
+        default=None
+    )
+    m_sample_direct = re.search(
+        r"(?:Sample\s+Required|Submission\s+of\s+Samples?|Sample\s+Submission)[\s\S]{0,80}?\b(Yes|No|Not\s+Required|Not\s+Applicable|NA)\b",
+        full_text, re.IGNORECASE
+    )
+    sample_mandatory = re.search(
+        r"(?:bidder\s+shall\s+submit\s+sample|submission\s+of\s+samples?\s+is\s+mandatory|sample\s+to\s+be\s+submitted|samples?\s+must\s+be\s+submitted|advance\s+sample\s+required|prototype\s+sample\s+required|testing\s+of\s+samples?\s+(?:is\s+mandatory|required)|submit\s+\d+\s*(?:no|nos|pieces?|sets?|samples?)\s+of\s+sample)",
+        full_text, re.IGNORECASE
+    )
+    sample_no = (
+        (m_sample_direct and m_sample_direct.group(1).lower() in ("no", "not required", "not applicable", "na"))
+        or (sample_val and str(sample_val).strip().lower() in ("no", "not required", "not applicable", "false", "nil", "none", "na"))
+        or bool(re.search(r"sample\s+(?:is\s+)?(?:not\s+required|not\s+applicable|nil|none)", full_text, re.IGNORECASE))
+    )
+
+    if sample_mandatory or (sample_val and any(kw in str(sample_val).lower() for kw in ["yes", "mandatory", "required", "advance sample", "prototype"])) or (m_sample_direct and m_sample_direct.group(1).lower() == "yes"):
+        details = []
+        qty_m = re.search(r"(?:submit|provide|furnish)\s+(\d{1,4}\s*(?:nos?|pieces?|units?|sets?|samples?))\b", full_text, re.IGNORECASE)
+        if qty_m:
+            details.append(f"Qty: {qty_m.group(1).strip()}")
+        dl_m = re.search(r"(?:within\s+\d+\s+days\s+(?:of|from)\s+[^\n,\.]{4,40}|before\s+bid\s+opening|prior\s+to\s+technical\s+evaluation|along\s+with\s+technical\s+bid)", full_text, re.IGNORECASE)
+        if dl_m:
+            details.append(dl_m.group(0).strip())
+        lab_m = re.search(r"(?:NABL\s+(?:accredited\s+)?(?:lab|laboratory)|government\s+approved\s+lab|buyer\s+lab)", full_text, re.IGNORECASE)
+        if lab_m:
+            details.append(lab_m.group(0).strip())
+        detail_suffix = f" ({'; '.join(details)})" if details else " (Sample required for technical evaluation)"
+        sample_submission_display = f"Yes{detail_suffix}"
+    elif sample_no:
+        sample_submission_display = "No"
+    elif any(kw in full_text.lower() for kw in ["sample testing", "testing of sample", "sample evaluation"]):
+        sample_submission_display = "Testing on sample required if demanded by buyer"
+    else:
+        sample_submission_display = "Not specified"
 
     def _format_qty_clean(raw_qty: Any) -> str:
         if raw_qty is None or str(raw_qty).strip() in ("", "NA", "Not Found"):
@@ -2938,6 +3018,9 @@ def build_infosheet_data(
         "pbg_duration_display": ["pbg_duration_months"],
         "custom_eligibility_criteria_display": ["custom_eligibility_criteria"],
         "pre_bid_meeting_display": ["pre_bid_meeting"],
+        "site_visit_display": ["site_visit", "site_inspection", "site_survey"],
+        "sample_submission_display": ["sample_submission", "sample_testing", "sample_required"],
+        "mii_preference_display": ["mii_purchase_preference", "mii_preference"],
         "payment_terms_supply_display": ["payment_terms_supply_percent", "payment_terms_supply", "payment_terms"],
         "payment_terms_installation_display": ["payment_terms_installation_percent", "payment_terms_installation"],
         "sd_required_display": ["sd_required", "sd_percentage"],
@@ -3041,6 +3124,8 @@ def build_infosheet_data(
         "mse_preference_display": mse_preference_display,
         "mii_preference_display": mii_preference_display,
         "pre_bid_meeting_display": pre_bid_display,
+        "site_visit_display": site_visit_display,
+        "sample_submission_display": sample_submission_display,
         "schedule_1_details_display": schedule_1_details_display,
         "schedule_2_details_display": schedule_2_details_display,
         "schedule_3_details_display": schedule_3_details_display,
@@ -3234,8 +3319,18 @@ def build_infosheet_data(
 
     # 5. Pre-bid meeting: NA when no meeting specified
     pre_bid = str(res_dict.get("pre_bid_meeting_display", "")).lower()
-    if not pre_bid or "no pre-bid" in pre_bid or pre_bid in ("na", "n/a"):
+    if not pre_bid or "no pre-bid" in pre_bid or pre_bid in ("na", "n/a", "none specified / no pre-bid meeting scheduled"):
         explicit_na_keys.add("pre_bid_meeting_display")
+
+    # 5b. Site visit: NA when not specified or No
+    sv_val = str(res_dict.get("site_visit_display", "")).lower()
+    if not sv_val or sv_val in ("not specified", "na", "n/a", "none"):
+        explicit_na_keys.add("site_visit_display")
+
+    # 5c. Sample submission: NA when not specified or No
+    ss_val = str(res_dict.get("sample_submission_display", "")).lower()
+    if not ss_val or ss_val in ("not specified", "na", "n/a", "none"):
+        explicit_na_keys.add("sample_submission_display")
 
     # 6. Physical docs tracking: NA when offline submission not required
     phys_req = str(res_dict.get("physical_docs_required_display", "")).lower()

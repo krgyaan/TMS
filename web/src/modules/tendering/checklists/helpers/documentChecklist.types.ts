@@ -77,6 +77,31 @@ export interface DocumentChecklistFormProps {
 }
 
 /**
+ * AI-suggested bidding requirement, returned by
+ * GET /document-checklists/tender/:tenderId/bidding-requirements
+ * (VolksAI's /analyze-bidding-requirements, bridged through the API).
+ */
+export interface SuggestedBiddingRequirement {
+    documentName: string;
+    category: 'oem' | 'standard' | 'company' | 'other';
+    required: boolean;
+    source: {
+        document: 'main' | 'atc';
+        page: number;
+        snippet: string;
+    };
+    matchedLibraryId: string | null;
+    confidence: 'high' | 'medium' | 'low';
+    reasoning: string;
+}
+
+export interface BiddingRequirementsAnalysisResult {
+    jobId: string;
+    requirements: SuggestedBiddingRequirement[];
+    llmUsage: Record<string, unknown> | null;
+}
+
+/**
  * Standard document options for checklist
  */
 export const standardDocumentOptions = [

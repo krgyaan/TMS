@@ -6,17 +6,41 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction }
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save, AlertCircle, Plus, Trash2, FileText } from 'lucide-react';
+import { ArrowLeft, Save, AlertCircle, Plus, Trash2, FileText, Sparkles, Check } from 'lucide-react';
 import { CompactFileUploader } from '@/components/file-upload';
 import { paths } from '@/app/routes/paths';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
-import { useEffect } from 'react';
-import { useCreateDocumentChecklist, useUpdateDocumentChecklist } from '@/hooks/api/useDocumentChecklists';
-import type { CreateDocumentChecklistDto, TenderDocumentChecklist, UpdateDocumentChecklistDto } from '../helpers/documentChecklist.types';
+import { useEffect, useMemo, useState } from 'react';
+import {
+    useCreateDocumentChecklist,
+    useUpdateDocumentChecklist,
+    useSuggestedBiddingRequirements,
+} from '@/hooks/api/useDocumentChecklists';
+import type {
+    CreateDocumentChecklistDto,
+    SuggestedBiddingRequirement,
+    TenderDocumentChecklist,
+    UpdateDocumentChecklistDto,
+} from '../helpers/documentChecklist.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { DocumentChecklistFormSchema } from '../helpers/documentChecklist.schema';
+
+const CATEGORY_BADGE_VARIANT: Record<SuggestedBiddingRequirement['category'], 'default' | 'secondary' | 'outline'> = {
+    oem: 'default',
+    standard: 'secondary',
+    company: 'secondary',
+    other: 'outline',
+};
+
+const CATEGORY_LABEL: Record<SuggestedBiddingRequirement['category'], string> = {
+    oem: 'OEM',
+    standard: 'Standard',
+    company: 'Company Library',
+    other: 'Other',
+};
 
 type FormValues = z.infer<typeof DocumentChecklistFormSchema>;
 
@@ -52,6 +76,8 @@ export default function DocumentChecklistForm({
     const navigate = useNavigate();
     const createMutation = useCreateDocumentChecklist();
     const updateMutation = useUpdateDocumentChecklist();
+    const suggestMutation = useSuggestedBiddingRequirements();
+    const [addedSuggestions, setAddedSuggestions] = useState<Set<string>>(new Set());
 
     const form = useForm<FormValues>({
         resolver: zodResolver(DocumentChecklistFormSchema),
@@ -78,6 +104,27 @@ export default function DocumentChecklistForm({
     });
 
     const isSubmitting = form.formState.isSubmitting;
+
+    const existingExtraDocNames = useMemo(
+        () => new Set((form.watch('extraDocuments') || []).map((d) => (d?.name || '').trim().toLowerCase())),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [fields],
+    );
+
+    const handleAddSuggestion = (requirement: SuggestedBiddingRequirement) => {
+        const key = requirement.documentName.trim().toLowerCase();
+        if (existingExtraDocNames.has(key)) {
+            setAddedSuggestions((prev) => new Set(prev).add(key));
+            return;
+        }
+        append({ name: requirement.documentName, path: '' });
+        setAddedSuggestions((prev) => new Set(prev).add(key));
+    };
+
+    const isSuggestionAdded = (requirement: SuggestedBiddingRequirement) => {
+        const key = requirement.documentName.trim().toLowerCase();
+        return addedSuggestions.has(key) || existingExtraDocNames.has(key);
+    };
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         try {
@@ -167,6 +214,96 @@ export default function DocumentChecklistForm({
                                     </p>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* AI-Suggested Requirements */}
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between border-b pb-2">
+                                <h4 className="font-semibold text-base text-primary">
+                                    Suggested Requirements (AI)
+                                </h4>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => suggestMutation.mutate(tenderId)}
+                                    disabled={suggestMutation.isPending}
+                                >
+                                    <Sparkles className="mr-2 h-4 w-4" />
+                                    {suggestMutation.isPending ? 'Analyzing tender documents…' : 'Analyze Tender Documents'}
+                                </Button>
+                            </div>
+
+                            {suggestMutation.isPending && (
+                                <Alert>
+                                    <AlertCircle className="h-4 w-4" />
+                                    <AlertDescription>
+                                        Reading the tender's main and ATC documents and identifying bidding
+                                        requirements — this can take up to a minute for large tenders.
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+
+                            {suggestMutation.isSuccess && suggestMutation.data.requirements.length === 0 && (
+                                <Alert>
+                                    <AlertCircle className="h-4 w-4" />
+                                    <AlertDescription>
+                                        No additional document requirements were identified in the tender's documents.
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+
+                            {suggestMutation.data && suggestMutation.data.requirements.length > 0 && (
+                                <div className="border rounded-lg divide-y">
+                                    {suggestMutation.data.requirements.map((requirement, index) => {
+                                        const added = isSuggestionAdded(requirement);
+                                        return (
+                                            <div
+                                                key={`${requirement.documentName}-${index}`}
+                                                className="p-3 flex items-start justify-between gap-3"
+                                            >
+                                                <div className="min-w-0">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className="font-medium text-sm">{requirement.documentName}</span>
+                                                        <Badge variant={CATEGORY_BADGE_VARIANT[requirement.category]}>
+                                                            {CATEGORY_LABEL[requirement.category]}
+                                                        </Badge>
+                                                        {requirement.required && (
+                                                            <Badge variant="destructive">Required</Badge>
+                                                        )}
+                                                        <Badge variant="outline">{requirement.confidence} confidence</Badge>
+                                                        {requirement.matchedLibraryId && (
+                                                            <Badge variant="success">Library match</Badge>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                                        {requirement.source.document === 'main' ? 'Main' : 'ATC'} p.{requirement.source.page}
+                                                        {': '}"{requirement.source.snippet}"
+                                                    </p>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    variant={added ? 'secondary' : 'outline'}
+                                                    size="sm"
+                                                    onClick={() => handleAddSuggestion(requirement)}
+                                                    disabled={added}
+                                                    className="shrink-0"
+                                                >
+                                                    {added ? (
+                                                        <>
+                                                            <Check className="mr-1 h-4 w-4" /> Added
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Plus className="mr-1 h-4 w-4" /> Add
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
 
                         {/* Standard Documents Selection */}

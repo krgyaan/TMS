@@ -1,6 +1,7 @@
 import { AppLogger } from '@/logger/app-logger.service';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { BiddingRequirementsService } from '@/modules/tendering/checklists/bidding-requirements.service';
 import { DocumentChecklistsService } from '@/modules/tendering/checklists/document-checklists.service';
 import type { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/modules/tendering/checklists/dto/document-checklist.dto';
 import { getFrontendTimersBatch } from '@/modules/timers/timer-helper';
@@ -14,8 +15,9 @@ export class DocumentChecklistsController {
     constructor(
         private readonly appLogger: AppLogger,
         private readonly documentChecklistsService: DocumentChecklistsService,
+        private readonly biddingRequirementsService: BiddingRequirementsService,
         private readonly timersService: TimersService
-    ) { 
+    ) {
         this.logger = this.appLogger.withContext(DocumentChecklistsController.name);
     }
 
@@ -72,6 +74,22 @@ export class DocumentChecklistsController {
     @Get('tender/:tenderId')
     findByTenderId(@Param('tenderId', ParseIntPipe) tenderId: number) {
         return this.documentChecklistsService.findByTenderId(tenderId);
+    }
+
+    /**
+     * AI-suggested bidding requirements for this tender, sourced from the
+     * tender's main + ATC documents via VolksAI's /analyze-bidding-requirements.
+     * Caches result in tender_extractions.fields under 'biddingRequirementsAnalysis'.
+     * Pass forceRefresh=true to bypass cache and re-analyze.
+     */
+    @Get('tender/:tenderId/bidding-requirements')
+    analyzeBiddingRequirements(
+        @Param('tenderId', ParseIntPipe) tenderId: number,
+        @Query('forceRefresh') forceRefresh?: string,
+        @CurrentUser() user?: ValidatedUser,
+    ) {
+        const isForceRefresh = forceRefresh === 'true' || forceRefresh === '1';
+        return this.biddingRequirementsService.analyzeForTender(tenderId, isForceRefresh, user?.id);
     }
 
     @Post()

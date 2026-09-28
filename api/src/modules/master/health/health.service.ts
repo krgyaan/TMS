@@ -4,7 +4,7 @@ import type { DbInstance } from "@/db";
 import { DRIZZLE } from "@/db/database.module";
 import type IORedis from "ioredis";
 import { Queue } from "bullmq";
-import { ClaudeUsageService } from "./claude-usage.service";
+import { ClaudeUsageService } from "@/modules/master/claude-usage/claude-usage.service";
 
 export interface WorkerHeartbeat {
     pid?: number;

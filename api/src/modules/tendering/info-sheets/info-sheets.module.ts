@@ -8,7 +8,7 @@ import { EmailModule } from '@/modules/email/email.module';
 import { TimersModule } from '@/modules/timers/timers.module';
 import { ClientDirectoryModule } from '@/modules/shared/client-directory/client-directory.module';
 import { FileUploadModule } from '@/modules/file-upload/file-upload.module';
-import { HealthModule } from '@/modules/master/health/health.module';
+import { ClaudeUsageModule } from '@/modules/master/claude-usage/claude-usage.module';
 import { PdfExtractionProducer } from './pdf-extraction.producer';
 import { PdfExtractionProcessor } from './pdf-extraction.processor';
 
@@ -21,7 +21,7 @@ import { PdfExtractionProcessor } from './pdf-extraction.processor';
         TimersModule,
         ClientDirectoryModule,
         FileUploadModule,
-        HealthModule,
+        ClaudeUsageModule,
     ],
     controllers: [TenderInfoSheetsController],
     providers: [TenderInfoSheetsService, PdfExtractionProducer, PdfExtractionProcessor],

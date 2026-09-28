@@ -133,3 +133,119 @@ def test_schedule_delivery_days_no_hardcoded_90_default():
     sch1 = infosheet.get("schedule_1_details_display")
     assert "90 days" not in sch1
     assert "Delivery: NA" in sch1
+
+
+def test_llm_delivery_time_ambiguity_rule_prompt_text():
+    """
+    FIX 1: Verify the rewritten Role 2 delivery time ambiguity prompt rules in llm_field_resolver.py.
+    The prompt must NEVER instruct the model to attach qualifying prose to numbers,
+    and must instruct to return null if no distinct figure is literally stated.
+    """
+    from app.services import llm_field_resolver as resolver
+    with open(resolver.__file__, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Old buggy qualification prose instructions must be completely removed
+    assert "DO NOT collapse the value to a bare 'Not Specified' or null" not in content
+    assert "return the total period accompanied by a clear qualification" not in content
+    assert "total completion) — no distinct supply-only figure found in scoped clauses" not in content
+    assert "total completion) — installation included in total period" not in content
+
+    # New prompt rule must be present
+    assert "If no distinct supply-only or installation-only figure is literally stated" in content
+    assert "choose action='override' with resolved_value=null for that field" in content
+    assert "Only return 'Inclusive (SITC Scope)' for delivery_time_installation_display when the document" in content
+    assert "explicitly states installation is included in the supply period" in content
+    assert "NEVER return a number with attached qualifying prose" in content
+
+
+def test_role2_delivery_time_overall_completion_period_yields_no_installation():
+    """
+    FIX 1: A scoped clause with only an overall completion period must NOT
+    yield an installation delivery value.
+    """
+    from unittest.mock import MagicMock
+    from app.services.llm_field_resolver import LLMFieldResolver
+
+    mock_block = MagicMock()
+    mock_block.type = "tool_use"
+    mock_block.name = "resolve_ambiguous_fields"
+    # Claude decides to override to null because only an overall completion period exists
+    mock_block.input = {
+        "decisions": [
+            {
+                "field_name": "delivery_time_installation_display",
+                "action": "override",
+                "resolved_value": None,
+                "reasoning": "Only overall contract completion period stated; no distinct installation timeline."
+            }
+        ]
+    }
+    mock_response = MagicMock()
+    mock_response.content = [mock_block]
+    mock_response.usage.input_tokens = 150
+    mock_response.usage.output_tokens = 40
+
+    resolver = LLMFieldResolver(api_key="test-key")
+    resolver.client.messages.create = MagicMock(return_value=mock_response)
+
+    candidates = {
+        "delivery_time_installation_display": "180 Days",
+    }
+    scoped_text = "Overall completion period: 180 Days from LOA."
+    res = resolver.resolve_ambiguous_fields(scoped_text, candidates)
+
+    inst_res = res.get("delivery_time_installation_display", {})
+    assert inst_res.get("action") == "override"
+    assert inst_res.get("resolved_value") is None
+    # Confirm no attached qualifying prose masquerades as an extracted value
+    assert "total completion" not in str(inst_res.get("resolved_value"))
+
+    # When mapped to TMS DTO, installation days must be None
+    dto = map_to_tms_dto({"delivery_time_installation_display": inst_res.get("resolved_value")})
+    assert dto.get("deliveryTimeInstallationDays") is None
+    assert dto.get("deliveryTimeInstallationInclusive") is False
+
+
+def test_role2_delivery_time_separately_stated_installation_extracted():
+    """
+    FIX 1: A scoped clause with a separately stated installation period
+    must extract the distinct installation value.
+    """
+    from unittest.mock import MagicMock
+    from app.services.llm_field_resolver import LLMFieldResolver
+
+    mock_block = MagicMock()
+    mock_block.type = "tool_use"
+    mock_block.name = "resolve_ambiguous_fields"
+    mock_block.input = {
+        "decisions": [
+            {
+                "field_name": "delivery_time_installation_display",
+                "action": "override",
+                "resolved_value": "45 Days",
+                "reasoning": "Separately stated installation period of 45 days isolated."
+            }
+        ]
+    }
+    mock_response = MagicMock()
+    mock_response.content = [mock_block]
+    mock_response.usage.input_tokens = 150
+    mock_response.usage.output_tokens = 40
+
+    resolver = LLMFieldResolver(api_key="test-key")
+    resolver.client.messages.create = MagicMock(return_value=mock_response)
+
+    candidates = {
+        "delivery_time_installation_display": "90 Days",
+    }
+    scoped_text = "Supply period: 90 Days. Installation period: 45 Days."
+    res = resolver.resolve_ambiguous_fields(scoped_text, candidates)
+
+    inst_res = res.get("delivery_time_installation_display", {})
+    assert inst_res.get("resolved_value") == "45 Days"
+
+    dto = map_to_tms_dto({"delivery_time_installation_display": inst_res.get("resolved_value")})
+    assert dto.get("deliveryTimeInstallationDays") == 45
+    assert dto.get("deliveryTimeInstallationInclusive") is False
+

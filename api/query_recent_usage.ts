@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './src/app.module';
-import { ClaudeUsageService } from './src/modules/master/health/claude-usage.service';
+import { ClaudeUsageService } from './src/modules/master/claude-usage/claude-usage.service';
 import { DRIZZLE } from './src/db/database.module';
 import { sql } from 'drizzle-orm';
 

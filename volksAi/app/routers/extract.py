@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
-from app.services.pdf_parent_ingest import ingest_parent_tender_pdf
+from app.services.pdf_parent_ingest import build_document_identity_check, ingest_parent_tender_pdf
 from app.services.tms_field_mapper import map_to_tms_dto
 from app.services.tender_mapper import (
     FIELD_STATUS_MISSING,
@@ -78,6 +78,29 @@ TMS_TO_SOURCE_KEY_MAP: Dict[str, str] = {
     "physicalDocsRequired": "physical_docs_required_display",
     "physicalDocsDeadline": "physical_docs_deadline_display",
 
+    # Before-Bidding Requirements
+    "preBidMeeting": "pre_bid_meeting_display",
+    "siteVisit": "site_visit_display",
+    "siteVisitRequired": "site_visit_display",
+    "sampleSubmission": "sample_submission_display",
+    "sampleSubmissionRequired": "sample_submission_display",
+
+    # Make in India (MII)
+    "miiPreference": "mii_preference_display",
+    "miiRequired": "mii_preference_display",
+
+    # Seller Required Documents
+    "requiredDocuments": "doc_1_display",
+    "doc1": "doc_1_display",
+    "doc2": "doc_2_display",
+    "doc3": "doc_3_display",
+    "doc4": "doc_4_display",
+    "doc5": "doc_5_display",
+    "doc6": "doc_6_display",
+    "doc7": "doc_7_display",
+    "doc8": "doc_8_display",
+    "doc9": "doc_9_display",
+
     # BEC Financial & Work Orders
     "orderValue1": "order_value_1_display",
     "orderValue2": "order_value_2_display",
@@ -133,7 +156,8 @@ def _normalize_extracted_value_for_key(tms_key: str, raw_val: Any) -> Any:
         return parsed if parsed is not None else s
 
     bool_keys = {
-        "reverseAuctionApplicable", "deliveryTimeInstallationInclusive", "physicalDocsRequired"
+        "reverseAuctionApplicable", "deliveryTimeInstallationInclusive", "physicalDocsRequired",
+        "siteVisitRequired", "sampleSubmissionRequired", "miiRequired"
     }
     if tms_key in bool_keys:
         s_lower = s.lower()
@@ -143,6 +167,102 @@ def _normalize_extracted_value_for_key(tms_key: str, raw_val: Any) -> Any:
             return False
 
     return s
+
+
+# Reasons a field's citation cannot point at a verified page/snippet.
+UNLOCATED_NO_SOURCE_RECORD = "no_source_record"          # no Layer-1 record exists for this field
+UNLOCATED_VALUE_CHANGED = "value_changed_after_extraction"  # snapshot exists but no longer matches the value
+UNLOCATED_NO_PAGE = "no_page_recorded"                  # value matches, but the page was never captured
+
+
+def _has_real_page(page: Any) -> bool:
+    return isinstance(page, int) and not isinstance(page, bool) and page >= 1
+
+
+def _build_citation(tms_key: str, item: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalizes a snapshot record and states honestly whether its location is known."""
+    raw = item.get("value")
+    norm = _normalize_extracted_value_for_key(tms_key, raw)
+    if norm is not None:
+        item["raw_value"] = str(raw if raw is not None else "")
+        item["value"] = norm
+    snippet = item.get("snippet") or None
+    item["snippet"] = snippet
+    if _has_real_page(item.get("page")):
+        item["located"] = True
+        item["unlocated_reason"] = None
+    else:
+        item["page"] = None
+        item["located"] = False
+        item["unlocated_reason"] = UNLOCATED_NO_PAGE
+    return item
+
+
+def _unlocated_citation(
+    value: Any, source: Optional[str], is_self_classified_atc: bool, reason: str
+) -> Dict[str, Any]:
+    if is_self_classified_atc or source == "atc":
+        document: Optional[str] = "atc"
+    elif source == "regex":
+        document = "main_tender"
+    else:
+        document = None  # LLM-resolved: no document/page attribution is known
+    return {
+        "value": value,
+        "raw_value": None if value is None else str(value),
+        "page": None,
+        "snippet": None,
+        "located": False,
+        "unlocated_reason": reason,
+        "document": document,
+    }
+
+
+def _normalize_for_compare(val: Any) -> Any:
+    if isinstance(val, str):
+        return " ".join(val.split()).casefold()
+    if isinstance(val, dict):
+        name = val.get("name")
+        if name:
+            return _normalize_for_compare(name)
+        return tuple(sorted((str(k), str(v).casefold()) for k, v in val.items() if v not in (None, "")))
+    return val
+
+
+def _values_match(a: Any, b: Any) -> bool:
+    if a is None or b is None:
+        return a is None and b is None
+    if isinstance(a, bool) or isinstance(b, bool):
+        return a is b if (isinstance(a, bool) and isinstance(b, bool)) else str(a).casefold() == str(b).casefold()
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return abs(float(a) - float(b)) <= 1e-4 * max(1.0, abs(float(a)), abs(float(b)))
+    if isinstance(a, list) and isinstance(b, list):
+        return {repr(_normalize_for_compare(x)) for x in a} == {repr(_normalize_for_compare(x)) for x in b}
+    return _normalize_for_compare(str(a) if not isinstance(a, (str, dict)) else a) == _normalize_for_compare(
+        str(b) if not isinstance(b, (str, dict)) else b
+    )
+
+
+def _citation_supports_value(
+    tms_key: str, source_field_name: Optional[str], raw_item: Optional[Dict[str, Any]], final_value: Any
+) -> bool:
+    """
+    True when a Layer-1 snapshot record's value, projected through the same DTO
+    transform as the final value, equals the final value. Any overwrite after the
+    snapshot (regex BEC merge, Role 1 / Role 2 LLM writes) makes this False.
+    """
+    if not raw_item:
+        return False
+    raw_val = raw_item.get("value")
+    candidates: List[Any] = []
+    if source_field_name:
+        try:
+            candidates.append(map_to_tms_dto({source_field_name: raw_val}).get(tms_key))
+        except Exception:
+            pass
+    candidates.append(_normalize_extracted_value_for_key(tms_key, raw_val))
+    candidates.append(raw_val)
+    return any(_values_match(c, final_value) for c in candidates)
 
 
 def _resolve_dual_source_for_tms_key(
@@ -182,70 +302,62 @@ def _resolve_dual_source_for_tms_key(
                 dual_entry = lower_dual[cand.lower()]
                 break
 
+    # Layer-1 snapshot records for this field. Self-classified ATC tenders have
+    # only one document, so any record belongs in the ATC slot.
     if is_self_classified_atc:
-        atc_item = None
-        if dual_entry and dual_entry.get("atc"):
-            atc_item = dict(dual_entry["atc"])
-        elif clean_value is not None:
-            atc_item = {"value": clean_value, "raw_value": str(clean_value), "page": 1, "snippet": ""}
-        if atc_item:
-            norm = _normalize_extracted_value_for_key(tms_key, atc_item.get("value"))
-            if norm is not None:
-                atc_item["raw_value"] = str(atc_item.get("value", ""))
-                atc_item["value"] = norm
-        return {
-            "self_classified_atc": True,
-            "has_conflict": False,
+        raw_items: Dict[str, Optional[Dict[str, Any]]] = {
             "main_tender": None,
-            "atc": atc_item,
+            "atc": (dual_entry.get("atc") or dual_entry.get("main_tender")) if dual_entry else None,
+        }
+    else:
+        raw_items = {
+            "main_tender": dual_entry.get("main_tender") if dual_entry else None,
+            "atc": dual_entry.get("atc") if dual_entry else None,
         }
 
-    main_item = None
-    atc_item = None
-    if dual_entry:
-        if dual_entry.get("main_tender"):
-            main_item = dict(dual_entry["main_tender"])
-        if dual_entry.get("atc"):
-            atc_item = dict(dual_entry["atc"])
+    items: Dict[str, Optional[Dict[str, Any]]] = {}
+    for slot, item in raw_items.items():
+        items[slot] = _build_citation(tms_key, dict(item)) if item else None
 
-    # Fallback attribution if dual_entry had no record but clean_value exists
-    if not main_item and not atc_item and clean_value is not None:
-        if source == "atc" and has_atc:
-            atc_item = {"value": clean_value, "raw_value": str(clean_value), "page": 1, "snippet": ""}
-        elif source == "regex" or not has_atc:
-            main_item = {"value": clean_value, "raw_value": str(clean_value), "page": 1, "snippet": ""}
+    present = {slot: item for slot, item in items.items() if item is not None}
+    supports = {
+        slot: _citation_supports_value(tms_key, source_field_name, raw_items[slot], clean_value)
+        for slot in present
+    }
 
-    if main_item and main_item.get("value") is not None:
-        norm = _normalize_extracted_value_for_key(tms_key, main_item.get("value"))
-        if norm is not None:
-            main_item["raw_value"] = str(main_item.get("value", ""))
-            main_item["value"] = norm
+    unlocated: Optional[Dict[str, Any]] = None
+    if present and not any(supports.values()):
+        # Every snapshot record disagrees with the final value: the value was
+        # overwritten after Layer 1 (regex BEC block, Role 1 / Role 2 LLM, DTO
+        # mapping). Showing the old page/snippet would cite text that does not
+        # contain the displayed value, so drop them and say so.
+        items = {"main_tender": None, "atc": None}
+        if clean_value is not None:
+            unlocated = _unlocated_citation(clean_value, source, is_self_classified_atc, UNLOCATED_VALUE_CHANGED)
+    elif not present and clean_value is not None:
+        unlocated = _unlocated_citation(clean_value, source, is_self_classified_atc, UNLOCATED_NO_SOURCE_RECORD)
 
-    if atc_item and atc_item.get("value") is not None:
-        norm = _normalize_extracted_value_for_key(tms_key, atc_item.get("value"))
-        if norm is not None:
-            atc_item["raw_value"] = str(atc_item.get("value", ""))
-            atc_item["value"] = norm
+    main_item, atc_item = items["main_tender"], items["atc"]
 
     has_conflict = False
     if (
-        main_item is not None
+        not is_self_classified_atc
+        and main_item is not None
         and atc_item is not None
         and main_item.get("value") is not None
         and atc_item.get("value") is not None
     ):
-        mv = main_item.get("value")
-        av = atc_item.get("value")
-        if isinstance(mv, (int, float)) and isinstance(av, (int, float)):
-            has_conflict = bool(abs(mv - av) > 1e-4)
-        else:
-            has_conflict = bool(str(mv).strip().lower() != str(av).strip().lower())
+        has_conflict = not _values_match(main_item.get("value"), atc_item.get("value"))
+
+    located = any(item.get("located") for item in (main_item, atc_item) if item)
 
     return {
-        "self_classified_atc": False,
+        "self_classified_atc": bool(is_self_classified_atc),
         "has_conflict": has_conflict,
         "main_tender": main_item,
         "atc": atc_item,
+        "located": located,
+        "unlocated": unlocated,
     }
 
 
@@ -443,6 +555,10 @@ async def extract_tender(
             is_self_classified_atc: bool = bool(infosheet_data.get("_self_classified_atc", False))
             has_atc: bool = bool(infosheet_data.get("_has_atc", bool(atc_paths)))
             ambiguous_field_conflicts: Dict[str, Any] = infosheet_data.get("_ambiguous_field_conflicts", {})
+            # Always present, including when unverifiable, so the check's own reliability is visible.
+            document_identity_check: Dict[str, Any] = infosheet_data.get("_document_identity_check") or build_document_identity_check(
+                None, None, has_atc=has_atc, same_document=is_self_classified_atc
+            )
 
             # 1. Transform raw extraction dictionary into TMS DTO shape
             tms_dto: Dict[str, Any] = map_to_tms_dto(infosheet_data)
@@ -487,6 +603,7 @@ async def extract_tender(
                 "self_classified_atc": is_self_classified_atc,
                 "has_atc": has_atc,
                 "ambiguous_field_conflicts": ambiguous_field_conflicts,
+                "documentIdentityCheck": document_identity_check,
             }
 
 

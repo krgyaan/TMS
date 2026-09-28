@@ -512,6 +512,15 @@ export class TenderInfoSheetsService {
                         physicalDocType: isRejection
                             ? null
                             : (payload.physicalDocType ?? null),
+                        preBidMeeting: isRejection
+                            ? null
+                            : (payload.preBidMeeting ?? null),
+                        siteVisit: isRejection
+                            ? null
+                            : (payload.siteVisit ?? null),
+                        sampleSubmission: isRejection
+                            ? null
+                            : (payload.sampleSubmission ?? null),
                         techEligibilityAge: isRejection
                             ? null
                             : (payload.techEligibilityAge ?? null),
@@ -944,6 +953,15 @@ export class TenderInfoSheetsService {
                         physicalDocType: isRejection
                             ? null
                             : (payload.physicalDocType ?? null),
+                        preBidMeeting: isRejection
+                            ? null
+                            : (payload.preBidMeeting ?? null),
+                        siteVisit: isRejection
+                            ? null
+                            : (payload.siteVisit ?? null),
+                        sampleSubmission: isRejection
+                            ? null
+                            : (payload.sampleSubmission ?? null),
                         techEligibilityAge: isRejection
                             ? null
                             : (payload.techEligibilityAge ?? null),
@@ -1994,6 +2012,7 @@ export class TenderInfoSheetsService {
                 self_classified_atc: jobStatus.result?.self_classified_atc,
                 has_atc: jobStatus.result?.has_atc,
                 ambiguous_field_conflicts: jobStatus.result?.ambiguous_field_conflicts,
+                documentIdentityCheck: jobStatus.result?.documentIdentityCheck,
             };
         }
 

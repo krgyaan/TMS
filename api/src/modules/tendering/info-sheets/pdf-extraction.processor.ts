@@ -10,7 +10,7 @@ import { DRIZZLE } from '@db/database.module';
 import { tenderExtractions } from '@db/schemas/tendering';
 import { eq } from 'drizzle-orm';
 import { FileUploadService } from '@/modules/file-upload/file-upload.service';
-import { ClaudeUsageService } from '@/modules/master/health/claude-usage.service';
+import { ClaudeUsageService } from '@/modules/master/claude-usage/claude-usage.service';
 import { startHeartbeat } from '@/infra/queue/worker-heartbeat';
 import { PdfExtractionJobData, PdfExtractionJobResult } from './types/pdf-extraction.types';
 

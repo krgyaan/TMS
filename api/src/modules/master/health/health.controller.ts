@@ -4,7 +4,7 @@ import { Roles } from "@/modules/auth/decorators/roles.decorator";
 import { RolesGuard } from "@/modules/auth/guards/roles.guard";
 import { RoleName } from "@/common/constants/roles.constant";
 import { HealthService } from "@/modules/master/health/health.service";
-import { ClaudeUsageService } from "@/modules/master/health/claude-usage.service";
+import { ClaudeUsageService } from "@/modules/master/claude-usage/claude-usage.service";
 import { AdminUsageService } from "@/modules/master/health/admin-usage.service";
 
 @Controller("health")
