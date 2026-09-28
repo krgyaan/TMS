@@ -1,21 +1,9 @@
 import type { UseFormReturn } from 'react-hook-form';
 import type { TenderInfoSheetFormValues } from './tenderInfoSheet.types';
 
-export interface FieldSourceCitation {
-    value: unknown;
-    raw_value: string;
-    page: number;
-    snippet: string;
-    confidence?: number;
-    status?: string;
-}
+import type { FieldSources } from '@/components/form/AiIndicatorsContext';
 
-export interface FieldSources {
-    self_classified_atc: boolean;
-    has_conflict: boolean;
-    main_tender: FieldSourceCitation | null;
-    atc: FieldSourceCitation | null;
-}
+export type { FieldSourceCitation, FieldSources } from '@/components/form/AiIndicatorsContext';
 
 export interface ExtractedField<T = unknown> {
     value: T;

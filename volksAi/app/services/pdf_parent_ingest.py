@@ -52,10 +52,14 @@ AMBIGUOUS_LABELS = {
 }
 
 
-def _find_atc_anchor_citation(key: str, atc_page_texts: List[Dict[str, Any]]) -> Tuple[int, str]:
-    """Finds the page number and a contextual text snippet for an ATC anchor field."""
+def _find_atc_anchor_citation(key: str, atc_page_texts: List[Dict[str, Any]]) -> Tuple[Optional[int], str]:
+    """
+    Finds the page number and a contextual text snippet for an ATC anchor field.
+    Returns (None, "") when no anchor phrase is found -- the caller must not be
+    handed a guessed page.
+    """
     if not atc_page_texts:
-        return 1, ""
+        return None, ""
     patterns = {
         "maf_required": [r"oem\s+authorization", r"manufacturer\s+authorization", r"authorization\s+certificate", r"\bmaf\b"],
         "payment_terms_supply_percent": [r"terms\s+of\s+payment", r"payment\s+terms", r"payment.*supply", r"payment"],
@@ -83,7 +87,7 @@ def _find_atc_anchor_citation(key: str, atc_page_texts: List[Dict[str, Any]]) ->
         for pat in key_patterns:
             m = re.search(pat, text, re.IGNORECASE)
             if m:
-                p_num = page.get("page", page.get("page_number", 1))
+                p_num = page.get("page", page.get("page_number"))
                 start = max(0, m.start() - 30)
                 end = min(len(text), m.end() + 70)
                 snip = text[start:end].replace("\n", " ").strip()
@@ -92,8 +96,7 @@ def _find_atc_anchor_citation(key: str, atc_page_texts: List[Dict[str, Any]]) ->
                 if end < len(text):
                     snip = snip + "..."
                 return p_num, snip
-    first_p = atc_page_texts[0].get("page", atc_page_texts[0].get("page_number", 1)) if atc_page_texts else 1
-    return first_p, ""
+    return None, ""
 
 
 def build_page_tagged_text(
@@ -150,7 +153,9 @@ def _collect_field_snapshots(sections_list: List[Dict[str, Any]]) -> Dict[str, D
             fid = f.get("id", "").strip()
             val = f.get("value")
             st = f.get("status")
-            page = f.get("sourcePage", 1)
+            # No page recorded -> None. Never default to page 1: a guessed page renders
+            # as a verified citation downstream.
+            page = f.get("sourcePage")
             snip = f.get("sourceSnippet") or ""
             conf = f.get("confidence", 85.0)
 

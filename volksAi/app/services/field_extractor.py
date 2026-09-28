@@ -8,6 +8,31 @@ from app.ocr.extractors.gem_field_extractor import GemFieldExtractor
 
 logger = logging.getLogger(__name__)
 
+
+def _verified_source_page(f: Any) -> Optional[int]:
+    """
+    Page a Layer-1 value was actually read from, or None if unknown.
+
+    Many extractor branches set a placeholder source_page=1 for values computed
+    from the whole document (schedule totals, EMD sums, etc.). The real page lives
+    on source_blocks, so prefer that; a bare source_page of 1 with no blocks is
+    the placeholder and is reported as unknown rather than as page 1.
+    """
+    blocks = getattr(f, "source_blocks", None) or []
+    for b in blocks:
+        page_number = getattr(b, "page_number", None)
+        if page_number is None and isinstance(b, dict):
+            page_number = b.get("page_number")
+        if isinstance(page_number, int) and page_number >= 1:
+            return page_number
+    page = getattr(f, "page", None)
+    if page is None:
+        page = getattr(f, "source_page", None)
+    if isinstance(page, int) and page > 1:
+        return page
+    return None
+
+
 def extract_tender_fields(
     pages: List[Dict[str, Any]],
     filename_title: str,
@@ -146,7 +171,7 @@ def extract_tender_fields(
         "value": filename_title,
         "confidence": 90.0,
         "critical": False,
-        "sourcePage": 1,
+        "sourcePage": None,  # derived from the filename, not located on any page
         "sourceSnippet": f"Filename Title fallback: {filename_title}",
         "status": "extracted",
         "source": "main_tender"
@@ -173,7 +198,7 @@ def extract_tender_fields(
             "value": f.value,
             "confidence": f.confidence,
             "critical": getattr(f, "critical", False),
-            "sourcePage": getattr(f, "page", getattr(f, "source_page", 1)),
+            "sourcePage": _verified_source_page(f),
             "sourceSnippet": getattr(f, "source_snippet", getattr(f, "evidence", "")),
             "status": status,
             "source": canonical_source
@@ -215,7 +240,7 @@ def extract_tender_fields(
             "value": val_str,
             "confidence": 90.0,
             "critical": False,
-            "sourcePage": p.get("page_number", 1),
+            "sourcePage": p.get("page_number"),
             "sourceSnippet": evidence,
             "status": "extracted",
             "source": "main_tender"
