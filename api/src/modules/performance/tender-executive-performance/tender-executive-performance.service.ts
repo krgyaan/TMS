@@ -1204,23 +1204,25 @@ export class TenderExecutiveService {
         ) tcd ON true
     `;
 
-        const missedStatus = [8, 10, 11];
         const dnb = [8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32, 34, 35, 36];
         const disqualified = [33, 39, 41];
         const excludedStatuses = [...dnb, ...disqualified];
         /* =====================================================
        ASSIGNED
     ===================================================== */
+        /**
+         * Pending at Start
+         * Assigned before the period and the tender has never been filled
+         * (no info sheet exists at all — including sheets created later).
+         */
         const assignedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.created_at < '${from}'
-        AND ti.status = 1
         AND NOT EXISTS (
             SELECT 1
             FROM tender_information tin
             WHERE tin.tender_id = ti.id
-            AND tin.created_at < '${from}'
         )
         `);
         /**
@@ -1234,45 +1236,30 @@ export class TenderExecutiveService {
             `);
 
         /**
-         * Filled During
-         * Assigned during period and infosheet created during period
+         * Info Filled During
+         * Info sheet saved during the period (any assignment date) — this is the
+         * shared source for both the Assignment and Approval "Info Filled" columns.
          */
         const assignedDuringCompleted = await exec(`
             ${baseSelect}
             WHERE ${baseWhere()}
-            AND ti.created_at BETWEEN '${from}' AND '${to}'
             AND EXISTS (
                 SELECT 1
                 FROM tender_information tin
                 WHERE tin.tender_id = ti.id
+                AND tin.created_at BETWEEN '${from}' AND '${to}'
             )
             `);
 
         /**
-         * Status Changed During
-         * Assigned during period but moved to missed/rejected without infosheet
-         */
-        const assignedDuringStatusChanged = await exec(`
-            ${baseSelect}
-            WHERE ${baseWhere()}
-            AND ti.created_at BETWEEN '${from}' AND '${to}'
-            AND ti.status IN (${missedStatus})
-            AND NOT EXISTS (
-                SELECT 1
-                FROM tender_information tin
-                WHERE tin.tender_id = ti.id
-            )
-            `);
-
-        /**
-         * Pending Closing
-         * Assigned during period and still no infosheet by end of period
+         * Pending at End
+         * Assigned on or before end of period and still no info sheet by end
+         * (includes carry-over backlog from pending-at-start).
          */
         const assignedClosingPending = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
-        -- AND ti.status NOT IN (${missedStatus})
+        AND ti.created_at <= '${to}'
         AND NOT EXISTS (
             SELECT 1
             FROM tender_information tin
@@ -1634,9 +1621,9 @@ export class TenderExecutiveService {
                     },
 
                     total: {
-                        count: assignedTotal.length + assignedOpening.length,
-                        value: this.sumValue([...assignedTotal, ...assignedOpening]),
-                        drilldown: this.mapDrilldown([...assignedTotal, ...assignedOpening]),
+                        count: assignedTotal.length,
+                        value: this.sumValue(assignedTotal),
+                        drilldown: this.mapDrilldown(assignedTotal),
                     },
 
                     during: {
@@ -1652,11 +1639,8 @@ export class TenderExecutiveService {
                             drilldown: this.mapDrilldown(assignedDuringCompleted),
                         },
 
-                        // statusChanged: {
-                        //     count: assignedDuringStatusChanged.length,
-                        //     value: this.sumValue(assignedDuringStatusChanged),
-                        //     drilldown: this.mapDrilldown(assignedDuringStatusChanged),
-                        // },
+                        // statusChanged is intentionally no longer reported for this
+                        // stage: it duplicated the assignment cohort and was never rendered.
 
                         pending: {
                             count: assignedClosingPending.length,
