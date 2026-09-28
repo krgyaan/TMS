@@ -285,6 +285,7 @@ export const paths = {
         vendorMaster: "/accounts/vendor-master",
         vendorMasterCreate: "/accounts/vendor-master/create",
         vendorMasterEdit: (id: number | string) => `/accounts/vendor-master/${id}/edit`,
+        vendorMasterView: (id: number | string) => `/accounts/vendor-master/${id}`,
         parties: "/accounts/parties",
     },
 
@@ -345,6 +346,7 @@ export const paths = {
         vendors: "/master/vendors",
         vendors_create: "/master/vendors/create",
         vendors_edit: (id: number | string) => `/master/vendors/${id}/edit`,
+        vendors_view: (id: number | string) => `/master/vendors/${id}`,
 
         websites: "/master/websites",
         websites_create: "/master/websites/create",

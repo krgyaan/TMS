@@ -5,9 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form } from '@/components/ui/form';
 import { useCreateVendorOrganization, useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
+import { useAuth } from '@/contexts/AuthContext';
 import { OrgFormSchema, type OrgFormValues } from './helpers/vendorForm.schema';
 import { vendorAreaBase } from './vendorAreaPath';
 import { VendorOrgFields } from './components/VendorOrgFields';
+
+const PERMISSION_MODULE = 'master.vendors';
 
 const CreateVendorPage = () => {
     const navigate = useNavigate();
@@ -15,6 +18,7 @@ const CreateVendorPage = () => {
     const basePath = vendorAreaBase(location.pathname);
     const createOrg = useCreateVendorOrganization();
     const { data: organizations } = useVendorOrganizations();
+    const { canCreate } = useAuth();
 
     const form = useForm<OrgFormValues>({
         resolver: zodResolver(OrgFormSchema),
@@ -39,7 +43,7 @@ const CreateVendorPage = () => {
         try {
             const org = await createOrg.mutateAsync(values);
             navigate(`${basePath}/${org.id}/edit`);
-        } catch (error) {
+        } catch {
             // Error handling is done in the hook
         }
     };
@@ -73,9 +77,11 @@ const CreateVendorPage = () => {
                         <Button type="button" variant="outline" onClick={() => navigate(basePath)} disabled={createOrg.isPending}>
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={createOrg.isPending}>
-                            {createOrg.isPending ? 'Creating...' : 'Create Organization'}
-                        </Button>
+                        {canCreate(PERMISSION_MODULE) && (
+                            <Button type="submit" disabled={createOrg.isPending}>
+                                {createOrg.isPending ? 'Creating...' : 'Create Organization'}
+                            </Button>
+                        )}
                     </div>
                 </form>
             </Form>
