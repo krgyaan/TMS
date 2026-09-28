@@ -79,12 +79,17 @@ export class DocumentChecklistsController {
     /**
      * AI-suggested bidding requirements for this tender, sourced from the
      * tender's main + ATC documents via VolksAI's /analyze-bidding-requirements.
-     * Read-only: does not persist anything, purely a suggestion feed for the
-     * checklist form.
+     * Caches result in tender_extractions.fields under 'biddingRequirementsAnalysis'.
+     * Pass forceRefresh=true to bypass cache and re-analyze.
      */
     @Get('tender/:tenderId/bidding-requirements')
-    analyzeBiddingRequirements(@Param('tenderId', ParseIntPipe) tenderId: number) {
-        return this.biddingRequirementsService.analyzeForTender(tenderId);
+    analyzeBiddingRequirements(
+        @Param('tenderId', ParseIntPipe) tenderId: number,
+        @Query('forceRefresh') forceRefresh?: string,
+        @CurrentUser() user?: ValidatedUser,
+    ) {
+        const isForceRefresh = forceRefresh === 'true' || forceRefresh === '1';
+        return this.biddingRequirementsService.analyzeForTender(tenderId, isForceRefresh, user?.id);
     }
 
     @Post()

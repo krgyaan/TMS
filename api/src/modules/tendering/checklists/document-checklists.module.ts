@@ -9,6 +9,7 @@ import { FinanceDocumentsModule } from '@/modules/shared/finance-documents/finan
 import { TenderInfoSheetsModule } from '@/modules/tendering/info-sheets/info-sheets.module';
 import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
 import { TimersModule } from '@/modules/timers/timers.module';
+import { ClaudeUsageModule } from '@/modules/master/claude-usage/claude-usage.module';
 
 @Module({
     imports: [
@@ -19,6 +20,7 @@ import { TimersModule } from '@/modules/timers/timers.module';
         TenderInfoSheetsModule,
         FileUploadModule,
         FinanceDocumentsModule,
+        ClaudeUsageModule,
     ],
     controllers: [DocumentChecklistsController],
     providers: [DocumentChecklistsService, BiddingRequirementsService],

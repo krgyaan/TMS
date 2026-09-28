@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './src/app.module';
-import { ClaudeUsageService } from './src/modules/master/health/claude-usage.service';
+import { ClaudeUsageService } from './src/modules/master/claude-usage/claude-usage.service';
 import { AdminUsageService } from './src/modules/master/health/admin-usage.service';
 import { HealthService } from './src/modules/master/health/health.service';
 
