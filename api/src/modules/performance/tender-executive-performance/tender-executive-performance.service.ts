@@ -2049,123 +2049,142 @@ export class TenderExecutiveService {
 
         const sumValue = (rows: any[]) => rows.reduce((s, r) => s + Number(r.value ?? 0), 0);
 
+        const emdCte = `
+        WITH emd AS (
+            SELECT
+                pi.id                    AS instrument_id,
+                pr.tender_id             AS tender_id,
+                pi.amount                AS value,
+                sst.name                 AS status,
+                pi.instrument_type       AS instrument_type,
+                pi.action                AS action,
+                pi.status                AS instrument_status,
+                pi.transfer_date         AS transfer_date,
+                itd.return_transfer_date AS return_date,
+                itd.return_utr           AS return_utr,
+                itd.reason               AS return_reason,
+                COALESCE(ti.tender_no, '-') AS tender_no,
+                COALESCE(ti.tender_name, pr.project_name) AS tender_name,
+                COALESCE(
+                    CASE pi.instrument_type
+                        WHEN 'DD'             THEN idd.dd_date
+                        WHEN 'FDR'            THEN ifd.fdr_date
+                        WHEN 'BG'             THEN ibd.bg_date
+                        WHEN 'Cheque'         THEN icd.cheque_date
+                        WHEN 'Bank Transfer'  THEN itd.transaction_date
+                        WHEN 'Portal Payment' THEN itd.transaction_date
+                    END,
+                    pi.transfer_date,
+                    itd.transaction_date,
+                    pr.created_at
+                ) AS paid_at,
+                COALESCE(itd.return_transfer_date, pi.updated_at) AS returned_at,
+                (
+                       (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (3,4,7))
+                    OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (3,4))
+                    OR (pi.instrument_type = 'Cheque'                           AND pi.action IN (3,4,5,6))
+                    OR (pi.instrument_type = 'BG'                               AND pi.action IN (6,8,9))
+                ) AS has_return
+            FROM payment_requests pr
+            JOIN payment_instruments pi ON pi.request_id = pr.id
+            LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
+            LEFT JOIN statuses sst ON sst.id = ti.status
+            LEFT JOIN instrument_dd_details idd ON idd.instrument_id = pi.id
+            LEFT JOIN instrument_fdr_details ifd ON ifd.instrument_id = pi.id
+            LEFT JOIN instrument_bg_details ibd ON ibd.instrument_id = pi.id
+            LEFT JOIN instrument_cheque_details icd ON icd.instrument_id = pi.id
+            LEFT JOIN instrument_transfer_details itd ON itd.instrument_id = pi.id
+            WHERE ${baseWhere()}
+            AND ti.delete_status NOT IN (1)
+            AND pi.status NOT ILIKE '%rejected%'
+            AND pi.status NOT ILIKE '%pending%'
+        )`;
+
         /* =====================================================
    A. OPENING
 ===================================================== */
 
-        const opening = await exec(`
+        const opening = await exec(`${emdCte}
         SELECT
-            pi.id               AS "instrumentId",
-            pr.tender_id        AS "tenderId",
-            pi.amount           AS "value",
-            sst.name            AS "status",
-            COALESCE(pi.transfer_date, pr.created_at) AS "date",
-            pi.instrument_type  AS "instrumentType",
-            COALESCE(ti.tender_no, '-') AS "tenderNo",
-            COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
-        FROM payment_requests pr
-        JOIN payment_instruments pi ON pi.request_id = pr.id
-        LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
-        LEFT JOIN statuses sst ON sst.id = ti.status
-        WHERE ${baseWhere()}
-        AND pr.created_at < '${from}'
-        AND ti.delete_status NOT IN (1)
-        AND pi.status NOT ILIKE '%rejected%'
-        AND pi.status NOT ILIKE '%pending%'
-        AND pi.status ILIKE '%accepted%'
-        AND (
-            (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
-        OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
-        OR (pi.instrument_type = 'BG' AND pi.action IN (0,1,2,3,4,5,6,7))
-        );
+            instrument_id AS "instrumentId",
+            tender_id AS "tenderId",
+            value,
+            status,
+            instrument_type AS "instrumentType",
+            tender_no AS "tenderNo",
+            tender_name AS "tenderName",
+            transfer_date AS "transferDate",
+            paid_at AS "date"
+        FROM emd
+        WHERE paid_at < '${from}'
+        AND (NOT has_return OR returned_at >= '${from}')
         `);
 
         /* =====================================================
    B. PAID DURING PERIOD (ALL)
 ===================================================== */
 
-        const paidDuring = await exec(`
+        const paidDuring = await exec(`${emdCte}
         SELECT
-            pi.id               AS "instrumentId",
-            pr.tender_id        AS "tenderId",
-            pi.amount           AS "value",
-            sst.name            AS "status",
-            COALESCE(pi.transfer_date, pr.created_at) AS "date",
-            pi.instrument_type  AS "instrumentType",
-            COALESCE(ti.tender_no, '-') AS "tenderNo",
-            COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
-        FROM payment_requests pr
-        JOIN payment_instruments pi ON pi.request_id = pr.id
-        LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
-        LEFT JOIN statuses sst ON sst.id = ti.status
-        WHERE ${baseWhere()}
-        AND pr.created_at BETWEEN '${from}' AND '${to}'
-        AND ti.delete_status NOT IN (1)
-        AND pi.status NOT ILIKE '%rejected%'
-        AND pi.status NOT ILIKE '%pending%'
-        AND pi.instrument_type NOT IN ('Cheque')
+            instrument_id AS "instrumentId",
+            tender_id AS "tenderId",
+            value,
+            status,
+            instrument_type AS "instrumentType",
+            tender_no AS "tenderNo",
+            tender_name AS "tenderName",
+            transfer_date AS "transferDate",
+            paid_at AS "date"
+        FROM emd
+        WHERE paid_at BETWEEN '${from}' AND '${to}'
         `);
 
         /* =====================================================
    C. RECEIVED FOR PRIOR PAID
 ===================================================== */
 
-        const receivedForPrior = await exec(`
+        const receivedForPrior = await exec(`${emdCte}
         SELECT
-            pi.id               AS "instrumentId",
-            pr.tender_id        AS "tenderId",
-            pi.amount           AS "value",
-            sst.name            AS "status",
-            COALESCE(pi.transfer_date, pr.created_at) AS "date",
-            pi.transfer_date    AS "transferDate",
-            pi.instrument_type  AS "instrumentType",
-            COALESCE(ti.tender_no, '-') AS "tenderNo",
-            COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
-        FROM payment_requests pr
-        JOIN payment_instruments pi ON pi.request_id = pr.id
-        LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
-        LEFT JOIN statuses sst ON sst.id = ti.status
-        WHERE ${baseWhere()}
-        AND COALESCE(pi.transfer_date, pr.created_at) < '${from}'
-        AND ti.delete_status NOT IN (1)
-        AND pi.status NOT ILIKE '%rejected%'
-        AND pi.status NOT ILIKE '%pending%'
-        AND (
-            (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
-        OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
-        OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
-        );
+            instrument_id AS "instrumentId",
+            tender_id AS "tenderId",
+            value,
+            status,
+            instrument_type AS "instrumentType",
+            tender_no AS "tenderNo",
+            tender_name AS "tenderName",
+            transfer_date AS "transferDate",
+            returned_at AS "date",
+            return_date AS "returnDate",
+            return_utr AS "returnUtr",
+            return_reason AS "returnReason"
+        FROM emd
+        WHERE paid_at < '${from}'
+        AND has_return
+        AND returned_at BETWEEN '${from}' AND '${to}'
         `);
 
         /* =====================================================
    D. RECEIVED FOR DURING PAID
 ===================================================== */
 
-        const receivedForDuring = await exec(`
+        const receivedForDuring = await exec(`${emdCte}
         SELECT
-            pi.id               AS "instrumentId",
-            pr.tender_id        AS "tenderId",
-            pi.amount           AS "value",
-            sst.name            AS "status",
-            COALESCE(pi.transfer_date, pr.created_at) AS "date",
-            pi.instrument_type  AS "instrumentType",
-            pi.transfer_date    AS "transferDate",
-            COALESCE(ti.tender_no, '-') AS "tenderNo",
-            COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
-        FROM payment_requests pr
-        JOIN payment_instruments pi ON pi.request_id = pr.id
-        LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
-        LEFT JOIN statuses sst ON sst.id = ti.status
-        WHERE ${baseWhere()}
-        AND COALESCE(pi.transfer_date, pi.created_at) BETWEEN '${from}' AND '${to}'
-        AND ti.delete_status NOT IN (1)
-        AND pi.status NOT ILIKE '%rejected%'
-        AND pi.status NOT ILIKE '%pending%'
-        AND (
-            (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
-        OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
-        OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
-        );
+            instrument_id AS "instrumentId",
+            tender_id AS "tenderId",
+            value,
+            status,
+            instrument_type AS "instrumentType",
+            tender_no AS "tenderNo",
+            tender_name AS "tenderName",
+            transfer_date AS "transferDate",
+            returned_at AS "date",
+            return_date AS "returnDate",
+            return_utr AS "returnUtr",
+            return_reason AS "returnReason"
+        FROM emd
+        WHERE paid_at BETWEEN '${from}' AND '${to}'
+        AND has_return
+        AND returned_at BETWEEN '${from}' AND '${to}'
         `);
 
         /* =====================================================
@@ -2173,31 +2192,20 @@ export class TenderExecutiveService {
    Pending at end of period
 ===================================================== */
 
-        const closing = await exec(`
+        const closing = await exec(`${emdCte}
         SELECT
-            pi.id               AS "instrumentId",
-            pr.tender_id        AS "tenderId",
-            pi.amount           AS "value",
-            sst.name            AS "status",
-            COALESCE(pi.transfer_date, pr.created_at) AS "date",
-            pi.instrument_type  AS "instrumentType",
-            COALESCE(ti.tender_no, '-') AS "tenderNo",
-            COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
-        FROM payment_requests pr
-        JOIN payment_instruments pi ON pi.request_id = pr.id
-        LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
-        LEFT JOIN statuses sst ON sst.id = ti.status
-        WHERE ${baseWhere()}
-        AND pr.created_at < '${to}'
-        AND ti.delete_status NOT IN (1)
-        AND pi.status NOT ILIKE '%rejected%'
-        AND pi.status NOT ILIKE '%pending%'
-        AND pi.status ILIKE '%accepted%'
-        AND (
-            (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
-        OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
-        OR (pi.instrument_type = 'BG' AND pi.action IN (0,1,2,3,4,5,6,7))
-        );
+            instrument_id AS "instrumentId",
+            tender_id AS "tenderId",
+            value,
+            status,
+            instrument_type AS "instrumentType",
+            tender_no AS "tenderNo",
+            tender_name AS "tenderName",
+            transfer_date AS "transferDate",
+            paid_at AS "date"
+        FROM emd
+        WHERE paid_at < '${to}'
+        AND (NOT has_return OR returned_at >= '${to}')
         `);
 
         let otherThanTms: any[] | null = null;

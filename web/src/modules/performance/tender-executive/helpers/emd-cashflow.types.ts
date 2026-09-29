@@ -3,6 +3,9 @@ import type { MetricDrilldownItem } from "./tender-executive.types";
 export interface EmdCashFlowDrilldownItem extends MetricDrilldownItem {
     instrumentId: number;
     instrumentType: string;
+    returnDate?: string | null;
+    returnUtr?: string | null;
+    returnReason?: string | null;
 }
 
 export interface EmdMetricBucket {
