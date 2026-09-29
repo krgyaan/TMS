@@ -1207,6 +1207,9 @@ export class TenderExecutiveService {
         const dnb = [8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32, 34, 35, 36];
         const disqualified = [33, 39, 41];
         const excludedStatuses = [...dnb, ...disqualified];
+        const resolvedResultStatuses =
+            "'won','lost','disqualified','cancelled','lost - h1 elimination'";
+        const receivedResultStatuses = "'won','lost','cancelled','lost - h1 elimination'";
         /* =====================================================
        ASSIGNED
     ===================================================== */
@@ -1432,153 +1435,141 @@ export class TenderExecutiveService {
         const resultAwaitedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.status NOT IN (${excludedStatuses})
-          AND ti.created_at < '${from}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.created_at < '${from}'
+                  AND bs.submission_datetime < '${from}'
           )
           AND NOT EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                AND LOWER(tr.status) IN ('won','lost','disqualified')
-                AND tr.created_at < '${from}'
+                  AND (
+                        LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
+                     OR (LOWER(TRIM(tr.status)) = 'under evaluation'
+                         AND tr.created_at >= '${from}')
+                  )
           )
     `);
 
         const resultAwaitedDuringTotal = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.status NOT IN (${excludedStatuses})
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.created_at BETWEEN '${from}' AND '${to}'
+                  AND bs.submission_datetime BETWEEN '${from}' AND '${to}'
           )
     `);
 
         const wonDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND tr.status ILIKE 'won'
-                  AND tr.created_at BETWEEN '${from}' AND '${to}'
+                  AND LOWER(TRIM(tr.status)) = 'won'
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN '${from}' AND '${to}'
           )
     `);
 
         const lostDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND tr.status ILIKE 'lost'
-                  AND tr.created_at BETWEEN '${from}' AND '${to}'
+                  AND LOWER(TRIM(tr.status)) IN ('lost', 'lost - h1 elimination')
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN '${from}' AND '${to}'
           )
     `);
 
         const resultAwaitedDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                AND tr.created_at BETWEEN '${from}' AND '${to}'
-                AND LOWER(tr.status) IN ('won', 'lost', 'disqualified')
-        )
+                  AND (
+                        (LOWER(TRIM(tr.status)) IN (${receivedResultStatuses})
+                          AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN '${from}' AND '${to}')
+                     OR (LOWER(TRIM(tr.status)) = 'disqualified'
+                          AND tr.created_at BETWEEN '${from}' AND '${to}')
+                  )
+          )
     `);
 
         const disqualifiedDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                AND tr.status ILIKE 'disqualified'
-                AND tr.created_at BETWEEN '${from}' AND '${to}'
+                  AND LOWER(TRIM(tr.status)) = 'disqualified'
+                  AND tr.created_at BETWEEN '${from}' AND '${to}'
           )
     `);
 
         const resultAwaitedClosing = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.status NOT IN (${excludedStatuses})
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.created_at <= '${to}'
+                  AND bs.submission_datetime <= '${to}'
           )
           AND NOT EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                AND LOWER(tr.status) IN ('won','lost','disqualified')
-                AND tr.created_at <= '${to}'
-          )
-    `);
-
-        const resultAwaitedDuringPending = await exec(`
-        ${baseSelect}
-        WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
-          AND EXISTS (
-                SELECT 1
-                FROM bid_submissions bs
-                WHERE bs.tender_id = ti.id
-                  AND bs.status = 'Bid Submitted'
-                  AND bs.created_at BETWEEN '${from}' AND '${to}'
-          )
-          AND NOT EXISTS (
-                SELECT 1
-                FROM tender_results tr
-                WHERE tr.tender_id = ti.id
-                AND tr.created_at BETWEEN '${from}' AND '${to}'
+                  AND (
+                        LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
+                     OR (LOWER(TRIM(tr.status)) = 'under evaluation'
+                         AND tr.created_at >= '${to}')
+                  )
           )
     `);
 
         const wonOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at < '${from}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
                   AND LOWER(TRIM(tr.status)) = 'won'
-                  AND tr.created_at < '${from}'
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) < '${from}'
           )
     `);
 
         const lostOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at < '${from}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND LOWER(TRIM(tr.status)) = 'lost'
-                  AND tr.created_at < '${from}'
+                  AND LOWER(TRIM(tr.status)) IN ('lost', 'lost - h1 elimination')
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) < '${from}'
           )
     `);
 
