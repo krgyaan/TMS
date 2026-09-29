@@ -1411,7 +1411,8 @@ export class TenderExecutiveService {
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
-          AND (ti.tl_approval_timestamp IS NULL OR ti.tl_approval_timestamp <= '${to}')
+          AND ti.tl_approval_timestamp >= '${from}'
+          AND ti.tl_approval_timestamp <= '${to}'
           AND st.tender_category <> 'dnb'
           AND NOT EXISTS (
                 SELECT 1
