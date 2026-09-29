@@ -222,7 +222,7 @@ You are an expert procurement auditor and document parsing AI specialized in Ind
    - For PBG / Security Deposit: Extract the percentage of contract value ("X% of contract value") and validity period ("N months"), only if literally stated in the text.
    - For Liquidated Damages (LD / PRS): Extract the weekly rate ("X% per week") and maximum cap ("Y% cap"), only if literally stated in the text.
    - X, Y and N above are placeholders, not values: never fill them with a typical, customary, or default rate. If the clause does not state the number, return null.
-   - For MAF (Manufacturer Authorization Form): Return true if required from OEM/Manufacturer, otherwise false.
+   - For MAF (Manufacturer Authorization Form): Return true ONLY if the text explicitly states MAF is required; return false ONLY if the text explicitly states MAF is not required or not applicable; return null if the document is silent on MAF (absence of a requirement is not the same as an explicit exemption).
 5. Clause-purpose check for eligibility thresholds: before using a turnover, net worth, working capital, solvency or order-value figure as the answer to a general eligibility (BEC) field, confirm the surrounding text states it as this tender's general eligibility requirement for bidders. The same "annual turnover of [X] or more" phrasing appears in unrelated clauses that are NOT the BEC requirement:
    - EMD / bid-security exemption lists (e.g. "sellers having annual turnover of INR [X] Crore or more ... are exempted from EMD");
    - MSE / Startup relaxation clauses ("relaxation of prior turnover and prior experience");
@@ -437,7 +437,10 @@ FIELD_PROMPT_MAP: Dict[str, Tuple[str, str, str, Any]] = {
     ),
     "maf_required_display": (
         "maf_required", "boolean",
-        "Is Manufacturer Authorization Form (MAF) / OEM Authorization required? Look in BEC Section-II for 'Manufacturer' or 'Authorized Dealer'",
+        "Is Manufacturer Authorization Form (MAF) / OEM Authorization required? "
+        "Return true ONLY if the text explicitly requires MAF (e.g. 'MAF is required', 'Authorized Dealer must submit OEM authorization'). "
+        "Return false ONLY if the text explicitly says it is not required or not applicable. "
+        "Return null if the document is silent -- silence is NOT the same as 'not required'.",
         _fmt_bool,
     ),
     "client_name_1_display": (
