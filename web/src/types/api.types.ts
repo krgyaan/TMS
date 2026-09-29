@@ -257,6 +257,25 @@ export interface VendorOrganizationWithRelations extends VendorOrganization {
     };
 }
 
+// One row of the paginated vendor list. Carries counts only — no relation arrays —
+// which is what lets the endpoint stay a single paged query.
+export interface VendorOrganizationListItem extends VendorOrganization {
+    _counts: {
+        persons: number;
+        gsts: number;
+        accounts: number;
+        files: number;
+    };
+}
+
+export interface VendorOrganizationListParams {
+    page: number;
+    limit: number;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+}
+
 // DTOs for creating/updating vendor organizations with relations
 export interface CreateVendorGstDto {
     orgId: number;

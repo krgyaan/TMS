@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, HttpCode, HttpStatus } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus } from "@nestjs/common";
 import { z } from "zod";
 import { VendorMasterService } from "@/modules/master/vendor-master/vendor-master.service";
 
@@ -78,6 +78,30 @@ export class VendorMasterController {
     @Get("vendor-organizations/with-relations")
     async listOrganizationsWithRelations() {
         return this.vendorMasterService.findAllOrganizationsWithRelations();
+    }
+
+    // Declared before vendor-organizations/:id so "paginated" is not parsed as an id.
+    @Get("vendor-organizations/paginated")
+    async listOrganizationsPaginated(
+        @Query("page") page?: string,
+        @Query("limit") limit?: string,
+        @Query("search") search?: string,
+        @Query("sortBy") sortBy?: string,
+        @Query("sortOrder") sortOrder?: string
+    ) {
+        const toNumber = (value?: string): number | undefined => {
+            if (!value) return undefined;
+            const parsed = parseInt(value, 10);
+            return Number.isNaN(parsed) ? undefined : parsed;
+        };
+
+        return this.vendorMasterService.findAllOrganizationsPaginated({
+            page: toNumber(page),
+            limit: toNumber(limit),
+            search,
+            sortBy,
+            sortOrder: sortOrder === "asc" || sortOrder === "desc" ? sortOrder : undefined,
+        });
     }
 
     @Get("vendor-organizations/:id")

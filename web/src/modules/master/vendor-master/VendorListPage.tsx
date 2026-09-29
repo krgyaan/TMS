@@ -8,39 +8,38 @@ import DataTable from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
-import { useSetVendorOrganizationStatus, useVendorOrganizationsWithRelations } from "@/hooks/api/useVendorOrganizations";
+import { useSetVendorOrganizationStatus, useVendorOrganizationsPaginated } from "@/hooks/api/useVendorOrganizations";
 import { usePersistentTableState } from "@/hooks/usePersistentTableState";
-import type { VendorOrganizationWithRelations } from "@/types/api.types";
+import type { VendorOrganizationListItem } from "@/types/api.types";
 import type { ColDef } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { AlertCircle, Eye, FileText, Pencil, Plus, Power, PowerOff, Search } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { vendorAreaBase } from "./vendorAreaPath";
 import { MsmeBadge } from "./helpers/MsmeBadge";
 
 const PERMISSION_MODULE = "master.vendors";
 
-type VendorRow = VendorOrganizationWithRelations & {
+type VendorRow = VendorOrganizationListItem & {
     gstCount: number;
     accountCount: number;
     personCount: number;
     fileCount: number;
 };
 
-const toRow = (org: VendorOrganizationWithRelations): VendorRow => ({
+const toRow = (org: VendorOrganizationListItem): VendorRow => ({
     ...org,
-    gstCount: org._counts?.gsts ?? org.gsts?.length ?? 0,
-    accountCount: org._counts?.accounts ?? org.accounts?.length ?? 0,
-    personCount: org._counts?.persons ?? org.persons?.length ?? 0,
-    fileCount: org._counts?.files ?? org.files?.length ?? 0,
+    gstCount: org._counts.gsts,
+    accountCount: org._counts.accounts,
+    personCount: org._counts.persons,
+    fileCount: org._counts.files,
 });
 
 const VendorsPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const basePath = vendorAreaBase(location.pathname);
-    const { data: organizations, isLoading, error, refetch } = useVendorOrganizationsWithRelations();
     const setVendorStatus = useSetVendorOrganizationStatus();
     const { canCreate, canUpdate } = useAuth();
 
@@ -50,12 +49,21 @@ const VendorsPage = () => {
         debouncedSearch,
         pagination,
         setPagination,
+        sortModel,
         handleSortChanged,
         handlePageSizeChange,
     } = usePersistentTableState<"all">({
         storageKey: "vendor-master",
         defaultTab: "all",
         defaultPageSize: 50,
+    });
+
+    const { data: response, isLoading, isFetching, error, refetch } = useVendorOrganizationsPaginated({
+        page: pagination.pageIndex + 1,
+        limit: pagination.pageSize,
+        search: debouncedSearch.trim() || undefined,
+        sortBy: sortModel[0]?.colId,
+        sortOrder: sortModel[0]?.sort,
     });
 
     const handleToggleStatus = useCallback(
@@ -76,29 +84,19 @@ const VendorsPage = () => {
         [setVendorStatus],
     );
 
-    const filteredRows = useMemo(() => {
-        const list = (organizations ?? []).map(toRow);
-        const q = debouncedSearch.trim().toLowerCase();
-        if (!q) return list;
+    const pageRows = useMemo(() => (response?.data ?? []).map(toRow), [response]);
+    const totalRows = response?.meta?.total ?? 0;
+    const totalPages = response?.meta?.totalPages ?? 1;
 
-        return list.filter(org => {
-            // "Manufacturer"/"Service" are searchable alongside the raw M/S codes.
-            const msmeTypeText = org.msmeType === "M" ? "Manufacturer" : org.msmeType === "S" ? "Service" : "";
-            const own = [org.name, org.alias, org.pan, org.msme, org.address, msmeTypeText];
-            const gst = (org.gsts ?? []).flatMap(g => [g.gstNo, g.gstState]);
-            const persons = (org.persons ?? []).flatMap(p => [p.name, p.email, p.mobile]);
-            const accounts = (org.accounts ?? []).flatMap(a => [a.accountNum, a.ifscCode]);
-
-            return [...own, ...gst, ...persons, ...accounts].some(value =>
-                (value ?? "").toLowerCase().includes(q),
-            );
-        });
-    }, [organizations, debouncedSearch]);
-
-    const totalRows = filteredRows.length;
-    const totalPages = Math.max(1, Math.ceil(totalRows / pagination.pageSize));
-    const pageIndex = Math.min(pagination.pageIndex, totalPages - 1);
-    const pageRows = filteredRows.slice(pageIndex * pagination.pageSize, (pageIndex + 1) * pagination.pageSize);
+    // Guard against a stale page index (e.g. rows removed while sitting on the last
+    // page), which would otherwise leave an empty grid with no way back.
+    useEffect(() => {
+        if (!response) return;
+        const lastPage = Math.max(1, totalPages);
+        if (pagination.pageIndex + 1 > lastPage) {
+            setPagination({ ...pagination, pageIndex: lastPage - 1 });
+        }
+    }, [response, totalPages, pagination, setPagination]);
 
     const rowActions = useMemo<ActionItem<VendorRow>[]>(
         () => [
@@ -256,9 +254,10 @@ const VendorsPage = () => {
                     <DataTable
                         data={pageRows}
                         columnDefs={columns}
+                        loading={isFetching}
                         manualPagination={true}
                         rowCount={totalRows}
-                        paginationState={{ pageIndex, pageSize: pagination.pageSize }}
+                        paginationState={pagination}
                         onPaginationChange={setPagination}
                         onPageSizeChange={handlePageSizeChange}
                         showTotalCount={true}
