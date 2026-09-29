@@ -2063,6 +2063,7 @@ export class TenderExecutiveService {
                 itd.return_transfer_date AS return_date,
                 itd.return_utr           AS return_utr,
                 itd.reason               AS return_reason,
+                (itd.return_transfer_date IS NULL) AS return_date_derived,
                 COALESCE(ti.tender_no, '-') AS tender_no,
                 COALESCE(ti.tender_name, pr.project_name) AS tender_name,
                 COALESCE(
@@ -2084,7 +2085,17 @@ export class TenderExecutiveService {
                     OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (3,4))
                     OR (pi.instrument_type = 'Cheque'                           AND pi.action IN (3,4,5,6))
                     OR (pi.instrument_type = 'BG'                               AND pi.action IN (6,8,9))
-                ) AS has_return
+                ) AS has_return,
+                CASE
+                    WHEN (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (3,4,7))
+                      OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (3))
+                      OR (pi.instrument_type = 'Cheque'                           AND pi.action IN (3,6))
+                      OR (pi.instrument_type = 'BG'                               AND pi.action IN (6,8,9)) THEN 'RETURNED'
+                    WHEN (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (5))
+                      OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (4))
+                      OR (pi.instrument_type = 'Cheque'                           AND pi.action IN (4,5))        THEN 'SETTLED'
+                    ELSE 'PAID'
+                END AS emd_state
             FROM payment_requests pr
             JOIN payment_instruments pi ON pi.request_id = pr.id
             LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
@@ -2114,7 +2125,14 @@ export class TenderExecutiveService {
             tender_no AS "tenderNo",
             tender_name AS "tenderName",
             transfer_date AS "transferDate",
-            paid_at AS "date"
+            paid_at AS "date",
+            paid_at AS "paidDate",
+            returned_at AS "returnedAt",
+            return_date AS "returnDate",
+            return_utr AS "returnUtr",
+            return_reason AS "returnReason",
+            return_date_derived AS "returnDateDerived",
+            emd_state AS "emdState"
         FROM emd
         WHERE paid_at < '${from}'
         AND (NOT has_return OR returned_at >= '${from}')
@@ -2134,7 +2152,14 @@ export class TenderExecutiveService {
             tender_no AS "tenderNo",
             tender_name AS "tenderName",
             transfer_date AS "transferDate",
-            paid_at AS "date"
+            paid_at AS "date",
+            paid_at AS "paidDate",
+            returned_at AS "returnedAt",
+            return_date AS "returnDate",
+            return_utr AS "returnUtr",
+            return_reason AS "returnReason",
+            return_date_derived AS "returnDateDerived",
+            emd_state AS "emdState"
         FROM emd
         WHERE paid_at BETWEEN '${from}' AND '${to}'
         `);
@@ -2154,9 +2179,13 @@ export class TenderExecutiveService {
             tender_name AS "tenderName",
             transfer_date AS "transferDate",
             returned_at AS "date",
+            paid_at AS "paidDate",
+            returned_at AS "returnedAt",
             return_date AS "returnDate",
             return_utr AS "returnUtr",
-            return_reason AS "returnReason"
+            return_reason AS "returnReason",
+            return_date_derived AS "returnDateDerived",
+            emd_state AS "emdState"
         FROM emd
         WHERE paid_at < '${from}'
         AND has_return
@@ -2178,9 +2207,13 @@ export class TenderExecutiveService {
             tender_name AS "tenderName",
             transfer_date AS "transferDate",
             returned_at AS "date",
+            paid_at AS "paidDate",
+            returned_at AS "returnedAt",
             return_date AS "returnDate",
             return_utr AS "returnUtr",
-            return_reason AS "returnReason"
+            return_reason AS "returnReason",
+            return_date_derived AS "returnDateDerived",
+            emd_state AS "emdState"
         FROM emd
         WHERE paid_at BETWEEN '${from}' AND '${to}'
         AND has_return
@@ -2202,7 +2235,14 @@ export class TenderExecutiveService {
             tender_no AS "tenderNo",
             tender_name AS "tenderName",
             transfer_date AS "transferDate",
-            paid_at AS "date"
+            paid_at AS "date",
+            paid_at AS "paidDate",
+            returned_at AS "returnedAt",
+            return_date AS "returnDate",
+            return_utr AS "returnUtr",
+            return_reason AS "returnReason",
+            return_date_derived AS "returnDateDerived",
+            emd_state AS "emdState"
         FROM emd
         WHERE paid_at < '${to}'
         AND (NOT has_return OR returned_at >= '${to}')

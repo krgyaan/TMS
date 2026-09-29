@@ -1,9 +1,11 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { paths } from "@/app/routes/paths";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Eye, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import type { EmdLifecycleState } from "../helpers/emd-cashflow.types";
 
 export type ScoreDrilldownTender = {
     tenderId: number;
@@ -12,6 +14,16 @@ export type ScoreDrilldownTender = {
     value: number | null;
     date: string | null;
     status?: string | null;
+    emdState?: EmdLifecycleState;
+    paidDate?: string | null;
+    returnDate?: string | null;
+    returnUtr?: string | null;
+};
+
+const EMD_STATE_BADGE: Record<EmdLifecycleState, { label: string; variant: "secondary" | "success" | "outline" }> = {
+    PAID: { label: "Paid", variant: "secondary" },
+    RETURNED: { label: "Returned", variant: "success" },
+    SETTLED: { label: "Settled", variant: "outline" },
 };
 
 const formatCurrency = (amount: number) =>
@@ -43,6 +55,14 @@ export function ScoreDrilldownPopover({ title, tenders, trigger }: { title: stri
 
     const summaryFor = (tender: ScoreDrilldownTender) =>
         `${formatCurrency(Number(tender.value ?? 0))} · ${tender.status ?? "—"} · ${formatDate(tender.date)}`;
+
+    const lifecycleFor = (tender: ScoreDrilldownTender) => {
+        const parts: string[] = [];
+        if (tender.paidDate) parts.push(`Paid ${formatDate(tender.paidDate)}`);
+        if (tender.returnDate) parts.push(`Returned ${formatDate(tender.returnDate)}`);
+        if (tender.returnUtr) parts.push(`UTR ${tender.returnUtr}`);
+        return parts.join(" · ");
+    };
 
     const isSearching = search.trim().length > 0;
 
@@ -88,11 +108,19 @@ export function ScoreDrilldownPopover({ title, tenders, trigger }: { title: stri
                             {filteredTenders.map(tender => (
                                 <div key={`${tender.tenderId}-${tender.tenderNo}`} className="flex items-start justify-between gap-2 border-b pb-2 text-xs last:border-0">
                                     <div className="min-w-0">
-                                        <p className="truncate font-medium">{tender.tenderName}</p>
+                                        <div className="flex items-center gap-1.5">
+                                            <p className="truncate font-medium">{tender.tenderName}</p>
+                                            {tender.emdState && <Badge variant={EMD_STATE_BADGE[tender.emdState].variant}>{EMD_STATE_BADGE[tender.emdState].label}</Badge>}
+                                        </div>
                                         <p className="truncate text-muted-foreground">{tender.tenderNo}</p>
                                         <p className="truncate text-muted-foreground" title={summaryFor(tender)}>
                                             {summaryFor(tender)}
                                         </p>
+                                        {lifecycleFor(tender) && (
+                                            <p className="truncate text-foreground/70" title={lifecycleFor(tender)}>
+                                                {lifecycleFor(tender)}
+                                            </p>
+                                        )}
                                     </div>
                                     <button
                                         type="button"

@@ -1,9 +1,15 @@
 import type { MetricDrilldownItem } from "./tender-executive.types";
 
+export type EmdLifecycleState = "PAID" | "RETURNED" | "SETTLED";
+
 export interface EmdCashFlowDrilldownItem extends MetricDrilldownItem {
     instrumentId: number;
     instrumentType: string;
+    emdState?: EmdLifecycleState;
+    paidDate?: string | null;
+    returnedAt?: string | null;
     returnDate?: string | null;
+    returnDateDerived?: boolean;
     returnUtr?: string | null;
     returnReason?: string | null;
 }
