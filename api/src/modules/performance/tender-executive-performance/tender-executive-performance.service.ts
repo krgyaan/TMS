@@ -1276,25 +1276,34 @@ export class TenderExecutiveService {
        APPROVED
     ===================================================== */
 
+        /**
+         * Pending at Start
+         * Info sheet filled before the period and still awaiting approval
+         * (tl_status 0 = pending, 3 = incomplete bounce — neither decided).
+         * Point-in-time: a tender decided after ${from} was pending at ${from}.
+         */
         const approvedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at < '${from}'
-          AND ti.tl_status IN (0,3)
-    `);
-
-        const approvedDuringCompleted = await exec(`
-        ${baseSelect}
-        JOIN tender_information tin ON tin.tender_id = ti.id
-        WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
-          AND ti.tl_status = 1
+          AND EXISTS (
+              SELECT 1
+              FROM tender_information tin
+              WHERE tin.tender_id = ti.id
+                AND tin.created_at < '${from}'
+          )
+          AND (
+              ti.tl_status IN (0,3)
+              OR (
+                  ti.tl_status IN (1,2)
+                  AND ti.tl_approval_timestamp >= '${from}'
+              )
+          )
     `);
 
         const approvedDuringAccepted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND ti.tl_approval_timestamp BETWEEN '${from}' AND '${to}'
         AND EXISTS (
             SELECT 1
             FROM tender_information tin
@@ -1306,7 +1315,7 @@ export class TenderExecutiveService {
         const approvedDuringRejected = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND ti.tl_approval_timestamp BETWEEN '${from}' AND '${to}'
         AND EXISTS (
             SELECT 1
             FROM tender_information tin
@@ -1315,28 +1324,18 @@ export class TenderExecutiveService {
         AND ti.tl_status = 2
         `);
 
-        const approvedDuringPending = await exec(`
-        ${baseSelect}
-        JOIN tender_information tin ON tin.tender_id = ti.id
-        WHERE ${baseWhere()}
-          AND tin.created_at < '${to}'
-          AND ti.tl_status = 0
-    `);
-
-        //     const approvedDuringRejected = await exec(`
-        //     ${baseSelect}
-        //     JOIN tender_information tin ON tin.tender_id = ti.id
-        //     WHERE ${baseWhere()}
-        //       AND tin.created_at BETWEEN '${from}' AND '${to}'
-        //       AND ti.tl_status = 2
-        // `);
-
         const approvedTotal = await exec(`
         ${baseSelect}
         JOIN tender_information tin ON tin.tender_id = ti.id
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
-          AND ti.tl_status IN (0,3)
+          AND tin.created_at <= '${to}'
+          AND (
+              ti.tl_status IN (0,3)
+              OR (
+                  ti.tl_status IN (1,2)
+                  AND ti.tl_approval_timestamp > '${to}'
+              )
+          )
     `);
 
         /* =====================================================
