@@ -112,5 +112,6 @@ export interface StageBacklogV2Response {
         resultAwaited: StageBacklogStage;
         won: StageBacklogStage;
         lost: StageBacklogStage;
+        cancelled: StageBacklogStage;
     };
 }

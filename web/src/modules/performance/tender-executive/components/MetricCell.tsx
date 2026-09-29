@@ -9,7 +9,7 @@ const formatCurrency = (amount: number) =>
         maximumFractionDigits: 0,
     }).format(amount);
 
-export function MetricCell({ data, strong = false }: { data: MetricBucket; strong?: boolean }) {
+export function MetricCell({ data, strong = false }: { data?: MetricBucket; strong?: boolean }) {
     if (!data || data.count === 0) {
         return <TableCell className="text-center text-muted-foreground">·</TableCell>;
     }

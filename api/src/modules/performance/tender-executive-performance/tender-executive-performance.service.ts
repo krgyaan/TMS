@@ -1573,6 +1573,20 @@ export class TenderExecutiveService {
           )
     `);
 
+        const cancelledOpening = await exec(`
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND ti.status = 18
+          AND ti.updated_at < '${from}'
+    `);
+
+        const cancelledDuringCompleted = await exec(`
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND ti.status = 18
+          AND ti.updated_at BETWEEN '${from}' AND '${to}'
+    `);
+
         /* =====================================================
         FINAL RESPONSE
     ===================================================== */
@@ -1588,6 +1602,12 @@ export class TenderExecutiveService {
             lostTotalSet.set(t.id, t);
         });
         const lostTotal = Array.from(lostTotalSet.values());
+
+        const cancelledTotalSet = new Map();
+        [...cancelledOpening, ...cancelledDuringCompleted].forEach(t => {
+            cancelledTotalSet.set(t.id, t);
+        });
+        const cancelledTotal = Array.from(cancelledTotalSet.values());
 
         return {
             from: new Date(from),
@@ -1761,6 +1781,27 @@ export class TenderExecutiveService {
                             count: lostDuringCompleted.length,
                             value: this.sumValue(lostDuringCompleted),
                             drilldown: this.mapDrilldown(lostDuringCompleted),
+                        },
+                        pending: { count: 0, value: 0, drilldown: [] },
+                    },
+                },
+
+                cancelled: {
+                    opening: {
+                        count: cancelledOpening.length,
+                        value: this.sumValue(cancelledOpening),
+                        drilldown: this.mapDrilldown(cancelledOpening),
+                    },
+                    total: {
+                        count: cancelledTotal.length,
+                        value: this.sumValue(cancelledTotal),
+                        drilldown: this.mapDrilldown(cancelledTotal),
+                    },
+                    during: {
+                        completed: {
+                            count: cancelledDuringCompleted.length,
+                            value: this.sumValue(cancelledDuringCompleted),
+                            drilldown: this.mapDrilldown(cancelledDuringCompleted),
                         },
                         pending: { count: 0, value: 0, drilldown: [] },
                     },
