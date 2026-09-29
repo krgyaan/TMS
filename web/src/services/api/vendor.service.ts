@@ -6,6 +6,9 @@ import type {
     UpdateVendorDto,
     VendorOrganization,
     VendorOrganizationWithRelations,
+    VendorOrganizationListItem,
+    VendorOrganizationListParams,
+    PaginatedResult,
     CreateVendorOrganizationDto,
     UpdateVendorOrganizationDto,
     CreateVendorOrganizationWithRelationsDto,
@@ -63,6 +66,19 @@ class VendorsApiService extends BaseApiService {
 
     async getAllOrganizationsWithRelations(): Promise<VendorOrganizationWithRelations[]> {
         return this.get<VendorOrganizationWithRelations[]>("/vendor-organizations/with-relations");
+    }
+
+    async getOrganizationsPaginated(params: VendorOrganizationListParams): Promise<PaginatedResult<VendorOrganizationListItem>> {
+        const search = new URLSearchParams();
+
+        if (params.page) search.set("page", String(params.page));
+        if (params.limit) search.set("limit", String(params.limit));
+        if (params.search) search.set("search", params.search);
+        if (params.sortBy) search.set("sortBy", params.sortBy);
+        if (params.sortOrder) search.set("sortOrder", params.sortOrder);
+
+        const qs = search.toString();
+        return this.get<PaginatedResult<VendorOrganizationListItem>>(`/vendor-organizations/paginated${qs ? `?${qs}` : ""}`);
     }
 
     async getOrganizationById(id: number): Promise<VendorOrganization> {

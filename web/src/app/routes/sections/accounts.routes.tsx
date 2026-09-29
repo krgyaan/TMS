@@ -44,6 +44,7 @@ const Accounts_VwoClosure = lazy(() => import("@/modules/operations/vendor-work-
 const Accounts_VendorMaster = lazy(() => import("@/modules/master/vendor-master/VendorListPage"));
 const Accounts_VendorMaster_Create = lazy(() => import("@/modules/master/vendor-master/VendorCreatePage"));
 const Accounts_VendorMaster_Edit = lazy(() => import("@/modules/master/vendor-master/VendorEditPage"));
+const Accounts_VendorMaster_View = lazy(() => import("@/modules/master/vendor-master/VendorViewPage"));
 const Accounts_Parties = lazy(() => import("@/modules/master/vendor-master/PartyListPage"));
 const Accounts_InventoryPage = lazy(() => import("@/modules/operations/inventory/pages/InventoryPage"));
 
@@ -86,6 +87,14 @@ export default function AccountsRoutes() {
             <Route path="vendor-master" element={<RouteWrapper><Accounts_VendorMaster /></RouteWrapper>} />
             <Route path="vendor-master/create" element={<RouteWrapper><Accounts_VendorMaster_Create /></RouteWrapper>} />
             <Route path="vendor-master/:id/edit" element={<RouteWrapper><Accounts_VendorMaster_Edit /></RouteWrapper>} />
+            <Route
+                path="vendor-master/:id"
+                element={
+                    <RouteWrapper permission={{ module: "master.vendors", action: "read" }}>
+                        <Accounts_VendorMaster_View />
+                    </RouteWrapper>
+                }
+            />
             <Route path="parties" element={<RouteWrapper><Accounts_Parties /></RouteWrapper>} />
             <Route path="sale-invoices" element={<RouteWrapper><Accounts_SaleInvoiceTabs /></RouteWrapper>} />
             <Route path="vendor-work-orders" element={<RouteWrapper><Accounts_VendorWorkOrderTabs /></RouteWrapper>} />

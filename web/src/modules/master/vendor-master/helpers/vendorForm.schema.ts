@@ -1,13 +1,27 @@
 import { z } from "zod";
 
-export const OrgFormSchema = z.object({
+const OrgFields = z.object({
     name: z.string().min(1, "Organization name is required").max(255),
     alias: z.string().max(255).optional(),
     msme: z.string().max(50).optional(),
+    msmeType: z.enum(["M", "S"]).optional(),
     pan: z.string().max(100).optional(),
     address: z.string().max(500).optional(),
     status: z.boolean(),
 });
+
+// Mirrors the API rule: an MSME number must be accompanied by its type (M/S).
+const requireMsmeType = (val: z.infer<typeof OrgFields>, ctx: z.RefinementCtx) => {
+    if (val.msme?.trim() && !val.msmeType) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["msmeType"],
+            message: "MSME type is required when an MSME number is present",
+        });
+    }
+};
+
+export const OrgFormSchema = OrgFields.superRefine(requireMsmeType);
 
 export const GstFormSchema = z.object({
     id: z.number().optional(),

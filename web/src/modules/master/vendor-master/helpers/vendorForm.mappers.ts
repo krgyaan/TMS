@@ -53,6 +53,7 @@ export const vendorOrgToFormValues = (organization: VendorOrganizationWithRelati
         name: organization.name,
         alias: organization.alias ?? "",
         msme: organization.msme ?? "",
+        msmeType: organization.msmeType ?? undefined,
         pan: organization.pan ?? "",
         address: organization.address ?? "",
         status: organization.status,

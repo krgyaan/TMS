@@ -8,6 +8,7 @@ export const vendorOrganizations = pgTable("vendor_organizations", {
     name: varchar("name", { length: 255 }).notNull().unique(),
     alias: varchar("alias", { length: 255 }),
     msme: varchar("msme", { length: 50 }),
+    msmeType: varchar("msme_type", { length: 1 }),
     pan: varchar("pan", { length: 100 }),
     address: text("address"),
     status: boolean("status").notNull().default(true),

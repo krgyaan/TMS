@@ -5,6 +5,9 @@ import type {
     UpdateVendorOrganizationDto,
     CreateVendorOrganizationWithRelationsDto,
     UpdateVendorOrganizationWithRelationsDto,
+    VendorOrganizationListItem,
+    VendorOrganizationListParams,
+    PaginatedResult,
 } from "@/types/api.types";
 import { handleQueryError } from "@/lib/react-query";
 import { toast } from "sonner";
@@ -12,6 +15,7 @@ import { toast } from "sonner";
 export const vendorOrganizationsKey = {
     all: ["vendorOrganizations"] as const,
     lists: () => [...vendorOrganizationsKey.all, "list"] as const,
+    paginated: () => [...vendorOrganizationsKey.all, "paginated"] as const,
     withRelations: () => [...vendorOrganizationsKey.all, "withRelations"] as const,
     details: () => [...vendorOrganizationsKey.all, "detail"] as const,
     detail: (id: number) => [...vendorOrganizationsKey.details(), id] as const,
@@ -28,6 +32,16 @@ export const useVendorOrganizationsWithRelations = () => {
     return useQuery({
         queryKey: vendorOrganizationsKey.withRelations(),
         queryFn: () => vendorApi.getAllOrganizationsWithRelations(),
+    });
+};
+
+// Server-side paginated list for the vendor master grid. placeholderData keeps the
+// previous page visible while the next one loads, so the grid doesn't flash white.
+export const useVendorOrganizationsPaginated = (params: VendorOrganizationListParams) => {
+    return useQuery<PaginatedResult<VendorOrganizationListItem>>({
+        queryKey: [...vendorOrganizationsKey.paginated(), params],
+        queryFn: () => vendorApi.getOrganizationsPaginated(params),
+        placeholderData: (previousData) => previousData,
     });
 };
 
@@ -59,6 +73,9 @@ export const useCreateVendorOrganization = () => {
             queryClient.invalidateQueries({
                 queryKey: vendorOrganizationsKey.withRelations(),
             });
+            queryClient.invalidateQueries({
+                queryKey: vendorOrganizationsKey.paginated(),
+            });
             toast.success("Vendor Organization created successfully");
         },
         onError: error => {
@@ -78,6 +95,9 @@ export const useUpdateVendorOrganization = () => {
             });
             queryClient.invalidateQueries({
                 queryKey: vendorOrganizationsKey.withRelations(),
+            });
+            queryClient.invalidateQueries({
+                queryKey: vendorOrganizationsKey.paginated(),
             });
             queryClient.invalidateQueries({
                 queryKey: vendorOrganizationsKey.detail(variables.id),
@@ -120,6 +140,9 @@ export const useCreateVendorOrganizationWithRelations = () => {
             queryClient.invalidateQueries({
                 queryKey: vendorOrganizationsKey.withRelations(),
             });
+            queryClient.invalidateQueries({
+                queryKey: vendorOrganizationsKey.paginated(),
+            });
             toast.success('Vendor Organization with relations created successfully');
         },
         onError: (error) => {
@@ -145,6 +168,9 @@ export const useUpdateVendorOrganizationWithRelations = () => {
             });
             queryClient.invalidateQueries({
                 queryKey: vendorOrganizationsKey.withRelations(),
+            });
+            queryClient.invalidateQueries({
+                queryKey: vendorOrganizationsKey.paginated(),
             });
             queryClient.invalidateQueries({
                 queryKey: vendorOrganizationsKey.detail(variables.id),
