@@ -9,8 +9,9 @@ export type ScoreDrilldownTender = {
     tenderId: number;
     tenderNo: string;
     tenderName: string;
-    value: number;
+    value: number | null;
     date: string | null;
+    status?: string | null;
 };
 
 const formatCurrency = (amount: number) =>
@@ -37,8 +38,11 @@ export function ScoreDrilldownPopover({ title, tenders, trigger }: { title: stri
     const filteredTenders = useMemo(() => {
         const term = search.trim().toLowerCase();
         if (!term) return tenders;
-        return tenders.filter(tender => `${tender.tenderName} ${tender.tenderNo}`.toLowerCase().includes(term));
+        return tenders.filter(tender => `${tender.tenderName} ${tender.tenderNo} ${tender.status ?? ""}`.toLowerCase().includes(term));
     }, [search, tenders]);
+
+    const summaryFor = (tender: ScoreDrilldownTender) =>
+        `${formatCurrency(Number(tender.value ?? 0))} · ${tender.status ?? "—"} · ${formatDate(tender.date)}`;
 
     const isSearching = search.trim().length > 0;
 
@@ -86,8 +90,8 @@ export function ScoreDrilldownPopover({ title, tenders, trigger }: { title: stri
                                     <div className="min-w-0">
                                         <p className="truncate font-medium">{tender.tenderName}</p>
                                         <p className="truncate text-muted-foreground">{tender.tenderNo}</p>
-                                        <p className="text-muted-foreground">
-                                            {tender.value ? formatCurrency(tender.value) : "—"} · {formatDate(tender.date)}
+                                        <p className="truncate text-muted-foreground" title={summaryFor(tender)}>
+                                            {summaryFor(tender)}
                                         </p>
                                     </div>
                                     <button

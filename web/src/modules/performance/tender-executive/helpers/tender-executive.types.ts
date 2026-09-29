@@ -51,6 +51,8 @@ export interface StageMatrixDrilldownItem {
     deadline?: string | null;
     completedAt?: string | null;
     daysOverdue?: number | null;
+    value?: number;
+    status?: string | null;
     meta?: Record<string, string | number | boolean | null>;
 }
 
@@ -73,6 +75,8 @@ export interface MetricDrilldownItem {
     value: number;
     instrumentType?: string;
     transferDate?: string | null;
+    date?: string | null;
+    status?: string | null;
 }
 
 export interface MetricBucket {

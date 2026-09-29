@@ -19,7 +19,8 @@ export function MetricCell({ data, strong = false }: { data?: MetricBucket; stro
         tenderNo: item.tenderNo ?? `Tender #${item.tenderId}`,
         tenderName: item.tenderName ?? "Tender name unavailable",
         value: item.value,
-        date: item.transferDate ?? null,
+        date: item.date ?? item.transferDate ?? null,
+        status: item.status ?? null,
     }));
 
     return (

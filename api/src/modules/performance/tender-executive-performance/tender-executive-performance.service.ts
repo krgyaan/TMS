@@ -100,6 +100,9 @@ interface StageDrilldownItem {
 
     // Stage-specific (optional)
     meta?: Record<string, any>;
+
+    value?: number;
+    status?: string | null;
 }
 
 function getExecutiveStages() {
@@ -556,6 +559,25 @@ export class TenderExecutiveService {
     async getStageMatrix(query: PerformanceQueryDto) {
         const stages = await this.getStagePerformance(query);
 
+        const stageTenderIds = Array.from(new Set(stages.map(s => s.tenderId)));
+        const tenderDetails = new Map<number, { value: number; status: string | null }>();
+
+        if (stageTenderIds.length) {
+            const detailRows = (await this.db.execute(sql.raw(`
+                SELECT
+                    ti.id,
+                    ti.gst_values AS "value",
+                    s.name AS "status"
+                FROM tender_infos ti
+                LEFT JOIN statuses s ON s.id = ti.status
+                WHERE ti.id IN (${stageTenderIds.join(",")})
+            `))).rows as any[];
+
+            for (const row of detailRows) {
+                tenderDetails.set(Number(row.id), { value: Number(row.value ?? 0), status: row.status ?? null });
+            }
+        }
+
         // ----------------------------------------
         // Resolve unique stages (column order)
         // ----------------------------------------
@@ -610,6 +632,8 @@ export class TenderExecutiveService {
             const counter = counters.get(stage.stageKey)!;
 
             const tenderMeta: StageDrilldownItem = {
+                value: tenderDetails.get(stage.tenderId)?.value ?? 0,
+                status: tenderDetails.get(stage.tenderId)?.status ?? null,
                 tenderId: stage.tenderId,
                 stageKey: stage.stageKey,
                 tenderNo: stage.tenderNo,
@@ -1190,7 +1214,8 @@ export class TenderExecutiveService {
                 )
                 THEN COALESCE(tcd.final_price, ti.gst_values)
                 ELSE ti.gst_values
-            END AS effective_value
+            END AS effective_value,
+            sst.name AS status_name
         FROM tender_infos ti
         LEFT JOIN LATERAL (
             SELECT tcd.final_price
@@ -1202,6 +1227,7 @@ export class TenderExecutiveService {
             ORDER BY tcd.approved_at DESC NULLS LAST, tcd.id DESC
             LIMIT 1
         ) tcd ON true
+        LEFT JOIN statuses sst ON sst.id = ti.status
     `;
 
         const dnb = [8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32, 34, 35, 36];
@@ -1816,6 +1842,8 @@ export class TenderExecutiveService {
             tenderNo: t.tender_no ?? t.tenderNo,
             tenderName: t.tender_name ?? t.tenderName,
             value: Number(t.effective_value ?? t.gst_values ?? 0),
+            status: t.status_name ?? null,
+            date: t.updated_at ?? null,
         }));
     }
 
@@ -2030,12 +2058,15 @@ export class TenderExecutiveService {
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
             pi.amount           AS "value",
+            sst.name            AS "status",
+            COALESCE(pi.transfer_date, pr.created_at) AS "date",
             pi.instrument_type  AS "instrumentType",
             COALESCE(ti.tender_no, '-') AS "tenderNo",
             COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
         FROM payment_requests pr
         JOIN payment_instruments pi ON pi.request_id = pr.id
         LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
+        LEFT JOIN statuses sst ON sst.id = ti.status
         WHERE ${baseWhere()}
         AND pr.created_at < '${from}'
         AND ti.delete_status NOT IN (1)
@@ -2058,12 +2089,15 @@ export class TenderExecutiveService {
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
             pi.amount           AS "value",
+            sst.name            AS "status",
+            COALESCE(pi.transfer_date, pr.created_at) AS "date",
             pi.instrument_type  AS "instrumentType",
             COALESCE(ti.tender_no, '-') AS "tenderNo",
             COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
         FROM payment_requests pr
         JOIN payment_instruments pi ON pi.request_id = pr.id
         LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
+        LEFT JOIN statuses sst ON sst.id = ti.status
         WHERE ${baseWhere()}
         AND pr.created_at BETWEEN '${from}' AND '${to}'
         AND ti.delete_status NOT IN (1)
@@ -2081,6 +2115,8 @@ export class TenderExecutiveService {
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
             pi.amount           AS "value",
+            sst.name            AS "status",
+            COALESCE(pi.transfer_date, pr.created_at) AS "date",
             pi.transfer_date    AS "transferDate",
             pi.instrument_type  AS "instrumentType",
             COALESCE(ti.tender_no, '-') AS "tenderNo",
@@ -2088,6 +2124,7 @@ export class TenderExecutiveService {
         FROM payment_requests pr
         JOIN payment_instruments pi ON pi.request_id = pr.id
         LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
+        LEFT JOIN statuses sst ON sst.id = ti.status
         WHERE ${baseWhere()}
         AND COALESCE(pi.transfer_date, pr.created_at) < '${from}'
         AND ti.delete_status NOT IN (1)
@@ -2109,6 +2146,8 @@ export class TenderExecutiveService {
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
             pi.amount           AS "value",
+            sst.name            AS "status",
+            COALESCE(pi.transfer_date, pr.created_at) AS "date",
             pi.instrument_type  AS "instrumentType",
             pi.transfer_date    AS "transferDate",
             COALESCE(ti.tender_no, '-') AS "tenderNo",
@@ -2116,6 +2155,7 @@ export class TenderExecutiveService {
         FROM payment_requests pr
         JOIN payment_instruments pi ON pi.request_id = pr.id
         LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
+        LEFT JOIN statuses sst ON sst.id = ti.status
         WHERE ${baseWhere()}
         AND COALESCE(pi.transfer_date, pi.created_at) BETWEEN '${from}' AND '${to}'
         AND ti.delete_status NOT IN (1)
@@ -2138,12 +2178,15 @@ export class TenderExecutiveService {
             pi.id               AS "instrumentId",
             pr.tender_id        AS "tenderId",
             pi.amount           AS "value",
+            sst.name            AS "status",
+            COALESCE(pi.transfer_date, pr.created_at) AS "date",
             pi.instrument_type  AS "instrumentType",
             COALESCE(ti.tender_no, '-') AS "tenderNo",
             COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
         FROM payment_requests pr
         JOIN payment_instruments pi ON pi.request_id = pr.id
         LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
+        LEFT JOIN statuses sst ON sst.id = ti.status
         WHERE ${baseWhere()}
         AND pr.created_at < '${to}'
         AND ti.delete_status NOT IN (1)

@@ -649,8 +649,9 @@ export default function TenderExecutivePerformance() {
                                                                             tenderId: item.tenderId,
                                                                             tenderNo: item.tenderNo ?? `Tender #${item.tenderId}`,
                                                                             tenderName: item.tenderName ?? "Tender name unavailable",
-                                                                            value: 0,
+                                                                            value: item.value ?? 0,
                                                                             date: item.completedAt ?? item.deadline ?? null,
+                                                                            status: item.status ?? null,
                                                                         }));
 
                                                                         return (
