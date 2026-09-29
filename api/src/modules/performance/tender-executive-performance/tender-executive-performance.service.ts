@@ -1347,22 +1347,19 @@ export class TenderExecutiveService {
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
-          AND ti.created_at < '${from}'
-          AND st.status = true
-          AND st.tender_category = 'prep'
-          AND ti.status NOT IN (0, 1, 2, 3)
+          AND ti.tl_approval_timestamp < '${from}'
+          AND st.tender_category <> 'dnb'
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
-                  AND bs.created_at < '${from}'
           )
     `);
 
         const bidDuringTotal = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.tl_approval_timestamp BETWEEN '${from}' AND '${to}'
           AND EXISTS (
                 SELECT 1
                 FROM tender_information tin
@@ -1374,46 +1371,36 @@ export class TenderExecutiveService {
         const bidDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
           AND ti.tl_status = 1
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.created_at BETWEEN '${from}' AND '${to}'
+                  AND bs.submission_datetime BETWEEN '${from}' AND '${to}'
           )
     `);
 
         const dnbDuringCompleted = await exec(`
         ${baseSelect}
+        JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
           AND ti.tl_status = 1
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.created_at <= '${to}'
+                  AND bs.submission_datetime <= '${to}'
           )
           AND (
-                EXISTS (
-                      SELECT 1
-                      FROM tender_status_history tsh
-                      JOIN statuses st ON st.id = tsh.new_status
-                      WHERE tsh.tender_id = ti.id
-                        AND st.status = true
-                        AND st.tender_category = 'dnb'
-                        AND tsh.created_at BETWEEN '${from}' AND '${to}'
-                )
-                OR
-                EXISTS (
-                      SELECT 1
-                      FROM bid_submissions bs
-                      WHERE bs.tender_id = ti.id
-                        AND bs.status = 'Tender Missed'
-                        AND bs.created_at BETWEEN '${from}' AND '${to}'
+                st.tender_category = 'dnb'
+             OR EXISTS (
+                    SELECT 1
+                    FROM bid_submissions bs
+                    WHERE bs.tender_id = ti.id
+                      AND bs.status = 'Tender Missed'
+                      AND bs.created_at BETWEEN '${from}' AND '${to}'
                 )
           )
     `);
@@ -1423,15 +1410,16 @@ export class TenderExecutiveService {
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
-          AND st.status = true
-          AND st.tender_category = 'prep'
+          AND (ti.tl_approval_timestamp IS NULL OR ti.tl_approval_timestamp <= '${to}')
+          AND st.tender_category <> 'dnb'
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
-                  AND bs.status IN ('Bid Submitted', 'Tender Missed')
-                  AND bs.created_at <= '${to}'
+                  AND (
+                        (bs.status = 'Bid Submitted' AND bs.submission_datetime <= '${to}')
+                     OR (bs.status = 'Tender Missed'    AND bs.created_at <= '${to}')
+                  )
           )
     `);
 
