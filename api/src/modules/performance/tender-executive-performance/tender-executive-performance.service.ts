@@ -1385,7 +1385,7 @@ export class TenderExecutiveService {
         ${baseSelect}
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
-          AND ti.tl_status = 1
+          AND ti.tl_status IN (1, 2)
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1400,9 +1400,10 @@ export class TenderExecutiveService {
                     FROM bid_submissions bs
                     WHERE bs.tender_id = ti.id
                       AND bs.status = 'Tender Missed'
-                      AND bs.created_at BETWEEN '${from}' AND '${to}'
                 )
           )
+          AND ti.updated_at >= '${from}'
+          AND ti.updated_at <= '${to}'
     `);
 
         const bidTotal = await exec(`
