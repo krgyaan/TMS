@@ -180,6 +180,7 @@ export interface VendorOrganization {
     name: string;
     alias?: string | null;
     msme?: string | null;
+    msmeType?: "M" | "S" | null;
     pan?: string | null;
     address?: string;
     status: boolean;
@@ -304,6 +305,7 @@ export interface CreateVendorOrganizationWithRelationsDto {
         name: string;
         alias?: string | null;
         msme?: string | null;
+        msmeType?: "M" | "S" | null;
         pan?: string | null;
         address?: string;
         status?: boolean;
@@ -325,6 +327,7 @@ export interface UpdateVendorOrganizationWithRelationsDto {
         name?: string;
         alias?: string | null;
         msme?: string | null;
+        msmeType?: "M" | "S" | null;
         pan?: string | null;
         address?: string;
         status?: boolean;
@@ -436,6 +439,7 @@ export interface CreateVendorOrganizationDto {
     name: string;
     alias?: string | null;
     msme?: string | null;
+    msmeType?: "M" | "S" | null;
     pan?: string | null;
     address?: string;
     status?: boolean;

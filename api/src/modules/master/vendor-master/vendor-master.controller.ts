@@ -2,16 +2,31 @@ import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, HttpCo
 import { z } from "zod";
 import { VendorMasterService } from "@/modules/master/vendor-master/vendor-master.service";
 
-const CreateVendorOrganizationSchema = z.object({
+const VendorOrganizationFields = z.object({
     name: z.string().min(1).max(255),
     alias: z.string().max(255).optional().nullable(),
     msme: z.string().max(50).optional().nullable(),
+    msmeType: z.enum(["M", "S"]).optional().nullable(),
     pan: z.string().max(100).optional().nullable(),
     address: z.string().optional(),
     status: z.boolean().optional().default(true),
 });
 
-const UpdateVendorOrganizationSchema = CreateVendorOrganizationSchema.partial();
+// An MSME number is only meaningful once its type (M/S) is known, so reject the
+// number alone. Existing rows are unaffected: this applies to incoming payloads only.
+const requireMsmeType = (val: z.infer<typeof VendorOrganizationFields>, ctx: z.RefinementCtx) => {
+    if (val.msme?.trim() && !val.msmeType) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["msmeType"],
+            message: "MSME type is required when an MSME number is present",
+        });
+    }
+};
+
+const CreateVendorOrganizationSchema = VendorOrganizationFields.superRefine(requireMsmeType);
+
+const UpdateVendorOrganizationSchema = VendorOrganizationFields.partial().superRefine(requireMsmeType);
 
 const CreateVendorSchema = z.object({
     orgId: z.number().optional(),

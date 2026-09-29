@@ -540,6 +540,13 @@
       "when": 1789900000000,
       "tag": "0144_add_vendor_gsts_address",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1790000000000,
+      "tag": "0145_add_msme_type_to_vendor_organizations",
+      "breakpoints": true
     }
   ]
 }

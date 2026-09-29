@@ -17,6 +17,7 @@ import { AlertCircle, Eye, FileText, Pencil, Plus, Power, PowerOff, Search } fro
 import { useCallback, useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { vendorAreaBase } from "./vendorAreaPath";
+import { MsmeBadge } from "./helpers/MsmeBadge";
 
 const PERMISSION_MODULE = "master.vendors";
 
@@ -54,7 +55,7 @@ const VendorsPage = () => {
     } = usePersistentTableState<"all">({
         storageKey: "vendor-master",
         defaultTab: "all",
-        defaultPageSize: 25,
+        defaultPageSize: 50,
     });
 
     const handleToggleStatus = useCallback(
@@ -81,7 +82,9 @@ const VendorsPage = () => {
         if (!q) return list;
 
         return list.filter(org => {
-            const own = [org.name, org.alias, org.pan, org.msme, org.address];
+            // "Manufacturer"/"Service" are searchable alongside the raw M/S codes.
+            const msmeTypeText = org.msmeType === "M" ? "Manufacturer" : org.msmeType === "S" ? "Service" : "";
+            const own = [org.name, org.alias, org.pan, org.msme, org.address, msmeTypeText];
             const gst = (org.gsts ?? []).flatMap(g => [g.gstNo, g.gstState]);
             const persons = (org.persons ?? []).flatMap(p => [p.name, p.email, p.mobile]);
             const accounts = (org.accounts ?? []).flatMap(a => [a.accountNum, a.ifscCode]);
@@ -134,34 +137,18 @@ const VendorsPage = () => {
             { field: "pan", headerName: "PAN", sortable: true, filter: true, minWidth: 120 },
             { field: "msme", headerName: "MSME", sortable: true, filter: true, minWidth: 130 },
             { field: "gstCount", headerName: "GSTs", sortable: true, filter: true, minWidth: 80, width: 80 },
-            {
-                field: "accountCount",
-                headerName: "Accounts",
-                sortable: true,
-                filter: true,
-                minWidth: 100,
-                width: 100,
-            },
-            {
-                field: "personCount",
-                headerName: "Persons",
-                sortable: true,
-                filter: true,
-                minWidth: 90,
-                width: 90,
-            },
+            { field: "accountCount", headerName: "Accounts", sortable: true, filter: true, minWidth: 100, width: 100 },
+            { field: "personCount", headerName: "Persons", sortable: true, filter: true, minWidth: 90, width: 90 },
             { field: "fileCount", headerName: "Files", sortable: true, filter: true, minWidth: 80, width: 80 },
             {
-                field: "status",
-                headerName: "Status",
+                field: "msmeType",
+                headerName: "MSME Type",
                 sortable: true,
                 filter: true,
-                minWidth: 100,
-                width: 100,
+                minWidth: 130,
+                width: 130,
                 cellRenderer: (params: CustomCellRendererProps<VendorRow>) => (
-                    <Badge variant={params.value ? "default" : "secondary"}>
-                        {params.value ? "Active" : "Inactive"}
-                    </Badge>
+                    <MsmeBadge msme={params.data?.msme} msmeType={params.data?.msmeType} />
                 ),
             },
             {
