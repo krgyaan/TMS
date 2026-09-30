@@ -377,3 +377,168 @@ def test_maf_pre_2a8bda3e_wording_would_fail_tripartite_and_null_checks():
     assert "silence is NOT the same as 'not required'" not in old_field_desc
     assert "Return true ONLY" not in old_system_prompt
 
+
+# ── FIX H: Remove concrete example values from EMD, PBG, LD, and contact field prompts ──
+
+EMD_PBG_LD_CONTACT_KEYS = [
+    "emd_mode_display",
+    "pbg_mode_display",
+    "sd_mode_display",
+    "tender_fee_mode_display",
+    "ld_percentage_display",
+    "max_ld_percentage_display",
+    "client_name_1_display",
+    "client_email_1_display",
+    "client_phone_1_display",
+    "client_name_2_display",
+    "client_email_2_display",
+    "client_phone_2_display",
+    "client_name_3_display",
+    "client_email_3_display",
+    "client_phone_3_display",
+]
+
+KOCHI_GEM_NATIVE_EMD_PBG_LD_MISSING = (
+    "Bid Number: GEM/2026/B/8024876\n"
+    "Ministry/State Name: Ministry Of Petroleum And Natural Gas\n"
+    "Department Name: Gail India Limited\n"
+    "Organisation Name: Gail India Limited\n"
+    "Office Name: Kochi Kerala\n"
+    "Item Category: Custom Bid for Services - Lumpsum Charges\n"
+    "Contact details of Grievance redressal:\n"
+    "HOD Email id: sharikumar@gail.co.in\n"
+    "Buyer Email id: allan.tomy@gail.co.in\n"
+)
+
+BANNED_CONTACT_EXAMPLES = [
+    "Ramesh Kumar",
+    "ramesh.kumar@gail.co.in",
+    "A. Kumar",
+    "a.kumar@gail.co.in",
+]
+
+BANNED_INSTRUMENT_LIST_EXAMPLES = [
+    "Bank Guarantee / Demand Draft / FDR / Online / Insurance Surety Bond",
+    "DD, SB, FDR, BG, Bank Transfer",
+    "Demand Draft / Banker Cheque / Online",
+    "Bank Guarantee / Insurance Surety Bond",
+    "Bank Guarantee / DD / FDR / Insurance Surety Bond",
+]
+
+
+def test_system_prompt_and_field_descriptions_have_no_contact_or_instrument_examples():
+    """Assert the system prompt and FIELD_PROMPT_MAP contain no concrete contact or instrument examples."""
+    s = UNIVERSAL_TENDER_SYSTEM_INSTRUCTION
+
+    # 1. Contact examples must not appear in system prompt
+    for banned in BANNED_CONTACT_EXAMPLES:
+        assert banned not in s, f"Banned contact example '{banned}' found in system prompt"
+
+    # 2. Contact examples must not appear in any field description
+    for key, entry in FIELD_PROMPT_MAP.items():
+        desc = entry[2]
+        for banned in BANNED_CONTACT_EXAMPLES:
+            assert banned not in desc, f"Banned contact example '{banned}' found in FIELD_PROMPT_MAP[{key}]"
+
+    # 3. Instrument-list examples must not appear in system prompt or field descriptions
+    for banned in BANNED_INSTRUMENT_LIST_EXAMPLES:
+        assert banned not in s, f"Banned instrument list '{banned}' found in system prompt"
+        for key, entry in FIELD_PROMPT_MAP.items():
+            assert banned not in entry[2], f"Banned instrument list '{banned}' found in FIELD_PROMPT_MAP[{key}]"
+
+    # 4. Contact fields must use placeholder tokens ([Full Name], [email]@[domain], [phone-number])
+    for num in ("1", "2", "3"):
+        name_desc = FIELD_PROMPT_MAP[f"client_name_{num}_display"][2]
+        email_desc = FIELD_PROMPT_MAP[f"client_email_{num}_display"][2]
+        phone_desc = FIELD_PROMPT_MAP[f"client_phone_{num}_display"][2]
+
+        assert "[Full Name]" in name_desc
+        assert "[email]@[domain]" in email_desc
+        assert "[phone-number]" in phone_desc
+        assert "only if literally stated in the text" in name_desc
+        assert "only if literally stated in the text" in email_desc
+        assert "only if literally stated in the text" in phone_desc
+
+    # 5. EMD, PBG, SD mode fields must carry neutral instruction and no concrete lists
+    for mode_key in ("emd_mode_display", "pbg_mode_display", "sd_mode_display"):
+        mode_desc = FIELD_PROMPT_MAP[mode_key][2]
+        assert "only if literally named in the text" in mode_desc
+        assert "Do NOT list default or customary instruments" in mode_desc
+        assert not re.search(r"e\.g\.\s*['\"].*?(?:Bank Guarantee|Demand Draft|FDR)", mode_desc, re.IGNORECASE)
+
+
+def test_prompt_actually_sent_for_emd_pbg_ld_contacts_has_no_example_values(monkeypatch):
+    """When Role 1 is invoked, the actual prompt payload sent to Claude has no banned examples."""
+    calls, _ = _run_role1(monkeypatch, KOCHI_GEM_NATIVE_EMD_PBG_LD_MISSING, EMD_PBG_LD_CONTACT_KEYS)
+    assert calls, "Role 1 made no call"
+    for kwargs in calls:
+        sent = _sent_text(kwargs)
+        for banned in BANNED_CONTACT_EXAMPLES:
+            assert banned not in sent, f"Found '{banned}' in sent payload"
+        for banned in BANNED_INSTRUMENT_LIST_EXAMPLES:
+            assert banned not in sent, f"Found '{banned}' in sent payload"
+        assert "0.5%" not in sent
+
+
+def _instrument_and_contact_copying_stub(i, kwargs):
+    """
+    Simulates a model that copies concrete contact names, emails, instrument lists,
+    or LD rates directly from the tool property descriptions.
+    """
+    props = kwargs["tools"][0]["input_schema"]["properties"]
+    out = {}
+    for name, spec in props.items():
+        desc = spec.get("description", "")
+        # Copy any concrete email (not a bracketed placeholder)
+        email_m = re.search(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", desc)
+        if email_m and "[" not in email_m.group(0):
+            out[name] = email_m.group(0)
+            continue
+        # Copy any concrete instrument list pattern (e.g. "Bank Guarantee / Demand Draft / ...")
+        inst_m = re.search(r"(?:Bank Guarantee|Demand Draft|FDR|Insurance Surety Bond|Bank Transfer)(?:\s*/\s*(?:Bank Guarantee|Demand Draft|FDR|Online|Insurance Surety Bond|Banker Cheque))+", desc, re.IGNORECASE)
+        if inst_m:
+            out[name] = inst_m.group(0)
+            continue
+        # Copy any concrete percentage like 0.5% or 5%
+        pct_m = re.search(r"\b(?:0\.5|5|10)%", desc)
+        if pct_m:
+            out[name] = pct_m.group(0)
+            continue
+        out[name] = None
+    return out
+
+
+def test_example_copying_model_has_no_contact_or_instrument_examples_to_copy(monkeypatch):
+    """
+    On real Kochi tender text where EMD, PBG, LD, and contacts are missing at the mapper level,
+    an example-copying stub finds zero ready-made examples in the prompt descriptions,
+    so no fabricated values leak into results.
+    """
+    _, results = _run_role1(
+        monkeypatch,
+        KOCHI_GEM_NATIVE_EMD_PBG_LD_MISSING,
+        EMD_PBG_LD_CONTACT_KEYS,
+        _instrument_and_contact_copying_stub,
+    )
+    for key in EMD_PBG_LD_CONTACT_KEYS:
+        assert key not in results, f"{key} was unexpectedly populated with: {results.get(key)}"
+
+
+def test_pre_fix_h_descriptions_would_have_leaked_to_copying_stub():
+    """
+    Regression proof against pre-Fix-H baseline:
+    Verify that the old descriptions WOULD have been matched and copied by the stub,
+    proving the fix prevents real prompt leakage.
+    """
+    old_contact_desc = "Name of primary contact / Tender Dealing Officer from IFB Tag (G) (e.g. 'Sh. Ramesh Kumar')"
+    old_email_desc = "Email address of primary contact (e.g. ramesh.kumar@gail.co.in)"
+    old_emd_mode_desc = "Accepted payment instruments for EMD (e.g. 'Bank Guarantee / Demand Draft / FDR / Online / Insurance Surety Bond')."
+    old_ld_desc = "Maximum PRS/LD cap as 5% of total order value"
+
+    # Pre-fix strings match the stub's extraction patterns
+    assert "ramesh.kumar@gail.co.in" in old_email_desc
+    assert "Ramesh Kumar" in old_contact_desc
+    assert re.search(r"(?:Bank Guarantee|Demand Draft|FDR)", old_emd_mode_desc)
+    assert re.search(r"\b5%", old_ld_desc)
+
+

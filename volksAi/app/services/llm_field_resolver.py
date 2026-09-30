@@ -223,7 +223,7 @@ You are an expert procurement auditor and document parsing AI specialized in Ind
    - For Payment Terms: Extract the supply percentage ("X% on supply") and installation percentage ("Y% on installation"), only if literally stated in the text.
    - For PBG / Security Deposit: Extract the percentage of contract value ("X% of contract value") and validity period ("N months"), only if literally stated in the text.
    - For Liquidated Damages (LD / PRS): Extract the weekly rate ("X% per week") and maximum cap ("Y% cap"), only if literally stated in the text.
-   - For Payment Instruments (EMD / PBG / SD / Fees): List ONLY instruments explicitly named in the text (e.g. "DD" or "Bank Guarantee" or "ePBG"). Do NOT provide a generic or default instrument list (such as "DD, SB, FDR, BG, Bank Transfer") if the document does not literally list them.
+   - For Payment Instruments (EMD / PBG / SD / Fees): List ONLY instruments explicitly named in the text. Return only instruments literally stated in the clause, or null if none specified. Do NOT provide default, customary, or generic instruments if the document does not literally list them.
    - X, Y and N above are placeholders, not values: never fill them with a typical, customary, or default rate. If the clause does not state the number, return null.
    - For MAF (Manufacturer Authorization Form): Return true ONLY if the text explicitly states MAF is required; return false ONLY if the text explicitly states MAF is not required or not applicable; return null if the document is silent on MAF (absence of a requirement is not the same as an explicit exemption).
 5. Clause-purpose check for eligibility thresholds: before using a turnover, net worth, working capital, solvency or order-value figure as the answer to a general eligibility (BEC) field, confirm the surrounding text states it as this tender's general eligibility requirement for bidders. The same "annual turnover of [X] or more" phrasing appears in unrelated clauses that are NOT the BEC requirement:
@@ -1516,7 +1516,7 @@ class LLMFieldResolver:
             "1. If the candidate value is accurate and matches the tender-specific criteria, choose action='confirm'.\n"
             "2. If the candidate value is wrong (e.g. GCC boilerplate 'Positive' when BEC declares financial criteria exempt), "
             "choose action='override', provide the corrected 'resolved_value', and a clear one-line 'reasoning'. "
-            "CRITICAL: Never invent, extrapolate, or hallucinate figures (such as 95% or 5%) not literally present in the scoped clauses.\n"
+            "CRITICAL: Never invent, extrapolate, or hallucinate figures not literally present in the scoped clauses.\n"
             "3. SPECIAL RULE FOR DELIVERY TIME FIELDS (delivery_time_supply_display, delivery_time_installation_display):\n"
             "   - If no distinct supply-only or installation-only figure is literally stated in the scoped clauses, "
             "choose action='override' with resolved_value=null for that field.\n"
@@ -1593,4 +1593,7 @@ class LLMFieldResolver:
         if "amc" in t or "annual maintenance" in t:
             return "AMC_SERVICES"
         if "battery" in t or "vrla" in t or "nicd" in t:
-            return "BATTERY_ELECTRIC
+            return "BATTERY_ELECTRICAL"
+        if "pipe" in t or "pipeline" in t:
+            return "PIPELINE_MECHANICAL"
+        return "GENERAL_PROCUREMENT"
