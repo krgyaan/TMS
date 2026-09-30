@@ -688,15 +688,6 @@ def evaluate_bounded_fallback(
                 if 7 <= days_val <= 730:
                     fallback_val = f"{days_val} Days"
                     source_quote = m.group(0)
-    elif field_name in ("client_name_2", "nodal_officer"):
-        m = re.search(r"(?:Shri?|Mr|Ms|Sh)\.?\s*[A-Z][a-zA-Z\.\s]{2,30}", section_text)
-        if m:
-            val_candidate = m.group(0).strip()
-            if any(part in val_candidate.lower() for part in ["boda", "pool", "singh"]):
-                fallback_val = None
-            else:
-                fallback_val = val_candidate
-                source_quote = val_candidate
 
     if fallback_val is not None and fallback_val != extracted_val:
         logger.info(f"[BOUNDED_FALLBACK] Field '{field_name}' recovered via fallback: {fallback_val!r} | Quote: {source_quote!r}")
@@ -833,6 +824,93 @@ def is_valid_experience_years_candidate(value: Any) -> bool:
     if norm in _EXPERIENCE_YEARS_STUBS or (norm.endswith(" etc") and not has_digit):
         return False
     return has_digit or bool(_RE_YEARS_WORD.search(s))
+
+
+CONTACT_SLOT_KEYS = tuple(
+    (f"client_name_{i}_display", f"client_email_{i}_display", f"client_phone_{i}_display") for i in (1, 2, 3)
+)
+_CONTACT_EMPTY = ("", "na", "n/a", "not found", "none", "⚠️ missing", "not applicable")
+_RE_HONORIFIC = re.compile(r"^(?:shri|smt|sh|mr|mrs|ms|dr)\.?\s+", re.IGNORECASE)
+_RE_DIGIT_JOINERS = re.compile(r"(?<=\d)[\s\-\.\(\)/+]+(?=\d)")
+
+
+def _contact_is_empty(value: Any) -> bool:
+    return value is None or str(value).strip().lower() in _CONTACT_EMPTY
+
+
+def _norm_person_name(name: Any) -> str:
+    if _contact_is_empty(name):
+        return ""
+    s = re.sub(r"\s+", " ", str(name)).strip().lower()
+    s = _RE_HONORIFIC.sub("", s)
+    return re.sub(r"[^a-z ]", "", s).strip()
+
+
+def clean_phone(value: Any) -> str:
+    """
+    Normalizes a captured phone string: collapses whitespace/newlines and strips trailing
+    junk left by line-bounded captures (e.g. "0484 2983217 \\n    E" -> "0484 2983217",
+    "+91-484-2983210/11/12/13 Ext." -> "+91-484-2983210/11/12/13"). Returns "NA" unless
+    at least 6 digits remain -- a phone value must be a literal number, never a label.
+    """
+    if _contact_is_empty(value):
+        return "NA"
+    s = re.sub(r"\s+", " ", str(value)).strip()
+    s = re.sub(r"(?:[\s\-/,:]*\b(?:e|ex|ext|extn)\b\.?)+\s*$", "", s, flags=re.IGNORECASE)
+    s = s.strip(" -/,:.")
+    return s if len(re.sub(r"\D", "", s)) >= 6 else "NA"
+
+
+def phone_appears_in_text(phone: Any, text: str) -> bool:
+    """True if the phone's digit sequence literally occurs in text (separators ignored)."""
+    if _contact_is_empty(phone) or not text:
+        return False
+    core = max(re.findall(r"\d+", _RE_DIGIT_JOINERS.sub("", str(phone))), key=len, default="")
+    return len(core) >= 6 and core in _RE_DIGIT_JOINERS.sub("", text)
+
+
+def name_appears_in_text(name: Any, text: str) -> bool:
+    """True if the person name (honorific-insensitive) literally occurs in text."""
+    n = _norm_person_name(name)
+    if not n or not text:
+        return False
+    return n in re.sub(r"[^a-z ]", "", re.sub(r"\s+", " ", text.lower()))
+
+
+def is_same_contact(name_a: Any, email_a: Any, name_b: Any, email_b: Any) -> bool:
+    """Same person if both emails are present and equal, or both names are present and equal."""
+    ea = "" if _contact_is_empty(email_a) else str(email_a).strip().lower()
+    eb = "" if _contact_is_empty(email_b) else str(email_b).strip().lower()
+    if ea and eb and ea == eb:
+        return True
+    na, nb = _norm_person_name(name_a), _norm_person_name(name_b)
+    return bool(na and nb and na == nb)
+
+
+def contact_integrity_violations(data: Dict[str, Any], source_text: Optional[str] = None) -> set:
+    """
+    Keys among client_{name,email,phone}_{1,2,3}_display that must not be kept:
+      - a phone with fewer than 6 digits, or (with source_text) whose digits don't occur in it;
+      - (with source_text) a name that doesn't occur in it -- never a synthesized name;
+      - every key of a slot that duplicates an earlier slot (same email or same name), so
+        one person is never assigned to two contact slots.
+    """
+    bad = set()
+    for name_k, _email_k, phone_k in CONTACT_SLOT_KEYS:
+        phone = data.get(phone_k)
+        if not _contact_is_empty(phone):
+            if clean_phone(phone) == "NA" or (source_text is not None and not phone_appears_in_text(phone, source_text)):
+                bad.add(phone_k)
+        name = data.get(name_k)
+        if source_text is not None and not _contact_is_empty(name) and not name_appears_in_text(name, source_text):
+            bad.add(name_k)
+    for j in (1, 2):
+        nj, ej, pj = CONTACT_SLOT_KEYS[j]
+        for i in range(j):
+            ni, ei, _pi = CONTACT_SLOT_KEYS[i]
+            if is_same_contact(data.get(ni), data.get(ei), data.get(nj), data.get(ej)):
+                bad.update((nj, ej, pj))
+    return bad
 
 
 def resolve_field_staged(
@@ -2419,9 +2497,11 @@ def build_infosheet_data(
         s = str(name_str).strip()
         s = re.sub(r"^(?:Name|Nodal\s+Officer|Contact\s+Person|Consignee\s+Reporting\s+Officer|Buyer\s+Name)[:\-\s]*", "", s, flags=re.IGNORECASE).strip()
         s = s.split("\n")[0].strip()
-        s = re.sub(r"[\s\.\,]+(?:Designation|AO|DGM|GM|Engineer|Sr\.?\s*Officer|Manager)[\s\S]*$", "", s, flags=re.IGNORECASE).strip()
-        s = s.strip(" ,.-:")
-        if s.lower().startswith("&") or any(kw in s.lower() for kw in ["& address", "address", "details", "designation", "officer", "telephone", "email", "consignee"]):
+        if s.lower().startswith("&") or any(kw in s.lower() for kw in [
+            "& address", "address", "details", "designation", "officer", "telephone", "email",
+            "consignee", "ministry", "department", "organisation", "organization", "office",
+            "petroleum", "natural gas", "limited", "gail", "india", "state name"
+        ]):
             return "NA"
         if len(s) <= 3 or s.lower() in ("the", "name", "officer", "beneficiary", "authority", "not found"):
             return "NA"
@@ -2478,7 +2558,6 @@ def build_infosheet_data(
     # Ensure client_phone_1 is not an item/material number (like M6620156001) and prioritize NTPC beneficiary mobile
     m_ntpc_buyer_phone = (
         re.search(r"Active\s+Mobile\s+Numb[\s\S]{0,60}?\b([6-9]\d{9})\b", full_text, re.IGNORECASE)
-        or re.search(r"(?:Active\s+Mobile|Mobile\s+Number)[\s\S]{0,60}?\b([6-9]\d{9})\b", full_text, re.IGNORECASE)
         or re.search(r"(?:vivekmasram@ntpc\.co\.in[\s\S]{0,150}?([6-9]\d{9})|([6-9]\d{9})[\s\S]{0,150}?vivekmasram@ntpc\.co\.in)", full_text, re.IGNORECASE)
     )
     if m_ntpc_buyer_phone:
@@ -2489,19 +2568,14 @@ def build_infosheet_data(
         client_phone_1_display = "NA"
 
     if client_name_1_display in ("NA", "The", "the", "Not Found") or len(str(client_name_1_display)) <= 3:
-        if client_email_1_display and "@" in client_email_1_display:
-            u_name = client_email_1_display.split("@")[0].lower()
-            if "masram" in u_name:
-                client_name_1_display = "Vivek Masram"
-            elif "sudipto" in u_name:
-                client_name_1_display = "Sudipto De Sarkar"
-            else:
-                client_name_1_display = u_name.replace(".", " ").title()
-        else:
-            # Check GeM consignee/buyer name
-            m_gem_buyer = re.search(r"(?:Consignee\s*Reporting\s*Officer|Buyer\s*Name|Officer\s*Inviting\s*Bid)[:\-\s]*\n?\s*([A-Za-z\.\s]{3,35})", full_text, re.IGNORECASE)
-            if m_gem_buyer:
-                client_name_1_display = _clean_cname(m_gem_buyer.group(1))
+        client_name_1_display = "NA"
+        # A name is only ever taken from a labelled name in the text. It is never derived
+        # from an email address ("allan.tomy@..." -> "Allan Tomy" invented a name on the real
+        # GeM bid GEM/2026/B/8024876, which states only a Buyer and an HOD email) and never
+        # hardcoded per client (the former NTPC/POWERGRID name literals are removed).
+        m_gem_buyer = re.search(r"(?:Consignee\s*Reporting\s*Officer|Buyer\s*Name|Officer\s*Inviting\s*Bid)[:\-\s]*\n?\s*([A-Za-z\.\s]{3,35})", full_text, re.IGNORECASE)
+        if m_gem_buyer:
+            client_name_1_display = _clean_cname(m_gem_buyer.group(1))
 
     # Ensure Officer 1 email is allocated properly
     if client_email_1_display == "NA":
@@ -2528,12 +2602,16 @@ def build_infosheet_data(
         )
         em = re.search(r"([a-zA-Z0-9\._%+\-]+@[a-zA-Z0-9\.\-]+\.[a-zA-Z]{2,})", n_text)
         ph = re.search(r"(?:Phone|Tel|Mobile)(?:[^\n:]*?)[:\-][ \t]*([0-9\+\-\/\(\)\sExtn\.]+)", n_text, re.IGNORECASE)
-        if nm:
-            client_name_2_display = _clean_cname(nm.group(0))
-        if em:
-            client_email_2_display = em.group(1).strip()
-        if ph:
-            client_phone_2_display = ph.group(1).strip()
+        cand_name = _clean_cname(nm.group(0)) if nm else "NA"
+        cand_email = em.group(1).strip() if em else "NA"
+        cand_phone = ph.group(1).strip() if ph else "NA"
+        if not is_same_contact(client_name_1_display, client_email_1_display, cand_name, cand_email):
+            if cand_name != "NA":
+                client_name_2_display = cand_name
+            if cand_email != "NA":
+                client_email_2_display = cand_email
+            if cand_phone != "NA":
+                client_phone_2_display = cand_phone
 
     if client_name_2_display == "NA" or client_email_2_display == "NA":
         clause_39_2_matches = re.finditer(r"\b39\.2\b(.*?)(?=\b40\b|\bSECTION-III\b|\bBIDDING DATA SHEET\b|\Z)", full_text, re.IGNORECASE | re.DOTALL)
@@ -2542,23 +2620,16 @@ def build_infosheet_data(
             nm = re.search(r"(?:Shri?|Mr|Ms|Sh)\.?\s*[A-Z][a-zA-Z\.\s]{2,30}", c_text)
             if nm:
                 cand = _clean_cname(nm.group(0))
-                if cand != client_name_1_display:
+                n_email = re.search(r"([a-zA-Z0-9\._%+\-]+@[a-zA-Z0-9\.\-]+\.[a-zA-Z]{2,})", c_text, re.IGNORECASE)
+                cand_em = n_email.group(1).strip() if n_email else "NA"
+                if not is_same_contact(client_name_1_display, client_email_1_display, cand, cand_em):
                     client_name_2_display = cand
-                    n_email = re.search(r"([a-zA-Z0-9\._%+\-]+@[a-zA-Z0-9\.\-]+\.[a-zA-Z]{2,})", c_text, re.IGNORECASE)
                     n_phone = re.search(r"(?:Phone|Tel|Mobile|Tel[:\-\s]*)(?:\s*No|\s*and\s*Extn)?[:\-\s]*([0-9\+\-\/\(\)\sExtn\.]+)", c_text, re.IGNORECASE)
-                    if n_email:
-                        client_email_2_display = n_email.group(1).strip()
+                    if cand_em != "NA":
+                        client_email_2_display = cand_em
                     if n_phone:
                         client_phone_2_display = n_phone.group(1).strip()
                     break
-
-    # Officer 2 fallback for POWERGRID (Insha Khan)
-    if client_name_2_display == "NA":
-        for em in distinct_emails:
-            if "powergrid.in" in em.lower():
-                client_email_2_display = em
-                client_name_2_display = "Ms. Insha Feroz Khan"
-                break
 
     # If Officer 2 email is still NA, assign next distinct email
     if client_email_2_display == "NA":
@@ -2567,23 +2638,14 @@ def build_infosheet_data(
                 client_email_2_display = em
                 break
 
-    # If Officer 2 name is still NA but email is known, search around email
-    if client_name_2_display == "NA" and client_email_2_display != "NA":
-        em_idx = full_text.lower().find(client_email_2_display.lower())
-        if em_idx != -1:
-            window = full_text[max(0, em_idx-300):min(len(full_text), em_idx+300)]
-            n_name = re.search(r"(?:Shri?|Mr|Ms|Sh)\.?\s*([A-Z][a-zA-Z\.\s]{2,35})", window)
-            if n_name:
-                cand = _clean_cname(n_name.group(0))
-                if cand != client_name_1_display:
-                    client_name_2_display = cand
 
-    client_name_2_display, c2_fb_meta = evaluate_bounded_fallback(
-        "client_name_2",
-        client_name_2_display,
-        full_text[:20000],
-        lambda v: not _is_missing(v) and v not in ("NA", "Not Found") and len(str(v).strip()) >= 3
-    )
+    # Guard: Before finalizing Officer 2, ensure it is not identical to Officer 1
+    if is_same_contact(client_name_1_display, client_email_1_display, client_name_2_display, client_email_2_display):
+        client_name_2_display = "NA"
+        client_email_2_display = "NA"
+        client_phone_2_display = "NA"
+    elif _norm_person_name(client_name_2_display) and _norm_person_name(client_name_2_display) == _norm_person_name(client_name_1_display):
+        client_name_2_display = "NA"
 
     # 4. Officer 3 (Site Contact / Consignee / Additional Contact)
     client_name_3_display = resolve_field(["Client Contacts 3", "Client Contacts III", "client_contacts_3", "client_name_3"], default="NA")
@@ -2606,6 +2668,24 @@ def build_infosheet_data(
     if client_name_3_display == "NA":
         client_email_3_display = "NA"
         client_phone_3_display = "NA"
+
+    # Contact integrity: phones must be literal numbers found in the text, names must occur
+    # in the text, and no person may occupy two slots (the second occurrence is cleared,
+    # never duplicated -- e.g. Buyer and HOD must not collapse into one repeated identity).
+    client_phone_1_display = clean_phone(client_phone_1_display)
+    client_phone_2_display = clean_phone(client_phone_2_display)
+    client_phone_3_display = clean_phone(client_phone_3_display)
+    _contacts = {
+        "client_name_1_display": client_name_1_display, "client_email_1_display": client_email_1_display, "client_phone_1_display": client_phone_1_display,
+        "client_name_2_display": client_name_2_display, "client_email_2_display": client_email_2_display, "client_phone_2_display": client_phone_2_display,
+        "client_name_3_display": client_name_3_display, "client_email_3_display": client_email_3_display, "client_phone_3_display": client_phone_3_display,
+    }
+    for _bad_key in contact_integrity_violations(_contacts, full_text):
+        logger.info("[CONTACT_INTEGRITY] Cleared %s (was %r)", _bad_key, _contacts[_bad_key])
+        _contacts[_bad_key] = "NA"
+    client_name_1_display, client_email_1_display, client_phone_1_display = (_contacts[k] for k in CONTACT_SLOT_KEYS[0])
+    client_name_2_display, client_email_2_display, client_phone_2_display = (_contacts[k] for k in CONTACT_SLOT_KEYS[1])
+    client_name_3_display, client_email_3_display, client_phone_3_display = (_contacts[k] for k in CONTACT_SLOT_KEYS[2])
 
     # 46. Docs Submitted
     doc_1_display = "NA"
@@ -2841,13 +2921,63 @@ def build_infosheet_data(
     inspection_required_display = "Yes" if insp_val and "yes" in str(insp_val).lower() else "No"
 
     # 40. Pre-Bid Meeting
-    pre_bid_m = resolve_field(["Pre-Bid Meeting Date", "Pre-Bid Meeting", "pre_bid_meeting", "pre_bid_datetime", "Pre-Bid Date and Time"], default=None)
+    # A resolved value must look like a pre-bid value (a date, a time or real words) --
+    # a table-of-contents line "17. PRE-BID MEETING\n18. FORMAT..." yielded "18.".
+    pre_bid_m = resolve_field(
+        ["Pre-Bid Meeting Date", "Pre-Bid Meeting", "pre_bid_meeting", "pre_bid_datetime", "Pre-Bid Date and Time"],
+        default=None,
+        validator=lambda v: bool(re.search(r"\d{1,2}[\-/.]\d{1,2}[\-/.]\d{2,4}|\d{1,2}:\d{2}|[A-Za-z]{3,}", str(v))),
+    )
     parts = []
     
     atc_pb_clause = None
+
+    # GeM native bid-PDF template ("Pre Bid Detail(s)" table, e.g. GEM/2026/B/8024876):
+    # bilingual label rows extracted column-wise, so both labels come first and the values
+    # follow them, with labels possibly broken across lines:
+    #   "मूUय ... /Pre-Bid\nDate and Time\n4ी-बड 'थान/Pre-Bid Venue\n24-09-2026 11:00:00\n
+    #    Through VC, MS-Team Link for the same provided in GAIL's Tender document\n"
+    # Used when the tender's own pre-bid paragraph gives no date (the Kochi tender says
+    # "Pre-Bid Date & Time shall be as per GeM bid document"); when both give a date and
+    # they differ (real Abu Road: GeM 13-03-2026 vs ATC 14.03.2026), the ATC value is kept
+    # and the GeM value is shown alongside it rather than silently dropped.
+    gem_pb_datetime = None
+    gem_pb_venue = None
+    gem_pb_label = re.search(r"Pre[\s\-]*Bid\s+Date\s+and\s+Time", full_text, re.IGNORECASE)
+    if gem_pb_label:
+        gem_window = full_text[gem_pb_label.end():gem_pb_label.end() + 500]
+        m_gem_dt = re.search(
+            r"(?<![\d/.\-])(\d{1,2}[\-/.]\d{1,2}[\-/.]\d{4})[ \t]+(\d{1,2}:\d{2}(?::\d{2})?)", gem_window
+        )
+        if m_gem_dt:
+            gem_pb_datetime = f"{m_gem_dt.group(1)} {m_gem_dt.group(2)}"
+            venue_line = next(
+                (ln.strip() for ln in gem_window[m_gem_dt.end():].split("\n") if ln.strip()), ""
+            )
+            # The venue is the first non-empty line after the date-time value, unless that
+            # line is itself a label row (Devanagari text or the "Pre-Bid Venue" caption).
+            if venue_line and not re.search(r"Pre[\s\-]*Bid\s+Venue|[\u0900-\u097F]", venue_line):
+                gem_pb_venue = venue_line
+
+    def _date_key(date_str):
+        nums = re.findall(r"\d+", date_str or "")
+        if len(nums) < 3:
+            return None
+        year = int(nums[2]) + (2000 if len(nums[2]) == 2 else 0)
+        return (int(nums[0]), int(nums[1]), year)
+
+    pb_not_applicable = False
     for pb_match in re.finditer(r"(?:PRE[\s\-]?BID\s+MEETING|PRE[\s\-]?BID\s+CONFERENCE)[\s\S]{0,800}", full_text, re.IGNORECASE):
         block = pb_match.group(0)
-        m_date = re.search(r"\b(\d{1,2}[\.\-\/]\d{1,2}[\.\-\/]\d{2,4})\b", block)
+        # "(F) DATE, TIME & VENUE OF PRE-BID MEETING  Not Applicable" (real Morena ATC): the
+        # 800-char window otherwise picked up the next page header's "DATE: 19.12.2025".
+        if re.match(r"(?:PRE[\s\-]?BID\s+MEETING|PRE[\s\-]?BID\s+CONFERENCE)\s*[:\-]?\s*(?:Not\s+Applicable|N/?A\b|Nil\b)", block, re.IGNORECASE):
+            pb_not_applicable = True
+            break
+        # Guarded so a date can't be the tail of a longer number: the real Kochi tender
+        # (GEM/2026/B/8024876) printed "+91-484-2983210/11/12/13" near its pre-bid clause,
+        # and "11/12/13" was taken as the pre-bid date.
+        m_date = re.search(r"(?<![\d/.\-])(\d{1,2}[\.\-\/]\d{1,2}[\.\-\/]\d{2,4})(?![\d/.\-]*\d)", block)
         m_time = re.search(r"\b(\d{1,2}[:\.]\d{2}(?:\s*(?:AM|PM|HRS|Hours))?)\b", block, re.IGNORECASE)
         if m_date:
             d_str = m_date.group(1)
@@ -2869,6 +2999,21 @@ def build_infosheet_data(
                 parts.append("Through Video Conferencing")
             break
 
+    pb_from_gem = False
+    if gem_pb_datetime:
+        if not atc_pb_clause:
+            pb_from_gem = True
+            atc_pb_clause = gem_pb_datetime
+            parts.insert(0, gem_pb_datetime)
+            if gem_pb_venue:
+                parts.insert(1, gem_pb_venue)
+        elif _date_key(gem_pb_datetime) != _date_key(atc_pb_clause):
+            logger.warning(
+                "[PRE_BID] GeM bid (%s) and tender document (%s) state different pre-bid dates",
+                gem_pb_datetime, atc_pb_clause,
+            )
+            parts.insert(1, f"GeM bid states: {gem_pb_datetime}")
+
     if not atc_pb_clause and pre_bid_m and pre_bid_m != "NA":
         parts.append(str(pre_bid_m).strip())
 
@@ -2876,7 +3021,7 @@ def build_infosheet_data(
     if teams_m:
         mid = re.sub(r"\s+", " ", teams_m.group(1)).strip()
         pwd = teams_m.group(2).strip()
-        if not atc_pb_clause:
+        if not atc_pb_clause or pb_from_gem:
             parts.append("MS Teams")
             parts.append(f"Meeting ID: {mid}")
             parts.append(f"Passcode: {pwd}")
@@ -2887,7 +3032,9 @@ def build_infosheet_data(
         elif "through ms teams" in full_text.lower():
             parts.append("Through MS Teams")
 
-    if parts:
+    if pb_not_applicable and not gem_pb_datetime:
+        pre_bid_display = "Not Applicable"
+    elif parts:
         pre_bid_display = ", ".join(parts)
     else:
         pre_bid_display = "N/A"
@@ -3522,10 +3669,23 @@ def build_infosheet_data(
         ])
 
     # 7. Secondary/Tertiary Client contacts & Schedules: NA when tender only has 1 client/schedule
-    if res_dict.get("client_name_2_display") in (None, "", "NA", "N/A"):
+    c2_name_empty = res_dict.get("client_name_2_display") in (None, "", "NA", "N/A")
+    c2_email_empty = res_dict.get("client_email_2_display") in (None, "", "NA", "N/A")
+    if c2_name_empty and c2_email_empty:
         explicit_na_keys.update(["client_name_2_display", "client_email_2_display", "client_phone_2_display"])
-    if res_dict.get("client_name_3_display") in (None, "", "NA", "N/A"):
+    elif c2_name_empty:
+        explicit_na_keys.add("client_name_2_display")
+        if res_dict.get("client_phone_2_display") in (None, "", "NA", "N/A"):
+            explicit_na_keys.add("client_phone_2_display")
+
+    c3_name_empty = res_dict.get("client_name_3_display") in (None, "", "NA", "N/A")
+    c3_email_empty = res_dict.get("client_email_3_display") in (None, "", "NA", "N/A")
+    if c3_name_empty and c3_email_empty:
         explicit_na_keys.update(["client_name_3_display", "client_email_3_display", "client_phone_3_display"])
+    elif c3_name_empty:
+        explicit_na_keys.add("client_name_3_display")
+        if res_dict.get("client_phone_3_display") in (None, "", "NA", "N/A"):
+            explicit_na_keys.add("client_phone_3_display")
     if res_dict.get("schedule_2_details_display") in (None, "", "NA", "N/A"):
         explicit_na_keys.add("schedule_2_details_display")
     if res_dict.get("schedule_3_details_display") in (None, "", "NA", "N/A"):
@@ -3543,8 +3703,6 @@ def build_infosheet_data(
         fallback_keys.add("payment_terms_supply_display")
     if 'del_fb_meta' in locals() and del_fb_meta.get("needs_review"):
         fallback_keys.add("delivery_time_supply_display")
-    if 'c2_fb_meta' in locals() and c2_fb_meta.get("needs_review"):
-        fallback_keys.add("client_name_2_display")
 
     field_statuses = {}
     missing_fields = []

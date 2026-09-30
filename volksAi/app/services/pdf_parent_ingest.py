@@ -816,7 +816,13 @@ def ingest_parent_tender_pdf(
                     LLM_TOKEN_BUDGET_PER_TENDER,
                     is_unambiguous_layer1,
                 )
-                from app.services.tender_mapper import FIELD_STATUS_OK_FALLBACK, FIELD_STATUS_MISSING
+                from app.services.tender_mapper import (
+                    FIELD_STATUS_OK_FALLBACK,
+                    FIELD_STATUS_MISSING,
+                    CONTACT_SLOT_KEYS,
+                    contact_integrity_violations,
+                )
+                _CONTACT_KEYS = tuple(k for slot in CONTACT_SLOT_KEYS for k in slot)
                 _DISPLAY_KEY_TO_LABEL = {
                     "tender_value_display": "Tender Value",
                     "emd_amount_display": "EMD Amount",
@@ -952,6 +958,23 @@ def ingest_parent_tender_pdf(
 
                             current_val = infosheet_data.get(key)
                             is_stub = current_val in _stub_vals or (isinstance(current_val, str) and not current_val.strip())
+
+                            # Contact integrity: never merge an LLM contact value that is not literally
+                            # in the tender text (invented name/phone) or that makes one person occupy
+                            # two contact slots (e.g. Buyer + HOD collapsed into one repeated identity).
+                            if key in _CONTACT_KEYS:
+                                _before = {k: infosheet_data.get(k) for k in _CONTACT_KEYS}
+                                _after = dict(_before, **{key: val})
+                                _new_violations = (
+                                    contact_integrity_violations(_after, target_text)
+                                    - contact_integrity_violations(_before, target_text)
+                                )
+                                if _new_violations:
+                                    logger.info(
+                                        "[LLM_FALLBACK][Role 1] Rejected contact value %s=%r (violates: %s)",
+                                        key, val, sorted(_new_violations),
+                                    )
+                                    continue
 
                             is_bec_override = False
                             if key in COMPLEX_BEC_KEYS:

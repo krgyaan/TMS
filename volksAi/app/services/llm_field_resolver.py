@@ -180,7 +180,7 @@ AMBIGUITY_FIELD_DEFINITIONS: Dict[str, str] = {
         "CRITICAL RULE: If the scoped tender clauses specify a milestone schedule (such as 70% on supply, 30% on installation; "
         "or 80% on supply, 20% on installation; or 85% on supply, 15% on installation), extract the supply milestone percentage. "
         "If the candidate value matches the milestone percentage explicitly specified in the scoped clauses (e.g. '70%', '80%', '85%'), "
-        "choose action='confirm'. NEVER override with numbers (such as 95% or 5%) not literally present in the scoped text. "
+        "choose action='confirm'. NEVER override with numbers not literally present in the scoped text. "
         "Return as percentage string (e.g. '70%', '80%', '85%')."
     ),
     "payment_terms_installation_display": (
@@ -217,12 +217,13 @@ You are an expert procurement auditor and document parsing AI specialized in Ind
 2. If a field is not present or mentioned in the text, return null. Do not use default, speculative, or placeholder values.
 3. Multiple Organizations: The document may be issued by DMRC, GAIL, Indian Railways, NTPC, IOCL, State Governments (e.g. Rajasthan, UP, Maharashtra), CPWD, or any other authority. Extract the exact authority, buyer, and officers named in THIS specific document.
 4. Numerical Precision:
-   - For Estimated Value & EMD: Extract exact amounts (e.g. "₹15,00,000" or "1500000"). If EMD is exempt or not required, indicate accordingly.
+   - For Estimated Value & EMD: Extract exact amounts (format e.g. "₹[Amount]" or "[Amount]"), only if literally stated in the text. If EMD is exempt or not required, indicate accordingly.
    - For Experience Years: Extract single clean integer (e.g. 3, 5, 7).
    - For Work Order Values & Turnover: Always preserve units as written (e.g. "Rs. [X] Lakhs" or "Rs. [X] Crore"), only if literally stated in the text.
    - For Payment Terms: Extract the supply percentage ("X% on supply") and installation percentage ("Y% on installation"), only if literally stated in the text.
    - For PBG / Security Deposit: Extract the percentage of contract value ("X% of contract value") and validity period ("N months"), only if literally stated in the text.
    - For Liquidated Damages (LD / PRS): Extract the weekly rate ("X% per week") and maximum cap ("Y% cap"), only if literally stated in the text.
+   - For Payment Instruments (EMD / PBG / SD / Fees): List ONLY instruments explicitly named in the text (e.g. "DD" or "Bank Guarantee" or "ePBG"). Do NOT provide a generic or default instrument list (such as "DD, SB, FDR, BG, Bank Transfer") if the document does not literally list them.
    - X, Y and N above are placeholders, not values: never fill them with a typical, customary, or default rate. If the clause does not state the number, return null.
    - For MAF (Manufacturer Authorization Form): Return true ONLY if the text explicitly states MAF is required; return false ONLY if the text explicitly states MAF is not required or not applicable; return null if the document is silent on MAF (absence of a requirement is not the same as an explicit exemption).
 5. Clause-purpose check for eligibility thresholds: before using a turnover, net worth, working capital, solvency or order-value figure as the answer to a general eligibility (BEC) field, confirm the surrounding text states it as this tender's general eligibility requirement for bidders. The same "annual turnover of [X] or more" phrasing appears in unrelated clauses that are NOT the BEC requirement:
@@ -269,9 +270,9 @@ You are an expert procurement auditor and document parsing AI specialized in Ind
 ## Worked Reasoning Examples Per Category (generic patterns, not tender-specific data):
 
 ### Category: bid_summary (Tender No, EMD, Tender Fee, Estimated Value, Bid Validity)
-Clause: "GeM Bid No.: GEM/2025/B/1234567 DATE 01.01.2026. Bid Validity Period: 120 (One Hundred Twenty) Days. EMD Amount: Rs. 2,00,000/- (Rupees Two Lakhs Only) OR Bidder may opt for EMD Exemption if MSE registered."
-Correct reasoning: the bid number is the literal alphanumeric code following "GeM Bid No.:", not the date. Bid validity is the plain integer 120, not the parenthetical spell-out. EMD is conditional on MSE status -- if the document does not state the bidder's MSE status, record the stated default amount (₹2,00,000) rather than assuming exemption applies.
-Common mistake to avoid: capturing "One Hundred Twenty" as a string instead of the integer 120; conflating the GeM bid number with an internal tender reference number if both appear nearby.
+Clause: "GeM Bid No.: GEM/[YYYY]/B/[NNNNNNN] DATE [DD.MM.YYYY]. Bid Validity Period: [V] Days. EMD Amount: Rs. [E]/- OR Bidder may opt for EMD Exemption if MSE registered."
+Correct reasoning: the bid number is the literal alphanumeric code following "GeM Bid No.:", not the date. Bid validity is the plain integer [V]. EMD is conditional on MSE status -- if the document does not state the bidder's MSE status, record the stated default amount rather than assuming exemption applies. Only extract EMD payment instruments if explicitly named in the text.
+Common mistake to avoid: capturing numbers as spelled-out words instead of plain integers; conflating the GeM bid number with an internal tender reference number if both appear nearby.
 
 ### Category: payment_terms (Supply %, Installation %)
 Clause (Split tender): "Terms of Payment: [A]% payment against supply and balance [B]% after successful installation and commissioning at site."
@@ -281,8 +282,8 @@ Correct reasoning: supply percentage = 100, installation percentage = null / "No
 Common mistake to avoid: inventing an installation percentage when the tender is pure supply; swapping supply and installation percentages when the clause lists installation before supply in a different sentence order; missing a third milestone (e.g. "[Z]% on warranty completion") that changes the supply/installation split.
 
 ### Category: pbg_sd (PBG/SD percentage, mode, duration)
-Clause: "Successful bidder shall submit a Performance Bank Guarantee (PBG) of [P]% of the contract value, valid for [T] months ([W] months warranty + [C] months claim period), in the form of a Bank Guarantee from a Nationalized/Scheduled Bank."
-Correct reasoning: PBG percentage = P, PBG duration = T months (use the total stated duration, not just the warranty component W), PBG mode = "Bank Guarantee". If the clause instead says "Security Deposit" with no separate PBG clause, map the same fields to the SD-equivalent display keys instead of leaving both blank.
+Clause: "Successful bidder shall submit a Performance Bank Guarantee (PBG) of [P]% of the contract value, valid for [T] months ([W] months warranty + [C] months claim period), in the form of [Instrument] from a Nationalized/Scheduled Bank."
+Correct reasoning: PBG percentage = P, PBG duration = T months (use the total stated duration, not just the warranty component W), PBG mode = only the instrument literally named in the clause. If the clause instead says "Security Deposit" with no separate PBG clause, map the same fields to the SD-equivalent display keys instead of leaving both blank.
 Common mistake to avoid: using only the warranty figure W and dropping the additional claim-period months C explicitly added by the clause.
 
 ### Category: prs_ld (Liquidated Damages / Price Reduction Schedule)
@@ -301,9 +302,9 @@ Correct reasoning: delivery/supply time = 60 days, installation time = 90 days. 
 Common mistake to avoid: adding 60+90=150 days when the document intends 90 as the total cumulative figure, not an additional period.
 
 ### Category: contacts_bds (Client contacts, courier/submission address)
-Clause: "For any technical clarification, contact: Shri A. Kumar, Dy. General Manager (C&P), Email: a.kumar@gail.co.in, Phone: 011-12345678. Physical bid documents shall be submitted to: The Manager (Contracts), GAIL Bhawan, 16 Bhikaiji Cama Place, New Delhi - 110066."
+Clause: "For any technical clarification, contact: [Full Name], [Designation], Email: [email]@[domain], Phone: [phone-number]. Physical bid documents shall be submitted to: [Office/Department], [Address Line], [City], [State] - [PIN]."
 Correct reasoning: extract the named officer, designation, email, and phone as a single contact record; extract the courier address as a full postal address string including PIN code. Do not merge the officer's contact details with the courier submission address -- they frequently refer to different people/departments.
-Common mistake to avoid: dropping the PIN code from the courier address; extracting only the department name ("The Manager (Contracts)") without the full address block that follows.
+Common mistake to avoid: dropping the PIN code from the courier address; extracting only the department name without the full address block that follows.
 
 ### Category: commercial_ra (Commercial Evaluation Method, Reverse Auction)
 Clause: "Evaluation shall be done on Overall L-1 basis considering total quoted value across all items. Reverse Auction (RA) shall be conducted post technical evaluation, subject to a minimum of 3 technically qualified bidders."
@@ -409,12 +410,12 @@ FIELD_PROMPT_MAP: Dict[str, Tuple[str, str, str, Any]] = {
     ),
     "sd_required_display": (
         "sd_required", "boolean",
-        "Is Security Deposit / CPS required? If PBG at 5% covers CPS, sd_required=false",
+        "Is Security Deposit / CPS required? If PBG covers CPS, sd_required=false",
         _fmt_bool,
     ),
     "sd_mode_display": (
         "sd_mode", "string",
-        "Accepted payment instruments for Security Deposit/CPS (e.g. 'Bank Guarantee / DD / FDR / Insurance Surety Bond')",
+        "Accepted payment instruments for Security Deposit/CPS, only if literally named in the text. Return only instruments explicitly mentioned, or null if none specified. Do NOT list default or customary instruments.",
         _fmt_str,
     ),
     "sd_percentage_display": (
@@ -447,47 +448,47 @@ FIELD_PROMPT_MAP: Dict[str, Tuple[str, str, str, Any]] = {
     ),
     "client_name_1_display": (
         "client_name_1", "string",
-        "Name of primary contact / Tender Dealing Officer from IFB Tag (G) or BDS Clause 39.2 (e.g. 'Sh. Ramesh Kumar')",
+        "Name of primary contact / Tender Dealing Officer from IFB Tag (G) or BDS Clause 39.2 (format e.g. '[Full Name]'), only if literally stated in the text",
         _fmt_str,
     ),
     "client_email_1_display": (
         "client_email_1", "string",
-        "Email address of primary contact (e.g. ramesh.kumar@gail.co.in)",
+        "Email address of primary contact (format e.g. '[email]@[domain]'), only if literally stated in the text",
         _fmt_str,
     ),
     "client_phone_1_display": (
         "client_phone_1", "string",
-        "Phone/extension number of primary contact",
+        "Phone/extension number of primary contact (format e.g. '[phone-number]'), only if literally stated in the text",
         _fmt_str,
     ),
     "client_name_2_display": (
         "client_name_2", "string",
-        "Name of second contact / Nodal Officer from BDS Clause 39.3",
+        "Name of second contact / Nodal Officer from BDS Clause 39.3 (format e.g. '[Full Name]'), only if literally stated in the text",
         _fmt_str,
     ),
     "client_email_2_display": (
         "client_email_2", "string",
-        "Email of second contact / Nodal Officer",
+        "Email of second contact / Nodal Officer (format e.g. '[email]@[domain]'), only if literally stated in the text",
         _fmt_str,
     ),
     "client_phone_2_display": (
         "client_phone_2", "string",
-        "Phone of second contact / Nodal Officer",
+        "Phone of second contact / Nodal Officer (format e.g. '[phone-number]'), only if literally stated in the text",
         _fmt_str,
     ),
     "client_name_3_display": (
         "client_name_3", "string",
-        "Name of third contact / additional dealing officer",
+        "Name of third contact / additional dealing officer (format e.g. '[Full Name]'), only if literally stated in the text",
         _fmt_str,
     ),
     "client_email_3_display": (
         "client_email_3", "string",
-        "Email of third contact",
+        "Email of third contact (format e.g. '[email]@[domain]'), only if literally stated in the text",
         _fmt_str,
     ),
     "client_phone_3_display": (
         "client_phone_3", "string",
-        "Phone of third contact",
+        "Phone of third contact (format e.g. '[phone-number]'), only if literally stated in the text",
         _fmt_str,
     ),
     "custom_eligibility_criteria_display": (
@@ -507,7 +508,7 @@ FIELD_PROMPT_MAP: Dict[str, Tuple[str, str, str, Any]] = {
     ),
     "pbg_mode_display": (
         "pbg_mode", "string",
-        "Accepted instruments for PBG/ePBG (e.g. 'Bank Guarantee / Insurance Surety Bond')",
+        "Accepted instruments for PBG/ePBG, only if literally named in the text. Return only instruments explicitly mentioned, or null if none specified. Do NOT list default or customary instruments.",
         _fmt_str,
     ),
     "commercial_evaluation_display": (
@@ -578,17 +579,17 @@ FIELD_PROMPT_MAP: Dict[str, Tuple[str, str, str, Any]] = {
     ),
     "emd_mode_display": (
         "emd_mode", "string",
-        "Accepted payment instruments for EMD (e.g. 'Bank Guarantee / Demand Draft / FDR / Online / Insurance Surety Bond').",
+        "Accepted payment instruments for EMD, only if literally named in the text. Return only instruments explicitly mentioned, or null if none specified. Do NOT list default or customary instruments.",
         _fmt_str,
     ),
     "tender_fee_amount_display": (
         "tender_fee_amount", "number",
-        "Tender document fee / cost in Rupees (e.g. 1000). If exempt or nil, return null or 0.",
+        "Tender document fee / cost in Rupees. If exempt or nil, return null or 0.",
         _fmt_str,
     ),
     "tender_fee_mode_display": (
         "tender_fee_mode", "string",
-        "Accepted payment instruments for Tender Fee (e.g. 'Demand Draft / Banker Cheque / Online').",
+        "Accepted payment instruments for Tender Fee, only if literally named in the text. Return only instruments explicitly mentioned, or null if none specified.",
         _fmt_str,
     ),
     "processing_fee_amount_display": (
@@ -1592,7 +1593,4 @@ class LLMFieldResolver:
         if "amc" in t or "annual maintenance" in t:
             return "AMC_SERVICES"
         if "battery" in t or "vrla" in t or "nicd" in t:
-            return "BATTERY_ELECTRICAL"
-        if "pipe" in t or "pipeline" in t:
-            return "PIPELINE_MECHANICAL"
-        return "GENERAL_PROCUREMENT"
+            return "BATTERY_ELECTRIC
