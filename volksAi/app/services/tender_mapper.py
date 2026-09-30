@@ -826,6 +826,93 @@ def is_valid_experience_years_candidate(value: Any) -> bool:
     return has_digit or bool(_RE_YEARS_WORD.search(s))
 
 
+_RE_EMD_SECTION = re.compile(
+    r"(?:(?:SECTION|CLAUSE|ANNEXURE|\d+[\.\s]|\([A-Z0-9]{1,3}\))\s*)?(?:BID\s+SECURITY|EARNEST\s+MONEY\s+DEPOSIT|EMD\s+DETAIL)"
+    r"(.*?)(?=\n\s*(?:SECTION|ANNEXURE|CLAUSE|\d+[\.\s]|\([A-Z0-9]{1,3}\)|\Z))",
+    re.IGNORECASE | re.DOTALL,
+)
+# A table-of-contents entry: a short heading followed by a dotted leader / page number, or
+# directly by the next numbered heading (real Kochi TOC: "16. EARNEST MONEY DEPOSITE (EMD) /
+# BID SECURITY \n17. \nPRE-BID MEETING").
+_RE_TOC_TAIL = re.compile(r"^[\s.·…]*(?:\.{3,}|…)\s*\d*\s*$|^\s*\d{1,4}\s*$")
+_RE_NEXT_NUMBERED_HEADING = re.compile(r"\A\s*\n\s*\d{1,3}\.\s*(?:\n\s*)?[A-Z]")
+
+
+def detect_emd_instruments(block: str) -> List[str]:
+    """
+    EMD instrument codes named in `block`, in a stable order. Banker's Cheque is a
+    cheque-type instrument and maps to DD (the TMS mapping's own convention in
+    tms_field_mapper: "BANKER'S CHEQUE" -> DD), never to BT/Bank Transfer; BT is only for
+    genuine electronic transfers (IMPS/NEFT/RTGS/online banking). Curly apostrophes
+    ("Banker’s Cheque", as printed in real GAIL tenders) are normalized first.
+    """
+    b = (block or "").lower().replace("’", "'").replace("‘", "'")
+    found = []
+    if any(k in b for k in ["imps", "neft", "rtgs", "online banking", "bank transfer", "online payment"]):
+        found.append("BT")
+    if "demand draft" in b or re.search(r"\bdd\b", b) or "banker's cheque" in b or "bankers cheque" in b or "banker cheque" in b:
+        found.append("DD")
+    if "surety bond" in b or "insurance surety" in b:
+        found.append("SB")
+    if "fixed deposit" in b or re.search(r"\bfdr\b", b):
+        found.append("FDR")
+    if "bank guarantee" in b or re.search(r"\bbg\b", b):
+        found.append("BG")
+    return found
+
+
+def _is_toc_entry(match: "re.Match", full_text: str) -> bool:
+    body = match.group(1) or ""
+    if len(re.sub(r"\s+", " ", body).strip()) > 60:
+        return False
+    return bool(_RE_TOC_TAIL.match(body) or _RE_NEXT_NUMBERED_HEADING.match(full_text[match.end():match.end() + 40]))
+
+
+def find_emd_instrument_block(full_text: str, tag_e_block: Optional[str] = None) -> str:
+    """
+    The EMD/Bid Security text that actually lists the accepted instruments.
+
+    The first "BID SECURITY" match is often not it: on the real Kochi tender the Tag (E)
+    summary only says "Refer clause no. 16.0 of ITB & BDS", the first generic match is the
+    GeM "EMD Detail" row, and the TOC entry is another -- the real list is clause 16.1.
+    So TOC entries are skipped and, among the Tag (E) block and every EMD-section match,
+    the one naming the MOST instruments wins (ties -> earliest, Tag (E) first). Returns ""
+    when no candidate names any instrument.
+    """
+    candidates: List[Tuple[str, Optional["re.Match"]]] = [(tag_e_block, None)] if tag_e_block else []
+    for m in _RE_EMD_SECTION.finditer(full_text or ""):
+        if not _is_toc_entry(m, full_text):
+            candidates.append((m.group(1), m))
+    best, best_m, best_n = "", None, 0
+    for text, m in candidates:
+        n = len(detect_emd_instruments(text))
+        if n > best_n:
+            best, best_m, best_n = text, m, n
+    if best_m is not None:
+        best += _sibling_subclauses(full_text, best_m)
+    return best
+
+
+def _sibling_subclauses(full_text: str, m: "re.Match", max_chars: int = 4000) -> str:
+    """
+    Text of the following sub-clauses of the same numbered clause as match `m`. The EMD
+    clause is split across sub-clauses and the section regex stops at the first one: on the
+    real Kochi tender 16.1 lists DD / Banker's Cheque / Insurance Surety Bond / FDR / BG and
+    16.2 adds "online banking transaction i.e. IMPS/NEFT/RTGS". Stops at the first heading
+    with a different clause number ("17.") or after max_chars.
+    """
+    head = re.search(r"(?:^|\n)\s*(\d{1,2})\.\d{1,2}\b[^\n]*(?:\n(?!\s*\d{1,2}\.)[^\n]*){0,6}\Z",
+                     full_text[max(0, m.start() - 400):m.start()])
+    if not head:
+        return ""
+    major = head.group(1)
+    tail = full_text[m.end():m.end() + max_chars]
+    stop = re.search(r"\n\s*(\d{1,2})\s*\.\s*(?:\d{1,2}\b)?", tail)
+    while stop and stop.group(1) == major:
+        stop = re.compile(r"\n\s*(\d{1,2})\s*\.\s*(?:\d{1,2}\b)?").search(tail, stop.end())
+    return "\n" + (tail[:stop.start()] if stop else tail)
+
+
 CONTACT_SLOT_KEYS = tuple(
     (f"client_name_{i}_display", f"client_email_{i}_display", f"client_phone_{i}_display") for i in (1, 2, 3)
 )
@@ -1569,25 +1656,11 @@ def build_infosheet_data(
     if str(emd_required_display).lower() in ("no", "not required", "not applicable") or (emd_total == 0.0 and emd_required_display != "Yes"):
         emd_mode_display = "Not Applicable"
     elif _is_missing(emd_mode_display) or emd_mode_display in ("NA", "Not Found"):
-        # Prioritize Tag (E) section text if present, or scoped EMD section
-        emd_section_match = tag_e_match or re.search(
-            r"(?:(?:SECTION|CLAUSE|ANNEXURE|\d+[\.\s]|\([A-Z0-9]{1,3}\))\s*)?(?:BID\s+SECURITY|EARNEST\s+MONEY\s+DEPOSIT|EMD\s+DETAIL)(.*?)(?=\n\s*(?:SECTION|ANNEXURE|CLAUSE|\d+[\.\s]|\([A-Z0-9]{1,3}\)|\Z))",
-            full_text, re.IGNORECASE | re.DOTALL
-        )
-        emd_block = emd_section_match.group(1).lower() if emd_section_match else ""
-        modes_found = []
-        if emd_block:
-            if any(k in emd_block for k in ["banker's cheque", "bankers cheque", "imps", "neft", "rtgs", "online banking", "bank transfer", "online payment"]):
-                modes_found.append("BT")
-            if "demand draft" in emd_block or re.search(r"\bdd\b", emd_block):
-                modes_found.append("DD")
-            if "surety bond" in emd_block or "insurance surety" in emd_block:
-                modes_found.append("SB")
-            if "fixed deposit" in emd_block or re.search(r"\bfdr\b", emd_block):
-                modes_found.append("FDR")
-            if "bank guarantee" in emd_block or re.search(r"\bbg\b", emd_block):
-                modes_found.append("BG")
-                
+        # Tag (E) block first, then every EMD-section match (TOC entries skipped); the one
+        # naming the most instruments is used -- not simply the first match.
+        emd_block = find_emd_instrument_block(full_text, tag_e_match.group(1) if tag_e_match else None)
+        modes_found = detect_emd_instruments(emd_block)
+
         if modes_found:
             emd_mode_display = "/".join(modes_found)
             logger.info(f"[ATC_ANCHOR] Resolved field 'emd_mode' via EMD section check ({emd_mode_display})")

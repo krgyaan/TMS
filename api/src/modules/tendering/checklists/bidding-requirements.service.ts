@@ -7,7 +7,7 @@ import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service'
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { tenderExtractions } from '@db/schemas/tendering/tender-extractions.schema';
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException, StreamableFile } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { eq, sql } from 'drizzle-orm';
 import * as fs from 'fs';
@@ -30,17 +30,61 @@ export interface SuggestedBiddingRequirement {
     reasoning: string;
 }
 
+export type AnnexureBlock =
+    | { type: 'heading'; text: string }
+    | { type: 'paragraph'; text: string }
+    | { type: 'blank_field'; label: string }
+    | { type: 'table'; headers: string[]; rows: string[][] }
+    | { type: 'signature_line'; label: string };
+
+export interface SuggestedAnnexure {
+    annexureName: string;
+    source: {
+        document: 'main' | 'atc';
+        page: number;
+        snippet: string;
+    };
+    blocks: AnnexureBlock[];
+    droppedBlocks?: number;
+}
+
+/**
+ * Version of the VolksAI extraction shape this code understands (VolksAI's
+ * TENDER_KNOWLEDGE_SCHEMA_VERSION). Cached entries with a missing or lower
+ * schemaVersion are treated as absent and re-extracted, so growing the shape never
+ * serves incomplete old-shape data as if it were current.
+ *   1: requirements[] + annexures[]
+ */
+export const BIDDING_REQUIREMENTS_SCHEMA_VERSION = 1;
+
+/**
+ * Minimum wait for VolksAI's /analyze-bidding-requirements: its single Sonnet call now
+ * returns requirements AND annexure structures (Claude timeout 180s in VolksAI), plus PDF
+ * text extraction/OCR before it. 240s = 180s + 60s headroom.
+ */
+export const BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS = 240000;
+
 export interface BiddingRequirementsAnalysisResult {
     jobId: string;
     requirements: SuggestedBiddingRequirement[];
     llmUsage: Record<string, unknown> | null;
+    schemaVersion: number;
+    annexures: SuggestedAnnexure[];
+    rejectedAnnexures: { annexureName: string | null; reason: string }[];
+    truncated: boolean;
 }
 
 interface VolksAiBiddingRequirementsResponse {
     job_id: string;
     requirements: SuggestedBiddingRequirement[];
     llm_usage: Record<string, unknown> | null;
+    schemaVersion?: number;
+    annexures?: SuggestedAnnexure[];
+    rejectedAnnexures?: { annexureName: string | null; reason: string }[];
+    truncated?: boolean;
 }
+
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 /**
  * Bridges document-checklist auto-suggestion to VolksAI's `/analyze-bidding-requirements`
@@ -79,21 +123,15 @@ export class BiddingRequirementsService {
             .from(tenderExtractions)
             .where(eq(tenderExtractions.tenderId, tenderId));
 
-        const cachedAnalysis =
-            existingExtraction?.fields &&
-            typeof existingExtraction.fields === 'object' &&
-            (existingExtraction.fields as Record<string, any>).biddingRequirementsAnalysis;
+        const cachedAnalysis = this.readCurrentCache(existingExtraction?.fields, tenderId);
 
         if (!forceRefresh && cachedAnalysis) {
             this.logger.log(
                 `Returning cached bidding-requirements analysis for tender ${tenderId} ` +
-                `(${cachedAnalysis.requirements?.length ?? 0} requirement(s))`,
+                `(${cachedAnalysis.requirements.length} requirement(s), ${cachedAnalysis.annexures.length} annexure(s), ` +
+                `schemaVersion ${cachedAnalysis.schemaVersion})`,
             );
-            return {
-                jobId: cachedAnalysis.jobId || `cached_${tenderId}`,
-                requirements: cachedAnalysis.requirements || [],
-                llmUsage: cachedAnalysis.llmUsage ?? null,
-            };
+            return cachedAnalysis;
         }
 
         const resolvedDocs = this.tenderInfoSheetsService.resolveTenderDocuments(tender.documents);
@@ -129,10 +167,15 @@ export class BiddingRequirementsService {
             this.configService.get<string>('volksAi.serviceUrl') ||
             this.configService.get<string>('volksAi.VOLKS_AI_SERVICE_URL') ||
             'http://localhost:8001';
-        const timeoutMs =
+        // VOLKS_AI_TIMEOUT_MS is shared with /extract (120s default); this call must outlast
+        // VolksAI's own Claude timeout (ANTHROPIC_ROLE3_TIMEOUT_S, 180s) plus PDF text/OCR time,
+        // so it never waits less than BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS.
+        const timeoutMs = Math.max(
             this.configService.get<number>('volksAi.timeoutMs') ||
-            this.configService.get<number>('volksAi.VOLKS_AI_TIMEOUT_MS') ||
-            120000;
+                this.configService.get<number>('volksAi.VOLKS_AI_TIMEOUT_MS') ||
+                120000,
+            BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS,
+        );
 
         const endpoint = `${serviceUrl.replace(/\/+$/, '')}/analyze-bidding-requirements`;
         this.logger.log(
@@ -174,10 +217,24 @@ export class BiddingRequirementsService {
             `Bidding requirements analysis complete for tender ${tenderId}: ${result.requirements?.length ?? 0} requirement(s) identified in ${durationMs}ms`,
         );
 
+        // A VolksAI build older than this code returns no schemaVersion; it is stored as 0 so
+        // the next read treats it as stale instead of caching old-shape data as current.
+        const schemaVersion = Number(result.schemaVersion) || 0;
+        if (schemaVersion < BIDDING_REQUIREMENTS_SCHEMA_VERSION) {
+            this.logger.warn(
+                `VolksAI returned bidding-requirements schemaVersion ${schemaVersion} for tender ${tenderId} ` +
+                `(expected ${BIDDING_REQUIREMENTS_SCHEMA_VERSION}); it will be re-extracted on next request`,
+            );
+        }
+
         const analysisResult: BiddingRequirementsAnalysisResult = {
             jobId: result.job_id,
             requirements: result.requirements || [],
             llmUsage: result.llm_usage ?? null,
+            schemaVersion,
+            annexures: Array.isArray(result.annexures) ? result.annexures : [],
+            rejectedAnnexures: Array.isArray(result.rejectedAnnexures) ? result.rejectedAnnexures : [],
+            truncated: Boolean(result.truncated),
         };
 
         // STEP 1: Wire token usage tracking into claude_token_usage
@@ -267,6 +324,105 @@ export class BiddingRequirementsService {
         }
 
         return analysisResult;
+    }
+
+    /**
+     * Streams ONE cached annexure as a .docx. Reads the cached
+     * tender_extractions.fields.biddingRequirementsAnalysis.annexures[annexureIndex] and asks
+     * VolksAI's deterministic /generate-annexure-docx to render its stored blocks -- the
+     * tender is not re-read and no Claude call is made. A missing/stale cache is a 404 (run
+     * the analysis first) rather than an implicit, costly re-extraction from a GET download.
+     */
+    async downloadAnnexureDocx(tenderId: number, annexureIndex: number): Promise<StreamableFile> {
+        await this.tenderInfosService.validateExists(tenderId);
+
+        const [existingExtraction] = await this.db
+            .select()
+            .from(tenderExtractions)
+            .where(eq(tenderExtractions.tenderId, tenderId));
+
+        const cached = this.readCurrentCache(existingExtraction?.fields, tenderId);
+        if (!cached) {
+            throw new NotFoundException(
+                `No current bidding-requirements analysis for tender ${tenderId}; run the analysis before downloading annexures`,
+            );
+        }
+        const annexure = cached.annexures[annexureIndex];
+        if (!Number.isInteger(annexureIndex) || annexureIndex < 0 || !annexure) {
+            throw new NotFoundException(
+                `Annexure ${annexureIndex} not found for tender ${tenderId} (${cached.annexures.length} available)`,
+            );
+        }
+
+        const endpoint = `${this.getServiceUrl()}/generate-annexure-docx`;
+        let response: Response;
+        try {
+            response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ annexureName: annexure.annexureName, blocks: annexure.blocks }),
+                signal: AbortSignal.timeout(30000),
+            });
+        } catch (err: unknown) {
+            throw new Error(`Failed to connect to VolksAI service at ${endpoint}: ${(err as Error).message}`);
+        }
+        if (!response.ok) {
+            const responseText = await response.text();
+            throw new Error(`Annexure .docx generation failed with HTTP ${response.status}: ${responseText}`);
+        }
+
+        const buffer = Buffer.from(await response.arrayBuffer());
+        const baseName = (annexure.annexureName || `annexure-${annexureIndex + 1}`)
+            .replace(/[^A-Za-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 80) || `annexure-${annexureIndex + 1}`;
+        const filename = `tender${tenderId}_${baseName}.docx`;
+
+        this.logger.log(`Serving annexure ${annexureIndex} ('${annexure.annexureName}') for tender ${tenderId} as ${filename}`);
+        return new StreamableFile(buffer, {
+            type: DOCX_MIME,
+            disposition: `attachment; filename="${filename}"`,
+            length: buffer.length,
+        });
+    }
+
+    /**
+     * The cached analysis, or null when absent or older than
+     * BIDDING_REQUIREMENTS_SCHEMA_VERSION (so callers re-extract instead of serving an
+     * old-shape entry, e.g. one cached before annexures existed).
+     */
+    private readCurrentCache(fields: unknown, tenderId: number): BiddingRequirementsAnalysisResult | null {
+        const cached =
+            fields && typeof fields === 'object'
+                ? (fields as Record<string, any>).biddingRequirementsAnalysis
+                : null;
+        if (!cached || typeof cached !== 'object') return null;
+
+        const version = Number(cached.schemaVersion) || 0;
+        if (version < BIDDING_REQUIREMENTS_SCHEMA_VERSION) {
+            this.logger.log(
+                `Ignoring stale bidding-requirements cache for tender ${tenderId} ` +
+                `(schemaVersion ${cached.schemaVersion ?? 'missing'} < ${BIDDING_REQUIREMENTS_SCHEMA_VERSION})`,
+            );
+            return null;
+        }
+        return {
+            jobId: cached.jobId || `cached_${tenderId}`,
+            requirements: cached.requirements || [],
+            llmUsage: cached.llmUsage ?? null,
+            schemaVersion: version,
+            annexures: Array.isArray(cached.annexures) ? cached.annexures : [],
+            rejectedAnnexures: Array.isArray(cached.rejectedAnnexures) ? cached.rejectedAnnexures : [],
+            truncated: Boolean(cached.truncated),
+        };
+    }
+
+    private getServiceUrl(): string {
+        const serviceUrl =
+            this.configService.get<string>('volksAi.serviceUrl') ||
+            this.configService.get<string>('volksAi.VOLKS_AI_SERVICE_URL') ||
+            'http://localhost:8001';
+        return serviceUrl.replace(/\/+$/, '');
     }
 
     private resolvePdfPath(pdfPath: string): string {

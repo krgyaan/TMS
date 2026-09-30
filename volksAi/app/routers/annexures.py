@@ -24,11 +24,12 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+from pydantic import BaseModel, Field
 
 from app.services.pdf_text_extractor import extract_pdf_text_hybrid
 from app.services.pdf_parent_ingest import build_page_tagged_text
-from app.services.annexure_resolver import identify_annexures
+from app.services.annexure_resolver import _sanitize_block, identify_annexures
 from app.services.annexure_docx_builder import build_annexure_docx
 
 router = APIRouter(tags=["Annexures"])
@@ -171,3 +172,44 @@ async def get_annexure_file(job_id: str, filename: str) -> FileResponse:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Annexure file not found")
 
     return FileResponse(str(file_path), media_type=DOCX_MEDIA_TYPE, filename=filename)
+
+
+class GenerateAnnexureDocxRequest(BaseModel):
+    """One annexure exactly as previously identified and stored (e.g. from the cached
+    /analyze-bidding-requirements response) -- no tender text, no LLM input."""
+    annexureName: str = ""
+    blocks: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+@router.post("/generate-annexure-docx")
+async def generate_annexure_docx_endpoint(payload: GenerateAnnexureDocxRequest) -> Response:
+    """
+    Renders ONE annexure's stored blocks to a .docx and returns the file bytes.
+
+    Purely deterministic (build_annexure_docx, python-docx): this endpoint never re-reads
+    the tender and never calls Claude, so re-downloading an annexure costs nothing.
+    Malformed blocks are dropped with the same sanitizer the identification step uses;
+    a payload with no usable block is a 400, not an empty document.
+    """
+    blocks = [b for b in (_sanitize_block(raw) for raw in payload.blocks) if b is not None]
+    if not blocks:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Annexure has no valid blocks to render.",
+        )
+
+    filename = f"{_slugify(payload.annexureName)}.docx"
+    with tempfile.TemporaryDirectory(prefix="volksai_annexure_docx_") as temp_dir:
+        out_path = build_annexure_docx(
+            {"annexureName": payload.annexureName, "blocks": blocks}, Path(temp_dir) / filename
+        )
+        content = out_path.read_bytes()
+
+    logger.info(
+        "[ANNEXURE_DOCX] Generated '%s' (%d block(s), %d bytes)", filename, len(blocks), len(content),
+    )
+    return Response(
+        content=content,
+        media_type=DOCX_MEDIA_TYPE,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

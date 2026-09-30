@@ -25,6 +25,7 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
+from app.services.annexure_resolver import _build_annexures_tool_schema, validate_annexures
 from app.services.llm_field_resolver import (
     SONNET_5_INPUT_PRICE_PER_M,
     SONNET_5_OUTPUT_PRICE_PER_M,
@@ -43,8 +44,18 @@ ROLE_3_MODEL_DEFAULT = os.getenv("ANTHROPIC_ROLE3_MODEL", "claude-sonnet-5")
 # tender+ATC pair) to truncate mid-JSON (stop_reason="max_tokens") before a
 # single requirement was even parseable, silently returning zero results.
 ROLE_3_MAX_TOKENS = int(os.getenv("ANTHROPIC_ROLE3_MAX_TOKENS", "16000"))
+# One call now emits requirements AND the full block structure of every annexure, so it
+# needs the same headroom the standalone annexure call had (180s); the former 60s default
+# was sized for requirements alone. The NestJS caller waits longer than this (see
+# BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS in bidding-requirements.service.ts).
+ROLE_3_TIMEOUT_S = float(os.getenv("ANTHROPIC_ROLE3_TIMEOUT_S", "180"))
 
 VALID_CATEGORIES = ("oem", "standard", "company", "other")
+
+# Version of this role's extraction output shape. Bump whenever the shape grows so
+# consumers (the NestJS tender_extractions cache) can detect and refresh stale entries.
+#   1: requirements[] + annexures[] (annexures added additively to the same tool call).
+TENDER_KNOWLEDGE_SCHEMA_VERSION = 1
 VALID_CONFIDENCE = ("high", "medium", "low")
 
 
@@ -54,7 +65,9 @@ def _build_requirements_tool_schema() -> Dict[str, Any]:
         "name": "report_bidding_requirements",
         "description": (
             "Reports every document or certificate a bidder must submit for this "
-            "tender, with a page citation and an optional company-library match."
+            "tender, with a page citation and an optional company-library match, and "
+            "every annexure/proforma/format the tender provides for the bidder to fill in, "
+            "with a page citation and its structure as ordered typed blocks."
         ),
         "input_schema": {
             "type": "object",
@@ -115,9 +128,14 @@ def _build_requirements_tool_schema() -> Dict[str, Any]:
                             "matchedLibraryId", "confidence", "reasoning",
                         ],
                     },
-                }
+                },
+                # Same per-annexure schema (annexureName, source, typed blocks) as the
+                # standalone Role 4 tool in annexure_resolver.py. Required so the model must
+                # always answer this task (an empty list when there are none) rather than
+                # silently omitting the field; the parser still defaults a missing field to [].
+                "annexures": _build_annexures_tool_schema()["input_schema"]["properties"]["annexures"],
             },
-            "required": ["requirements"],
+            "required": ["requirements", "annexures"],
         },
     }
 
@@ -153,7 +171,32 @@ SYSTEM_PROMPT = (
     "  - confidence: your confidence that this is a genuine, tender-specific requirement "
     "(not generic legal boilerplate).\n\n"
     "Do not invent documents that are not actually referenced in the text. Do not merge "
-    "distinct requirements into one entry."
+    "distinct requirements into one entry.\n\n"
+    "SECOND TASK, in the same response -- annexures: also find EVERY annexure, proforma, "
+    "form, or format that the tender itself provides for the bidder to fill in and submit "
+    "(e.g. 'ANNEXURE-I', 'Format F-2A Declaration for Bid Security', 'Proforma for Bank "
+    "Guarantee', 'Format for Manufacturer's Authorization', 'Guaranteed Technical "
+    "Particulars (To be filled by Bidder)'). The requirements list above names WHAT must be "
+    "submitted; this list reproduces the STRUCTURE of documents whose format the tender "
+    "text actually contains. Only report an annexure when its body (text, blanks, table, or "
+    "signature block) appears in the text -- a clause that merely says 'as per proforma at "
+    "Form F-2A' is not enough. Do not report purely informational annexures the bidder only "
+    "reads (e.g. technical specifications, scope of work).\n"
+    "For every annexure:\n"
+    "  - annexureName: a clean title with the tender's own identifier, e.g. 'Annexure-III: "
+    "Manufacturer's Authorization Form'.\n"
+    "  - source: the page label ('[Main Page N]' or '[ATC Page N]') the format begins "
+    "under, with its title/opening text as the snippet -- same citation discipline as "
+    "requirements; never omit it and never cite a page you did not see it on.\n"
+    "  - blocks: the annexure's content in order, reproduced faithfully from the text: "
+    "heading (title/section heading), paragraph (running text, verbatim apart from fixing "
+    "broken PDF line-wrapping), blank_field (a line the bidder fills in; label = the text "
+    "before the blank), table (headers + rows, '' for cells the bidder fills in), "
+    "signature_line (a signature/seal line). Keep an inline blank inside a sentence as a "
+    "paragraph with the blank shown as '______'.\n"
+    "Do not invent fields, clauses, rows, or signature lines not present in the document. "
+    "If a blank's exact label is not stated, describe what it is for rather than guessing "
+    "wording. Do not merge or split annexures. Return an empty annexures list if there are none."
 )
 
 
@@ -163,7 +206,7 @@ def analyze_bidding_requirements(
     *,
     api_key: Optional[str] = None,
     model: Optional[str] = None,
-    timeout: float = 60.0,
+    timeout: float = ROLE_3_TIMEOUT_S,
 ) -> Dict[str, Any]:
     """
     Role 3: identifies bidding document requirements from page-tagged tender
@@ -265,10 +308,13 @@ def analyze_bidding_requirements(
         )
 
     requirements: List[Dict[str, Any]] = []
+    raw_annexures: Any = []
     for block in response.content:
         if getattr(block, "type", "") == "tool_use" and getattr(block, "name", "") == "report_bidding_requirements":
             input_data = getattr(block, "input", {}) or {}
             requirements = input_data.get("requirements", [])
+            # Absent in an old-shape response -> no annexures, not an error.
+            raw_annexures = input_data.get("annexures") or []
             break
 
     # Defensive normalization: category='oem' must never carry a library match,
@@ -277,4 +323,22 @@ def analyze_bidding_requirements(
         if isinstance(r, dict) and r.get("category") == "oem":
             r["matchedLibraryId"] = None
 
-    return {"requirements": requirements, "usage": usage}
+    # Citation guard for annexures (same discipline as the OEM null-match guard below the
+    # requirements): missing/malformed/non-existent page citations or no valid blocks ->
+    # moved to rejectedAnnexures with a reason, never silently accepted.
+    annexures, rejected_annexures = validate_annexures(raw_annexures, page_tagged_text)
+
+    truncated = getattr(response, "stop_reason", None) == "max_tokens"
+    if truncated:
+        logger.warning(
+            "[LLM_BIDDING_REQUIREMENTS][Role 3] Response hit max_tokens=%d; requirements/annexures may be incomplete",
+            ROLE_3_MAX_TOKENS,
+        )
+
+    return {
+        "requirements": requirements,
+        "annexures": annexures,
+        "rejectedAnnexures": rejected_annexures,
+        "truncated": truncated,
+        "usage": usage,
+    }

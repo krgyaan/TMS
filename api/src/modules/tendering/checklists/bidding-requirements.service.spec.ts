@@ -3,7 +3,7 @@ jest.mock('uuid', () => ({
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { BiddingRequirementsService } from './bidding-requirements.service';
+import { BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS, BiddingRequirementsService } from './bidding-requirements.service';
 import { AppLogger } from '@/logger/app-logger.service';
 import { FileUploadService } from '@/modules/file-upload/file-upload.service';
 import { FinanceDocumentsService } from '@/modules/shared/finance-documents/finance-documents.service';
@@ -140,6 +140,12 @@ describe('BiddingRequirementsService', () => {
                     },
                 ],
                 llmUsage: { input_tokens: 500, output_tokens: 100 },
+                // A current-shape entry (schemaVersion 1). Entries without schemaVersion are
+                // stale by design and re-extracted instead of served.
+                schemaVersion: 1,
+                annexures: [],
+                rejectedAnnexures: [],
+                truncated: false,
             };
 
             mockDb.select.mockReturnValueOnce({
@@ -298,6 +304,32 @@ describe('BiddingRequirementsService', () => {
                     },
                 },
             });
+        });
+    });
+
+    describe('analyzeForTender - Role 3 timeout', () => {
+        it('waits at least BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS even when the shared VolksAI timeout is lower', async () => {
+            mockConfigService.get.mockImplementation((key: string) => {
+                if (key.includes('serviceUrl') || key.includes('SERVICE_URL')) return 'http://localhost:8001';
+                if (key.includes('timeoutMs') || key.includes('TIMEOUT_MS')) return 120000; // /extract's shared value
+                return undefined;
+            });
+            mockDb.select.mockReturnValueOnce({
+                from: jest.fn().mockReturnValueOnce({ where: jest.fn().mockResolvedValueOnce([]) }),
+            });
+            const timeoutSpy = jest.spyOn(AbortSignal, 'timeout');
+            jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: jest.fn().mockResolvedValueOnce({
+                    schemaVersion: 1, job_id: 'breq_t', requirements: [], annexures: [], llm_usage: null,
+                }),
+            } as any);
+
+            await service.analyzeForTender(1175, true, 1);
+
+            expect(BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS).toBe(240000);
+            expect(timeoutSpy).toHaveBeenCalledWith(240000);
         });
     });
 });
