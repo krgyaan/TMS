@@ -3,7 +3,13 @@ jest.mock('uuid', () => ({
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS, BiddingRequirementsService } from './bidding-requirements.service';
+import {
+    BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS,
+    BIDDING_REQUIREMENTS_SCHEMA_VERSION,
+    BiddingRequirementsService,
+} from './bidding-requirements.service';
+import { StreamableFile } from '@nestjs/common';
+import { tenderExtractions } from '@db/schemas/tendering/tender-extractions.schema';
 import { AppLogger } from '@/logger/app-logger.service';
 import { FileUploadService } from '@/modules/file-upload/file-upload.service';
 import { FinanceDocumentsService } from '@/modules/shared/finance-documents/finance-documents.service';
@@ -250,6 +256,102 @@ describe('BiddingRequirementsService', () => {
                 }),
             );
         });
+
+        it('should treat cached entry with missing or older schemaVersion as stale, call VolksAI for fresh analysis, and re-cache the fresh result', async () => {
+            const staleCachedResult = {
+                jobId: 'breq_stale_no_schema',
+                requirements: [
+                    {
+                        documentName: 'Old Cached Requirement',
+                        category: 'company',
+                        required: true,
+                        source: { document: 'main', page: 1, snippet: 'Old text' },
+                        matchedLibraryId: null,
+                        confidence: 'medium',
+                        reasoning: 'Old reasoning from pre-annexure schema',
+                    },
+                ],
+                llmUsage: null,
+                // Intentionally NO schemaVersion (or older version) to simulate stale pre-annexure cache
+            };
+
+            mockDb.select.mockReturnValueOnce({
+                from: jest.fn().mockReturnValueOnce({
+                    where: jest.fn().mockResolvedValueOnce([
+                        {
+                            tenderId: 1175,
+                            fields: {
+                                biddingRequirementsAnalysis: staleCachedResult,
+                                otherField: 'preserved',
+                            },
+                        },
+                    ]),
+                }),
+            });
+
+            const freshVolksAiResponse = {
+                job_id: 'breq_fresh_v1',
+                schemaVersion: BIDDING_REQUIREMENTS_SCHEMA_VERSION,
+                requirements: [
+                    {
+                        documentName: 'Fresh Requirement',
+                        category: 'oem',
+                        required: true,
+                        source: { document: 'main', page: 3, snippet: 'Fresh snippet' },
+                        matchedLibraryId: null,
+                        confidence: 'high',
+                        reasoning: 'Fresh reasoning',
+                    },
+                ],
+                annexures: [
+                    {
+                        annexureName: 'Annexure A - Bid Security Declaration',
+                        source: { document: 'main', page: 10, snippet: 'Format of Bid Security Declaration' },
+                        blocks: [
+                            { type: 'heading', text: 'BID SECURITY DECLARATION' },
+                            { type: 'paragraph', text: 'We hereby declare...' },
+                        ],
+                    },
+                ],
+                rejectedAnnexures: [],
+                truncated: false,
+                llm_usage: {
+                    input_tokens: 1800,
+                    output_tokens: 350,
+                    cache_creation_tokens: 0,
+                    cache_read_tokens: 0,
+                    estimated_cost_usd: 0.009,
+                },
+            };
+
+            const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                json: jest.fn().mockResolvedValueOnce(freshVolksAiResponse),
+            } as any);
+
+            // forceRefresh is false: proves that stale schemaVersion alone bypasses cache and triggers fresh analysis
+            const result = await service.analyzeForTender(1175, false, 42);
+
+            // 1. Confirm VolksAI /analyze-bidding-requirements was called
+            expect(fetchSpy).toHaveBeenCalledTimes(1);
+            expect(fetchSpy).toHaveBeenCalledWith(
+                expect.stringContaining('/analyze-bidding-requirements'),
+                expect.objectContaining({ method: 'POST' }),
+            );
+
+            // 2. Confirm the fresh result with current schemaVersion is returned
+            expect(result.jobId).toBe('breq_fresh_v1');
+            expect(result.schemaVersion).toBe(BIDDING_REQUIREMENTS_SCHEMA_VERSION);
+            expect(result.requirements).toHaveLength(1);
+            expect(result.requirements[0].documentName).toBe('Fresh Requirement');
+            expect(result.annexures).toHaveLength(1);
+            expect(result.annexures[0].annexureName).toBe('Annexure A - Bid Security Declaration');
+
+            // 3. Confirm result is re-cached in tender_extractions
+            expect(mockDb.insert).toHaveBeenCalledTimes(1);
+            expect(mockDb.insert).toHaveBeenCalledWith(tenderExtractions);
+        });
     });
 
     describe('analyzeForTender - Token Usage Wiring (Step 1)', () => {
@@ -330,6 +432,92 @@ describe('BiddingRequirementsService', () => {
 
             expect(BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS).toBe(240000);
             expect(timeoutSpy).toHaveBeenCalledWith(240000);
+        });
+    });
+
+    describe('downloadAnnexureDocx - Annexure Download Isolation', () => {
+        it('should call only /generate-annexure-docx endpoint and not call /analyze-bidding-requirements when downloading cached annexure', async () => {
+            const storedBlocks: any[] = [
+                { type: 'heading', text: 'ANNEXURE-I: BID SECURITY DECLARATION' },
+                { type: 'paragraph', text: 'We, the bidder, certify that...' },
+                { type: 'blank_field', label: 'Authorized Signatory Name' },
+            ];
+
+            const cachedResultWithAnnexures = {
+                jobId: 'breq_cached_with_annexures',
+                schemaVersion: BIDDING_REQUIREMENTS_SCHEMA_VERSION,
+                requirements: [
+                    {
+                        documentName: 'Bid Security Declaration',
+                        category: 'standard',
+                        required: true,
+                        source: { document: 'main', page: 5, snippet: 'Submit Bid Security Declaration' },
+                        matchedLibraryId: null,
+                        confidence: 'high',
+                        reasoning: 'Mandatory annexure',
+                    },
+                ],
+                annexures: [
+                    {
+                        annexureName: 'Bid Security Declaration',
+                        source: { document: 'main', page: 12, snippet: 'Format of Annexure-I' },
+                        blocks: storedBlocks,
+                    },
+                ],
+                rejectedAnnexures: [],
+                truncated: false,
+                llmUsage: null,
+            };
+
+            mockDb.select.mockReturnValueOnce({
+                from: jest.fn().mockReturnValueOnce({
+                    where: jest.fn().mockResolvedValueOnce([
+                        {
+                            tenderId: 1175,
+                            fields: {
+                                biddingRequirementsAnalysis: cachedResultWithAnnexures,
+                            },
+                        },
+                    ]),
+                }),
+            });
+
+            // Mock binary response from /generate-annexure-docx
+            const mockDocxBytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04]); // PK zip header
+            const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                arrayBuffer: jest.fn().mockResolvedValueOnce(mockDocxBytes.buffer),
+            } as any);
+
+            // Download annexure at index 0
+            const file = await service.downloadAnnexureDocx(1175, 0);
+
+            // 1. Confirm ONLY VolksAI's /generate-annexure-docx was called with the stored blocks
+            expect(fetchSpy).toHaveBeenCalledTimes(1);
+            expect(fetchSpy).toHaveBeenCalledWith(
+                'http://localhost:8001/generate-annexure-docx',
+                expect.objectContaining({
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        annexureName: 'Bid Security Declaration',
+                        blocks: storedBlocks,
+                    }),
+                }),
+            );
+
+            // 2. Confirm /analyze-bidding-requirements was NEVER called (no fresh Claude read)
+            expect(fetchSpy).not.toHaveBeenCalledWith(
+                expect.stringContaining('/analyze-bidding-requirements'),
+                expect.anything(),
+            );
+
+            // 3. Confirm no Claude usage was recorded
+            expect(mockClaudeUsageService.recordUsage).not.toHaveBeenCalled();
+
+            // 4. Confirm the returned file is a StreamableFile
+            expect(file).toBeInstanceOf(StreamableFile);
         });
     });
 });
