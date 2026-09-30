@@ -21,10 +21,13 @@ import pytest
 
 from app.services.pdf_parent_ingest import ingest_parent_tender_pdf
 
-# Force-disable the LLM fallback layer for this test: the signal we assert on
-# (maf_required_display) is resolved deterministically before Layer 2 ever
-# runs, and disabling it keeps this test free of any Anthropic API dependency.
-os.environ["LLM_FALLBACK_ENABLED"] = "false"
+@pytest.fixture(autouse=True)
+def _isolate_llm_fallback(monkeypatch):
+    # Force-disable the LLM fallback layer for this test: the signal we assert on
+    # (maf_required_display) is resolved deterministically before Layer 2 ever
+    # runs, and disabling it keeps this test free of any Anthropic API dependency.
+    # Using monkeypatch ensures LLM_FALLBACK_ENABLED is restored after each test.
+    monkeypatch.setenv("LLM_FALLBACK_ENABLED", "false")
 
 MAIN_PDF_TEXT = (
     "NIT No: TEST/2026/001\n"
