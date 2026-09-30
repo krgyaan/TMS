@@ -100,6 +100,9 @@ interface StageDrilldownItem {
 
     // Stage-specific (optional)
     meta?: Record<string, any>;
+
+    value?: number;
+    status?: string | null;
 }
 
 function getExecutiveStages() {
@@ -556,6 +559,25 @@ export class TenderExecutiveService {
     async getStageMatrix(query: PerformanceQueryDto) {
         const stages = await this.getStagePerformance(query);
 
+        const stageTenderIds = Array.from(new Set(stages.map(s => s.tenderId)));
+        const tenderDetails = new Map<number, { value: number; status: string | null }>();
+
+        if (stageTenderIds.length) {
+            const detailRows = (await this.db.execute(sql.raw(`
+                SELECT
+                    ti.id,
+                    ti.gst_values AS "value",
+                    s.name AS "status"
+                FROM tender_infos ti
+                LEFT JOIN statuses s ON s.id = ti.status
+                WHERE ti.id IN (${stageTenderIds.join(",")})
+            `))).rows as any[];
+
+            for (const row of detailRows) {
+                tenderDetails.set(Number(row.id), { value: Number(row.value ?? 0), status: row.status ?? null });
+            }
+        }
+
         // ----------------------------------------
         // Resolve unique stages (column order)
         // ----------------------------------------
@@ -610,6 +632,8 @@ export class TenderExecutiveService {
             const counter = counters.get(stage.stageKey)!;
 
             const tenderMeta: StageDrilldownItem = {
+                value: tenderDetails.get(stage.tenderId)?.value ?? 0,
+                status: tenderDetails.get(stage.tenderId)?.status ?? null,
                 tenderId: stage.tenderId,
                 stageKey: stage.stageKey,
                 tenderNo: stage.tenderNo,
@@ -1190,7 +1214,8 @@ export class TenderExecutiveService {
                 )
                 THEN COALESCE(tcd.final_price, ti.gst_values)
                 ELSE ti.gst_values
-            END AS effective_value
+            END AS effective_value,
+            sst.name AS status_name
         FROM tender_infos ti
         LEFT JOIN LATERAL (
             SELECT tcd.final_price
@@ -1202,25 +1227,42 @@ export class TenderExecutiveService {
             ORDER BY tcd.approved_at DESC NULLS LAST, tcd.id DESC
             LIMIT 1
         ) tcd ON true
+        LEFT JOIN statuses sst ON sst.id = ti.status
     `;
 
-        const missedStatus = [8, 10, 11];
         const dnb = [8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32, 34, 35, 36];
         const disqualified = [33, 39, 41];
         const excludedStatuses = [...dnb, ...disqualified];
+        const resolvedResultStatuses =
+            "'won','lost','disqualified','cancelled','lost - h1 elimination'";
+        const receivedResultStatuses = "'won','lost','cancelled','lost - h1 elimination'";
         /* =====================================================
        ASSIGNED
     ===================================================== */
+        /**
+         * Pending at Start
+         * Point-in-time: assigned before ${from} with no info sheet as of ${from}.
+         * Carry-over whose sheet landed during the period still counts as pending
+         * at the start. Legacy rows with no info sheet at all and a progressed
+         * status are excluded.
+         */
         const assignedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.created_at < '${from}'
-        AND ti.status = 1
         AND NOT EXISTS (
             SELECT 1
             FROM tender_information tin
             WHERE tin.tender_id = ti.id
             AND tin.created_at < '${from}'
+        )
+        AND (
+            EXISTS (
+                SELECT 1
+                FROM tender_information tin
+                WHERE tin.tender_id = ti.id
+            )
+            OR ti.status = 1
         )
         `);
         /**
@@ -1234,45 +1276,45 @@ export class TenderExecutiveService {
             `);
 
         /**
-         * Filled During
-         * Assigned during period and infosheet created during period
+         * Info Filled During
+         * Info sheet saved during the period (any assignment date) — this is the
+         * shared source for both the Assignment and Approval "Info Filled" columns.
+         * Also counts tenders assigned during the period that progressed past
+         * Read Tender with no info sheet recorded, since reaching a later status
+         * implies the information was captured.
          */
         const assignedDuringCompleted = await exec(`
             ${baseSelect}
             WHERE ${baseWhere()}
-            AND ti.created_at BETWEEN '${from}' AND '${to}'
-            AND EXISTS (
-                SELECT 1
-                FROM tender_information tin
-                WHERE tin.tender_id = ti.id
+            AND (
+                EXISTS (
+                    SELECT 1
+                    FROM tender_information tin
+                    WHERE tin.tender_id = ti.id
+                    AND tin.created_at BETWEEN '${from}' AND '${to}'
+                )
+                OR (
+                    ti.created_at BETWEEN '${from}' AND '${to}'
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM tender_information tin
+                        WHERE tin.tender_id = ti.id
+                    )
+                    AND ti.status <> 1
+                )
             )
             `);
 
         /**
-         * Status Changed During
-         * Assigned during period but moved to missed/rejected without infosheet
-         */
-        const assignedDuringStatusChanged = await exec(`
-            ${baseSelect}
-            WHERE ${baseWhere()}
-            AND ti.created_at BETWEEN '${from}' AND '${to}'
-            AND ti.status IN (${missedStatus})
-            AND NOT EXISTS (
-                SELECT 1
-                FROM tender_information tin
-                WHERE tin.tender_id = ti.id
-            )
-            `);
-
-        /**
-         * Pending Closing
-         * Assigned during period and still no infosheet by end of period
+         * Pending at End
+         * Assigned on or before end of period and still no info sheet by end
+         * (includes carry-over backlog from pending-at-start).
          */
         const assignedClosingPending = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
-        -- AND ti.status NOT IN (${missedStatus})
+        AND ti.created_at <= '${to}'
+        AND ti.status = 1
         AND NOT EXISTS (
             SELECT 1
             FROM tender_information tin
@@ -1289,25 +1331,34 @@ export class TenderExecutiveService {
        APPROVED
     ===================================================== */
 
+        /**
+         * Pending at Start
+         * Info sheet filled before the period and still awaiting approval
+         * (tl_status 0 = pending, 3 = incomplete bounce — neither decided).
+         * Point-in-time: a tender decided after ${from} was pending at ${from}.
+         */
         const approvedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at < '${from}'
-          AND ti.tl_status IN (0,3)
-    `);
-
-        const approvedDuringCompleted = await exec(`
-        ${baseSelect}
-        JOIN tender_information tin ON tin.tender_id = ti.id
-        WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
-          AND ti.tl_status = 1
+          AND EXISTS (
+              SELECT 1
+              FROM tender_information tin
+              WHERE tin.tender_id = ti.id
+                AND tin.created_at < '${from}'
+          )
+          AND (
+              ti.tl_status IN (0,3)
+              OR (
+                  ti.tl_status IN (1,2)
+                  AND ti.tl_approval_timestamp >= '${from}'
+              )
+          )
     `);
 
         const approvedDuringAccepted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND ti.tl_approval_timestamp BETWEEN '${from}' AND '${to}'
         AND EXISTS (
             SELECT 1
             FROM tender_information tin
@@ -1319,7 +1370,7 @@ export class TenderExecutiveService {
         const approvedDuringRejected = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.created_at BETWEEN '${from}' AND '${to}'
+        AND ti.tl_approval_timestamp BETWEEN '${from}' AND '${to}'
         AND EXISTS (
             SELECT 1
             FROM tender_information tin
@@ -1328,28 +1379,18 @@ export class TenderExecutiveService {
         AND ti.tl_status = 2
         `);
 
-        const approvedDuringPending = await exec(`
-        ${baseSelect}
-        JOIN tender_information tin ON tin.tender_id = ti.id
-        WHERE ${baseWhere()}
-          AND tin.created_at < '${to}'
-          AND ti.tl_status = 0
-    `);
-
-        //     const approvedDuringRejected = await exec(`
-        //     ${baseSelect}
-        //     JOIN tender_information tin ON tin.tender_id = ti.id
-        //     WHERE ${baseWhere()}
-        //       AND tin.created_at BETWEEN '${from}' AND '${to}'
-        //       AND ti.tl_status = 2
-        // `);
-
         const approvedTotal = await exec(`
         ${baseSelect}
         JOIN tender_information tin ON tin.tender_id = ti.id
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
-          AND ti.tl_status IN (0,3)
+          AND tin.created_at <= '${to}'
+          AND (
+              ti.tl_status IN (0,3)
+              OR (
+                  ti.tl_status IN (1,2)
+                  AND ti.tl_approval_timestamp > '${to}'
+              )
+          )
     `);
 
         /* =====================================================
@@ -1361,22 +1402,19 @@ export class TenderExecutiveService {
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
-          AND ti.created_at < '${from}'
-          AND st.status = true
-          AND st.tender_category = 'prep'
-          AND ti.status NOT IN (0, 1, 2, 3)
+          AND ti.tl_approval_timestamp < '${from}'
+          AND st.tender_category <> 'dnb'
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
-                  AND bs.created_at < '${from}'
           )
     `);
 
         const bidDuringTotal = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.tl_approval_timestamp BETWEEN '${from}' AND '${to}'
           AND EXISTS (
                 SELECT 1
                 FROM tender_information tin
@@ -1388,48 +1426,39 @@ export class TenderExecutiveService {
         const bidDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
           AND ti.tl_status = 1
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.created_at BETWEEN '${from}' AND '${to}'
+                  AND bs.submission_datetime BETWEEN '${from}' AND '${to}'
           )
     `);
 
         const dnbDuringCompleted = await exec(`
         ${baseSelect}
+        JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
-          AND ti.tl_status = 1
+          AND ti.tl_status IN (1, 2)
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.created_at <= '${to}'
+                  AND bs.submission_datetime <= '${to}'
           )
           AND (
-                EXISTS (
-                      SELECT 1
-                      FROM tender_status_history tsh
-                      JOIN statuses st ON st.id = tsh.new_status
-                      WHERE tsh.tender_id = ti.id
-                        AND st.status = true
-                        AND st.tender_category = 'dnb'
-                        AND tsh.created_at BETWEEN '${from}' AND '${to}'
-                )
-                OR
-                EXISTS (
-                      SELECT 1
-                      FROM bid_submissions bs
-                      WHERE bs.tender_id = ti.id
-                        AND bs.status = 'Tender Missed'
-                        AND bs.created_at BETWEEN '${from}' AND '${to}'
+                st.tender_category = 'dnb'
+             OR EXISTS (
+                    SELECT 1
+                    FROM bid_submissions bs
+                    WHERE bs.tender_id = ti.id
+                      AND bs.status = 'Tender Missed'
                 )
           )
+          AND ti.updated_at >= '${from}'
+          AND ti.updated_at <= '${to}'
     `);
 
         const bidTotal = await exec(`
@@ -1437,15 +1466,17 @@ export class TenderExecutiveService {
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
-          AND st.status = true
-          AND st.tender_category = 'prep'
+          AND ti.tl_approval_timestamp >= '${from}'
+          AND ti.tl_approval_timestamp <= '${to}'
+          AND st.tender_category <> 'dnb'
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
-                  AND bs.status IN ('Bid Submitted', 'Tender Missed')
-                  AND bs.created_at <= '${to}'
+                  AND (
+                        (bs.status = 'Bid Submitted' AND bs.submission_datetime <= '${to}')
+                     OR (bs.status = 'Tender Missed'    AND bs.created_at <= '${to}')
+                  )
           )
     `);
 
@@ -1456,154 +1487,156 @@ export class TenderExecutiveService {
         const resultAwaitedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.status NOT IN (${excludedStatuses})
-          AND ti.created_at < '${from}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.created_at < '${from}'
+                  AND bs.submission_datetime < '${from}'
           )
           AND NOT EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                AND LOWER(tr.status) IN ('won','lost','disqualified')
-                AND tr.created_at < '${from}'
+                  AND (
+                        LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
+                     OR (LOWER(TRIM(tr.status)) = 'under evaluation'
+                         AND tr.created_at >= '${from}')
+                  )
           )
     `);
 
         const resultAwaitedDuringTotal = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.status NOT IN (${excludedStatuses})
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.created_at BETWEEN '${from}' AND '${to}'
+                  AND bs.submission_datetime BETWEEN '${from}' AND '${to}'
           )
     `);
 
         const wonDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND tr.status ILIKE 'won'
-                  AND tr.created_at BETWEEN '${from}' AND '${to}'
+                  AND LOWER(TRIM(tr.status)) = 'won'
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN '${from}' AND '${to}'
           )
     `);
 
         const lostDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND tr.status ILIKE 'lost'
-                  AND tr.created_at BETWEEN '${from}' AND '${to}'
+                  AND LOWER(TRIM(tr.status)) IN ('lost', 'lost - h1 elimination')
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN '${from}' AND '${to}'
           )
     `);
 
         const resultAwaitedDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                AND tr.created_at BETWEEN '${from}' AND '${to}'
-                AND LOWER(tr.status) IN ('won', 'lost', 'disqualified')
-        )
+                  AND (
+                        (LOWER(TRIM(tr.status)) IN (${receivedResultStatuses})
+                          AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN '${from}' AND '${to}')
+                     OR (LOWER(TRIM(tr.status)) = 'disqualified'
+                          AND tr.created_at BETWEEN '${from}' AND '${to}')
+                  )
+          )
     `);
 
         const disqualifiedDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                AND tr.status ILIKE 'disqualified'
-                AND tr.created_at BETWEEN '${from}' AND '${to}'
+                  AND LOWER(TRIM(tr.status)) = 'disqualified'
+                  AND tr.created_at BETWEEN '${from}' AND '${to}'
           )
     `);
 
         const resultAwaitedClosing = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.status NOT IN (${excludedStatuses})
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.created_at <= '${to}'
+                  AND bs.submission_datetime <= '${to}'
           )
           AND NOT EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                AND LOWER(tr.status) IN ('won','lost','disqualified')
-                AND tr.created_at <= '${to}'
-          )
-    `);
-
-        const resultAwaitedDuringPending = await exec(`
-        ${baseSelect}
-        WHERE ${baseWhere()}
-          AND ti.created_at BETWEEN '${from}' AND '${to}'
-          AND EXISTS (
-                SELECT 1
-                FROM bid_submissions bs
-                WHERE bs.tender_id = ti.id
-                  AND bs.status = 'Bid Submitted'
-                  AND bs.created_at BETWEEN '${from}' AND '${to}'
-          )
-          AND NOT EXISTS (
-                SELECT 1
-                FROM tender_results tr
-                WHERE tr.tender_id = ti.id
-                AND tr.created_at BETWEEN '${from}' AND '${to}'
+                  AND (
+                        LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
+                     OR (LOWER(TRIM(tr.status)) = 'under evaluation'
+                         AND tr.created_at >= '${to}')
+                  )
           )
     `);
 
         const wonOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at < '${from}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
                   AND LOWER(TRIM(tr.status)) = 'won'
-                  AND tr.created_at < '${from}'
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) < '${from}'
           )
     `);
 
         const lostOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.created_at < '${from}'
+          AND ti.status NOT IN (${excludedStatuses})
           AND EXISTS (
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND LOWER(TRIM(tr.status)) = 'lost'
-                  AND tr.created_at < '${from}'
+                  AND LOWER(TRIM(tr.status)) IN ('lost', 'lost - h1 elimination')
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) < '${from}'
           )
+    `);
+
+        const cancelledOpening = await exec(`
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND ti.status = 18
+          AND ti.updated_at < '${from}'
+    `);
+
+        const cancelledDuringCompleted = await exec(`
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND ti.status = 18
+          AND ti.updated_at BETWEEN '${from}' AND '${to}'
     `);
 
         /* =====================================================
@@ -1622,6 +1655,12 @@ export class TenderExecutiveService {
         });
         const lostTotal = Array.from(lostTotalSet.values());
 
+        const cancelledTotalSet = new Map();
+        [...cancelledOpening, ...cancelledDuringCompleted].forEach(t => {
+            cancelledTotalSet.set(t.id, t);
+        });
+        const cancelledTotal = Array.from(cancelledTotalSet.values());
+
         return {
             from: new Date(from),
             to: new Date(to),
@@ -1634,9 +1673,9 @@ export class TenderExecutiveService {
                     },
 
                     total: {
-                        count: assignedTotal.length + assignedOpening.length,
-                        value: this.sumValue([...assignedTotal, ...assignedOpening]),
-                        drilldown: this.mapDrilldown([...assignedTotal, ...assignedOpening]),
+                        count: assignedTotal.length,
+                        value: this.sumValue(assignedTotal),
+                        drilldown: this.mapDrilldown(assignedTotal),
                     },
 
                     during: {
@@ -1652,11 +1691,8 @@ export class TenderExecutiveService {
                             drilldown: this.mapDrilldown(assignedDuringCompleted),
                         },
 
-                        // statusChanged: {
-                        //     count: assignedDuringStatusChanged.length,
-                        //     value: this.sumValue(assignedDuringStatusChanged),
-                        //     drilldown: this.mapDrilldown(assignedDuringStatusChanged),
-                        // },
+                        // statusChanged is intentionally no longer reported for this
+                        // stage: it duplicated the assignment cohort and was never rendered.
 
                         pending: {
                             count: assignedClosingPending.length,
@@ -1801,6 +1837,27 @@ export class TenderExecutiveService {
                         pending: { count: 0, value: 0, drilldown: [] },
                     },
                 },
+
+                cancelled: {
+                    opening: {
+                        count: cancelledOpening.length,
+                        value: this.sumValue(cancelledOpening),
+                        drilldown: this.mapDrilldown(cancelledOpening),
+                    },
+                    total: {
+                        count: cancelledTotal.length,
+                        value: this.sumValue(cancelledTotal),
+                        drilldown: this.mapDrilldown(cancelledTotal),
+                    },
+                    during: {
+                        completed: {
+                            count: cancelledDuringCompleted.length,
+                            value: this.sumValue(cancelledDuringCompleted),
+                            drilldown: this.mapDrilldown(cancelledDuringCompleted),
+                        },
+                        pending: { count: 0, value: 0, drilldown: [] },
+                    },
+                },
             },
         };
     }
@@ -1811,6 +1868,8 @@ export class TenderExecutiveService {
             tenderNo: t.tender_no ?? t.tenderNo,
             tenderName: t.tender_name ?? t.tenderName,
             value: Number(t.effective_value ?? t.gst_values ?? 0),
+            status: t.status_name ?? null,
+            date: t.updated_at ?? null,
         }));
     }
 
@@ -2016,111 +2075,175 @@ export class TenderExecutiveService {
 
         const sumValue = (rows: any[]) => rows.reduce((s, r) => s + Number(r.value ?? 0), 0);
 
+        const emdCte = `
+        WITH emd AS (
+            SELECT
+                pi.id                    AS instrument_id,
+                pr.tender_id             AS tender_id,
+                pi.amount                AS value,
+                sst.name                 AS status,
+                pi.instrument_type       AS instrument_type,
+                pi.action                AS action,
+                pi.status                AS instrument_status,
+                pi.transfer_date         AS transfer_date,
+                itd.return_transfer_date AS return_date,
+                itd.return_utr           AS return_utr,
+                itd.reason               AS return_reason,
+                (itd.return_transfer_date IS NULL) AS return_date_derived,
+                COALESCE(ti.tender_no, '-') AS tender_no,
+                COALESCE(ti.tender_name, pr.project_name) AS tender_name,
+                COALESCE(
+                    CASE pi.instrument_type
+                        WHEN 'DD'             THEN idd.dd_date
+                        WHEN 'FDR'            THEN ifd.fdr_date
+                        WHEN 'BG'             THEN ibd.bg_date
+                        WHEN 'Cheque'         THEN icd.cheque_date
+                        WHEN 'Bank Transfer'  THEN itd.transaction_date
+                        WHEN 'Portal Payment' THEN itd.transaction_date
+                    END,
+                    pi.transfer_date,
+                    itd.transaction_date,
+                    pr.created_at
+                ) AS paid_at,
+                COALESCE(itd.return_transfer_date, pi.updated_at) AS returned_at,
+                (
+                       (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (3,4,7))
+                    OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (3,4))
+                    OR (pi.instrument_type = 'Cheque'                           AND pi.action IN (3,4,5,6))
+                    OR (pi.instrument_type = 'BG'                               AND pi.action IN (6,8,9))
+                ) AS has_return,
+                CASE
+                    WHEN (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (3,4,7))
+                      OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (3))
+                      OR (pi.instrument_type = 'Cheque'                           AND pi.action IN (3,6))
+                      OR (pi.instrument_type = 'BG'                               AND pi.action IN (6,8,9)) THEN 'RETURNED'
+                    WHEN (pi.instrument_type IN ('DD','FDR')                      AND pi.action IN (5))
+                      OR (pi.instrument_type IN ('Bank Transfer','Portal Payment') AND pi.action IN (4))
+                      OR (pi.instrument_type = 'Cheque'                           AND pi.action IN (4,5))        THEN 'SETTLED'
+                    ELSE 'PAID'
+                END AS emd_state
+            FROM payment_requests pr
+            JOIN payment_instruments pi ON pi.request_id = pr.id
+            LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
+            LEFT JOIN statuses sst ON sst.id = ti.status
+            LEFT JOIN instrument_dd_details idd ON idd.instrument_id = pi.id
+            LEFT JOIN instrument_fdr_details ifd ON ifd.instrument_id = pi.id
+            LEFT JOIN instrument_bg_details ibd ON ibd.instrument_id = pi.id
+            LEFT JOIN instrument_cheque_details icd ON icd.instrument_id = pi.id
+            LEFT JOIN instrument_transfer_details itd ON itd.instrument_id = pi.id
+            WHERE ${baseWhere()}
+            AND ti.delete_status NOT IN (1)
+            AND pi.status NOT ILIKE '%rejected%'
+            AND pi.status NOT ILIKE '%pending%'
+        )`;
+
         /* =====================================================
    A. OPENING
 ===================================================== */
 
-        const opening = await exec(`
+        const opening = await exec(`${emdCte}
         SELECT
-            pi.id               AS "instrumentId",
-            pr.tender_id        AS "tenderId",
-            pi.amount           AS "value",
-            pi.instrument_type  AS "instrumentType",
-            COALESCE(ti.tender_no, '-') AS "tenderNo",
-            COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
-        FROM payment_requests pr
-        JOIN payment_instruments pi ON pi.request_id = pr.id
-        LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
-        WHERE ${baseWhere()}
-        AND pr.created_at < '${from}'
-        AND ti.delete_status NOT IN (1)
-        AND pi.status NOT ILIKE '%rejected%'
-        AND pi.status NOT ILIKE '%pending%'
-        AND pi.status ILIKE '%accepted%'
-        AND (
-            (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
-        OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
-        OR (pi.instrument_type = 'BG' AND pi.action IN (0,1,2,3,4,5,6,7))
-        );
+            instrument_id AS "instrumentId",
+            tender_id AS "tenderId",
+            value,
+            status,
+            instrument_type AS "instrumentType",
+            tender_no AS "tenderNo",
+            tender_name AS "tenderName",
+            transfer_date AS "transferDate",
+            paid_at AS "date",
+            paid_at AS "paidDate",
+            returned_at AS "returnedAt",
+            return_date AS "returnDate",
+            return_utr AS "returnUtr",
+            return_reason AS "returnReason",
+            return_date_derived AS "returnDateDerived",
+            emd_state AS "emdState"
+        FROM emd
+        WHERE paid_at < '${from}'
+        AND (NOT has_return OR returned_at >= '${from}')
         `);
 
         /* =====================================================
    B. PAID DURING PERIOD (ALL)
 ===================================================== */
 
-        const paidDuring = await exec(`
+        const paidDuring = await exec(`${emdCte}
         SELECT
-            pi.id               AS "instrumentId",
-            pr.tender_id        AS "tenderId",
-            pi.amount           AS "value",
-            pi.instrument_type  AS "instrumentType",
-            COALESCE(ti.tender_no, '-') AS "tenderNo",
-            COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
-        FROM payment_requests pr
-        JOIN payment_instruments pi ON pi.request_id = pr.id
-        LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
-        WHERE ${baseWhere()}
-        AND pr.created_at BETWEEN '${from}' AND '${to}'
-        AND ti.delete_status NOT IN (1)
-        AND pi.status NOT ILIKE '%rejected%'
-        AND pi.status NOT ILIKE '%pending%'
-        AND pi.instrument_type NOT IN ('Cheque')
+            instrument_id AS "instrumentId",
+            tender_id AS "tenderId",
+            value,
+            status,
+            instrument_type AS "instrumentType",
+            tender_no AS "tenderNo",
+            tender_name AS "tenderName",
+            transfer_date AS "transferDate",
+            paid_at AS "date",
+            paid_at AS "paidDate",
+            returned_at AS "returnedAt",
+            return_date AS "returnDate",
+            return_utr AS "returnUtr",
+            return_reason AS "returnReason",
+            return_date_derived AS "returnDateDerived",
+            emd_state AS "emdState"
+        FROM emd
+        WHERE paid_at BETWEEN '${from}' AND '${to}'
         `);
 
         /* =====================================================
    C. RECEIVED FOR PRIOR PAID
 ===================================================== */
 
-        const receivedForPrior = await exec(`
+        const receivedForPrior = await exec(`${emdCte}
         SELECT
-            pi.id               AS "instrumentId",
-            pr.tender_id        AS "tenderId",
-            pi.amount           AS "value",
-            pi.transfer_date    AS "transferDate",
-            pi.instrument_type  AS "instrumentType",
-            COALESCE(ti.tender_no, '-') AS "tenderNo",
-            COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
-        FROM payment_requests pr
-        JOIN payment_instruments pi ON pi.request_id = pr.id
-        LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
-        WHERE ${baseWhere()}
-        AND COALESCE(pi.transfer_date, pr.created_at) < '${from}'
-        AND ti.delete_status NOT IN (1)
-        AND pi.status NOT ILIKE '%rejected%'
-        AND pi.status NOT ILIKE '%pending%'
-        AND (
-            (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
-        OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
-        OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
-        );
+            instrument_id AS "instrumentId",
+            tender_id AS "tenderId",
+            value,
+            status,
+            instrument_type AS "instrumentType",
+            tender_no AS "tenderNo",
+            tender_name AS "tenderName",
+            transfer_date AS "transferDate",
+            returned_at AS "date",
+            paid_at AS "paidDate",
+            returned_at AS "returnedAt",
+            return_date AS "returnDate",
+            return_utr AS "returnUtr",
+            return_reason AS "returnReason",
+            return_date_derived AS "returnDateDerived",
+            emd_state AS "emdState"
+        FROM emd
+        WHERE paid_at < '${from}'
+        AND has_return
+        AND returned_at BETWEEN '${from}' AND '${to}'
         `);
 
         /* =====================================================
    D. RECEIVED FOR DURING PAID
 ===================================================== */
 
-        const receivedForDuring = await exec(`
+        const receivedForDuring = await exec(`${emdCte}
         SELECT
-            pi.id               AS "instrumentId",
-            pr.tender_id        AS "tenderId",
-            pi.amount           AS "value",
-            pi.instrument_type  AS "instrumentType",
-            pi.transfer_date    AS "transferDate",
-            COALESCE(ti.tender_no, '-') AS "tenderNo",
-            COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
-        FROM payment_requests pr
-        JOIN payment_instruments pi ON pi.request_id = pr.id
-        LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
-        WHERE ${baseWhere()}
-        AND COALESCE(pi.transfer_date, pi.created_at) BETWEEN '${from}' AND '${to}'
-        AND ti.delete_status NOT IN (1)
-        AND pi.status NOT ILIKE '%rejected%'
-        AND pi.status NOT ILIKE '%pending%'
-        AND (
-            (pi.instrument_type IN ('DD','FDR') AND pi.action IN (3,4,5,6,7))
-        OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
-        OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
-        );
+            instrument_id AS "instrumentId",
+            tender_id AS "tenderId",
+            value,
+            status,
+            instrument_type AS "instrumentType",
+            tender_no AS "tenderNo",
+            tender_name AS "tenderName",
+            transfer_date AS "transferDate",
+            returned_at AS "date",
+            paid_at AS "paidDate",
+            returned_at AS "returnedAt",
+            return_date AS "returnDate",
+            return_utr AS "returnUtr",
+            return_reason AS "returnReason",
+            return_date_derived AS "returnDateDerived",
+            emd_state AS "emdState"
+        FROM emd
+        WHERE paid_at BETWEEN '${from}' AND '${to}'
+        AND has_return
+        AND returned_at BETWEEN '${from}' AND '${to}'
         `);
 
         /* =====================================================
@@ -2128,28 +2251,27 @@ export class TenderExecutiveService {
    Pending at end of period
 ===================================================== */
 
-        const closing = await exec(`
+        const closing = await exec(`${emdCte}
         SELECT
-            pi.id               AS "instrumentId",
-            pr.tender_id        AS "tenderId",
-            pi.amount           AS "value",
-            pi.instrument_type  AS "instrumentType",
-            COALESCE(ti.tender_no, '-') AS "tenderNo",
-            COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
-        FROM payment_requests pr
-        JOIN payment_instruments pi ON pi.request_id = pr.id
-        LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
-        WHERE ${baseWhere()}
-        AND pr.created_at < '${to}'
-        AND ti.delete_status NOT IN (1)
-        AND pi.status NOT ILIKE '%rejected%'
-        AND pi.status NOT ILIKE '%pending%'
-        AND pi.status ILIKE '%accepted%'
-        AND (
-            (pi.instrument_type IN ('DD','FDR') AND pi.action IN (1,2))
-        OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
-        OR (pi.instrument_type = 'BG' AND pi.action IN (0,1,2,3,4,5,6,7))
-        );
+            instrument_id AS "instrumentId",
+            tender_id AS "tenderId",
+            value,
+            status,
+            instrument_type AS "instrumentType",
+            tender_no AS "tenderNo",
+            tender_name AS "tenderName",
+            transfer_date AS "transferDate",
+            paid_at AS "date",
+            paid_at AS "paidDate",
+            returned_at AS "returnedAt",
+            return_date AS "returnDate",
+            return_utr AS "returnUtr",
+            return_reason AS "returnReason",
+            return_date_derived AS "returnDateDerived",
+            emd_state AS "emdState"
+        FROM emd
+        WHERE paid_at < '${to}'
+        AND (NOT has_return OR returned_at >= '${to}')
         `);
 
         let otherThanTms: any[] | null = null;

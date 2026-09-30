@@ -1,17 +1,32 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, HttpCode, HttpStatus } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, HttpCode, HttpStatus } from "@nestjs/common";
 import { z } from "zod";
 import { VendorMasterService } from "@/modules/master/vendor-master/vendor-master.service";
 
-const CreateVendorOrganizationSchema = z.object({
+const VendorOrganizationFields = z.object({
     name: z.string().min(1).max(255),
     alias: z.string().max(255).optional().nullable(),
     msme: z.string().max(50).optional().nullable(),
+    msmeType: z.enum(["M", "S"]).optional().nullable(),
     pan: z.string().max(100).optional().nullable(),
     address: z.string().optional(),
     status: z.boolean().optional().default(true),
 });
 
-const UpdateVendorOrganizationSchema = CreateVendorOrganizationSchema.partial();
+// An MSME number is only meaningful once its type (M/S) is known, so reject the
+// number alone. Existing rows are unaffected: this applies to incoming payloads only.
+const requireMsmeType = (val: z.infer<typeof VendorOrganizationFields>, ctx: z.RefinementCtx) => {
+    if (val.msme?.trim() && !val.msmeType) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["msmeType"],
+            message: "MSME type is required when an MSME number is present",
+        });
+    }
+};
+
+const CreateVendorOrganizationSchema = VendorOrganizationFields.superRefine(requireMsmeType);
+
+const UpdateVendorOrganizationSchema = VendorOrganizationFields.partial().superRefine(requireMsmeType);
 
 const CreateVendorSchema = z.object({
     orgId: z.number().optional(),
@@ -63,6 +78,30 @@ export class VendorMasterController {
     @Get("vendor-organizations/with-relations")
     async listOrganizationsWithRelations() {
         return this.vendorMasterService.findAllOrganizationsWithRelations();
+    }
+
+    // Declared before vendor-organizations/:id so "paginated" is not parsed as an id.
+    @Get("vendor-organizations/paginated")
+    async listOrganizationsPaginated(
+        @Query("page") page?: string,
+        @Query("limit") limit?: string,
+        @Query("search") search?: string,
+        @Query("sortBy") sortBy?: string,
+        @Query("sortOrder") sortOrder?: string
+    ) {
+        const toNumber = (value?: string): number | undefined => {
+            if (!value) return undefined;
+            const parsed = parseInt(value, 10);
+            return Number.isNaN(parsed) ? undefined : parsed;
+        };
+
+        return this.vendorMasterService.findAllOrganizationsPaginated({
+            page: toNumber(page),
+            limit: toNumber(limit),
+            search,
+            sortBy,
+            sortOrder: sortOrder === "asc" || sortOrder === "desc" ? sortOrder : undefined,
+        });
     }
 
     @Get("vendor-organizations/:id")

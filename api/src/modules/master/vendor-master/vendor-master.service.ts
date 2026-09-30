@@ -1,13 +1,18 @@
 import { Inject, Injectable, NotFoundException, ConflictException } from "@nestjs/common";
-import { eq, asc, and, ne, sql } from "drizzle-orm";
+import { eq, asc, desc, and, ne, sql, getTableColumns, type SQL } from "drizzle-orm";
+import { getTableConfig } from "drizzle-orm/pg-core";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
+import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import { vendorOrganizations, type VendorOrganization, type NewVendorOrganization } from "@db/schemas/vendors/vendor-organizations.schema";
 import { vendors, type Vendor, type NewVendor } from "@db/schemas/vendors/vendors.schema";
 import { vendorGsts, type VendorGst, type NewVendorGst } from "@db/schemas/vendors/vendor-gsts.schema";
 import { vendorAccs, type VendorAcc, type NewVendorAcc } from "@db/schemas/vendors/vendor-banks.schema";
 import { vendorFiles, type VendorFile, type NewVendorFile } from "@db/schemas/vendors/vendor-files.schema";
+import type { BaseFilters } from "@/modules/tendering/types/shared.types";
+
+export type VendorOrganizationListFilters = BaseFilters & { search?: string };
 
 @Injectable()
 export class VendorMasterService {
@@ -189,6 +194,135 @@ export class VendorMasterService {
         );
 
         return orgsWithRelations;
+    }
+
+    /**
+     * Paginated organization list for the vendor master grid.
+     *
+     * Two queries total (total count + page rows), replacing the N+1 pattern of
+     * findAllOrganizationsWithRelations(). Relation counts come from correlated
+     * subqueries so the four count columns can be both selected and sorted by.
+     */
+    async findAllOrganizationsPaginated(filters?: VendorOrganizationListFilters) {
+        const page = Math.max(1, filters?.page ?? 1);
+        const limit = Math.max(1, Math.min(filters?.limit ?? 50, 100));
+        const offset = (page - 1) * limit;
+
+        // Correlated count subqueries — reused by the SELECT list and the sort whitelist.
+        //
+        // The outer id must be written explicitly: drizzle renders `${column}` inside a
+        // raw sql template as a bare name when the template sits in the SELECT list, and
+        // an unqualified "id" inside these subqueries resolves to the INNER table's id,
+        // silently turning the count into a non-correlated one.
+        const outerOrgId = sql.raw(`"${getTableConfig(vendorOrganizations).name}"."id"`);
+        const personCountSql = sql<number>`(select count(*)::int from ${vendors} where ${vendors.orgId} = ${outerOrgId})`.as("persons_count");
+        const gstCountSql = sql<number>`(select count(*)::int from ${vendorGsts} where ${vendorGsts.orgId} = ${outerOrgId})`.as("gsts_count");
+        const accountCountSql = sql<number>`(select count(*)::int from ${vendorAccs} where ${vendorAccs.orgId} = ${outerOrgId})`.as("accounts_count");
+        const fileCountSql = sql<number>`(select count(*)::int from ${vendorFiles} where ${vendorFiles.orgId} = ${outerOrgId})`.as("files_count");
+
+        // Search mirrors the former client-side filter exactly, including the
+        // "Manufacturer"/"Service" labels derived from msmeType.
+        const conditions: SQL<unknown>[] = [];
+        const search = filters?.search?.trim();
+        if (search) {
+            const q = `%${search}%`;
+            conditions.push(sql`(
+                ${vendorOrganizations.name} ILIKE ${q} OR
+                ${vendorOrganizations.alias} ILIKE ${q} OR
+                ${vendorOrganizations.pan} ILIKE ${q} OR
+                ${vendorOrganizations.msme} ILIKE ${q} OR
+                ${vendorOrganizations.address} ILIKE ${q} OR
+                case ${vendorOrganizations.msmeType}
+                    when 'M' then 'Manufacturer'
+                    when 'S' then 'Service'
+                    else ${vendorOrganizations.msmeType}
+                end ILIKE ${q} OR
+                exists (
+                    select 1 from ${vendorGsts}
+                    where ${vendorGsts.orgId} = ${vendorOrganizations.id}
+                      and (${vendorGsts.gstNo} ILIKE ${q} or ${vendorGsts.gstState} ILIKE ${q})
+                ) OR
+                exists (
+                    select 1 from ${vendors}
+                    where ${vendors.orgId} = ${vendorOrganizations.id}
+                      and (${vendors.name} ILIKE ${q} or ${vendors.email} ILIKE ${q} or ${vendors.mobile} ILIKE ${q})
+                ) OR
+                exists (
+                    select 1 from ${vendorAccs}
+                    where ${vendorAccs.orgId} = ${vendorOrganizations.id}
+                      and (${vendorAccs.accountNum} ILIKE ${q} or ${vendorAccs.ifscCode} ILIKE ${q})
+                )
+            )`);
+        }
+
+        const whereClause = conditions.length ? and(...conditions) : undefined;
+
+        const [countRow] = await this.db
+            .select({ total: sql<number>`COUNT(*)`.as("total") })
+            .from(vendorOrganizations)
+            .where(whereClause);
+        const total = Number(countRow?.total ?? 0);
+
+        // Sort whitelist: AG Grid colId -> SQL. A raw colId never reaches ORDER BY.
+        const sortFn = filters?.sortOrder === "desc" ? desc : asc;
+        let orderByClause: SQL<unknown>;
+        switch (filters?.sortBy) {
+            case "alias":
+                orderByClause = sortFn(vendorOrganizations.alias);
+                break;
+            case "pan":
+                orderByClause = sortFn(vendorOrganizations.pan);
+                break;
+            case "msme":
+                orderByClause = sortFn(vendorOrganizations.msme);
+                break;
+            case "msmeType":
+                orderByClause = sortFn(vendorOrganizations.msmeType);
+                break;
+            case "gstCount":
+                orderByClause = sortFn(gstCountSql);
+                break;
+            case "accountCount":
+                orderByClause = sortFn(accountCountSql);
+                break;
+            case "personCount":
+                orderByClause = sortFn(personCountSql);
+                break;
+            case "fileCount":
+                orderByClause = sortFn(fileCountSql);
+                break;
+            case "name":
+                orderByClause = sortFn(vendorOrganizations.name);
+                break;
+            default:
+                orderByClause = asc(vendorOrganizations.name);
+        }
+
+        const rows = await this.db
+            .select({
+                ...getTableColumns(vendorOrganizations),
+                personsCount: personCountSql,
+                gstsCount: gstCountSql,
+                accountsCount: accountCountSql,
+                filesCount: fileCountSql,
+            })
+            .from(vendorOrganizations)
+            .where(whereClause)
+            .orderBy(orderByClause, asc(vendorOrganizations.id))
+            .limit(limit)
+            .offset(offset);
+
+        const data = rows.map(({ personsCount, gstsCount, accountsCount, filesCount, ...org }) => ({
+            ...org,
+            _counts: {
+                persons: personsCount,
+                gsts: gstsCount,
+                accounts: accountsCount,
+                files: filesCount,
+            },
+        }));
+
+        return wrapPaginatedResponse(data, total, page, limit);
     }
 
     async createOrganization(data: NewVendorOrganization): Promise<VendorOrganization> {

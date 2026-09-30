@@ -5,6 +5,7 @@ import { Form } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUpdateVendorOrganizationWithRelations, useVendorOrganizationWithRelations, useVendorOrganizations } from "@/hooks/api/useVendorOrganizations";
+import { useAuth } from "@/contexts/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle } from "lucide-react";
 import { useEffect } from "react";
@@ -19,12 +20,15 @@ import { vendorOrgToFormValues } from "./helpers/vendorForm.mappers";
 import { VendorFormSchema, type VendorFormValues } from "./helpers/vendorForm.schema";
 import { vendorAreaBase } from "./vendorAreaPath";
 
+const PERMISSION_MODULE = "master.vendors";
+
 const EditVendorPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const basePath = vendorAreaBase(location.pathname);
     const { id } = useParams<{ id: string }>();
     const orgId = id ? parseInt(id) : null;
+    const { canUpdate } = useAuth();
 
     const { data: organization, isLoading, error } = useVendorOrganizationWithRelations(orgId);
     const { data: organizations } = useVendorOrganizations();
@@ -90,7 +94,7 @@ const EditVendorPage = () => {
                 },
             });
             navigate(basePath);
-        } catch (error) {
+        } catch {
             // Error handling is done in the hook
         }
     };
@@ -163,9 +167,11 @@ const EditVendorPage = () => {
                         <Button type="button" variant="outline" onClick={() => navigate(basePath)} disabled={updateVendor.isPending}>
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={updateVendor.isPending}>
-                            {updateVendor.isPending ? "Updating..." : "Update Organization"}
-                        </Button>
+                        {canUpdate(PERMISSION_MODULE) && (
+                            <Button type="submit" disabled={updateVendor.isPending}>
+                                {updateVendor.isPending ? "Updating..." : "Update Organization"}
+                            </Button>
+                        )}
                     </div>
                 </form>
             </Form>

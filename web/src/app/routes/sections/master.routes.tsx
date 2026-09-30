@@ -107,6 +107,7 @@ const Master_LeadType_Edit = lazy(() => import("@/modules/master/lead-type/edit"
 const Master_Vendors = lazy(() => import("@/modules/master/vendor-master/VendorListPage"));
 const Master_Vendors_Create = lazy(() => import("@/modules/master/vendor-master/VendorCreatePage"));
 const Master_Vendors_Edit = lazy(() => import("@/modules/master/vendor-master/VendorEditPage"));
+const Master_Vendors_View = lazy(() => import("@/modules/master/vendor-master/VendorViewPage"));
 
 //Circulars
 const Master_Circular = lazy(() => import("@/modules/master/circulars/CircularDashboardSection"))
@@ -682,6 +683,14 @@ export default function MasterRoutes() {
                     element={
                         <RouteWrapper>
                             <Master_Vendors_Edit />
+                        </RouteWrapper>
+                    }
+                />
+                <Route
+                    path=":id"
+                    element={
+                        <RouteWrapper permission={{ module: "master.vendors", action: "read" }}>
+                            <Master_Vendors_View />
                         </RouteWrapper>
                     }
                 />

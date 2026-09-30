@@ -264,8 +264,41 @@ function LostTable({ stage }: { stage: StageBacklogStage }) {
 }
 
 /* ================================
-   FINAL PAGE EXPORT
+   CANCELLED
 ================================ */
+
+function CancelledTable({ stage }: { stage: StageBacklogStage }) {
+    return (
+        <Card className="border-0 ring-1 ring-border/50 shadow-sm">
+            <CardContent className="p-0">
+                <Table className="w-full table-fixed">
+                    <TableHeader className="bg-muted/30">
+                        <TableRow>
+                            <TableHead />
+                            <TableHead className="text-center">
+                                <ColumnHeader title="Cancelled Before Period" description="Tenders cancelled before the start of the period (Final Price)" />
+                            </TableHead>
+                            <TableHead className="text-center">
+                                <ColumnHeader title="Cancelled During Period" description="Tenders cancelled during the period (Final Price)" />
+                            </TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableRow className="hover:bg-muted/20">
+                            <TableCell className="font-semibold">Tenders Cancelled</TableCell>
+                            <MetricCell data={stage.opening} />
+                            <MetricCell data={stage.during.completed} />
+                        </TableRow>
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
+}
+
+/* ================================
+   FINAL PAGE EXPORT
+=============================== */
 
 export function StageBacklogV4Table(props: { view: "user" | "team"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
     const { data } = useStageBacklogV2(props);
@@ -281,6 +314,7 @@ export function StageBacklogV4Table(props: { view: "user" | "team"; userId?: num
             <ResultTable stage={stages.resultAwaited} />
             <WonTable stage={stages.won} />
             <LostTable stage={stages.lost} />
+            <CancelledTable stage={stages.cancelled} />
         </div>
     );
 }
