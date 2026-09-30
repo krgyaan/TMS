@@ -3,5 +3,5 @@
 -- (self-filed via support page); will differ once HR can file complaints
 -- on behalf of other employees.
 
-ALTER TABLE "hrms_complaints" ADD COLUMN "created_by" bigint;
+ALTER TABLE "hrms_complaints" ADD COLUMN IF NOT EXISTS "created_by" bigint;
 

@@ -18,3 +18,4 @@ pyyaml
 rapidfuzz
 python-dotenv
 pypdf
+python-docx==1.2.0

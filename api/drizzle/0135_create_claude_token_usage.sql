@@ -1,6 +1,6 @@
 -- 0135: Create claude_token_usage table for tracking Anthropic Claude API token consumption and costs per tender, user, and pipeline stage
 
-CREATE TABLE "claude_token_usage" (
+CREATE TABLE IF NOT EXISTS "claude_token_usage" (
     "id" bigserial PRIMARY KEY NOT NULL,
     "user_id" bigint REFERENCES "users"("id") ON DELETE SET NULL,
     "tender_id" bigint,
@@ -17,7 +17,7 @@ CREATE TABLE "claude_token_usage" (
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 
-CREATE INDEX "idx_claude_token_usage_created_at" ON "claude_token_usage" ("created_at");
-CREATE INDEX "idx_claude_token_usage_user_id" ON "claude_token_usage" ("user_id");
-CREATE INDEX "idx_claude_token_usage_tender_id" ON "claude_token_usage" ("tender_id");
-CREATE INDEX "idx_claude_token_usage_call_type" ON "claude_token_usage" ("call_type");
+CREATE INDEX IF NOT EXISTS "idx_claude_token_usage_created_at" ON "claude_token_usage" ("created_at");
+CREATE INDEX IF NOT EXISTS "idx_claude_token_usage_user_id" ON "claude_token_usage" ("user_id");
+CREATE INDEX IF NOT EXISTS "idx_claude_token_usage_tender_id" ON "claude_token_usage" ("tender_id");
+CREATE INDEX IF NOT EXISTS "idx_claude_token_usage_call_type" ON "claude_token_usage" ("call_type");

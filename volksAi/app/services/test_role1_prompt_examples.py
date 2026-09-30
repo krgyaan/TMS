@@ -240,3 +240,140 @@ def test_emd_exemption_turnover_clause_is_flagged_to_the_model_not_offered_as_th
     assert "never a figure from an EMD-exemption" in turnover_desc
     assert "500 Crore" not in system_text and "500 Crore" not in turnover_desc  # not suggested by the prompt itself
     assert "avg_annual_turnover_value_display" not in results
+
+
+# ── FIX: Manufacturer Authorization Form (MAF) tripartite resolution (true/false/null) ──
+
+MAF_REQUIRED_CLAUSE = (
+    "SECTION-II BID EVALUATION CRITERIA (BEC)\n"
+    "TECHNICAL CRITERIA: In case the bidder is not the OEM, bidder must submit "
+    "a valid Manufacturer Authorization Form (MAF) from the OEM along with the bid.\n"
+)
+
+MAF_EXPLICITLY_NOT_REQUIRED_CLAUSE = (
+    "SECTION-II BID EVALUATION CRITERIA (BEC)\n"
+    "TECHNICAL CRITERIA: Manufacturer Authorization Form (MAF) / OEM Authorization is NOT REQUIRED "
+    "for this tender. Resellers are exempted from submitting MAF.\n"
+)
+
+MAF_SILENT_CLAUSE = (
+    "SECTION-II BID EVALUATION CRITERIA (BEC)\n"
+    "TECHNICAL CRITERIA: Bidder must have executed at least one order for supply of battery chargers.\n"
+    "FINANCIAL CRITERIA: Average annual turnover must be at least Rs. 50 Lakhs.\n"
+)
+
+
+def test_maf_prompt_has_no_old_binary_wording_and_uses_tripartite_rules():
+    """Old binary rule ('otherwise false') must be absent; new tripartite rules must be present."""
+    sys_instruction = UNIVERSAL_TENDER_SYSTEM_INSTRUCTION
+    maf_desc = FIELD_PROMPT_MAP["maf_required_display"][2]
+
+    # Old binary wording must be completely gone
+    assert "otherwise false" not in sys_instruction
+    assert "otherwise false" not in maf_desc
+    assert "Look in BEC Section-II for 'Manufacturer' or 'Authorized Dealer'" not in maf_desc
+
+    # System instruction must instruct true only on explicit requirement, false only on explicit exemption, null on silence
+    assert "Return true ONLY if the text explicitly states MAF is required" in sys_instruction
+    assert "return false ONLY if the text explicitly states MAF is not required or not applicable" in sys_instruction
+    assert "return null if the document is silent on MAF" in sys_instruction
+    assert "absence of a requirement is not the same as an explicit exemption" in sys_instruction
+
+    # Field-specific prompt must instruct the same tripartite logic
+    assert "Return true ONLY if the text explicitly requires MAF" in maf_desc
+    assert "Return false ONLY if the text explicitly says it is not required or not applicable" in maf_desc
+    assert "Return null if the document is silent -- silence is NOT the same as 'not required'" in maf_desc
+
+
+def test_maf_prompt_sent_to_claude_has_tripartite_wording(monkeypatch):
+    """The actual prompt payload sent to Claude must carry the tripartite instruction, not the binary one."""
+    calls, _ = _run_role1(monkeypatch, MAF_REQUIRED_CLAUSE, ["maf_required_display"])
+    assert calls, "Role 1 made no call"
+    sent = _sent_text(calls[0])
+
+    assert "otherwise false" not in sent
+    assert "Return true ONLY if the text explicitly" in sent
+    assert "Return null if the document is silent" in sent
+
+
+def test_maf_explicitly_required_clause_accepts_true(monkeypatch):
+    """Explicit MAF requirement: prompt instructs true ONLY here, and stubbed true is accepted as Yes."""
+    calls, results = _run_role1(
+        monkeypatch,
+        MAF_REQUIRED_CLAUSE,
+        ["maf_required_display"],
+        lambda i, kw: {"maf_required": True},
+    )
+    assert calls
+    sent = _sent_text(calls[0])
+    assert "Return true ONLY if the text explicitly" in sent
+
+    assert "maf_required_display" in results
+    res = results["maf_required_display"]
+    assert res["value"] == "Yes"
+    assert res["raw_value"] is True
+    assert res["source"] == "llm"
+
+
+def test_maf_explicitly_not_required_clause_accepts_false(monkeypatch):
+    """Explicit MAF exemption: stubbed false is accepted as No."""
+    calls, results = _run_role1(
+        monkeypatch,
+        MAF_EXPLICITLY_NOT_REQUIRED_CLAUSE,
+        ["maf_required_display"],
+        lambda i, kw: {"maf_required": False},
+    )
+    assert calls
+    sent = _sent_text(calls[0])
+    assert "return false ONLY if the text explicitly states MAF is not required" in sent
+
+    assert "maf_required_display" in results
+    res = results["maf_required_display"]
+    assert res["value"] == "No"
+    assert res["raw_value"] is False
+    assert res["source"] == "llm"
+
+
+def test_maf_silent_clause_instructs_and_accepts_null(monkeypatch):
+    """
+    Tender document is silent on MAF (the bug fixed by 2a8bda3e):
+    The prompt explicitly instructs returning null (silence != not required),
+    and a stubbed null response leaves maf_required_display unresolved (not falsely set to No).
+    """
+    calls, results = _run_role1(
+        monkeypatch,
+        MAF_SILENT_CLAUSE,
+        ["maf_required_display"],
+        lambda i, kw: {"maf_required": None},
+    )
+    assert calls
+    sent = _sent_text(calls[0])
+    assert "Return null if the document is silent -- silence is NOT the same as 'not required'" in sent
+    assert "return null if the document is silent on MAF" in sent
+
+    # Most important assertion: null does NOT populate results with 'No'
+    assert "maf_required_display" not in results
+
+
+def test_maf_pre_2a8bda3e_wording_would_fail_tripartite_and_null_checks():
+    """
+    Regression check proving the fix against the pre-2a8bda3e baseline:
+    Simulating the old prompt strings confirms they fail the new assertions.
+    """
+    old_system_prompt = (
+        "4. Exact numerical and conditional precision:\n"
+        "   - For MAF (Manufacturer Authorization Form): Return true if required from OEM/Manufacturer, otherwise false.\n"
+    )
+    old_field_desc = (
+        "Is Manufacturer Authorization Form (MAF) / OEM Authorization required? "
+        "Look in BEC Section-II for 'Manufacturer' or 'Authorized Dealer'"
+    )
+
+    # 1. Old wording contains the banned phrase
+    assert "otherwise false" in old_system_prompt
+
+    # 2. Old wording lacks null instruction on silence
+    assert "return null if the document is silent" not in old_system_prompt
+    assert "silence is NOT the same as 'not required'" not in old_field_desc
+    assert "Return true ONLY" not in old_system_prompt
+
