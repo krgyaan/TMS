@@ -40,7 +40,6 @@ const defaultFormValues: PurchaseOrderFormValues = {
   category: "",
   poDate: formatDateForInput(new Date()),
   sellerId: "",
-  sellerSource: "",
   sellerName: "",
   sellerEmail: "",
   sellerAddress: "",
@@ -153,7 +152,6 @@ export default function CreatePurchaseOrderPage() {
     if (!selectedSellerId || selectedSellerId === "__create_new__") return;
     const party = parties.find((p: any) => String(p.id) === selectedSellerId);
     if (!party) return;
-    form.setValue("sellerSource", party.source === "vendor_org" ? "vendor_org" : "party");
     form.setValue("sellerName", party.name || "");
     form.setValue("sellerEmail", party.email || "");
     form.setValue("sellerAddress", party.address || "");

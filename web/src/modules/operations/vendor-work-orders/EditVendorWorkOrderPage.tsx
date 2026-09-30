@@ -35,7 +35,6 @@ const defaultFormValues: VendorWorkOrderFormValues = {
   woDate: formatDateForInput(new Date()),
   category: "",
   sellerId: "",
-  sellerSource: "",
   sellerName: "",
   sellerEmail: "",
   sellerAddress: "",
@@ -106,8 +105,7 @@ function mapVwoDataToFormValues(data: any): VendorWorkOrderFormValues {
     return {
       woDate: formatDateForInput(data.woDate) || formatDateForInput(new Date()),
       category: data.category || "",
-      sellerId: data.sellerOrganizationId ? String(data.sellerOrganizationId) : (data.sellerId ? String(data.sellerId) : ""),
-      sellerSource: data.sellerOrganizationId ? "vendor_org" : "",
+      sellerId: data.sellerOrganizationId ? String(data.sellerOrganizationId) : "",
       sellerName: data.sellerName || "",
       sellerEmail: data.sellerEmail || "",
       sellerAddress: data.sellerAddress || "",
@@ -213,7 +211,6 @@ export default function EditVendorWorkOrderPage() {
     if (!selectedSellerId || selectedSellerId === "__create_new__") return;
     const party = parties.find((p: any) => String(p.id) === selectedSellerId);
     if (!party) return;
-    form.setValue("sellerSource", party.source === "vendor_org" ? "vendor_org" : "party");
     form.setValue("sellerName", party.name || "");
     form.setValue("sellerEmail", party.email || "");
     form.setValue("sellerAddress", party.address || "");

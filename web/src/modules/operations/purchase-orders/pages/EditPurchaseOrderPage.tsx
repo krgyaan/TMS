@@ -34,7 +34,6 @@ const defaultFormValues: PurchaseOrderFormValues = {
     category: "",
     poDate: "",
     sellerId: "",
-    sellerSource: "",
     sellerName: "",
     sellerEmail: "",
     sellerAddress: "",
@@ -155,7 +154,6 @@ export default function EditPurchaseOrderPage() {
         if (!selectedSellerId || selectedSellerId === "__create_new__") return;
         const party = parties.find((p: any) => String(p.id) === selectedSellerId);
         if (!party) return;
-        form.setValue("sellerSource", party.source === "vendor_org" ? "vendor_org" : "party");
         form.setValue("sellerName", party.name || "");
         form.setValue("sellerEmail", party.email || "");
         form.setValue("sellerAddress", party.address || "");
@@ -194,7 +192,6 @@ export default function EditPurchaseOrderPage() {
             category: poData.category || "",
             poDate: formatDateForInput(poData.poDate),
             sellerId: poData.sellerOrganizationId ? String(poData.sellerOrganizationId) : "",
-            sellerSource: poData.sellerOrganizationId ? "vendor_org" : "",
             sellerName: poData.sellerName || "",
             sellerEmail: poData.sellerEmail || "",
             sellerAddress: poData.sellerAddress || "",

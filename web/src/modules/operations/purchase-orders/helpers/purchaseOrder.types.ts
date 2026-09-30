@@ -11,7 +11,6 @@ export interface CreatePurchaseOrderDTO {
     piAttachments?: string;
     category?: string;
     poDate: string;
-    sellerId?: number;
     sellerOrganizationId?: number;
     shipToPartyId?: number;
     sellerName: string;
@@ -109,7 +108,6 @@ export interface UpdatePurchaseOrderDTO {
     piAttachments?: string;
     category?: string;
     poDate: string;
-    sellerId?: number;
     sellerOrganizationId?: number;
     shipToPartyId?: number;
     sellerName: string;
