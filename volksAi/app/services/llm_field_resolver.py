@@ -116,7 +116,9 @@ FIELD_SECTION_CATEGORY: Dict[str, str] = {
     "solvency_certificate_type_display": "bec_criteria",
     "net_worth_value_display": "bec_criteria",
     "net_worth_type_display": "bec_criteria",
-    "eligibility_criterion_years_display": "bec_criteria",
+    # Same key tender_mapper emits and CSV / TMS DTO read (was eligibility_criterion_years_display,
+    # which nothing produced, so Role 1 results for this field were never merged).
+    "experience_years_display": "bec_criteria",
 
     # 3. Payment Terms
     "payment_terms_supply_display": "payment_terms",
@@ -553,7 +555,7 @@ FIELD_PROMPT_MAP: Dict[str, Tuple[str, str, str, Any]] = {
         "Net worth requirement from BEC criteria (e.g. 'Must be positive' or a monetary threshold in the format '[X] Lakhs' / '[X] Crore'), only if literally stated in the text. Use only the general BEC requirement for bidders -- never a figure from an EMD-exemption, MSE/Startup relaxation or bank-guarantee clause.",
         _fmt_str,
     ),
-    "eligibility_criterion_years_display": (
+    "experience_years_display": (
         "eligibility_criterion_years", "string",
         "Number of years of prior experience required in BEC technical criteria (e.g. '7' or '3'). Return clean integer number string only.",
         _fmt_years,

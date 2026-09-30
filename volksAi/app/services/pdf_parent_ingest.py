@@ -869,7 +869,7 @@ def ingest_parent_tender_pdf(
                     "solvency_certificate_value_display": "Solvency Certificate Value",
                     "net_worth_value_display": "Net Worth Value",
                     "net_worth_type_display": "Net Worth Requirement",
-                    "eligibility_criterion_years_display": "Eligibility Criterion Years",
+                    "experience_years_display": "Eligibility Criterion Years",
                 }
                 COMPLEX_BEC_KEYS = [
                     "custom_eligibility_criteria_display",
@@ -880,7 +880,7 @@ def ingest_parent_tender_pdf(
                     "working_capital_value_display",
                     "solvency_certificate_value_display",
                     "net_worth_value_display",
-                    "eligibility_criterion_years_display",
+                    "experience_years_display",
                 ]
                 _stub_vals = ("NA", "N/A", None, "", "Not Found", "NOT_APPLICABLE", "Not Applicable", "0", "0.0", "0.00", "₹0.00", 0, 0.0, "⚠️ MISSING")
                 # Dynamically collect ALL infosheet fields that are still NA / missing after Layer 1 regex pass
@@ -955,8 +955,8 @@ def ingest_parent_tender_pdf(
 
                             is_bec_override = False
                             if key in COMPLEX_BEC_KEYS:
-                                # Rule: If eligibility_criterion_years_display is already a clean integer from main_tender, preserve it (MAIN_SOURCED_LABELS)
-                                if key == "eligibility_criterion_years_display":
+                                # Rule: If experience_years_display is already a clean integer from main_tender, preserve it (MAIN_SOURCED_LABELS)
+                                if key == "experience_years_display":
                                     if is_stub or not str(current_val).strip().isdigit():
                                         is_bec_override = True
                                 elif is_stub:

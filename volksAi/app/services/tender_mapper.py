@@ -584,21 +584,62 @@ def map_extraction_to_tender_information(extracted: dict, tender_id: int) -> dic
     return map_internal_to_db_payload(normalized, tender_id)
 
 
+# Indian money unit words, longest alternative first so "Lacs"/"Crore" are never cut to
+# "Lac"/"Cr" and singular "Lakh" matches at all (the old "Lac|Lakhs|Cr|Crore" missed it).
+MONEY_UNIT = r"(?:Lakhs?|Lacs?|Crores?|Cr\b)"
+# A unit word right after a captured number, possibly on the next line (PDF line breaks,
+# e.g. Morena's "INR 2.9\nLacs") or after a table-cell gap.
+_RE_TRAILING_MONEY_UNIT = re.compile(r"\A[ \t]*\n?[ \t]*(" + MONEY_UNIT + r")", re.IGNORECASE)
+_RE_HAS_MONEY_UNIT = re.compile(r"\b" + MONEY_UNIT, re.IGNORECASE)
+# Make-in-India / local-content text: never a technical eligibility criterion.
+_RE_MII_TEXT = re.compile(r"make\s+in\s+india|local\s+content|local\s+supplier|purchase\s+preference", re.IGNORECASE)
+_RE_ENDS_IN_NUMBER = re.compile(r"\d\s*$")
+
+
+def _append_trailing_money_unit(value: str, following_text: str) -> str:
+    """If `value` ends in a number with no unit and `following_text` starts with a unit word, append it."""
+    if not value or not _RE_ENDS_IN_NUMBER.search(value) or _RE_HAS_MONEY_UNIT.search(value):
+        return value
+    m = _RE_TRAILING_MONEY_UNIT.match(following_text or "")
+    return f"{value} {m.group(1)}" if m else value
+
+
+def complete_money_unit(value: Any, full_text: str) -> Any:
+    """
+    Repairs a money value whose unit word was dropped by a line-/cell-bounded capture
+    (e.g. "Rs. 61.00" when the text reads "Rs. 61.00\\nLac"): finds the value in
+    full_text and appends the unit word immediately following it. Values that already
+    carry a unit, don't end in a number, or aren't found are returned unchanged.
+    """
+    if not isinstance(value, str) or not full_text:
+        return value
+    v = value.strip()
+    if not _RE_ENDS_IN_NUMBER.search(v) or _RE_HAS_MONEY_UNIT.search(v):
+        return value
+    for m in re.finditer(re.escape(v), full_text):
+        completed = _append_trailing_money_unit(v, full_text[m.end():m.end() + 40])
+        if completed != v:
+            return completed
+    return value
+
+
 def extract_regex_safe(label: str, full_text: str) -> Optional[str]:
     if not full_text or not label:
         return None
+    # Each pass stops at end of line / a large gap, which used to drop a unit word printed
+    # after the number ("Rs. 61.00\nLac" -> "Rs. 61.00"); re-attach it when present.
     # 1. Match inline with colon/dash (allows any characters after colon/dash up to a large gap)
     m1 = re.search(rf"{re.escape(label)}[ \t]*[:\-–—\.]+[ \t]*((?:(?!\s{{2,}})[^\n])+)", full_text, re.IGNORECASE)
     if m1:
-        return m1.group(1).strip()
+        return _append_trailing_money_unit(m1.group(1).strip(), full_text[m1.end(1):m1.end(1) + 40])
     # 2. Match inline with 1-2 spaces (requires starting with alphanumeric, stops at large gaps or end of line)
     m2 = re.search(rf"{re.escape(label)}[ \t]{{1,2}}([A-Za-z0-9₹Rs](?:(?!\s{{2,}})[^\n]){{0,24}})(?:\s{{2,}}|\n|$)", full_text, re.IGNORECASE)
     if m2:
-        return m2.group(1).strip()
+        return _append_trailing_money_unit(m2.group(1).strip(), full_text[m2.end(1):m2.end(1) + 40])
     # 3. Match next line ONLY if label is the only thing on the line
     m3 = re.search(rf"^[ \t]*{re.escape(label)}[ \t]*\n[ \t]*((?:(?!\s{{2,}})[^\n])+)", full_text, re.IGNORECASE | re.MULTILINE)
     if m3:
-        return m3.group(1).strip()
+        return _append_trailing_money_unit(m3.group(1).strip(), full_text[m3.end(1):m3.end(1) + 40])
     return None
 
 def evaluate_bounded_fallback(
@@ -713,11 +754,93 @@ def is_unconditional_financial_exemption(text: str) -> bool:
 
     return False
 
+_RE_FIN_BEC_KEYWORD = re.compile(
+    r"(?:Average\s+Annual\s+(?:Financial\s+)?Turnover|Annual\s+(?:Average\s+|Financial\s+)*Turnover"
+    r"|Turnover|Working\s+Capital|Net\s*Worth|Solvency)",
+    re.IGNORECASE,
+)
+_RE_FIN_BEC_AMOUNT = re.compile(
+    r"(?:Rs\.?|₹|INR)\s*[\d,]*\d(?:\.\d+)?"
+    r"|\b\d[\d,]*(?:\.\d+)?\s*(?:Lakhs?|Lacs?|Crores?|Cr\b)"
+    r"|\b\d+(?:\.\d+)?\s*%\s*of\s+(?:the\s+)?(?:estimated|annuali[sz]ed|tender|bid)",
+    re.IGNORECASE,
+)
+# Boilerplate that pairs a financial keyword with an amount without being a bidder
+# financial BEC -- each seen in real GAIL/GeM text: bank-guarantee proformas ("bank
+# having net worth ... Rs. 100 Crores"), GeM exemption lists ("annual turnover of INR
+# 500 Crore or more"), startup/MSE definitions ("turnover ... not exceeded Rs.100 crore"),
+# Make-in-India thresholds ("For bids < 200 Crore"), PAN rule ("Rs. 2 Lacs per transaction").
+_FIN_BEC_BOILERPLATE = (
+    "per transaction", "guarantee", "crore or more", "make in india", "relaxation", "relaxed",
+    "for bids <", "since incorporation", "not exceed", "has exceed", "startup", "start-up", "enterprise",
+)
+_RE_BANK_WORD = re.compile(r"\bbanks?\b")
+
+
+def has_financial_bec_content(text: Optional[str]) -> bool:
+    """
+    True if `text` contains a bidder financial-eligibility requirement: a turnover /
+    working capital / net worth / solvency keyword followed within 300 chars by a money
+    amount (Rs./₹/INR, or a Lakh/Lac/Crore figure, or "N% of the estimated ...").
+
+    Whitespace (incl. PDF line breaks, e.g. "INR 8.70\\nLacs") is normalized first, and
+    fill-in blanks ("____") collapsed so proforma blanks don't push context out of range.
+    Matches whose surrounding context is known boilerplate are skipped; a nearby "bank"
+    also disqualifies a match (the amount is the bank's, not the bidder's) except for
+    Solvency, whose certificate is inherently bank-issued.
+    """
+    if not text:
+        return False
+    norm = re.sub(r"_{2,}", "_", re.sub(r"\s+", " ", text))
+    for m in _RE_FIN_BEC_KEYWORD.finditer(norm):
+        amount = _RE_FIN_BEC_AMOUNT.search(norm, m.end(), m.end() + 300)
+        if not amount:
+            continue
+        # Trailing context is kept short (25 chars): enough for suffixes like " Lacs per
+        # transaction" / " Crore or more", without reaching into the next clause (a real
+        # BEC is routinely followed by the bank-guarantee paragraph).
+        ctx = norm[max(0, m.start() - 150):amount.end() + 25].lower()
+        if any(b in ctx for b in _FIN_BEC_BOILERPLATE):
+            continue
+        if not m.group(0).lower().startswith("solvency") and _RE_BANK_WORD.search(ctx):
+            continue
+        return True
+    return False
+
+# GeM bid documents all carry "...related to Turn Over, Past Performance and Project /
+# Past Experience etc." -- extract_regex_safe("Past Experience") then captures "etc."
+# as the years value. These fragments are never a years value.
+_EXPERIENCE_YEARS_STUBS = frozenset({
+    "etc", "and etc", "etc. this has no relevance", "and completion certificates etc",
+    "completion certificates etc", "past performance etc", "and project etc",
+})
+_RE_YEARS_WORD = re.compile(r"\b(?:years?|yrs?|yea\s?rs?)\b|\(\s*s\s*\)|वर्ष", re.IGNORECASE)
+
+
+def is_valid_experience_years_candidate(value: Any) -> bool:
+    """
+    Gate for the experience-years field: reject known boilerplate stubs, and require
+    a digit or a years/yrs word ("3 Year(s)", "seven (07) years", "7") -- otherwise the
+    caller falls through to the next synonym / the years regex instead of accepting it.
+    """
+    if value is None:
+        return False
+    s = str(value).strip()
+    if not s:
+        return False
+    norm = re.sub(r"[\s\.,;:]+$", "", re.sub(r"\s+", " ", s.lower()))
+    has_digit = bool(_RE_DIGIT.search(s))
+    if norm in _EXPERIENCE_YEARS_STUBS or (norm.endswith(" etc") and not has_digit):
+        return False
+    return has_digit or bool(_RE_YEARS_WORD.search(s))
+
+
 def resolve_field_staged(
     canonical_key: str,
     synonyms: List[str],
     full_text: str,
-    grid_matrix: List[List[str]]
+    grid_matrix: List[List[str]],
+    validator: Optional[Any] = None,
 ) -> Tuple[Any, str, float]:
     """
     Executes a 4-pass resolution protocol before defaulting to NA:
@@ -744,7 +867,7 @@ def resolve_field_staged(
             if any(_match_synonym(syn, cell) for syn in synonyms):
                 if idx + 1 < len(row) and row[idx+1].strip():
                     val = row[idx+1].strip()
-                    if val.lower() not in ["na", "n/a", "nil", "—"]:
+                    if val.lower() not in ["na", "n/a", "nil", "—"] and (validator is None or validator(val)):
                         return val, "grid_matrix_cell", 95.0
 
     # Pass 2: Section Regex Extraction
@@ -752,7 +875,7 @@ def resolve_field_staged(
         val = extract_regex_safe(syn, full_text)
         if val and val.strip():
             val_clean = val.strip()
-            if val_clean.lower() not in ["na", "n/a", "nil", "—"]:
+            if val_clean.lower() not in ["na", "n/a", "nil", "—"] and (validator is None or validator(val_clean)):
                 return val_clean, "section_regex", 85.0
 
     # Pass 3: Business & Exemption Rules Check
@@ -1072,9 +1195,15 @@ def build_infosheet_data(
                 if p_blocks:
                     grid_matrix.extend(reconstruct_grid(p_blocks))
 
+    # Main-document text and ATC text kept separately (full_text is their concatenation)
+    # for checks that must consider each document on its own, e.g. the financial-BEC wipe.
+    main_only_text = full_text
+    atc_only_text = ""
+
     # Append ATC child PDF text if provided directly or available on disk
     if atc_full_text:
         full_text += "\n\n" + atc_full_text
+        atc_only_text = atc_full_text
     else:
         try:
             import fitz
@@ -1087,7 +1216,9 @@ def build_infosheet_data(
                         try:
                             doc = fitz.open(str(atc_file))
                             for page in doc:
-                                full_text += "\n" + (page.get_text() or "")
+                                page_text = page.get_text() or ""
+                                full_text += "\n" + page_text
+                                atc_only_text += "\n" + page_text
                         except Exception:
                             pass
         except Exception:
@@ -1113,7 +1244,9 @@ def build_infosheet_data(
             return m.group(1).strip()
         return default
 
-    def resolve_field(keys, regex_pattern: Optional[str] = None, default: Optional[str] = "NA"):
+    def resolve_field(keys, regex_pattern: Optional[str] = None, default: Optional[str] = "NA", validator=None):
+        # validator: optional callable(value) -> bool; a rejected candidate is skipped so the
+        # next synonym / pass is tried, instead of the first (stub) match winning outright.
         if isinstance(keys, str):
             keys = [keys]
             
@@ -1133,6 +1266,8 @@ def build_infosheet_data(
                 norm_k = key.lower().replace("_", " ").replace("-", " ").strip()
                 val = field_lookup.get(norm_k)
             if val is not None and not _is_missing(val) and val != "Not Found":
+                if validator is not None and not validator(val):
+                    continue
                 if any(k in keys[0].lower() for k in ["client", "contact", "person"]) and any(p in str(val).lower() for p in ["are as under", "is as under", "as under", "refer bds", "refer scc", "refer nit"]):
                     continue
                 logger.info("[MAIN_ALIAS] Matched field '%s' via concept alias '%s' -> %r", keys[0], key, val)
@@ -1140,7 +1275,7 @@ def build_infosheet_data(
                 
         # Staged resolver fallback
         canonical_key = keys[0] if keys else "unknown"
-        val_staged, method, conf = resolve_field_staged(canonical_key, expanded_keys, full_text, grid_matrix)
+        val_staged, method, conf = resolve_field_staged(canonical_key, expanded_keys, full_text, grid_matrix, validator=validator)
         if val_staged != "NA":
             if any(k in canonical_key.lower() for k in ["client", "contact", "person"]) and any(p in str(val_staged).lower() for p in ["are as under", "is as under", "as under", "refer bds", "refer scc", "refer nit"]):
                 pass
@@ -2025,12 +2160,21 @@ def build_infosheet_data(
     )
     bec_text = bec_block_match.group(1) if bec_block_match else full_text
 
-    exp_years_from_sec = resolve_field(["Eligibility Criterion (Years)", "eligibility_criterion_years", "Years of Past Experience", "Past Experience", "Minimum Experience (Years)", "Experience Criteria", "Years of Past Experience Required"], default=None)
+    exp_years_from_sec = resolve_field(
+        # Longer labels first: "Years of Past Experience" would otherwise match inside
+        # "Years of Past Experience Required: 3 Year(s)" and capture "Required: 3 Year(s)".
+        ["Eligibility Criterion (Years)", "eligibility_criterion_years", "Years of Past Experience Required", "Years of Past Experience", "Minimum Experience (Years)", "Past Experience", "Experience Criteria"],
+        default=None,
+        validator=is_valid_experience_years_candidate,
+    )
     if not _is_missing(exp_years_from_sec) and exp_years_from_sec not in ("NA", "Not Found", "0", 0, "0.0", "—"):
         age_in_yrs = str(exp_years_from_sec)
     else:
         yrs_m = re.search(
-            r"(?:previous|past|preceding)\s+(?:(one|two|three|four|five|six|seven|eight|nine|ten|\(?\d{1,2}\)?))\s*\(?\d{0,2}\)?\s*years?",
+            # "previous seven (07) years" (Vadodra ATC), "preceding 7 (Seven) years" (Morena),
+            # "preceding 07 years", "last seven (7) years" (GeM); "yea rs" = PDF layout split.
+            r"(?:previous|past|preceding|last)\s+(?:(one|two|three|four|five|six|seven|eight|nine|ten|\(?\d{1,2}\)?))\s*"
+            r"(?:\(\s*(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s*\))?\s*yea\s?rs?\b",
             full_text, re.IGNORECASE
         )
         if yrs_m:
@@ -2066,25 +2210,34 @@ def build_infosheet_data(
     # 35. 3 Works Value / 1st Work Order Value
     ov1_raw = resolve_field(["Value of 1st Work Order", "1st Work Order Value", "3 Works Value", "order_value_1"], default=None)
     if _is_missing(ov1_raw) or ov1_raw in ("NA", "Not Found"):
-        m1 = re.search(r"(?:Schedule\s*1|1st\s+Work|1)\s+(?:Minimum[^\n]*?)?([\d\.]+\s*Lakhs?)", full_text, re.IGNORECASE)
+        m1 = re.search(r"(?:Schedule\s*1|1st\s+Work|(?<![\d.])1)\s+(?:Minimum[^\n]*?)?([\d\.]+\s*" + MONEY_UNIT + ")", full_text, re.IGNORECASE)
+        # Real GAIL BEC phrasing: "Purchase order/Work order value of INR 2.9\nLacs" (Morena),
+        # "purchase order of value not less than Rs. 12.46 Lacs" (Visakhapatnam ATC).
+        m_ov_phrase = re.search(
+            r"(?:purchase|work)\s*order(?:\s*/\s*(?:purchase|work)\s*order)?(?:\s*\(s\))?\s+(?:of\s+)?value\s+"
+            r"(?:of\s+)?(?:not\s+less\s+than\s+|minimum\s+|at\s+least\s+)?((?:Rs\.?|INR|₹)\s*[\d,]*\d(?:\.\d+)?\s*" + MONEY_UNIT + ")",
+            full_text, re.IGNORECASE,
+        )
         if m1: ov1_raw = m1.group(1)
+        elif m_ov_phrase: ov1_raw = m_ov_phrase.group(1)
         else:
             # Scoped to 500 chars to avoid scanning into bank net worth clauses
-            m_bec_wo = re.search(r"(?:Technical\s+BEC|Executed\s+Value)[\s\S]{0,500}?(Rs\.?\s*[\d\.]+\s*(?:Lac|Lakhs|Cr|Crore)|[\d\.]+\s*(?:Lac|Lakhs|Cr|Crore))", full_text, re.IGNORECASE)
+            m_bec_wo = re.search(r"(?:Technical\s+BEC|Executed\s+Value)[\s\S]{0,500}?(Rs\.?\s*[\d\.]+\s*" + MONEY_UNIT + r"|[\d\.]+\s*" + MONEY_UNIT + ")", full_text, re.IGNORECASE)
             if m_bec_wo and re.search(r"\d", m_bec_wo.group(1)) and "bank" not in m_bec_wo.group(0).lower():
                 ov1_raw = m_bec_wo.group(1).strip()
             else: ov1_raw = "NA"
-    order_value_1_display = format_order_value_with_unit_check(ov1_raw)
+    order_value_1_display = format_order_value_with_unit_check(complete_money_unit(ov1_raw, full_text))
 
     # 36. Annual Avg Turnover, 38. Working Capital, 40. Net Worth, 42. Solvency Certificate
     avg_annual_turnover_type_display = resolve_field("Avg Annual Turnover Type", r"Avg Annual Turnover Type[:\-\s]+([^\n]+)")
     avg_annual_turnover_value_display = field_lookup.get("Annual Turnover Limit") or field_lookup.get("Annual Avg Turnover")
     if _is_missing(avg_annual_turnover_value_display):
         avg_annual_turnover_value_display = extract_regex(r"Avg Annual Turnover Value[:\-\s]+([^\n]+)")
+    avg_annual_turnover_value_display = complete_money_unit(avg_annual_turnover_value_display, full_text)
     turnover_has_digit = any(c.isdigit() for c in str(avg_annual_turnover_value_display))
     turnover_is_exempt = any(kw in str(avg_annual_turnover_value_display).lower() for kw in ["exempt", "not applicable", "n/a", "nil", "no"])
     if _is_missing(avg_annual_turnover_value_display) or (not turnover_has_digit and not turnover_is_exempt):
-        m_to_atc = re.search(r"Average\s+Annual\s+Turnover[\s\S]*?Rs\.?\s*([\d\.]+\s*(?:Lac|Lakhs|Cr|Crore))", full_text, re.IGNORECASE)
+        m_to_atc = re.search(r"Average\s+Annual\s+Turnover[\s\S]*?Rs\.?\s*([\d\.]+\s*" + MONEY_UNIT + ")", full_text, re.IGNORECASE)
         if m_to_atc and re.search(r"\d", m_to_atc.group(1)):
             raw_to_str = f"Rs. {m_to_atc.group(1)}"
             avg_annual_turnover_value_display = format_currency(parse_money(raw_to_str)) if parse_money(raw_to_str) else raw_to_str
@@ -2105,17 +2258,19 @@ def build_infosheet_data(
     # 37. 2 Works Value / 2nd Work Order Value
     ov2_raw = resolve_field(["Value of 2nd Work Order", "2nd Work Order Value", "2 Works Value", "order_value_2"], default=None)
     if _is_missing(ov2_raw) or ov2_raw in ("NA", "Not Found"):
-        m2 = re.search(r"(?:Schedule\s*2|2nd\s+Work|2)\s+(?:Minimum[^\n]*?)?([\d\.]+\s*Lakhs?)", full_text, re.IGNORECASE)
+        m2 = re.search(r"(?:Schedule\s*2|2nd\s+Work|(?<![\d.])2)\s+(?:Minimum[^\n]*?)?([\d\.]+\s*" + MONEY_UNIT + ")", full_text, re.IGNORECASE)
         if m2: ov2_raw = m2.group(1)
-    order_value_2_display = format_order_value_with_unit_check(ov2_raw)
+    order_value_2_display = format_order_value_with_unit_check(complete_money_unit(ov2_raw, full_text))
 
     # 38. Working Capital
     working_capital_type_display = resolve_field("Working Capital Type", r"Working Capital Type[:\-\s]+([^\n]+)")
-    working_capital_value_display = resolve_field(["Working Capital Value", "Working Capital"], r"Working Capital Value[:\-\s]+([^\n]+)")
+    working_capital_value_display = complete_money_unit(
+        resolve_field(["Working Capital Value", "Working Capital"], r"Working Capital Value[:\-\s]+([^\n]+)"), full_text
+    )
     wc_has_digit = any(c.isdigit() for c in str(working_capital_value_display))
     wc_is_exempt = any(kw in str(working_capital_value_display).lower() for kw in ["exempt", "not applicable", "n/a", "nil", "no"])
     if _is_missing(working_capital_value_display) or (not wc_has_digit and not wc_is_exempt):
-        m_wc_atc = re.search(r"Working\s+Capital[\s\S]*?Rs\.?\s*([\d\.]+\s*(?:Lac|Lakhs|Cr|Crore))", full_text, re.IGNORECASE)
+        m_wc_atc = re.search(r"Working\s+Capital[\s\S]*?Rs\.?\s*([\d\.]+\s*" + MONEY_UNIT + ")", full_text, re.IGNORECASE)
         if m_wc_atc and re.search(r"\d", m_wc_atc.group(1)):
             wc_ctx = full_text[max(0, m_wc_atc.start()-100):min(len(full_text), m_wc_atc.end()+100)].lower()
             if not any(k in wc_ctx for k in ["bank guarantee", "bank net worth", "issuing bank", "scheduled bank"]):
@@ -2142,14 +2297,16 @@ def build_infosheet_data(
     # 39. 1 work Value / 3rd Work Order Value
     ov3_raw = resolve_field(["Value of 3rd Work Order", "3rd Work Order Value", "1 work Value", "order_value_3"], default=None)
     if _is_missing(ov3_raw) or ov3_raw in ("NA", "Not Found"):
-        m3 = re.search(r"(?:Schedule\s*3|3rd\s+Work|3)\s+(?:Minimum[^\n]*?)?([\d\.]+\s*Lakhs?)", full_text, re.IGNORECASE)
+        m3 = re.search(r"(?:Schedule\s*3|3rd\s+Work|(?<![\d.])3)\s+(?:Minimum[^\n]*?)?([\d\.]+\s*" + MONEY_UNIT + ")", full_text, re.IGNORECASE)
         if m3: ov3_raw = m3.group(1)
         else: ov3_raw = "NA"
-    order_value_3_display = format_order_value_with_unit_check(ov3_raw)
+    order_value_3_display = format_order_value_with_unit_check(complete_money_unit(ov3_raw, full_text))
 
     # 40. Net Worth
     net_worth_type_display = resolve_field("Net Worth Type", r"Net Worth Type[:\-\s]+([^\n]+)")
-    net_worth_value_display = resolve_field(["Net Worth Value", "Net Worth"], r"Net Worth Value[:\-\s]+([^\n]+)")
+    net_worth_value_display = complete_money_unit(
+        resolve_field(["Net Worth Value", "Net Worth"], r"Net Worth Value[:\-\s]+([^\n]+)"), full_text
+    )
     if _is_missing(net_worth_value_display):
         clause_2_2_match = re.search(r"\b2\.2\b\s*NET\s*WORTH\s*[:\-]?\s*(.*?)(?=\b2\.3\b|\b3\.\d\b|\bSECTION-III\b|\bBIDDING DATA SHEET\b|\Z)", full_text, re.IGNORECASE | re.DOTALL)
         if clause_2_2_match:
@@ -2163,7 +2320,9 @@ def build_infosheet_data(
 
     # 42. Solvency Certificate
     solvency_certificate_type_display = resolve_field("Solvency Certificate Type", r"Solvency Certificate Type[:\-\s]+([^\n]+)")
-    solvency_certificate_value_display = resolve_field(["Solvency Certificate Value", "Solvency Certificate"], r"Solvency Certificate Value[:\-\s]+([^\n]+)")
+    solvency_certificate_value_display = complete_money_unit(
+        resolve_field(["Solvency Certificate Value", "Solvency Certificate"], r"Solvency Certificate Value[:\-\s]+([^\n]+)"), full_text
+    )
 
     normalized_full_text = re.sub(r"\s+", " ", full_text).lower()
     m_fc_exempt = re.search(
@@ -2172,7 +2331,14 @@ def build_infosheet_data(
         re.DOTALL,
     )
     is_gem_tender = "GEM/" in str(tender_id_display or "") or "bidplus.gem.gov.in" in full_text or "gem.gov.in" in full_text
-    has_financial_bec = bool(re.search(r"(?:Annual\s+(?:Average\s+)?Turnover|Working\s+Capital|Net\s+Worth|Solvency\s+Certificate)[\s\S]{0,100}?(?:Rs\.?|₹|INR|\d+\s*(?:Lakh|Crore|Cr|Lac))", full_text, re.IGNORECASE))
+    # The GeM blanket wipe below is only safe when NEITHER document carries a bidder
+    # financial BEC: the parent GeM overview often says "Turnover: No" / lists nothing,
+    # while the ATC holds the real clause. Each document is checked on its own.
+    main_has_financial_bec = has_financial_bec_content(main_only_text)
+    atc_has_financial_bec = has_financial_bec_content(atc_only_text) if atc_only_text.strip() else False
+    has_financial_bec = main_has_financial_bec or atc_has_financial_bec
+    if is_gem_tender and not main_has_financial_bec and atc_has_financial_bec:
+        logger.info("[FINANCIAL_BEC] Main GeM document shows no financial BEC but the ATC does; skipping blanket financial wipe")
 
     if m_fc_exempt or (is_gem_tender and not has_financial_bec):
         # Unconditionally override all financial sub-fields per AGENTS.md rule
@@ -2215,8 +2381,11 @@ def build_infosheet_data(
             custom_eligibility_criteria_value_normalized = total_inr
 
     if _is_missing(custom_eligibility_criteria_display) or custom_eligibility_criteria_display in ("NA", "Not Found"):
-        clause_1_2_match = re.search(r"\b1\.2\b(.*?)(?=\b2\.[0123]\b|\b1\.3\b|\b2\.0\b|\bSECTION-III\b|\bBIDDING DATA SHEET\b|\Z)", full_text, re.IGNORECASE | re.DOTALL)
-        if clause_1_2_match:
+        # Clause text ends at the NEXT numbered sub-clause header on its own line (any "N.N",
+        # e.g. "1.3", "2.1") as well as the explicit section markers, so it never runs on
+        # into an adjacent clause.
+        clause_1_2_match = re.search(r"\b1\.2\b(.*?)(?=\n[ \t]*\d{1,2}\.\d{1,2}\b|\b2\.[0123]\b|\b1\.3\b|\b2\.0\b|\bSECTION-III\b|\bBIDDING DATA SHEET\b|\Z)", full_text, re.IGNORECASE | re.DOTALL)
+        if clause_1_2_match and not _RE_MII_TEXT.search(clause_1_2_match.group(1)):
             c_text = clause_1_2_match.group(1).strip()
             lines = [line.strip() for line in c_text.split("\n") if line.strip()]
             table_lines = []
@@ -2953,31 +3122,35 @@ def build_infosheet_data(
         except (ValueError, TypeError):
             pass
     if _is_missing(custom_eligibility_criteria_display) or custom_eligibility_criteria_display == "NA":
-        lc_match = re.search(r"Minimum\s+(\d+\%)\s+and\s+(\d+\%)\s+Local\s+Content\s+required[^\n\)]*", full_text, re.IGNORECASE)
-        if lc_match:
-            custom_eligibility_criteria_display = lc_match.group(0).strip()
+        # The Make-in-India "Minimum 50% and 20% Local Content required for qualifying as Class 1
+        # and Class 2 Local Supplier" line (a GeM item-table header / MII clause) used to be tried
+        # FIRST here, so it won over the actual technical eligibility clause (seen on real Noida
+        # and Vadodra text). It is not an eligibility criterion and is no longer accepted.
+        # Values are digits/commas/decimal plus an optional unit on the SAME line: the old
+        # "[\d\.\,\s]+" also swallowed a following "\n1.2 " clause header into the number.
+        order_value_capture = r"([\d,]*\d(?:\.\d+)?(?:[ \t]*" + MONEY_UNIT + r")?)"
+        custom_match = re.search(
+            r"(?:executed|completed)\s+(?:at\s+least\s+)?(?:one|1)\s+(?:single\s+)?(?:purchase\s+order|order|work\s+order)\s+of\s+(?:a\s+)?value\s+(?:not\s+less\s+than|of)\s+Rs\.?\s*"
+            + order_value_capture,
+            full_text, re.IGNORECASE,
+        )
+        if custom_match:
+            val_str = custom_match.group(1).strip()
+            custom_eligibility_criteria_display = f"Minimum Qualifying Order Value: Rs. {val_str}"
+            total_inr = normalize_bec_order_value(val_str)
+            if total_inr:
+                custom_eligibility_criteria_value_normalized = total_inr
         else:
-            custom_match = re.search(r"(?:executed|completed)\s+(?:at\s+least\s+)?(?:one|1)\s+(?:single\s+)?(?:purchase\s+order|order|work\s+order)\s+of\s+(?:a\s+)?value\s+(?:not\s+less\s+than|of)\s+Rs\.?\s*([\d\.\,\s]+(?:Lacs|Lakhs|Crore|Cr)?)\b", full_text, re.IGNORECASE)
-            if custom_match:
-                val_str = custom_match.group(1).strip()
-                custom_eligibility_criteria_display = f"Minimum Qualifying Order Value: Rs. {val_str}"
-                total_inr = normalize_bec_order_value(val_str)
-                if total_inr:
-                    custom_eligibility_criteria_value_normalized = total_inr
-            else:
-                custom_match_broad = None
-                for m_head in re.finditer(r"Minimum\s+Executed\s+Order\s+Value", full_text, re.IGNORECASE):
-                    window = full_text[m_head.start():m_head.start() + 500]
-                    m_sub = re.search(r"(Rs\.?\s*[\d\.\,\s]+(?:Lacs|Lakhs|Crore|Cr)?)", window, re.IGNORECASE)
-                    if m_sub:
-                        custom_match_broad = m_sub
-                        break
-                if custom_match_broad:
-                    val_str = custom_match_broad.group(1).strip()
+            for m_head in re.finditer(r"Minimum\s+Executed\s+Order\s+Value", full_text, re.IGNORECASE):
+                window = full_text[m_head.start():m_head.start() + 500]
+                m_sub = re.search(r"Rs\.?\s*" + order_value_capture, window, re.IGNORECASE)
+                if m_sub:
+                    val_str = f"Rs. {m_sub.group(1).strip()}"
                     custom_eligibility_criteria_display = f"Minimum Qualifying Order Value: {val_str}"
                     total_inr = normalize_bec_order_value(val_str)
                     if total_inr:
                         custom_eligibility_criteria_value_normalized = total_inr
+                    break
 
     field_sources = {}
     for sec in sections:
