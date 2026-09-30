@@ -1248,6 +1248,7 @@ export class TenderExecutiveService {
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.created_at < '${from}'
+        AND ti.status = 1
         AND NOT EXISTS (
             SELECT 1
             FROM tender_information tin
@@ -1289,6 +1290,7 @@ export class TenderExecutiveService {
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.created_at <= '${to}'
+        AND ti.status = 1
         AND NOT EXISTS (
             SELECT 1
             FROM tender_information tin
