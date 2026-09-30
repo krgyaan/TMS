@@ -31,7 +31,7 @@ const UpdateVendorOrganizationSchema = VendorOrganizationFields.partial().superR
 const CreateVendorSchema = z.object({
     orgId: z.number().optional(),
     name: z.string().trim().min(1).max(255),
-    email: z.string().trim().email(),
+    email: z.union([z.literal(""), z.string().trim().email()]).optional(),
     mobile: z.string().trim().min(1).max(22),
     address: z.string().trim().optional(),
 });

@@ -39,13 +39,23 @@ export const AccountFormSchema = z.object({
     status: z.boolean(),
 });
 
+// Email is optional (281 of 517 person rows have none); a blank string is a valid
+// "no email" value. Mobile stays required — it is what the API enforces too.
 export const PersonFormSchema = z.object({
     id: z.number().optional(),
     name: z.string().min(1, "Person name is required"),
-    email: z.string().email("Invalid email").min(1, "Email is required"),
-    mobile: z.string().min(1, "Mobile number is required"),
+    email: z.union([z.email("Invalid email"), z.literal("")]),
+    mobile: z.string().min(1, "Mobile number is required").max(22, "Mobile number is too long"),
     address: z.string().optional(),
-    status: z.boolean(),
+});
+
+// Persons are saved through PersonFormDialog, never inside the organization
+// payload, so the array held on the org form is a display cache only. Loosen
+// email/mobile here (same inferred shape) so a legacy person row missing either
+// can no longer block saving the organization around it.
+const CachedPersonFormSchema = PersonFormSchema.extend({
+    email: z.string(),
+    mobile: z.string(),
 });
 
 export const FileFormSchema = z.object({
@@ -58,7 +68,7 @@ export const VendorFormSchema = z.object({
     organization: OrgFormSchema,
     gsts: z.array(GstFormSchema),
     accounts: z.array(AccountFormSchema),
-    persons: z.array(PersonFormSchema),
+    persons: z.array(CachedPersonFormSchema),
     files: z.array(FileFormSchema),
 });
 
