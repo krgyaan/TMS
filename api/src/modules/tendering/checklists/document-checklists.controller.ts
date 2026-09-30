@@ -3,7 +3,6 @@ import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { BiddingRequirementsService } from '@/modules/tendering/checklists/bidding-requirements.service';
 import { DocumentChecklistsService } from '@/modules/tendering/checklists/document-checklists.service';
-import { TenderAnnexuresService } from '@/modules/tendering/checklists/tender-annexures.service';
 import type { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/modules/tendering/checklists/dto/document-checklist.dto';
 import { getFrontendTimersBatch } from '@/modules/timers/timer-helper';
 import { TimersService } from '@/modules/timers/timers.service';
@@ -17,7 +16,6 @@ export class DocumentChecklistsController {
         private readonly appLogger: AppLogger,
         private readonly documentChecklistsService: DocumentChecklistsService,
         private readonly biddingRequirementsService: BiddingRequirementsService,
-        private readonly tenderAnnexuresService: TenderAnnexuresService,
         private readonly timersService: TimersService
     ) {
         this.logger = this.appLogger.withContext(DocumentChecklistsController.name);
@@ -105,20 +103,6 @@ export class DocumentChecklistsController {
     ) {
         const isForceRefresh = forceRefresh === 'true' || forceRefresh === '1';
         return this.biddingRequirementsService.analyzeForTender(tenderId, isForceRefresh, user?.id);
-    }
-
-    /**
-     * AI-identified fillable annexures/proformas/formats for this tender, via VolksAI's
-     * /identify-annexures (Role 4). Each is generated as a .docx, saved under uploads
-     * (checklists context), and appended to this tender's checklist extra_documents
-     * when a checklist row exists (see TenderAnnexuresService.appendedToChecklist).
-     */
-    @Post('tender/:tenderId/identify-annexures')
-    identifyAnnexures(
-        @Param('tenderId', ParseIntPipe) tenderId: number,
-        @CurrentUser() user?: ValidatedUser,
-    ) {
-        return this.tenderAnnexuresService.identifyAnnexuresForTender(tenderId, user?.id);
     }
 
     @Post()
