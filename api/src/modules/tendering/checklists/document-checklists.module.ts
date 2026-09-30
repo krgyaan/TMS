@@ -3,6 +3,7 @@ import { DatabaseModule } from '@db/database.module';
 import { BiddingRequirementsService } from '@/modules/tendering/checklists/bidding-requirements.service';
 import { DocumentChecklistsController } from '@/modules/tendering/checklists/document-checklists.controller';
 import { DocumentChecklistsService } from '@/modules/tendering/checklists/document-checklists.service';
+import { TenderAnnexuresService } from '@/modules/tendering/checklists/tender-annexures.service';
 import { EmailModule } from '@/modules/email/email.module';
 import { FileUploadModule } from '@/modules/file-upload/file-upload.module';
 import { FinanceDocumentsModule } from '@/modules/shared/finance-documents/finance-documents.module';
@@ -23,7 +24,7 @@ import { ClaudeUsageModule } from '@/modules/master/claude-usage/claude-usage.mo
         ClaudeUsageModule,
     ],
     controllers: [DocumentChecklistsController],
-    providers: [DocumentChecklistsService, BiddingRequirementsService],
+    providers: [DocumentChecklistsService, BiddingRequirementsService, TenderAnnexuresService],
     exports: [DocumentChecklistsService],
 })
 export class DocumentChecklistsModule { }
