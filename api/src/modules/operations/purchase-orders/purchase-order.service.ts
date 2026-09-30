@@ -1073,18 +1073,6 @@ export class PurchaseOrderService {
 
             await this.syncPersonForOrg(orgId, body);
             await this.syncGstForOrg(orgId, body);
-        } else if (body.sellerId) {
-            await this.db
-                .update(projectParties)
-                .set({
-                    name: body.sellerName,
-                    email: body.sellerEmail || null,
-                    address: body.sellerAddress || null,
-                    gstNo: body.sellerGstNo || null,
-                    pan: body.sellerPanNo || null,
-                    msme: body.sellerMsmeNo || null,
-                })
-                .where(eq(projectParties.id, body.sellerId));
         }
         if (body.shipToPartyId) {
             await this.db
@@ -1531,7 +1519,8 @@ export class PurchaseOrderService {
             .where(eq(vendorOrganizations.status, true))
             .orderBy(desc(vendorOrganizations.createdAt));
 
-        const orgMap = new Map<number, any>();
+        type OrgRow = (typeof orgRows)[number] & { type: string; source: string };
+        const orgMap = new Map<number, OrgRow>();
         for (const row of orgRows) {
             const existing = orgMap.get(row.id);
             if (existing) {
@@ -1549,12 +1538,13 @@ export class PurchaseOrderService {
         }
 
         const sellerOrgs = [...orgMap.values()];
-        const legacySellers = partyRows.filter(
-            (p) => p.type === "seller" && !p.vendorOrganizationId,
-        ).map((p) => ({ ...p, source: "party" as const }));
-        const otherParties = partyRows.filter((p) => p.type !== "seller");
+        // Sellers exist only in vendor master now, so project_parties contributes
+        // nothing here beyond ship-to addresses and other non-seller beneficiaries.
+        const otherParties = partyRows
+            .filter((p) => p.type !== "seller")
+            .map((p) => ({ ...p, source: "party" as const }));
 
-        return [...sellerOrgs, ...legacySellers, ...otherParties];
+        return [...sellerOrgs, ...otherParties];
     }
 
     async activateParty(id: number, source?: string) {
@@ -1566,22 +1556,6 @@ export class PurchaseOrderService {
                 .returning();
             if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
             return { ...rows[0], type: "seller", source: "vendor_org", isActive: true };
-        }
-
-        const [party] = await this.db
-            .select()
-            .from(projectParties)
-            .where(eq(projectParties.id, id))
-            .limit(1);
-
-        if (party?.vendorOrganizationId) {
-            const rows = await this.db
-                .update(vendorOrganizations)
-                .set({ status: true, updatedAt: new Date() })
-                .where(eq(vendorOrganizations.id, party.vendorOrganizationId))
-                .returning();
-            if (!rows[0]) throw new NotFoundException(`Vendor organization not found for party ${id}`);
-            return { ...party, isActive: true, source: "vendor_org" };
         }
 
         const rows = await this.db
@@ -1605,22 +1579,6 @@ export class PurchaseOrderService {
                 .returning();
             if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
             return { ...rows[0], type: "seller", source: "vendor_org", isActive: false };
-        }
-
-        const [party] = await this.db
-            .select()
-            .from(projectParties)
-            .where(eq(projectParties.id, id))
-            .limit(1);
-
-        if (party?.vendorOrganizationId) {
-            const rows = await this.db
-                .update(vendorOrganizations)
-                .set({ status: false, updatedAt: new Date() })
-                .where(eq(vendorOrganizations.id, party.vendorOrganizationId))
-                .returning();
-            if (!rows[0]) throw new NotFoundException(`Vendor organization not found for party ${id}`);
-            return { ...party, isActive: false, source: "vendor_org" };
         }
 
         const rows = await this.db
@@ -1669,20 +1627,6 @@ export class PurchaseOrderService {
             throw new NotFoundException(`Party with ID ${id} not found`);
         }
 
-        if (existing.vendorOrganizationId) {
-            await this.db
-                .update(vendorOrganizations)
-                .set({
-                    name: body.name ?? undefined,
-                    alias: body.alias ?? undefined,
-                    msme: body.msme ?? undefined,
-                    pan: body.pan ?? undefined,
-                    address: body.address ?? undefined,
-                    updatedAt: new Date(),
-                })
-                .where(eq(vendorOrganizations.id, existing.vendorOrganizationId));
-        }
-
         const rows = await this.db
             .update(projectParties)
             .set({
@@ -1714,6 +1658,6 @@ export class PurchaseOrderService {
             }]);
         }
 
-        return { ...rows[0], source: existing.vendorOrganizationId ? "vendor_org" : "party" };
+        return { ...rows[0], source: "party" as const };
     }
 }
