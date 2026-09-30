@@ -188,6 +188,8 @@ const TERMINAL_KPI: TenderKpiBucket[] = ["WON", "LOST", "DISQUALIFIED", "MISSED"
 
 type StageState = "DONE" | "PENDING" | "OVERDUE" | "NOT_APPLICABLE";
 
+type DrilldownDateMode = "assigned" | "infoFilled" | "approved" | "bidSubmitted" | "resultEval" | "resultUploaded" | "tenderUpdated";
+
 @Injectable()
 export class TenderExecutiveService {
     constructor(
@@ -1181,6 +1183,27 @@ export class TenderExecutiveService {
         return aggregated;
     }
 
+    private mapDrilldown(rows: any[], dateMode: DrilldownDateMode = "assigned") {
+        const pick: Record<DrilldownDateMode, (t: any) => unknown> = {
+            assigned: t => t.created_at,
+            infoFilled: t => t.info_filled_at,
+            approved: t => t.tl_approval_timestamp ?? t.info_filled_at,
+            bidSubmitted: t => t.bid_submitted_at,
+            resultEval: t => t.result_created_at ?? t.bid_submitted_at,
+            resultUploaded: t => t.result_resolved_at,
+            tenderUpdated: t => t.updated_at,
+        };
+
+        return rows.map(t => ({
+            tenderId: t.id,
+            tenderNo: t.tender_no ?? t.tenderNo,
+            tenderName: t.tender_name ?? t.tenderName,
+            value: Number(t.effective_value ?? t.gst_values ?? 0),
+            status: t.status_name ?? null,
+            date: (pick[dateMode](t) as string | undefined) ?? null,
+        }));
+    }
+
     async getStageBacklogV2(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
         const from = `${query.fromDate}T00:00:00.000Z`;
         const to = `${query.toDate}T23:59:59.999Z`;
@@ -1215,6 +1238,26 @@ export class TenderExecutiveService {
                 THEN COALESCE(tcd.final_price, ti.gst_values)
                 ELSE ti.gst_values
             END AS effective_value,
+            (
+                SELECT MIN(tin.created_at)
+                FROM tender_information tin
+                WHERE tin.tender_id = ti.id
+            ) AS info_filled_at,
+            (
+                SELECT MIN(bs.submission_datetime)
+                FROM bid_submissions bs
+                WHERE bs.tender_id = ti.id
+            ) AS bid_submitted_at,
+            (
+                SELECT MIN(tr.created_at)
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+            ) AS result_created_at,
+            (
+                SELECT COALESCE(MAX(tr.result_uploaded_at), MAX(tr.updated_at))
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+            ) AS result_resolved_at,
             sst.name AS status_name
         FROM tender_infos ti
         LEFT JOIN LATERAL (
@@ -1697,7 +1740,7 @@ export class TenderExecutiveService {
                         completed: {
                             count: assignedDuringCompleted.length,
                             value: this.sumValue(assignedDuringCompleted),
-                            drilldown: this.mapDrilldown(assignedDuringCompleted),
+                            drilldown: this.mapDrilldown(assignedDuringCompleted, "infoFilled"),
                         },
 
                         // statusChanged is intentionally no longer reported for this
@@ -1715,28 +1758,28 @@ export class TenderExecutiveService {
                     opening: {
                         count: approvedOpening.length,
                         value: this.sumValue(approvedOpening),
-                        drilldown: this.mapDrilldown(approvedOpening),
+                        drilldown: this.mapDrilldown(approvedOpening, "infoFilled"),
                     },
                     total: {
                         count: approvedTotal.length,
                         value: this.sumValue(approvedTotal),
-                        drilldown: this.mapDrilldown(approvedTotal),
+                        drilldown: this.mapDrilldown(approvedTotal, "infoFilled"),
                     },
                     during: {
                         total: {
                             count: assignedDuringCompleted.length,
                             value: this.sumValue(assignedDuringCompleted),
-                            drilldown: this.mapDrilldown(assignedDuringCompleted),
+                            drilldown: this.mapDrilldown(assignedDuringCompleted, "infoFilled"),
                         },
                         completed: {
                             count: approvedDuringAccepted.length,
                             value: this.sumValue(approvedDuringAccepted),
-                            drilldown: this.mapDrilldown(approvedDuringAccepted),
+                            drilldown: this.mapDrilldown(approvedDuringAccepted, "approved"),
                         },
                         rejected: {
                             count: approvedDuringRejected.length,
                             value: this.sumValue(approvedDuringRejected),
-                            drilldown: this.mapDrilldown(approvedDuringRejected),
+                            drilldown: this.mapDrilldown(approvedDuringRejected, "approved"),
                         },
                     },
                 },
@@ -1761,12 +1804,12 @@ export class TenderExecutiveService {
                         completed: {
                             count: bidDuringCompleted.length,
                             value: this.sumValue(bidDuringCompleted),
-                            drilldown: this.mapDrilldown(bidDuringCompleted),
+                            drilldown: this.mapDrilldown(bidDuringCompleted, "bidSubmitted"),
                         },
                         pending: {
                             count: dnbDuringCompleted.length,
                             value: this.sumValue(dnbDuringCompleted),
-                            drilldown: this.mapDrilldown(dnbDuringCompleted),
+                            drilldown: this.mapDrilldown(dnbDuringCompleted, "tenderUpdated"),
                         },
                     },
                 },
@@ -1774,13 +1817,13 @@ export class TenderExecutiveService {
                     opening: {
                         count: resultAwaitedOpening.length,
                         value: this.sumValue(resultAwaitedOpening),
-                        drilldown: this.mapDrilldown(resultAwaitedOpening),
+                        drilldown: this.mapDrilldown(resultAwaitedOpening, "resultEval"),
                     },
 
                     total: {
                         count: resultAwaitedClosing.length, // 🔥 closing pending
                         value: this.sumValue(resultAwaitedClosing),
-                        drilldown: this.mapDrilldown(resultAwaitedClosing),
+                        drilldown: this.mapDrilldown(resultAwaitedClosing, "resultEval"),
                     },
 
                     during: {
@@ -1788,19 +1831,19 @@ export class TenderExecutiveService {
                             // 🔥 bids that entered result stage during period
                             count: resultAwaitedDuringTotal.length,
                             value: this.sumValue(resultAwaitedDuringTotal),
-                            drilldown: this.mapDrilldown(resultAwaitedDuringTotal),
+                            drilldown: this.mapDrilldown(resultAwaitedDuringTotal, "bidSubmitted"),
                         },
                         disqualified: {
                             // 🔥 bids that entered result stage during period
                             count: disqualifiedDuringCompleted.length,
                             value: this.sumValue(disqualifiedDuringCompleted),
-                            drilldown: this.mapDrilldown(disqualifiedDuringCompleted),
+                            drilldown: this.mapDrilldown(disqualifiedDuringCompleted, "resultUploaded"),
                         },
                         received: {
                             // 🔥 result received during period
                             count: resultAwaitedDuringCompleted.length,
                             value: this.sumValue(resultAwaitedDuringCompleted),
-                            drilldown: this.mapDrilldown(resultAwaitedDuringCompleted),
+                            drilldown: this.mapDrilldown(resultAwaitedDuringCompleted, "resultUploaded"),
                         },
                     },
                 },
@@ -1809,18 +1852,18 @@ export class TenderExecutiveService {
                     opening: {
                         count: wonOpening.length,
                         value: this.sumValue(wonOpening),
-                        drilldown: this.mapDrilldown(wonOpening),
+                        drilldown: this.mapDrilldown(wonOpening, "resultUploaded"),
                     },
                     total: {
                         count: wonTotal.length,
                         value: this.sumValue(wonTotal),
-                        drilldown: this.mapDrilldown(wonTotal),
+                        drilldown: this.mapDrilldown(wonTotal, "resultUploaded"),
                     },
                     during: {
                         completed: {
                             count: wonDuringCompleted.length,
                             value: this.sumValue(wonDuringCompleted),
-                            drilldown: this.mapDrilldown(wonDuringCompleted),
+                            drilldown: this.mapDrilldown(wonDuringCompleted, "resultUploaded"),
                         },
                         pending: { count: 0, value: 0, drilldown: [] },
                     },
@@ -1830,18 +1873,18 @@ export class TenderExecutiveService {
                     opening: {
                         count: lostOpening.length,
                         value: this.sumValue(lostOpening),
-                        drilldown: this.mapDrilldown(lostOpening),
+                        drilldown: this.mapDrilldown(lostOpening, "resultUploaded"),
                     },
                     total: {
                         count: lostTotal.length,
                         value: this.sumValue(lostTotal),
-                        drilldown: this.mapDrilldown(lostTotal),
+                        drilldown: this.mapDrilldown(lostTotal, "resultUploaded"),
                     },
                     during: {
                         completed: {
                             count: lostDuringCompleted.length,
                             value: this.sumValue(lostDuringCompleted),
-                            drilldown: this.mapDrilldown(lostDuringCompleted),
+                            drilldown: this.mapDrilldown(lostDuringCompleted, "resultUploaded"),
                         },
                         pending: { count: 0, value: 0, drilldown: [] },
                     },
@@ -1851,35 +1894,24 @@ export class TenderExecutiveService {
                     opening: {
                         count: cancelledOpening.length,
                         value: this.sumValue(cancelledOpening),
-                        drilldown: this.mapDrilldown(cancelledOpening),
+                        drilldown: this.mapDrilldown(cancelledOpening, "resultUploaded"),
                     },
                     total: {
                         count: cancelledTotal.length,
                         value: this.sumValue(cancelledTotal),
-                        drilldown: this.mapDrilldown(cancelledTotal),
+                        drilldown: this.mapDrilldown(cancelledTotal, "resultUploaded"),
                     },
                     during: {
                         completed: {
                             count: cancelledDuringCompleted.length,
                             value: this.sumValue(cancelledDuringCompleted),
-                            drilldown: this.mapDrilldown(cancelledDuringCompleted),
+                            drilldown: this.mapDrilldown(cancelledDuringCompleted, "resultUploaded"),
                         },
                         pending: { count: 0, value: 0, drilldown: [] },
                     },
                 },
             },
         };
-    }
-
-    private mapDrilldown(rows: any[]) {
-        return rows.map(t => ({
-            tenderId: t.id,
-            tenderNo: t.tender_no ?? t.tenderNo,
-            tenderName: t.tender_name ?? t.tenderName,
-            value: Number(t.effective_value ?? t.gst_values ?? 0),
-            status: t.status_name ?? null,
-            date: t.updated_at ?? null,
-        }));
     }
 
     private sumValue(rows: any[]) {
