@@ -22,6 +22,7 @@ import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { BadRequestException, ConflictException, Inject, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { eq, inArray, or } from 'drizzle-orm';
+import { countExtractionFieldKeys, extractionFieldsUpsertValue } from './extraction-fields-merge';
 
 export type TechnicalDocument = {
     id: number;
@@ -1894,7 +1895,9 @@ export class TenderInfoSheetsService {
     ) {
         await this.tenderInfosService.validateExists(tenderId);
 
-        const fieldsCount = Object.keys(data.fields || {}).length;
+        // Extraction-owned keys only: preserved keys (e.g. biddingRequirementsAnalysis) are
+        // carried over from the stored row and must not skew the save verification below.
+        const fieldsCount = countExtractionFieldKeys(data.fields);
 
         this.logger.log(`[AutoExtract] Save request initiated for tender ${tenderId}`, {
             event_type: 'autoextract_save',
@@ -1919,7 +1922,9 @@ export class TenderInfoSheetsService {
                 .onConflictDoUpdate({
                     target: tenderExtractions.tenderId,
                     set: {
-                        fields: data.fields,
+                        // Replace the extraction data but keep other features' cached keys
+                        // (the bidding-requirements analysis) instead of wiping them.
+                        fields: extractionFieldsUpsertValue(data.fields),
                         missingFields: data.missing_fields || [],
                         extractionVersion: data.extraction_version || '1.0.0',
                         processingTimeMs: data.processing_time_ms || null,
@@ -1943,14 +1948,14 @@ export class TenderInfoSheetsService {
                 .where(eq(tenderExtractions.tenderId, tenderId))
                 .limit(1);
 
-            const verified = Boolean(saved && Object.keys(saved.fields || {}).length === fieldsCount);
+            const verified = Boolean(saved && countExtractionFieldKeys(saved.fields as Record<string, unknown>) === fieldsCount);
 
             this.logger.log(`[AutoExtract] Follow-up check: verified=${verified} for tender ${tenderId}`, {
                 event_type: 'autoextract_save',
                 action: 'followup_check',
                 tenderId,
                 verified,
-                persistedFieldsCount: saved ? Object.keys(saved.fields || {}).length : 0,
+                persistedFieldsCount: saved ? countExtractionFieldKeys(saved.fields as Record<string, unknown>) : 0,
             });
 
             return {

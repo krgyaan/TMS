@@ -7,11 +7,13 @@ import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service'
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { tenderExtractions } from '@db/schemas/tendering/tender-extractions.schema';
-import { BadRequestException, Inject, Injectable, NotFoundException, StreamableFile } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional, StreamableFile } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { eq, sql } from 'drizzle-orm';
 import * as fs from 'fs';
 import * as path from 'path';
+import { randomUUID } from 'crypto';
+import type IORedis from 'ioredis';
 
 export type SuggestedRequirementCategory = 'oem' | 'standard' | 'company' | 'other';
 export type SuggestedRequirementConfidence = 'high' | 'medium' | 'low';
@@ -64,6 +66,18 @@ export const BIDDING_REQUIREMENTS_SCHEMA_VERSION = 1;
  */
 export const BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS = 240000;
 
+/**
+ * Cross-process lock for one tender's analysis (Redis SET NX PX). Held while a VolksAI
+ * dispatch is running so a second API process never starts a second paid analysis for
+ * the same tender. The TTL outlasts the longest dispatch so a crashed holder frees it.
+ */
+export const BIDDING_REQUIREMENTS_LOCK_TTL_MS = BIDDING_REQUIREMENTS_MIN_TIMEOUT_MS + 60000;
+export const BIDDING_REQUIREMENTS_LOCK_POLL_MS = 2000;
+const lockKey = (tenderId: number) => `bidding-requirements:lock:${tenderId}`;
+// Delete the lock only if we still own it (a stale holder must not free a newer lock).
+const RELEASE_LOCK_LUA =
+    "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+
 export interface BiddingRequirementsAnalysisResult {
     jobId: string;
     requirements: SuggestedBiddingRequirement[];
@@ -96,6 +110,12 @@ const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingm
 @Injectable()
 export class BiddingRequirementsService {
     private readonly logger;
+    /**
+     * In-process de-duplication: tenderId -> the analysis currently running for it. A second
+     * request for the same tender (double-click, two tabs) awaits this promise and gets the
+     * same result instead of dispatching its own VolksAI call.
+     */
+    private readonly inFlight = new Map<number, Promise<BiddingRequirementsAnalysisResult>>();
 
     constructor(
         private readonly appLogger: AppLogger,
@@ -106,6 +126,7 @@ export class BiddingRequirementsService {
         private readonly tenderInfoSheetsService: TenderInfoSheetsService,
         private readonly financeDocumentsService: FinanceDocumentsService,
         private readonly claudeUsageService: ClaudeUsageService,
+        @Optional() @Inject('REDIS_CONNECTION') private readonly redis?: IORedis | null,
     ) {
         this.logger = this.appLogger.withContext(BiddingRequirementsService.name);
     }
@@ -134,6 +155,79 @@ export class BiddingRequirementsService {
             return cachedAnalysis;
         }
 
+        // In-process: join an analysis already running for this tender. No await between this
+        // check and the set below, so two concurrent requests can never both miss it.
+        const running = this.inFlight.get(tenderId);
+        if (running) {
+            this.logger.log(`Joining in-flight bidding-requirements analysis for tender ${tenderId} (no second VolksAI dispatch)`);
+            return running;
+        }
+        const run = this.runWithTenderLock(tenderId, () =>
+            this.dispatchAnalysis(tenderId, tender, existingExtraction, forceRefresh, userId),
+        );
+        this.inFlight.set(tenderId, run);
+        try {
+            return await run;
+        } finally {
+            if (this.inFlight.get(tenderId) === run) this.inFlight.delete(tenderId);
+        }
+    }
+
+    /**
+     * Cross-process guard (only when Redis is connected): acquires the tender's lock and runs
+     * `dispatch`; if another API process already holds it, waits for it to finish and returns
+     * the analysis that process cached, instead of dispatching a second paid VolksAI call.
+     * Without Redis this is a pass-through (the in-process map still de-duplicates).
+     */
+    private async runWithTenderLock(
+        tenderId: number,
+        dispatch: () => Promise<BiddingRequirementsAnalysisResult>,
+    ): Promise<BiddingRequirementsAnalysisResult> {
+        const redis = this.redis && this.redis.status === 'ready' ? this.redis : null;
+        if (!redis) return dispatch();
+
+        const key = lockKey(tenderId);
+        const token = randomUUID();
+        let acquired: string | null;
+        try {
+            acquired = await redis.set(key, token, 'PX', BIDDING_REQUIREMENTS_LOCK_TTL_MS, 'NX');
+        } catch (err) {
+            this.logger.warn(`Redis lock unavailable for tender ${tenderId} (${(err as Error).message}); continuing without it`);
+            return dispatch();
+        }
+
+        if (acquired === 'OK') {
+            try {
+                return await dispatch();
+            } finally {
+                try {
+                    await redis.eval(RELEASE_LOCK_LUA, 1, key, token);
+                } catch (err) {
+                    this.logger.warn(`Could not release bidding-requirements lock for tender ${tenderId}: ${(err as Error).message}`);
+                }
+            }
+        }
+
+        this.logger.log(`Bidding-requirements analysis for tender ${tenderId} is running in another process; waiting for its result`);
+        const deadline = Date.now() + BIDDING_REQUIREMENTS_LOCK_TTL_MS;
+        while (Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, BIDDING_REQUIREMENTS_LOCK_POLL_MS));
+            if (!(await redis.exists(key))) break;
+        }
+        const cached = await this.getCachedAnalysis(tenderId);
+        if (cached) return cached;
+        throw new ConflictException(
+            `A bidding-requirements analysis for tender ${tenderId} was already running and did not produce a result; please retry`,
+        );
+    }
+
+    private async dispatchAnalysis(
+        tenderId: number,
+        tender: Awaited<ReturnType<TenderInfosService['validateExists']>>,
+        existingExtraction: typeof tenderExtractions.$inferSelect | undefined,
+        forceRefresh: boolean,
+        userId: number | undefined,
+    ): Promise<BiddingRequirementsAnalysisResult> {
         const resolvedDocs = this.tenderInfoSheetsService.resolveTenderDocuments(tender.documents);
 
         const mainPath = this.resolvePdfPath(resolvedDocs.mainTenderPath);
@@ -324,6 +418,20 @@ export class BiddingRequirementsService {
         }
 
         return analysisResult;
+    }
+
+    /**
+     * Read-only: the current cached analysis for this tender, or null when there is none
+     * (or it is older than BIDDING_REQUIREMENTS_SCHEMA_VERSION). Never calls VolksAI, so the
+     * checklist page can show an earlier result on load without starting a paid analysis.
+     */
+    async getCachedAnalysis(tenderId: number): Promise<BiddingRequirementsAnalysisResult | null> {
+        await this.tenderInfosService.validateExists(tenderId);
+        const [existingExtraction] = await this.db
+            .select()
+            .from(tenderExtractions)
+            .where(eq(tenderExtractions.tenderId, tenderId));
+        return this.readCurrentCache(existingExtraction?.fields, tenderId);
     }
 
     /**

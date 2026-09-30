@@ -102,6 +102,14 @@ export interface BiddingRequirementsAnalysisResult {
 }
 
 /**
+ * GET /document-checklists/tender/:tenderId/bidding-requirements/cached -- cache-only read;
+ * `analysis` is null when the tender has no current cached analysis. Never runs VolksAI.
+ */
+export interface CachedBiddingRequirementsResponse {
+    analysis: BiddingRequirementsAnalysisResult | null;
+}
+
+/**
  * Standard document options for checklist
  */
 export const standardDocumentOptions = [

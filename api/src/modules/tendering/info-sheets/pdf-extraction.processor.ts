@@ -13,6 +13,7 @@ import { FileUploadService } from '@/modules/file-upload/file-upload.service';
 import { ClaudeUsageService } from '@/modules/master/claude-usage/claude-usage.service';
 import { startHeartbeat } from '@/infra/queue/worker-heartbeat';
 import { PdfExtractionJobData, PdfExtractionJobResult } from './types/pdf-extraction.types';
+import { extractionFieldsUpsertValue } from './extraction-fields-merge';
 
 @Injectable()
 export class PdfExtractionProcessor implements OnModuleInit {
@@ -275,7 +276,9 @@ export class PdfExtractionProcessor implements OnModuleInit {
                     .onConflictDoUpdate({
                         target: tenderExtractions.tenderId,
                         set: {
-                            fields: extractionResult.fields,
+                            // Replace the extraction data but keep other features' cached keys
+                            // (the bidding-requirements analysis) instead of wiping them.
+                            fields: extractionFieldsUpsertValue(extractionResult.fields),
                             missingFields: extractionResult.missing_fields,
                             extractionVersion: extractionResult.extraction_version || '1.0.0',
                             processingTimeMs: extractionResult.processing_time_ms,

@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save, AlertCircle, Plus, Trash2, FileText, Sparkles, Check } from 'lucide-react';
+import { ArrowLeft, Save, AlertCircle, Plus, Trash2, FileText, Sparkles, Check, RefreshCw } from 'lucide-react';
 import { CompactFileUploader } from '@/components/file-upload';
 import { paths } from '@/app/routes/paths';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
@@ -18,6 +18,7 @@ import {
     useCreateDocumentChecklist,
     useUpdateDocumentChecklist,
     useSuggestedBiddingRequirements,
+    useCachedBiddingRequirements,
 } from '@/hooks/api/useDocumentChecklists';
 import type {
     CreateDocumentChecklistDto,
@@ -27,6 +28,7 @@ import type {
 } from '../helpers/documentChecklist.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { DocumentChecklistFormSchema } from '../helpers/documentChecklist.schema';
+import { resolveSuggestionPanel } from '../helpers/suggestionPanel';
 
 const CATEGORY_BADGE_VARIANT: Record<SuggestedBiddingRequirement['category'], 'default' | 'secondary' | 'outline'> = {
     oem: 'default',
@@ -77,6 +79,15 @@ export default function DocumentChecklistForm({
     const createMutation = useCreateDocumentChecklist();
     const updateMutation = useUpdateDocumentChecklist();
     const suggestMutation = useSuggestedBiddingRequirements();
+    // Page-load, cache-only read: shows a completed analysis without starting a new one.
+    const cachedSuggestions = useCachedBiddingRequirements(tenderId);
+    const suggestionPanel = resolveSuggestionPanel({
+        cached: cachedSuggestions.data,
+        cacheLoading: cachedSuggestions.isLoading,
+        fresh: suggestMutation.data,
+        analyzing: suggestMutation.isPending,
+    });
+    const suggestions = suggestionPanel.analysis;
     const [addedSuggestions, setAddedSuggestions] = useState<Set<string>>(new Set());
 
     const form = useForm<FormValues>({
@@ -222,16 +233,35 @@ export default function DocumentChecklistForm({
                                 <h4 className="font-semibold text-base text-primary">
                                     Suggested Requirements (AI)
                                 </h4>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => suggestMutation.mutate(tenderId)}
-                                    disabled={suggestMutation.isPending}
-                                >
-                                    <Sparkles className="mr-2 h-4 w-4" />
-                                    {suggestMutation.isPending ? 'Analyzing tender documents…' : 'Analyze Tender Documents'}
-                                </Button>
+                                {suggestionPanel.showAnalyze && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => suggestMutation.mutate({ tenderId })}
+                                    >
+                                        <Sparkles className="mr-2 h-4 w-4" />
+                                        Analyze Tender Documents
+                                    </Button>
+                                )}
+                                {suggestionPanel.showReanalyze && (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => suggestMutation.mutate({ tenderId, forceRefresh: true })}
+                                        title="Run a new analysis of the tender documents (replaces the saved result)"
+                                    >
+                                        <RefreshCw className="mr-2 h-4 w-4" />
+                                        Re-analyze
+                                    </Button>
+                                )}
+                                {suggestMutation.isPending && (
+                                    <Button type="button" variant="outline" size="sm" disabled>
+                                        <Sparkles className="mr-2 h-4 w-4" />
+                                        Analyzing tender documents…
+                                    </Button>
+                                )}
                             </div>
 
                             {suggestMutation.isPending && (
@@ -244,7 +274,11 @@ export default function DocumentChecklistForm({
                                 </Alert>
                             )}
 
-                            {suggestMutation.isSuccess && suggestMutation.data.requirements.length === 0 && (
+                            {suggestionPanel.checkingCache && (
+                                <p className="text-sm text-muted-foreground">Checking for a saved analysis…</p>
+                            )}
+
+                            {suggestions && !suggestMutation.isPending && suggestions.requirements.length === 0 && (
                                 <Alert>
                                     <AlertCircle className="h-4 w-4" />
                                     <AlertDescription>
@@ -253,9 +287,9 @@ export default function DocumentChecklistForm({
                                 </Alert>
                             )}
 
-                            {suggestMutation.data && suggestMutation.data.requirements.length > 0 && (
+                            {suggestions && suggestions.requirements.length > 0 && (
                                 <div className="border rounded-lg divide-y">
-                                    {suggestMutation.data.requirements.map((requirement, index) => {
+                                    {suggestions.requirements.map((requirement, index) => {
                                         const added = isSuggestionAdded(requirement);
                                         return (
                                             <div

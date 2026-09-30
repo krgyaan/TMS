@@ -95,6 +95,16 @@ export class DocumentChecklistsController {
         return this.biddingRequirementsService.downloadAnnexureDocx(tenderId, annexureIndex);
     }
 
+    /**
+     * Cache-only read of the bidding-requirements analysis: `{ analysis }`, where analysis is
+     * null when no current cached result exists. Never calls VolksAI -- used on page load so
+     * an earlier analysis is visible without starting a new (paid) one.
+     */
+    @Get('tender/:tenderId/bidding-requirements/cached')
+    async getCachedBiddingRequirements(@Param('tenderId', ParseIntPipe) tenderId: number) {
+        return { analysis: await this.biddingRequirementsService.getCachedAnalysis(tenderId) };
+    }
+
     @Get('tender/:tenderId/bidding-requirements')
     analyzeBiddingRequirements(
         @Param('tenderId', ParseIntPipe) tenderId: number,
