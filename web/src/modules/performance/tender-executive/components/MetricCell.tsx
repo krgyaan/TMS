@@ -1,4 +1,5 @@
 import { TableCell } from "@/components/ui/table";
+import type { EmdCashFlowDrilldownItem } from "../helpers/emd-cashflow.types";
 import type { MetricBucket } from "../helpers/tender-executive.types";
 import { ScoreDrilldownPopover } from "./ScoreDrilldownPopover";
 
@@ -9,18 +10,26 @@ const formatCurrency = (amount: number) =>
         maximumFractionDigits: 0,
     }).format(amount);
 
-export function MetricCell({ data, strong = false }: { data: MetricBucket; strong?: boolean }) {
+export function MetricCell({ data, strong = false }: { data?: MetricBucket; strong?: boolean }) {
     if (!data || data.count === 0) {
         return <TableCell className="text-center text-muted-foreground">·</TableCell>;
     }
 
-    const tenders = data.drilldown.map(item => ({
-        tenderId: item.tenderId,
-        tenderNo: item.tenderNo ?? `Tender #${item.tenderId}`,
-        tenderName: item.tenderName ?? "Tender name unavailable",
-        value: item.value,
-        date: item.transferDate ?? null,
-    }));
+    const tenders = data.drilldown.map(item => {
+        const emd = "emdState" in item ? (item as EmdCashFlowDrilldownItem) : null;
+        return {
+            tenderId: item.tenderId,
+            tenderNo: item.tenderNo ?? `Tender #${item.tenderId}`,
+            tenderName: item.tenderName ?? "Tender name unavailable",
+            value: item.value,
+            date: item.date ?? item.transferDate ?? null,
+            status: item.status ?? null,
+            emdState: emd?.emdState,
+            paidDate: emd?.paidDate ?? null,
+            returnDate: emd?.returnDate ?? null,
+            returnUtr: emd?.returnUtr ?? null,
+        };
+    });
 
     return (
         <TableCell className="text-center">
