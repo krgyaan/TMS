@@ -1307,19 +1307,28 @@ export class TenderExecutiveService {
 
         /**
          * Pending at End
-         * Assigned on or before end of period and still no info sheet by end
-         * (includes carry-over backlog from pending-at-start).
+         * Point-in-time: assigned on or before end of period with no info sheet
+         * by end. Includes carry-over backlog from pending-at-start and tenders
+         * that progressed after the period. Legacy rows with no info sheet at
+         * all and a progressed status are excluded.
          */
         const assignedClosingPending = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.created_at <= '${to}'
-        AND ti.status = 1
         AND NOT EXISTS (
             SELECT 1
             FROM tender_information tin
             WHERE tin.tender_id = ti.id
             AND tin.created_at <= '${to}'
+        )
+        AND (
+            EXISTS (
+                SELECT 1
+                FROM tender_information tin
+                WHERE tin.tender_id = ti.id
+            )
+            OR ti.status = 1
         )
         `);
 
