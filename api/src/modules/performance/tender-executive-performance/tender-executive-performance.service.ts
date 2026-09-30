@@ -1241,8 +1241,10 @@ export class TenderExecutiveService {
     ===================================================== */
         /**
          * Pending at Start
-         * Assigned before the period and the tender has never been filled
-         * (no info sheet exists at all — including sheets created later).
+         * Point-in-time: assigned before ${from} with no info sheet as of ${from}.
+         * Carry-over whose sheet landed during the period still counts as pending
+         * at the start. Legacy rows with no info sheet at all and a progressed
+         * status are excluded.
          */
         const assignedOpening = await exec(`
         ${baseSelect}
@@ -1252,6 +1254,15 @@ export class TenderExecutiveService {
             SELECT 1
             FROM tender_information tin
             WHERE tin.tender_id = ti.id
+            AND tin.created_at < '${from}'
+        )
+        AND (
+            EXISTS (
+                SELECT 1
+                FROM tender_information tin
+                WHERE tin.tender_id = ti.id
+            )
+            OR ti.status = 1
         )
         `);
         /**
@@ -1268,15 +1279,29 @@ export class TenderExecutiveService {
          * Info Filled During
          * Info sheet saved during the period (any assignment date) — this is the
          * shared source for both the Assignment and Approval "Info Filled" columns.
+         * Also counts tenders assigned during the period that progressed past
+         * Read Tender with no info sheet recorded, since reaching a later status
+         * implies the information was captured.
          */
         const assignedDuringCompleted = await exec(`
             ${baseSelect}
             WHERE ${baseWhere()}
-            AND EXISTS (
-                SELECT 1
-                FROM tender_information tin
-                WHERE tin.tender_id = ti.id
-                AND tin.created_at BETWEEN '${from}' AND '${to}'
+            AND (
+                EXISTS (
+                    SELECT 1
+                    FROM tender_information tin
+                    WHERE tin.tender_id = ti.id
+                    AND tin.created_at BETWEEN '${from}' AND '${to}'
+                )
+                OR (
+                    ti.created_at BETWEEN '${from}' AND '${to}'
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM tender_information tin
+                        WHERE tin.tender_id = ti.id
+                    )
+                    AND ti.status <> 1
+                )
             )
             `);
 
@@ -1289,6 +1314,7 @@ export class TenderExecutiveService {
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.created_at <= '${to}'
+        AND ti.status = 1
         AND NOT EXISTS (
             SELECT 1
             FROM tender_information tin
