@@ -52,6 +52,50 @@ VALID_SOURCE_DOCUMENTS = ("main", "atc")
 
 _PAGE_LABEL_RE = re.compile(r"\[(Main|ATC) Page (\d+)\]:")
 
+_WORD_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+# Words too generic to tie a page line to a specific requirement name.
+_STOPWORDS = {
+    "the", "and", "for", "with", "from", "of", "to", "in", "on", "by", "or", "an", "a",
+    "certificate", "document", "documents", "copy", "copies", "details", "proof", "if",
+    "applicable", "any", "all", "etc", "as", "per", "under", "required",
+}
+SNIPPET_MAX_CHARS = 200
+
+
+def split_page_tagged_text(page_tagged_text: str) -> Dict[tuple, str]:
+    """{('main', 3): '<page text>', ...} from build_page_tagged_text() output."""
+    pages: Dict[tuple, str] = {}
+    matches = list(_PAGE_LABEL_RE.finditer(page_tagged_text or ""))
+    for i, m in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(page_tagged_text)
+        pages[(m.group(1).lower(), int(m.group(2)))] = page_tagged_text[m.end():end].strip()
+    return pages
+
+
+def snippet_from_page(document_name: str, page_text: str) -> str:
+    """
+    The sentence/line on the cited page sharing the most significant words with the
+    requirement's name, trimmed to SNIPPET_MAX_CHARS. '' when no line shares enough words
+    (one for a 1-2 word name, otherwise two) -- a wrong quote is worse than none.
+    """
+    terms = {
+        w for w in _WORD_RE.findall(document_name.lower())
+        if w not in _STOPWORDS and (len(w) > 2 or any(c.isdigit() for c in w))
+    }
+    if not terms:
+        return ""
+    needed = 1 if len(terms) <= 2 else 2
+    best, best_score = "", 0
+    for piece in re.split(r"(?<=[.;:!?])\s+|\n+", page_text):
+        piece = " ".join(piece.split())
+        score = len(terms & set(_WORD_RE.findall(piece.lower())))
+        if score > best_score:
+            best, best_score = piece, score
+    if best_score < needed:
+        return ""
+    return best if len(best) <= SNIPPET_MAX_CHARS else best[: SNIPPET_MAX_CHARS - 1].rstrip() + "…"
+
+
 
 def _build_annexures_tool_schema() -> Dict[str, Any]:
     """Build a strict JSON schema for Role 4 annexure tool use."""
@@ -219,7 +263,8 @@ def validate_annexures(
       - it is not an object, or has no annexureName;
       - source is missing, or source.document is not 'main'/'atc';
       - source.page is missing / not a positive integer;
-      - source.snippet is missing or blank;
+      - source.snippet is missing or blank AND the cited page has no line matching the
+        annexure's title to use instead;
       - the cited (document, page) label does not exist in the input text
         (i.e. the model cited a page it could not have seen);
       - no valid blocks remain after dropping malformed ones.
@@ -232,6 +277,7 @@ def validate_annexures(
     accepted: List[Dict[str, Any]] = []
     rejected: List[Dict[str, Any]] = []
     available = _available_page_labels(page_tagged_text)
+    pages = split_page_tagged_text(page_tagged_text)
 
     def reject(raw: Any, reason: str) -> None:
         name = raw.get("annexureName") if isinstance(raw, dict) else None
@@ -262,13 +308,18 @@ def validate_annexures(
         if isinstance(page, bool) or not isinstance(page, int) or page < 1:
             reject(raw, f"missing or invalid source.page {page!r}")
             continue
-        if not isinstance(snippet, str) or not snippet.strip():
-            reject(raw, "missing source.snippet")
-            continue
         if (document, page) not in available:
             label = "Main" if document == "main" else "ATC"
             reject(raw, f"cited page '[{label} Page {page}]' does not exist in the input text")
             continue
+        if not isinstance(snippet, str) or not snippet.strip():
+            # The model sometimes omits the snippet even when the citation is right. Take
+            # the cited page's line that matches the annexure's title (no extra Claude
+            # call); still reject when the page shows nothing matching it.
+            snippet = snippet_from_page(name, pages.get((document, page), ""))
+            if not snippet:
+                reject(raw, "missing source.snippet")
+                continue
 
         raw_blocks = raw.get("blocks") if isinstance(raw.get("blocks"), list) else []
         blocks = [b for b in (_sanitize_block(rb) for rb in raw_blocks) if b is not None]

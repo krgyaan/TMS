@@ -247,7 +247,6 @@ def _with_source(source):
     (_with_source({"document": "main", "page": None, "snippet": "FORMAT F-2A"}), "source.page"),
     (_with_source({"document": "main", "page": 0, "snippet": "FORMAT F-2A"}), "source.page"),
     (_with_source({"document": "main", "page": True, "snippet": "FORMAT F-2A"}), "source.page"),
-    (_with_source({"document": "main", "page": 68, "snippet": "  "}), "source.snippet"),
     (_with_source({"document": "boq", "page": 68, "snippet": "FORMAT F-2A"}), "source.document"),
     # page 99 was never in the input text -> fabricated citation
     (_with_source({"document": "main", "page": 99, "snippet": "FORMAT F-2A"}), "does not exist"),
@@ -364,3 +363,30 @@ def test_generate_endpoint_applies_letterhead_only_when_required_without_claude(
     assert _header_footer_pictures(d2) == (0, 0)
     # Blanks are left for the bidder to fill in by hand.
     assert any("M/s______" in p.text for p in d1.paragraphs)
+
+
+# ── Missing annexure snippet: filled from the cited page, not rejected ─────────
+# Real-world case: tender 3635's analysis found 6 GAIL forms but Claude omitted every
+# source.snippet, so all 6 were rejected and the checklist showed no annexures.
+
+@pytest.mark.parametrize("missing", [{}, {"snippet": ""}, {"snippet": "   "}, {"snippet": None}])
+def test_missing_annexure_snippet_is_filled_from_cited_page(missing):
+    raw = {**F2A_ANNEXURE, "source": {"document": "main", "page": 68, **missing}}
+    accepted, rejected = validate_annexures([raw], TENDER_TEXT)
+    assert rejected == []
+    assert accepted[0]["source"]["page"] == 68
+    assert "FORMAT F-2A DECLARATION FOR BID SECURITY" in accepted[0]["source"]["snippet"]
+
+
+def test_missing_annexure_snippet_still_rejected_when_cited_page_does_not_match():
+    raw = {**F2A_ANNEXURE, "annexureName": "Integrity Pact Proforma", "source": {"document": "main", "page": 68}}
+    accepted, rejected = validate_annexures([raw], TENDER_TEXT)
+    assert accepted == []
+    assert rejected[0]["reason"] == "missing source.snippet"
+
+
+def test_missing_annexure_snippet_on_nonexistent_page_is_rejected_as_fabricated():
+    raw = {**F2A_ANNEXURE, "source": {"document": "main", "page": 99}}
+    accepted, rejected = validate_annexures([raw], TENDER_TEXT)
+    assert accepted == []
+    assert "does not exist" in rejected[0]["reason"]

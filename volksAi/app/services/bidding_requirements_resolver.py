@@ -26,7 +26,12 @@ import os
 import re
 from typing import Any, Dict, List, Optional
 
-from app.services.annexure_resolver import _build_annexures_tool_schema, validate_annexures
+from app.services.annexure_resolver import (
+    _build_annexures_tool_schema,
+    snippet_from_page,
+    split_page_tagged_text,
+    validate_annexures,
+)
 from app.services.llm_field_resolver import (
     SONNET_5_INPUT_PRICE_PER_M,
     SONNET_5_OUTPUT_PRICE_PER_M,
@@ -202,51 +207,6 @@ SYSTEM_PROMPT = (
 )
 
 
-_PAGE_SPLIT_RE = re.compile(r"\[(Main|ATC) Page (\d+)\]:")
-_WORD_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
-# Words too generic to tie a page line to a specific requirement name.
-_STOPWORDS = {
-    "the", "and", "for", "with", "from", "of", "to", "in", "on", "by", "or", "an", "a",
-    "certificate", "document", "documents", "copy", "copies", "details", "proof", "if",
-    "applicable", "any", "all", "etc", "as", "per", "under", "required",
-}
-SNIPPET_MAX_CHARS = 200
-
-
-def _split_pages(page_tagged_text: str) -> Dict[tuple, str]:
-    """{('main', 3): '<page text>', ...} from build_page_tagged_text() output."""
-    pages: Dict[tuple, str] = {}
-    matches = list(_PAGE_SPLIT_RE.finditer(page_tagged_text or ""))
-    for i, m in enumerate(matches):
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(page_tagged_text)
-        pages[(m.group(1).lower(), int(m.group(2)))] = page_tagged_text[m.end():end].strip()
-    return pages
-
-
-def _snippet_from_page(document_name: str, page_text: str) -> str:
-    """
-    The sentence/line on the cited page sharing the most significant words with the
-    requirement's name, trimmed to SNIPPET_MAX_CHARS. '' when no line shares enough words
-    (one for a 1-2 word name, otherwise two) -- a wrong quote is worse than none.
-    """
-    terms = {
-        w for w in _WORD_RE.findall(document_name.lower())
-        if w not in _STOPWORDS and (len(w) > 2 or any(c.isdigit() for c in w))
-    }
-    if not terms:
-        return ""
-    needed = 1 if len(terms) <= 2 else 2
-    best, best_score = "", 0
-    for piece in re.split(r"(?<=[.;:!?])\s+|\n+", page_text):
-        piece = " ".join(piece.split())
-        score = len(terms & set(_WORD_RE.findall(piece.lower())))
-        if score > best_score:
-            best, best_score = piece, score
-    if best_score < needed:
-        return ""
-    return best if len(best) <= SNIPPET_MAX_CHARS else best[: SNIPPET_MAX_CHARS - 1].rstrip() + "…"
-
-
 def fill_missing_requirement_snippets(requirements: List[Any], page_tagged_text: str) -> Dict[str, int]:
     """
     Ensures every requirement's source carries a string snippet. A model-provided snippet
@@ -254,7 +214,7 @@ def fill_missing_requirement_snippets(requirements: List[Any], page_tagged_text:
     page exists and a matching line is found, otherwise set to ''. Mutates in place and
     returns counts {model, filled, missing}.
     """
-    pages = _split_pages(page_tagged_text)
+    pages = split_page_tagged_text(page_tagged_text)
     counts = {"model": 0, "filled": 0, "missing": 0}
     for r in requirements:
         if not isinstance(r, dict) or not isinstance(r.get("source"), dict):
@@ -266,7 +226,7 @@ def fill_missing_requirement_snippets(requirements: List[Any], page_tagged_text:
             counts["model"] += 1
             continue
         page_text = pages.get((str(source.get("document", "")).lower(), source.get("page")))
-        filled = _snippet_from_page(str(r.get("documentName") or ""), page_text) if page_text else ""
+        filled = snippet_from_page(str(r.get("documentName") or ""), page_text) if page_text else ""
         source["snippet"] = filled
         counts["filled" if filled else "missing"] += 1
     if counts["filled"] or counts["missing"]:
