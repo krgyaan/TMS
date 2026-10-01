@@ -242,11 +242,9 @@ export default function TenderExecutivePerformance() {
     useEffect(() => {
         /* Unrestricted roles legitimately pick their own scope, so a saved
            preference must survive a reload. */
-        if (authUserId == null || unrestricted) return;
+        if (authUserId == null || authTeamId == null || unrestricted) return;
 
-        const forced: Scope = selfOnly
-            ? { view: "user", userId: authUserId }
-            : { view: "team", teamId: authTeamId ?? -1 };
+        const forced: Scope = selfOnly ? { view: "user", userId: authUserId } : { view: "team", teamId: authTeamId };
 
         setDraftScope(current => (isSameScope(current, forced) ? current : forced));
         setAppliedScope(current => (isSameScope(current, forced) ? current : forced));
@@ -300,13 +298,20 @@ export default function TenderExecutivePerformance() {
     }, [appliedFromDate, appliedScope, appliedToDate, setSearchParams]);
 
     const dateError = draftFromDate && draftToDate && draftFromDate > draftToDate ? "From Date must be on or before To Date" : null;
-    const canSubmit = draftScope.view !== null && !!draftFromDate && !!draftToDate && !dateError;
+    /* A locked role is pinned to a valid scope by the effect above, so it must never
+       gate Submit on a scope the user cannot change anyway. */
+    const scopeSettled = teamLocked || draftScope.view !== null;
+    const canSubmit = scopeSettled && !!draftFromDate && !!draftToDate && !dateError;
     const hasAnyFilter =
         draftScope.view !== null || !!draftFromDate || !!draftToDate || appliedScope.view !== null || !!appliedFromDate || !!appliedToDate || selectedMetric !== null;
 
     const handleSubmit = () => {
         if (!canSubmit) return;
-        setAppliedScope(draftScope);
+        /* For a locked role the draft can still be empty if auth arrived after the first
+           render, so submit the resolved scope rather than an empty one. */
+        const effectiveScope = draftScope.view === null && teamLocked && authTeamId != null ? ({ view: "team", teamId: authTeamId } as Scope) : draftScope;
+
+        setAppliedScope(effectiveScope);
         setAppliedFromDate(draftFromDate);
         setAppliedToDate(draftToDate);
     };
@@ -351,6 +356,10 @@ export default function TenderExecutivePerformance() {
             return !memberTeam || memberTeam === authTeamName;
         });
     }, [allUsers, unrestricted, teamLocked, authTeamName]);
+
+    /* The team that "All Team Members" resolves to: the selected team, or the locked-in
+       team for roles that cannot change it. */
+    const memberScopeTeamId = draftScope.view === "team" ? draftScope.teamId : authTeamId;
 
     /** Describes whose data is on screen, using the applied scope (what actually loaded). */
     const scopeNote = useMemo(() => {
@@ -596,12 +605,30 @@ export default function TenderExecutivePerformance() {
                                 <label className="text-sm font-medium">Team Member</label>
                                 <Combobox
                                     disabled={selfOnly || draftScope.view === "all"}
-                                    value={draftScope.view === "user" ? String(draftScope.userId) : ""}
+                                    value={
+                                        selfOnly
+                                            ? String(authUserId ?? "")
+                                            : draftScope.view === "user"
+                                              ? String(draftScope.userId)
+                                              : draftScope.view === "team"
+                                                ? "all"
+                                                : ""
+                                    }
                                     onChange={v => {
+                                        /* "All Team Members" is the team view, not a member. */
+                                        if (v === "all") {
+                                            if (memberScopeTeamId != null) setDraftScope({ view: "team", teamId: memberScopeTeamId });
+                                            return;
+                                        }
                                         const userId = parsePositiveId(v);
                                         setDraftScope(userId ? { view: "user", userId } : { view: null });
                                     }}
-                                    options={users?.map(u => ({ id: u.id.toString(), name: u.name })) ?? []}
+                                    options={[
+                                        /* Omitted when the team view is "All Teams", where it
+                                           would just repeat the same selection. */
+                                        ...(memberScopeTeamId != null && draftScope.view !== "all" ? [{ id: "all", name: "All Team Members" }] : []),
+                                        ...(users?.map(u => ({ id: u.id.toString(), name: u.name })) ?? []),
+                                    ]}
                                     placeholder="Select User"
                                 />
                             </div>
@@ -828,19 +855,6 @@ export default function TenderExecutivePerformance() {
                                                 );
                                             })}
 
-                                            {/* Summary Percentages */}
-                                            {/* {summary.map((row, i) => (
-                                        <TableRow key={`sum-${i}`} className="bg-muted/10 border-t-2 border-border/50">
-                                            <TableCell className="font-medium text-xs uppercase tracking-wide text-muted-foreground sticky left-0 z-10 border-r bg-muted/10">
-                                                {row.label}
-                                            </TableCell>
-                                            {row.data.map((val, j) => (
-                                                <TableCell key={j} className="text-center text-xs font-medium text-muted-foreground">
-                                                    {val || "-"}
-                                                </TableCell>
-                                            ))}
-                                        </TableRow>
-                                    ))} */}
                                         </TableBody>
                                     </Table>
                                 </div>
