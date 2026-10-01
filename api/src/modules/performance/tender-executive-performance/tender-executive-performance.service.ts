@@ -1188,7 +1188,7 @@ export class TenderExecutiveService {
             assigned: t => t.created_at,
             infoFilled: t => t.info_filled_at,
             approved: t => t.tl_approval_timestamp ?? t.info_filled_at,
-            bidSubmitted: t => t.bid_submitted_at,
+            bidSubmitted: t => t.bid_submitted_at ?? t.missed_at,
             resultEval: t => t.result_created_at ?? t.bid_submitted_at,
             resultUploaded: t => t.result_resolved_at,
             tenderUpdated: t => t.updated_at,
@@ -1272,6 +1272,12 @@ export class TenderExecutiveService {
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
             ) AS bid_submitted_at,
+            (
+                SELECT MIN(bs.created_at)
+                FROM bid_submissions bs
+                WHERE bs.tender_id = ti.id
+                  AND bs.status = 'Tender Missed'
+            ) AS missed_at,
             (
                 SELECT MIN(tr.created_at)
                 FROM tender_results tr
@@ -1477,24 +1483,46 @@ export class TenderExecutiveService {
 
         /**
          * Pending at Start
-         * Approved before the period and with no bid on record as of the
-         * period start. A bid raised later in the period does not remove the
-         * tender from the opening backlog.
+         * Tenders already approved before the period (tl_status = 1) that had no
+         * bid raised and none missed as of the period start, excluding the dnb,
+         * won and lost categories.
+         *
+         * The bid test is point-in-time, not "has no bid row at all": a tender
+         * that bids during the period was still opening backlog on the first day,
+         * so it belongs here as well as in Bid Submitted. submission_datetime is
+         * coalesced to created_at because a few Bid Submitted rows carry a null
+         * submission_datetime and would otherwise read as never-bid.
+         *
+         * Won and lost are excluded because those tenders are already resolved
+         * and belong to no outcome column. The dnb category needs no category
+         * check of its own: the Tender Missed test in the guard above already
+         * drops those missed before the period, while one missed during the
+         * period is still opening backlog here and resolves into Did Not Bid.
+         *
+         * The approval bound keeps this column disjoint from Approved During: a
+         * tender approved inside the window belongs to Approved During only, so
+         * it can never be counted on both sides of the inflow. A null
+         * tl_approval_timestamp is treated as carry-in, since the real approval
+         * time is not recoverable from any other column.
          */
         const bidOpening = await exec(`
         ${baseSelect}
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
-          AND ti.tl_approval_timestamp < ${fromUtc}
-          AND st.tender_category <> 'dnb'
+          AND (ti.tl_approval_timestamp IS NULL OR ti.tl_approval_timestamp < ${fromUtc})
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
-                  AND bs.status = 'Bid Submitted'
-                  AND bs.submission_datetime < ${fromTz}
+                  AND (
+                        (bs.status = 'Bid Submitted'
+                         AND COALESCE(bs.submission_datetime, bs.created_at) < ${fromTz})
+                     OR (bs.status = 'Tender Missed'
+                         AND bs.created_at < ${fromTz})
+                  )
           )
+          AND st.tender_category NOT IN ('won', 'lost')
     `);
 
         const bidDuringTotal = await exec(`
@@ -1518,7 +1546,7 @@ export class TenderExecutiveService {
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.submission_datetime BETWEEN ${fromTz} AND ${toTz}
+                  AND COALESCE(bs.submission_datetime, bs.created_at) BETWEEN ${fromTz} AND ${toTz}
           )
     `);
 
@@ -1532,35 +1560,38 @@ export class TenderExecutiveService {
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.submission_datetime <= ${toTz}
+                  AND COALESCE(bs.submission_datetime, bs.created_at) <= ${toTz}
           )
-          AND (
-                st.tender_category = 'dnb'
-             OR EXISTS (
-                    SELECT 1
-                    FROM bid_submissions bs
-                    WHERE bs.tender_id = ti.id
-                      AND bs.status = 'Tender Missed'
-                )
-          )
+          AND st.tender_category = 'dnb'
           AND ti.updated_at >= ${fromTz}
           AND ti.updated_at <= ${toTz}
     `);
 
+        /**
+         * Pending at End
+         * Approved tenders with no bid raised and none missed by the end of the
+         * period. A null tl_approval_timestamp is treated as carry-in, since the
+         * real approval time is not recoverable from any other column.
+         *
+         * Won and lost are excluded because those tenders are already resolved
+         * and belong to no outcome column. The dnb category is handled by the
+         * Tender Missed test in the guard below rather than by a category check,
+         * so a tender missed during the period is excluded here and counted in
+         * Did Not Bid, while one missed after the period is still open.
+         */
         const bidTotal = await exec(`
         ${baseSelect}
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
-          AND ti.tl_approval_timestamp >= ${fromUtc}
-          AND ti.tl_approval_timestamp <= ${toUtc}
-          AND st.tender_category <> 'dnb'
+          AND (ti.tl_approval_timestamp IS NULL OR ti.tl_approval_timestamp <= ${toUtc})
+          AND st.tender_category NOT IN ('won', 'lost')
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND (
-                        (bs.status = 'Bid Submitted' AND bs.submission_datetime <= ${toTz})
+                        (bs.status = 'Bid Submitted' AND COALESCE(bs.submission_datetime, bs.created_at) <= ${toTz})
                      OR (bs.status = 'Tender Missed'    AND bs.created_at <= ${toTz})
                   )
           )
@@ -1579,7 +1610,7 @@ export class TenderExecutiveService {
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.submission_datetime < ${fromTz}
+                  AND COALESCE(bs.submission_datetime, bs.created_at) < ${fromTz}
           )
           AND NOT EXISTS (
                 SELECT 1
@@ -1602,7 +1633,7 @@ export class TenderExecutiveService {
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.submission_datetime BETWEEN ${fromTz} AND ${toTz}
+                  AND COALESCE(bs.submission_datetime, bs.created_at) BETWEEN ${fromTz} AND ${toTz}
           )
     `);
 
@@ -1671,7 +1702,7 @@ export class TenderExecutiveService {
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.submission_datetime <= ${toTz}
+                  AND COALESCE(bs.submission_datetime, bs.created_at) <= ${toTz}
           )
           AND NOT EXISTS (
                 SELECT 1
@@ -1822,18 +1853,18 @@ export class TenderExecutiveService {
                     opening: {
                         count: bidOpening.length,
                         value: this.sumValue(bidOpening),
-                        drilldown: this.mapDrilldown(bidOpening),
+                        drilldown: this.mapDrilldown(bidOpening, "bidSubmitted"),
                     },
                     total: {
                         count: bidTotal.length,
                         value: this.sumValue(bidTotal),
-                        drilldown: this.mapDrilldown(bidTotal),
+                        drilldown: this.mapDrilldown(bidTotal, "bidSubmitted"),
                     },
                     during: {
                         total: {
                             count: bidDuringTotal.length,
                             value: this.sumValue(bidDuringTotal),
-                            drilldown: this.mapDrilldown(bidDuringTotal),
+                            drilldown: this.mapDrilldown(bidDuringTotal, "approved"),
                         },
                         completed: {
                             count: bidDuringCompleted.length,
