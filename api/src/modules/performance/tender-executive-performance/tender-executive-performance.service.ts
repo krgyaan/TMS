@@ -1205,8 +1205,32 @@ export class TenderExecutiveService {
     }
 
     async getStageBacklogV2(query: { view: "user" | "team" | "all"; userId?: number; teamId?: number; fromDate: string; toDate: string }) {
-        const from = `${query.fromDate}T00:00:00.000Z`;
-        const to = `${query.toDate}T23:59:59.999Z`;
+        /* =====================================================
+       DATE BOUNDARIES
+       The date columns in this schema are stored inconsistently, so a
+       single pair of literals cannot be reused everywhere:
+         - `timestamptz` columns (tender_infos.created_at/updated_at,
+           bid_submissions.*, tender_results.*) hold real instants.
+         - tender_infos.tl_approval_timestamp is `timestamp without time
+           zone` and holds UTC wall clock.
+         - tender_information.created_at is `timestamp without time zone`
+           and holds local wall clock.
+       Appending `Z` made every comparison resolve in UTC, which shifted
+       the `timestamptz` and approval windows by +05:30.
+     ===================================================== */
+        const APP_ZONE = `'Asia/Calcutta'`;
+
+        /** Boundary for `timestamptz` columns: the real instant of local midnight. */
+        const fromTz = `(('${query.fromDate}'::date + TIME '00:00:00') AT TIME ZONE ${APP_ZONE})`;
+        const toTz = `(('${query.toDate}'::date + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE})`;
+
+        /** Boundary for tender_infos.tl_approval_timestamp, which stores UTC wall clock. */
+        const fromUtc = `(timezone('UTC', ('${query.fromDate}'::date + TIME '00:00:00') AT TIME ZONE ${APP_ZONE}))`;
+        const toUtc = `(timezone('UTC', ('${query.toDate}'::date + TIME '23:59:59.999') AT TIME ZONE ${APP_ZONE}))`;
+
+        /** Boundary for tender_information.created_at, which stores local wall clock. */
+        const fromLocal = `(('${query.fromDate}'::date + TIME '00:00:00'))`;
+        const toLocal = `(('${query.toDate}'::date + TIME '23:59:59.999'))`;
 
         const baseWhere = () => {
             let w = `ti.delete_status = 0`;
@@ -1284,7 +1308,8 @@ export class TenderExecutiveService {
     ===================================================== */
         /**
          * Pending at Start
-         * Point-in-time: assigned before ${from} with no info sheet as of ${from}.
+         * Point-in-time: assigned before the period start with no info sheet
+         * as of the period start.
          * Carry-over whose sheet landed during the period still counts as pending
          * at the start. Legacy rows with no info sheet at all and a progressed
          * status are excluded.
@@ -1292,12 +1317,12 @@ export class TenderExecutiveService {
         const assignedOpening = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.created_at < '${from}'
+        AND ti.created_at < ${fromTz}
         AND NOT EXISTS (
             SELECT 1
             FROM tender_information tin
             WHERE tin.tender_id = ti.id
-            AND tin.created_at < '${from}'
+            AND tin.created_at < ${fromLocal}
         )
         AND (
             EXISTS (
@@ -1315,7 +1340,7 @@ export class TenderExecutiveService {
         const assignedDuringTotal = await exec(`
             ${baseSelect}
             WHERE ${baseWhere()}
-            AND ti.created_at BETWEEN '${from}' AND '${to}'
+            AND ti.created_at BETWEEN ${fromTz} AND ${toTz}
             `);
 
         /**
@@ -1334,10 +1359,10 @@ export class TenderExecutiveService {
                     SELECT 1
                     FROM tender_information tin
                     WHERE tin.tender_id = ti.id
-                    AND tin.created_at BETWEEN '${from}' AND '${to}'
+                    AND tin.created_at BETWEEN ${fromLocal} AND ${toLocal}
                 )
                 OR (
-                    ti.created_at BETWEEN '${from}' AND '${to}'
+                    ti.created_at BETWEEN ${fromTz} AND ${toTz}
                     AND NOT EXISTS (
                         SELECT 1
                         FROM tender_information tin
@@ -1358,12 +1383,12 @@ export class TenderExecutiveService {
         const assignedClosingPending = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.created_at <= '${to}'
+        AND ti.created_at <= ${toTz}
         AND NOT EXISTS (
             SELECT 1
             FROM tender_information tin
             WHERE tin.tender_id = ti.id
-            AND tin.created_at <= '${to}'
+            AND tin.created_at <= ${toLocal}
         )
         AND (
             EXISTS (
@@ -1387,7 +1412,8 @@ export class TenderExecutiveService {
          * Pending at Start
          * Info sheet filled before the period and still awaiting approval
          * (tl_status 0 = pending, 3 = incomplete bounce — neither decided).
-         * Point-in-time: a tender decided after ${from} was pending at ${from}.
+         * Point-in-time: a tender decided after the period start was pending
+         * at the period start.
          */
         const approvedOpening = await exec(`
         ${baseSelect}
@@ -1396,13 +1422,13 @@ export class TenderExecutiveService {
               SELECT 1
               FROM tender_information tin
               WHERE tin.tender_id = ti.id
-                AND tin.created_at < '${from}'
+                AND tin.created_at < ${fromLocal}
           )
           AND (
               ti.tl_status IN (0,3)
               OR (
                   ti.tl_status IN (1,2)
-                  AND ti.tl_approval_timestamp >= '${from}'
+                  AND ti.tl_approval_timestamp >= ${fromUtc}
               )
           )
     `);
@@ -1410,7 +1436,7 @@ export class TenderExecutiveService {
         const approvedDuringAccepted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.tl_approval_timestamp BETWEEN '${from}' AND '${to}'
+        AND ti.tl_approval_timestamp BETWEEN ${fromUtc} AND ${toUtc}
         AND EXISTS (
             SELECT 1
             FROM tender_information tin
@@ -1422,7 +1448,7 @@ export class TenderExecutiveService {
         const approvedDuringRejected = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        AND ti.tl_approval_timestamp BETWEEN '${from}' AND '${to}'
+        AND ti.tl_approval_timestamp BETWEEN ${fromUtc} AND ${toUtc}
         AND EXISTS (
             SELECT 1
             FROM tender_information tin
@@ -1435,12 +1461,12 @@ export class TenderExecutiveService {
         ${baseSelect}
         JOIN tender_information tin ON tin.tender_id = ti.id
         WHERE ${baseWhere()}
-          AND tin.created_at <= '${to}'
+          AND tin.created_at <= ${toLocal}
           AND (
               ti.tl_status IN (0,3)
               OR (
                   ti.tl_status IN (1,2)
-                  AND ti.tl_approval_timestamp > '${to}'
+                  AND ti.tl_approval_timestamp > ${toUtc}
               )
           )
     `);
@@ -1449,24 +1475,32 @@ export class TenderExecutiveService {
        BID
     ===================================================== */
 
+        /**
+         * Pending at Start
+         * Approved before the period and with no bid on record as of the
+         * period start. A bid raised later in the period does not remove the
+         * tender from the opening backlog.
+         */
         const bidOpening = await exec(`
         ${baseSelect}
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
-          AND ti.tl_approval_timestamp < '${from}'
+          AND ti.tl_approval_timestamp < ${fromUtc}
           AND st.tender_category <> 'dnb'
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
+                  AND bs.status = 'Bid Submitted'
+                  AND bs.submission_datetime < ${fromTz}
           )
     `);
 
         const bidDuringTotal = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-          AND ti.tl_approval_timestamp BETWEEN '${from}' AND '${to}'
+          AND ti.tl_approval_timestamp BETWEEN ${fromUtc} AND ${toUtc}
           AND EXISTS (
                 SELECT 1
                 FROM tender_information tin
@@ -1484,7 +1518,7 @@ export class TenderExecutiveService {
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.submission_datetime BETWEEN '${from}' AND '${to}'
+                  AND bs.submission_datetime BETWEEN ${fromTz} AND ${toTz}
           )
     `);
 
@@ -1492,13 +1526,13 @@ export class TenderExecutiveService {
         ${baseSelect}
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
-          AND ti.tl_status IN (1, 2)
+          AND ti.tl_status = 1
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.submission_datetime <= '${to}'
+                  AND bs.submission_datetime <= ${toTz}
           )
           AND (
                 st.tender_category = 'dnb'
@@ -1509,8 +1543,8 @@ export class TenderExecutiveService {
                       AND bs.status = 'Tender Missed'
                 )
           )
-          AND ti.updated_at >= '${from}'
-          AND ti.updated_at <= '${to}'
+          AND ti.updated_at >= ${fromTz}
+          AND ti.updated_at <= ${toTz}
     `);
 
         const bidTotal = await exec(`
@@ -1518,16 +1552,16 @@ export class TenderExecutiveService {
         JOIN statuses st ON st.id = ti.status
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
-          AND ti.tl_approval_timestamp >= '${from}'
-          AND ti.tl_approval_timestamp <= '${to}'
+          AND ti.tl_approval_timestamp >= ${fromUtc}
+          AND ti.tl_approval_timestamp <= ${toUtc}
           AND st.tender_category <> 'dnb'
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND (
-                        (bs.status = 'Bid Submitted' AND bs.submission_datetime <= '${to}')
-                     OR (bs.status = 'Tender Missed'    AND bs.created_at <= '${to}')
+                        (bs.status = 'Bid Submitted' AND bs.submission_datetime <= ${toTz})
+                     OR (bs.status = 'Tender Missed'    AND bs.created_at <= ${toTz})
                   )
           )
     `);
@@ -1545,7 +1579,7 @@ export class TenderExecutiveService {
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.submission_datetime < '${from}'
+                  AND bs.submission_datetime < ${fromTz}
           )
           AND NOT EXISTS (
                 SELECT 1
@@ -1554,7 +1588,7 @@ export class TenderExecutiveService {
                   AND (
                         LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
                      OR (LOWER(TRIM(tr.status)) = 'under evaluation'
-                         AND tr.created_at >= '${from}')
+                         AND tr.created_at >= ${fromTz})
                   )
           )
     `);
@@ -1568,7 +1602,7 @@ export class TenderExecutiveService {
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.submission_datetime BETWEEN '${from}' AND '${to}'
+                  AND bs.submission_datetime BETWEEN ${fromTz} AND ${toTz}
           )
     `);
 
@@ -1581,7 +1615,7 @@ export class TenderExecutiveService {
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
                   AND LOWER(TRIM(tr.status)) = 'won'
-                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN '${from}' AND '${to}'
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN ${fromTz} AND ${toTz}
           )
     `);
 
@@ -1594,7 +1628,7 @@ export class TenderExecutiveService {
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
                   AND LOWER(TRIM(tr.status)) IN ('lost', 'lost - h1 elimination')
-                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN '${from}' AND '${to}'
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN ${fromTz} AND ${toTz}
           )
     `);
 
@@ -1608,9 +1642,9 @@ export class TenderExecutiveService {
                 WHERE tr.tender_id = ti.id
                   AND (
                         (LOWER(TRIM(tr.status)) IN (${receivedResultStatuses})
-                          AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN '${from}' AND '${to}')
+                          AND COALESCE(tr.result_uploaded_at, tr.updated_at) BETWEEN ${fromTz} AND ${toTz})
                      OR (LOWER(TRIM(tr.status)) = 'disqualified'
-                          AND tr.created_at BETWEEN '${from}' AND '${to}')
+                          AND tr.created_at BETWEEN ${fromTz} AND ${toTz})
                   )
           )
     `);
@@ -1624,7 +1658,7 @@ export class TenderExecutiveService {
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
                   AND LOWER(TRIM(tr.status)) = 'disqualified'
-                  AND tr.created_at BETWEEN '${from}' AND '${to}'
+                  AND tr.created_at BETWEEN ${fromTz} AND ${toTz}
           )
     `);
 
@@ -1637,7 +1671,7 @@ export class TenderExecutiveService {
                 FROM bid_submissions bs
                 WHERE bs.tender_id = ti.id
                   AND bs.status = 'Bid Submitted'
-                  AND bs.submission_datetime <= '${to}'
+                  AND bs.submission_datetime <= ${toTz}
           )
           AND NOT EXISTS (
                 SELECT 1
@@ -1646,7 +1680,7 @@ export class TenderExecutiveService {
                   AND (
                         LOWER(TRIM(tr.status)) IN (${resolvedResultStatuses})
                      OR (LOWER(TRIM(tr.status)) = 'under evaluation'
-                         AND tr.created_at >= '${to}')
+                         AND tr.created_at >= ${toTz})
                   )
           )
     `);
@@ -1660,7 +1694,7 @@ export class TenderExecutiveService {
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
                   AND LOWER(TRIM(tr.status)) = 'won'
-                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) < '${from}'
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) < ${fromTz}
           )
     `);
 
@@ -1673,7 +1707,7 @@ export class TenderExecutiveService {
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
                   AND LOWER(TRIM(tr.status)) IN ('lost', 'lost - h1 elimination')
-                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) < '${from}'
+                  AND COALESCE(tr.result_uploaded_at, tr.updated_at) < ${fromTz}
           )
     `);
 
@@ -1681,14 +1715,14 @@ export class TenderExecutiveService {
         ${baseSelect}
         WHERE ${baseWhere()}
           AND ti.status = 18
-          AND ti.updated_at < '${from}'
+          AND ti.updated_at < ${fromTz}
     `);
 
         const cancelledDuringCompleted = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
           AND ti.status = 18
-          AND ti.updated_at BETWEEN '${from}' AND '${to}'
+          AND ti.updated_at BETWEEN ${fromTz} AND ${toTz}
     `);
 
         /* =====================================================
@@ -1714,8 +1748,8 @@ export class TenderExecutiveService {
         const cancelledTotal = Array.from(cancelledTotalSet.values());
 
         return {
-            from: new Date(from),
-            to: new Date(to),
+            from: new Date(`${query.fromDate}T00:00:00+05:30`),
+            to: new Date(`${query.toDate}T23:59:59.999+05:30`),
             stages: {
                 assigned: {
                     opening: {
