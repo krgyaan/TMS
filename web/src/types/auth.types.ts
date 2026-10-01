@@ -190,3 +190,10 @@ export function canDelete(user: AuthUser | null, module: string): boolean {
 export function canApprove(user: AuthUser | null, module: string): boolean {
     return hasPermission(user, module, 'approve');
 }
+
+/**
+ * Check if user can close a document in a module
+ */
+export function canClose(user: AuthUser | null, module: string): boolean {
+    return hasPermission(user, module, 'close');
+}

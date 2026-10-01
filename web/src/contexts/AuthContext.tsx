@@ -38,6 +38,7 @@ interface AuthContextValue {
     canUpdate: (module: string) => boolean;
     canDelete: (module: string) => boolean;
     canApprove: (module: string) => boolean;
+    canClose: (module: string) => boolean;
 
     // Role checks
     hasRole: (roleName: string) => boolean;
@@ -135,6 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             canUpdate: (module) => hasPermission(module, 'update'),
             canDelete: (module) => hasPermission(module, 'delete'),
             canApprove: (module) => hasPermission(module, 'approve'),
+            canClose: (module) => hasPermission(module, 'close'),
 
             // Role checks
             hasRole: (roleName) => role === roleName,
