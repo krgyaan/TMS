@@ -12,8 +12,8 @@ import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { FileUploader } from "@/components/file-upload";
 import { vendorWorkOrderApi } from "@/services/api/vendor-work-order.api";
-import { CanUpdate } from "@/components/PermissionGuard";
-import { AdminOnly } from "@/components/RoleGuard";
+import { CanUpdate, CanDelete } from "@/components/PermissionGuard";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -175,6 +175,10 @@ const VwoClosurePage = () => {
   const remainingToPay = amountAfterTds - totalPaymentDone;
   const remainingInvoice = amountAfterTds - totalPiAmount;
   const canClose = remainingToPay <= 0 && remainingInvoice <= 0;
+
+  // `canClose` above is the derived "everything settled" state, so the
+  // permission check needs its own name to avoid shadowing it.
+  const { canClose: hasClosePermission, canCreate } = useAuth();
 
   const updatePaymentRow = (index: number, field: keyof PaymentRow, value: string) => {
     setPaymentRows((rows) => rows.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
@@ -424,10 +428,12 @@ const VwoClosurePage = () => {
               </div>
             )}
             <div className="flex justify-end mt-4">
-              <Button onClick={savePayments} disabled={savingPayments || paymentRows.length === 0}>
-                {savingPayments ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                Bulk Save Payments
-              </Button>
+              {canCreate("accounts.payment-requests") && (
+                <Button onClick={savePayments} disabled={savingPayments || paymentRows.length === 0}>
+                  {savingPayments ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  Bulk Save Payments
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -535,10 +541,12 @@ const VwoClosurePage = () => {
               </div>
             )}
             <div className="flex justify-end mt-4">
-              <Button onClick={saveInvoices} disabled={savingInvoices || invoiceRows.length === 0}>
-                {savingInvoices ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                Bulk Save Invoices
-              </Button>
+              {canCreate("accounts.purchase-invoices") && (
+                <Button onClick={saveInvoices} disabled={savingInvoices || invoiceRows.length === 0}>
+                  {savingInvoices ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  Bulk Save Invoices
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -592,7 +600,7 @@ const VwoClosurePage = () => {
                                 <Edit className="h-4 w-4" />
                               </Button>
                             </CanUpdate>
-                            <AdminOnly>
+                            <CanDelete module="accounts.payment-requests">
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -603,7 +611,7 @@ const VwoClosurePage = () => {
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
-                            </AdminOnly>
+                            </CanDelete>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -664,7 +672,7 @@ const VwoClosurePage = () => {
                                 <Edit className="h-4 w-4" />
                               </Button>
                             </CanUpdate>
-                            <AdminOnly>
+                            <CanDelete module="accounts.purchase-invoices">
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -675,7 +683,7 @@ const VwoClosurePage = () => {
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
-                            </AdminOnly>
+                            </CanDelete>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -689,7 +697,7 @@ const VwoClosurePage = () => {
       </Card>
 
       <CardFooter className="flex gap-3">
-        {canClose && (
+        {canClose && hasClosePermission("accounts.vendor-work-orders") && (
           <Button
             className="bg-green-600 hover:bg-green-700"
             onClick={async () => {
