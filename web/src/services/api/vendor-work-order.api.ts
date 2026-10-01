@@ -79,15 +79,6 @@ class VendorWorkOrderApiService extends BaseApiService {
         return this.get<string>(`/next-number${params}`);
     }
 
-    async getParties(type?: string) {
-        const params = type ? `?type=${encodeURIComponent(type)}` : "";
-        return this.get<any[]>(`/parties${params}`);
-    }
-
-    async createParty(data: any) {
-        return this.post<any>("/parties", data);
-    }
-
     getPdfDownloadUrl(id: number, version?: string): string {
         const baseUrl = axiosInstance.defaults.baseURL || '';
         let url = `${baseUrl}/vendor-work-orders/${id}/pdf`;

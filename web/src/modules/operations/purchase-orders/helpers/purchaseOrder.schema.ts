@@ -20,7 +20,6 @@ export const purchaseOrderFormSchema = z.object({
     poDate: z.string().min(1, "PO date is required"),
 
     sellerId: z.string(),
-    sellerSource: z.enum(["", "vendor_org", "party"]),
     sellerName: z.string().min(1, "Seller name is required"),
     sellerEmail: z.string(),
     sellerAddress: z.string(),

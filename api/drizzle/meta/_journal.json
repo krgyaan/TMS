@@ -493,11 +493,11 @@
       "breakpoints": true
     },
     {
-        "idx":  94,
-        "version":  "7",
-        "when":  1788600000000,
-        "tag":  "0135_add_warehouse_dimension",
-        "breakpoints":  true
+      "idx": 94,
+      "version": "7",
+      "when": 1788600000000,
+      "tag": "0135_add_warehouse_dimension",
+      "breakpoints": true
     },
     {
       "idx": 95,
@@ -546,6 +546,34 @@
       "version": "7",
       "when": 1790000000000,
       "tag": "0145_add_msme_type_to_vendor_organizations",
+      "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1791000000000,
+      "tag": "0146_project_parties_only_ship_to",
+      "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1792000000000,
+      "tag": "0147_create_vendor_organizations_dups_archive",
+      "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1793000000000,
+      "tag": "0148_po_vwo_approve_close_and_invoice_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1794000000000,
+      "tag": "0149_add_closed_at_to_po_and_vwo",
       "breakpoints": true
     }
   ]

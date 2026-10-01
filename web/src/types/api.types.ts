@@ -226,7 +226,6 @@ export interface Vendor {
     email?: string;
     mobile?: string;
     address?: string;
-    status: boolean;
     createdAt: string;
     updatedAt: string;
 
@@ -447,9 +446,9 @@ export interface UpdateDocumentSubmittedDto extends Partial<CreateDocumentSubmit
 export interface CreateVendorDto {
     orgId?: number;
     name: string;
-    email?: string;
+    email: string;
+    mobile: string;
     address?: string;
-    status?: boolean;
 }
 
 export interface UpdateVendorDto extends Partial<CreateVendorDto> {}

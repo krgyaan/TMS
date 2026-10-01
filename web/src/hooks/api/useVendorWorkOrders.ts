@@ -57,23 +57,6 @@ export function useNextVWONumber(projectName?: string) {
     });
 }
 
-export function useVendorWorkOrderParties() {
-    return useQuery({
-        queryKey: ["vendor-work-orders", "parties"],
-        queryFn: () => vendorWorkOrderApi.getParties(),
-    });
-}
-
-export function useCreateVendorWorkOrderParty() {
-    const queryClient = useQueryClient();
-    return useMutation({
-        mutationFn: (data: any) => vendorWorkOrderApi.createParty(data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["vendor-work-orders", "parties"] });
-        },
-    });
-}
-
 export function useCreateVendorWorkOrder() {
     const queryClient = useQueryClient();
     return useMutation({

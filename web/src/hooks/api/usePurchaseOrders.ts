@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 export const purchaseOrderKeys = {
     all: ["purchase-orders"] as const,
     poParties: () => [...purchaseOrderKeys.all, "po-parties"] as const,
+    sellerOptions: () => [...purchaseOrderKeys.poParties(), "sellers"] as const,
+    shipToOptions: () => [...purchaseOrderKeys.poParties(), "ship-to"] as const,
     purchaseOrder: (id: number) => [...purchaseOrderKeys.all, "purchase-order", id] as const,
     projectPurchaseOrders: (projectId: number) => [...purchaseOrderKeys.all, "project", projectId] as const,
     projectInventory: (projectId: number) => [...purchaseOrderKeys.all, "project-inventory", projectId] as const,
@@ -30,6 +32,22 @@ export const usePoParties = () => {
     return useQuery({
         queryKey: purchaseOrderKeys.poParties(),
         queryFn: () => purchaseOrderApi.getPoParties(),
+        staleTime: 5 * 60 * 1000,
+    });
+};
+
+export const useSellerOptions = () => {
+    return useQuery({
+        queryKey: purchaseOrderKeys.sellerOptions(),
+        queryFn: () => purchaseOrderApi.getSellerOptions(),
+        staleTime: 5 * 60 * 1000,
+    });
+};
+
+export const useShipToOptions = () => {
+    return useQuery({
+        queryKey: purchaseOrderKeys.shipToOptions(),
+        queryFn: () => purchaseOrderApi.getShipToOptions(),
         staleTime: 5 * 60 * 1000,
     });
 };

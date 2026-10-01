@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, Table
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
-import { usePoParties, useCreatePoParty, useProjectInventory } from "@/hooks/api/usePurchaseOrders";
+import { useSellerOptions, useShipToOptions, useCreatePoParty, useProjectInventory } from "@/hooks/api/usePurchaseOrders";
 import { useCreateSaleInvoice, useWoBillingData } from "@/hooks/api/useSaleInvoices";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, ArrowLeft, Building2, Copy, Eye, FileText, ListChecks, Mail, MapPin, Trash2, Truck, UserPlus } from "lucide-react";
@@ -91,11 +91,11 @@ export default function CreateSaleInvoicePage() {
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
     const { data: woBillingData, isLoading: isWoDataLoading } = useWoBillingData(projectId);
     const { data: inventoryData } = useProjectInventory(projectId);
-    const { data: partiesData } = usePoParties();
+    const { data: sellerRows = [] } = useSellerOptions();
+    const { data: shipToRows = [] } = useShipToOptions();
     const createPartyMutation = useCreatePoParty();
     const createSIMutation = useCreateSaleInvoice();
 
-    const parties = partiesData || [];
     const [partyCreationType, setPartyCreationType] = useState<"seller" | "ship_to">("seller");
     const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
     const [isShipToPartyOpen, setIsShipToPartyOpen] = useState(false);
@@ -176,24 +176,22 @@ export default function CreateSaleInvoicePage() {
 
     const itemRow = (index: number) => items[index] ?? {};
 
-    const sellerOptions = useMemo(() => [
-        ...(parties || [])
-            .filter((p: any) => !p.type || p.type === "seller")
-            .map((p: any) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
-    ], [parties]);
+    const sellerOptions = useMemo(
+        () => sellerRows.map((p) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
+        [sellerRows]
+    );
 
-    const partyOptions = useMemo(() => [
-        ...(parties || [])
-            .filter((p: any) => p.type === "ship_to")
-            .map((p: any) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
-    ], [parties]);
+    const partyOptions = useMemo(
+        () => shipToRows.map((p) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
+        [shipToRows]
+    );
 
     const selectedSellerId = form.watch("sellerId");
     const selectedPartyId = form.watch("partyId");
 
     useEffect(() => {
         if (!selectedSellerId) return;
-        const party = parties.find((p: any) => String(p.id) === selectedSellerId);
+        const party = sellerRows.find((p) => String(p.id) === selectedSellerId);
         if (!party) return;
         form.setValue("billingCustomerName", party.name || "");
         form.setValue("billingAddress", party.address || "");
@@ -201,17 +199,17 @@ export default function CreateSaleInvoicePage() {
         form.setValue("billingEmail", party.email || "");
         form.setValue("billingPanNo", party.pan || "");
         form.setValue("billingMsmeNo", party.msme || "");
-    }, [selectedSellerId, parties, form]);
+    }, [selectedSellerId, sellerRows, form]);
 
     useEffect(() => {
         if (!selectedPartyId) return;
-        const party = parties.find((p: any) => String(p.id) === selectedPartyId);
+        const party = shipToRows.find((p) => String(p.id) === selectedPartyId);
         if (!party) return;
         form.setValue("shippingCustomerName", party.name || "");
         form.setValue("shippingAddress", party.address || "");
         form.setValue("shippingGst", party.gstNo || "");
         form.setValue("shippingPanNo", party.pan || "");
-    }, [selectedPartyId, parties, form]);
+    }, [selectedPartyId, shipToRows, form]);
 
     const handleDispatchSameAsShipping = (checked: boolean) => {
         setDispatchSameAsShipping(checked);

@@ -39,7 +39,6 @@ export const personApiToForm = (person: Vendor): PersonFormValues => ({
     email: person.email ?? "",
     mobile: person.mobile ?? "",
     address: person.address,
-    status: person.status ?? true,
 });
 
 export const fileApiToForm = (file: VendorFile): FileFormValues => ({
@@ -99,16 +98,16 @@ export const toUpdateAccountDto = (account: AccountFormValues): UpdateVendorAcco
 export const toCreatePersonDto = (person: PersonFormValues, orgId: number): CreateVendorDto => ({
     orgId,
     name: person.name,
-    email: person.email,
+    email: person.email.trim(),
+    mobile: person.mobile,
     address: person.address,
-    status: person.status,
 });
 
 export const toUpdatePersonDto = (person: PersonFormValues): UpdateVendorDto => ({
     name: person.name,
-    email: person.email,
+    email: person.email.trim(),
+    mobile: person.mobile,
     address: person.address,
-    status: person.status,
 });
 
 export const toCreateFileDto = (file: FileFormValues, orgId: number): CreateVendorFileDto => ({

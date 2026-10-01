@@ -4,9 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Form } from "@/components/ui/form";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { useCreateVendor, useUpdateVendor } from "@/hooks/api/useVendors";
 import { personApiToForm, toCreatePersonDto, toUpdatePersonDto } from "../helpers/vendorForm.mappers";
@@ -17,7 +16,6 @@ const emptyPerson: PersonFormValues = {
     email: "",
     mobile: "",
     address: "",
-    status: true,
 };
 
 export type PersonFormDialogProps = {
@@ -56,19 +54,27 @@ export const PersonFormDialog = ({ orgId, open, onOpenChange, initial, siblings,
             return;
         }
 
+        // Close only after the API has confirmed the write, so a failed save
+        // leaves the dialog (and the typed values) in place instead of looking
+        // like a silent success.
         if (initial?.id) {
             updateVendor.mutate({ id: initial.id, data: toUpdatePersonDto(values) }, {
-                onSuccess: () => onSaved({ ...initial, ...values }),
+                onSuccess: updated => {
+                    onSaved(personApiToForm(updated));
+                    onOpenChange(false);
+                },
             });
         } else if (orgId) {
             createVendor.mutate(toCreatePersonDto(values, orgId), {
-                onSuccess: created => onSaved(personApiToForm(created)),
+                onSuccess: created => {
+                    onSaved(personApiToForm(created));
+                    onOpenChange(false);
+                },
             });
         } else {
             onSaved(values);
+            onOpenChange(false);
         }
-
-        onOpenChange(false);
     });
 
     return (
@@ -96,21 +102,6 @@ export const PersonFormDialog = ({ orgId, open, onOpenChange, initial, siblings,
                         <FieldWrapper control={form.control} name="address" label="Address">
                             {field => <Textarea rows={3} placeholder="Enter address" {...field} value={field.value ?? ""} />}
                         </FieldWrapper>
-
-                        <FormField
-                            control={form.control}
-                            name="status"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                    <FormControl>
-                                        <Checkbox checked={field.value} onCheckedChange={checked => field.onChange(checked === true)} />
-                                    </FormControl>
-                                    <div className="space-y-1 leading-none">
-                                        <FormLabel>Active</FormLabel>
-                                    </div>
-                                </FormItem>
-                            )}
-                        />
                     </div>
                 </Form>
 

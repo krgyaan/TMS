@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, inArray, isNull, like, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, like, ne, sql } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rename } from "node:fs/promises";
 import { join } from "node:path";
@@ -74,6 +74,7 @@ export class PurchaseOrderService {
                     totalPiCount: sql<number>`COALESCE((SELECT COUNT(*) FROM project_purchase_invoices WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     poApproved: purchaseOrders.poApproved,
                     poApprovalRemark: purchaseOrders.poApprovalRemark,
+                    closedAt: purchaseOrders.closedAt,
                 })
                 .from(purchaseOrders)
                 .leftJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
@@ -149,15 +150,19 @@ export class PurchaseOrderService {
         if (status === "pending") {
             conditions.push(isNull(purchaseOrders.poApproved));
         } else if (status === "approved") {
-            conditions.push(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} < ${effectiveAmount}`);
+            // approved but not yet closed: payment progress is no longer what
+            // separates these two tabs, `closed_at` is (see closePurchaseOrder).
+            conditions.push(sql`${purchaseOrders.poApproved} = true AND ${purchaseOrders.closedAt} IS NULL`);
         } else if (status === "rejected") {
             conditions.push(eq(purchaseOrders.poApproved, false));
         } else if (status === "new") {
             conditions.push(sql`${purchaseOrders.poApproved} IS NOT FALSE`);
         } else if (status === "closed") {
-            conditions.push(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`);
+            conditions.push(isNotNull(purchaseOrders.closedAt));
         } else if (status === "invoice-pending") {
-            conditions.push(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`);
+            conditions.push(
+                sql`${purchaseOrders.poApproved} = true AND ${purchaseOrders.closedAt} IS NULL AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`
+            );
         }
 
         const purchaseOrdersData = await this.db
@@ -186,6 +191,7 @@ export class PurchaseOrderService {
                     amountAfterTds: purchaseOrders.amountAfterTds,
                     poApproved: purchaseOrders.poApproved,
                     poApprovalRemark: purchaseOrders.poApprovalRemark,
+                    closedAt: purchaseOrders.closedAt,
                     totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
@@ -227,11 +233,13 @@ export class PurchaseOrderService {
 
         const [pending, approved, newCount, rejected, closedCount, invoicePendingCount] = await Promise.all([
             buildCount(isNull(purchaseOrders.poApproved)),
-            buildCount(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} < ${effectiveAmount}`),
+            buildCount(sql`${purchaseOrders.poApproved} = true AND ${purchaseOrders.closedAt} IS NULL`),
             buildCount(sql`${purchaseOrders.poApproved} IS NOT FALSE`),
             buildCount(eq(purchaseOrders.poApproved, false)),
-            buildCount(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`),
-            buildCount(sql`${purchaseOrders.poApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`),
+            buildCount(isNotNull(purchaseOrders.closedAt)),
+            buildCount(
+                sql`${purchaseOrders.poApproved} = true AND ${purchaseOrders.closedAt} IS NULL AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`
+            ),
         ]);
 
         return { pending, approved, rejected, new: newCount, closed: closedCount, invoicePending: invoicePendingCount };
@@ -703,6 +711,41 @@ export class PurchaseOrderService {
         }
     }
 
+    /**
+     * Closure is an explicit, permissioned decision rather than a derived state:
+     * `closed_at` is what the "Closed" tab and the approval counts read, so a PO
+     * that is merely fully paid stays in "Approved" until someone closes it.
+     */
+    async closePurchaseOrder(id: number) {
+        const po = await this.db
+            .select()
+            .from(purchaseOrders)
+            .where(eq(purchaseOrders.id, id))
+            .then(rows => rows[0]);
+
+        if (!po) throw new NotFoundException("Purchase Order not found");
+        if (po.poApproved !== true) {
+            throw new BadRequestException("Only approved Purchase Orders can be closed");
+        }
+
+        const closureStatus = await this.checkClosure(id);
+        if (!closureStatus.canClose) {
+            throw new BadRequestException("Purchase Order cannot be closed until all payment requests and purchase invoices are cleared.");
+        }
+
+        const [updated] = await this.db
+            .update(purchaseOrders)
+            .set({
+                closedAt: new Date(),
+                updatedAt: new Date(),
+            })
+            .where(eq(purchaseOrders.id, id))
+            .returning();
+
+        this.logger.info(`Purchase Order closed #${id}`);
+        return updated ?? po;
+    }
+
     async getPurchaseOrder(id: number) {
         this.logger.debug("PO details called");
         const po = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
@@ -1073,18 +1116,6 @@ export class PurchaseOrderService {
 
             await this.syncPersonForOrg(orgId, body);
             await this.syncGstForOrg(orgId, body);
-        } else if (body.sellerId) {
-            await this.db
-                .update(projectParties)
-                .set({
-                    name: body.sellerName,
-                    email: body.sellerEmail || null,
-                    address: body.sellerAddress || null,
-                    gstNo: body.sellerGstNo || null,
-                    pan: body.sellerPanNo || null,
-                    msme: body.sellerMsmeNo || null,
-                })
-                .where(eq(projectParties.id, body.sellerId));
         }
         if (body.shipToPartyId) {
             await this.db
@@ -1531,7 +1562,8 @@ export class PurchaseOrderService {
             .where(eq(vendorOrganizations.status, true))
             .orderBy(desc(vendorOrganizations.createdAt));
 
-        const orgMap = new Map<number, any>();
+        type OrgRow = (typeof orgRows)[number] & { type: string; source: string };
+        const orgMap = new Map<number, OrgRow>();
         for (const row of orgRows) {
             const existing = orgMap.get(row.id);
             if (existing) {
@@ -1549,12 +1581,70 @@ export class PurchaseOrderService {
         }
 
         const sellerOrgs = [...orgMap.values()];
-        const legacySellers = partyRows.filter(
-            (p) => p.type === "seller" && !p.vendorOrganizationId,
-        ).map((p) => ({ ...p, source: "party" as const }));
-        const otherParties = partyRows.filter((p) => p.type !== "seller");
+        // Sellers exist only in vendor master now, so project_parties contributes
+        // nothing here beyond ship-to addresses and other non-seller beneficiaries.
+        const otherParties = partyRows
+            .filter((p) => p.type !== "seller")
+            .map((p) => ({ ...p, source: "party" as const }));
 
-        return [...sellerOrgs, ...legacySellers, ...otherParties];
+        return [...sellerOrgs, ...otherParties];
+    }
+
+    // Seller picker reads vendor_organizations only - project_parties never
+    // contributes here (it is ship-to only since migration 0146).
+    async listSellerOptions() {
+        const orgRows = await this.db
+            .select({
+                id: vendorOrganizations.id,
+                name: vendorOrganizations.name,
+                alias: vendorOrganizations.alias,
+                gstNo: vendorGsts.gstNo,
+                msme: vendorOrganizations.msme,
+                pan: vendorOrganizations.pan,
+                address: vendorOrganizations.address,
+                email: vendors.email,
+                mobile: vendors.mobile,
+                contactPerson: vendors.name,
+            })
+            .from(vendorOrganizations)
+            .leftJoin(vendorGsts, eq(vendorGsts.orgId, vendorOrganizations.id))
+            .leftJoin(vendors, eq(vendors.orgId, vendorOrganizations.id))
+            .where(eq(vendorOrganizations.status, true))
+            .orderBy(asc(vendorOrganizations.name));
+
+        const merged = new Map<number, (typeof orgRows)[number]>();
+        for (const row of orgRows) {
+            const existing = merged.get(row.id);
+            if (!existing) {
+                merged.set(row.id, row);
+                continue;
+            }
+            if (!existing.gstNo && row.gstNo) existing.gstNo = row.gstNo;
+            if (!existing.email && row.email) existing.email = row.email;
+            if (!existing.mobile && row.mobile) existing.mobile = row.mobile;
+            if (!existing.contactPerson && row.contactPerson) existing.contactPerson = row.contactPerson;
+        }
+
+        return [...merged.values()];
+    }
+
+    // Ship-to picker reads project_parties only - vendor_organizations never
+    // contributes here, so ids from the two tables cannot cross-wire.
+    async listShipToOptions() {
+        const rows = await this.db
+            .select({
+                id: projectParties.id,
+                name: projectParties.name,
+                alias: projectParties.alias,
+                address: projectParties.address,
+                gstNo: projectParties.gstNo,
+                pan: projectParties.pan,
+            })
+            .from(projectParties)
+            .where(and(eq(projectParties.type, "ship_to"), eq(projectParties.isActive, true)))
+            .orderBy(asc(projectParties.name));
+
+        return rows;
     }
 
     async activateParty(id: number, source?: string) {
@@ -1566,22 +1656,6 @@ export class PurchaseOrderService {
                 .returning();
             if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
             return { ...rows[0], type: "seller", source: "vendor_org", isActive: true };
-        }
-
-        const [party] = await this.db
-            .select()
-            .from(projectParties)
-            .where(eq(projectParties.id, id))
-            .limit(1);
-
-        if (party?.vendorOrganizationId) {
-            const rows = await this.db
-                .update(vendorOrganizations)
-                .set({ status: true, updatedAt: new Date() })
-                .where(eq(vendorOrganizations.id, party.vendorOrganizationId))
-                .returning();
-            if (!rows[0]) throw new NotFoundException(`Vendor organization not found for party ${id}`);
-            return { ...party, isActive: true, source: "vendor_org" };
         }
 
         const rows = await this.db
@@ -1605,22 +1679,6 @@ export class PurchaseOrderService {
                 .returning();
             if (!rows[0]) throw new NotFoundException(`Vendor organization with ID ${id} not found`);
             return { ...rows[0], type: "seller", source: "vendor_org", isActive: false };
-        }
-
-        const [party] = await this.db
-            .select()
-            .from(projectParties)
-            .where(eq(projectParties.id, id))
-            .limit(1);
-
-        if (party?.vendorOrganizationId) {
-            const rows = await this.db
-                .update(vendorOrganizations)
-                .set({ status: false, updatedAt: new Date() })
-                .where(eq(vendorOrganizations.id, party.vendorOrganizationId))
-                .returning();
-            if (!rows[0]) throw new NotFoundException(`Vendor organization not found for party ${id}`);
-            return { ...party, isActive: false, source: "vendor_org" };
         }
 
         const rows = await this.db
@@ -1669,20 +1727,6 @@ export class PurchaseOrderService {
             throw new NotFoundException(`Party with ID ${id} not found`);
         }
 
-        if (existing.vendorOrganizationId) {
-            await this.db
-                .update(vendorOrganizations)
-                .set({
-                    name: body.name ?? undefined,
-                    alias: body.alias ?? undefined,
-                    msme: body.msme ?? undefined,
-                    pan: body.pan ?? undefined,
-                    address: body.address ?? undefined,
-                    updatedAt: new Date(),
-                })
-                .where(eq(vendorOrganizations.id, existing.vendorOrganizationId));
-        }
-
         const rows = await this.db
             .update(projectParties)
             .set({
@@ -1714,6 +1758,6 @@ export class PurchaseOrderService {
             }]);
         }
 
-        return { ...rows[0], source: existing.vendorOrganizationId ? "vendor_org" : "party" };
+        return { ...rows[0], source: "party" as const };
     }
 }

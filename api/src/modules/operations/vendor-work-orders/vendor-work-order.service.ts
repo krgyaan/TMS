@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, eq, like, desc, sql, inArray, isNull, ne } from "drizzle-orm";
+import { and, eq, like, desc, sql, inArray, isNull, isNotNull, ne } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { rename, readFile } from "node:fs/promises";
@@ -415,15 +415,19 @@ export class VendorWorkOrderService {
         if (status === "pending") {
             conditions.push(isNull(vendorWorkOrders.woApproved));
         } else if (status === "approved") {
-            conditions.push(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} < ${effectiveAmount}`);
+            // approved but not yet closed: payment progress no longer separates
+            // these two tabs, `closed_at` does (see closeVendorWorkOrder).
+            conditions.push(sql`${vendorWorkOrders.woApproved} = true AND ${vendorWorkOrders.closedAt} IS NULL`);
         } else if (status === "rejected") {
             conditions.push(eq(vendorWorkOrders.woApproved, false));
         } else if (status === "new") {
             conditions.push(sql`${vendorWorkOrders.woApproved} IS NOT FALSE`);
         } else if (status === "closed") {
-            conditions.push(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`);
+            conditions.push(isNotNull(vendorWorkOrders.closedAt));
         } else if (status === "invoice-pending") {
-            conditions.push(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`);
+            conditions.push(
+                sql`${vendorWorkOrders.woApproved} = true AND ${vendorWorkOrders.closedAt} IS NULL AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`
+            );
         }
 
         const rows = await this.db
@@ -451,6 +455,7 @@ export class VendorWorkOrderService {
                 amountAfterTds: vendorWorkOrders.amountAfterTds,
                 woApproved: vendorWorkOrders.woApproved,
                 woApprovalRemark: vendorWorkOrders.woApprovalRemark,
+                closedAt: vendorWorkOrders.closedAt,
                 totalAmount: sql<number>`COALESCE((SELECT SUM(CAST(taxable_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 totalGstAmt: sql<number>`COALESCE((SELECT SUM(CAST(gst_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 grandTotal: sql<number>`COALESCE((SELECT SUM(CAST(total_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
@@ -492,11 +497,13 @@ export class VendorWorkOrderService {
 
         const [pending, approved, newCount, rejected, closedCount, invoicePendingCount] = await Promise.all([
             buildCount(isNull(vendorWorkOrders.woApproved)),
-            buildCount(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} < ${effectiveAmount}`),
+            buildCount(sql`${vendorWorkOrders.woApproved} = true AND ${vendorWorkOrders.closedAt} IS NULL`),
             buildCount(sql`${vendorWorkOrders.woApproved} IS NOT FALSE`),
             buildCount(eq(vendorWorkOrders.woApproved, false)),
-            buildCount(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} >= ${effectiveAmount}`),
-            buildCount(sql`${vendorWorkOrders.woApproved} = true AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`),
+            buildCount(isNotNull(vendorWorkOrders.closedAt)),
+            buildCount(
+                sql`${vendorWorkOrders.woApproved} = true AND ${vendorWorkOrders.closedAt} IS NULL AND ${paymentDoneTotal} >= ${effectiveAmount} AND ${piTotal} < ${effectiveAmount}`
+            ),
         ]);
 
         return { pending, approved, rejected, new: newCount, closed: closedCount, invoicePending: invoicePendingCount };
@@ -660,6 +667,7 @@ export class VendorWorkOrderService {
                 amountAfterTds: vendorWorkOrders.amountAfterTds,
                 woApproved: vendorWorkOrders.woApproved,
                 woApprovalRemark: vendorWorkOrders.woApprovalRemark,
+                closedAt: vendorWorkOrders.closedAt,
                 generatedPdfVersions: vendorWorkOrders.generatedPdfVersions,
             })
             .from(vendorWorkOrders)
@@ -785,7 +793,8 @@ export class VendorWorkOrderService {
         const [updated] = await this.db
             .update(vendorWorkOrders)
             .set({
-                updatedAt: sql`now()`,
+                closedAt: new Date(),
+                updatedAt: new Date(),
             })
             .where(eq(vendorWorkOrders.id, id))
             .returning();
@@ -1125,7 +1134,8 @@ export class VendorWorkOrderService {
             .where(eq(vendorOrganizations.status, true))
             .orderBy(desc(vendorOrganizations.createdAt));
 
-        const orgMap = new Map<number, any>();
+        type OrgRow = (typeof orgRows)[number] & { type: string; source: string };
+        const orgMap = new Map<number, OrgRow>();
         for (const row of orgRows) {
             const existing = orgMap.get(row.id);
             if (existing) {
@@ -1143,12 +1153,13 @@ export class VendorWorkOrderService {
         }
 
         const sellerOrgs = [...orgMap.values()];
-        const legacySellers = partyRows.filter(
-            (p) => p.type === "seller" && !p.vendorOrganizationId,
-        ).map((p) => ({ ...p, source: "party" as const }));
-        const otherParties = partyRows.filter((p) => p.type !== "seller");
+        // Sellers exist only in vendor master now, so project_parties contributes
+        // nothing here beyond ship-to addresses and other non-seller beneficiaries.
+        const otherParties = partyRows
+            .filter((p) => p.type !== "seller")
+            .map((p) => ({ ...p, source: "party" as const }));
 
-        return [...sellerOrgs, ...legacySellers, ...otherParties];
+        return [...sellerOrgs, ...otherParties];
     }
 
     async createParty(body: any) {
@@ -1214,22 +1225,6 @@ export class VendorWorkOrderService {
             return { ...rows[0], type: "seller", source: "vendor_org", isActive: true };
         }
 
-        const [party] = await this.db
-            .select()
-            .from(projectParties)
-            .where(eq(projectParties.id, id))
-            .limit(1);
-
-        if (party?.vendorOrganizationId) {
-            const rows = await this.db
-                .update(vendorOrganizations)
-                .set({ status: true, updatedAt: new Date() })
-                .where(eq(vendorOrganizations.id, party.vendorOrganizationId))
-                .returning();
-            if (!rows[0]) throw new NotFoundException(`Vendor organization not found for party ${id}`);
-            return { ...party, isActive: true, source: "vendor_org" };
-        }
-
         const rows = await this.db
             .update(projectParties)
             .set({ isActive: true, updatedAt: new Date() })
@@ -1239,7 +1234,7 @@ export class VendorWorkOrderService {
         if (!rows[0]) {
             throw new NotFoundException(`Party with ID ${id} not found`);
         }
-        return { ...rows[0], source: "party" };
+        return { ...rows[0], source: "party" as const };
     }
 
     async deactivateParty(id: number, source?: string) {
@@ -1253,22 +1248,6 @@ export class VendorWorkOrderService {
             return { ...rows[0], type: "seller", source: "vendor_org", isActive: false };
         }
 
-        const [party] = await this.db
-            .select()
-            .from(projectParties)
-            .where(eq(projectParties.id, id))
-            .limit(1);
-
-        if (party?.vendorOrganizationId) {
-            const rows = await this.db
-                .update(vendorOrganizations)
-                .set({ status: false, updatedAt: new Date() })
-                .where(eq(vendorOrganizations.id, party.vendorOrganizationId))
-                .returning();
-            if (!rows[0]) throw new NotFoundException(`Vendor organization not found for party ${id}`);
-            return { ...party, isActive: false, source: "vendor_org" };
-        }
-
         const rows = await this.db
             .update(projectParties)
             .set({ isActive: false, updatedAt: new Date() })
@@ -1278,7 +1257,7 @@ export class VendorWorkOrderService {
         if (!rows[0]) {
             throw new NotFoundException(`Party with ID ${id} not found`);
         }
-        return { ...rows[0], source: "party" };
+        return { ...rows[0], source: "party" as const };
     }
 
     async updateParty(id: number, body: any) {
@@ -1315,20 +1294,6 @@ export class VendorWorkOrderService {
             throw new NotFoundException(`Party with ID ${id} not found`);
         }
 
-        if (existing.vendorOrganizationId) {
-            await this.db
-                .update(vendorOrganizations)
-                .set({
-                    name: body.name ?? undefined,
-                    alias: body.alias ?? undefined,
-                    msme: body.msme ?? undefined,
-                    pan: body.pan ?? undefined,
-                    address: body.address ?? undefined,
-                    updatedAt: new Date(),
-                })
-                .where(eq(vendorOrganizations.id, existing.vendorOrganizationId));
-        }
-
         const rows = await this.db
             .update(projectParties)
             .set({
@@ -1350,7 +1315,7 @@ export class VendorWorkOrderService {
         if (!rows[0]) {
             throw new NotFoundException(`Party with ID ${id} not found`);
         }
-        return { ...rows[0], source: existing.vendorOrganizationId ? "vendor_org" : "party" };
+        return { ...rows[0], source: "party" as const };
     }
 
     async getPdf(id: number, version?: string) {
@@ -1431,7 +1396,7 @@ export class VendorWorkOrderService {
         }
     }
 
-    private async syncParty(body: any) {
+    private async syncParty(body: { sellerName?: string | null; sellerOrganizationId?: number | null; [key: string]: any }) {
         if (!body.sellerName) return;
 
         if (body.sellerOrganizationId) {
@@ -1450,34 +1415,9 @@ export class VendorWorkOrderService {
             await this.syncPersonForOrg(orgId, body);
             await this.syncGstForOrg(orgId, body);
         } else {
-            const existing = await this.db
-                .select()
-                .from(projectParties)
-                .where(eq(projectParties.name, body.sellerName))
-                .then(rows => rows[0]);
-
-            if (existing) {
-                await this.db
-                    .update(projectParties)
-                    .set({
-                        email: body.sellerEmail || existing.email,
-                        address: body.sellerAddress || existing.address,
-                        gstNo: body.sellerGstNo || existing.gstNo,
-                        pan: body.sellerPanNo || existing.pan,
-                        msme: body.sellerMsmeNo || existing.msme,
-                    })
-                    .where(eq(projectParties.id, existing.id));
-            } else {
-                await this.db.insert(projectParties).values({
-                    name: body.sellerName,
-                    email: body.sellerEmail,
-                    address: body.sellerAddress,
-                    gstNo: body.sellerGstNo,
-                    pan: body.sellerPanNo,
-                    msme: body.sellerMsmeNo,
-                    type: "seller",
-                });
-            }
+            // Sellers live only in vendor master; without an org id there is
+            // nothing to write to rather than recreating a party row.
+            this.logger.warn(`No sellerOrganizationId for "${body.sellerName}" - seller not synced`);
         }
 
         if (body.shipToName) {
