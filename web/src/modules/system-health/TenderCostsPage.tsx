@@ -93,6 +93,58 @@ export function CallTypeBadge({ callType }: { callType: string }) {
     );
 }
 
+function renderTenderIdentity(item: { tenderId: number; tenderName?: string | null; tenderNo?: string | null }) {
+    const rawName = item.tenderName?.trim();
+    const rawNo = item.tenderNo?.trim();
+
+    const isMeaningful = (val?: string | null) => {
+        if (!val) return false;
+        const v = val.trim();
+        return v !== '' && v !== '0' && v !== '000' && v.toLowerCase() !== 'null' && v.toLowerCase() !== 'undefined';
+    };
+
+    const hasName = isMeaningful(rawName);
+    const hasNo = isMeaningful(rawNo);
+
+    if (hasName) {
+        return (
+            <div className="flex flex-col">
+                <span className="font-semibold text-xs text-foreground leading-tight">
+                    {rawName}
+                </span>
+                {hasNo ? (
+                    <span className="text-[11px] text-muted-foreground leading-normal mt-0.5">
+                        {rawNo}
+                    </span>
+                ) : (
+                    <span className="text-[10px] text-muted-foreground leading-normal mt-0.5">
+                        #{item.tenderId}
+                    </span>
+                )}
+            </div>
+        );
+    }
+
+    if (hasNo) {
+        return (
+            <div className="flex flex-col">
+                <span className="font-semibold text-xs text-foreground leading-tight">
+                    {rawNo}
+                </span>
+                <span className="text-[10px] text-muted-foreground leading-normal mt-0.5">
+                    Tender #{item.tenderId}
+                </span>
+            </div>
+        );
+    }
+
+    return (
+        <span className="font-semibold text-xs text-foreground">
+            Tender #{item.tenderId}
+        </span>
+    );
+}
+
 export default function TenderCostsPage() {
     const [tenderSortBy, setTenderSortBy] = useState<'cost' | 'tokens' | 'recent'>('cost');
     const { data: tendersData, isLoading: tendersLoading, refetch: refetchTenders, isFetching } = useClaudeTenders(tenderSortBy);
@@ -180,7 +232,7 @@ export default function TenderCostsPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead className="w-8"></TableHead>
-                                    <TableHead className="text-xs">Tender ID</TableHead>
+                                    <TableHead className="text-xs">Tender</TableHead>
                                     <TableHead className="text-xs">Total Tokens</TableHead>
                                     <TableHead className="text-xs">Total Cost (₹ / $)</TableHead>
                                     <TableHead className="text-xs">Calls Count</TableHead>
@@ -214,8 +266,8 @@ export default function TenderCostsPage() {
                                                             <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                                         )}
                                                     </TableCell>
-                                                    <TableCell className="font-semibold text-xs">
-                                                        Tender #{item.tenderId}
+                                                    <TableCell className="text-xs max-w-[280px]">
+                                                        {renderTenderIdentity(item)}
                                                     </TableCell>
                                                     <TableCell className="text-xs">
                                                         <Badge variant="outline" className="font-mono text-xs">
@@ -246,7 +298,7 @@ export default function TenderCostsPage() {
                                                         <TableCell colSpan={7} className="p-3 pl-10">
                                                             <div className="rounded-md border bg-background p-3">
                                                                 <div className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                                                                    Stage Breakdown for Tender #{item.tenderId}
+                                                                    Stage Breakdown for {item.tenderName?.trim() ? `${item.tenderName.trim()} (#${item.tenderId})` : `Tender #${item.tenderId}`}
                                                                 </div>
                                                                 <Table>
                                                                     <TableHeader>
