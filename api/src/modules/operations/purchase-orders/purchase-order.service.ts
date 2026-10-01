@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, desc, eq, inArray, isNotNull, isNull, like, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, like, ne, sql } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, rename } from "node:fs/promises";
 import { join } from "node:path";
@@ -1588,6 +1588,63 @@ export class PurchaseOrderService {
             .map((p) => ({ ...p, source: "party" as const }));
 
         return [...sellerOrgs, ...otherParties];
+    }
+
+    // Seller picker reads vendor_organizations only - project_parties never
+    // contributes here (it is ship-to only since migration 0146).
+    async listSellerOptions() {
+        const orgRows = await this.db
+            .select({
+                id: vendorOrganizations.id,
+                name: vendorOrganizations.name,
+                alias: vendorOrganizations.alias,
+                gstNo: vendorGsts.gstNo,
+                msme: vendorOrganizations.msme,
+                pan: vendorOrganizations.pan,
+                address: vendorOrganizations.address,
+                email: vendors.email,
+                mobile: vendors.mobile,
+                contactPerson: vendors.name,
+            })
+            .from(vendorOrganizations)
+            .leftJoin(vendorGsts, eq(vendorGsts.orgId, vendorOrganizations.id))
+            .leftJoin(vendors, eq(vendors.orgId, vendorOrganizations.id))
+            .where(eq(vendorOrganizations.status, true))
+            .orderBy(asc(vendorOrganizations.name));
+
+        const merged = new Map<number, (typeof orgRows)[number]>();
+        for (const row of orgRows) {
+            const existing = merged.get(row.id);
+            if (!existing) {
+                merged.set(row.id, row);
+                continue;
+            }
+            if (!existing.gstNo && row.gstNo) existing.gstNo = row.gstNo;
+            if (!existing.email && row.email) existing.email = row.email;
+            if (!existing.mobile && row.mobile) existing.mobile = row.mobile;
+            if (!existing.contactPerson && row.contactPerson) existing.contactPerson = row.contactPerson;
+        }
+
+        return [...merged.values()];
+    }
+
+    // Ship-to picker reads project_parties only - vendor_organizations never
+    // contributes here, so ids from the two tables cannot cross-wire.
+    async listShipToOptions() {
+        const rows = await this.db
+            .select({
+                id: projectParties.id,
+                name: projectParties.name,
+                alias: projectParties.alias,
+                address: projectParties.address,
+                gstNo: projectParties.gstNo,
+                pan: projectParties.pan,
+            })
+            .from(projectParties)
+            .where(and(eq(projectParties.type, "ship_to"), eq(projectParties.isActive, true)))
+            .orderBy(asc(projectParties.name));
+
+        return rows;
     }
 
     async activateParty(id: number, source?: string) {

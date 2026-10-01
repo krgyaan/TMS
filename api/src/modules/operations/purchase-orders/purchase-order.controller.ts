@@ -57,6 +57,16 @@ export class PurchaseOrderController {
         return this.service.listParties(type);
     }
 
+    @Get("parties/sellers")
+    listSellerOptions() {
+        return this.service.listSellerOptions();
+    }
+
+    @Get("parties/ship-to")
+    listShipToOptions() {
+        return this.service.listShipToOptions();
+    }
+
     @Get("next-number")
     getNextPONumber(@Query("projectName") projectName: string) {
         return this.service.generatePONumber(projectName);
